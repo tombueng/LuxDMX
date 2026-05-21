@@ -318,12 +318,16 @@ Open `http://lumigate.local` (or the IP shown in serial monitor at 115200 baud):
 - All 512 DMX channels as a color-coded grid (cyan = active)
 - Click any cell → slider appears → set value directly
 
-### 3. Config Reset
+### 3. Changing WiFi / Config Reset
 
-| Method | How |
+To move LumiGate to a different WiFi network, clear its stored credentials — it will reopen the setup portal on next boot.
+
+| Method | Steps |
 |---|---|
-| Web | `http://lumigate.local/reset` → button |
-| Hardware | Hold **BOOT** during power-on for 3 seconds |
+| **Web** (easiest) | Open `http://lumigate.local/reset` → click **Reset WiFi** → device reboots into AP mode |
+| **Hardware** | Power off → hold **BOOT** → power on → keep holding for 3 seconds → release → device reboots into AP mode |
+
+After reset, connect to the `DMX-Gateway` access point (no password) and follow the [First Setup](#1-config-portal) steps to join the new network.
 
 ---
 
