@@ -173,42 +173,57 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 ---
 
-## Quick Flash (pre-built binary)
+## Flashing Pre-built Firmware
 
-No toolchain needed. GitHub CI builds the firmware on every push and publishes it as the `latest` release.
+No toolchain needed. GitHub CI builds the firmware on every push to master.
 
-### Windows (PowerShell)
+**[Download latest release](https://github.com/tombueng/LumiGate/releases/tag/latest)** — includes `firmware.bin`, `bootloader.bin`, `partitions.bin`, `boot_app0.bin`.
+
+### Boot mode (required for all methods)
+
+This board has no auto-reset circuit, so you must enter download mode manually before flashing:
+
+1. Unplug USB
+2. Hold **BOOT** button on the ESP32
+3. Plug USB back in (keep holding BOOT)
+4. Release BOOT after ~1 second
+5. Run the flash command — the LED stays off while in download mode
+
+### Windows — one-liner (PowerShell)
+
+Downloads and runs [`flash.ps1`](flash.ps1), which installs Python + esptool automatically:
 
 ```powershell
-irm https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 | iex
+Set-ExecutionPolicy -Scope Process Bypass; irm https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 | iex
 ```
 
-Or download [`flash.ps1`](flash.ps1) manually and run it:
+Or save and run it manually:
 
 ```powershell
+# Download
+Invoke-WebRequest https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 -OutFile flash.ps1
+# Run
 Set-ExecutionPolicy -Scope Process Bypass
 .\flash.ps1
 ```
 
-The script will:
-1. Install Python 3 via `winget` if not present
-2. Install `esptool` via `pip`
-3. Download the latest firmware binaries from GitHub
-4. Let you select the COM port
-5. Walk you through the BOOT mode sequence and flash
+The script: installs Python 3 via `winget` if missing → installs `esptool` via pip → downloads the four firmware blobs from the latest GitHub release → lets you pick a COM port → guides you through boot mode → flashes.
 
 ### macOS / Linux
 
 ```bash
 pip install esptool
+
 REPO=tombueng/LumiGate
 for f in firmware.bin bootloader.bin partitions.bin boot_app0.bin; do
   curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
     | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
       print(next(a['browser_download_url'] for a in assets if a['name']=='$f'))")" -o $f
 done
+
+# Put ESP32 in boot mode first (see above), then:
 esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
-  --before no_reset --after hard_reset \
+  --before default_reset --after hard_reset \
   write_flash -z --flash_mode dio --flash_freq 80m \
   0x1000 bootloader.bin 0x8000 partitions.bin \
   0xe000 boot_app0.bin 0x10000 firmware.bin
