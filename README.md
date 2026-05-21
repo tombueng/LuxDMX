@@ -173,6 +173,51 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 ---
 
+## Quick Flash (pre-built binary)
+
+No toolchain needed. GitHub CI builds the firmware on every push and publishes it as the `latest` release.
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 | iex
+```
+
+Or download [`flash.ps1`](flash.ps1) manually and run it:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\flash.ps1
+```
+
+The script will:
+1. Install Python 3 via `winget` if not present
+2. Install `esptool` via `pip`
+3. Download the latest firmware binaries from GitHub
+4. Let you select the COM port
+5. Walk you through the BOOT mode sequence and flash
+
+### macOS / Linux
+
+```bash
+pip install esptool
+REPO=tombueng/LumiGate
+for f in firmware.bin bootloader.bin partitions.bin boot_app0.bin; do
+  curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
+    | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
+      print(next(a['browser_download_url'] for a in assets if a['name']=='$f'))")" -o $f
+done
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
+  --before no_reset --after hard_reset \
+  write_flash -z --flash_mode dio --flash_freq 80m \
+  0x1000 bootloader.bin 0x8000 partitions.bin \
+  0xe000 boot_app0.bin 0x10000 firmware.bin
+```
+
+> Replace `/dev/ttyUSB0` with your port (`/dev/tty.usbserial-*` on macOS).
+
+---
+
 ## Build & Flash
 
 ### Requirements

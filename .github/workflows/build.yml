@@ -1,0 +1,54 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('platformio.ini') }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build firmware
+        run: pio run
+
+      - name: Collect binaries
+        run: |
+          cp .pio/build/esp32dev/firmware.bin        firmware.bin
+          cp .pio/build/esp32dev/bootloader.bin      bootloader.bin
+          cp .pio/build/esp32dev/partitions.bin      partitions.bin
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+             boot_app0.bin
+
+      - name: Delete existing latest release
+        run: gh release delete latest --yes 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish rolling latest release
+        run: |
+          gh release create latest \
+            --title "Latest build ($(date -u '+%Y-%m-%d %H:%M UTC'))" \
+            --notes "Auto-built from commit ${{ github.sha }}. Use \`flash.ps1\` to flash." \
+            --prerelease \
+            firmware.bin bootloader.bin partitions.bin boot_app0.bin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
