@@ -1,191 +1,281 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en" data-bs-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LumiGate</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="/bootstrap.min.css">
+<style>
+:root {
+  --gh-bg:      #0d1117;
+  --gh-surface: #161b22;
+  --gh-border:  #30363d;
+  --gh-text:    #c9d1d9;
+  --gh-muted:   #8b949e;
+  --gh-accent:  #58a6ff;
+}
+[data-bs-theme="dark"] {
+  --bs-body-bg:            var(--gh-bg);
+  --bs-body-color:         var(--gh-text);
+  --bs-card-bg:            var(--gh-surface);
+  --bs-card-border-color:  var(--gh-border);
+  --bs-border-color:       var(--gh-border);
+  --bs-secondary-color:    var(--gh-muted);
+}
+body { background: var(--gh-bg); }
+
+.site-nav {
+  background: var(--gh-surface);
+  border-bottom: 1px solid var(--gh-border);
+  padding: 0.6rem 1rem;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+.site-nav .brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+.site-nav .brand img { height: 64px; }
+.site-nav .brand-text .name { font-size: 1.4rem; font-weight: 700; color: #fff; line-height: 1; }
+.site-nav .brand-text .sub  { font-size: 0.68rem; color: var(--gh-muted); margin-top: 2px; }
+.site-nav .nav-links { margin-left: auto; display: flex; gap: 0.4rem; }
+
+.card { background: var(--gh-surface); border-color: var(--gh-border); }
+.card-header { background: #1c2128; border-color: var(--gh-border); font-size: 0.85rem; }
+
+.stat-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gh-muted); }
+.stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.25; color: #fff; }
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 42px);
+  gap: 3px;
+}
+.ch {
+  width: 42px; height: 42px;
+  border-radius: 5px;
+  background: #1c2128;
+  border: 1px solid var(--gh-border);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .08s, border-color .1s;
+  position: relative;
+}
+.ch:hover { transform: scale(1.15); border-color: var(--gh-accent); z-index: 1; }
+.ch .ch-n { font-size: 0.52rem; color: var(--gh-muted); line-height: 1; }
+.ch .ch-v { font-size: 0.72rem; font-weight: 700; color: #fff; line-height: 1.2; }
+
+.form-check-input:checked { background-color: var(--gh-accent); border-color: var(--gh-accent); }
+
+/* Channel modal */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.75); z-index: 1040;
+  align-items: center; justify-content: center;
+}
+.modal-backdrop.show { display: flex; }
+.modal-card {
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-border);
+  border-radius: 10px;
+  padding: 1.4rem;
+  width: min(340px, 92vw);
+}
+.form-range::-webkit-slider-thumb { background: var(--gh-accent); }
+.form-range::-webkit-slider-runnable-track { background: #30363d; }
+
+#ws-badge { font-size: 0.72rem; }
+footer { border-color: var(--gh-border) !important; color: var(--gh-muted); font-size: 0.77rem; }
+footer a { color: var(--gh-muted); text-decoration: none; }
+footer a:hover { color: var(--gh-text); }
+</style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen font-mono text-sm">
-<nav class="bg-gray-900 border-b border-gray-800 px-4 py-3 flex flex-wrap items-center gap-4">
-  <img src="/logo.png" alt="LumiGate" class="h-8 w-8 rounded">
-  <a href="/" class="text-cyan-400 border-b border-cyan-400 pb-0.5">Status</a>
-  <a href="/config" class="text-gray-400 hover:text-cyan-400">Config</a>
-  <a href="/reset"  class="text-gray-400 hover:text-cyan-400">Reset</a>
-  <span class="ml-auto flex items-center gap-2">
-    <span id="ws-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
-    <span id="ws-lbl" class="text-xs text-gray-500">Offline</span>
-  </span>
+<body>
+
+<nav class="site-nav">
+  <a class="brand" href="/">
+    <img src="/logo.png" alt="LumiGate">
+    <div class="brand-text">
+      <div class="name">LumiGate</div>
+      <div class="sub">{{HOSTNAME}}.local &nbsp;&middot;&nbsp; {{IP}} &nbsp;&middot;&nbsp; Universe {{UNIVERSE}}</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="/" class="btn btn-primary btn-sm">Status</a>
+    <a href="/config" class="btn btn-outline-secondary btn-sm">Settings</a>
+    <a href="/reset" class="btn btn-outline-danger btn-sm">Reset WiFi</a>
+  </div>
 </nav>
-<main class="p-4 max-w-5xl mx-auto space-y-4">
 
-<!-- Stats -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-  <div class="bg-gray-800 rounded-lg p-3">
-    <div class="text-xs text-gray-400 mb-1">Framerate</div>
-    <div id="fps" class="text-xl text-cyan-400">– fps</div>
+<div class="container-fluid p-3">
+
+  <!-- Stats -->
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-sm-3">
+      <div class="card p-3 text-center">
+        <div class="stat-label">Art-Net FPS</div>
+        <div class="stat-value" id="fps">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="card p-3 text-center">
+        <div class="stat-label">WiFi Signal</div>
+        <div class="stat-value" id="rssi">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="card p-3 text-center">
+        <div class="stat-label">Free Heap</div>
+        <div class="stat-value" id="heap">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="card p-3 text-center">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value" id="uptime">—</div>
+      </div>
+    </div>
   </div>
-  <div class="bg-gray-800 rounded-lg p-3">
-    <div class="text-xs text-gray-400 mb-1">RSSI</div>
-    <div id="rssi" class="text-xl">–</div>
+
+  <!-- Controls -->
+  <div class="card mb-3">
+    <div class="card-body py-2 d-flex align-items-center flex-wrap gap-3">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="modeSwitch" role="switch"
+               onchange="setMode(this.checked)">
+        <label class="form-check-label" for="modeSwitch">Manual override</label>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="sendBlackout()">Blackout</button>
+      <span class="badge ms-auto" id="ws-badge" style="background:#30363d;padding:.35em .65em">Connecting…</span>
+    </div>
   </div>
-  <div class="bg-gray-800 rounded-lg p-3">
-    <div class="text-xs text-gray-400 mb-1">Uptime</div>
-    <div id="up" class="text-xl text-gray-300">–</div>
+
+  <!-- DMX Grid -->
+  <div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <span>DMX Channels 1–512</span>
+      <small class="text-secondary">click to edit</small>
+    </div>
+    <div class="card-body p-2">
+      <div id="grid"></div>
+    </div>
   </div>
-  <div class="bg-gray-800 rounded-lg p-3">
-    <div class="text-xs text-gray-400 mb-1">Heap free</div>
-    <div id="heap" class="text-xl text-gray-300">–</div>
+
+</div>
+
+<!-- Channel modal -->
+<div class="modal-backdrop" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <span class="fw-semibold" id="modal-title">Channel</span>
+      <button class="btn btn-sm btn-outline-secondary px-2 py-0" onclick="closeModal()">&times;</button>
+    </div>
+    <input type="range" class="form-range mb-1" id="ch-slider" min="0" max="255"
+           oninput="sliderMove(+this.value)">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <span class="text-secondary small" id="modal-pct">0%</span>
+      <span class="fw-bold" style="font-size:1.3rem" id="modal-val">0</span>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="setQuick(0)">Off</button>
+      <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="setQuick(128)">50%</button>
+      <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="setQuick(255)">Full</button>
+      <button class="btn btn-primary btn-sm flex-fill" onclick="closeModal()">Done</button>
+    </div>
   </div>
 </div>
 
-<!-- Info -->
-<div class="bg-gray-800 rounded-lg p-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-400">
-  <span>SSID: <span class="text-gray-200">{{SSID}}</span></span>
-  <span>IP: <span class="text-gray-200">{{IP}}</span></span>
-  <span>Universe: <span class="text-gray-200">{{UNIVERSE}}</span></span>
-  <span>Hostname: <span class="text-gray-200">{{HOSTNAME}}.local</span></span>
-</div>
-
-<!-- Controls -->
-<div class="bg-gray-800 rounded-lg p-3 flex flex-wrap items-center gap-3">
-  <button id="btn-mode"
-    onclick="toggleMode()"
-    class="px-3 py-1.5 rounded text-xs font-bold bg-gray-700 hover:bg-gray-600 text-gray-200">
-    Art-Net active
-  </button>
-  <button onclick="sendCmd({type:'blackout'})"
-    class="px-3 py-1.5 rounded text-xs font-bold bg-red-900 hover:bg-red-800 text-red-200">
-    Blackout
-  </button>
-  <span id="sel-label" class="text-xs text-gray-400 ml-2"></span>
-  <div id="ch-ctrl" class="hidden flex items-center gap-2 w-full mt-2">
-    <span id="ch-name" class="w-16 text-xs text-gray-300"></span>
-    <input id="ch-slider" type="range" min="0" max="255" value="0"
-      oninput="onSlider(this.value)"
-      class="flex-1 accent-cyan-400">
-    <span id="ch-val" class="w-8 text-right text-cyan-400">0</span>
-  </div>
-</div>
-
-<!-- DMX Grid -->
-<div class="bg-gray-800 rounded-lg p-3">
-  <div class="text-xs text-gray-400 mb-2">DMX channels 1–512
-    <span class="text-gray-600">· click to edit</span>
-  </div>
-  <div id="grid" style="display:grid;grid-template-columns:repeat(32,1fr);border-top:1px solid #374151;border-left:1px solid #374151"></div>
-</div>
-
-</main>
+<footer class="text-center py-3 mt-1 border-top">
+  &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
+  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LumiGate">LumiGate</a>
+  &nbsp;&mdash;&nbsp; MIT License
+</footer>
 
 <script>
-const N=512, cells=[], vals=new Uint8Array(512);
-const grid=document.getElementById('grid');
-for(let i=1;i<=N;i++){
-  const d=document.createElement('div');
-  d.style.cssText=[
-    'height:28px','background:#111827','cursor:pointer',
-    'border-right:1px solid #374151','border-bottom:1px solid #374151',
-    'display:flex','flex-direction:column','align-items:center',
-    'justify-content:center','gap:1px','overflow:hidden','position:relative'
-  ].join(';');
-  const cn=document.createElement('span');
-  cn.textContent=i;
-  cn.style.cssText='font-size:6px;color:#6b7280;line-height:1;pointer-events:none;user-select:none';
-  const vl=document.createElement('span');
-  vl.textContent='0';
-  vl.style.cssText='font-size:7px;color:#9ca3af;line-height:1;pointer-events:none;user-select:none';
-  d.appendChild(cn); d.appendChild(vl);
-  d.dataset.ch=i;
-  d.addEventListener('click',()=>selectCh(i));
-  grid.appendChild(d);
-  cells.push({el:d,vl});
+const dmx = new Uint8Array(512);
+let activeCh = 0, sock;
+
+// Build 512-cell grid
+const grid = document.getElementById('grid');
+for (let i = 1; i <= 512; i++) {
+  const el = document.createElement('div');
+  el.className = 'ch';
+  el.id = 'ch' + i;
+  el.innerHTML = '<span class="ch-n">' + i + '</span><span class="ch-v" id="v' + i + '">0</span>';
+  el.onclick = () => openModal(i);
+  grid.appendChild(el);
 }
 
-let manual=false, selCh=null;
-const slider=document.getElementById('ch-slider');
-const chVal =document.getElementById('ch-val');
-const chName=document.getElementById('ch-name');
-const chCtrl=document.getElementById('ch-ctrl');
-const btnMode=document.getElementById('btn-mode');
-
-function selectCh(i){
-  if(selCh) cells[selCh-1].el.style.outline='';
-  selCh=i;
-  cells[i-1].el.style.outline='2px solid #22d3ee';
-  chCtrl.classList.remove('hidden');
-  const v=vals[i-1];
-  slider.value=v; chVal.textContent=v;
-  chName.textContent='Ch '+i;
+function cellBg(v) {
+  if (v === 0) return '';
+  const t = v / 255;
+  const r = Math.round(28  + t * (88  - 28));
+  const g = Math.round(33  + t * (166 - 33));
+  const b = Math.round(40  + t * (255 - 40));
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
-function onSlider(v){
-  chVal.textContent=v;
-  if(selCh) sendCmd({type:'set',ch:selCh,val:parseInt(v)});
+function applyDmx(data) {
+  for (let i = 0; i < 512; i++) {
+    const v = data[i];
+    if (dmx[i] === v) continue;
+    dmx[i] = v;
+    const el = document.getElementById('ch' + (i + 1));
+    el.style.background = cellBg(v);
+    document.getElementById('v' + (i + 1)).textContent = v;
+    if (activeCh === i + 1) syncModal(v);
+  }
 }
 
-function toggleMode(){
-  manual=!manual;
-  sendCmd({type:'mode',manual});
-  btnMode.textContent=manual?'Manual active':'Art-Net active';
-  btnMode.className=manual
-    ?'px-3 py-1.5 rounded text-xs font-bold bg-cyan-900 hover:bg-cyan-800 text-cyan-200'
-    :'px-3 py-1.5 rounded text-xs font-bold bg-gray-700 hover:bg-gray-600 text-gray-200';
+// Modal
+function openModal(ch) {
+  activeCh = ch;
+  document.getElementById('modal-title').textContent = 'Channel ' + ch;
+  syncModal(dmx[ch - 1]);
+  document.getElementById('modal').classList.add('show');
 }
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+  activeCh = 0;
+}
+function syncModal(v) {
+  document.getElementById('ch-slider').value = v;
+  document.getElementById('modal-val').textContent = v;
+  document.getElementById('modal-pct').textContent = Math.round(v / 255 * 100) + '%';
+}
+function sliderMove(v) {
+  syncModal(v);
+  send({type: 'set', ch: activeCh, val: v});
+}
+function setQuick(v) { sliderMove(v); document.getElementById('ch-slider').value = v; }
+function setMode(m)   { send({type: 'mode', manual: m}); }
+function sendBlackout() { send({type: 'blackout'}); }
+function send(obj) { if (sock && sock.readyState === 1) sock.send(JSON.stringify(obj)); }
 
-let sock=null;
-function connect(){
-  sock=new WebSocket('ws://'+location.hostname+':81');
-  sock.binaryType='arraybuffer';
-  sock.onopen=()=>{
-    document.getElementById('ws-dot').className='w-2 h-2 rounded-full bg-green-400';
-    document.getElementById('ws-lbl').textContent='Live';
+// WebSocket
+function connect() {
+  sock = new WebSocket('ws://' + location.hostname + ':81/');
+  sock.binaryType = 'arraybuffer';
+  const badge = document.getElementById('ws-badge');
+  sock.onopen  = () => { badge.textContent = 'Live';    badge.style.background = '#238636'; };
+  sock.onclose = () => { badge.textContent = 'Offline'; badge.style.background = '#da3633'; setTimeout(connect, 2000); };
+  sock.onmessage = e => {
+    if (!(e.data instanceof ArrayBuffer)) return;
+    const v   = new DataView(e.data);
+    const fps = (v.getUint16(0) / 10).toFixed(1);
+    const rssi = v.getInt16(2);
+    const heap = v.getUint32(4);
+    const upS  = v.getUint32(8);
+    document.getElementById('fps').textContent    = fps;
+    const re = document.getElementById('rssi');
+    re.textContent = rssi + ' dBm';
+    re.style.color = rssi > -65 ? '#3fb950' : rssi > -80 ? '#e3b341' : '#f85149';
+    document.getElementById('heap').textContent   = (heap / 1024).toFixed(0) + ' KB';
+    const h = Math.floor(upS / 3600), m = Math.floor((upS % 3600) / 60), s = upS % 60;
+    document.getElementById('uptime').textContent =
+      (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + s + 's';
+    applyDmx(new Uint8Array(e.data, 12, 512));
   };
-  sock.onclose=()=>{
-    document.getElementById('ws-dot').className='w-2 h-2 rounded-full bg-red-500';
-    document.getElementById('ws-lbl').textContent='Offline';
-    setTimeout(connect,2000);
-  };
-  sock.onmessage=e=>{
-    if(!(e.data instanceof ArrayBuffer)) return;
-    const v=new DataView(e.data);
-    const fps =v.getUint16(0)/10;
-    const rssi=v.getInt16(2);
-    const heap=v.getUint32(4);
-    const upS =v.getUint32(8);
-    const ch  =new Uint8Array(e.data,12,512);
-    document.getElementById('fps').textContent=fps.toFixed(1)+' fps';
-    const rssiEl=document.getElementById('rssi');
-    rssiEl.textContent=rssi+' dBm';
-    rssiEl.className='text-xl '+(rssi>-70?'text-green-400':rssi>-85?'text-yellow-400':'text-red-400');
-    document.getElementById('heap').textContent=Math.round(heap/1024)+' KB';
-    const d=Math.floor(upS/86400),h=Math.floor((upS%86400)/3600),
-          m=Math.floor((upS%3600)/60),s=upS%60;
-    document.getElementById('up').textContent=
-      String(d).padStart(2,'0')+'d '+String(h).padStart(2,'0')+':'+
-      String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-    for(let i=0;i<512;i++){
-      const val=ch[i];
-      if(vals[i]===val) continue;
-      vals[i]=val;
-      const c=cells[i];
-      c.el.style.background=val>0?`rgba(34,211,238,${(val/255).toFixed(3)})`:'#111827';
-      c.vl.textContent=val;
-      c.vl.style.color=val>0?'#e5e7eb':'#6b7280';
-      if(selCh===i+1){slider.value=val;chVal.textContent=val;}
-    }
-  };
-}
-
-function sendCmd(obj){
-  if(sock&&sock.readyState===1) sock.send(JSON.stringify(obj));
 }
 connect();
 </script>
-<footer class="text-center text-gray-700 text-xs py-4 mt-6 border-t border-gray-800">
-  &copy; 2026 <a href="https://github.com/tombueng" class="hover:text-gray-400 underline">tombueng</a>
-  &nbsp;&mdash;&nbsp;
-  <a href="https://github.com/tombueng/LumiGate" class="hover:text-gray-400 underline">LumiGate on GitHub</a>
-  &nbsp;&mdash;&nbsp;MIT License
-</footer>
-</body></html>
+</body>
+</html>

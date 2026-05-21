@@ -23,6 +23,7 @@
 #include "generated/reset_html.h"
 #include "generated/reset_done_html.h"
 #include "generated/logo_png.h"
+#include "generated/bootstrap_min_css.h"
 
 // ---------------------------------------------------------------------------
 // Hardware
@@ -253,6 +254,11 @@ static void handleLogo() {
     http.send_P(200, "image/png", (const char*)LOGO_PNG, LOGO_PNG_LEN);
 }
 
+static void handleBootstrapCss() {
+    http.sendHeader("Cache-Control", "max-age=604800");
+    http.send_P(200, "text/css", (const char*)BOOTSTRAP_MIN_CSS, BOOTSTRAP_MIN_CSS_LEN);
+}
+
 // ---------------------------------------------------------------------------
 // WiFiManager
 // ---------------------------------------------------------------------------
@@ -342,7 +348,8 @@ void setup() {
     artnet.begin();
     Serial.printf("[ArtNet] universe %d\n", cfg.universe);
 
-    http.on("/logo.png", HTTP_GET,  handleLogo);
+    http.on("/logo.png",           HTTP_GET,  handleLogo);
+    http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
     http.on("/",         HTTP_GET,  handleRoot);
     http.on("/dmx.json", HTTP_GET,  handleDmxJson);
     http.on("/config",   HTTP_GET,  handleConfigGet);

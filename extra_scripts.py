@@ -1,6 +1,6 @@
 """
 LumiGate pre-build script.
-Converts src/pages/*.html and src/assets/*.png into C PROGMEM headers
+Converts src/pages/*.html and src/assets/*.{png,css} into C PROGMEM headers
 under src/generated/ — runs at script-load time (before compilation).
 """
 Import("env")
@@ -11,7 +11,7 @@ def escape_c(s: str) -> str:
 
 def html_to_header(path: pathlib.Path, out_dir: pathlib.Path):
     content = path.read_text(encoding="utf-8")
-    var = path.stem.upper().replace("-", "_") + "_HTML"
+    var = path.stem.upper().replace("-", "_").replace(".", "_") + "_HTML"
     lines = content.split("\n")
     body = "\n".join(f'    "{escape_c(l)}\\n"' for l in lines)
     h = f"// Auto-generated from {path.name} — do not edit\n"
@@ -20,16 +20,18 @@ def html_to_header(path: pathlib.Path, out_dir: pathlib.Path):
     out.write_text(h, encoding="utf-8")
     print(f"  [embed] {path.name} -> {out.name}  ({len(content)} chars)")
 
-def png_to_header(path: pathlib.Path, out_dir: pathlib.Path):
+def binary_to_header(path: pathlib.Path, out_dir: pathlib.Path, type_suffix: str):
     data = path.read_bytes()
-    var = path.stem.upper().replace("-", "_") + "_PNG"
+    safe = path.stem.upper().replace("-", "_").replace(".", "_")
+    var  = safe + "_" + type_suffix
     rows = ["  " + ", ".join(f"0x{b:02x}" for b in data[i:i+16]) + ","
             for i in range(0, len(data), 16)]
-    h = f"// Auto-generated from {path.name} — do not edit\n"
+    h  = f"// Auto-generated from {path.name} — do not edit\n"
     h += f"static const uint8_t {var}[] PROGMEM = {{\n"
     h += "\n".join(rows) + "\n};\n"
     h += f"static const size_t  {var}_LEN = {len(data)};\n"
-    out = out_dir / (path.stem + "_png.h")
+    out_name = path.stem.replace(".", "_") + "_" + type_suffix.lower() + ".h"
+    out = out_dir / out_name
     out.write_text(h, encoding="utf-8")
     print(f"  [embed] {path.name} -> {out.name}  ({len(data)} bytes)")
 
@@ -41,7 +43,9 @@ def generate():
     for f in sorted((root / "src" / "pages").glob("*.html")):
         html_to_header(f, gen_dir)
     for f in sorted((root / "src" / "assets").glob("*.png")):
-        png_to_header(f, gen_dir)
+        binary_to_header(f, gen_dir, "PNG")
+    for f in sorted((root / "src" / "assets").glob("*.css")):
+        binary_to_header(f, gen_dir, "CSS")
     print("LumiGate: done.")
 
 # Run immediately so headers exist before main.cpp is compiled

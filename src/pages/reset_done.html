@@ -1,12 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-bs-theme="dark">
 <head>
-<meta charset="utf-8">
-<script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LumiGate — WiFi Reset</title>
+<link rel="stylesheet" href="/bootstrap.min.css">
+<style>
+body { background: #0d1117; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.box { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 2.5rem; text-align: center; width: min(380px, 90vw); }
+</style>
 </head>
-<body class="bg-gray-950 text-gray-100 flex items-center justify-center h-screen font-mono">
-<div class="text-center space-y-3">
-  <div class="text-yellow-400 text-xl">WiFi credentials cleared.</div>
-  <div class="text-gray-400 text-sm">Restarting in AP mode...</div>
+<body>
+<div class="box">
+  <div style="font-size:2.5rem;margin-bottom:1rem">&#8635;</div>
+  <div class="fw-bold fs-5 mb-2 text-warning">WiFi credentials cleared</div>
+  <div class="text-secondary small">Restarting in AP mode&hellip;<br>Connect to <strong>DMX-Gateway</strong> to reconfigure.</div>
 </div>
-</body></html>
+</body>
+</html>

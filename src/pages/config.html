@@ -1,47 +1,105 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en" data-bs-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LumiGate – Config</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LumiGate — Settings</title>
+<link rel="stylesheet" href="/bootstrap.min.css">
+<style>
+:root {
+  --gh-bg:      #0d1117;
+  --gh-surface: #161b22;
+  --gh-border:  #30363d;
+  --gh-text:    #c9d1d9;
+  --gh-muted:   #8b949e;
+  --gh-accent:  #58a6ff;
+}
+[data-bs-theme="dark"] {
+  --bs-body-bg:           var(--gh-bg);
+  --bs-body-color:        var(--gh-text);
+  --bs-card-bg:           var(--gh-surface);
+  --bs-card-border-color: var(--gh-border);
+  --bs-border-color:      var(--gh-border);
+}
+body { background: var(--gh-bg); }
+.site-nav {
+  background: var(--gh-surface);
+  border-bottom: 1px solid var(--gh-border);
+  padding: 0.6rem 1rem;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+.site-nav .brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+.site-nav .brand img { height: 48px; }
+.site-nav .brand-text { font-size: 1.2rem; font-weight: 700; color: #fff; }
+.site-nav .nav-links { margin-left: auto; display: flex; gap: 0.4rem; }
+.card { background: var(--gh-surface); border-color: var(--gh-border); }
+.card-header { background: #1c2128; border-color: var(--gh-border); font-weight: 600; }
+.form-control, .form-select {
+  background: var(--gh-bg); border-color: var(--gh-border); color: var(--gh-text);
+}
+.form-control:focus {
+  background: var(--gh-bg); border-color: var(--gh-accent); color: var(--gh-text);
+  box-shadow: 0 0 0 .2rem rgba(88,166,255,.2);
+}
+.input-group-text { background: #1c2128; border-color: var(--gh-border); color: var(--gh-muted); }
+footer { border-color: var(--gh-border) !important; color: var(--gh-muted); font-size: 0.77rem; }
+footer a { color: var(--gh-muted); text-decoration: none; }
+footer a:hover { color: var(--gh-text); }
+</style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen font-mono text-sm">
-<nav class="bg-gray-900 border-b border-gray-800 px-4 py-3 flex flex-wrap items-center gap-4">
-  <img src="/logo.png" alt="LumiGate" class="h-8 w-8 rounded">
-  <a href="/" class="text-gray-400 hover:text-cyan-400">Status</a>
-  <a href="/config" class="text-cyan-400 border-b border-cyan-400">Config</a>
-  <a href="/reset"  class="text-gray-400 hover:text-cyan-400">Reset</a>
+<body>
+
+<nav class="site-nav">
+  <a class="brand" href="/">
+    <img src="/logo.png" alt="LumiGate">
+    <span class="brand-text">LumiGate</span>
+  </a>
+  <div class="nav-links">
+    <a href="/" class="btn btn-outline-secondary btn-sm">Status</a>
+    <a href="/config" class="btn btn-primary btn-sm">Settings</a>
+    <a href="/reset" class="btn btn-outline-danger btn-sm">Reset WiFi</a>
+  </div>
 </nav>
-<main class="p-4 max-w-md mx-auto">
-<div class="bg-gray-800 rounded-lg p-5 space-y-4">
-<h2 class="text-cyan-400 font-bold">Configuration</h2>
-<form method="POST" action="/config" class="space-y-3">
-<label class="block">
-  <span class="text-xs text-gray-400">Art-Net Universe (0–15)</span>
-  <input name="universe" type="number" min="0" max="15" value="{{UNIVERSE}}"
-    class="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-cyan-500">
-</label>
-<label class="block">
-  <span class="text-xs text-gray-400">Hostname (without .local)</span>
-  <input name="hostname" type="text" maxlength="32" value="{{HOSTNAME}}"
-    class="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-cyan-500">
-</label>
-<label class="block">
-  <span class="text-xs text-gray-400">OTA Password</span>
-  <input name="otapw" type="password" maxlength="32" value="{{OTAPW}}"
-    class="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-cyan-500">
-</label>
-<button type="submit"
-  class="w-full py-2 rounded bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-bold">
-  Save &amp; Restart
-</button>
-</form>
+
+<div class="container py-4" style="max-width:520px">
+  <form method="POST" action="/config">
+
+    <div class="card mb-3">
+      <div class="card-header">Art-Net</div>
+      <div class="card-body">
+        <label class="form-label text-secondary small mb-1">Universe <span class="text-muted">(0–15)</span></label>
+        <input class="form-control" type="number" name="universe" min="0" max="15" value="{{UNIVERSE}}">
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header">Device</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label text-secondary small mb-1">Hostname</label>
+          <div class="input-group">
+            <input class="form-control" type="text" name="hostname" maxlength="32" value="{{HOSTNAME}}">
+            <span class="input-group-text">.local</span>
+          </div>
+          <div class="form-text">http://{{HOSTNAME}}.local</div>
+        </div>
+        <div>
+          <label class="form-label text-secondary small mb-1">OTA Password</label>
+          <input class="form-control" type="text" name="otapw" maxlength="32" value="{{OTAPW}}">
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100">Save &amp; Restart</button>
+
+  </form>
 </div>
-<footer class="text-center text-gray-700 text-xs py-4 mt-6 border-t border-gray-800">
-  &copy; 2026 <a href="https://github.com/tombueng" class="hover:text-gray-400 underline">tombueng</a>
-  &nbsp;&mdash;&nbsp;
-  <a href="https://github.com/tombueng/LumiGate" class="hover:text-gray-400 underline">LumiGate on GitHub</a>
-  &nbsp;&mdash;&nbsp;MIT License
+
+<footer class="text-center py-3 mt-1 border-top">
+  &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
+  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LumiGate">LumiGate</a>
+  &nbsp;&mdash;&nbsp; MIT License
 </footer>
-</main></body></html>
+
+</body>
+</html>

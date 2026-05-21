@@ -1,34 +1,66 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en" data-bs-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LumiGate – Reset</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LumiGate — Reset WiFi</title>
+<link rel="stylesheet" href="/bootstrap.min.css">
+<style>
+:root { --gh-bg:#0d1117; --gh-surface:#161b22; --gh-border:#30363d; --gh-text:#c9d1d9; --gh-muted:#8b949e; }
+[data-bs-theme="dark"] {
+  --bs-body-bg: var(--gh-bg); --bs-body-color: var(--gh-text);
+  --bs-card-bg: var(--gh-surface); --bs-card-border-color: var(--gh-border);
+}
+body { background: var(--gh-bg); }
+.site-nav {
+  background: var(--gh-surface); border-bottom: 1px solid var(--gh-border);
+  padding: 0.6rem 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+.brand img { height: 48px; }
+.brand-text { font-size: 1.2rem; font-weight: 700; color: #fff; }
+.nav-links { margin-left: auto; display: flex; gap: 0.4rem; }
+.card { background: var(--gh-surface); border-color: var(--gh-border); }
+footer { border-color: var(--gh-border) !important; color: var(--gh-muted); font-size: 0.77rem; }
+footer a { color: var(--gh-muted); text-decoration: none; }
+footer a:hover { color: var(--gh-text); }
+</style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen font-mono text-sm">
-<nav class="bg-gray-900 border-b border-gray-800 px-4 py-3 flex flex-wrap items-center gap-4">
-  <img src="/logo.png" alt="LumiGate" class="h-8 w-8 rounded">
-  <a href="/" class="text-gray-400 hover:text-cyan-400">Status</a>
-  <a href="/config" class="text-gray-400 hover:text-cyan-400">Config</a>
-  <a href="/reset"  class="text-cyan-400 border-b border-cyan-400">Reset</a>
+<body>
+
+<nav class="site-nav">
+  <a class="brand" href="/">
+    <img src="/logo.png" alt="LumiGate">
+    <span class="brand-text">LumiGate</span>
+  </a>
+  <div class="nav-links">
+    <a href="/" class="btn btn-outline-secondary btn-sm">Status</a>
+    <a href="/config" class="btn btn-outline-secondary btn-sm">Settings</a>
+    <a href="/reset" class="btn btn-primary btn-sm">Reset WiFi</a>
+  </div>
 </nav>
-<main class="p-4 max-w-md mx-auto">
-<div class="bg-gray-800 rounded-lg p-5 space-y-4">
-<h2 class="text-red-400 font-bold">WiFi Reset</h2>
-<p class="text-gray-400 text-xs">Clears WiFi credentials and opens the config portal.
-Other settings are preserved.</p>
-<form method="POST" action="/reset">
-<button type="submit"
-  class="w-full py-2 rounded bg-red-700 hover:bg-red-600 text-white font-bold">
-  Reset now
-</button>
-</form>
+
+<div class="container py-5" style="max-width:460px">
+  <div class="card border-danger">
+    <div class="card-body text-center py-5">
+      <div class="mb-3" style="font-size:3rem;line-height:1">&#9888;</div>
+      <h5 class="fw-bold mb-2">Reset WiFi credentials</h5>
+      <p class="text-secondary mb-4">
+        Erases the stored WiFi password and reboots into the setup access point
+        <strong>DMX-Gateway</strong>. Art-Net universe and other settings are preserved.
+      </p>
+      <form method="POST" action="/reset">
+        <button type="submit" class="btn btn-danger px-5">Reset &amp; Reboot</button>
+      </form>
+    </div>
+  </div>
 </div>
-<footer class="text-center text-gray-700 text-xs py-4 mt-6 border-t border-gray-800">
-  &copy; 2026 <a href="https://github.com/tombueng" class="hover:text-gray-400 underline">tombueng</a>
-  &nbsp;&mdash;&nbsp;
-  <a href="https://github.com/tombueng/LumiGate" class="hover:text-gray-400 underline">LumiGate on GitHub</a>
-  &nbsp;&mdash;&nbsp;MIT License
+
+<footer class="text-center py-3 border-top">
+  &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
+  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LumiGate">LumiGate</a>
+  &nbsp;&mdash;&nbsp; MIT License
 </footer>
-</main></body></html>
+
+</body>
+</html>
