@@ -6,45 +6,26 @@
 <title>LumiGate — Settings</title>
 <link rel="stylesheet" href="/bootstrap.min.css">
 <style>
-:root {
-  --gh-bg:      #0d1117;
-  --gh-surface: #161b22;
-  --gh-border:  #30363d;
-  --gh-text:    #c9d1d9;
-  --gh-muted:   #8b949e;
-  --gh-accent:  #58a6ff;
-}
+:root { --gh-bg:#0d1117; --gh-surface:#161b22; --gh-border:#30363d; --gh-text:#c9d1d9; --gh-muted:#8b949e; --gh-accent:#58a6ff; }
 [data-bs-theme="dark"] {
-  --bs-body-bg:           var(--gh-bg);
-  --bs-body-color:        var(--gh-text);
-  --bs-card-bg:           var(--gh-surface);
-  --bs-card-border-color: var(--gh-border);
-  --bs-border-color:      var(--gh-border);
+  --bs-body-bg: var(--gh-bg); --bs-body-color: var(--gh-text);
+  --bs-card-bg: var(--gh-surface); --bs-card-border-color: var(--gh-border);
+  --bs-border-color: var(--gh-border);
 }
 body { background: var(--gh-bg); }
-.site-nav {
-  background: var(--gh-surface);
-  border-bottom: 1px solid var(--gh-border);
-  padding: 0.6rem 1rem;
-  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-}
-.site-nav .brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
-.site-nav .brand img { height: 48px; }
-.site-nav .brand-text { font-size: 1.2rem; font-weight: 700; color: #fff; }
-.site-nav .nav-links { margin-left: auto; display: flex; gap: 0.4rem; }
-.card { background: var(--gh-surface); border-color: var(--gh-border); }
-.card-header { background: #1c2128; border-color: var(--gh-border); font-weight: 600; }
-.form-control, .form-select {
-  background: var(--gh-bg); border-color: var(--gh-border); color: var(--gh-text);
-}
-.form-control:focus {
-  background: var(--gh-bg); border-color: var(--gh-accent); color: var(--gh-text);
-  box-shadow: 0 0 0 .2rem rgba(88,166,255,.2);
-}
-.input-group-text { background: #1c2128; border-color: var(--gh-border); color: var(--gh-muted); }
-footer { border-color: var(--gh-border) !important; color: var(--gh-muted); font-size: 0.77rem; }
-footer a { color: var(--gh-muted); text-decoration: none; }
-footer a:hover { color: var(--gh-text); }
+.site-nav { background:var(--gh-surface); border-bottom:1px solid var(--gh-border); padding:.6rem 1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+.brand { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+.brand img { height:48px; }
+.brand-text { font-size:1.2rem; font-weight:700; color:#fff; }
+.nav-links { margin-left:auto; display:flex; gap:.4rem; }
+.card { background:var(--gh-surface); border-color:var(--gh-border); }
+.card-header { background:#1c2128; border-color:var(--gh-border); font-weight:600; }
+.form-control,.form-select { background:var(--gh-bg); border-color:var(--gh-border); color:var(--gh-text); }
+.form-control:focus { background:var(--gh-bg); border-color:var(--gh-accent); color:var(--gh-text); box-shadow:0 0 0 .2rem rgba(88,166,255,.2); }
+.input-group-text { background:#1c2128; border-color:var(--gh-border); color:var(--gh-muted); }
+footer { border-color:var(--gh-border)!important; color:var(--gh-muted); font-size:.77rem; }
+footer a { color:var(--gh-muted); text-decoration:none; }
+footer a:hover { color:var(--gh-text); }
 </style>
 </head>
 <body>
@@ -57,13 +38,13 @@ footer a:hover { color: var(--gh-text); }
   <div class="nav-links">
     <a href="/" class="btn btn-outline-secondary btn-sm">Status</a>
     <a href="/config" class="btn btn-primary btn-sm">Settings</a>
-    <a href="/reset" class="btn btn-outline-danger btn-sm">Reset WiFi</a>
   </div>
 </nav>
 
-<div class="container py-4" style="max-width:520px">
-  <form method="POST" action="/config">
+<div class="container py-4" style="max-width:540px">
 
+  <!-- Art-Net + Device config form -->
+  <form method="POST" action="/config">
     <div class="card mb-3">
       <div class="card-header">Art-Net</div>
       <div class="card-body">
@@ -72,7 +53,7 @@ footer a:hover { color: var(--gh-text); }
       </div>
     </div>
 
-    <div class="card mb-4">
+    <div class="card mb-3">
       <div class="card-header">Device</div>
       <div class="card-body">
         <div class="mb-3">
@@ -90,12 +71,73 @@ footer a:hover { color: var(--gh-text); }
       </div>
     </div>
 
-    <button type="submit" class="btn btn-primary w-100">Save &amp; Restart</button>
-
+    <button type="submit" class="btn btn-primary w-100 mb-4">Save &amp; Restart</button>
   </form>
+
+  <!-- Firmware OTA -->
+  <div class="card mb-3">
+    <div class="card-header">Firmware Update</div>
+    <div class="card-body">
+
+      <div class="mb-4">
+        <div class="fw-semibold small mb-1">Update from GitHub</div>
+        <p class="text-secondary small mb-2">
+          Downloads the latest release from
+          <a href="https://github.com/tombueng/LumiGate/releases/tag/latest" target="_blank" class="text-secondary">GitHub</a>
+          and installs it. The device reboots automatically when done.
+        </p>
+        <form method="POST" action="/ota/github">
+          <button type="submit" class="btn btn-outline-primary btn-sm">
+            &#8635;&nbsp; Update from GitHub
+          </button>
+        </form>
+      </div>
+
+      <hr style="border-color:#30363d">
+
+      <div>
+        <div class="fw-semibold small mb-1">Manual upload</div>
+        <p class="text-secondary small mb-2">Flash a local <code>firmware.bin</code> file directly.</p>
+        <form method="POST" action="/ota/upload" enctype="multipart/form-data"
+              class="d-flex gap-2 align-items-center flex-wrap">
+          <input type="file" name="firmware" accept=".bin"
+                 class="form-control form-control-sm" style="max-width:280px"
+                 onchange="document.getElementById('upload-btn').disabled = !this.files.length">
+          <button type="submit" class="btn btn-outline-secondary btn-sm" id="upload-btn" disabled>
+            Upload &amp; Flash
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- WiFi Reset — danger zone -->
+  <div class="card border-danger mt-2">
+    <div class="card-header" style="color:#f85149;background:#1c1014;border-color:#6e1a1a">Danger Zone</div>
+    <div class="card-body">
+      <p class="text-secondary small mb-3">
+        Erases the stored WiFi password and reboots into setup AP mode
+        (<strong>DMX-Gateway</strong>). Art-Net universe and other settings are preserved.
+      </p>
+      <div class="form-check mb-3">
+        <input class="form-check-input border-danger" type="checkbox" id="confirm-reset"
+               onchange="document.getElementById('reset-btn').disabled = !this.checked">
+        <label class="form-check-label small" for="confirm-reset">
+          I understand this will disconnect the device from WiFi
+        </label>
+      </div>
+      <form method="POST" action="/reset">
+        <button type="submit" class="btn btn-outline-danger btn-sm" id="reset-btn" disabled>
+          Reset WiFi &amp; Reboot
+        </button>
+      </form>
+    </div>
+  </div>
+
 </div>
 
-<footer class="text-center py-3 mt-1 border-top">
+<footer class="text-center py-3 mt-2 border-top">
   &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
   &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LumiGate">LumiGate</a>
   &nbsp;&mdash;&nbsp; MIT License

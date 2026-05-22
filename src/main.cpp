@@ -13,6 +13,9 @@
 #include <WebSocketsServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
+#include <WiFiClientSecure.h>
+#include <HTTPUpdate.h>
+#include <Update.h>
 #include <ArtnetWifi.h>
 #include <esp_dmx.h>
 
@@ -22,6 +25,8 @@
 #include "generated/config_saved_html.h"
 #include "generated/reset_html.h"
 #include "generated/reset_done_html.h"
+#include "generated/ota_progress_html.h"
+#include "generated/ota_done_html.h"
 #include "generated/logo_png.h"
 #include "generated/bootstrap_min_css.h"
 
@@ -64,7 +69,8 @@ static uint32_t startMs      = 0;
 static bool     dmxReady     = false;
 static bool     manualMode   = false;
 static uint32_t lastWsPush   = 0;
-static uint32_t lastArtNetMs = 0;
+static uint32_t lastArtNetMs   = 0;
+static bool     pendingGithubOta = false;
 
 // Binary WS frame: fps(2) rssi(2) heap(4) uptime(4) dmx(512) = 524 bytes
 static uint8_t wsBuf[524];
@@ -260,6 +266,60 @@ static void handleBootstrapCss() {
 }
 
 // ---------------------------------------------------------------------------
+// OTA handlers
+// ---------------------------------------------------------------------------
+static void doGithubOta() {
+    Serial.println("[OTA] Starting GitHub update...");
+    dmxReady = false;
+    WiFiClientSecure client;
+    client.setInsecure();
+    httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+    httpUpdate.rebootOnUpdate(true);
+    t_httpUpdate_return ret = httpUpdate.update(
+        client,
+        "https://github.com/tombueng/LumiGate/releases/download/latest/firmware.bin"
+    );
+    // Only reached on failure
+    Serial.printf("[OTA] Failed (%d): %s\n",
+        httpUpdate.getLastError(),
+        httpUpdate.getLastErrorString().c_str());
+    dmxReady = true;
+    delay(2000);
+    ESP.restart();
+}
+
+static void handleOtaGithub() {
+    http.send(200, "text/html", FPSTR(OTA_PROGRESS_HTML));
+    pendingGithubOta = true;
+}
+
+static void handleOtaUploadDone() {
+    bool ok = !Update.hasError();
+    String p = FPSTR(OTA_DONE_HTML);
+    p.replace("{{OTA_ICON}}",  ok ? "&#10003;" : "&#10007;");
+    p.replace("{{OTA_CLASS}}", ok ? "text-success" : "text-danger");
+    p.replace("{{OTA_TITLE}}", ok ? "Firmware updated" : "Update failed");
+    p.replace("{{OTA_MSG}}",   ok ? "Rebooting&hellip;" :
+                                    String("Error: ") + Update.errorString());
+    http.send(200, "text/html", p);
+    if (ok) { delay(500); ESP.restart(); }
+}
+
+static void handleOtaUploadChunk() {
+    HTTPUpload& up = http.upload();
+    if (up.status == UPLOAD_FILE_START) {
+        Serial.printf("[OTA] Upload: %s\n", up.filename.c_str());
+        dmxReady = false;
+        Update.begin(UPDATE_SIZE_UNKNOWN);
+    } else if (up.status == UPLOAD_FILE_WRITE) {
+        Update.write(up.buf, up.currentSize);
+    } else if (up.status == UPLOAD_FILE_END) {
+        Update.end(true);
+        Serial.printf("[OTA] Upload done: %u bytes\n", up.totalSize);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // WiFiManager
 // ---------------------------------------------------------------------------
 static bool wm_shouldSave = false;
@@ -350,12 +410,14 @@ void setup() {
 
     http.on("/logo.png",           HTTP_GET,  handleLogo);
     http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
-    http.on("/",         HTTP_GET,  handleRoot);
-    http.on("/dmx.json", HTTP_GET,  handleDmxJson);
-    http.on("/config",   HTTP_GET,  handleConfigGet);
-    http.on("/config",   HTTP_POST, handleConfigPost);
-    http.on("/reset",    HTTP_GET,  handleResetGet);
-    http.on("/reset",    HTTP_POST, handleResetPost);
+    http.on("/",                  HTTP_GET,  handleRoot);
+    http.on("/dmx.json",          HTTP_GET,  handleDmxJson);
+    http.on("/config",            HTTP_GET,  handleConfigGet);
+    http.on("/config",            HTTP_POST, handleConfigPost);
+    http.on("/reset",             HTTP_GET,  handleResetGet);
+    http.on("/reset",             HTTP_POST, handleResetPost);
+    http.on("/ota/github",        HTTP_POST, handleOtaGithub);
+    http.on("/ota/upload",        HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     http.begin();
 
     ws.begin();
@@ -386,5 +448,10 @@ void loop() {
     if (now - lastWsPush >= 100) {
         wsPush();
         lastWsPush = now;
+    }
+
+    if (pendingGithubOta) {
+        pendingGithubOta = false;
+        doGithubOta();
     }
 }

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LumiGate — OTA</title>
+<link rel="stylesheet" href="/bootstrap.min.css">
+<style>
+body { background:#0d1117; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+.box { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:2.5rem; text-align:center; width:min(400px,92vw); }
+</style>
+</head>
+<body>
+<div class="box">
+  <div style="font-size:2.5rem;margin-bottom:1rem">{{OTA_ICON}}</div>
+  <div class="fw-bold fs-5 mb-2 {{OTA_CLASS}}">{{OTA_TITLE}}</div>
+  <div class="text-secondary small">{{OTA_MSG}}</div>
+  <a href="/" class="btn btn-outline-secondary btn-sm mt-4">Back to status</a>
+</div>
+</body>
+</html>

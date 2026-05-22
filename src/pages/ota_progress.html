@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LumiGate — Updating</title>
+<link rel="stylesheet" href="/bootstrap.min.css">
+<style>
+body { background:#0d1117; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+.box { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:2.5rem; text-align:center; width:min(420px,92vw); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { display:inline-block; width:2.5rem; height:2.5rem; border:3px solid #30363d; border-top-color:#58a6ff; border-radius:50%; animation:spin .8s linear infinite; margin-bottom:1.25rem; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="spinner" id="spin"></div>
+  <div class="fw-bold fs-5 mb-2" id="title">Downloading update&hellip;</div>
+  <div class="text-secondary small" id="sub">Connecting to GitHub and installing firmware.<br>The device will reboot automatically.</div>
+</div>
+<script>
+var phase = 0;
+var titles = ['Downloading update…', 'Installing firmware…', 'Rebooting…', 'Waiting for device…'];
+var subs   = [
+  'Connecting to GitHub and installing firmware.<br>The device will reboot automatically.',
+  'Writing new firmware to flash.',
+  'Applying update and restarting.',
+  'Trying to reconnect&hellip;'
+];
+function next() {
+  phase = Math.min(phase + 1, titles.length - 1);
+  document.getElementById('title').textContent = titles[phase];
+  document.getElementById('sub').innerHTML = subs[phase];
+}
+setTimeout(next, 8000);
+setTimeout(next, 20000);
+setTimeout(next, 30000);
+setTimeout(function poll() {
+  fetch('/').then(function(r) {
+    if (r.ok) { location.href = '/'; } else { setTimeout(poll, 2000); }
+  }).catch(function() { setTimeout(poll, 2000); });
+}, 32000);
+</script>
+</body>
+</html>
