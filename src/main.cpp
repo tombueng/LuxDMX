@@ -680,7 +680,7 @@ static void wmSaveCallback() { wm_shouldSave = true; }
 static void startWiFiManager(bool forcePortal) {
     WiFiManager wm;
     wm.setSaveConfigCallback(wmSaveCallback);
-    wm.setConnectTimeout(15);
+    wm.setConnectTimeout(60);
     wm.setConfigPortalTimeout(180);
     snprintf(wm_universeStr, sizeof(wm_universeStr), "%d", cfg.universe);
     WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-15)", wm_universeStr, 3);
