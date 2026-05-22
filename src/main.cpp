@@ -45,7 +45,6 @@ static constexpr dmx_port_t DMX_PORT    = DMX_NUM_1;
 static constexpr int        BOOT_PIN    = 0;
 static constexpr uint32_t   HOLD_MS     = 3000;
 
-// Compile-time defaults (overridden by NVS config at runtime)
 #ifndef DEF_LED_PIN
 #define DEF_LED_PIN  2
 #endif
@@ -59,9 +58,43 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 static const char* DEF_HOSTNAME = "dmx-gateway";
 static const char* DEF_OTA_PW   = "dmxota";
 static constexpr int DEF_UNIVERSE = 0;
-static constexpr int DEF_PROTOCOL = 0;   // 0=ArtNet, 1=sACN, 2=Both
+static constexpr int DEF_PROTOCOL = 2;
 static const char* PREF_NS = "dmxgw";
 static const char* AP_SSID = "DMX-Gateway";
+
+// ---------------------------------------------------------------------------
+// Sender tracking
+// ---------------------------------------------------------------------------
+static constexpr int MAX_SENDERS = 8;
+
+struct Sender {
+    uint32_t ip;       // 0 = empty slot
+    uint8_t  proto;    // 0=ArtNet, 1=sACN
+    uint32_t lastMs;
+    uint32_t winMs;    // fps window start
+    uint16_t winCnt;
+    float    fps;
+};
+static Sender senders[MAX_SENDERS] = {};
+
+// ---------------------------------------------------------------------------
+// Change log
+// ---------------------------------------------------------------------------
+static constexpr int LOG_SIZE = 50;
+static constexpr int LOG_TOP  = 6;   // top changed channels stored per entry
+
+struct LogEntry {
+    uint32_t ms;
+    uint32_t ip;
+    uint8_t  proto;
+    uint8_t  topN;    // valid entries in top[]
+    uint16_t total;   // total channels changed
+    struct { uint16_t ch; uint8_t val; } top[LOG_TOP];
+};
+static LogEntry dmxLog[LOG_SIZE] = {};
+static uint8_t  logHead  = 0;
+static uint8_t  logCount = 0;
+static uint32_t lastLogMs = 0;
 
 // ---------------------------------------------------------------------------
 // Global objects
@@ -71,6 +104,7 @@ WebServer        http(80);
 WebSocketsServer ws(81);
 ArtnetWifi       artnet;
 static WiFiUDP   sacnUdp;
+static Adafruit_NeoPixel neoPixel(1, 0, NEO_GRB + NEO_KHZ800);
 
 // ---------------------------------------------------------------------------
 // Runtime state
@@ -79,32 +113,31 @@ static uint8_t  dmxBuf[DMX_PACKET_SIZE] = {0};
 static uint32_t lastFrameMs  = 0;
 static uint32_t frameCount   = 0;
 static float    fps          = 0.0f;
+static float    jitterMs     = 0.0f;
+static uint32_t prevFrameMs  = 0;
 static uint32_t startMs      = 0;
 static bool     dmxReady     = false;
 static bool     manualMode   = false;
 static uint32_t lastWsPush   = 0;
-static uint32_t lastDmxMs    = 0;   // last received frame (any protocol)
+static uint32_t lastDmxMs    = 0;
 static bool     pendingGithubOta = false;
 static String   latestVersion   = "";
 static bool     updateAvailable = false;
 
-// Binary WS frame: fps(2) rssi(2) heap(4) uptime(4) dmx(512) = 524 bytes
-static uint8_t wsBuf[524];
+// WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512) = 528
+static uint8_t wsBuf[528];
 
-// sACN receive buffer — 126-byte header + 512 DMX bytes
+// sACN receive buffer
 static uint8_t sacnBuf[638];
 
 struct Config {
     int    universe;
     String hostname;
     String otaPassword;
-    int    protocol;   // 0=ArtNet, 1=sACN, 2=Both
-    int    ledPin;     // GPIO pin for status LED
-    int    ledType;    // 0=disabled, 1=plain GPIO, 2=WS2812 RGB
+    int    protocol;
+    int    ledPin;
+    int    ledType;
 } cfg;
-
-// Single-pixel NeoPixel instance; re-initialised when ledPin/ledType change
-static Adafruit_NeoPixel neoPixel(1, 0, NEO_GRB + NEO_KHZ800);
 
 // ---------------------------------------------------------------------------
 // Config persistence
@@ -132,9 +165,8 @@ static void saveConfig() {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// LED helpers
 // ---------------------------------------------------------------------------
-// LED status colours for WS2812: off / green (active) / amber (idle) / red (no WiFi)
 static constexpr uint32_t NEO_OFF   = 0x000000;
 static constexpr uint32_t NEO_GREEN = 0x002200;
 static constexpr uint32_t NEO_AMBER = 0x221000;
@@ -152,17 +184,19 @@ static void initLed() {
     }
 }
 
-// colour is used for WS2812; on/off maps: on=green, off=off
 static void setLedColor(uint32_t neoColor, bool gpioOn) {
-    if (cfg.ledType == 1 && cfg.ledPin >= 0) {
+    if (cfg.ledType == 1 && cfg.ledPin >= 0)
         digitalWrite(cfg.ledPin, gpioOn ? HIGH : LOW);
-    } else if (cfg.ledType == 2 && cfg.ledPin >= 0) {
+    else if (cfg.ledType == 2 && cfg.ledPin >= 0) {
         neoPixel.setPixelColor(0, neoColor);
         neoPixel.show();
     }
 }
 static void setLed(bool on) { setLedColor(on ? NEO_GREEN : NEO_OFF, on); }
 
+// ---------------------------------------------------------------------------
+// General helpers
+// ---------------------------------------------------------------------------
 static uint32_t uptimeSec() { return (millis() - startMs) / 1000; }
 
 static String uptimeStr() {
@@ -170,6 +204,13 @@ static String uptimeStr() {
     char buf[32];
     snprintf(buf, sizeof(buf), "%02ud %02u:%02u:%02u",
              s/86400, (s%86400)/3600, (s%3600)/60, s%60);
+    return String(buf);
+}
+
+static String ipStr(uint32_t ip) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%u.%u.%u.%u",
+             ip & 0xFF, (ip>>8)&0xFF, (ip>>16)&0xFF, (ip>>24)&0xFF);
     return String(buf);
 }
 
@@ -181,22 +222,101 @@ static void sendDmx() {
 }
 
 // ---------------------------------------------------------------------------
-// WebSocket push (binary)
+// Sender tracking
+// ---------------------------------------------------------------------------
+static void updateSender(uint32_t ip, uint8_t proto) {
+    uint32_t now = millis();
+    for (int i = 0; i < MAX_SENDERS; i++) {
+        if (senders[i].ip == ip && senders[i].proto == proto) {
+            senders[i].lastMs = now;
+            senders[i].winCnt++;
+            if (now - senders[i].winMs >= 1000) {
+                senders[i].fps   = (float)senders[i].winCnt * 1000.0f
+                                   / (float)(now - senders[i].winMs);
+                senders[i].winCnt = 0;
+                senders[i].winMs  = now;
+            }
+            return;
+        }
+    }
+    for (int i = 0; i < MAX_SENDERS; i++) {
+        if (senders[i].ip == 0) {
+            senders[i] = {ip, proto, now, now, 0, 0.0f};
+            Serial.printf("[SND] new sender %s proto=%d\n", ipStr(ip).c_str(), proto);
+            return;
+        }
+    }
+    // evict least-recently-seen
+    int oldest = 0;
+    for (int i = 1; i < MAX_SENDERS; i++)
+        if (senders[i].lastMs < senders[oldest].lastMs) oldest = i;
+    senders[oldest] = {ip, proto, now, now, 0, 0.0f};
+}
+
+static uint8_t activeSenderCount() {
+    uint32_t now = millis();
+    uint8_t n = 0;
+    for (int i = 0; i < MAX_SENDERS; i++)
+        if (senders[i].ip != 0 && now - senders[i].lastMs < 5000) n++;
+    return n;
+}
+
+static bool hasConflict() { return activeSenderCount() > 1; }
+
+// ---------------------------------------------------------------------------
+// Change log
+// ---------------------------------------------------------------------------
+static void maybeLog(const uint8_t* data, uint16_t len, uint32_t ip, uint8_t proto) {
+    uint32_t now = millis();
+    if (now - lastLogMs < 200) return;
+
+    LogEntry e;
+    e.ms    = now;
+    e.ip    = ip;
+    e.proto = proto;
+    e.total = 0;
+    e.topN  = 0;
+    uint16_t lim = len < 512 ? len : 512;
+    for (int i = 0; i < lim; i++) {
+        if (data[i] != dmxBuf[i + 1]) {
+            e.total++;
+            if (e.topN < LOG_TOP) {
+                e.top[e.topN].ch  = (uint16_t)(i + 1);
+                e.top[e.topN].val = data[i];
+                e.topN++;
+            }
+        }
+    }
+    if (e.total == 0) return;
+
+    dmxLog[logHead] = e;
+    logHead  = (logHead + 1) % LOG_SIZE;
+    if (logCount < LOG_SIZE) logCount++;
+    lastLogMs = now;
+}
+
+// ---------------------------------------------------------------------------
+// WebSocket push (binary, 528 bytes)
+// frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512)
 // ---------------------------------------------------------------------------
 static void wsPush() {
     if (ws.connectedClients() == 0) return;
-    uint16_t fpsI = (uint16_t)(fps * 10.0f);
-    int16_t  rssi = (int16_t)WiFi.RSSI();
-    uint32_t heap = ESP.getFreeHeap();
-    uint32_t upS  = uptimeSec();
-    wsBuf[0] = fpsI >> 8;           wsBuf[1] = fpsI & 0xFF;
-    wsBuf[2] = (uint8_t)((uint16_t)rssi >> 8); wsBuf[3] = rssi & 0xFF;
-    wsBuf[4] = heap >> 24;          wsBuf[5] = (heap>>16)&0xFF;
-    wsBuf[6] = (heap>>8)&0xFF;      wsBuf[7] = heap & 0xFF;
-    wsBuf[8] = upS >> 24;           wsBuf[9] = (upS>>16)&0xFF;
-    wsBuf[10]= (upS>>8)&0xFF;       wsBuf[11]= upS & 0xFF;
-    memcpy(&wsBuf[12], &dmxBuf[1], 512);
-    ws.broadcastBIN(wsBuf, 524);
+    uint16_t fpsI  = (uint16_t)(fps * 10.0f);
+    int16_t  rssi  = (int16_t)WiFi.RSSI();
+    uint32_t heap  = ESP.getFreeHeap();
+    uint32_t upS   = uptimeSec();
+    uint16_t jitI  = (uint16_t)(jitterMs * 10.0f < 65535.0f ? jitterMs * 10.0f : 65535.0f);
+    wsBuf[0]  = fpsI >> 8;                       wsBuf[1]  = fpsI & 0xFF;
+    wsBuf[2]  = (uint8_t)((uint16_t)rssi >> 8);  wsBuf[3]  = rssi & 0xFF;
+    wsBuf[4]  = heap >> 24;  wsBuf[5]  = (heap>>16)&0xFF;
+    wsBuf[6]  = (heap>>8)&0xFF; wsBuf[7] = heap & 0xFF;
+    wsBuf[8]  = upS >> 24;   wsBuf[9]  = (upS>>16)&0xFF;
+    wsBuf[10] = (upS>>8)&0xFF; wsBuf[11] = upS & 0xFF;
+    wsBuf[12] = activeSenderCount();
+    wsBuf[13] = hasConflict() ? 1 : 0;
+    wsBuf[14] = jitI >> 8;  wsBuf[15] = jitI & 0xFF;
+    memcpy(&wsBuf[16], &dmxBuf[1], 512);
+    ws.broadcastBIN(wsBuf, 528);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,15 +325,11 @@ static void wsPush() {
 static void wsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t len) {
     if (type != WStype_TEXT || len < 2) return;
     String msg((char*)payload, len);
-
     if (msg.indexOf("\"blackout\"") >= 0) {
-        memset(&dmxBuf[1], 0, 512);
-        sendDmx();
-        return;
+        memset(&dmxBuf[1], 0, 512); sendDmx(); return;
     }
     if (msg.indexOf("\"mode\"") >= 0) {
-        manualMode = (msg.indexOf("true") >= 0);
-        return;
+        manualMode = (msg.indexOf("true") >= 0); return;
     }
     if (msg.indexOf("\"set\"") >= 0) {
         int chIdx  = msg.indexOf("\"ch\":");
@@ -228,15 +344,31 @@ static void wsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t len) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared DMX frame handler (called by Art-Net and sACN)
+// Shared DMX frame handler
 // ---------------------------------------------------------------------------
-static void onDmxFrame(const uint8_t* data, uint16_t length) {
+static void onDmxFrame(const uint8_t* data, uint16_t length, uint32_t senderIp, uint8_t proto) {
+    uint32_t now = millis();
+
+    // Log changes before dmxBuf is overwritten (need old values for comparison)
+    maybeLog(data, length, senderIp, proto);
+
     if (!manualMode) {
         memcpy(&dmxBuf[1], data, min((uint16_t)512, length));
         sendDmx();
     }
-    lastDmxMs = millis();
-    uint32_t now = millis();
+
+    updateSender(senderIp, proto);
+
+    // Jitter: deviation from expected inter-frame interval
+    if (prevFrameMs > 0 && fps > 1.0f) {
+        float interval = (float)(now - prevFrameMs);
+        float expected = 1000.0f / fps;
+        float dev = interval > expected ? interval - expected : expected - interval;
+        jitterMs = jitterMs * 0.85f + dev * 0.15f;
+    }
+    prevFrameMs = now;
+
+    lastDmxMs = now;
     frameCount++;
     if (now - lastFrameMs >= 1000) {
         fps         = (float)frameCount * 1000.0f / (float)(now - lastFrameMs);
@@ -254,20 +386,19 @@ static void onDmxFrame(const uint8_t* data, uint16_t length) {
 // ---------------------------------------------------------------------------
 static void onArtDmx(uint16_t universe, uint16_t length, uint8_t, uint8_t* data) {
     if ((int)universe != cfg.universe) return;
-    onDmxFrame(data, length);
+    onDmxFrame(data, length, (uint32_t)artnet.getSenderIp(), 0);
 }
 
 // ---------------------------------------------------------------------------
 // sACN / E1.31
 // ---------------------------------------------------------------------------
-// E1.31 packet offsets
-static constexpr int SACN_ACN_ID_OFF    = 4;    // 12-byte ACN packet identifier
-static constexpr int SACN_ROOT_VEC_OFF  = 18;   // uint32 big-endian
-static constexpr int SACN_FRAME_VEC_OFF = 40;   // uint32 big-endian
-static constexpr int SACN_UNIVERSE_OFF  = 113;  // uint16 big-endian, 1-based
-static constexpr int SACN_STARTCODE_OFF = 125;  // DMX start code (must be 0x00)
-static constexpr int SACN_DATA_OFF      = 126;  // DMX channel values
-static constexpr int SACN_MIN_LEN       = 638;  // 126-byte header + 512 DMX bytes
+static constexpr int SACN_ACN_ID_OFF    = 4;
+static constexpr int SACN_ROOT_VEC_OFF  = 18;
+static constexpr int SACN_FRAME_VEC_OFF = 40;
+static constexpr int SACN_UNIVERSE_OFF  = 113;
+static constexpr int SACN_STARTCODE_OFF = 125;
+static constexpr int SACN_DATA_OFF      = 126;
+static constexpr int SACN_MIN_LEN       = 638;
 
 static const uint8_t ACN_PACKET_ID[12] = {
     0x41, 0x53, 0x43, 0x2d, 0x45, 0x31, 0x2e, 0x31,
@@ -288,36 +419,25 @@ static void startSacn() {
 static void readSacn() {
     int pktLen = sacnUdp.parsePacket();
     if (pktLen < SACN_MIN_LEN) return;
-
+    uint32_t senderIp = (uint32_t)sacnUdp.remoteIP();
     int n = sacnUdp.read(sacnBuf, sizeof(sacnBuf));
     if (n < SACN_MIN_LEN) return;
-
-    // Validate ACN packet identifier
     if (memcmp(sacnBuf + SACN_ACN_ID_OFF, ACN_PACKET_ID, 12) != 0) return;
-
-    // Validate root vector (0x00000004 = VECTOR_ROOT_E131_DATA)
     uint32_t rootVec = ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF    ] << 24)
                      | ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 1] << 16)
                      | ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 2] <<  8)
                      |  (uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 3];
     if (rootVec != 0x00000004u) return;
-
-    // Validate framing vector (0x00000002 = VECTOR_E131_DATA_PACKET)
     uint32_t frameVec = ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF    ] << 24)
                       | ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 1] << 16)
                       | ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 2] <<  8)
                       |  (uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 3];
     if (frameVec != 0x00000002u) return;
-
-    // Validate universe
     uint16_t universe = ((uint16_t)sacnBuf[SACN_UNIVERSE_OFF] << 8)
                        | sacnBuf[SACN_UNIVERSE_OFF + 1];
     if ((int)universe != cfg.universe + 1) return;
-
-    // Validate DMX start code (0x00 = standard dimmer data)
     if (sacnBuf[SACN_STARTCODE_OFF] != 0x00) return;
-
-    onDmxFrame(sacnBuf + SACN_DATA_OFF, 512);
+    onDmxFrame(sacnBuf + SACN_DATA_OFF, 512, senderIp, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +451,54 @@ static void handleVersionJson() {
     j += "\",\"update\":";
     j += updateAvailable ? "true" : "false";
     j += "}";
+    http.send(200, "application/json", j);
+}
+
+static void handleSendersJson() {
+    String j = "[";
+    bool first = true;
+    uint32_t now = millis();
+    for (int i = 0; i < MAX_SENDERS; i++) {
+        if (senders[i].ip == 0) continue;
+        uint32_t ago = now - senders[i].lastMs;
+        if (ago > 30000) continue;
+        if (!first) j += ",";
+        first = false;
+        char buf[72];
+        snprintf(buf, sizeof(buf),
+            "{\"ip\":\"%s\",\"p\":%d,\"fps\":%.1f,\"ago\":%lu}",
+            ipStr(senders[i].ip).c_str(),
+            (int)senders[i].proto,
+            senders[i].fps,
+            (unsigned long)(ago / 1000));
+        j += buf;
+    }
+    j += "]";
+    http.send(200, "application/json", j);
+}
+
+static void handleLogJson() {
+    String j = "[";
+    bool first = true;
+    for (int k = 0; k < logCount; k++) {
+        // Iterate newest → oldest
+        int idx = ((int)logHead - 1 - k + LOG_SIZE * 2) % LOG_SIZE;
+        LogEntry& e = dmxLog[idx];
+        if (!first) j += ",";
+        first = false;
+        char buf[64];
+        snprintf(buf, sizeof(buf),
+            "{\"ms\":%lu,\"ip\":\"%s\",\"p\":%d,\"n\":%d,\"ch\":[",
+            (unsigned long)e.ms, ipStr(e.ip).c_str(), (int)e.proto, (int)e.total);
+        j += buf;
+        for (int t = 0; t < e.topN; t++) {
+            if (t > 0) j += ",";
+            snprintf(buf, sizeof(buf), "[%d,%d]", (int)e.top[t].ch, (int)e.top[t].val);
+            j += buf;
+        }
+        j += "]}";
+    }
+    j += "]";
     http.send(200, "application/json", j);
 }
 
@@ -394,9 +562,7 @@ static void handleConfigPost() {
     ESP.restart();
 }
 
-static void handleResetGet() {
-    http.send(200, "text/html", FPSTR(RESET_HTML));
-}
+static void handleResetGet()  { http.send(200, "text/html", FPSTR(RESET_HTML)); }
 
 static void handleResetPost() {
     http.send(200, "text/html", FPSTR(RESET_DONE_HTML));
@@ -417,7 +583,7 @@ static void handleBootstrapCss() {
 }
 
 // ---------------------------------------------------------------------------
-// Version check (runs once at startup in a FreeRTOS task)
+// Version check (FreeRTOS task, runs once 8s after boot)
 // ---------------------------------------------------------------------------
 static int parseBuild(const String& v) {
     int dot = v.lastIndexOf('.');
@@ -445,7 +611,7 @@ static void checkForUpdate() {
 }
 
 static void versionCheckTask(void*) {
-    vTaskDelay(pdMS_TO_TICKS(8000)); // wait for WiFi/mDNS to fully settle
+    vTaskDelay(pdMS_TO_TICKS(8000));
     checkForUpdate();
     vTaskDelete(NULL);
 }
@@ -466,10 +632,8 @@ static void doGithubOta() {
     httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
     httpUpdate.rebootOnUpdate(true);
     t_httpUpdate_return ret = httpUpdate.update(client, otaUrl);
-    // Only reached on failure
     Serial.printf("[OTA] Failed (%d): %s\n",
-        httpUpdate.getLastError(),
-        httpUpdate.getLastErrorString().c_str());
+        httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
     dmxReady = true;
     delay(2000);
     ESP.restart();
@@ -516,16 +680,14 @@ static void wmSaveCallback() { wm_shouldSave = true; }
 static void startWiFiManager(bool forcePortal) {
     WiFiManager wm;
     wm.setSaveConfigCallback(wmSaveCallback);
+    wm.setConnectTimeout(15);
     wm.setConfigPortalTimeout(180);
-
     snprintf(wm_universeStr, sizeof(wm_universeStr), "%d", cfg.universe);
     WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-15)", wm_universeStr, 3);
     wm.addParameter(&param_universe);
-
     bool connected = forcePortal ? wm.startConfigPortal(AP_SSID)
                                  : wm.autoConnect(AP_SSID);
     if (!connected) ESP.restart();
-
     if (wm_shouldSave) {
         cfg.universe = constrain(atoi(param_universe.getValue()), 0, 15);
         saveConfig();
@@ -566,7 +728,6 @@ void setup() {
     Serial.println("\n[BOOT] LumiGate — Art-Net / sACN DMX Gateway");
 
     loadConfig();
-
     initLed();
     pinMode(BOOT_PIN, INPUT_PULLUP);
 
@@ -579,6 +740,10 @@ void setup() {
         Serial.println(forcePortal ? " → config portal" : " released");
     }
 
+    WiFi.persistent(false);
+    WiFi.disconnect(true);
+    delay(100);
+    WiFi.mode(WIFI_STA);
     startWiFiManager(forcePortal);
     Serial.printf("[WiFi] %s / %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
 
@@ -597,14 +762,14 @@ void setup() {
         artnet.begin();
         Serial.printf("[ArtNet] universe %d\n", cfg.universe);
     }
-    if (cfg.protocol != 0) {
-        startSacn();
-    }
+    if (cfg.protocol != 0) startSacn();
 
     http.on("/logo.png",          HTTP_GET,  handleLogo);
     http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
     http.on("/",                  HTTP_GET,  handleRoot);
     http.on("/dmx.json",          HTTP_GET,  handleDmxJson);
+    http.on("/senders.json",      HTTP_GET,  handleSendersJson);
+    http.on("/log.json",          HTTP_GET,  handleLogJson);
     http.on("/config",            HTTP_GET,  handleConfigGet);
     http.on("/config",            HTTP_POST, handleConfigPost);
     http.on("/reset",             HTTP_GET,  handleResetGet);
@@ -612,6 +777,7 @@ void setup() {
     http.on("/ota/github",        HTTP_POST, handleOtaGithub);
     http.on("/ota/upload",        HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     http.on("/version.json",      HTTP_GET,  handleVersionJson);
+    http.onNotFound([]() { http.send(404, "text/plain", "Not found"); });
     http.begin();
 
     ws.begin();

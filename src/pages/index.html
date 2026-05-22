@@ -77,7 +77,7 @@ body { background: var(--gh-bg); }
   border: 1px solid var(--gh-border);
   border-radius: 10px;
   padding: 1.4rem;
-  width: min(340px, 92vw);
+  width: min(380px, 94vw);
 }
 .form-range::-webkit-slider-thumb { background: var(--gh-accent); }
 .form-range::-webkit-slider-runnable-track { background: #30363d; }
@@ -86,6 +86,10 @@ body { background: var(--gh-bg); }
 footer { border-color: var(--gh-border) !important; color: var(--gh-muted); font-size: 0.77rem; }
 footer a { color: var(--gh-muted); text-decoration: none; }
 footer a:hover { color: var(--gh-text); }
+
+.snd-tbl { font-size: .8rem; }
+.snd-tbl th { color: var(--gh-muted); font-weight: 500; border-color: var(--gh-border) !important; }
+.snd-tbl td { border-color: var(--gh-border) !important; }
 </style>
 </head>
 <body>
@@ -106,6 +110,16 @@ footer a:hover { color: var(--gh-text); }
 
 <div class="container-fluid p-3">
 
+  <!-- Conflict warning -->
+  <div id="conflict-banner" style="display:none;background:#2d1200;border:1px solid #f85149"
+       class="align-items-center gap-2 mb-3 px-3 py-2 rounded">
+    <span style="color:#f85149">&#9888;</span>
+    <span class="small" style="color:#f85149">
+      Universe conflict &mdash; <strong id="conflict-count">2</strong> senders active simultaneously.
+      Only one source should control a universe.
+    </span>
+  </div>
+
   <!-- Update banner -->
   <div id="update-banner" class="d-flex align-items-center justify-content-between mb-3 px-3 py-2 rounded"
        style="display:none!important;background:#2d2a00;border:1px solid #e3b341">
@@ -113,30 +127,36 @@ footer a:hover { color: var(--gh-text); }
     <a href="/config" class="btn btn-sm fw-semibold" style="background:#e3b341;color:#000;font-size:.78rem">Update</a>
   </div>
 
-  <!-- Stats -->
+  <!-- Stats (5 cards) -->
   <div class="row g-2 mb-3">
-    <div class="col-6 col-sm-3">
+    <div class="col-6 col-sm">
       <div class="card p-3 text-center">
-        <div class="stat-label">Art-Net FPS</div>
+        <div class="stat-label">FPS</div>
         <div class="stat-value" id="fps">—</div>
       </div>
     </div>
-    <div class="col-6 col-sm-3">
+    <div class="col-6 col-sm">
       <div class="card p-3 text-center">
         <div class="stat-label">WiFi Signal</div>
         <div class="stat-value" id="rssi">—</div>
       </div>
     </div>
-    <div class="col-6 col-sm-3">
+    <div class="col-6 col-sm">
       <div class="card p-3 text-center">
         <div class="stat-label">Free Heap</div>
         <div class="stat-value" id="heap">—</div>
       </div>
     </div>
-    <div class="col-6 col-sm-3">
+    <div class="col-6 col-sm">
       <div class="card p-3 text-center">
         <div class="stat-label">Uptime</div>
         <div class="stat-value" id="uptime">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm">
+      <div class="card p-3 text-center">
+        <div class="stat-label">Jitter</div>
+        <div class="stat-value" id="jitter">—</div>
       </div>
     </div>
   </div>
@@ -155,7 +175,7 @@ footer a:hover { color: var(--gh-text); }
   </div>
 
   <!-- DMX Grid -->
-  <div class="card">
+  <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
       <span>DMX Channels 1–512</span>
       <small class="text-secondary">click to edit</small>
@@ -165,15 +185,49 @@ footer a:hover { color: var(--gh-text); }
     </div>
   </div>
 
+  <!-- Active Senders -->
+  <div class="card mb-3">
+    <div class="card-header">Active Senders</div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0 snd-tbl" style="--bs-table-bg:transparent">
+        <thead>
+          <tr>
+            <th class="ps-3">Source IP</th>
+            <th>Protocol</th>
+            <th>FPS</th>
+            <th>Last seen</th>
+          </tr>
+        </thead>
+        <tbody id="senders-body">
+          <tr><td colspan="4" class="text-secondary text-center small py-2">No senders detected</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Change Log -->
+  <div class="card mb-3">
+    <div class="card-header">Change Log</div>
+    <div id="log-body" style="max-height:280px;overflow-y:auto">
+      <div class="text-secondary small text-center py-3">No changes yet</div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Channel modal -->
 <div class="modal-backdrop" id="modal" onclick="if(event.target===this)closeModal()">
   <div class="modal-card">
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
       <span class="fw-semibold" id="modal-title">Channel</span>
       <button class="btn btn-sm btn-outline-secondary px-2 py-0" onclick="closeModal()">&times;</button>
     </div>
+    <svg id="spark-svg" viewBox="0 0 60 40" preserveAspectRatio="none"
+         width="100%" height="36"
+         style="display:block;border-radius:4px;background:#1c2128;margin-bottom:.5rem">
+      <polyline id="spark-line" points="" fill="none" stroke="#58a6ff" stroke-width="1.5"
+                vector-effect="non-scaling-stroke"/>
+    </svg>
     <input type="range" class="form-range mb-1" id="ch-slider" min="0" max="255"
            oninput="sliderMove(+this.value)">
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -198,6 +252,11 @@ footer a:hover { color: var(--gh-text); }
 <script>
 const dmx = new Uint8Array(512);
 let activeCh = 0, sock;
+
+// Sparkline — 60 samples at 0.5 s = 30 s of history
+const SPARK_LEN = 60;
+const spark = new Uint8Array(SPARK_LEN);
+let sparkIdx = 0, sparkFull = false, sparkTimer = null;
 
 // Build 512-cell grid
 const grid = document.getElementById('grid');
@@ -234,13 +293,18 @@ function applyDmx(data) {
 // Modal
 function openModal(ch) {
   activeCh = ch;
+  spark.fill(0); sparkIdx = 0; sparkFull = false;
+  document.getElementById('spark-line').setAttribute('points', '');
   document.getElementById('modal-title').textContent = 'Channel ' + ch;
   syncModal(dmx[ch - 1]);
   document.getElementById('modal').classList.add('show');
+  if (sparkTimer) clearInterval(sparkTimer);
+  sparkTimer = setInterval(sampleSpark, 500);
 }
 function closeModal() {
   document.getElementById('modal').classList.remove('show');
   activeCh = 0;
+  if (sparkTimer) { clearInterval(sparkTimer); sparkTimer = null; }
 }
 function syncModal(v) {
   document.getElementById('ch-slider').value = v;
@@ -252,44 +316,129 @@ function sliderMove(v) {
   send({type: 'set', ch: activeCh, val: v});
 }
 function setQuick(v) { sliderMove(v); document.getElementById('ch-slider').value = v; }
-function setMode(m)   { send({type: 'mode', manual: m}); }
+function setMode(m)  { send({type: 'mode', manual: m}); }
 function sendBlackout() { send({type: 'blackout'}); }
 function send(obj) { if (sock && sock.readyState === 1) sock.send(JSON.stringify(obj)); }
+
+// Sparkline
+function sampleSpark() {
+  if (!activeCh) return;
+  spark[sparkIdx] = dmx[activeCh - 1];
+  sparkIdx = (sparkIdx + 1) % SPARK_LEN;
+  if (sparkIdx === 0) sparkFull = true;
+  drawSpark();
+}
+function drawSpark() {
+  var count = sparkFull ? SPARK_LEN : sparkIdx;
+  if (count < 2) return;
+  var pts = '';
+  for (var i = 0; i < count; i++) {
+    var si = sparkFull ? (sparkIdx + i) % SPARK_LEN : i;
+    var x = (i / (count - 1) * 60).toFixed(2);
+    var y = (38 - spark[si] / 255 * 37).toFixed(2);
+    pts += (i ? ' ' : '') + x + ',' + y;
+  }
+  document.getElementById('spark-line').setAttribute('points', pts);
+}
 
 // WebSocket
 function connect() {
   sock = new WebSocket('ws://' + location.hostname + ':81/');
   sock.binaryType = 'arraybuffer';
-  const badge = document.getElementById('ws-badge');
-  sock.onopen  = () => { badge.textContent = 'Live';    badge.style.background = '#238636'; };
-  sock.onclose = () => { badge.textContent = 'Offline'; badge.style.background = '#da3633'; setTimeout(connect, 2000); };
-  sock.onmessage = e => {
+  var badge = document.getElementById('ws-badge');
+  sock.onopen  = function() { badge.textContent = 'Live';    badge.style.background = '#238636'; };
+  sock.onclose = function() { badge.textContent = 'Offline'; badge.style.background = '#da3633'; setTimeout(connect, 2000); };
+  sock.onmessage = function(e) {
     if (!(e.data instanceof ArrayBuffer)) return;
-    const v   = new DataView(e.data);
-    const fps = (v.getUint16(0) / 10).toFixed(1);
-    const rssi = v.getInt16(2);
-    const heap = v.getUint32(4);
-    const upS  = v.getUint32(8);
-    document.getElementById('fps').textContent    = fps;
-    const re = document.getElementById('rssi');
+    // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512)
+    var v = new DataView(e.data);
+    var fps         = (v.getUint16(0) / 10).toFixed(1);
+    var rssi        = v.getInt16(2);
+    var heap        = v.getUint32(4);
+    var upS         = v.getUint32(8);
+    var senderCount = v.getUint8(12);
+    var conflict    = v.getUint8(13);
+    var jitter      = (v.getUint16(14) / 10).toFixed(1);
+
+    document.getElementById('fps').textContent = fps;
+    var re = document.getElementById('rssi');
     re.textContent = rssi + ' dBm';
     re.style.color = rssi > -65 ? '#3fb950' : rssi > -80 ? '#e3b341' : '#f85149';
     document.getElementById('heap').textContent   = (heap / 1024).toFixed(0) + ' KB';
-    const h = Math.floor(upS / 3600), m = Math.floor((upS % 3600) / 60), s = upS % 60;
-    document.getElementById('uptime').textContent =
-      (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + s + 's';
-    applyDmx(new Uint8Array(e.data, 12, 512));
+    var h = Math.floor(upS / 3600), m = Math.floor((upS % 3600) / 60), s = upS % 60;
+    document.getElementById('uptime').textContent = (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + s + 's';
+    document.getElementById('jitter').textContent = jitter + ' ms';
+
+    var cb = document.getElementById('conflict-banner');
+    if (conflict) {
+      document.getElementById('conflict-count').textContent = senderCount;
+      cb.style.display = 'flex';
+    } else {
+      cb.style.display = 'none';
+    }
+
+    applyDmx(new Uint8Array(e.data, 16, 512));
   };
 }
 connect();
 
-fetch('/version.json').then(function(r){ return r.json(); }).then(function(d){
+// Senders & log polling
+function fmtAgo(ago) { return ago === 0 ? 'now' : ago + 's ago'; }
+
+function updateSenders(data) {
+  var tbody = document.getElementById('senders-body');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-secondary text-center small py-2">No senders detected</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(function(s) {
+    var proto = s.p === 0 ? 'Art-Net' : 'sACN';
+    return '<tr>' +
+      '<td class="ps-3" style="font-family:monospace">' + s.ip + '</td>' +
+      '<td>' + proto + '</td>' +
+      '<td>' + s.fps.toFixed(1) + '</td>' +
+      '<td>' + fmtAgo(s.ago) + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function updateLog(data) {
+  var el = document.getElementById('log-body');
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="text-secondary small text-center py-3">No changes yet</div>';
+    return;
+  }
+  var newest = data[0].ms;
+  el.innerHTML = data.map(function(entry) {
+    var ageSec  = Math.round((newest - entry.ms) / 1000);
+    var timeStr = ageSec === 0 ? 'now' : ageSec + 's ago';
+    var proto   = entry.p === 0 ? 'Art-Net' : 'sACN';
+    var chs     = entry.ch.map(function(c) { return 'ch' + c[0] + '=' + c[1]; }).join('&nbsp; ');
+    return '<div class="px-3 py-2" style="border-bottom:1px solid #30363d">' +
+      '<div class="d-flex justify-content-between align-items-baseline">' +
+      '<span style="font-size:.72rem;color:#8b949e">' + timeStr + ' &middot; ' + proto + ' &middot; ' + entry.ip + '</span>' +
+      '<span class="fw-semibold" style="font-size:.75rem">' + entry.n + ' ch</span>' +
+      '</div>' +
+      (chs ? '<div style="font-size:.7rem;color:#8b949e;font-family:monospace;margin-top:1px">' + chs + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function pollData() {
+  fetch('/senders.json').then(function(r) { return r.json(); }).then(updateSenders).catch(function() {});
+  fetch('/log.json').then(function(r) { return r.json(); }).then(updateLog).catch(function() {});
+}
+pollData();
+setInterval(pollData, 2000);
+
+// Firmware update check
+fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
   if (d.update) {
     document.getElementById('update-ver').textContent = d.latest;
     var b = document.getElementById('update-banner');
     b.style.cssText = 'display:flex!important;background:#2d2a00;border:1px solid #e3b341';
   }
-}).catch(function(){});
+}).catch(function() {});
 </script>
 </body>
 </html>
