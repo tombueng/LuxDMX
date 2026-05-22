@@ -4,6 +4,10 @@
 
 **Art-Net / sACN (E1.31) → DMX512 Gateway** based on ESP32 / ESP32-S3 with a live web UI, WebSocket push, and manual DMX control via browser.
 
+| Status page | Settings page |
+|---|---|
+| ![Status page](docs/screenshot-status.png) | ![Settings page](docs/screenshot-config.png) |
+
 ---
 
 ## Features
