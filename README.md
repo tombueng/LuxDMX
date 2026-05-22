@@ -2,7 +2,7 @@
 
 # LumiGate
 
-**Art-Net → DMX512 Gateway** based on ESP32 with a live web UI, WebSocket push, and manual DMX control via browser.
+**Art-Net / sACN (E1.31) → DMX512 Gateway** based on ESP32 / ESP32-S3 with a live web UI, WebSocket push, and manual DMX control via browser.
 
 ---
 
@@ -10,18 +10,26 @@
 
 | Feature | Details |
 |---|---|
-| **Art-Net → DMX512** | Full 512-channel, unicast or broadcast, universe configurable |
-| **Live Web UI** | Dark Tailwind UI, WebSocket push ~25 fps, all 512 channels visible |
+| **Art-Net → DMX512** | Full 512-channel, unicast or broadcast, universe configurable (0–15) |
+| **sACN / E1.31 → DMX512** | Multicast receive, universe configurable, runs alongside Art-Net |
+| **Protocol selection** | Art-Net only / sACN only / Both — configurable in web UI |
+| **Live Web UI** | Bootstrap 5 dark theme, WebSocket push ~25 fps, all 512 channels visible |
+| **Sender list** | Shows all active Art-Net / sACN senders with per-sender FPS |
+| **Conflict detection** | Warning banner when multiple senders are active simultaneously |
+| **Jitter stat** | Real-time inter-frame timing deviation (EMA) |
+| **Change log** | Live log of DMX value changes with top-N changed channels per frame |
+| **Sparkline** | Per-channel history sparkline in the channel detail modal |
 | **Manual DMX control** | Click any channel in browser, set value via slider |
 | **Blackout button** | Zero all channels instantly from browser |
-| **Art-Net / Manual toggle** | Switch between Art-Net passthrough and manual override |
+| **Art-Net / Manual toggle** | Switch between protocol passthrough and manual override |
 | **WiFi Config Portal** | First-boot AP + captive portal via WiFiManager |
-| **OTA Updates** | ArduinoOTA over WiFi, password protected |
-| **mDNS** | Reachable as `lumigate.local` (configurable) |
-| **REST API** | `GET /dmx.json` — all 512 values + stats as JSON |
-| **NVS persistence** | Universe, hostname, OTA password survive reboots |
+| **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click GitHub update |
+| **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
+| **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json` |
+| **Status LED** | Plain GPIO or WS2812 RGB NeoPixel — color codes WiFi/idle/DMX active state |
+| **NVS persistence** | Universe, protocol, hostname, OTA password, LED config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Status LED** | Off = no WiFi · Heartbeat = idle · Solid = Art-Net active |
+| **Dual target** | Builds for ESP32 (WROOM-32) and ESP32-S3 (DevKitC-1) |
 
 ---
 
@@ -163,13 +171,15 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 | Library | Purpose |
 |---|---|
 | `someweisguy/esp_dmx ^4.1` | DMX512 transmit via UART |
-| `rstephan/ArtnetWifi ^1.5` | Art-Net UDP receiver |
+| `rstephan/ArtnetWifi ^1.5` | Art-Net UDP receiver (port 6454) |
 | `tzapu/WiFiManager ^2.0` | WiFi config portal |
 | `links2004/WebSockets ^2.4` | WebSocket server (port 81) |
+| `adafruit/Adafruit NeoPixel ^1.12` | WS2812 RGB status LED support |
 | `ArduinoOTA` | OTA firmware updates |
-| `ESPmDNS` | mDNS (`lumigate.local`) |
+| `ESPmDNS` | mDNS (`dmx-gateway.local`) |
 | `Preferences` | NVS persistent config |
 | `WebServer` | HTTP server (port 80) |
+| *(built-in UDP)* | sACN / E1.31 multicast receive (port 5568) |
 
 ---
 
@@ -245,7 +255,7 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
 ```
 LumiGate/
 ├── src/
-│   ├── main.cpp          ← firmware logic only (~270 lines)
+│   ├── main.cpp          ← firmware logic
 │   ├── pages/            ← edit web UI here (plain HTML)
 │   │   ├── index.html
 │   │   ├── config.html
@@ -281,19 +291,14 @@ pio run --target upload
 ```
 
 > **If upload fails** ("Wrong boot mode"): Hold **BOOT** button, tap **EN/RST**, release BOOT — chip enters download mode. Then retry upload.
->
-> Or use the included flash helper:
-> ```bash
-> bash ~/.claude/flash_esp32.sh COM3 460800
-> ```
-> The script gives you an 8-second countdown to press BOOT+EN.
 
 ### OTA Updates (after first flash)
 
-Uncomment in `platformio.ini`:
+- **From browser:** open `http://dmx-gateway.local/config` → Firmware Update section → upload a `.bin` file or click "Update from GitHub"
+- **From IDE:** uncomment in `platformio.ini`:
 ```ini
 upload_protocol = espota
-upload_port     = lumigate.local
+upload_port     = dmx-gateway.local
 upload_flags    = --auth=dmxota
 ```
 
@@ -312,11 +317,14 @@ On first boot (or after WiFi reset), LumiGate opens a WiFi access point:
 
 ### 2. Status Page
 
-Open `http://lumigate.local` (or the IP shown in serial monitor at 115200 baud):
+Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 baud):
 
-- Live stats: framerate, RSSI, uptime, free heap
+- Live stats: framerate, RSSI, uptime, free heap, jitter
+- Conflict warning if multiple senders are detected
+- Active sender list with per-sender protocol and FPS
 - All 512 DMX channels as a color-coded grid (cyan = active)
-- Click any cell → slider appears → set value directly
+- Click any cell → slider + sparkline history appear → set value directly
+- Change log with recent DMX activity
 
 ### 3. Changing WiFi / Config Reset
 
@@ -324,7 +332,7 @@ To move LumiGate to a different WiFi network, clear its stored credentials — i
 
 | Method | Steps |
 |---|---|
-| **Web** (easiest) | Open `http://lumigate.local/reset` → click **Reset WiFi** → device reboots into AP mode |
+| **Web** (easiest) | Open `http://dmx-gateway.local/reset` → click **Reset WiFi** → device reboots into AP mode |
 | **Hardware** | Power off → hold **BOOT** → power on → keep holding for 3 seconds → release → device reboots into AP mode |
 
 After reset, connect to the `DMX-Gateway` access point (no password) and follow the [First Setup](#1-config-portal) steps to join the new network.
@@ -333,23 +341,31 @@ After reset, connect to the `DMX-Gateway` access point (no password) and follow 
 
 ## Web UI
 
-| URL | Function |
-|---|---|
-| `/` | Live status + 512-channel DMX grid |
-| `/config` | Change universe, hostname, OTA password |
-| `/reset` | Clear WiFi credentials, reboot to AP mode |
-| `/dmx.json` | JSON API: all 512 values, fps, rssi, uptime, heap |
+| URL | Method | Function |
+|---|---|---|
+| `/` | GET | Live status + 512-channel DMX grid |
+| `/config` | GET / POST | Change universe, protocol, hostname, OTA password, LED config |
+| `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
+| `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
+| `/senders.json` | GET | Active Art-Net / sACN senders with FPS and last-seen age |
+| `/log.json` | GET | Recent DMX change log entries (up to 50, newest first) |
+| `/version.json` | GET | Current firmware version + latest GitHub release |
+| `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
+| `/ota/github` | POST | Download and flash latest release from GitHub |
 
 ### WebSocket (port 81)
 
-Binary push frame at up to 25 fps:
+Binary push frame at up to 25 fps (528 bytes):
 
 ```
-Bytes  0–1   fps × 10        uint16 big-endian
-Bytes  2–3   RSSI (dBm)      int16  big-endian
-Bytes  4–7   free heap       uint32 big-endian
-Bytes  8–11  uptime (s)      uint32 big-endian
-Bytes 12–523 DMX ch 1–512   uint8[512]
+Bytes  0–1    fps × 10           uint16 big-endian
+Bytes  2–3    RSSI (dBm)         int16  big-endian
+Bytes  4–7    free heap          uint32 big-endian
+Bytes  8–11   uptime (s)         uint32 big-endian
+Byte   12     active sender count uint8
+Byte   13     conflict flag       uint8 (1 = multiple senders)
+Bytes  14–15  jitter × 10 (ms)   uint16 big-endian
+Bytes  16–527 DMX ch 1–512       uint8[512]
 ```
 
 Browser → ESP32 (JSON text):
@@ -364,21 +380,26 @@ Browser → ESP32 (JSON text):
 ## QLC+ Setup
 
 1. Open **Eingänge/Ausgänge** tab
-2. Click in the output area right of **Universe 1** → select **ArtNet** → interface `192.168.x.x` (your PC's IP)
-3. Configure: IP = LumiGate's IP, Art-Net Universe = `0`
-4. Test with **Einfaches Mischpult** → move fader → grid lights up cyan
+2. Click in the output area right of **Universe 1** → select **ArtNet** → interface = your PC's IP
+3. Configure: Output IP = LumiGate's IP, Art-Net Universe = `0`
+4. Set transmission mode to **Full** (sends all 512 channels continuously at ~40 fps)
+5. Test with **Einfaches Mischpult** → move fader → grid lights up cyan
 
-> **Universe mapping:** QLC+ "Universe 1" = Art-Net Universe `0`. LumiGate defaults to Universe `0`.
+> **Universe mapping:** QLC+ "Universe 1" = Art-Net Universe `0`. LumiGate defaults to Universe `0`.  
+> **Tip:** if "Standard" mode shows ~0.4 fps and values don't update, restart QLC+ or switch to "Full" mode.
 
 ---
 
-## Status LED (GPIO2 / D2)
+## Status LED
 
-| State | LED |
+LumiGate supports two LED types, configurable in the web UI:
+
+| LED type | Behavior |
 |---|---|
-| No WiFi | Off |
-| Connected, no Art-Net | Short pulse every 2 s (heartbeat) |
-| Art-Net receiving | Solid on |
+| **Plain GPIO** (active high) | Off = no WiFi · Short pulse every 2 s = idle · Solid = DMX active |
+| **WS2812 RGB NeoPixel** | Red blink = no WiFi · Amber blink = idle · Solid green = DMX active |
+
+Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48` (built-in WS2812).
 
 ---
 
@@ -387,8 +408,11 @@ Browser → ESP32 (JSON text):
 | Key | Default | Change via |
 |---|---|---|
 | Art-Net Universe | `0` | Web `/config` or portal |
+| Protocol | `Both (Art-Net + sACN)` | Web `/config` |
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password | `dmxota` | Web `/config` |
+| LED type | board default | Web `/config` |
+| LED GPIO pin | board default | Web `/config` |
 | WiFi credentials | — | Config portal or `/reset` |
 
 ---
@@ -397,8 +421,7 @@ Browser → ESP32 (JSON text):
 
 - [ ] Scenes / presets (save & recall DMX snapshots)
 - [ ] Fade engine (smooth transitions between scenes)
-- [ ] Failsafe scene (auto-load when Art-Net signal lost)
-- [ ] E1.31 sACN support
+- [ ] Failsafe scene (auto-load when Art-Net / sACN signal lost)
 - [ ] MQTT integration (Home Assistant / Node-RED)
 - [ ] Channel labels / fixture naming
 - [ ] RDM support (requires module with controllable DE/RE pin, e.g. SP3485)
