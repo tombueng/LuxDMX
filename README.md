@@ -195,13 +195,14 @@ No toolchain needed. GitHub CI builds the firmware on every push to master.
 
 ### Boot mode (required for all methods)
 
-This board has no auto-reset circuit, so you must enter download mode manually before flashing:
+You must manually enter download mode before flashing:
 
-1. Unplug USB
-2. Hold **BOOT** button on the ESP32
-3. Plug USB back in (keep holding BOOT)
-4. Release BOOT after ~1 second
-5. Run the flash command — the LED stays off while in download mode
+1. Hold **BOOT** button
+2. Press and release **EN** (or **RST**) while keeping BOOT held
+3. Release BOOT — the chip is now in download mode
+4. Run the flash command
+
+> **ESP32-S3 DevKitC-1:** use the **USB-UART** port (labeled on the board), not the native USB port. The native USB port cannot be used with esptool.
 
 ### Windows — one-liner (PowerShell)
 
@@ -223,7 +224,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 The script: installs Python 3 via `winget` if missing → installs `esptool` via pip → downloads the four firmware blobs from the latest GitHub release → lets you pick a COM port → guides you through boot mode → flashes.
 
-### macOS / Linux
+### macOS / Linux — ESP32 (WROOM-32)
 
 ```bash
 pip install esptool
@@ -235,12 +236,34 @@ for f in firmware.bin bootloader.bin partitions.bin boot_app0.bin; do
       print(next(a['browser_download_url'] for a in assets if a['name']=='$f'))")" -o $f
 done
 
-# Put ESP32 in boot mode first (see above), then:
+# Enter boot mode first (see above), then:
 esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
   --before default_reset --after hard_reset \
   write_flash -z --flash_mode dio --flash_freq 80m \
   0x1000 bootloader.bin 0x8000 partitions.bin \
   0xe000 boot_app0.bin 0x10000 firmware.bin
+```
+
+### macOS / Linux — ESP32-S3 (DevKitC-1)
+
+> **Important:** bootloader goes at `0x0000` on S3 (not `0x1000` like the original ESP32).
+
+```bash
+pip install esptool
+
+REPO=tombueng/LumiGate
+for f in firmware-esp32s3.bin bootloader-esp32s3.bin partitions-esp32s3.bin boot_app0.bin; do
+  curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
+    | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
+      print(next(a['browser_download_url'] for a in assets if a['name']=='$f'))")" -o $f
+done
+
+# Enter boot mode first, use the USB-UART port, then:
+esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 \
+  --before default_reset --after hard_reset \
+  write_flash -z --flash_mode dio --flash_freq 80m \
+  0x0000 bootloader-esp32s3.bin 0x8000 partitions-esp32s3.bin \
+  0xe000 boot_app0.bin 0x10000 firmware-esp32s3.bin
 ```
 
 > Replace `/dev/ttyUSB0` with your port (`/dev/tty.usbserial-*` on macOS).
