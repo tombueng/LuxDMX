@@ -85,8 +85,8 @@ This module is the key interface between the ESP32's UART and the DMX RS485 bus.
 ```
 Pin 1  VCC   → ESP32 3.3V
 Pin 2  GND   → ESP32 GND
-Pin 3  RXD   → ESP32 GPIO16 (UART2 RX)
-Pin 4  TXD   → ESP32 GPIO17 (UART2 TX)
+Pin 3  RXD   → ESP32 GPIO17 (UART2 TX)
+Pin 4  TXD   → ESP32 GPIO16 (UART2 RX)
 Pin 5  —     (not connected)
 Pin 6  —     (not connected)
 ```
@@ -109,8 +109,8 @@ GND→  DMX XLR pin 1  (Shield/Ground)  [optional but recommended]
 
 | ESP32 pin | → | Module pin | → | XLR pin |
 |---|---|---|---|---|
-| GPIO17 | → | TXD | — | — |
-| GPIO16 | ← | RXD | — | — |
+| GPIO17 (TX) | → | RXD | — | — |
+| GPIO16 (RX) | ← | TXD | — | — |
 | 3.3V | → | VCC | — | — |
 | GND | → | GND | — | — |
 | — | — | A (RS485+) | → | Pin 3 |
@@ -133,8 +133,8 @@ Using dupont jumper wires:
 |---|---|---|
 | Red | ESP32 **3.3V** | Module **VCC** |
 | Black | ESP32 **GND** | Module **GND** |
-| Yellow | ESP32 **GPIO17** | Module **TXD** |
-| Green | ESP32 **GPIO16** | Module **RXD** |
+| Yellow | ESP32 **GPIO17** (TX) | Module **RXD** |
+| Green | ESP32 **GPIO16** (RX) | Module **TXD** |
 
 > Use **3.3V**, not 5V — the ESP32's GPIOs are not 5V tolerant.
 
