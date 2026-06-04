@@ -58,14 +58,22 @@ jobs:
 
       - name: Publish rolling latest release
         run: |
+          {
+            echo "## Changes"
+            echo ""
+            cat changes.txt
+            echo ""
+            echo ""
+            echo "## Flash files"
+            echo "- **ESP32** (WROOM-32, WROVER): \`firmware.bin\` + \`flash.ps1\`"
+            echo "- **ESP32-S3** (DevKitC-1): \`firmware-esp32s3.bin\`"
+            echo "- **WT32-ETH01** (Ethernet): \`firmware-wt32eth01.bin\`"
+            echo ""
+            echo "_Build 1.0.${{ github.run_number }} from ${{ github.sha }}_"
+          } > notes.md
           gh release create latest \
             --title "v1.0.${{ github.run_number }} ($(date -u '+%Y-%m-%d %H:%M UTC'))" \
-            --notes "Version 1.0.${{ github.run_number }} — built from ${{ github.sha }}.
-
-          Flash files:
-          - **ESP32** (WROOM-32, WROVER): \`firmware.bin\` + \`flash.ps1\`
-          - **ESP32-S3** (DevKitC-1): \`firmware-esp32s3.bin\`
-          - **WT32-ETH01** (Ethernet): \`firmware-wt32eth01.bin\`" \
+            --notes-file notes.md \
             --prerelease \
             firmware.bin bootloader.bin partitions.bin boot_app0.bin \
             firmware-esp32s3.bin bootloader-esp32s3.bin partitions-esp32s3.bin \

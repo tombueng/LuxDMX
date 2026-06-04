@@ -491,9 +491,14 @@ fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
     .then(function(r) { return r.json(); })
     .then(function(rel) {
       if (!rel.body) return;
-      // Strip the "Flash files:" section and show only the changes
-      var body = rel.body.split('\n').filter(function(l) {
-        return l.trim() && !l.match(/^Flash files:/i) && !l.match(/^-.*\.(bin|ps1)/i);
+      var body = rel.body;
+      // Drop everything from the "Flash files" section onward
+      var cut = body.search(/##?\s*Flash files/i);
+      if (cut >= 0) body = body.slice(0, cut);
+      // Keep only meaningful change lines
+      body = body.split('\n').filter(function(l) {
+        l = l.trim();
+        return l && !/^##?\s*Changes/i.test(l) && !/built from|^_Build/i.test(l);
       }).join('\n').trim();
       if (!body) return;
       var pre = document.getElementById('update-notes');
