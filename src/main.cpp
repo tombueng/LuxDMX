@@ -17,8 +17,7 @@
 #else
 #include <WiFiManager.h>
 #endif
-#include <WebServer.h>
-#include <WebSocketsServer.h>
+#include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
 #include <WiFiClientSecure.h>
@@ -132,10 +131,10 @@ static bool parseIp(const String& s, IPAddress& out) {
 // ---------------------------------------------------------------------------
 // Global objects
 // ---------------------------------------------------------------------------
-Preferences      prefs;
-WebServer        http(80);
-WebSocketsServer ws(81);
-ArtnetWifi       artnet;
+Preferences       prefs;
+AsyncWebServer    http(80);
+AsyncWebSocket    ws("/ws");
+ArtnetWifi        artnet;
 static WiFiUDP   sacnUdp;
 static Adafruit_NeoPixel neoPixel(1, 0, NEO_GRB + NEO_KHZ800);
 
@@ -163,6 +162,9 @@ static constexpr uint32_t IDENTIFY_MS = 1500;
 static uint16_t identifyCh      = 0;       // 1-512, 0 = inactive
 static uint32_t identifyUntil   = 0;
 static uint32_t lastIdentifyTx  = 0;
+static volatile bool dmxDirty   = false;   // manual change pending; loop() sends it
+static uint32_t pendingRebootAt = 0;       // 0 = none; loop() reboots when due
+static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
 
 // WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512) = 528
 static uint8_t wsBuf[528];
@@ -252,9 +254,17 @@ static void initLed() {
 }
 
 static void setLedColor(uint32_t neoColor, bool gpioOn) {
-    if (cfg.ledType == 1 && cfg.ledPin >= 0)
+    // Skip redundant updates — repeatedly clocking the WS2812 (it sits next to
+    // the antenna on the S3 DevKitC-1) injects RF noise and weakens WiFi.
+    static uint32_t lastNeo = 0xFFFFFFFF;
+    static int8_t   lastGpio = -1;
+    if (cfg.ledType == 1 && cfg.ledPin >= 0) {
+        if ((int8_t)gpioOn == lastGpio) return;
+        lastGpio = gpioOn;
         digitalWrite(cfg.ledPin, gpioOn ? HIGH : LOW);
-    else if (cfg.ledType == 2 && cfg.ledPin >= 0) {
+    } else if (cfg.ledType == 2 && cfg.ledPin >= 0) {
+        if (neoColor == lastNeo) return;
+        lastNeo = neoColor;
         neoPixel.setPixelColor(0, neoColor);
         neoPixel.show();
     }
@@ -373,7 +383,7 @@ static void maybeLog(const uint8_t* data, uint16_t len, uint32_t ip, uint8_t pro
 // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512)
 // ---------------------------------------------------------------------------
 static void wsPush() {
-    if (ws.connectedClients() == 0) return;
+    if (ws.count() == 0) return;
     uint16_t fpsI  = (uint16_t)(fps * 10.0f);
     int16_t  rssi  = (int16_t)netRSSI();
     uint32_t heap  = ESP.getFreeHeap();
@@ -389,17 +399,19 @@ static void wsPush() {
     wsBuf[13] = hasConflict() ? 1 : 0;
     wsBuf[14] = jitI >> 8;  wsBuf[15] = jitI & 0xFF;
     memcpy(&wsBuf[16], &dmxBuf[1], 512);
-    ws.broadcastBIN(wsBuf, 528);
+    // Only push if the async TCP queues have room, so a slow client never
+    // backs up memory or blocks.
+    if (ws.availableForWriteAll()) ws.binaryAll(wsBuf, 528);
 }
 
 // ---------------------------------------------------------------------------
-// WebSocket event (browser → ESP)
+// WebSocket event (browser → ESP). Runs in the AsyncTCP task, so it only
+// updates dmxBuf/flags — loop() performs the actual DMX send.
 // ---------------------------------------------------------------------------
-static void wsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t len) {
-    if (type != WStype_TEXT || len < 2) return;
-    String msg((char*)payload, len);
+static void handleWsText(const char* payload, size_t len) {
+    String msg(payload, len);
     if (msg.indexOf("\"blackout\"") >= 0) {
-        memset(&dmxBuf[1], 0, 512); sendDmx(); return;
+        memset(&dmxBuf[1], 0, 512); dmxDirty = true; return;
     }
     if (msg.indexOf("\"mode\"") >= 0) {
         manualMode = (msg.indexOf("true") >= 0); return;
@@ -412,7 +424,6 @@ static void wsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t len) {
         identifyCh    = (uint16_t)ch;
         identifyUntil = millis() + IDENTIFY_MS;
         lastIdentifyTx = 0;
-        sendDmx();
         return;
     }
     if (msg.indexOf("\"set\"") >= 0) {
@@ -423,7 +434,17 @@ static void wsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t len) {
         int val = msg.substring(valIdx + 6).toInt();
         if (ch < 1 || ch > 512) return;
         dmxBuf[ch] = (uint8_t)constrain(val, 0, 255);
-        sendDmx();
+        dmxDirty = true;
+    }
+}
+
+static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient*, AwsEventType type,
+                      void* arg, uint8_t* data, size_t len) {
+    if (type != WS_EVT_DATA) return;
+    AwsFrameInfo* info = (AwsFrameInfo*)arg;
+    // Only handle complete, single-frame text messages (our control msgs are tiny)
+    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+        handleWsText((const char*)data, len);
     }
 }
 
@@ -527,7 +548,14 @@ static void readSacn() {
 // ---------------------------------------------------------------------------
 // HTTP handlers
 // ---------------------------------------------------------------------------
-static void handleVersionJson() {
+// Fetch a request parameter from POST body or query string
+static bool argStr(AsyncWebServerRequest* req, const char* n, String& out) {
+    if (req->hasParam(n, true)) { out = req->getParam(n, true)->value(); return true; }
+    if (req->hasParam(n))       { out = req->getParam(n)->value();       return true; }
+    return false;
+}
+
+static void handleVersionJson(AsyncWebServerRequest* req) {
     String j = "{\"current\":\"";
     j += FIRMWARE_VERSION;
     j += "\",\"latest\":\"";
@@ -535,7 +563,7 @@ static void handleVersionJson() {
     j += "\",\"update\":";
     j += updateAvailable ? "true" : "false";
     j += "}";
-    http.send(200, "application/json", j);
+    req->send(200, "application/json", j);
 }
 
 static String sendersJson() {
@@ -586,30 +614,28 @@ static String logJson() {
     return j;
 }
 
-static void handleSendersJson() { http.send(200, "application/json", sendersJson()); }
-static void handleLogJson()     { http.send(200, "application/json", logJson()); }
+static void handleSendersJson(AsyncWebServerRequest* req) { req->send(200, "application/json", sendersJson()); }
+static void handleLogJson(AsyncWebServerRequest* req)     { req->send(200, "application/json", logJson()); }
 
 // Push senders + log over the WebSocket (one persistent connection) so the
-// browser doesn't have to poll two HTTP endpoints every 2 s — that churn was
-// exhausting lwIP's TCP control blocks and wedging the HTTP server.
+// browser doesn't have to poll two HTTP endpoints every 2 s.
 static void wsPushMeta() {
-    if (ws.connectedClients() == 0) return;
+    if (ws.count() == 0 || !ws.availableForWriteAll()) return;
     String m = "{\"meta\":1,\"senders\":";
     m += sendersJson();
     m += ",\"log\":";
     m += logJson();
     m += "}";
-    ws.broadcastTXT(m);
+    ws.textAll(m);
 }
 
-// Static pages are served straight from PROGMEM (zero heap, no per-request
-// 19 KB String + replace churn that made serving pathologically slow).
-// Dynamic values are fetched client-side from /info.json.
-static void handleRoot() {
-    http.send_P(200, "text/html", INDEX_HTML);
+// Static pages are served straight from PROGMEM (zero heap). Dynamic values
+// are fetched client-side from /info.json.
+static void handleRoot(AsyncWebServerRequest* req) {
+    req->send_P(200, "text/html", INDEX_HTML);
 }
 
-static void handleInfoJson() {
+static void handleInfoJson(AsyncWebServerRequest* req) {
     String j = "{";
     j += "\"ssid\":\"";     j += netSSID();              j += "\",";
     j += "\"ip\":\"";       j += netLocalIP().toString(); j += "\",";
@@ -627,10 +653,10 @@ static void handleInfoJson() {
     j += "\"dns\":\"";      j += cfg.dns;                j += "\",";
     j += "\"autoUpdate\":"; j += cfg.autoUpdate ? "true" : "false";
     j += "}";
-    http.send(200, "application/json", j);
+    req->send(200, "application/json", j);
 }
 
-static void handleDmxJson() {
+static void handleDmxJson(AsyncWebServerRequest* req) {
     String j;
     j.reserve(2300);
     char buf[32];
@@ -646,88 +672,88 @@ static void handleDmxJson() {
         if (i < 512) j += ',';
     }
     j += "]}";
-    http.send(200, "application/json", j);
+    req->send(200, "application/json", j);
 }
 
-static void handleConfigGet() {
-    http.send_P(200, "text/html", CONFIG_HTML);
+static void handleConfigGet(AsyncWebServerRequest* req) {
+    req->send_P(200, "text/html", CONFIG_HTML);
 }
 
-static void handleConfigPost() {
-    if (http.hasArg("universe"))
-        cfg.universe = constrain(http.arg("universe").toInt(), 0, 15);
-    if (http.hasArg("hostname") && http.arg("hostname").length() > 0)
-        cfg.hostname = http.arg("hostname");
-    if (http.hasArg("otapw") && http.arg("otapw").length() > 0)
-        cfg.otaPassword = http.arg("otapw");
-    if (http.hasArg("protocol"))
-        cfg.protocol = constrain(http.arg("protocol").toInt(), 0, 2);
-    if (http.hasArg("ledtype"))
-        cfg.ledType = constrain(http.arg("ledtype").toInt(), 0, 2);
-    if (http.hasArg("ledpin"))
-        cfg.ledPin = constrain(http.arg("ledpin").toInt(), -1, 48);
-    cfg.staticIp = http.hasArg("staticip");
-    if (http.hasArg("ip"))      cfg.ip      = http.arg("ip");
-    if (http.hasArg("gateway")) cfg.gateway = http.arg("gateway");
-    if (http.hasArg("subnet"))  cfg.subnet  = http.arg("subnet");
-    if (http.hasArg("dns"))     cfg.dns     = http.arg("dns");
+static void handleConfigPost(AsyncWebServerRequest* req) {
+    String s;
+    if (argStr(req, "universe", s)) cfg.universe = constrain(s.toInt(), 0, 15);
+    if (argStr(req, "hostname", s) && s.length() > 0) cfg.hostname = s;
+    if (argStr(req, "otapw", s)    && s.length() > 0) cfg.otaPassword = s;
+    if (argStr(req, "protocol", s)) cfg.protocol = constrain(s.toInt(), 0, 2);
+    if (argStr(req, "ledtype", s))  cfg.ledType  = constrain(s.toInt(), 0, 2);
+    if (argStr(req, "ledpin", s))   cfg.ledPin   = constrain(s.toInt(), -1, 48);
+    cfg.staticIp = req->hasParam("staticip", true) || req->hasParam("staticip");
+    if (argStr(req, "ip", s))      cfg.ip      = s;
+    if (argStr(req, "gateway", s)) cfg.gateway = s;
+    if (argStr(req, "subnet", s))  cfg.subnet  = s;
+    if (argStr(req, "dns", s))     cfg.dns     = s;
     saveConfig();
-    http.send(200, "text/html", FPSTR(CONFIG_SAVED_HTML));
-    delay(400);
-    ESP.restart();
+    req->send_P(200, "text/html", CONFIG_SAVED_HTML);
+    pendingRebootAt = millis() + 600;
 }
 
 // ---------------------------------------------------------------------------
 // Channel labels — browser owns the JSON object, device just persists it
 // ---------------------------------------------------------------------------
-static void handleLabelsGet() {
-    http.send(200, "application/json", g_labels);
+static void handleLabelsGet(AsyncWebServerRequest* req) {
+    req->send(200, "application/json", g_labels);
 }
 
-static void handleLabelsPost() {
-    String body = http.arg("plain");
-    if (body.length() == 0 || body.length() > LABELS_MAX || body[0] != '{') {
-        http.send(400, "text/plain", "Invalid labels payload");
+// Body handler for POST /labels (raw JSON). Accumulates chunks then persists.
+static void handleLabelsBody(AsyncWebServerRequest* req, uint8_t* data, size_t len,
+                             size_t index, size_t total) {
+    static String buf;
+    if (index == 0) { buf = ""; buf.reserve(total + 1); }
+    if (total <= LABELS_MAX) buf.concat((const char*)data, len);
+    if (index + len != total) return;   // wait for the full body
+    if (buf.length() == 0 || buf.length() > LABELS_MAX || buf[0] != '{') {
+        req->send(400, "text/plain", "Invalid labels payload");
+        buf = "";
         return;
     }
-    g_labels = body;
+    g_labels = buf;
+    buf = "";
     prefs.begin(PREF_NS, false);
     prefs.putString("labels", g_labels);
     prefs.end();
-    http.send(200, "application/json", "{\"ok\":true}");
+    req->send(200, "application/json", "{\"ok\":true}");
 }
 
-static void handleAutoUpdatePost() {
-    cfg.autoUpdate = http.hasArg("enabled") && http.arg("enabled") == "1";
+static void handleAutoUpdatePost(AsyncWebServerRequest* req) {
+    String s;
+    cfg.autoUpdate = argStr(req, "enabled", s) && s == "1";
     saveConfig();
-    http.send(200, "application/json",
+    req->send(200, "application/json",
         String("{\"autoUpdate\":") + (cfg.autoUpdate ? "true" : "false") + "}");
 }
 
-static void handleResetGet()  { http.send(200, "text/html", FPSTR(RESET_HTML)); }
+static void handleResetGet(AsyncWebServerRequest* req)  { req->send_P(200, "text/html", RESET_HTML); }
 
-static void handleResetPost() {
-    http.send(200, "text/html", FPSTR(RESET_DONE_HTML));
-    delay(400);
+static void handleResetPost(AsyncWebServerRequest* req) {
+    req->send_P(200, "text/html", RESET_DONE_HTML);
     // Also drop static IP so recovery always comes back up on DHCP
     cfg.staticIp = false;
     saveConfig();
-#ifndef USE_ETHERNET
-    WiFiManager wm;
-    wm.resetSettings();
-#endif
-    ESP.restart();
+    pendingWifiReset = true;
+    pendingRebootAt  = millis() + 600;
 }
 
-static void handleLogo() {
-    http.sendHeader("Cache-Control", "max-age=86400");
-    http.send_P(200, "image/png", (const char*)LOGO_PNG, LOGO_PNG_LEN);
+static void handleLogo(AsyncWebServerRequest* req) {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/png", LOGO_PNG, LOGO_PNG_LEN);
+    r->addHeader("Cache-Control", "max-age=86400");
+    req->send(r);
 }
 
-static void handleBootstrapCss() {
-    http.sendHeader("Cache-Control", "max-age=604800");
-    http.sendHeader("Content-Encoding", "gzip");
-    http.send_P(200, "text/css", (const char*)BOOTSTRAP_MIN_CSS, BOOTSTRAP_MIN_CSS_LEN);
+static void handleBootstrapCss(AsyncWebServerRequest* req) {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/css", BOOTSTRAP_MIN_CSS, BOOTSTRAP_MIN_CSS_LEN);
+    r->addHeader("Content-Encoding", "gzip");
+    r->addHeader("Cache-Control", "max-age=604800");
+    req->send(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -803,9 +829,10 @@ static void doGithubOta() {
     ESP.restart();
 }
 
-static void handleOtaGithub() {
-    // Optional ?version=1.0.N (or form arg) selects a specific release; default latest
-    String v = http.arg("version");
+static void handleOtaGithub(AsyncWebServerRequest* req) {
+    // Optional version=1.0.N (POST/query) selects a specific release; default latest
+    String v;
+    argStr(req, "version", v);
     v.trim();
     if (v.length() == 0 || v == "latest") {
         otaTarget = "latest";
@@ -814,11 +841,11 @@ static void handleOtaGithub() {
         otaTarget = "v" + v;
     }
     Serial.printf("[OTA] Target requested: %s\n", otaTarget.c_str());
-    http.send(200, "text/html", FPSTR(OTA_PROGRESS_HTML));
+    req->send_P(200, "text/html", OTA_PROGRESS_HTML);
     pendingGithubOta = true;
 }
 
-static void handleOtaUploadDone() {
+static void handleOtaUploadDone(AsyncWebServerRequest* req) {
     bool ok = !Update.hasError();
     String p = FPSTR(OTA_DONE_HTML);
     p.replace("{{OTA_ICON}}",  ok ? "&#10003;" : "&#10007;");
@@ -826,21 +853,21 @@ static void handleOtaUploadDone() {
     p.replace("{{OTA_TITLE}}", ok ? "Firmware updated" : "Update failed");
     p.replace("{{OTA_MSG}}",   ok ? "Rebooting&hellip;" :
                                     String("Error: ") + Update.errorString());
-    http.send(200, "text/html", p);
-    if (ok) { delay(500); ESP.restart(); }
+    req->send(200, "text/html", p);
+    if (ok) pendingRebootAt = millis() + 800;
 }
 
-static void handleOtaUploadChunk() {
-    HTTPUpload& up = http.upload();
-    if (up.status == UPLOAD_FILE_START) {
-        Serial.printf("[OTA] Upload: %s\n", up.filename.c_str());
+static void handleOtaUploadChunk(AsyncWebServerRequest* req, const String& filename,
+                                 size_t index, uint8_t* data, size_t len, bool final) {
+    if (index == 0) {
+        Serial.printf("[OTA] Upload: %s\n", filename.c_str());
         dmxReady = false;
         Update.begin(UPDATE_SIZE_UNKNOWN);
-    } else if (up.status == UPLOAD_FILE_WRITE) {
-        Update.write(up.buf, up.currentSize);
-    } else if (up.status == UPLOAD_FILE_END) {
+    }
+    if (len) Update.write(data, len);
+    if (final) {
         Update.end(true);
-        Serial.printf("[OTA] Upload done: %u bytes\n", up.totalSize);
+        Serial.printf("[OTA] Upload done: %u bytes\n", (unsigned)(index + len));
     }
 }
 
@@ -970,9 +997,9 @@ void setup() {
     WiFi.mode(WIFI_STA);
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
     startWiFiManager(forcePortal);
-    // Disable WiFi modem sleep — otherwise the radio naps between beacons and
-    // adds 100ms+ latency per round-trip, making the web UI take many seconds.
-    WiFi.setSleep(false);
+    // NOTE: do NOT call WiFi.setSleep(false) — on this link it caused large
+    // transfers to stall mid-flight (the page would never finish loading).
+    // The default modem-sleep is stable; the async server keeps latency low.
     Serial.printf("[WiFi] %s / %s\n", netSSID().c_str(), netLocalIP().toString().c_str());
 #endif
 
@@ -1008,16 +1035,13 @@ void setup() {
     http.on("/version.json",      HTTP_GET,  handleVersionJson);
     http.on("/info.json",         HTTP_GET,  handleInfoJson);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
-    http.on("/labels",            HTTP_POST, handleLabelsPost);
+    http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
-    http.onNotFound([]() { http.send(404, "text/plain", "Not found"); });
-    http.begin();
+    http.onNotFound([](AsyncWebServerRequest* req) { req->send(404, "text/plain", "Not found"); });
 
-    ws.begin();
-    ws.onEvent(wsEvent);
-    // Reap dead clients, but leniently (ping 30 s, pong window 10 s, 2 misses)
-    // so a real browser is never dropped over a transient network hiccup.
-    ws.enableHeartbeat(30000, 10000, 2);
+    ws.onEvent(onWsEvent);
+    http.addHandler(&ws);
+    http.begin();
 
     lastFrameMs = millis();
     // LED on its own low-priority task so web traffic can't freeze it.
@@ -1030,13 +1054,17 @@ void setup() {
 // loop()
 // ---------------------------------------------------------------------------
 void loop() {
+    // AsyncWebServer + AsyncWebSocket run in their own task, so loop() never
+    // blocks on the network — only Art-Net/sACN input and DMX output here.
     if (cfg.protocol != 1) artnet.read();
     if (cfg.protocol != 0) readSacn();
     ArduinoOTA.handle();
-    http.handleClient();
-    ws.loop();
 
     uint32_t now = millis();
+
+    // Manual change from the web UI (WS handler set dmxBuf) — push it out
+    if (dmxDirty) { dmxDirty = false; sendDmx(); }
+
     if (now - lastWsPush >= 100) {
         wsPush();
         lastWsPush = now;
@@ -1046,6 +1074,12 @@ void loop() {
     if (now - lastMetaPush >= 2000) {
         wsPushMeta();
         lastMetaPush = now;
+    }
+
+    static uint32_t lastWsClean = 0;
+    if (now - lastWsClean >= 1000) {
+        ws.cleanupClients();
+        lastWsClean = now;
     }
 
     // Identify: refresh the channel on the wire so the fixture stays lit even
@@ -1064,12 +1098,21 @@ void loop() {
         doGithubOta();
     }
 
+    // Deferred reboot (config save / reset / OTA done) so the HTTP response
+    // can flush from the async task before we restart.
+    if (pendingRebootAt && now >= pendingRebootAt) {
+#ifndef USE_ETHERNET
+        if (pendingWifiReset) { WiFiManager wm; wm.resetSettings(); }
+#endif
+        ESP.restart();
+    }
+
     // Heap watchdog: log periodically so leaks/fragmentation are visible
     static uint32_t lastHeapLog = 0;
     if (now - lastHeapLog >= 10000) {
         lastHeapLog = now;
         Serial.printf("[HEAP] free=%u minFree=%u maxBlock=%u up=%lus ws=%u\n",
             ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap(),
-            (unsigned long)uptimeSec(), ws.connectedClients());
+            (unsigned long)uptimeSec(), ws.count());
     }
 }

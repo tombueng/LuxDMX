@@ -400,7 +400,7 @@ function drawSpark() {
 
 // WebSocket
 function connect() {
-  sock = new WebSocket('ws://' + location.hostname + ':81/');
+  sock = new WebSocket('ws://' + location.host + '/ws');
   sock.binaryType = 'arraybuffer';
   var badge = document.getElementById('ws-badge');
   sock.onopen  = function() { badge.textContent = 'Live';    badge.style.background = '#238636'; };
