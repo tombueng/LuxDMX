@@ -2,7 +2,7 @@
 
 # LumiGate
 
-**Art-Net / sACN (E1.31) → DMX512 Gateway** based on ESP32 / ESP32-S3 with a live web UI, WebSocket push, and manual DMX control via browser.
+**Art-Net / sACN (E1.31) → DMX512 Gateway** based on ESP32 / ESP32-S3 / WT32-ETH01 with a live web UI, WebSocket push, and manual DMX control via browser.
 
 | Status page | Settings page |
 |---|---|
@@ -33,13 +33,14 @@
 | **Status LED** | Plain GPIO or WS2812 RGB NeoPixel — color codes WiFi/idle/DMX active state |
 | **NVS persistence** | Universe, protocol, hostname, OTA password, LED config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Dual target** | Builds for ESP32 (WROOM-32) and ESP32-S3 (DevKitC-1) |
+| **Ethernet support** | WT32-ETH01: wired LAN via LAN8720, no WiFi required, DHCP |
+| **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
 
 ## Hardware
 
-### Bill of Materials
+### Bill of Materials — WiFi build (ESP32 / ESP32-S3)
 
 | # | Component | Description | Link |
 |---|---|---|---|
@@ -48,6 +49,18 @@
 | 3 | **XLR-5 female panel socket** | Standard DMX output connector (XLR-3 also works) | [Amazon.de search](https://www.amazon.de/s?k=XLR+5+Pin+Buchse+Panel) |
 | 4 | **Jumper wires / dupont cables** | Male–male for breadboard, or direct solder | any |
 | 5 | **USB-A to Micro-USB cable** | Power + serial flash | any |
+
+### Bill of Materials — Ethernet build (WT32-ETH01)
+
+| # | Component | Description | Link |
+|---|---|---|---|
+| 1 | **WT32-ETH01** | ESP32 + LAN8720 Ethernet PHY, built-in RJ45 | [Amazon.de search](https://www.amazon.de/s?k=WT32-ETH01) |
+| 2 | **Waveshare TTL to RS485 (C)** | Same as WiFi build | [Amazon.de – B0D4TZQYVG](https://www.amazon.de/dp/B0D4TZQYVG) |
+| 3 | **XLR-5 female panel socket** | Same as WiFi build | any |
+| 4 | **Ethernet cable** | Cat5e or better | any |
+| 5 | **5V power supply** (500 mA+) | WT32-ETH01 has no USB port — use a 5V supply on the VIN pin | any |
+
+> The WT32-ETH01 has a built-in RJ45 jack and LAN8720 PHY soldered on-board. No additional Ethernet module needed.
 
 **Optional for enclosure:**
 - Project box / DIN-rail enclosure
@@ -116,6 +129,19 @@ GND→  DMX XLR pin 1  (Shield/Ground)  [optional but recommended]
 | — | — | A (RS485+) | → | Pin 3 |
 | — | — | B (RS485–) | → | Pin 2 |
 | GND | — | GND | → | Pin 1 (optional) |
+
+#### WT32-ETH01 wiring (different pins — GPIO16 used by LAN8720)
+
+| WT32-ETH01 pin | → | Module pin | → | XLR pin |
+|---|---|---|---|---|
+| GPIO4 (TX) | → | RXD | — | — |
+| GPIO5 (RX) | ← | TXD | — | — |
+| 3.3V | → | VCC | — | — |
+| GND | → | GND | — | — |
+| — | — | A (RS485+) | → | Pin 3 |
+| — | — | B (RS485–) | → | Pin 2 |
+
+> **Do not use GPIO16 or GPIO17 on the WT32-ETH01** — they are connected to the LAN8720 Ethernet PHY (power and RMII).
 
 ---
 
@@ -268,6 +294,26 @@ esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 \
 
 > Replace `/dev/ttyUSB0` with your port (`/dev/tty.usbserial-*` on macOS).
 
+### macOS / Linux — WT32-ETH01
+
+```bash
+pip install esptool
+
+REPO=tombueng/LumiGate
+for f in firmware-wt32eth01.bin bootloader-wt32eth01.bin partitions-wt32eth01.bin boot_app0.bin; do
+  curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
+    | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
+      print(next(a['browser_download_url'] for a in assets if a['name']=='$f'))")" -o $f
+done
+
+# Enter boot mode (hold BOOT + press RST), then:
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
+  --before default_reset --after hard_reset \
+  write_flash -z --flash_mode dio --flash_freq 80m \
+  0x1000 bootloader-wt32eth01.bin 0x8000 partitions-wt32eth01.bin \
+  0xe000 boot_app0.bin 0x10000 firmware-wt32eth01.bin
+```
+
 ---
 
 ## Build & Flash
@@ -338,7 +384,11 @@ upload_flags    = --auth=dmxota
 
 ## First Setup
 
-### 1. Config Portal
+### WT32-ETH01 (Ethernet)
+
+No configuration needed. Connect an Ethernet cable, power on — DHCP assigns an IP automatically. Open `http://dmx-gateway.local` or check your router for the assigned IP. There is no WiFi portal.
+
+### 1. Config Portal (WiFi builds only)
 
 On first boot (or after WiFi reset), LumiGate opens a WiFi access point:
 
