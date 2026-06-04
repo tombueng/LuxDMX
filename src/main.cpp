@@ -1,8 +1,9 @@
 /*
  * LumiGate — Art-Net / sACN → DMX Gateway
- * ESP32 + Waveshare RS485 (C) — galvanically isolated, auto-direction
+ * ESP32 / ESP32-S3 / WT32-ETH01 + Waveshare RS485 (C)
  *
- * Pins: DMX TX=17, RX=16, DE/RE=auto (Waveshare), LED=2, BOOT=0
+ * Default pins: DMX TX=DEF_DMX_TX_PIN(17), RX=DEF_DMX_RX_PIN(16)
+ * WT32-ETH01:   DMX TX=4, RX=5  (GPIO16 used by LAN8720 power)
  */
 
 #include <Arduino.h>
@@ -11,7 +12,11 @@
 #include <Adafruit_NeoPixel.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#ifdef USE_ETHERNET
+#include <ETH.h>
+#else
 #include <WiFiManager.h>
+#endif
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <ESPmDNS.h>
@@ -38,8 +43,15 @@
 // ---------------------------------------------------------------------------
 // Hardware
 // ---------------------------------------------------------------------------
-static constexpr int        DMX_TX_PIN  = 17;
-static constexpr int        DMX_RX_PIN  = 16;
+#ifndef DEF_DMX_TX_PIN
+#define DEF_DMX_TX_PIN 17
+#endif
+#ifndef DEF_DMX_RX_PIN
+#define DEF_DMX_RX_PIN 16
+#endif
+
+static constexpr int        DMX_TX_PIN  = DEF_DMX_TX_PIN;
+static constexpr int        DMX_RX_PIN  = DEF_DMX_RX_PIN;
 static constexpr int        DMX_RTS_PIN = -1;
 static constexpr dmx_port_t DMX_PORT    = DMX_NUM_1;
 static constexpr int        BOOT_PIN    = 0;
@@ -95,6 +107,21 @@ static LogEntry dmxLog[LOG_SIZE] = {};
 static uint8_t  logHead  = 0;
 static uint8_t  logCount = 0;
 static uint32_t lastLogMs = 0;
+
+// ---------------------------------------------------------------------------
+// Network abstraction (WiFi vs Ethernet)
+// ---------------------------------------------------------------------------
+#ifdef USE_ETHERNET
+static bool      netConnected() { return ETH.linkUp() && ETH.localIP() != IPAddress(0,0,0,0); }
+static IPAddress netLocalIP()   { return ETH.localIP(); }
+static String    netSSID()      { return "Ethernet"; }
+static int       netRSSI()      { return 0; }
+#else
+static bool      netConnected() { return WiFi.status() == WL_CONNECTED; }
+static IPAddress netLocalIP()   { return WiFi.localIP(); }
+static String    netSSID()      { return WiFi.SSID(); }
+static int       netRSSI()      { return (int)WiFi.RSSI(); }
+#endif
 
 // ---------------------------------------------------------------------------
 // Global objects
@@ -302,7 +329,7 @@ static void maybeLog(const uint8_t* data, uint16_t len, uint32_t ip, uint8_t pro
 static void wsPush() {
     if (ws.connectedClients() == 0) return;
     uint16_t fpsI  = (uint16_t)(fps * 10.0f);
-    int16_t  rssi  = (int16_t)WiFi.RSSI();
+    int16_t  rssi  = (int16_t)netRSSI();
     uint32_t heap  = ESP.getFreeHeap();
     uint32_t upS   = uptimeSec();
     uint16_t jitI  = (uint16_t)(jitterMs * 10.0f < 65535.0f ? jitterMs * 10.0f : 65535.0f);
@@ -504,8 +531,8 @@ static void handleLogJson() {
 
 static void handleRoot() {
     String p = FPSTR(INDEX_HTML);
-    p.replace("{{SSID}}",     WiFi.SSID());
-    p.replace("{{IP}}",       WiFi.localIP().toString());
+    p.replace("{{SSID}}",     netSSID());
+    p.replace("{{IP}}",       netLocalIP().toString());
     p.replace("{{UNIVERSE}}", String(cfg.universe));
     p.replace("{{HOSTNAME}}", cfg.hostname);
     p.replace("{{VERSION}}",  FIRMWARE_VERSION);
@@ -567,8 +594,10 @@ static void handleResetGet()  { http.send(200, "text/html", FPSTR(RESET_HTML)); 
 static void handleResetPost() {
     http.send(200, "text/html", FPSTR(RESET_DONE_HTML));
     delay(400);
+#ifndef USE_ETHERNET
     WiFiManager wm;
     wm.resetSettings();
+#endif
     ESP.restart();
 }
 
@@ -671,8 +700,9 @@ static void handleOtaUploadChunk() {
 }
 
 // ---------------------------------------------------------------------------
-// WiFiManager
+// WiFiManager (WiFi builds only)
 // ---------------------------------------------------------------------------
+#ifndef USE_ETHERNET
 static bool wm_shouldSave = false;
 static char wm_universeStr[4] = "0";
 static void wmSaveCallback() { wm_shouldSave = true; }
@@ -693,6 +723,7 @@ static void startWiFiManager(bool forcePortal) {
         saveConfig();
     }
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Peripheral init
@@ -731,6 +762,14 @@ void setup() {
     initLed();
     pinMode(BOOT_PIN, INPUT_PULLUP);
 
+#ifdef USE_ETHERNET
+    ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_IN);
+    Serial.print("[ETH] waiting for link");
+    { uint32_t t = millis();
+      while (!netConnected() && millis() - t < 15000) { delay(200); Serial.print("."); } }
+    Serial.println();
+    Serial.printf("[ETH] %s\n", netLocalIP().toString().c_str());
+#else
     bool forcePortal = false;
     if (digitalRead(BOOT_PIN) == LOW) {
         Serial.print("[BOOT] button held, waiting...");
@@ -739,13 +778,13 @@ void setup() {
         forcePortal = (digitalRead(BOOT_PIN) == LOW);
         Serial.println(forcePortal ? " → config portal" : " released");
     }
-
     WiFi.persistent(false);
     WiFi.disconnect(true);
     delay(100);
     WiFi.mode(WIFI_STA);
     startWiFiManager(forcePortal);
-    Serial.printf("[WiFi] %s / %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
+    Serial.printf("[WiFi] %s / %s\n", netSSID().c_str(), netLocalIP().toString().c_str());
+#endif
 
     if (MDNS.begin(cfg.hostname.c_str())) {
         MDNS.addService("http",   "tcp", 80);
@@ -799,7 +838,7 @@ void loop() {
     ws.loop();
 
     uint32_t now = millis();
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!netConnected()) {
         setLedColor((now % 1000) < 100 ? NEO_RED   : NEO_OFF, (now % 1000) < 100);
     } else if (now - lastDmxMs < 300) {
         setLedColor(NEO_GREEN, true);
