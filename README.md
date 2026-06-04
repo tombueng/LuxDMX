@@ -489,7 +489,7 @@ LumiGate supports two LED types, configurable in the web UI:
 | LED type | Behavior |
 |---|---|
 | **Plain GPIO** (active high) | Off = no WiFi · Short pulse every 2 s = idle · Solid = DMX active |
-| **WS2812 RGB NeoPixel** | Red blink = no WiFi · Amber blink = idle · Solid green = DMX active |
+| **WS2812 RGB NeoPixel** | Red blink every 1 s = no WiFi · Amber blink every 2 s = idle (WiFi ok, no DMX) · Solid green = DMX active |
 
 Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48` (built-in WS2812).
 

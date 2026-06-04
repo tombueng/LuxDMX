@@ -71,18 +71,20 @@ body { background: var(--gh-bg); }
 .form-check-input:checked { background-color: var(--gh-accent); border-color: var(--gh-accent); }
 
 /* Channel modal */
-.modal-backdrop {
+.ch-overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(0,0,0,.75); z-index: 1040;
   align-items: center; justify-content: center;
 }
-.modal-backdrop.show { display: flex; }
+.ch-overlay.show { display: flex; }
 .modal-card {
-  background: var(--gh-surface);
+  background: #161b22;
   border: 1px solid var(--gh-border);
   border-radius: 10px;
   padding: 1.4rem;
   width: min(380px, 94vw);
+  position: relative;
+  z-index: 1;
 }
 .form-range::-webkit-slider-thumb { background: var(--gh-accent); }
 .form-range::-webkit-slider-runnable-track { background: #30363d; }
@@ -221,7 +223,7 @@ footer a:hover { color: var(--gh-text); }
 </div>
 
 <!-- Channel modal -->
-<div class="modal-backdrop" id="modal" onclick="if(event.target===this)closeModal()">
+<div class="ch-overlay" id="modal" onclick="if(event.target===this)closeModal()">
   <div class="modal-card">
     <div class="d-flex align-items-center justify-content-between mb-2">
       <span class="fw-semibold" id="modal-title">Channel</span>
