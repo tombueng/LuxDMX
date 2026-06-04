@@ -483,15 +483,23 @@ setInterval(pollData, 2000);
 
 // Firmware update check
 fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
-  if (d.update) {
-    document.getElementById('update-ver').textContent = d.latest;
-    document.getElementById('update-banner').style.display = 'block';
-    if (d.notes) {
+  if (!d.update) return;
+  document.getElementById('update-ver').textContent = d.latest;
+  document.getElementById('update-banner').style.display = 'block';
+  // Fetch changelog from GitHub API (browser-side — no extra load on device)
+  fetch('https://api.github.com/repos/tombueng/LumiGate/releases/tags/latest')
+    .then(function(r) { return r.json(); })
+    .then(function(rel) {
+      if (!rel.body) return;
+      // Strip the "Flash files:" section and show only the changes
+      var body = rel.body.split('\n').filter(function(l) {
+        return l.trim() && !l.match(/^Flash files:/i) && !l.match(/^-.*\.(bin|ps1)/i);
+      }).join('\n').trim();
+      if (!body) return;
       var pre = document.getElementById('update-notes');
-      pre.textContent = d.notes;
+      pre.textContent = body;
       pre.style.display = 'block';
-    }
-  }
+    }).catch(function() {});
 }).catch(function() {});
 </script>
 </body>

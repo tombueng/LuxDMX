@@ -155,7 +155,6 @@ static uint32_t lastWsPush   = 0;
 static uint32_t lastDmxMs    = 0;
 static bool     pendingGithubOta = false;
 static String   latestVersion   = "";
-static String   latestNotes     = "";
 static bool     updateAvailable = false;
 
 // Identify: temporarily force one channel to full on the wire to locate a fixture
@@ -528,17 +527,7 @@ static void handleVersionJson() {
     j += latestVersion.length() > 0 ? latestVersion : String(FIRMWARE_VERSION);
     j += "\",\"update\":";
     j += updateAvailable ? "true" : "false";
-    j += ",\"notes\":\"";
-    // Escape the notes for JSON: replace \ " and newlines
-    for (int i = 0; i < (int)latestNotes.length(); i++) {
-        char c = latestNotes[i];
-        if      (c == '"')  j += "\\\"";
-        else if (c == '\\') j += "\\\\";
-        else if (c == '\n') j += "\\n";
-        else if (c == '\r') {}
-        else                j += c;
-    }
-    j += "\"}";
+    j += "}";
     http.send(200, "application/json", j);
 }
 
@@ -736,10 +725,6 @@ static void checkForUpdate() {
     updateAvailable = parseBuild(v) > parseBuild(String(FIRMWARE_VERSION));
     Serial.printf("[VER] latest=%s current=%s update=%s\n",
         v.c_str(), FIRMWARE_VERSION, updateAvailable ? "yes" : "no");
-    if (!updateAvailable) return;
-    String n;
-    if (httpsGet("https://github.com/tombueng/LumiGate/releases/download/latest/changes.txt", n, 2000))
-        latestNotes = n;
 }
 
 static void versionCheckTask(void*) {
