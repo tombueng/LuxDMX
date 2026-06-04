@@ -899,9 +899,6 @@ void setup() {
         cfg.staticIp = false;
         saveConfig();
     }
-    WiFi.persistent(false);
-    WiFi.disconnect(true);
-    delay(100);
     WiFi.mode(WIFI_STA);
     startWiFiManager(forcePortal);
     Serial.printf("[WiFi] %s / %s\n", netSSID().c_str(), netLocalIP().toString().c_str());
