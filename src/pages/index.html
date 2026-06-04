@@ -106,7 +106,7 @@ footer a:hover { color: var(--gh-text); }
     <img src="/logo.png" alt="LumiGate">
     <div class="brand-text">
       <div class="name">LumiGate</div>
-      <div class="sub">{{HOSTNAME}}.local &nbsp;&middot;&nbsp; {{IP}} &nbsp;&middot;&nbsp; Universe {{UNIVERSE}} &nbsp;&middot;&nbsp; v{{VERSION}}</div>
+      <div class="sub" id="nav-sub">&nbsp;</div>
     </div>
   </a>
   <div class="nav-links">
@@ -270,6 +270,15 @@ footer a:hover { color: var(--gh-text); }
 const dmx = new Uint8Array(512);
 let activeCh = 0, sock;
 let labels = {};   // { "1": "Front L", ... }
+let devInfo = {};  // filled from /info.json
+
+// Device info for the nav subtitle (served statically now; values via JSON)
+fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
+  devInfo = d;
+  document.getElementById('nav-sub').innerHTML =
+    (d.hostname || '') + '.local &nbsp;&middot;&nbsp; ' + (d.ip || '') +
+    ' &nbsp;&middot;&nbsp; Universe ' + d.universe + ' &nbsp;&middot;&nbsp; v' + (d.version || '');
+}).catch(function(){});
 
 // Sparkline — 60 samples at 0.5 s = 30 s of history
 const SPARK_LEN = 60;

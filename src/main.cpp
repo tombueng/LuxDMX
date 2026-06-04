@@ -602,14 +602,32 @@ static void wsPushMeta() {
     ws.broadcastTXT(m);
 }
 
+// Static pages are served straight from PROGMEM (zero heap, no per-request
+// 19 KB String + replace churn that made serving pathologically slow).
+// Dynamic values are fetched client-side from /info.json.
 static void handleRoot() {
-    String p = FPSTR(INDEX_HTML);
-    p.replace("{{SSID}}",     netSSID());
-    p.replace("{{IP}}",       netLocalIP().toString());
-    p.replace("{{UNIVERSE}}", String(cfg.universe));
-    p.replace("{{HOSTNAME}}", cfg.hostname);
-    p.replace("{{VERSION}}",  FIRMWARE_VERSION);
-    http.send(200, "text/html", p);
+    http.send_P(200, "text/html", INDEX_HTML);
+}
+
+static void handleInfoJson() {
+    String j = "{";
+    j += "\"ssid\":\"";     j += netSSID();              j += "\",";
+    j += "\"ip\":\"";       j += netLocalIP().toString(); j += "\",";
+    j += "\"hostname\":\""; j += cfg.hostname;           j += "\",";
+    j += "\"version\":\"";  j += FIRMWARE_VERSION;       j += "\",";
+    j += "\"otapw\":\"";    j += cfg.otaPassword;        j += "\",";
+    j += "\"universe\":";   j += cfg.universe;           j += ",";
+    j += "\"protocol\":";   j += cfg.protocol;           j += ",";
+    j += "\"ledType\":";    j += cfg.ledType;            j += ",";
+    j += "\"ledPin\":";     j += cfg.ledPin;             j += ",";
+    j += "\"staticIp\":";   j += cfg.staticIp ? "true" : "false"; j += ",";
+    j += "\"sip\":\"";      j += cfg.ip;                 j += "\",";
+    j += "\"gateway\":\"";  j += cfg.gateway;            j += "\",";
+    j += "\"subnet\":\"";   j += cfg.subnet;             j += "\",";
+    j += "\"dns\":\"";      j += cfg.dns;                j += "\",";
+    j += "\"autoUpdate\":"; j += cfg.autoUpdate ? "true" : "false";
+    j += "}";
+    http.send(200, "application/json", j);
 }
 
 static void handleDmxJson() {
@@ -632,21 +650,7 @@ static void handleDmxJson() {
 }
 
 static void handleConfigGet() {
-    String p = FPSTR(CONFIG_HTML);
-    p.replace("{{UNIVERSE}}", String(cfg.universe));
-    p.replace("{{HOSTNAME}}", cfg.hostname);
-    p.replace("{{OTAPW}}",    cfg.otaPassword);
-    p.replace("{{VERSION}}",  FIRMWARE_VERSION);
-    p.replace("{{PROTOCOL}}", String(cfg.protocol));
-    p.replace("{{LED_PIN}}",  String(cfg.ledPin));
-    p.replace("{{LED_TYPE}}", String(cfg.ledType));
-    p.replace("{{STATIC_IP}}", cfg.staticIp ? "1" : "0");
-    p.replace("{{IP}}",        cfg.ip);
-    p.replace("{{GATEWAY}}",   cfg.gateway);
-    p.replace("{{SUBNET}}",    cfg.subnet);
-    p.replace("{{DNS}}",       cfg.dns);
-    p.replace("{{AUTO_UPDATE}}", cfg.autoUpdate ? "1" : "0");
-    http.send(200, "text/html", p);
+    http.send_P(200, "text/html", CONFIG_HTML);
 }
 
 static void handleConfigPost() {
@@ -966,6 +970,9 @@ void setup() {
     WiFi.mode(WIFI_STA);
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
     startWiFiManager(forcePortal);
+    // Disable WiFi modem sleep — otherwise the radio naps between beacons and
+    // adds 100ms+ latency per round-trip, making the web UI take many seconds.
+    WiFi.setSleep(false);
     Serial.printf("[WiFi] %s / %s\n", netSSID().c_str(), netLocalIP().toString().c_str());
 #endif
 
@@ -999,6 +1006,7 @@ void setup() {
     http.on("/ota/github",        HTTP_POST, handleOtaGithub);
     http.on("/ota/upload",        HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     http.on("/version.json",      HTTP_GET,  handleVersionJson);
+    http.on("/info.json",         HTTP_GET,  handleInfoJson);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, handleLabelsPost);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
@@ -1007,10 +1015,9 @@ void setup() {
 
     ws.begin();
     ws.onEvent(wsEvent);
-    // Reap dead clients: ping every 15 s, expect pong within 3 s, drop after 2 misses.
-    // Without this, browser tabs that close uncleanly leak connection slots until
-    // the server stops accepting new connections (web UI becomes unreachable).
-    ws.enableHeartbeat(15000, 3000, 2);
+    // Reap dead clients, but leniently (ping 30 s, pong window 10 s, 2 misses)
+    // so a real browser is never dropped over a transient network hiccup.
+    ws.enableHeartbeat(30000, 10000, 2);
 
     lastFrameMs = millis();
     // LED on its own low-priority task so web traffic can't freeze it.
