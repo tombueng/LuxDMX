@@ -713,35 +713,33 @@ static int parseBuild(const String& v) {
     return dot >= 0 ? v.substring(dot + 1).toInt() : 0;
 }
 
-static void checkForUpdate() {
+static bool httpsGet(const char* url, String& out, size_t maxLen) {
     WiFiClientSecure client;
     client.setInsecure();
-    HTTPClient http2;
-    http2.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-
-    if (!http2.begin(client, "https://github.com/tombueng/LumiGate/releases/download/latest/version.txt")) return;
-    int code = http2.GET();
-    if (code == 200) {
-        String v = http2.getString();
-        v.trim();
-        if (v.length() > 0 && v.length() < 24) {
-            latestVersion   = v;
-            updateAvailable = parseBuild(v) > parseBuild(String(FIRMWARE_VERSION));
-            Serial.printf("[VER] latest=%s current=%s update=%s\n",
-                v.c_str(), FIRMWARE_VERSION, updateAvailable ? "yes" : "no");
-        }
+    HTTPClient h;
+    h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+    if (!h.begin(client, url)) return false;
+    bool ok = false;
+    if (h.GET() == 200) {
+        String s = h.getString();
+        s.trim();
+        if (s.length() > 0 && s.length() <= maxLen) { out = s; ok = true; }
     }
-    http2.end();
+    h.end();
+    return ok;
+}
 
+static void checkForUpdate() {
+    String v;
+    if (!httpsGet("https://github.com/tombueng/LumiGate/releases/download/latest/version.txt", v, 24)) return;
+    latestVersion   = v;
+    updateAvailable = parseBuild(v) > parseBuild(String(FIRMWARE_VERSION));
+    Serial.printf("[VER] latest=%s current=%s update=%s\n",
+        v.c_str(), FIRMWARE_VERSION, updateAvailable ? "yes" : "no");
     if (!updateAvailable) return;
-    if (!http2.begin(client, "https://github.com/tombueng/LumiGate/releases/download/latest/changes.txt")) return;
-    code = http2.GET();
-    if (code == 200) {
-        String n = http2.getString();
-        n.trim();
-        if (n.length() > 0 && n.length() < 2000) latestNotes = n;
-    }
-    http2.end();
+    String n;
+    if (httpsGet("https://github.com/tombueng/LumiGate/releases/download/latest/changes.txt", n, 2000))
+        latestNotes = n;
 }
 
 static void versionCheckTask(void*) {
@@ -948,7 +946,7 @@ void setup() {
     ws.onEvent(wsEvent);
 
     lastFrameMs = millis();
-    xTaskCreate(versionCheckTask, "ver_chk", 8192, nullptr, 1, nullptr);
+    xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr);
     Serial.println("[BOOT] ready.");
 }
 
