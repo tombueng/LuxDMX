@@ -11,6 +11,9 @@ const OUT         = 'C:/dev/DMX/docs';
 const VID_RAW     = OUT + '/video-raw';
 const RUN_OTA     = process.env.LUMIGATE_OTA === '1';   // off by default (reflashes device)
 const RUN_VIDEO   = process.env.LUMIGATE_NOVIDEO !== '1';
+const RUN_SHOTS   = process.env.LUMIGATE_NOSHOT !== '1';
+const VID_W       = 1920;                                // Full-HD walkthrough recording
+const VID_H       = 1080;
 
 async function resolveBase() {
   if (process.env.LUMIGATE_URL) return process.env.LUMIGATE_URL;
@@ -27,21 +30,35 @@ const BASE = await resolveBase();
 mkdirSync(OUT, { recursive: true });
 console.log('device:', BASE);
 
-// A visible cursor + click ripple so the walkthrough video is readable.
+// A visible cursor with a pulsing click ripple so the walkthrough is easy to follow.
 const CURSOR_JS = `(() => {
   if (window.__cursor) return; window.__cursor = 1;
+  const root = document.documentElement;
+  const style = document.createElement('style');
+  style.textContent =
+    '@keyframes lgRipple{0%{opacity:.55;transform:translate(-50%,-50%) scale(.25)}'
+    + '100%{opacity:0;transform:translate(-50%,-50%) scale(2.8)}}';
+  root.appendChild(style);
   const dot = document.createElement('div');
-  dot.style.cssText = 'position:fixed;z-index:2147483647;width:20px;height:20px;left:0;top:0;'
-    + 'margin:-10px 0 0 -10px;border-radius:50%;background:rgba(88,166,255,.55);'
-    + 'border:2px solid #fff;box-shadow:0 0 8px rgba(0,0,0,.6);pointer-events:none;'
-    + 'transition:width .08s,height .08s,margin .08s;';
-  const add = () => (document.body || document.documentElement).appendChild(dot);
+  dot.style.cssText = 'position:fixed;z-index:2147483647;width:22px;height:22px;left:0;top:0;'
+    + 'margin:-11px 0 0 -11px;border-radius:50%;background:rgba(88,166,255,.5);'
+    + 'border:2px solid #fff;box-shadow:0 0 10px rgba(0,0,0,.7);pointer-events:none;'
+    + 'transition:transform .08s;';
+  const add = () => (document.body || root).appendChild(dot);
   if (document.body) add(); else addEventListener('DOMContentLoaded', add);
-  addEventListener('mousemove', e => { dot.style.left = e.clientX + 'px'; dot.style.top = e.clientY + 'px'; }, true);
-  const press = down => { const s = down ? '12px' : '20px', m = down ? '-6px' : '-10px';
-    dot.style.width = dot.style.height = s; dot.style.margin = m + ' 0 0 ' + m; };
-  addEventListener('mousedown', () => press(true), true);
-  addEventListener('mouseup',   () => press(false), true);
+  let x = 0, y = 0;
+  addEventListener('mousemove', e => { x = e.clientX; y = e.clientY;
+    dot.style.left = x + 'px'; dot.style.top = y + 'px'; }, true);
+  addEventListener('mousedown', () => {
+    dot.style.transform = 'scale(.65)';
+    const r = document.createElement('div');
+    r.style.cssText = 'position:fixed;z-index:2147483646;left:' + x + 'px;top:' + y + 'px;'
+      + 'width:44px;height:44px;border-radius:50%;border:3px solid #58a6ff;'
+      + 'pointer-events:none;animation:lgRipple .6s ease-out forwards;';
+    (document.body || root).appendChild(r);
+    setTimeout(() => r.remove(), 650);
+  }, true);
+  addEventListener('mouseup', () => { dot.style.transform = 'scale(1)'; }, true);
 })();`;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,29 +149,89 @@ async function shoot(browser) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function recordDemo(browser) {
   const ctx = await browser.newContext({
-    viewport: { width: 1280, height: 800 },
-    recordVideo: { dir: VID_RAW, size: { width: 1280, height: 800 } },
+    viewport: { width: VID_W, height: VID_H },
+    deviceScaleFactor: 1,
+    recordVideo: { dir: VID_RAW, size: { width: VID_W, height: VID_H } },
   });
   await ctx.addInitScript(CURSOR_JS);
   const page = await ctx.newPage();
   page.setDefaultNavigationTimeout(60000);
   page.setDefaultTimeout(20000);
 
-  const pause = ms => page.waitForTimeout(ms);
+  const SLOW = 1.5;                              // global pacing multiplier
+  const ease = t => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
+  const pause = ms => page.waitForTimeout(Math.round(ms * SLOW));
+  let cur = { x: VID_W / 2, y: VID_H / 2 };
+
+  // Smoothly glide the (visible) cursor from its last position to (x, y).
+  async function glide(x, y, ms = 520) {
+    const dur = ms * SLOW, steps = Math.max(14, Math.round(dur / 16));
+    const sx = cur.x, sy = cur.y;
+    for (let i = 1; i <= steps; i++) {
+      const e = ease(i / steps);
+      await page.mouse.move(sx + (x - sx) * e, sy + (y - sy) * e);
+      await page.waitForTimeout(16);
+    }
+    cur = { x, y };
+  }
+  const boxOf = async sel => page.locator(sel).first().boundingBox();
   async function moveTo(sel, frac = 0.5) {
-    const el = page.locator(sel).first();
-    await el.scrollIntoViewIfNeeded();
-    await pause(150);
-    const b = await el.boundingBox();
+    const b = await boxOf(sel);
     if (!b) return null;
     const x = b.x + b.width * frac, y = b.y + b.height / 2;
-    await page.mouse.move(x, y, { steps: 22 });
+    await glide(x, y);
     return { x, y, b };
   }
   async function click(sel, frac = 0.5) {
     const p = await moveTo(sel, frac);
     if (!p) return;
-    await pause(250); await page.mouse.click(p.x, p.y); await pause(450);
+    await pause(220);
+    await page.mouse.down(); await page.waitForTimeout(70); await page.mouse.up();
+    await pause(360);
+  }
+
+  // Butter-smooth, eased programmatic scroll (captured frame-by-frame in the video).
+  async function smoothScroll(targetY, ms = 1300) {
+    await page.evaluate(({ targetY, ms }) => new Promise(res => {
+      const startY = window.scrollY, dist = targetY - startY, t0 = performance.now();
+      (function step(now) {
+        const t = Math.min(1, (now - t0) / ms);
+        const e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        window.scrollTo(0, startY + dist * e);
+        if (t < 1) requestAnimationFrame(step); else res();
+      })(performance.now());
+    }), { targetY, ms: ms * SLOW });
+    await pause(120);
+  }
+  async function scrollToEl(sel, margin = 150) {
+    const y = await page.evaluate(s => window.scrollY + document.querySelector(s).getBoundingClientRect().top, sel);
+    await smoothScroll(Math.max(0, y - margin));
+  }
+
+  // Open a <select> in-page (size = option count) so the expanded list is visible
+  // in the recording, glide over to the chosen option, pick it, then collapse.
+  async function pickOption(sel, value) {
+    await moveTo(sel);
+    await pause(250);
+    await page.locator(sel).first().evaluate(el => {
+      el.dataset.lgz = el.style.zIndex; el.style.position = 'relative'; el.style.zIndex = '50';
+      el.size = el.options.length;
+    });
+    await pause(550);
+    const ob = await page.evaluate(({ sel, value }) => {
+      const el = document.querySelector(sel);
+      const opt = [...el.options].find(o => o.value === value) || el.options[0];
+      const r = opt.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, { sel, value });
+    await glide(ob.x, ob.y, 460);
+    await pause(250);
+    await page.mouse.down(); await page.waitForTimeout(70); await page.mouse.up();
+    await page.locator(sel).first().evaluate((el, v) => {
+      el.value = v; el.size = 0; el.style.zIndex = el.dataset.lgz || ''; el.blur();
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
+    await pause(550);
   }
 
   try {
@@ -193,61 +270,74 @@ async function recordDemo(browser) {
     const s = await page.locator('#ch-slider').boundingBox();
     if (s) {
       const y = s.y + s.height / 2;
-      await page.mouse.move(s.x + 4, y, { steps: 10 });
+      await glide(s.x + 6, y, 400);
       await page.mouse.down();
-      await page.mouse.move(s.x + s.width - 4, y, { steps: 40 });
-      await pause(400);
-      await page.mouse.move(s.x + 4, y, { steps: 40 });
-      await pause(300);
-      await page.mouse.move(s.x + s.width * 0.6, y, { steps: 30 });
+      await glide(s.x + s.width - 6, y, 1100);     // sweep up
+      await pause(350);
+      await glide(s.x + 6, y, 1100);               // sweep down
+      await pause(250);
+      await glide(s.x + s.width * 0.6, y, 800);    // settle mid
       await page.mouse.up();
       await pause(600);
     }
   }
   await click('button[onclick="setQuick(0)"]');     // Off
-  await pause(400);
+  await pause(450);
   await click('button[onclick="setQuick(128)"]');   // 50%
-  await pause(400);
+  await pause(450);
   await click('button[onclick="setQuick(255)"]');   // Full
-  await pause(500);
+  await pause(550);
   await click('button[onclick="identify()"]');      // Identify flash
-  await pause(1600);
+  await pause(1700);
   await click('button[onclick="closeModal()"]');    // Done
-  await pause(700);
+  await pause(800);
 
   // Blackout everything
   await click('button[onclick="sendBlackout()"]');
-  await pause(1500);
+  await pause(1600);
 
   // ── SETTINGS PAGE ────────────────────────────────────────────────────────────
   await page.goto(BASE + '/config', { waitUntil: 'domcontentloaded' });
   await pause(2200);
 
-  // Protocol dropdown
-  await page.selectOption('#proto-sel', '0'); await pause(700);
-  await page.selectOption('#proto-sel', '1'); await pause(700);
-  await page.selectOption('#proto-sel', '2'); await pause(700);
+  // Protocol dropdown — expand it so every option is visible, then pick
+  await scrollToEl('#proto-sel', 200);
+  await pickOption('#proto-sel', '1');              // sACN only
+  await pickOption('#proto-sel', '2');              // Both (back to device default)
 
-  // Universe spinner
+  // Universe spinner (hint text below updates live)
   await click('#uni-inp');
-  await page.fill('#uni-inp', '4'); await page.dispatchEvent('#uni-inp', 'input'); await pause(900);
-  await page.fill('#uni-inp', '0'); await page.dispatchEvent('#uni-inp', 'input'); await pause(600);
+  await page.fill('#uni-inp', '4'); await page.dispatchEvent('#uni-inp', 'input'); await pause(1000);
+  await page.fill('#uni-inp', '0'); await page.dispatchEvent('#uni-inp', 'input'); await pause(700);
 
-  // Static IP toggle reveals the network fields
-  await click('#static-sw'); await pause(1200);
-  await click('#static-sw'); await pause(800);
+  // Network — static IP toggle reveals the address fields
+  await scrollToEl('.card:has(#static-sw)', 130);
+  await click('#static-sw'); await pause(1400);     // reveal fields
+  await click('#static-sw'); await pause(900);      // hide again
 
-  // LED type
-  await page.selectOption('#led-type', '1'); await pause(700);
-  await page.selectOption('#led-type', '2'); await pause(700);
+  // Status LED type — expand the dropdown to show all three options
+  await scrollToEl('#led-type', 200);
+  await pickOption('#led-type', '1');               // Plain GPIO
+  await pickOption('#led-type', '2');               // WS2812 RGB (back to device default)
 
-  // Scroll through the firmware version table + auto-update toggle
-  await moveTo('#auto-update-sw'); await pause(900);
-  await moveTo('#ver-rows'); await pause(1400);
+  // Device card (hostname / OTA password)
+  await scrollToEl('#dev-host', 160);
+  await moveTo('#dev-host'); await pause(1000);
+
+  // Firmware Update — auto-update toggle + the live GitHub version table
+  await scrollToEl('#auto-update-sw', 150);
+  await moveTo('#auto-update-sw'); await pause(1100);
+  await scrollToEl('#ver-rows', 160);
+  await pause(1600);
 
   // Danger zone confirm checkbox (do NOT submit)
-  await click('#confirm-reset'); await pause(900);
-  await click('#confirm-reset'); await pause(700);  // un-tick again
+  await scrollToEl('#confirm-reset', 200);
+  await click('#confirm-reset'); await pause(1000);
+  await click('#confirm-reset'); await pause(800);  // un-tick again
+
+  // Smooth scroll back to the top to round off the settings tour
+  await smoothScroll(0, 1500);
+  await pause(800);
 
   // ── Leave the device exactly as found ───────────────────────────────────────
   await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
@@ -275,11 +365,12 @@ async function recordDemo(browser) {
   const pal = VID_RAW + '/palette.png';
   console.log('encoding mp4...');
   execSync(`ffmpeg -y -i "${webm}" -movflags +faststart -pix_fmt yuv420p `
-         + `-vf "scale=1280:-2" -c:v libx264 -crf 24 "${mp4}"`, { stdio: 'inherit' });
+         + `-vf "scale=${VID_W}:-2" -c:v libx264 -preset slow -crf 18 "${mp4}"`, { stdio: 'inherit' });
   console.log('encoding gif...');
-  const GIF_VF = 'fps=10,scale=760:-1:flags=lanczos';
-  execSync(`ffmpeg -y -i "${webm}" -vf "${GIF_VF},palettegen=max_colors=128:stats_mode=diff" "${pal}"`, { stdio: 'inherit' });
-  execSync(`ffmpeg -y -i "${webm}" -i "${pal}" -filter_complex `
+  // Short, inline-friendly teaser (the YouTube link carries the full tour).
+  const GIF_T = '28', GIF_VF = 'fps=10,scale=760:-1:flags=lanczos';
+  execSync(`ffmpeg -y -t ${GIF_T} -i "${webm}" -vf "${GIF_VF},palettegen=max_colors=128:stats_mode=diff" "${pal}"`, { stdio: 'inherit' });
+  execSync(`ffmpeg -y -t ${GIF_T} -i "${webm}" -i "${pal}" -filter_complex `
          + `"${GIF_VF}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3" "${gif}"`, { stdio: 'inherit' });
   console.log('video done:', mp4, gif);
 }
@@ -287,7 +378,7 @@ async function recordDemo(browser) {
 // ─────────────────────────────────────────────────────────────────────────────
 const browser = await chromium.launch();
 try {
-  await shoot(browser);
+  if (RUN_SHOTS) await shoot(browser);
   if (RUN_VIDEO) {
     if (existsSync(VID_RAW)) rmSync(VID_RAW, { recursive: true, force: true });
     await recordDemo(browser);
