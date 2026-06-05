@@ -1015,13 +1015,21 @@ void setup() {
         saveConfig();
     }
     WiFi.mode(WIFI_STA);
+    // Mesh / multi-AP networks: scan ALL channels and associate with the
+    // STRONGEST AP for the SSID instead of the first one found. Without this
+    // the ESP32 often latches onto a distant AP (weak RSSI) and gets steered
+    // off it repeatedly (802.11k/v/r), causing constant reconnect churn.
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
     startWiFiManager(forcePortal);
     // Disable WiFi power save: with modem-sleep the station misses buffered
     // multicast (sACN) and IGMP queries, causing periodic ~0.3-0.5s reception
     // gaps. WIFI_PS_NONE keeps the radio awake for reliable multicast.
     WiFi.setSleep(WIFI_PS_NONE);
-    Serial.printf("[WiFi] %s / %s\n", netSSID().c_str(), netLocalIP().toString().c_str());
+    Serial.printf("[WiFi] %s / %s  rssi=%d  bssid=%s\n",
+        netSSID().c_str(), netLocalIP().toString().c_str(),
+        (int)WiFi.RSSI(), WiFi.BSSIDstr().c_str());
 #endif
 
     if (MDNS.begin(cfg.hostname.c_str())) {
@@ -1129,10 +1137,10 @@ void loop() {
     if (WiFi.status() == WL_CONNECTED) {
         lastWifiOk = now;
     } else if (now - lastWifiOk > 5000 && now - lastReconnect > 10000) {
-        Serial.printf("[WiFi] link down (status=%d), reconnecting... up=%lus\n",
+        Serial.printf("[WiFi] link down (status=%d), re-scanning for strongest AP... up=%lus\n",
             (int)WiFi.status(), (unsigned long)uptimeSec());
         WiFi.disconnect();
-        WiFi.reconnect();
+        WiFi.begin();   // re-scans all channels, reconnects to strongest BSSID
         lastReconnect = now;
     }
 #endif
