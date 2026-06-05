@@ -25,7 +25,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Art-Net → DMX512** | Full 512-channel, unicast or broadcast, universe configurable (0–15) |
 | **sACN / E1.31 → DMX512** | Multicast receive, universe configurable, runs alongside Art-Net |
 | **Protocol selection** | Art-Net only / sACN only / Both — configurable in web UI |
-| **Live Web UI** | Bootstrap 5 dark theme, WebSocket push ~25 fps, all 512 channels visible |
+| **Live Web UI** | Bootstrap 5 dark theme, WebSocket push (~10/s), all 512 channels visible |
 | **Sender list** | Shows all active Art-Net / sACN senders with per-sender FPS |
 | **Conflict detection** | Warning banner when multiple senders are active simultaneously |
 | **Jitter stat** | Real-time inter-frame timing deviation (EMA) |
@@ -36,8 +36,11 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Manual DMX control** | Click any channel in browser, set value via slider |
 | **Blackout button** | Zero all channels instantly from browser |
 | **Art-Net / Manual toggle** | Switch between protocol passthrough and manual override |
+| **Failsafe output** | Continuous 40 Hz DMX refresh holds the last frame through brief input gaps |
 | **Static IP or DHCP** | Configurable static IP/gateway/subnet/DNS, or automatic DHCP |
+| **Mesh-aware WiFi** | Scans all channels and joins the **strongest** AP (multi-AP/mesh friendly) |
 | **WiFi Config Portal** | First-boot AP + captive portal via WiFiManager |
+| **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click GitHub update |
 | **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
@@ -214,12 +217,12 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 | `someweisguy/esp_dmx ^4.1` | DMX512 transmit via UART |
 | `rstephan/ArtnetWifi ^1.5` | Art-Net UDP receiver (port 6454) |
 | `tzapu/WiFiManager ^2.0` | WiFi config portal |
-| `links2004/WebSockets ^2.4` | WebSocket server (port 81) |
+| `ESP32Async/ESPAsyncWebServer` | Non-blocking HTTP server + WebSocket (port 80) |
+| `ESP32Async/AsyncTCP` | Async TCP backend (runs networking off the main loop) |
 | `adafruit/Adafruit NeoPixel ^1.12` | WS2812 RGB status LED support |
 | `ArduinoOTA` | OTA firmware updates |
 | `ESPmDNS` | mDNS (`dmx-gateway.local`) |
 | `Preferences` | NVS persistent config |
-| `WebServer` | HTTP server (port 80) |
 | *(built-in UDP)* | sACN / E1.31 multicast receive (port 5568) |
 
 ---
@@ -408,6 +411,15 @@ On first boot (or after WiFi reset), LumiGate opens a WiFi access point:
 - Select your network, enter password, set Art-Net Universe (default: `0`)
 - Click **Save** → LumiGate connects and reboots
 
+> **Mesh / multi-AP WiFi:** LumiGate scans all channels and joins the
+> **strongest** AP for your SSID (and re-picks it on reconnect), so it won't
+> latch onto a distant node. The ESP32 is **2.4 GHz only** — make sure the AP
+> nearest the device broadcasts 2.4 GHz. Check `rssi` on the status page: a
+> healthy link is roughly −40 to −65 dBm. If it sits near −80 dBm right next to
+> a router, the nearby node likely isn't offering 2.4 GHz — use a dedicated
+> 2.4 GHz IoT SSID, or the **WT32-ETH01 (Ethernet) build** for a wired,
+> rock-solid connection.
+
 ### 2. Status Page
 
 Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 baud):
@@ -434,21 +446,29 @@ After reset, connect to the `DMX-Gateway` access point (no password) and follow 
 
 ## Web UI
 
+The HTTP server and WebSocket are served by ESPAsyncWebServer (non-blocking),
+so the web UI never stalls DMX output. Pages are gzip-compressed and dynamic
+values are fetched as JSON.
+
 | URL | Method | Function |
 |---|---|---|
-| `/` | GET | Live status + 512-channel DMX grid |
-| `/config` | GET / POST | Change universe, protocol, hostname, OTA password, LED config |
+| `/` | GET | Live status + 512-channel DMX grid (gzip) |
+| `/config` | GET / POST | Change universe, protocol, static IP, hostname, OTA password, LED config (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
+| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
-| `/senders.json` | GET | Active Art-Net / sACN senders with FPS and last-seen age |
-| `/log.json` | GET | Recent DMX change log entries (up to 50, newest first) |
-| `/version.json` | GET | Current firmware version + latest GitHub release |
+| `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
+| `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
+| `/labels.json` | GET | Channel labels object |
+| `/labels` | POST | Store the full labels object (JSON body) |
+| `/version.json` | GET | Current firmware version + update-available flag |
+| `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
-| `/ota/github` | POST | Download and flash latest release from GitHub |
+| `/ota/github` | POST | Install a release from GitHub (`version=latest` or `1.0.N`) |
 
-### WebSocket (port 81)
+### WebSocket (`ws://<device>/ws`, port 80)
 
-Binary push frame at up to 25 fps (528 bytes):
+Binary status/DMX frame pushed ~10×/s (528 bytes):
 
 ```
 Bytes  0–1    fps × 10           uint16 big-endian
@@ -461,6 +481,9 @@ Bytes  14–15  jitter × 10 (ms)   uint16 big-endian
 Bytes  16–527 DMX ch 1–512       uint8[512]
 ```
 
+A JSON **text** frame with the sender list + change log is pushed every 2 s
+(`{"meta":1,"senders":[…],"log":[…]}`) so the browser never has to poll.
+
 Browser → ESP32 (JSON text):
 ```json
 { "type": "set",      "ch": 1,  "val": 200 }
@@ -469,11 +492,7 @@ Browser → ESP32 (JSON text):
 { "type": "identify", "ch": 5              }
 ```
 
-Channel labels are managed over REST, not the WebSocket:
-```
-GET  /labels.json          → { "1": "Front L", "5": "Haze" }
-POST /labels  (JSON body)  → store the full labels object
-```
+Channel labels are managed over REST (`GET /labels.json`, `POST /labels`).
 
 ---
 
@@ -494,10 +513,18 @@ POST /labels  (JSON body)  → store the full labels object
 
 LumiGate supports two LED types, configurable in the web UI:
 
-| LED type | Behavior |
-|---|---|
-| **Plain GPIO** (active high) | Off = no WiFi · Short pulse every 2 s = idle · Solid = DMX active |
-| **WS2812 RGB NeoPixel** | Red blink every 1 s = no WiFi · Amber blink every 2 s = idle (WiFi ok, no DMX) · Solid green = DMX active |
+| State | WS2812 RGB | Plain GPIO |
+|---|---|---|
+| Booting | white | on |
+| Connecting to WiFi | blue blink | blink |
+| Config portal / AP active | purple | on |
+| No WiFi (lost) | red blink (fast) | off |
+| Idle (connected, no DMX) | amber heartbeat (½ s on/off) | pulse |
+| DMX active | solid green | solid |
+
+The "DMX active" green is held through brief input gaps (continuous 40 Hz
+output), so momentary multicast loss doesn't flicker the LED. The LED runs on
+its own task, so serving the web UI never freezes it.
 
 Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48` (built-in WS2812).
 
@@ -509,10 +536,12 @@ Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48`
 |---|---|---|
 | Art-Net Universe | `0` | Web `/config` or portal |
 | Protocol | `Both (Art-Net + sACN)` | Web `/config` |
+| Static IP / gateway / subnet / DNS | DHCP | Web `/config` (Network) |
+| Auto-update | off | Web `/config` (Firmware) |
+| Channel labels | — | Status page (channel modal) |
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password | `dmxota` | Web `/config` |
-| LED type | board default | Web `/config` |
-| LED GPIO pin | board default | Web `/config` |
+| LED type / GPIO pin | board default | Web `/config` |
 | WiFi credentials | — | Config portal or `/reset` |
 
 ---
