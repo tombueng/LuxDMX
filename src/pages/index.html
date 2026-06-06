@@ -215,6 +215,30 @@ footer a:hover { color: var(--gh-text); }
     </div>
   </div>
 
+  <!-- Fixtures (RDM) -->
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <span>Fixtures (RDM)</span>
+      <button class="btn btn-primary btn-sm py-0" id="rdm-discover" onclick="rdmDiscover()">Discover</button>
+    </div>
+    <div class="card-body p-0">
+      <div id="rdm-status" class="text-secondary small px-3 py-2">Loading…</div>
+      <table class="table table-sm mb-0 snd-tbl" id="rdm-table"
+             style="--bs-table-bg:transparent;display:none">
+        <thead>
+          <tr>
+            <th class="ps-3">UID</th>
+            <th>Model / Software</th>
+            <th>Footprint</th>
+            <th>Start addr</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rdm-body"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Change Log -->
   <div class="card mb-3">
     <div class="card-header">Change Log</div>
@@ -493,6 +517,79 @@ function updateLog(data) {
 
 // Senders + log now arrive over the WebSocket (see sock.onmessage) — no HTTP
 // polling, which previously exhausted the device's TCP sockets.
+
+// ── RDM fixtures ────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+  });
+}
+function rdmId(uid) { return 'rdma_' + uid.replace(/[^0-9A-Fa-f]/g, ''); }
+
+function rdmRender(d) {
+  var st = document.getElementById('rdm-status');
+  var tbl = document.getElementById('rdm-table');
+  var btn = document.getElementById('rdm-discover');
+  var has = d.devices && d.devices.length;
+  btn.disabled = !d.available || d.busy;
+
+  if (!d.available) {
+    st.textContent = 'RDM disabled — set an RTS/DE pin in Settings to enable discovery.';
+  } else if (d.busy) {
+    st.textContent = 'Scanning the line…';
+    setTimeout(rdmRefresh, 1000);
+  } else if (!has) {
+    st.textContent = d.scanned ? 'No RDM fixtures found.' : 'Click Discover to scan the line.';
+  }
+  st.style.display = has ? 'none' : '';
+  tbl.style.display = has ? '' : 'none';
+  if (!has) return;
+
+  document.getElementById('rdm-body').innerHTML = d.devices.map(function(f) {
+    var idCls = f.identify ? 'btn-warning' : 'btn-outline-warning';
+    var sens = (f.sensors || []).map(function(s) {
+      return esc(s.name) + ' ' + s.value + (s.unit ? ' ' + esc(s.unit) : '');
+    }).join(' · ');
+    return '<tr>' +
+      '<td class="ps-3" style="font-family:monospace">' + esc(f.uid) + '</td>' +
+      '<td><div>' + (f.model ? 'model ' + f.model : '&mdash;') +
+        (f.persCount > 1 ? ' <span class="text-secondary">(pers ' + f.pers + '/' + f.persCount + ')</span>' : '') +
+        '</div>' +
+        (f.sw ? '<div class="text-secondary" style="font-size:.7rem">' + esc(f.sw) + '</div>' : '') +
+        (sens ? '<div class="text-secondary" style="font-size:.7rem">' + sens + '</div>' : '') +
+        '</td>' +
+      '<td>' + f.footprint + '</td>' +
+      '<td><input type="number" min="1" max="512" value="' + f.addr + '" id="' + rdmId(f.uid) +
+        '" class="form-control form-control-sm d-inline-block" style="width:72px"></td>' +
+      '<td class="text-end pe-3 text-nowrap">' +
+        '<button class="btn btn-outline-primary btn-sm me-1" onclick="rdmSetAddr(\'' + f.uid + '\')">Set</button>' +
+        '<button class="btn ' + idCls + ' btn-sm" onclick="rdmIdentify(\'' + f.uid + '\',' + (f.identify ? 'false' : 'true') + ')">ID</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+function rdmRefresh() {
+  fetch('/rdm.json').then(function(r){ return r.json(); }).then(rdmRender).catch(function(){});
+}
+function rdmDiscover() {
+  send({type: 'rdm_discover'});
+  var btn = document.getElementById('rdm-discover');
+  btn.disabled = true;
+  document.getElementById('rdm-status').style.display = '';
+  document.getElementById('rdm-status').textContent = 'Scanning the line…';
+  setTimeout(rdmRefresh, 1200);
+}
+function rdmSetAddr(uid) {
+  var el = document.getElementById(rdmId(uid));
+  if (!el) return;
+  var a = parseInt(el.value, 10);
+  if (a >= 1 && a <= 512) { send({type: 'rdm_setaddr', uid: uid, addr: a}); setTimeout(rdmRefresh, 800); }
+}
+function rdmIdentify(uid, on) {
+  send({type: 'rdm_identify', uid: uid, on: on});
+  setTimeout(rdmRefresh, 600);
+}
+rdmRefresh();
 
 // Firmware update check
 function vNum(s) { var m = String(s).match(/(\d+)\.(\d+)\.(\d+)/); return m ? (+m[1]*1e6 + +m[2]*1e3 + +m[3]) : 0; }

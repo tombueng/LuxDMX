@@ -134,9 +134,13 @@ footer a:hover { color:var(--gh-text); }
           <input class="form-control" type="number" name="dmxrx" id="dmx-rx" min="-1" max="48" value="16">
         </div>
         <div>
-          <label class="form-label text-secondary small mb-1">RTS/DE pin (RS485 direction control)</label>
+          <label class="form-label text-secondary small mb-1">RTS / DE-RE pin (RS485 direction)</label>
           <input class="form-control" type="number" name="dmxrts" id="dmx-rts" min="-1" max="48" value="-1">
-          <div class="form-text">−1 if not needed (auto-direction modules like Waveshare C). Applied after reboot.</div>
+          <div class="form-text">
+            Set this to your transceiver's <code>EN</code> / DE-RE pin to enable <strong>RDM</strong>
+            (auto-discovery + remote addressing). <strong>−1 disables RDM</strong> (and is required for
+            auto-direction modules like the Waveshare C). Applied after reboot.
+          </div>
         </div>
       </div>
     </div>
