@@ -1214,6 +1214,49 @@ static void startWiFiManager(bool forcePortal) {
         saveConfig();
     }
 }
+
+// Scan every AP for our SSID, log them, and (re)connect to the strongest one.
+// On mesh/multi-AP networks the ESP32's auto-connect often sticks to a distant
+// node; this guarantees the closest one. Also a diagnostic: the [SCAN] log
+// reveals whether the SSID has multiple BSSIDs (per-node) or a single shared
+// BSSID (seamless mesh — in which case the AP, not us, chooses the node).
+static void connectStrongestAP() {
+    String ssid = WiFi.SSID();
+    if (ssid.length() == 0) return;
+    String pass = WiFi.psk();
+    int curRssi = (int)WiFi.RSSI();
+
+    int n = WiFi.scanNetworks(false /*async*/, true /*hidden*/);
+    int bestIdx = -1, bestRssi = -999, bestCh = 0, matches = 0;
+    uint8_t bestBssid[6] = {0};
+    Serial.printf("[SCAN] %d networks total. APs for '%s':\n", n, ssid.c_str());
+    for (int i = 0; i < n; i++) {
+        if (WiFi.SSID(i) != ssid) continue;
+        matches++;
+        Serial.printf("   bssid=%s rssi=%d ch=%d\n",
+            WiFi.BSSIDstr(i).c_str(), WiFi.RSSI(i), WiFi.channel(i));
+        if (WiFi.RSSI(i) > bestRssi) {
+            bestRssi = WiFi.RSSI(i); bestIdx = i; bestCh = WiFi.channel(i);
+            memcpy(bestBssid, WiFi.BSSID(i), 6);
+        }
+    }
+    Serial.printf("[SCAN] %d AP(s) for SSID, current rssi=%d, best rssi=%d\n",
+        matches, curRssi, bestRssi);
+    WiFi.scanDelete();
+
+    // Only switch if a meaningfully stronger distinct AP exists
+    if (bestIdx >= 0 && bestRssi > curRssi + 6) {
+        Serial.printf("[SCAN] switching to stronger AP (rssi %d -> %d)\n", curRssi, bestRssi);
+        WiFi.begin(ssid.c_str(), pass.c_str(), bestCh, bestBssid, true);
+        uint32_t t = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - t < 12000) {
+            setLedColor((millis() % 400) < 200 ? NEO_BLUE : NEO_OFF, (millis() % 400) < 200);
+            delay(100);
+        }
+        Serial.printf("[SCAN] reconnected rssi=%d bssid=%s\n",
+            (int)WiFi.RSSI(), WiFi.BSSIDstr().c_str());
+    }
+}
 #endif
 
 // ---------------------------------------------------------------------------
@@ -1308,31 +1351,14 @@ void setup() {
         saveConfig();
     }
     WiFi.mode(WIFI_STA);
-    // Mesh / multi-AP networks: scan ALL channels and associate with the
-    // STRONGEST AP for the SSID instead of the first one found.
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-    // The ESP32 also stores the BSSID (MAC of the last AP it used) in its
-    // persistent config and connects directly to that BSSID on every reboot,
-    // bypassing the scan. Clear it so every boot picks the strongest AP.
-    { wifi_config_t c;
-      if (esp_wifi_get_config(WIFI_IF_STA, &c) == ESP_OK && c.sta.bssid_set) {
-          c.sta.bssid_set = 0;
-          memset(c.sta.bssid, 0, sizeof(c.sta.bssid));
-          esp_wifi_set_config(WIFI_IF_STA, &c);
-          Serial.println("[WiFi] BSSID lock cleared — will pick strongest AP");
-      } }
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
     startWiFiManager(forcePortal);
-    // WiFiManager saves the connected AP's BSSID to flash on every connect.
-    // Clear it immediately POST-connect so the NEXT boot also scans for the
-    // strongest AP rather than dialling straight back to this one.
-    { wifi_config_t c;
-      if (esp_wifi_get_config(WIFI_IF_STA, &c) == ESP_OK) {
-          c.sta.bssid_set = 0;
-          memset(c.sta.bssid, 0, sizeof(c.sta.bssid));
-          esp_wifi_set_config(WIFI_IF_STA, &c);
-      } }
+    // The ESP32's auto-connect reliably sticks to whichever AP it used before,
+    // even a distant one on a mesh. Explicitly scan and hop to the strongest
+    // AP for our SSID on every boot (also logs all APs for diagnostics).
+    connectStrongestAP();
     // Disable WiFi power save: with modem-sleep the station misses buffered
     // multicast (sACN) and IGMP queries, causing periodic ~0.3-0.5s reception
     // gaps. WIFI_PS_NONE keeps the radio awake for reliable multicast.
