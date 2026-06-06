@@ -116,6 +116,25 @@ footer a:hover { color:var(--gh-text); }
     </div>
 
     <div class="card mb-3">
+      <div class="card-header">DMX Output Pins</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label text-secondary small mb-1">TX pin (ESP32 → RS485 RXD)</label>
+          <input class="form-control" type="number" name="dmxtx" id="dmx-tx" min="-1" max="48" value="17">
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small mb-1">RX pin (RS485 TXD → ESP32)</label>
+          <input class="form-control" type="number" name="dmxrx" id="dmx-rx" min="-1" max="48" value="16">
+        </div>
+        <div>
+          <label class="form-label text-secondary small mb-1">RTS/DE pin (RS485 direction control)</label>
+          <input class="form-control" type="number" name="dmxrts" id="dmx-rts" min="-1" max="48" value="-1">
+          <div class="form-text">−1 if not needed (auto-direction modules like Waveshare C). Applied after reboot.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
       <div class="card-header">Device</div>
       <div class="card-body">
         <div class="mb-3">
@@ -253,6 +272,9 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('net-dns').value = d.dns || '';
   $('led-type').value = d.ledType;
   $('led-pin').value  = d.ledPin;
+  $('dmx-tx').value   = d.dmxTxPin  !== undefined ? d.dmxTxPin  : 17;
+  $('dmx-rx').value   = d.dmxRxPin  !== undefined ? d.dmxRxPin  : 16;
+  $('dmx-rts').value  = d.dmxRtsPin !== undefined ? d.dmxRtsPin : -1;
   $('dev-host').value = d.hostname || '';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;

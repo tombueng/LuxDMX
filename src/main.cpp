@@ -2,7 +2,7 @@
  * LumiGate — Art-Net / sACN → DMX Gateway
  * ESP32 / ESP32-S3 / WT32-ETH01 + Waveshare RS485 (C)
  *
- * Default pins: DMX TX=DEF_DMX_TX_PIN(17), RX=DEF_DMX_RX_PIN(16)
+ * Default pins: DMX TX=17, RX=16 (compile-time: DEF_DMX_TX_PIN/DEF_DMX_RX_PIN; runtime: web /config)
  * WT32-ETH01:   DMX TX=4, RX=5  (GPIO16 used by LAN8720 power)
  */
 
@@ -48,12 +48,12 @@
 #ifndef DEF_DMX_RX_PIN
 #define DEF_DMX_RX_PIN 16
 #endif
+#ifndef DEF_DMX_RTS_PIN
+#define DEF_DMX_RTS_PIN -1
+#endif
 
-static constexpr int        DMX_TX_PIN  = DEF_DMX_TX_PIN;
-static constexpr int        DMX_RX_PIN  = DEF_DMX_RX_PIN;
-static constexpr int        DMX_RTS_PIN = -1;
-static constexpr dmx_port_t DMX_PORT    = DMX_NUM_1;
-static constexpr int        BOOT_PIN    = 0;
+static constexpr dmx_port_t DMX_PORT = DMX_NUM_1;
+static constexpr int        BOOT_PIN = 0;
 static constexpr uint32_t   HOLD_MS     = 3000;
 
 #ifndef DEF_LED_PIN
@@ -177,6 +177,9 @@ struct Config {
     int    protocol;
     int    ledPin;
     int    ledType;
+    int    dmxTxPin;
+    int    dmxRxPin;
+    int    dmxRtsPin;
     bool   staticIp;       // false = DHCP
     String ip;             // dotted-quad strings; empty when unused
     String gateway;
@@ -201,6 +204,9 @@ static void loadConfig() {
     cfg.protocol    = prefs.getInt("protocol",  DEF_PROTOCOL);
     cfg.ledPin      = prefs.getInt("ledpin",    DEF_LED_PIN);
     cfg.ledType     = prefs.getInt("ledtype",   DEF_LED_TYPE);
+    cfg.dmxTxPin    = prefs.getInt("dmxtx",     DEF_DMX_TX_PIN);
+    cfg.dmxRxPin    = prefs.getInt("dmxrx",     DEF_DMX_RX_PIN);
+    cfg.dmxRtsPin   = prefs.getInt("dmxrts",    DEF_DMX_RTS_PIN);
     cfg.staticIp    = prefs.getBool("staticip", false);
     cfg.ip          = prefs.getString("ip",      "");
     cfg.gateway     = prefs.getString("gateway", "");
@@ -219,6 +225,9 @@ static void saveConfig() {
     prefs.putInt("protocol",    cfg.protocol);
     prefs.putInt("ledpin",      cfg.ledPin);
     prefs.putInt("ledtype",     cfg.ledType);
+    prefs.putInt("dmxtx",       cfg.dmxTxPin);
+    prefs.putInt("dmxrx",       cfg.dmxRxPin);
+    prefs.putInt("dmxrts",      cfg.dmxRtsPin);
     prefs.putBool("staticip",   cfg.staticIp);
     prefs.putString("ip",       cfg.ip);
     prefs.putString("gateway",  cfg.gateway);
@@ -663,6 +672,9 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"protocol\":";   j += cfg.protocol;           j += ",";
     j += "\"ledType\":";    j += cfg.ledType;            j += ",";
     j += "\"ledPin\":";     j += cfg.ledPin;             j += ",";
+    j += "\"dmxTxPin\":";   j += cfg.dmxTxPin;           j += ",";
+    j += "\"dmxRxPin\":";   j += cfg.dmxRxPin;           j += ",";
+    j += "\"dmxRtsPin\":";  j += cfg.dmxRtsPin;          j += ",";
     j += "\"staticIp\":";   j += cfg.staticIp ? "true" : "false"; j += ",";
     j += "\"sip\":\"";      j += cfg.ip;                 j += "\",";
     j += "\"gateway\":\"";  j += cfg.gateway;            j += "\",";
@@ -704,8 +716,11 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "hostname", s) && s.length() > 0) cfg.hostname = s;
     if (argStr(req, "otapw", s)    && s.length() > 0) cfg.otaPassword = s;
     if (argStr(req, "protocol", s)) cfg.protocol = constrain(s.toInt(), 0, 2);
-    if (argStr(req, "ledtype", s))  cfg.ledType  = constrain(s.toInt(), 0, 2);
-    if (argStr(req, "ledpin", s))   cfg.ledPin   = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ledtype", s))  cfg.ledType   = constrain(s.toInt(), 0, 2);
+    if (argStr(req, "ledpin", s))   cfg.ledPin    = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "dmxtx", s))    cfg.dmxTxPin  = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "dmxrx", s))    cfg.dmxRxPin  = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "dmxrts", s))   cfg.dmxRtsPin = constrain(s.toInt(), -1, 48);
     cfg.staticIp = req->hasParam("staticip", true) || req->hasParam("staticip");
     if (argStr(req, "ip", s))      cfg.ip      = s;
     if (argStr(req, "gateway", s)) cfg.gateway = s;
@@ -930,7 +945,7 @@ static void startWiFiManager(bool forcePortal) {
 static void initDmx() {
     dmx_config_t config = DMX_CONFIG_DEFAULT;
     dmx_driver_install(DMX_PORT, &config, nullptr, 0);
-    dmx_set_pin(DMX_PORT, DMX_TX_PIN, DMX_RX_PIN, DMX_RTS_PIN);
+    dmx_set_pin(DMX_PORT, cfg.dmxTxPin, cfg.dmxRxPin, cfg.dmxRtsPin);
     dmx_write(DMX_PORT, dmxBuf, DMX_PACKET_SIZE);
     dmx_send(DMX_PORT);
     dmx_wait_sent(DMX_PORT, DMX_TIMEOUT_TICK);

@@ -112,11 +112,13 @@ This module is the key interface between the ESP32's UART and the DMX RS485 bus.
 ```
 Pin 1  VCC   → ESP32 3.3V
 Pin 2  GND   → ESP32 GND
-Pin 3  RXD   → ESP32 GPIO17 (UART2 TX)
-Pin 4  TXD   → ESP32 GPIO16 (UART2 RX)
+Pin 3  RXD   → ESP32 GPIO17  (default TX pin — configurable in web /config)
+Pin 4  TXD   → ESP32 GPIO16  (default RX pin — configurable in web /config)
 Pin 5  —     (not connected)
 Pin 6  —     (not connected)
 ```
+
+> **Different hardware?** If your RS485 module or ESP32 board uses different GPIO pins, change TX/RX under **Settings → DMX Output Pins** in the web UI. No recompile needed.
 
 **Waveshare TTL to RS485 (C) — RS485 screw terminal (right side):**
 
@@ -542,6 +544,7 @@ Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48`
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password | `dmxota` | Web `/config` |
 | LED type / GPIO pin | board default | Web `/config` |
+| DMX TX / RX / RTS pins | board default (TX=17, RX=16, RTS=−1) | Web `/config` (DMX Output Pins) |
 | WiFi credentials | — | Config portal or `/reset` |
 
 ---
