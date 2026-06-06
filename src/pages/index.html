@@ -132,7 +132,10 @@ footer a:hover { color: var(--gh-text); }
        style="display:none;background:#2d2a00;border:1px solid #e3b341">
     <div class="d-flex align-items-center justify-content-between">
       <span style="color:#e3b341;font-size:.85rem">&#8635;&nbsp; Firmware update available: <strong id="update-ver"></strong></span>
-      <a href="/config" class="btn btn-sm fw-semibold" style="background:#e3b341;color:#000;font-size:.78rem">Update</a>
+      <div class="d-flex gap-2">
+        <a href="/config" class="btn btn-sm fw-semibold" style="background:#e3b341;color:#000;font-size:.78rem">Update</a>
+        <button type="button" id="update-dismiss" class="btn btn-sm" style="border:1px solid #e3b341;color:#e3b341;font-size:.78rem">Dismiss</button>
+      </div>
     </div>
     <pre id="update-notes" style="display:none;margin:.5rem 0 0;font-size:.72rem;color:#c9b458;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.25);border-radius:4px;padding:.4rem .6rem;max-height:160px;overflow-y:auto"></pre>
   </div>
@@ -615,8 +618,16 @@ fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
         .filter(function(rel){ return /^v\d+\.\d+\.\d+$/.test(rel.tag_name); })
         .sort(function(a,b){ return vNum(b.tag_name) - vNum(a.tag_name); });
       if (!rels.length || vNum(rels[0].tag_name) <= curNum) return;  // up to date
-      document.getElementById('update-ver').textContent = rels[0].tag_name.replace(/^v/, '');
-      document.getElementById('update-banner').style.display = 'block';
+      var newest = rels[0].tag_name;
+      // Skip the banner if the user already dismissed this exact version
+      try { if (localStorage.getItem('dismissedUpdate') === newest) return; } catch (e) {}
+      document.getElementById('update-ver').textContent = newest.replace(/^v/, '');
+      var banner = document.getElementById('update-banner');
+      banner.style.display = 'block';
+      document.getElementById('update-dismiss').onclick = function() {
+        try { localStorage.setItem('dismissedUpdate', newest); } catch (e) {}
+        banner.style.display = 'none';
+      };
       // Aggregate changes across every release newer than the installed version
       var lines = [];
       rels.filter(function(rel){ return vNum(rel.tag_name) > curNum; }).forEach(function(rel) {
