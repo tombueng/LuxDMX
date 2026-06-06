@@ -1324,6 +1324,15 @@ void setup() {
       } }
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
     startWiFiManager(forcePortal);
+    // WiFiManager saves the connected AP's BSSID to flash on every connect.
+    // Clear it immediately POST-connect so the NEXT boot also scans for the
+    // strongest AP rather than dialling straight back to this one.
+    { wifi_config_t c;
+      if (esp_wifi_get_config(WIFI_IF_STA, &c) == ESP_OK) {
+          c.sta.bssid_set = 0;
+          memset(c.sta.bssid, 0, sizeof(c.sta.bssid));
+          esp_wifi_set_config(WIFI_IF_STA, &c);
+      } }
     // Disable WiFi power save: with modem-sleep the station misses buffered
     // multicast (sACN) and IGMP queries, causing periodic ~0.3-0.5s reception
     // gaps. WIFI_PS_NONE keeps the radio awake for reliable multicast.
