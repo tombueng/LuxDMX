@@ -833,13 +833,15 @@ static void checkForUpdate() {
 
 static void versionCheckTask(void*) {
     vTaskDelay(pdMS_TO_TICKS(8000));
-    checkForUpdate();
-    if (cfg.autoUpdate && updateAvailable) {
-        Serial.println("[OTA] auto-update enabled, installing latest...");
-        otaTarget = "latest";
-        pendingGithubOta = true;   // loop() performs the update
+    for (;;) {
+        checkForUpdate();
+        if (cfg.autoUpdate && updateAvailable) {
+            Serial.println("[OTA] auto-update enabled, installing latest...");
+            otaTarget = "latest";
+            pendingGithubOta = true;   // loop() performs the update
+        }
+        vTaskDelay(pdMS_TO_TICKS(6UL * 3600UL * 1000UL));  // re-check every 6 h
     }
-    vTaskDelete(NULL);
 }
 
 // ---------------------------------------------------------------------------
