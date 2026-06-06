@@ -51,9 +51,11 @@
 #ifndef DEF_DMX_RTS_PIN
 #define DEF_DMX_RTS_PIN -1
 #endif
+#ifndef DEF_DMX_PORT
+#define DEF_DMX_PORT 1
+#endif
 
-static constexpr dmx_port_t DMX_PORT = DMX_NUM_1;
-static constexpr int        BOOT_PIN = 0;
+static constexpr int BOOT_PIN = 0;
 static constexpr uint32_t   HOLD_MS     = 3000;
 
 #ifndef DEF_LED_PIN
@@ -177,6 +179,7 @@ struct Config {
     int    protocol;
     int    ledPin;
     int    ledType;
+    int    dmxPort;
     int    dmxTxPin;
     int    dmxRxPin;
     int    dmxRtsPin;
@@ -204,6 +207,7 @@ static void loadConfig() {
     cfg.protocol    = prefs.getInt("protocol",  DEF_PROTOCOL);
     cfg.ledPin      = prefs.getInt("ledpin",    DEF_LED_PIN);
     cfg.ledType     = prefs.getInt("ledtype",   DEF_LED_TYPE);
+    cfg.dmxPort     = prefs.getInt("dmxport",   DEF_DMX_PORT);
     cfg.dmxTxPin    = prefs.getInt("dmxtx",     DEF_DMX_TX_PIN);
     cfg.dmxRxPin    = prefs.getInt("dmxrx",     DEF_DMX_RX_PIN);
     cfg.dmxRtsPin   = prefs.getInt("dmxrts",    DEF_DMX_RTS_PIN);
@@ -225,6 +229,7 @@ static void saveConfig() {
     prefs.putInt("protocol",    cfg.protocol);
     prefs.putInt("ledpin",      cfg.ledPin);
     prefs.putInt("ledtype",     cfg.ledType);
+    prefs.putInt("dmxport",     cfg.dmxPort);
     prefs.putInt("dmxtx",       cfg.dmxTxPin);
     prefs.putInt("dmxrx",       cfg.dmxRxPin);
     prefs.putInt("dmxrts",      cfg.dmxRtsPin);
@@ -305,9 +310,9 @@ static void sendDmx() {
     bool ov = identifyCh && millis() < identifyUntil;
     uint8_t saved = 0;
     if (ov) { saved = dmxBuf[identifyCh]; dmxBuf[identifyCh] = 255; }
-    dmx_write(DMX_PORT, dmxBuf, DMX_PACKET_SIZE);
-    dmx_send(DMX_PORT);
-    dmx_wait_sent(DMX_PORT, DMX_TIMEOUT_TICK);
+    dmx_write((dmx_port_t)cfg.dmxPort, dmxBuf, DMX_PACKET_SIZE);
+    dmx_send((dmx_port_t)cfg.dmxPort);
+    dmx_wait_sent((dmx_port_t)cfg.dmxPort, DMX_TIMEOUT_TICK);
     if (ov) dmxBuf[identifyCh] = saved;
 }
 
@@ -672,6 +677,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"protocol\":";   j += cfg.protocol;           j += ",";
     j += "\"ledType\":";    j += cfg.ledType;            j += ",";
     j += "\"ledPin\":";     j += cfg.ledPin;             j += ",";
+    j += "\"dmxPort\":";    j += cfg.dmxPort;            j += ",";
     j += "\"dmxTxPin\":";   j += cfg.dmxTxPin;           j += ",";
     j += "\"dmxRxPin\":";   j += cfg.dmxRxPin;           j += ",";
     j += "\"dmxRtsPin\":";  j += cfg.dmxRtsPin;          j += ",";
@@ -718,6 +724,7 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "protocol", s)) cfg.protocol = constrain(s.toInt(), 0, 2);
     if (argStr(req, "ledtype", s))  cfg.ledType   = constrain(s.toInt(), 0, 2);
     if (argStr(req, "ledpin", s))   cfg.ledPin    = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "dmxport", s))  cfg.dmxPort   = constrain(s.toInt(), 0, 2);
     if (argStr(req, "dmxtx", s))    cfg.dmxTxPin  = constrain(s.toInt(), -1, 48);
     if (argStr(req, "dmxrx", s))    cfg.dmxRxPin  = constrain(s.toInt(), -1, 48);
     if (argStr(req, "dmxrts", s))   cfg.dmxRtsPin = constrain(s.toInt(), -1, 48);
@@ -943,12 +950,13 @@ static void startWiFiManager(bool forcePortal) {
 // Peripheral init
 // ---------------------------------------------------------------------------
 static void initDmx() {
+    dmx_port_t port = (dmx_port_t)cfg.dmxPort;
     dmx_config_t config = DMX_CONFIG_DEFAULT;
-    dmx_driver_install(DMX_PORT, &config, nullptr, 0);
-    dmx_set_pin(DMX_PORT, cfg.dmxTxPin, cfg.dmxRxPin, cfg.dmxRtsPin);
-    dmx_write(DMX_PORT, dmxBuf, DMX_PACKET_SIZE);
-    dmx_send(DMX_PORT);
-    dmx_wait_sent(DMX_PORT, DMX_TIMEOUT_TICK);
+    dmx_driver_install(port, &config, nullptr, 0);
+    dmx_set_pin(port, cfg.dmxTxPin, cfg.dmxRxPin, cfg.dmxRtsPin);
+    dmx_write(port, dmxBuf, DMX_PACKET_SIZE);
+    dmx_send(port);
+    dmx_wait_sent(port, DMX_TIMEOUT_TICK);
     dmxReady = true;
     Serial.println("[DMX] ready");
 }
