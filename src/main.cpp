@@ -12,6 +12,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
 #ifdef USE_ETHERNET
 #include <ETH.h>
 #else
@@ -1308,11 +1309,19 @@ void setup() {
     }
     WiFi.mode(WIFI_STA);
     // Mesh / multi-AP networks: scan ALL channels and associate with the
-    // STRONGEST AP for the SSID instead of the first one found. Without this
-    // the ESP32 often latches onto a distant AP (weak RSSI) and gets steered
-    // off it repeatedly (802.11k/v/r), causing constant reconnect churn.
+    // STRONGEST AP for the SSID instead of the first one found.
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+    // The ESP32 also stores the BSSID (MAC of the last AP it used) in its
+    // persistent config and connects directly to that BSSID on every reboot,
+    // bypassing the scan. Clear it so every boot picks the strongest AP.
+    { wifi_config_t c;
+      if (esp_wifi_get_config(WIFI_IF_STA, &c) == ESP_OK && c.sta.bssid_set) {
+          c.sta.bssid_set = 0;
+          memset(c.sta.bssid, 0, sizeof(c.sta.bssid));
+          esp_wifi_set_config(WIFI_IF_STA, &c);
+          Serial.println("[WiFi] BSSID lock cleared — will pick strongest AP");
+      } }
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
     startWiFiManager(forcePortal);
     // Disable WiFi power save: with modem-sleep the station misses buffered
@@ -1438,6 +1447,9 @@ void loop() {
         Serial.printf("[WiFi] link down (status=%d), re-scanning for strongest AP... up=%lus\n",
             (int)WiFi.status(), (unsigned long)uptimeSec());
         WiFi.disconnect();
+        { wifi_config_t c;   // clear BSSID lock before reconnect too
+          if (esp_wifi_get_config(WIFI_IF_STA, &c) == ESP_OK)
+              { c.sta.bssid_set = 0; esp_wifi_set_config(WIFI_IF_STA, &c); } }
         WiFi.begin();   // re-scans all channels, reconnects to strongest BSSID
         lastReconnect = now;
     }
