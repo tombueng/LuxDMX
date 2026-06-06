@@ -26,8 +26,9 @@
 #include <Update.h>
 #include <ArtnetWifi.h>
 #include <esp_dmx.h>
-#include <rdm/controller.h>     // RDM controller: discovery + GET/SET
-#include <rdm/include/uid.h>    // rdm_uid_is_eq() and friends
+#include <rdm/controller.h>             // RDM controller: discovery + GET/SET
+#include <rdm/controller/include/utils.h>  // rdm_send_request() for sensor PIDs
+#include <rdm/include/uid.h>            // rdm_uid_is_eq() and friends
 
 // Auto-generated asset headers (produced by extra_scripts.py before each build)
 #include "generated/version.h"
@@ -324,6 +325,13 @@ static void sendDmx() {
 // esp_dmx "enable" line). All bus access runs on loop()'s thread — the only
 // owner of the DMX port — so the async web/WS task just sets request flags.
 // ---------------------------------------------------------------------------
+static constexpr int RDM_MAX_SENSORS = 4;        // sensors stored per fixture
+struct RdmSensor {
+    char    name[20];   // SENSOR_DEFINITION description, or a type label
+    char    unit[8];    // SI unit string derived from the definition
+    int16_t value;      // SENSOR_VALUE present value
+    bool    valid;      // a value was read
+};
 struct RdmDevice {
     rdm_uid_t uid;
     uint16_t  startAddr;
@@ -334,6 +342,8 @@ struct RdmDevice {
     uint8_t   personalityCount;
     bool      identifying;
     char      swLabel[33];
+    uint8_t   sensorCount;
+    RdmSensor sensors[RDM_MAX_SENSORS];
 };
 static constexpr int RDM_MAX_DEVICES = 32;
 static RdmDevice rdmDevices[RDM_MAX_DEVICES];
@@ -353,6 +363,42 @@ static volatile bool rdmReqOn       = false;
 
 // RDM only works when the DMX driver is up AND a direction-enable pin is set.
 static bool rdmAvailable() { return dmxReady && cfg.dmxRtsPin >= 0; }
+
+// Map E1.20 sensor unit / type enums to short display strings.
+static const char* rdmUnitStr(uint8_t u) {
+    switch (u) {
+        case RDM_UNITS_CENTIGRADE:    return "C";
+        case RDM_UNITS_VOLTS_DC:
+        case RDM_UNITS_VOLTS_AC_PEAK:
+        case RDM_UNITS_VOLTS_AC_RMS:  return "V";
+        case RDM_UNITS_AMPERE_DC:
+        case RDM_UNITS_AMPERE_AC_PEAK:
+        case RDM_UNITS_AMPERE_AC_RMS: return "A";
+        case RDM_UNITS_HERTZ:         return "Hz";
+        case RDM_UNITS_OHM:           return "ohm";
+        case RDM_UNITS_WATT:          return "W";
+        case RDM_UNITS_KILOGRAM:      return "kg";
+        case RDM_UNITS_METERS:        return "m";
+        case RDM_UNITS_SECOND:        return "s";
+        case RDM_UNITS_DEGREE:        return "deg";
+        case RDM_UNITS_LUX:           return "lux";
+        case RDM_UNITS_BYTE:          return "B";
+        default:                      return "";
+    }
+}
+static const char* rdmTypeStr(uint8_t t) {
+    switch (t) {
+        case RDM_SENSOR_TYPE_TEMPERATURE:      return "Temperature";
+        case RDM_SENSOR_TYPE_VOLTAGE:          return "Voltage";
+        case RDM_SENSOR_TYPE_CURRENT:          return "Current";
+        case RDM_SENSOR_TYPE_FREQUENCY:        return "Frequency";
+        case RDM_SENSOR_TYPE_POWER:            return "Power";
+        case RDM_SENSOR_TYPE_ANGULAR_VELOCITY: return "Fan";
+        case RDM_SENSOR_TYPE_TIME:             return "Time";
+        case RDM_SENSOR_TYPE_HUMIDITY:         return "Humidity";
+        default:                               return "Sensor";
+    }
+}
 
 static RdmDevice* rdmFind(const rdm_uid_t& uid) {
     for (int i = 0; i < rdmCount; i++)
@@ -395,9 +441,40 @@ static void rdmDoDiscover() {
             d.subDeviceCount   = info.sub_device_count;
             d.personality      = info.personality.current;
             d.personalityCount = info.personality.count;
+            d.sensorCount      = info.sensor_count > RDM_MAX_SENSORS
+                                     ? RDM_MAX_SENSORS : info.sensor_count;
         }
         rdm_send_get_software_version_label(port, &uids[i], RDM_SUB_DEVICE_ROOT,
                                             d.swLabel, sizeof(d.swLabel), &ack);
+
+        // Sensors (E1.20): per sensor read its definition (name/unit) then value.
+        // Sensors are numbered 0..count-1; definition and value are independent —
+        // tolerate either being unsupported.
+        for (uint8_t s = 0; s < d.sensorCount; s++) {
+            RdmSensor& sen = d.sensors[s];
+            rdm_ack_t sack;
+            uint8_t   sn = s;
+
+            rdm_sensor_definition_t def = {};
+            rdm_request_t dreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
+                                   RDM_PID_SENSOR_DEFINITION, "b$", &sn, 1 };
+            if (rdm_send_request(port, &dreq, "bbbbwwwwba$", &def, sizeof(def), &sack)
+                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+                strlcpy(sen.name, def.description[0] ? def.description : rdmTypeStr(def.type),
+                        sizeof(sen.name));
+                strlcpy(sen.unit, rdmUnitStr(def.unit), sizeof(sen.unit));
+            }
+
+            rdm_sensor_value_t val = {};
+            rdm_request_t vreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
+                                   RDM_PID_SENSOR_VALUE, "b$", &sn, 1 };
+            if (rdm_send_request(port, &vreq, "bwwww$", &val, sizeof(val), &sack)
+                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+                sen.value = val.present_value;
+                sen.valid = true;
+                if (!sen.name[0]) strlcpy(sen.name, "Sensor", sizeof(sen.name));
+            }
+        }
         rdmDevices[rdmCount++] = d;
     }
     rdmScanned    = true;
@@ -863,7 +940,7 @@ static String rdmJsonEsc(const char* s) {
 
 static void handleRdmJson(AsyncWebServerRequest* req) {
     String j;
-    j.reserve(96 + rdmCount * 160);
+    j.reserve(96 + rdmCount * 280);
     j  = "{\"available\":"; j += rdmAvailable() ? "true" : "false";
     j += ",\"busy\":";      j += rdmBusy ? "true" : "false";
     j += ",\"scanned\":";   j += rdmScanned ? "true" : "false";
@@ -882,7 +959,18 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
         j += ",\"subs\":";      j += d.subDeviceCount;
         j += ",\"identify\":";  j += d.identifying ? "true" : "false";
         j += ",\"sw\":\"";      j += rdmJsonEsc(d.swLabel); j += "\"";
-        j += "}";
+        j += ",\"sensors\":[";
+        bool firstSen = true;
+        for (int s = 0; s < d.sensorCount; s++) {
+            const RdmSensor& sn = d.sensors[s];
+            if (!sn.valid) continue;
+            if (!firstSen) j += ',';
+            firstSen = false;
+            j += "{\"name\":\"";  j += rdmJsonEsc(sn.name);
+            j += "\",\"value\":"; j += sn.value;
+            j += ",\"unit\":\"";  j += rdmJsonEsc(sn.unit); j += "\"}";
+        }
+        j += "]}";
     }
     j += "]}";
     req->send(200, "application/json", j);
