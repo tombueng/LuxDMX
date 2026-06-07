@@ -1,0 +1,977 @@
+(export 
+  (version "D")
+  (design
+    (source "lumigate_carrier.py")
+    (date "06/08/2026 12:30 AM")
+    (tool "SKiDL (2.2.3)")
+    (sheet
+      (number 1)
+      (name "/")
+      (tstamps "/")
+      (title_block
+        (title)
+        (company)
+        (rev)
+        (date)
+        (source "lumigate_carrier.py")
+        (comment
+          (number "1")
+          (value ""))
+        (comment
+          (number "2")
+          (value ""))
+        (comment
+          (number "3")
+          (value ""))
+        (comment
+          (number "4")
+          (value ""))
+        (comment
+          (number "5")
+          (value ""))
+        (comment
+          (number "6")
+          (value ""))
+        (comment
+          (number "7")
+          (value ""))
+        (comment
+          (number "8")
+          (value ""))
+        (comment
+          (number "9")
+          (value "")))))
+  (components
+    (comp
+      (ref "C1")
+      (value "100nF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "n9_10FpyyS")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "c736586b-ca42-5d76-852b-1d7564adc1d5"))
+    (comp
+      (ref "C2")
+      (value "10uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_1206_3216Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_1206_3216Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "Djl9bGS3Ip")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "850079d8-f8ff-5f92-8299-97e58498a92e"))
+    (comp
+      (ref "C3")
+      (value "100nF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "51iTgjTyNq")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "c058a1cc-b554-5785-9f1b-a02e4f488888"))
+    (comp
+      (ref "C4")
+      (value "10uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_1206_3216Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_1206_3216Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "_ET48RyoI9")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "eec7b4c4-1471-517b-91c3-0f93a5e92b67"))
+    (comp
+      (ref "C5")
+      (value "100nF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "GUwjUSjojX")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "f4e7f242-a788-50b3-86e8-95d20f667fdd"))
+    (comp
+      (ref "C6")
+      (value "100nF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "9vtLCunHQu")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "6e38ee5f-37dc-5d69-90f1-6da9f4433b2f"))
+    (comp
+      (ref "C7")
+      (value "100nF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "Gi6feB3bX3")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "6ab33405-18f7-53f5-b551-55f57eaba464"))
+    (comp
+      (ref "D1")
+      (value "SM712")
+      (description "")
+      (footprint "Package_TO_SOT_SMD:SOT-23")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Package_TO_SOT_SMD:SOT-23")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "P6HHnRbYmR")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:125"))
+      (libsource
+        (lib "NO_LIB")
+        (part "SM712"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "ad147a6f-8c26-5dab-9796-daa9d6a59524"))
+    (comp
+      (ref "D2")
+      (value "SMAJ5.0A")
+      (description "")
+      (footprint "Diode_SMD:D_SMB")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Diode_SMD:D_SMB")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "wXwUXB3HrL")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:160"))
+      (libsource
+        (lib "NO_LIB")
+        (part "SMAJ5.0A"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "38acf5cc-ef48-5292-b399-271614525232"))
+    (comp
+      (ref "D3")
+      (value "SS34")
+      (description "")
+      (footprint "Diode_SMD:D_SMA")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Diode_SMD:D_SMA")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "b5zuOquOet")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:163"))
+      (libsource
+        (lib "NO_LIB")
+        (part "SS34"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "9ef5fb7c-d079-575b-9fbe-b2c8ec5082ed"))
+    (comp
+      (ref "F1")
+      (value "PTC 1A")
+      (description "")
+      (footprint "Fuse:Fuse_1206_3216Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Fuse:Fuse_1206_3216Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "m7h6A6z2n7")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "F"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "5a5bcba2-65ff-57c2-89a8-b026dcea470d"))
+    (comp
+      (ref "J1")
+      (value "XLR-3 DMX out (XLR-328P)")
+      (description "")
+      (footprint "XLR328P:CONN-TH_XLR-328P")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "XLR328P:CONN-TH_XLR-328P")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "HAg2i5uloO")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:171"))
+      (libsource
+        (lib "NO_LIB")
+        (part "XLR3"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "253c35b7-13bc-59fb-bb94-1621e60d2343"))
+    (comp
+      (ref "J2")
+      (value "USB-C 6P power (TYPE-C 6P)")
+      (description "")
+      (footprint "TypeC6P:TYPE-C-SMD_TYPE-C-6P_1")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TypeC6P:TYPE-C-SMD_TYPE-C-6P_1")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "Sw888cQPW_")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:147"))
+      (libsource
+        (lib "NO_LIB")
+        (part "USB_C_power"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "44d9b388-6f90-5ecd-979d-01b4ece28726"))
+    (comp
+      (ref "J3")
+      (value "1x10 socket 2.54 (C35445)")
+      (description "")
+      (footprint "Sock1x10:HDR-TH_10P-P2.54-V-F")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Sock1x10:HDR-TH_10P-P2.54-V-F")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "d3LHb3_7aR")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:58"))
+      (libsource
+        (lib "NO_LIB")
+        (part "Conn_1x10_socket"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "4bfe1ff3-79eb-5718-81cc-d6f39a7a3ac7"))
+    (comp
+      (ref "J4")
+      (value "1x10 socket 2.54 (C35445)")
+      (description "")
+      (footprint "Sock1x10:HDR-TH_10P-P2.54-V-F")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Sock1x10:HDR-TH_10P-P2.54-V-F")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "F0V4TM7QI9")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:63"))
+      (libsource
+        (lib "NO_LIB")
+        (part "Conn_1x10_socket"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "68e4a690-e4ba-5522-b3aa-a8c1f31f8b3b"))
+    (comp
+      (ref "LED1")
+      (value "WS2812B")
+      (description "")
+      (footprint "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "nq0wTrTHcs")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:137"))
+      (libsource
+        (lib "NO_LIB")
+        (part "WS2812B"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "582cd67c-b133-524e-8621-bdc7e8792244"))
+    (comp
+      (ref "R1")
+      (value "120R")
+      (description "")
+      (footprint "Resistor_SMD:R_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Resistor_SMD:R_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "9X8VxerwAy")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "R"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "14003964-6501-5c3a-9e94-d1e1cf6dac0d"))
+    (comp
+      (ref "R2")
+      (value "10k")
+      (description "")
+      (footprint "Resistor_SMD:R_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Resistor_SMD:R_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "cFeLll_cEG")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "R"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "f76f520d-d8f0-5726-84e7-f552c0ab78fb"))
+    (comp
+      (ref "R6")
+      (value "330R")
+      (description "")
+      (footprint "Resistor_SMD:R_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Resistor_SMD:R_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "8vanq6RziZ")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "R"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "a0465d41-e30d-51f1-9a43-5f7a749fd54f"))
+    (comp
+      (ref "Rcc1")
+      (value "5k1")
+      (description "")
+      (footprint "Resistor_SMD:R_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Resistor_SMD:R_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "5WdJyBNuqx")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "R"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "51428ca9-9b3b-590c-974d-8b70d9194fdc"))
+    (comp
+      (ref "Rcc2")
+      (value "5k1")
+      (description "")
+      (footprint "Resistor_SMD:R_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Resistor_SMD:R_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "aZihHcy2p5")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:38"))
+      (libsource
+        (lib "NO_LIB")
+        (part "R"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "ed047cb1-c632-5ef1-b1b6-6086fca76d7b"))
+    (comp
+      (ref "U2")
+      (value "ADM2587EBRWZ")
+      (description "")
+      (footprint "Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "vTB5ocDbqW")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:78"))
+      (libsource
+        (lib "NO_LIB")
+        (part "ADM2587E"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "96e6acaa-af14-541f-8f2a-ce8e0b1d7f95"))
+    (comp
+      (ref "U3")
+      (value "74LVC1G125")
+      (description "")
+      (footprint "Package_TO_SOT_SMD:SOT-23-5")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Package_TO_SOT_SMD:SOT-23-5")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "scE276nr76")
+        (field
+          (name "SKiDL Line") "lumigate_carrier.py:95"))
+      (libsource
+        (lib "NO_LIB")
+        (part "74LVC1G125"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "05992037-743c-537a-8ad3-b12ee745f46c")))
+  (nets
+    (net
+      (code 1)
+      (name "+3V3")
+      (class "Default")
+      (node
+        (ref "C1")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C2")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C5")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J3")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "2")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U2")
+        (pin "8")
+        (pintype "POWER-IN")))
+    (net
+      (code 2)
+      (name "+5V")
+      (class "Default")
+      (node
+        (ref "C6")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C7")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "D3")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J3")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "LED1")
+        (pin "1")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U3")
+        (pin "5")
+        (pintype "POWER-IN")))
+    (net
+      (code 3)
+      (name "CC1")
+      (class "Default")
+      (node
+        (ref "J2")
+        (pin "A5")
+        (pintype "PASSIVE"))
+      (node
+        (ref "Rcc1")
+        (pin "1")
+        (pintype "PASSIVE")))
+    (net
+      (code 4)
+      (name "CC2")
+      (class "Default")
+      (node
+        (ref "J2")
+        (pin "B5")
+        (pintype "PASSIVE"))
+      (node
+        (ref "Rcc2")
+        (pin "1")
+        (pintype "PASSIVE")))
+    (net
+      (code 5)
+      (name "DMX_A")
+      (class "Default")
+      (node
+        (ref "D1")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J1")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "R1")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "13")
+        (pintype "OUTPUT"))
+      (node
+        (ref "U2")
+        (pin "18")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 6)
+      (name "DMX_B")
+      (class "Default")
+      (node
+        (ref "D1")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "R1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "15")
+        (pintype "OUTPUT"))
+      (node
+        (ref "U2")
+        (pin "17")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 7)
+      (name "DMX_EN")
+      (class "Default")
+      (node
+        (ref "J4")
+        (pin "6")
+        (pintype "PASSIVE"))
+      (node
+        (ref "R2")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "5")
+        (pintype "INPUT"))
+      (node
+        (ref "U2")
+        (pin "6")
+        (pintype "INPUT")))
+    (net
+      (code 8)
+      (name "DMX_RX")
+      (class "Default")
+      (node
+        (ref "J4")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "4")
+        (pintype "OUTPUT")))
+    (net
+      (code 9)
+      (name "DMX_TX")
+      (class "Default")
+      (node
+        (ref "J3")
+        (pin "9")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "7")
+        (pintype "INPUT")))
+    (net
+      (code 10)
+      (name "GND")
+      (class "Default")
+      (node
+        (ref "C1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C2")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C5")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C6")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C7")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "D2")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J2")
+        (pin "7")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J2")
+        (pin "A12")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J2")
+        (pin "B12")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J3")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "LED1")
+        (pin "3")
+        (pintype "POWER-IN"))
+      (node
+        (ref "R2")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "Rcc1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "Rcc2")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "1")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U2")
+        (pin "10")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U2")
+        (pin "3")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U2")
+        (pin "9")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U3")
+        (pin "1")
+        (pintype "INPUT"))
+      (node
+        (ref "U3")
+        (pin "3")
+        (pintype "POWER-IN")))
+    (net
+      (code 11)
+      (name "GNDISO")
+      (class "Default")
+      (node
+        (ref "C3")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C4")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "D1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J1")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "11")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U2")
+        (pin "14")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U2")
+        (pin "16")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U2")
+        (pin "20")
+        (pintype "POWER-IN")))
+    (net
+      (code 12)
+      (name "LED_DIN")
+      (class "Default")
+      (node
+        (ref "LED1")
+        (pin "4")
+        (pintype "INPUT"))
+      (node
+        (ref "R6")
+        (pin "2")
+        (pintype "PASSIVE")))
+    (net
+      (code 13)
+      (name "RGB_DIN")
+      (class "Default")
+      (node
+        (ref "J4")
+        (pin "5")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U3")
+        (pin "2")
+        (pintype "INPUT")))
+    (net
+      (code 14)
+      (name "RGB_DIN_5V")
+      (class "Default")
+      (node
+        (ref "R6")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U3")
+        (pin "4")
+        (pintype "OUTPUT")))
+    (net
+      (code 15)
+      (name "VBUS_C")
+      (class "Default")
+      (node
+        (ref "D2")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "F1")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J2")
+        (pin "A9")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J2")
+        (pin "B9")
+        (pintype "PASSIVE")))
+    (net
+      (code 16)
+      (name "VBUS_FUSED")
+      (class "Default")
+      (node
+        (ref "D3")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "F1")
+        (pin "2")
+        (pintype "PASSIVE")))
+    (net
+      (code 17)
+      (name "VISO")
+      (class "Default")
+      (node
+        (ref "C3")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C4")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U2")
+        (pin "12")
+        (pintype "POWER-OUT"))
+      (node
+        (ref "U2")
+        (pin "19")
+        (pintype "POWER-IN")))))
