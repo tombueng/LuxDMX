@@ -34,5 +34,17 @@ for r in rows[1:]:
 with open(OUT, "w", newline="") as f:
     csv.writer(f).writerows(out)
 os.remove(TMP)
+
+# also emit .xlsx (JLCPCB's preferred CPL format; matches their sample cell types)
+try:
+    import openpyxl
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Sheet1"
+    ws.append(out[0])
+    for r in out[1:]:
+        ws.append([r[0], r[1], r[2], r[3], int(float(r[4]))])
+    wb.save(OUT.replace(".csv", ".xlsx"))
+except ImportError:
+    pass
+
 print(f"JLCPCB CPL written: {len(out)-1} placements (bottom-left origin, positive coords)")
 print("sample:", out[1])
