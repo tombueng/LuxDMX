@@ -50,6 +50,7 @@
 		)
 		(capping no)
 		(filling no)
+		(aux_axis_origin 98.242297 111.324999)
 		(pcbplotparams
 			(layerselection 0x00000000_00000000_55555555_5755f5ff)
 			(plot_on_all_layers_selection 0x00000000_00000000_00000000_00000000)
