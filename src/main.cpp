@@ -455,7 +455,9 @@ static void initDisplay() {
         } else {
             int h = (cfg.dispType == 2) ? 32 : 64;
             Adafruit_SSD1306* d = new Adafruit_SSD1306(128, h, &Wire, -1);
-            if (!d->begin(SSD1306_SWITCHCAPVCC, addr)) { delete d; Serial.println("[DISP] SSD1306 init failed"); return; }
+            // periphBegin=false: we already ran Wire.begin(sda,scl) above; don't let the
+            // library re-init I2C, which can fall back to default pins on older ESP32 cores.
+            if (!d->begin(SSD1306_SWITCHCAPVCC, addr, true, false)) { delete d; Serial.println("[DISP] SSD1306 init failed"); return; }
             gfx = d;
         }
         Serial.printf("[DISP] I2C addr 0x%02X\n", addr);
