@@ -45,6 +45,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
 | **Status LED** | Plain GPIO or WS2812 RGB NeoPixel — color codes WiFi/idle/DMX active state |
+| **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
 | **Configurable DMX pins** | TX / RX / RTS GPIO and UART port (0/1/2) set at runtime via web UI — no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
@@ -544,6 +545,47 @@ Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48`
 
 ---
 
+## Display (OLED / colour OLED)
+
+LumiGate can drive an **optional status display** that shows the gateway's live state
+without a browser — IP, universe, protocol, frame rate, source count and link / DMX
+activity — and **auto-switches to a full-screen alert** when something needs attention
+(two consoles fighting over the universe, identify, or manual override). It's **off by
+default**; enable and pin it under **Settings → Display**.
+
+![LumiGate display types](docs/display-preview.png)
+
+*Rendered from the firmware's own layout code with the real display font. **Top:** 0.96″ /
+1.3″ mono OLED (status, then the conflict / identify / manual banners). **Middle:** the same
+panel in blue and yellow/blue-split, and the 0.91″ 128×32 compact layout. **Bottom:** the
+1.5″ SSD1351 colour panel, which mirrors the RGB status-LED language (green = live,
+amber = idle, red = conflict).*
+
+### Supported panels
+
+| Panel | Controller | Bus | Pins | Boards |
+|---|---|---|---|---|
+| 0.96″ / 1.3″ OLED 128×64 | SSD1306 / SH1106 | I²C | 2 | all |
+| 0.91″ OLED 128×32 | SSD1306 | I²C | 2 | all |
+| 1.5″ colour OLED 128×128 | SSD1351 | SPI | ~5 | ESP32 / ESP32-S3 (not the Ethernet boards) |
+
+Mono panels are 1-bit — white, blue and yellow/blue-split versions all behave identically
+(the colour is the physical emitter, not addressable). The I²C address is auto-detected
+(`0x3C` / `0x3D`). SPI colour panels need ~5 pins, so they only fit the non-Ethernet boards.
+
+### Settings (Settings → Display)
+
+| Field | Notes |
+|---|---|
+| Display type | off / SSD1306 128×64 / SSD1306 128×32 / SH1106 128×64 / SSD1351 colour |
+| SDA, SCL | I²C pins (mono panels). Avoid strapping pins like GPIO12; WT32-ETH01 → `14` / `15` |
+| CS, DC, RST, SCK, MOSI | hardware-SPI pins (colour panel) |
+| Orientation | normal / flipped 180° |
+
+See [docs/display.md](docs/display.md) for the full design — per-board pin tables and layout details.
+
+---
+
 ## DMX Output Pins
 
 All DMX hardware settings are configurable at runtime under **Settings → DMX Output Pins** — no recompile needed.
@@ -580,6 +622,7 @@ All DMX hardware settings are configurable at runtime under **Settings → DMX O
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password | `dmxota` | Web `/config` |
 | LED type / GPIO pin | board default | Web `/config` (Status LED) |
+| Display type / pins | off | Web `/config` (Display) |
 | UART port | `1` | Web `/config` (DMX Output Pins) |
 | DMX TX / RX / RTS pins | board default (TX=17, RX=16, RTS=−1) | Web `/config` (DMX Output Pins) |
 | WiFi credentials | — | Config portal or `/reset` |
