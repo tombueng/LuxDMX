@@ -680,18 +680,6 @@ LUMIGATE_HOST=dmx-gateway.local npm test
 
 ---
 
-## Roadmap / Ideas
-
-- [ ] Scenes / presets (save & recall DMX snapshots)
-- [ ] Fade engine (smooth transitions between scenes)
-- [ ] Failsafe scene (auto-load when Art-Net / sACN signal lost)
-- [ ] MQTT integration (Home Assistant / Node-RED)
-- [x] Channel labels / fixture naming
-- [ ] RDM support (requires module with controllable DE/RE pin, e.g. SP3485)
-- [x] Multi-universe — up to 2 outputs, each its own universe + RS485 port (UART-limited)
-
----
-
 ## License
 
 MIT — do whatever you want, attribution appreciated.
