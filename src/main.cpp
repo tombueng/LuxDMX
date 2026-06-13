@@ -1705,7 +1705,7 @@ static void dispDrawStatus() {
         gfx->setTextColor(col(accent));
         gfx->setCursor(W - 24, 0); gfx->print(live ? "LIVE" : "idle");
         gfx->setTextColor(col(C_WHITE));
-        gfx->setCursor(0, 11); gfx->print('U'); gfx->print(cfg.universe);
+        gfx->setCursor(0, 11); gfx->print('U'); gfx->print(cfg.outputs[0].universe);
         gfx->print(' '); gfx->print(dispProto());
         snprintf(b, sizeof(b), "%.1ffps Src%u", fps, activeSenderCount());
         gfx->setCursor(0, 22); gfx->print(b);
@@ -1726,7 +1726,7 @@ static void dispDrawStatus() {
         gfx->setTextSize(3); gfx->setTextColor(col(accent));
         gfx->setCursor(0, 58); gfx->print(b);
         gfx->setTextSize(1); gfx->setTextColor(col(C_WHITE));
-        gfx->setCursor(0, 88);  gfx->print("Uni "); gfx->print(cfg.universe);
+        gfx->setCursor(0, 88);  gfx->print("Uni "); gfx->print(cfg.outputs[0].universe);
         gfx->print("  "); gfx->print(dispProto());
         gfx->setCursor(0, 100); gfx->print("Src "); gfx->print(activeSenderCount());
         gfx->setCursor(0, 114);
@@ -1752,7 +1752,7 @@ static void dispDrawStatus() {
     gfx->setTextColor(col(C_WHITE));
     gfx->setCursor(0, y); gfx->print(up ? netLocalIP().toString() : String("no link"));
     y += rp;
-    gfx->setCursor(0, y); gfx->print('U'); gfx->print(cfg.universe);
+    gfx->setCursor(0, y); gfx->print('U'); gfx->print(cfg.outputs[0].universe);
     gfx->print("  "); gfx->print(dispProto());
     y += rp;
     snprintf(b, sizeof(b), "FPS %.1f   Src %u", fps, activeSenderCount());
