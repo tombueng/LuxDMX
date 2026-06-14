@@ -2035,6 +2035,11 @@ static void displayTask(void*) {
 // setup()
 // ---------------------------------------------------------------------------
 void setup() {
+    // Brownout detector: on the classic ESP32 (esp32dev/wt32eth01) this register
+    // write disables it. On the ESP32-S3 under arduino-esp32 v3 / IDF 5 the BOD is
+    // already armed during IDF startup (before setup() runs), so this write is too
+    // late there — the v3 env disables it at the sdkconfig level instead
+    // (CONFIG_ESP_BROWNOUT_DET=n in platformio.ini). Harmless to keep here.
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
     Serial.begin(115200);
     startMs = millis();
