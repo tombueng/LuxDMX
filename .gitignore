@@ -15,3 +15,11 @@ docs/playwright-report/
 /lumigate.log
 /lumigate*_sklib.py
 /lumigate*.kicad_prl
+
+# pioarduino from-source core build byproducts (v3 custom_sdkconfig env)
+/CMakeLists.txt
+/sdkconfig.defaults
+/sdkconfig.*
+/dependencies.lock
+/managed_components/
+/.dummy/

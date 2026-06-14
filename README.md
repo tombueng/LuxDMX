@@ -511,7 +511,7 @@ values are fetched as JSON.
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
 | `/config` | GET / POST | Change universe, protocol, static IP, hostname, OTA password, LED config, DMX pins (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
-| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, etc.) |
+| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, `board`/`mcu` id, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
@@ -553,6 +553,33 @@ Browser → ESP32 (JSON text):
 ```
 
 Channel labels are managed over REST (`GET /labels.json`, `POST /labels`).
+
+---
+
+## Visual pin configuration (board picker)
+
+LumiGate has a lot of GPIOs to set (status LED, 5-LED panel, OLED, two DMX outputs).
+To make this idiot-proof, **Settings → Hardware board** offers:
+
+- **Templates** — pick your board and click **Apply template** to fill every LED /
+  display / DMX pin with the tested map in one step. Selecting the *LumiGate v3*
+  board applies the exact pin map of the open-hardware PCB.
+- **Click pins on a board diagram** — the pick button next to each GPIO field opens an
+  interactive board so you click the actual pin instead of guessing GPIO numbers. The
+  diagram colour-codes pins (free / caution / do-not-use) and shows your current
+  assignments right on the board.
+- **Live validation** — duplicate pins, strapping/flash/input-only pins and
+  Ethernet-reserved pins are flagged in red/amber before you can save.
+
+The three core boards (LumiGate v3, ESP32 DevKitC, ESP32-S3 DevKitC-1) are built into
+the firmware and work fully offline. Additional/community boards are pulled lazily from
+the online catalog ([web/boards/](web/boards/), served via GitHub Pages) and cached in
+your browser. No network means you still get the built-ins plus manual entry. The board
+diagrams are tiny SVG/JSON descriptors (~7 KB total in flash); board *photos* are an
+online-only overlay, never embedded.
+
+See [docs/pin-picker.md](docs/pin-picker.md) for the design, the descriptor schema and
+how to add a board.
 
 ---
 

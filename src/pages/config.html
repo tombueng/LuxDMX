@@ -30,6 +30,25 @@ footer a:hover { color:var(--gh-text); }
 .app-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1080; align-items:center; justify-content:center; padding:1rem; }
 .app-modal.show { display:flex; }
 .app-modal .card { width:min(440px,96vw); }
+/* Pin picker (issue #12) */
+.pin-grp .pin-pick { flex:0 0 auto; padding:.15rem .45rem; display:flex; align-items:center; }
+.pin-grp .pin-pick svg { width:15px; height:15px; }
+.is-warning { border-color:#d29922 !important; }
+.is-warning:focus { box-shadow:0 0 0 .2rem rgba(210,153,34,.25)!important; }
+#pin-warnings .alert { font-size:.8rem; padding:.5rem .75rem; }
+#pin-warnings .alert:last-child { margin-bottom:0; }
+.app-modal .card.board-card { width:min(700px,96vw); max-height:92vh; overflow:auto; }
+.board-wrap { overflow:auto; text-align:center; }
+.board-svg { max-width:100%; height:auto; font-family:ui-monospace,Menlo,Consolas,monospace; }
+.board-svg .pad { cursor:pointer; }
+.board-svg .pad:hover .pin-dot { stroke:#58a6ff; stroke-width:2.5; }
+.pin-dot { stroke:#30363d; stroke-width:1; }
+.pin-dot.free { fill:#238636; } .pin-dot.warn { fill:#9e6a03; } .pin-dot.bad { fill:#6e1a1a; }
+.pad.used .pin-dot { stroke:#58a6ff; stroke-width:2.5; }
+.pad-lbl { fill:#c9d1d9; font-size:11px; } .pad-gpio { fill:#8b949e; font-size:9px; } .pad-assign { fill:#58a6ff; font-size:9px; font-weight:600; }
+.board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
+.board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
+.lg-free::before{ background:#238636; } .lg-warn::before{ background:#9e6a03; } .lg-bad::before{ background:#6e1a1a; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #58a6ff inset; }
 </style>
 </head>
 <body>
@@ -49,6 +68,31 @@ footer a:hover { color:var(--gh-text); }
 
   <!-- Art-Net + Device config form -->
   <form method="POST" action="/config">
+
+    <!-- Hardware board / pin picker (issue #12) -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span>Hardware board</span>
+        <span class="text-secondary small" id="board-detected"></span>
+      </div>
+      <div class="card-body">
+        <label class="form-label text-secondary small mb-1">Board</label>
+        <div class="d-flex gap-2 flex-wrap align-items-start">
+          <select class="form-select" id="board-sel" style="max-width:340px"></select>
+          <button type="button" class="btn btn-outline-primary" id="board-apply">Apply template</button>
+          <button type="button" class="btn btn-outline-secondary" id="board-open">Show board &amp; pick pins</button>
+        </div>
+        <div class="form-text">
+          Pick your board to apply its tested pin map in one click, then fine-tune by clicking
+          pins on the diagram. The pick button next to each GPIO field opens the board so you
+          click the actual pin instead of guessing its number. Unknown board? Choose
+          <strong>Custom</strong> and the validator still flags strapping, flash, input-only and
+          Ethernet-reserved pins for your chip.
+        </div>
+        <div id="pin-warnings" class="mt-2"></div>
+      </div>
+    </div>
+
     <div class="card mb-3">
       <div class="card-header">Protocol</div>
       <div class="card-body">
@@ -400,6 +444,7 @@ footer a:hover { color:var(--gh-text); }
 
 <script>
 var CURRENT = '';
+var INFO_BOARD = '', INFO_MCU = '';
 
 function $(id){ return document.getElementById(id); }
 
@@ -491,8 +536,10 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('auto-update-sw').checked = !!d.autoUpdate;
   updStatic(); updLedPin(); updDispPins(); updHostUrl();
   $('save-btn').disabled = false;
+  INFO_BOARD = d.board || ''; INFO_MCU = d.mcu || '';
+  initBoards();
   loadVersions();
-}).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; loadVersions(); });
+}).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; INFO_BOARD=''; INFO_MCU=''; initBoards(); loadVersions(); });
 
 // Bootstrap-styled confirm/info dialog (no Bootstrap JS dependency).
 // opts: {title, body, okText, okClass, cancel:false}  ->  Promise<bool>
@@ -611,6 +658,427 @@ function loadVersions(){
     });
 }
 </script>
+
+<!-- ===================== Pin picker (issue #12) ===================== -->
+<script>
+var BOARDS = {};
+var PICK_TARGET = null;
+var REMOTE_INDEX = {};
+var BUILTINS = ['lumigate_v3','esp32s3-devkitc-1','esp32-devkitc'];
+var CATALOG_URL = 'https://tombueng.github.io/LumiGate/boards/';
+
+// Chip families — used when no full board descriptor is selected (Custom).
+var FAMILIES = {
+  esp32:   { flash:[6,7,8,9,10,11], serial:[1,3], inputOnly:[34,35,36,39], strapping:[0,2,5,12,15], usbjtag:[], max:39 },
+  esp32s3: { flash:[26,27,28,29,30,31,32], serial:[43,44], inputOnly:[], strapping:[0,3,45,46], usbjtag:[19,20], max:48 }
+};
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function byRole(role){ return document.getElementsByName(role)[0]; }
+function setVal(role, v){ var el = byRole(role); if (el) el.value = v; }
+
+// ---- Board descriptors -----------------------------------------------------
+function P(gpio, silk, flags){ return { gpio:gpio, silk:silk || ('IO'+gpio), flags:flags || [] }; }
+function finalizeDesc(d){
+  d.byGpio = {};
+  (d.cols || []).forEach(function(col){ col.forEach(function(p){ d.byGpio[p.gpio] = p; }); });
+  return d;
+}
+// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LumiGate v3 module).
+var S3L = [4,5,6,7,15,16,17,18,8,19,20,3,46,9,10,11,12,13,14];
+var S3R = [21,47,48,45,0,35,36,37,38,39,40,41,42,44,43,2,1];
+function s3silk(g){ return g===43 ? 'TX0' : g===44 ? 'RX0' : 'IO'+g; }
+function s3flags(g, eth){
+  var f = [];
+  if ([0,3,45,46].indexOf(g) >= 0) f.push('strapping');
+  if ([43,44].indexOf(g) >= 0) f.push('serial');
+  if ([19,20].indexOf(g) >= 0) f.push('usb-jtag');
+  if (eth && [9,10,11,12,13,14].indexOf(g) >= 0) f.push('reserved:eth-spi');
+  return f;
+}
+function s3cols(eth){
+  return [ S3L.map(function(g){ return P(g, s3silk(g), s3flags(g, eth)); }),
+           S3R.map(function(g){ return P(g, s3silk(g), s3flags(g, eth)); }) ];
+}
+// ESP32 DevKitC (WROOM-32, 38-pin).
+var E32L = [36,39,34,35,32,33,25,26,27,14,12,13,9,10,11];
+var E32R = [23,22,1,3,21,19,18,5,17,16,4,0,2,15,8,7,6];
+function e32silk(g){ return g===36 ? 'VP' : g===39 ? 'VN' : g===1 ? 'TX0' : g===3 ? 'RX0' : 'IO'+g; }
+function e32flags(g){
+  var f = [];
+  if ([6,7,8,9,10,11].indexOf(g) >= 0) f.push('flash');
+  if ([1,3].indexOf(g) >= 0) f.push('serial');
+  if ([34,35,36,39].indexOf(g) >= 0) f.push('input-only');
+  if ([0,2,5,12,15].indexOf(g) >= 0) f.push('strapping');
+  return f;
+}
+function e32cols(){
+  return [ E32L.map(function(g){ return P(g, e32silk(g), e32flags(g)); }),
+           E32R.map(function(g){ return P(g, e32silk(g), e32flags(g)); }) ];
+}
+function buildBoards(){
+  BOARDS = {};
+  BOARDS['lumigate_v3'] = finalizeDesc({ id:'lumigate_v3', name:'LumiGate v3 (ESP32-S3 + W5500)', mcu:'esp32s3',
+    cols:s3cols(true), photo:'img/lumigate-v3.png',
+    preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15, dispType:1, dispsda:4, dispscl:5,
+             outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8}] } });
+  BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
+    cols:s3cols(false),
+    preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,
+             outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:-1}] } });
+  BOARDS['esp32-devkitc'] = finalizeDesc({ id:'esp32-devkitc', name:'ESP32 DevKitC (WROOM-32)', mcu:'esp32',
+    cols:e32cols(),
+    preset:{ ledType:1, ledPin:2, dispType:1, dispsda:21, dispscl:22,
+             outputs:[{en:true, uni:0, port:1, tx:17, rx:16, rts:-1}] } });
+}
+
+// ---- Which board / family is in effect -------------------------------------
+function currentBoardDesc(){ var id = $('board-sel').value; return (id && id !== 'custom' && BOARDS[id]) ? BOARDS[id] : null; }
+function genericForMcu(){ return BOARDS[(INFO_MCU === 'esp32') ? 'esp32-devkitc' : 'esp32s3-devkitc-1'] || null; }
+function diagramDesc(){ return currentBoardDesc() || genericForMcu(); }
+function currentBoardName(){ var b = diagramDesc(); return b ? b.name : 'Board'; }
+function familyOf(){ var b = currentBoardDesc(); var m = (b && b.mcu) || INFO_MCU || 'esp32s3'; return FAMILIES[m] || FAMILIES.esp32s3; }
+
+// ---- Roles (one per configurable GPIO field) -------------------------------
+var ROLE_META = {
+  ledpin:{l:'Status LED',t:'out'},
+  ledr:{l:'LED Red',t:'out'}, ledg:{l:'LED Green',t:'out'}, ledy:{l:'LED Yellow',t:'out'},
+  ledb:{l:'LED Blue',t:'out'}, ledw:{l:'LED White',t:'out'},
+  dispsda:{l:'Display SDA',t:'out'}, dispscl:{l:'Display SCL',t:'out'},
+  dispcs:{l:'Display CS',t:'out'}, dispdc:{l:'Display DC',t:'out'}, disprst:{l:'Display RST',t:'out'},
+  dispsck:{l:'Display SCK',t:'out'}, dispmosi:{l:'Display MOSI',t:'out'}
+};
+function roleLabel(role){
+  if (ROLE_META[role]) return ROLE_META[role].l;
+  var m = role.match(/^o(\d+)_(tx|rx|rts)$/);
+  if (m) return 'Output ' + String.fromCharCode(65 + (+m[1])) + ' ' + m[2].toUpperCase();
+  return role;
+}
+function roleType(role){
+  if (ROLE_META[role]) return ROLE_META[role].t;
+  var m = role.match(/^o\d+_(tx|rx|rts)$/);
+  if (m) return m[1] === 'rx' ? 'in' : 'out';
+  return 'out';
+}
+// Roles that are currently relevant given LED type / display type / outputs.
+function activeRoles(){
+  var r = [], lt = $('led-type').value, dt = $('disp-type').value;
+  if (lt === '1' || lt === '2') r.push('ledpin');
+  if (lt === '3') r = r.concat(['ledr','ledg','ledy','ledb','ledw']);
+  if (dt === '1' || dt === '2' || dt === '3') r = r.concat(['dispsda','dispscl']);
+  if (dt === '4') r = r.concat(['dispcs','dispdc','disprst','dispsck','dispmosi']);
+  document.querySelectorAll('.out-card').forEach(function(card, i){ r.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
+  return r;
+}
+
+// ---- Add a "pick on board" button next to every GPIO field -----------------
+var PICK_ICON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">'
+  + '<circle cx="8" cy="8" r="3"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>';
+function decoratePin(input){
+  if (!input || input.dataset.picker) return;
+  input.dataset.picker = '1';
+  var role = input.name;
+  var grp = document.createElement('div');
+  grp.className = 'input-group input-group-sm pin-grp';
+  input.parentNode.insertBefore(grp, input);
+  grp.appendChild(input);
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-outline-secondary pin-pick';
+  btn.title = 'Pick this pin on the board diagram';
+  btn.innerHTML = PICK_ICON;
+  btn.addEventListener('click', function(){ openPicker(role); });
+  grp.appendChild(btn);
+  input.addEventListener('input', validate);
+  input.addEventListener('change', validate);
+}
+function decorateAllPins(){
+  var names = ['ledpin','ledr','ledg','ledy','ledb','ledw',
+               'dispsda','dispscl','dispcs','dispdc','disprst','dispsck','dispmosi'];
+  document.querySelectorAll('.out-card').forEach(function(card, i){ names.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
+  names.forEach(function(n){ decoratePin(byRole(n)); });
+  document.querySelectorAll('.out-en').forEach(function(en){
+    if (!en.dataset.vbound){ en.dataset.vbound = '1'; en.addEventListener('change', validate); }
+  });
+}
+
+// ---- Validation ------------------------------------------------------------
+function pinFlags(g){
+  if (isNaN(g)) return [];
+  var b = currentBoardDesc();
+  if (b && b.byGpio){ var p = b.byGpio[g]; return p ? (p.flags || []) : ['absent']; }
+  var fam = familyOf(), fl = [];
+  if (fam.flash.indexOf(g) >= 0) fl.push('flash');
+  if (fam.serial.indexOf(g) >= 0) fl.push('serial');
+  if (fam.inputOnly.indexOf(g) >= 0) fl.push('input-only');
+  if (fam.strapping.indexOf(g) >= 0) fl.push('strapping');
+  if (fam.usbjtag.indexOf(g) >= 0) fl.push('usb-jtag');
+  if (g > fam.max || g < 0) fl.push('range');
+  return fl;
+}
+function flagSeverity(flags, t){
+  function r(s, m){ return { sev:s, msg:m }; }
+  for (var i = 0; i < flags.length; i++){
+    var f = flags[i];
+    if (f === 'flash')  return r('err', 'is a SPI-flash pin (do not use)');
+    if (f === 'serial') return r('err', 'is the USB-serial console pin');
+    if (f === 'range')  return r('err', 'is out of range for this chip');
+    if (f.indexOf('reserved:') === 0)
+      return r('err', 'is reserved for ' + f.slice(9).replace('eth-spi', 'the W5500 Ethernet').replace('eth-rmii', 'Ethernet'));
+  }
+  if (flags.indexOf('input-only') >= 0 && t === 'out') return r('err', 'is input-only and cannot drive an output');
+  if (flags.indexOf('absent') >= 0)    return r('warn', 'is not broken out on this board');
+  if (flags.indexOf('strapping') >= 0) return r('warn', 'is a strapping/boot pin (use with care)');
+  if (flags.indexOf('usb-jtag') >= 0)  return r('warn', 'is a USB-JTAG pin (D+/D-)');
+  return r('', '');
+}
+function setState(el, cls){ el.classList.remove('is-invalid','is-warning'); if (cls) el.classList.add(cls); }
+function renderWarnings(msgs){
+  var c = $('pin-warnings'); if (!c) return;
+  if (!msgs.length){ c.innerHTML = ''; return; }
+  var errs = [], warns = [];
+  msgs.forEach(function(m){ (m.sev === 'err' ? errs : warns).push(m); });
+  var html = '';
+  if (errs.length) html += '<div class="alert alert-danger"><strong>Fix before saving:</strong><ul class="mb-0 ps-3">'
+    + errs.map(function(m){ return '<li>' + esc(m.text) + '</li>'; }).join('') + '</ul></div>';
+  if (warns.length) html += '<div class="alert alert-warning"><strong>Warnings:</strong><ul class="mb-0 ps-3">'
+    + warns.map(function(m){ return '<li>' + esc(m.text) + '</li>'; }).join('') + '</ul></div>';
+  c.innerHTML = html;
+}
+function validate(){
+  var roles = activeRoles(), used = {}, fields = [];
+  roles.forEach(function(role){
+    var el = byRole(role); if (!el) return;
+    var v = parseInt(el.value, 10);
+    fields.push({ role:role, el:el, v:v });
+    if (!isNaN(v) && v >= 0) (used[v] = used[v] || []).push(role);
+  });
+  var msgs = [], hard = false;
+  fields.forEach(function(f){
+    setState(f.el, '');
+    if (isNaN(f.v) || f.v < 0) return;
+    var probs = [], sev = '';
+    if (used[f.v].length > 1){
+      var others = used[f.v].filter(function(r){ return r !== f.role; }).map(roleLabel);
+      probs.push('GPIO' + f.v + ' also assigned to ' + others.join(', ')); sev = 'err';
+    }
+    var s = flagSeverity(pinFlags(f.v), roleType(f.role));
+    if (s.sev){
+      probs.push('GPIO' + f.v + ' ' + s.msg);
+      if (s.sev === 'err') sev = 'err'; else if (sev !== 'err') sev = 'warn';
+    }
+    if (probs.length){
+      setState(f.el, sev === 'err' ? 'is-invalid' : 'is-warning');
+      msgs.push({ sev:sev, text:roleLabel(f.role) + ': ' + probs.join('; ') });
+      if (sev === 'err') hard = true;
+    }
+  });
+  renderWarnings(msgs);
+  var sb = $('save-btn'); if (sb) sb.disabled = hard;
+  if ($('board-modal').classList.contains('show')) renderBoard();
+  return !hard;
+}
+
+// ---- SVG board diagram + picker --------------------------------------------
+var MOD_L = 150, MOD_R = 210, BRD_W = 360, ROW = 30, TOP = 26;
+function padClass(flags){
+  for (var i = 0; i < flags.length; i++){ var f = flags[i];
+    if (f === 'flash' || f === 'serial' || f === 'range' || f.indexOf('reserved:') === 0) return 'bad'; }
+  for (i = 0; i < flags.length; i++){ var f2 = flags[i];
+    if (f2 === 'strapping' || f2 === 'usb-jtag' || f2 === 'input-only') return 'warn'; }
+  return 'free';
+}
+function padSvg(side, pin, y, assign){
+  var g = pin.gpio, used = assign[g];
+  var cx = side === 'L' ? MOD_L : MOD_R;
+  var lx = side === 'L' ? (MOD_L - 13) : (MOD_R + 13);
+  var anc = side === 'L' ? 'end' : 'start';
+  var dot = '<circle class="pin-dot ' + padClass(pin.flags || []) + '" cx="' + cx + '" cy="' + y + '" r="6"/>';
+  var t1 = '<text class="pad-lbl" x="' + lx + '" y="' + (y - 2) + '" text-anchor="' + anc + '">' + esc(pin.silk) + '</text>';
+  var t2 = '<text class="pad-gpio" x="' + lx + '" y="' + (y + 9) + '" text-anchor="' + anc + '">GPIO' + g + '</text>';
+  var t3 = used ? '<text class="pad-assign" x="' + lx + '" y="' + (y + 19) + '" text-anchor="' + anc + '">' + esc(used.join(', ')) + '</text>' : '';
+  return '<g class="pad' + (used ? ' used' : '') + '" data-gpio="' + g + '">' + dot + t1 + t2 + t3 + '</g>';
+}
+function renderBoard(){
+  var b = diagramDesc(), wrap = $('board-svg-wrap');
+  if (!b){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
+  var assign = {};
+  activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(roleLabel(role)); });
+  var L = b.cols[0], R = b.cols[1], n = Math.max(L.length, R.length);
+  var H = TOP + n * ROW + 16;
+  var cxm = (MOD_L + MOD_R) / 2;
+  var s = '<svg class="board-svg" viewBox="0 0 ' + BRD_W + ' ' + H + '" width="' + BRD_W + '">';
+  s += '<rect x="' + MOD_L + '" y="14" width="' + (MOD_R - MOD_L) + '" height="' + (H - 28) + '" rx="6" fill="#0d1117" stroke="#30363d"/>';
+  s += '<text x="' + cxm + '" y="' + (H / 2) + '" fill="#484f58" font-size="9" text-anchor="middle" transform="rotate(-90 ' + cxm + ' ' + (H / 2) + ')">' + esc(b.name) + '</text>';
+  var i, y;
+  for (i = 0; i < L.length; i++){ y = TOP + i * ROW; s += padSvg('L', L[i], y, assign); }
+  for (i = 0; i < R.length; i++){ y = TOP + i * ROW; s += padSvg('R', R[i], y, assign); }
+  s += '</svg>';
+  wrap.innerHTML = s;
+  wrap.querySelectorAll('.pad').forEach(function(node){
+    node.addEventListener('click', function(){ onPinClick(+node.getAttribute('data-gpio')); });
+  });
+}
+function onPinClick(gpio){
+  if (PICK_TARGET){
+    var el = byRole(PICK_TARGET);
+    if (el){ el.value = gpio; el.dispatchEvent(new Event('input', { bubbles:true })); }
+    closeBoard();
+  } else {
+    chooseRole(gpio);
+  }
+}
+function chooseRole(gpio){
+  var roles = activeRoles(), h = $('board-pick-hint');
+  h.classList.remove('d-none');
+  h.innerHTML = 'Assign <strong>GPIO' + gpio + '</strong> to: '
+    + roles.map(function(r){ return '<button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1" data-r="' + r + '">' + esc(roleLabel(r)) + '</button>'; }).join('')
+    + ' <button type="button" class="btn btn-sm btn-outline-secondary mb-1" data-r="">cancel</button>';
+  h.querySelectorAll('button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var r = btn.getAttribute('data-r');
+      if (r){ var el = byRole(r); el.value = gpio; el.dispatchEvent(new Event('input', { bubbles:true })); }
+      h.classList.add('d-none'); renderBoard();
+    });
+  });
+}
+function setupPhotoToggle(){
+  var b = diagramDesc(), w = $('photo-toggle-wrap'), pw = $('board-photo-wrap'), t = $('photo-toggle');
+  pw.innerHTML = ''; t.checked = false;
+  if (b && b.photo){
+    w.style.display = '';
+    t.onchange = function(){
+      pw.innerHTML = t.checked
+        ? '<img src="' + CATALOG_URL + esc(b.photo) + '" alt="board photo" style="max-width:100%;border:1px solid #30363d;border-radius:6px" '
+          + 'onerror="this.parentNode.innerHTML=&quot;<span class=\'text-secondary small\'>photo unavailable offline</span>&quot;">'
+        : '';
+    };
+  } else { w.style.display = 'none'; }
+}
+function openPicker(role){
+  PICK_TARGET = role || null;
+  var h = $('board-pick-hint');
+  if (role){ h.classList.remove('d-none'); h.textContent = 'Click the pin to assign to ' + roleLabel(role) + '.'; }
+  else { h.classList.add('d-none'); }
+  $('board-modal-title').textContent = role ? ('Pick pin: ' + roleLabel(role)) : (currentBoardName() + ' — pin map');
+  setupPhotoToggle();
+  renderBoard();
+  $('board-modal').classList.add('show');
+}
+function closeBoard(){ $('board-modal').classList.remove('show'); PICK_TARGET = null; }
+
+// ---- Templates -------------------------------------------------------------
+function applyTemplate(){
+  var b = BOARDS[$('board-sel').value];
+  if (!b || !b.preset){ showModal({ title:'No template', body:'This board has no preset to apply.', cancel:false, okText:'OK' }); return; }
+  showModal({ title:'Apply ' + b.name + ' template?',
+    body:'This overwrites the LED, display and DMX pin fields with the tested pin map for ' + b.name
+       + '. Network, protocol and device settings are left unchanged.',
+    okText:'Apply', okClass:'btn-primary' }).then(function(ok){
+    if (!ok) return;
+    var p = b.preset;
+    if (p.ledType != null){ $('led-type').value = p.ledType; updLedPin(); }
+    if (p.ledPin != null) setVal('ledpin', p.ledPin);
+    ['ledr','ledg','ledy','ledb','ledw'].forEach(function(k){ if (p[k] != null) setVal(k, p[k]); });
+    if (p.dispType != null){ $('disp-type').value = p.dispType; updDispPins(); }
+    ['dispsda','dispscl','dispcs','dispdc','disprst','dispsck','dispmosi'].forEach(function(k){ if (p[k] != null) setVal(k, p[k]); });
+    if (p.outputs){ buildOutputs(p.outputs); decorateAllPins(); }
+    updAllUniHints(); validate();
+  });
+}
+function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply').disabled = !(b && b.preset); }
+
+// ---- Board <select> + remote catalog (Phase 2) -----------------------------
+function appendBoardOption(id, name){
+  if (document.querySelector('#board-sel option[value="' + id + '"]')) return;
+  var o = document.createElement('option'); o.value = id; o.textContent = name; $('board-sel').appendChild(o);
+}
+function fillBoardSelect(){
+  var html = '<option value="custom">Custom / manual</option>';
+  BUILTINS.forEach(function(id){ if (BOARDS[id]) html += '<option value="' + id + '">' + esc(BOARDS[id].name) + '</option>'; });
+  $('board-sel').innerHTML = html;
+}
+function ensureBoard(id, cb){
+  if (BOARDS[id]) return cb(true);
+  fetch(CATALOG_URL + id + '.json', { cache:'no-store' })
+    .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+    .then(function(d){
+      BOARDS[id] = finalizeDesc(d);
+      try { var c = JSON.parse(localStorage.getItem('lg_boards') || '{}'); c[id] = d; localStorage.setItem('lg_boards', JSON.stringify(c)); } catch(e){}
+      cb(true);
+    }).catch(function(){ cb(false); });
+}
+function loadRemoteCatalog(){
+  try {
+    var cache = JSON.parse(localStorage.getItem('lg_boards') || '{}');
+    Object.keys(cache).forEach(function(k){ if (!BOARDS[k]){ BOARDS[k] = finalizeDesc(cache[k]); appendBoardOption(k, cache[k].name); } });
+  } catch(e){}
+  fetch(CATALOG_URL + 'index.json', { cache:'no-store' })
+    .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+    .then(function(idx){
+      (idx.boards || []).forEach(function(e){
+        if (BUILTINS.indexOf(e.id) >= 0) return;
+        REMOTE_INDEX[e.id] = e;
+        appendBoardOption(e.id, e.name);
+      });
+    }).catch(function(){ /* offline: built-ins still work */ });
+}
+
+// ---- Init (called from the /info.json loader) ------------------------------
+function initBoards(){
+  buildBoards();
+  fillBoardSelect();
+  $('board-sel').value = BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom';
+  $('board-detected').textContent = INFO_BOARD ? ('detected: ' + INFO_BOARD + (INFO_MCU ? (' / ' + INFO_MCU) : '')) : '';
+  decorateAllPins();
+  $('board-sel').addEventListener('change', function(){
+    var id = $('board-sel').value;
+    if (id && id !== 'custom' && !BOARDS[id]){
+      ensureBoard(id, function(ok){
+        if (!ok){ showModal({ title:'Board unavailable', body:'That board could not be loaded from the online catalog. Connect to the internet and retry, or use Custom.', cancel:false, okText:'OK' }); $('board-sel').value = 'custom'; }
+        updBoardButtons(); validate();
+      });
+    } else { updBoardButtons(); validate(); }
+  });
+  $('board-apply').addEventListener('click', applyTemplate);
+  $('board-open').addEventListener('click', function(){ openPicker(null); });
+  $('board-modal-close').addEventListener('click', closeBoard);
+  $('board-modal-done').addEventListener('click', closeBoard);
+  $('board-modal').addEventListener('click', function(e){ if (e.target === $('board-modal')) closeBoard(); });
+  $('led-type').addEventListener('change', function(){ decorateAllPins(); validate(); });
+  $('disp-type').addEventListener('change', function(){ decorateAllPins(); validate(); });
+  updBoardButtons();
+  validate();
+  loadRemoteCatalog();
+}
+</script>
+
+<!-- Board pin-picker dialog (issue #12) -->
+<div class="app-modal" id="board-modal">
+  <div class="card shadow board-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span id="board-modal-title">Board pin map</span>
+      <button type="button" class="btn-close btn-close-white" id="board-modal-close" aria-label="Close"></button>
+    </div>
+    <div class="card-body">
+      <div id="board-pick-hint" class="alert alert-info py-2 small d-none mb-2"></div>
+      <div class="board-wrap" id="board-svg-wrap"></div>
+      <div class="board-legend">
+        <span class="lg-free">free</span>
+        <span class="lg-warn">caution (strapping / USB-JTAG / input-only)</span>
+        <span class="lg-bad">do not use (flash / serial / Ethernet)</span>
+        <span class="lg-used">assigned</span>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+        <label class="form-check small mb-0" id="photo-toggle-wrap" style="display:none">
+          <input type="checkbox" class="form-check-input me-1" id="photo-toggle"> show board photo (online)
+        </label>
+        <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="board-modal-done">Done</button>
+      </div>
+      <div id="board-photo-wrap" class="mt-2"></div>
+    </div>
+  </div>
+</div>
 
 <!-- Generic confirm / info dialog -->
 <div class="app-modal" id="app-modal">

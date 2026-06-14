@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "updated": "auto",
+  "boards": [
+    {
+      "id": "lumigate_v3",
+      "name": "LumiGate v3 (ESP32-S3 + W5500)",
+      "mcu": "esp32s3",
+      "builtin": true
+    },
+    {
+      "id": "esp32s3-devkitc-1",
+      "name": "ESP32-S3 DevKitC-1",
+      "mcu": "esp32s3",
+      "builtin": true
+    },
+    {
+      "id": "esp32-devkitc",
+      "name": "ESP32 DevKitC (WROOM-32)",
+      "mcu": "esp32",
+      "builtin": true
+    }
+  ]
+}
