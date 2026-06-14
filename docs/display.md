@@ -150,17 +150,38 @@ Banners dwell ≥1.5 s so a brief blip stays readable.
 
 ### 128×64 mono / 128×128 color (8 rows)
 
+Single output (resting):
+
 ```
 ┌────────────────────────────┐
 │ LumiGate           1.0.42  │  title + FIRMWARE_VERSION
 │ 192.168.1.50               │  netLocalIP()  — the #1 walk-up info
-│ Uni 0    sACN              │  cfg.universe + active protocol name
-│ FPS 44.0     Src 1         │  fps + activeSenderCount()
-│ WiFi ▂▄▆_ -58dBm    ● LIVE │  RSSI bars (or "ETH ↑") + DMX live/idle
+│ Uni 0    Both              │  output universe + protocol
+│ FPS 44.0  Sources 1        │  fps + activeSenderCount()
+│ WiFi -47dBm         ● LIVE │  link dBm (or "ETH up") + DMX live/idle
 └────────────────────────────┘
 ```
 
-- Link row: WiFi shows RSSI bars + dBm (`netRSSI()`); Ethernet shows `ETH ↑/↓`.
+With **both outputs enabled** the universe + FPS rows split into one row per output, each
+showing its own universe and its own frame rate (source count moves to the right):
+
+```
+┌────────────────────────────┐
+│ LumiGate           1.0.42  │
+│ 192.168.1.50               │
+│ A U0 44.0fps               │  output A: universe + dispOutFps(0)
+│ B U5 43.8fps        Src 1  │  output B + activeSenderCount()
+│ WiFi -47dBm         ● LIVE │
+└────────────────────────────┘
+```
+
+- Link row: WiFi shows dBm (`netRSSI()`); Ethernet shows `ETH up/down`.
+- Universe(s): `dispUniverseLabel()` joins every **enabled** output's universe (`0`, or `0+5`
+  for two) in the single-output layout; with two outputs each gets its own `A`/`B` row.
+- Per-output FPS: `dispOutFps(i)` is each universe's own 1 s frame rate, and reads `0.0` once
+  that input stalls (>1.5 s). The aggregate `fps` still feeds the WebSocket / web UI.
+- Source count: labelled **Sources** (number of active Art-Net / sACN senders), matching the
+  `2+ sources` wording on the conflict banner.
 - DMX state: `● LIVE` when `millis() - lastDmxMs < 1500` (the LED's threshold), else `idle`.
 - **Color panel (SSD1351)** reuses the device's existing status palette: title accent + LIVE dot
   **green** when active, **amber** when idle, **red** on no-link; the conflict banner fills
@@ -178,9 +199,9 @@ Title + RSSI bars dropped; live dot moves up beside the IP:
 
 ```
 ┌────────────────────────────┐
-│ 192.168.1.50        ● LIVE │
-│ Uni 0   sACN               │
-│ FPS 44.0  Src 1   -58dBm   │
+│ 10.13.37.2          ● LIVE │
+│ U0+5 Both                  │
+│ 44.0/43.8 Sources 1        │  per-output fps (single output: "40.0fps")
 └────────────────────────────┘
 ```
 

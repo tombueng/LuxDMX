@@ -45,8 +45,9 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
 | **Status LED** | Plain GPIO or WS2812 RGB NeoPixel — color codes WiFi/idle/DMX active state |
+| **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
-| **Configurable DMX pins** | TX / RX / RTS GPIO and UART port (0/1/2) set at runtime via web UI — no recompile |
+| **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
 | **Ethernet support** | WT32-ETH01: wired LAN via LAN8720, no WiFi required, DHCP |
@@ -412,6 +413,10 @@ upload_port     = dmx-gateway.local
 upload_flags    = --auth=dmxota
 ```
 
+> The **OTA Password** (Settings → Device) guards **only** this IDE / PlatformIO
+> `espota` path. The browser "Firmware Update" above (`.bin` upload + GitHub install)
+> is **not** protected by it.
+
 ---
 
 ## First Setup
@@ -486,18 +491,22 @@ values are fetched as JSON.
 
 ### WebSocket (`ws://<device>/ws`, port 80)
 
-Binary status/DMX frame pushed ~10×/s (528 bytes):
+Binary status/DMX frame pushed ~10×/s (528 + 2 bytes per output):
 
 ```
-Bytes  0–1    fps × 10           uint16 big-endian
+Bytes  0–1    fps × 10           uint16 big-endian (aggregate, all inputs)
 Bytes  2–3    RSSI (dBm)         int16  big-endian
 Bytes  4–7    free heap          uint32 big-endian
 Bytes  8–11   uptime (s)         uint32 big-endian
 Byte   12     active sender count uint8
 Byte   13     conflict flag       uint8 (1 = multiple senders)
 Bytes  14–15  jitter × 10 (ms)   uint16 big-endian
-Bytes  16–527 DMX ch 1–512       uint8[512]
+Bytes  16–527 DMX ch 1–512       uint8[512] (the viewed output)
+Bytes  528…   per-output fps × 10 uint16 big-endian × number of outputs
 ```
+
+The web UI shows the **viewed output's** frame rate in the navbar and each output's own
+rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` alongside `"fps"`.
 
 A JSON **text** frame with the sender list + change log is pushed every 2 s
 (`{"meta":1,"senders":[…],"log":[…]}`) so the browser never has to poll.
@@ -562,18 +571,23 @@ Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48`
 ## Display (OLED / colour OLED)
 
 LumiGate can drive an **optional status display** that shows the gateway's live state
-without a browser — IP, universe, protocol, frame rate, source count and link / DMX
+without a browser — IP, output universe(s), protocol, frame rate, source count and link / DMX
 activity — and **auto-switches to a full-screen alert** when something needs attention
 (two consoles fighting over the universe, identify, or manual override). It's **off by
 default**; enable and pin it under **Settings → Display**.
 
 ![LumiGate display types](docs/display-preview.png)
 
-*Rendered from the firmware's own layout code with the real display font. **Top:** 0.96″ /
+*Rendered from the firmware's own layout code with the real display font &nbsp;·&nbsp; regenerate
+with [`docs/make_display_preview.py`](docs/make_display_preview.py). **Top:** 0.96″ /
 1.3″ mono OLED (status, then the conflict / identify / manual banners). **Middle:** the same
 panel in blue and yellow/blue-split, and the 0.91″ 128×32 compact layout. **Bottom:** the
 1.5″ SSD1351 colour panel, which mirrors the RGB status-LED language (green = live,
 amber = idle, red = conflict).*
+
+The status screen adapts to the number of outputs: a single output shows `Uni 0` with one frame
+rate, while **two enabled outputs get a row each** (`A`/`B`) with their own universe and **own
+FPS** (shown above). The source count is labelled **Sources** (active Art-Net / sACN senders).
 
 ### Supported panels
 
@@ -600,27 +614,64 @@ See [docs/display.md](docs/display.md) for the full design — per-board pin tab
 
 ---
 
-## DMX Output Pins
+## DMX Outputs
 
-All DMX hardware settings are configurable at runtime under **Settings → DMX Output Pins** — no recompile needed.
+LumiGate drives up to **2 independent DMX outputs** — each its own universe, UART port and
+RS485 transceiver — configurable at runtime under **Settings → DMX Outputs** (no recompile).
+The 2-output ceiling is a hardware limit: the ESP32 / ESP32-S3 expose 3 UARTs and UART0 is the
+serial console, leaving UART1 + UART2. **Output B ships disabled**, so single-universe setups are
+unchanged, and devices updated from older firmware keep their existing output as Output A.
 
-| Setting | Default | Description |
+Per output:
+
+| Setting | Default (Output A / B) | Description |
 |---|---|---|
-| UART port | `1` | Which ESP32 UART peripheral to use (0 / 1 / 2). UART1 is recommended; UART0 conflicts with Serial. |
-| TX pin | `17` (GPIO17) | ESP32 GPIO that drives the RS485 module's RXD input |
-| RX pin | `16` (GPIO16) | ESP32 GPIO connected to the RS485 module's TXD output |
-| RTS / DE pin | `−1` (disabled) | RS485 direction-control pin. Set to −1 for auto-direction modules (Waveshare C). Required for RDM. |
+| Enabled | A on / B off | Whether this output drives a DMX line |
+| Universe | `0` / `1` | Art-Net universe (sACN universe = this + 1). Range 0–15 |
+| UART port | `1` / `2` | Which ESP32 UART drives the line. Each enabled output needs a **distinct** port |
+| TX pin | `17` (GPIO17) | ESP32 GPIO that drives the RS485 module's DI (data-in) |
+| RX pin | `16` (GPIO16) | ESP32 GPIO connected to the RS485 module's RO (data-out); needed for RDM |
+| RTS / DE pin | `−1` (disabled) | RS485 direction-control pin. −1 for auto-direction modules (Waveshare C). Required for RDM. |
 
-**Board defaults** (applied on first boot; overrideable in the web UI):
+Setting **both outputs to the same universe** turns LumiGate into a 1-in / 2-out DMX splitter.
+**RDM** runs on the first enabled output with an RTS pin set (one output at a time). For
+multi-universe input, **Art-Net is recommended** (single UDP socket, no IGMP); sACN works too
+(one multicast group joined per universe).
 
-| Board | TX | RX | RTS |
-|---|---|---|---|
-| ESP32 DevKit / ESP32-S3 | GPIO17 | GPIO16 | −1 |
-| WT32-ETH01 | GPIO4 | GPIO5 | −1 |
+> **WT32-ETH01:** the Ethernet PHY consumes most GPIOs, so a second output is best run
+> output-only (TX, no RX/RDM).
 
-> GPIO16 is used by the LAN8720 Ethernet PHY on the WT32-ETH01, so the default pins are shifted.
+### Per-board defaults & capabilities
 
-**Using a different RS485 module?** Connect your module's RXD (data-in) pin to the TX GPIO and its TXD (data-out) pin to the RX GPIO, then update Settings → DMX Output Pins to match.
+Applied on first boot; everything is overrideable in the web UI (no recompile).
+
+| Board | Build env | Net | Outputs | Output A — TX / RX / RTS | Suggested Output B | Notes |
+|---|---|---|---|---|---|---|
+| ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
+| ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48 |
+| WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
+
+> **All three boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
+> ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the
+> preprocessor reads as 0, so it was compiled out (null peripheral pointer). Fixed by a build-time
+> patch in [`extra_scripts.py`](extra_scripts.py).
+
+**ESP32-S3 — safe GPIOs for a 2nd output:** free choices are **5, 6, 7, 8, 15, 18, 21**. Avoid
+**26–37** (SPI flash / octal PSRAM — *will* crash), **19/20** (USB), **43/44** (serial console),
+**0/45/46** (strapping), **48** (WS2812 LED), and Output A's **16/17**.
+
+**Using a different RS485 module?** Wire your module's DI (data-in) to the TX GPIO and RO (data-out)
+to the RX GPIO, then set the pins under Settings → DMX Outputs.
+
+### Upgrade & crash safety
+
+- **Existing single-universe devices are unaffected by the update.** Migration maps the old
+  single-output config to **Output A** and leaves **Output B disabled**, so exactly one driver is
+  installed on UART1 — byte-for-byte the same path as before.
+- **No configuration can brick the device.** A safe-boot guard persists a crash counter around DMX
+  init; if init ever panics (a bad pin/port), the next boots progressively disable outputs (keep
+  A → all off) until the web UI is reachable. An enabled output with no TX pin is sanitized off
+  automatically (firmware + a client-side check).
 
 ---
 
@@ -634,24 +685,25 @@ All DMX hardware settings are configurable at runtime under **Settings → DMX O
 | Auto-update | off | Web `/config` (Firmware) |
 | Channel labels | — | Status page (channel modal) |
 | Hostname | `dmx-gateway` | Web `/config` |
-| OTA Password | `dmxota` | Web `/config` |
+| OTA Password (IDE `espota` only) | `dmxota` | Web `/config` |
 | LED type / GPIO pin | board default | Web `/config` (Status LED) |
+| Per-output: enabled / universe / UART port / TX / RX / RTS | A on (uni 0, UART1, TX=17, RX=16, RTS=−1); B off | Web `/config` (DMX Outputs) |
 | Display type / pins | off | Web `/config` (Display) |
-| UART port | `1` | Web `/config` (DMX Output Pins) |
-| DMX TX / RX / RTS pins | board default (TX=17, RX=16, RTS=−1) | Web `/config` (DMX Output Pins) |
 | WiFi credentials | — | Config portal or `/reset` |
 
 ---
 
-## Roadmap / Ideas
+## Testing
 
-- [ ] Scenes / presets (save & recall DMX snapshots)
-- [ ] Fade engine (smooth transitions between scenes)
-- [ ] Failsafe scene (auto-load when Art-Net / sACN signal lost)
-- [ ] MQTT integration (Home Assistant / Node-RED)
-- [x] Channel labels / fixture naming
-- [ ] RDM support (requires module with controllable DE/RE pin, e.g. SP3485)
-- [ ] Multi-universe (multiple RS485 ports)
+End-to-end Playwright tests drive a **live device** — they inject real Art-Net and sACN/E1.31
+packets over the network and assert the REST API, WebSocket and web UI react correctly (Art-Net/sACN
+→ DMX, sender tracking, conflict banner, change log, manual override + blackout, labels, and the
+2-output feature). See [`docs/tests/README.md`](docs/tests/README.md).
+
+```bash
+cd docs && npm install && npx playwright install chromium
+LUMIGATE_HOST=dmx-gateway.local npm test
+```
 
 ---
 

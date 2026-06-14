@@ -34,13 +34,17 @@ body { background: var(--gh-bg); }
 .site-nav .brand img { height: 64px; }
 .site-nav .brand-text .name { font-size: 1.4rem; font-weight: 700; color: #fff; line-height: 1; }
 .site-nav .brand-text .sub  { font-size: 0.68rem; color: var(--gh-muted); margin-top: 2px; }
-.site-nav .nav-links { margin-left: auto; display: flex; gap: 0.4rem; }
+.site-nav .nav-links { display: flex; gap: 0.4rem; }
+
+/* Compact live stats in the navbar (replaces the old stat cards) */
+.nav-stats { margin-left: auto; display: flex; gap: 1.15rem; align-items: center; flex-wrap: wrap; }
+.nav-stat  { display: flex; flex-direction: column; line-height: 1.05; }
+.nav-stat .ns-label { font-size: 0.55rem; text-transform: uppercase; letter-spacing: .07em; color: var(--gh-muted); }
+.nav-stat .ns-val   { font-size: 0.95rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
 
 .card { background: var(--gh-surface); border-color: var(--gh-border); }
 .card-header { background: #1c2128; border-color: var(--gh-border); font-size: 0.85rem; }
 
-.stat-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gh-muted); }
-.stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.25; color: #fff; }
 
 #grid {
   display: grid;
@@ -109,6 +113,13 @@ footer a:hover { color: var(--gh-text); }
       <div class="sub" id="nav-sub">&nbsp;</div>
     </div>
   </a>
+  <div class="nav-stats">
+    <div class="nav-stat"><span class="ns-label">FPS</span><span class="ns-val" id="fps">—</span></div>
+    <div class="nav-stat"><span class="ns-label">WiFi</span><span class="ns-val" id="rssi">—</span></div>
+    <div class="nav-stat"><span class="ns-label">Heap</span><span class="ns-val" id="heap">—</span></div>
+    <div class="nav-stat"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">—</span></div>
+    <div class="nav-stat"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">—</span></div>
+  </div>
   <div class="nav-links">
     <a href="/" class="btn btn-primary btn-sm">Status</a>
     <a href="/config" class="btn btn-outline-secondary btn-sm">Settings</a>
@@ -140,43 +151,14 @@ footer a:hover { color: var(--gh-text); }
     <pre id="update-notes" style="display:none;margin:.5rem 0 0;font-size:.72rem;color:#c9b458;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.25);border-radius:4px;padding:.4rem .6rem;max-height:160px;overflow-y:auto"></pre>
   </div>
 
-  <!-- Stats (5 cards) -->
-  <div class="row g-2 mb-3">
-    <div class="col-6 col-sm">
-      <div class="card p-3 text-center">
-        <div class="stat-label">FPS</div>
-        <div class="stat-value" id="fps">—</div>
-      </div>
-    </div>
-    <div class="col-6 col-sm">
-      <div class="card p-3 text-center">
-        <div class="stat-label">WiFi Signal</div>
-        <div class="stat-value" id="rssi">—</div>
-      </div>
-    </div>
-    <div class="col-6 col-sm">
-      <div class="card p-3 text-center">
-        <div class="stat-label">Free Heap</div>
-        <div class="stat-value" id="heap">—</div>
-      </div>
-    </div>
-    <div class="col-6 col-sm">
-      <div class="card p-3 text-center">
-        <div class="stat-label">Uptime</div>
-        <div class="stat-value" id="uptime">—</div>
-      </div>
-    </div>
-    <div class="col-6 col-sm">
-      <div class="card p-3 text-center">
-        <div class="stat-label">Jitter</div>
-        <div class="stat-value" id="jitter">—</div>
-      </div>
-    </div>
-  </div>
 
   <!-- Controls -->
   <div class="card mb-3">
     <div class="card-body py-2 d-flex align-items-center flex-wrap gap-3">
+      <div class="align-items-center gap-2 mb-0" id="out-sel-wrap" style="display:none">
+        <span class="mb-0 small text-secondary">View</span>
+        <div class="btn-group btn-group-sm" id="out-sel" role="group" aria-label="Output view"></div>
+      </div>
       <div class="form-check form-switch mb-0">
         <input class="form-check-input" type="checkbox" id="modeSwitch" role="switch"
                onchange="setMode(this.checked)">
@@ -296,15 +278,65 @@ footer a:hover { color: var(--gh-text); }
 <script>
 const dmx = new Uint8Array(512);
 let activeCh = 0, sock;
-let labels = {};   // { "1": "Front L", ... }
+let labels = {};      // labels for the currently-viewed output: { "1": "Front L", ... }
+let allLabels = {};   // per-output: { "0": {"1":"Front L"}, "1": {...} } — each line has its own fixtures
 let devInfo = {};  // filled from /info.json
+
+// Outputs (enabled universes) and which one the monitor is currently viewing.
+let outputs = [];     // [{idx, uni}] enabled outputs, from /info.json
+let viewOut = 0;      // device-side output index being streamed
+
+function outUniverse(idx){
+  for (var i = 0; i < outputs.length; i++) if (outputs[i].idx === idx) return outputs[i].uni;
+  return idx;
+}
+function updNavSub(){
+  document.getElementById('nav-sub').innerHTML =
+    (devInfo.hostname || '') + '.local &nbsp;&middot;&nbsp; ' + (devInfo.ip || '') +
+    ' &nbsp;&middot;&nbsp; Universe ' + outUniverse(viewOut) +
+    ' &nbsp;&middot;&nbsp; v' + (devInfo.version || '');
+}
+// Tell the device which output's DMX buffer to stream + control, then relabel.
+function setViewOut(idx){
+  viewOut = idx;
+  if (sock && sock.readyState === 1) sock.send(JSON.stringify({type:'viewout', out: idx}));
+  labels = allLabels[viewOut] || {};   // each output has its own fixture names
+  applyLabels();
+  markActiveOut();
+  updNavSub();
+}
+function markActiveOut(){
+  document.querySelectorAll('#out-sel button').forEach(function(b){
+    var on = +b.dataset.out === viewOut;
+    b.classList.toggle('btn-primary', on);
+    b.classList.toggle('btn-outline-secondary', !on);
+  });
+}
+function buildOutSelector(){
+  var wrap = document.getElementById('out-sel-wrap');
+  var grp  = document.getElementById('out-sel');
+  if (outputs.length < 2) { wrap.style.display = 'none'; return; }
+  grp.innerHTML = outputs.map(function(o){
+    return '<button type="button" class="btn btn-outline-secondary" data-out="' + o.idx +
+           '">Output ' + String.fromCharCode(65 + o.idx) + ' · U' + o.uni +
+           ' · <span class="out-fps">–</span> fps</button>';
+  }).join('');
+  grp.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){ setViewOut(+b.dataset.out); });
+  });
+  markActiveOut();
+  wrap.style.display = 'flex';
+}
 
 // Device info for the nav subtitle (served statically now; values via JSON)
 fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   devInfo = d;
-  document.getElementById('nav-sub').innerHTML =
-    (d.hostname || '') + '.local &nbsp;&middot;&nbsp; ' + (d.ip || '') +
-    ' &nbsp;&middot;&nbsp; Universe ' + d.universe + ' &nbsp;&middot;&nbsp; v' + (d.version || '');
+  var outs = d.outputs || [{en:true, uni:d.universe||0}];
+  outputs = [];
+  for (var i = 0; i < outs.length; i++) if (outs[i].en) outputs.push({idx:i, uni:outs[i].uni});
+  if (outputs.length) viewOut = outputs[0].idx;
+  buildOutSelector();
+  updNavSub();
 }).catch(function(){});
 
 // Sparkline — 60 samples at 0.5 s = 30 s of history
@@ -335,18 +367,30 @@ function applyLabels() {
     el.classList.toggle('labeled', !!lbl);
   }
 }
+// Labels are stored per output. A legacy flat {ch:name} blob (string values) is
+// migrated to {"0":{...}} so existing single-universe labels stay on Output A.
+function isNestedLabels(o){
+  for (var k in o) return typeof o[k] === 'object' && o[k] !== null;
+  return false;
+}
 function loadLabels() {
   fetch('/labels.json').then(function(r){ return r.json(); })
-    .then(function(d){ labels = d || {}; applyLabels(); }).catch(function(){});
+    .then(function(d){
+      d = d || {};
+      allLabels = isNestedLabels(d) ? d : { '0': d };
+      labels = allLabels[viewOut] || {};
+      applyLabels();
+    }).catch(function(){});
 }
 function saveLabel() {
   const v = document.getElementById('ch-label').value.trim();
   if (v) labels[activeCh] = v; else delete labels[activeCh];
+  allLabels[viewOut] = labels;
   applyLabels();
   document.getElementById('modal-title').textContent =
     'Channel ' + activeCh + (labels[activeCh] ? ' — ' + labels[activeCh] : '');
   fetch('/labels', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify(labels) }).catch(function(){});
+                     body: JSON.stringify(allLabels) }).catch(function(){});
 }
 function identify() { send({type: 'identify', ch: activeCh}); }
 loadLabels();
@@ -430,7 +474,8 @@ function connect() {
   sock = new WebSocket('ws://' + location.host + '/ws');
   sock.binaryType = 'arraybuffer';
   var badge = document.getElementById('ws-badge');
-  sock.onopen  = function() { badge.textContent = 'Live';    badge.style.background = '#238636'; };
+  sock.onopen  = function() { badge.textContent = 'Live';    badge.style.background = '#238636';
+                              if (viewOut) sock.send(JSON.stringify({type:'viewout', out: viewOut})); };
   sock.onclose = function() { badge.textContent = 'Offline'; badge.style.background = '#da3633'; setTimeout(connect, 2000); };
   sock.onmessage = function(e) {
     if (typeof e.data === 'string') {
@@ -442,9 +487,10 @@ function connect() {
       return;
     }
     if (!(e.data instanceof ArrayBuffer)) return;
-    // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512)
+    // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2)
+    //        dmx(512) + per-output fps(2 each)
     var v = new DataView(e.data);
-    var fps         = (v.getUint16(0) / 10).toFixed(1);
+    var fps         = (v.getUint16(0) / 10).toFixed(1);   // aggregate (fallback)
     var rssi        = v.getInt16(2);
     var heap        = v.getUint32(4);
     var upS         = v.getUint32(8);
@@ -452,7 +498,17 @@ function connect() {
     var conflict    = v.getUint8(13);
     var jitter      = (v.getUint16(14) / 10).toFixed(1);
 
-    document.getElementById('fps').textContent = fps;
+    // Per-output frame rates appended after the 512-byte DMX block.
+    var perOut = [], nOut = Math.max(0, (v.byteLength - 528) >> 1);
+    for (var oi = 0; oi < nOut; oi++) perOut[oi] = v.getUint16(528 + 2 * oi) / 10;
+    // Main FPS stat reflects the viewed output; each selector button shows its own.
+    document.querySelectorAll('#out-sel button').forEach(function(btn){
+      var sp = btn.querySelector('.out-fps'), idx = +btn.dataset.out;
+      if (sp && perOut[idx] != null) sp.textContent = perOut[idx].toFixed(1);
+    });
+
+    document.getElementById('fps').textContent =
+      perOut[viewOut] != null ? perOut[viewOut].toFixed(1) : fps;
     var re = document.getElementById('rssi');
     re.textContent = rssi + ' dBm';
     re.style.color = rssi > -65 ? '#3fb950' : rssi > -80 ? '#e3b341' : '#f85149';
@@ -505,6 +561,7 @@ function updateLog(data) {
     var ageSec  = Math.round((newest - entry.ms) / 1000);
     var timeStr = ageSec === 0 ? 'now' : ageSec + 's ago';
     var proto   = entry.p === 0 ? 'Art-Net' : 'sACN';
+    if (entry.u != null && outputs.length > 1) proto += ' U' + entry.u;
     var chs     = entry.ch.map(function(c) {
       return (labels[c[0]] ? labels[c[0]] : 'ch' + c[0]) + '=' + c[1];
     }).join('&nbsp; ');

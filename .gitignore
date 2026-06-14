@@ -3,6 +3,8 @@ src/generated/
 docs/node_modules/
 docs/video-raw/
 docs/demo.mp4
+docs/test-results/
+docs/playwright-report/
 
 # local editor/agent config (never publish)
 .claude/
