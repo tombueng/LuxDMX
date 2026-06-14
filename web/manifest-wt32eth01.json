@@ -1,0 +1,16 @@
+{
+  "name": "LumiGate (WT32-ETH01)",
+  "version": "latest",
+  "new_install_prompt_erase": false,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "https://github.com/tombueng/LumiGate/releases/download/latest/bootloader-wt32eth01.bin", "offset": 4096 },
+        { "path": "https://github.com/tombueng/LumiGate/releases/download/latest/partitions-wt32eth01.bin", "offset": 32768 },
+        { "path": "https://github.com/tombueng/LumiGate/releases/download/latest/boot_app0.bin", "offset": 57344 },
+        { "path": "https://github.com/tombueng/LumiGate/releases/download/latest/firmware-wt32eth01.bin", "offset": 65536 }
+      ]
+    }
+  ]
+}
