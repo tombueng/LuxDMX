@@ -191,6 +191,12 @@ static int      rdmOut       = -1;                 // output RDM runs on, -1 = n
 static uint32_t lastFrameMs  = 0;
 static uint32_t frameCount   = 0;
 static float    fps          = 0.0f;
+// Per-output frame rate (one universe each). The aggregate `fps` above stays the
+// sum of all inputs for the WS/web UI; these drive the per-universe display.
+static uint32_t outFrameCount[MAX_OUTPUTS]  = {0};
+static uint32_t outLastFrameMs[MAX_OUTPUTS] = {0};
+static uint32_t outLastDmxMs[MAX_OUTPUTS]   = {0};
+static float    outFps[MAX_OUTPUTS]         = {0.0f};
 static float    jitterMs     = 0.0f;
 static uint32_t prevFrameMs  = 0;
 static uint32_t startMs      = 0;
@@ -925,17 +931,24 @@ static void applyToOutput(int outIdx, const uint8_t* data, uint16_t length) {
 // the aggregate stats/sender tracking once per input frame.
 static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
                        uint32_t senderIp, uint8_t proto) {
+    uint32_t now = millis();
     bool matched = false;
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!cfg.outputs[i].enabled || cfg.outputs[i].universe != artUniverse) continue;
         // Log changes for the viewed output before its buffer is overwritten.
         if (i == viewOutput()) maybeLog(i, data, length, senderIp, proto);
         applyToOutput(i, data, length);
+        // Per-output frame rate over a 1 s window (this universe only).
+        outLastDmxMs[i] = now;
+        outFrameCount[i]++;
+        if (now - outLastFrameMs[i] >= 1000) {
+            outFps[i] = (float)outFrameCount[i] * 1000.0f / (float)(now - outLastFrameMs[i]);
+            outFrameCount[i] = 0;
+            outLastFrameMs[i] = now;
+        }
         matched = true;
     }
     if (!matched) return;
-
-    uint32_t now = millis();
 
     // [DEBUG] flag DMX reception gaps (input stalled)
     if (lastDmxMs && now - lastDmxMs > 300)
@@ -1680,6 +1693,37 @@ static const char* dispProto() {
     return cfg.protocol == 0 ? "Art-Net" : cfg.protocol == 1 ? "sACN" : "Both";
 }
 
+// Compact universe label for the status display: "0" for a single output, "0+5"
+// when both outputs are enabled (each output carries its own universe). Falls
+// back to output 0's universe if nothing is enabled yet. Single static buffer is
+// safe: the display task is the only caller.
+static const char* dispUniverseLabel() {
+    static char buf[16];
+    buf[0] = '\0';
+    bool any = false;
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        if (!cfg.outputs[i].enabled) continue;
+        char part[8];
+        snprintf(part, sizeof(part), "%s%d", any ? "+" : "", cfg.outputs[i].universe);
+        strncat(buf, part, sizeof(buf) - strlen(buf) - 1);
+        any = true;
+    }
+    if (!any) snprintf(buf, sizeof(buf), "%d", cfg.outputs[0].universe);
+    return buf;
+}
+
+static int dispEnabledOutputs() {
+    int n = 0;
+    for (int i = 0; i < MAX_OUTPUTS; i++) if (cfg.outputs[i].enabled) n++;
+    return n;
+}
+
+// Per-output frame rate for the display: the live value, or 0 once that output's
+// input has stalled (>1.5 s), so a dead universe reads 0.0 instead of a stale rate.
+static float dispOutFps(int i) {
+    return (millis() - outLastDmxMs[i] < 1500) ? outFps[i] : 0.0f;
+}
+
 // Print s at text size ts, horizontally centred, top at y (built-in 6x8 font).
 static void dispCenter(const char* s, int ts, int y) {
     int w = (int)strlen(s) * 6 * ts;
@@ -1693,6 +1737,7 @@ static void dispDrawStatus() {
     const int W = gfx->width(), H = gfx->height();
     const bool live = (millis() - lastDmxMs) < 1500;
     const bool up   = netConnected();
+    const bool dual = dispEnabledOutputs() >= 2;   // show a frame rate per universe
     const uint16_t accent = !up ? C_RED : (live ? C_GREEN : C_AMBER);
     char b[40];
 
@@ -1705,9 +1750,13 @@ static void dispDrawStatus() {
         gfx->setTextColor(col(accent));
         gfx->setCursor(W - 24, 0); gfx->print(live ? "LIVE" : "idle");
         gfx->setTextColor(col(C_WHITE));
-        gfx->setCursor(0, 11); gfx->print('U'); gfx->print(cfg.outputs[0].universe);
+        gfx->setCursor(0, 11); gfx->print('U'); gfx->print(dispUniverseLabel());
         gfx->print(' '); gfx->print(dispProto());
-        snprintf(b, sizeof(b), "%.1ffps Src%u", fps, activeSenderCount());
+        if (dual)
+            snprintf(b, sizeof(b), "%.1f/%.1f Sources %u",
+                     dispOutFps(0), dispOutFps(1), activeSenderCount());
+        else
+            snprintf(b, sizeof(b), "%.1ffps Sources %u", fps, activeSenderCount());
         gfx->setCursor(0, 22); gfx->print(b);
         return;
     }
@@ -1721,14 +1770,30 @@ static void dispDrawStatus() {
         gfx->setTextColor(col(C_WHITE));
         gfx->setCursor(0, 30); gfx->print(up ? netLocalIP().toString() : String("no link"));
         gfx->drawFastHLine(0, 42, W, col(C_GREY));
-        gfx->setTextColor(col(C_GREY)); gfx->setCursor(0, 48); gfx->print("FPS");
-        snprintf(b, sizeof(b), "%.1f", fps);
-        gfx->setTextSize(3); gfx->setTextColor(col(accent));
-        gfx->setCursor(0, 58); gfx->print(b);
-        gfx->setTextSize(1); gfx->setTextColor(col(C_WHITE));
-        gfx->setCursor(0, 88);  gfx->print("Uni "); gfx->print(cfg.outputs[0].universe);
-        gfx->print("  "); gfx->print(dispProto());
-        gfx->setCursor(0, 100); gfx->print("Src "); gfx->print(activeSenderCount());
+        if (dual) {                          // one rate per universe
+            gfx->setTextColor(col(C_WHITE));
+            snprintf(b, sizeof(b), "A Uni %d", cfg.outputs[0].universe);
+            gfx->setCursor(0, 50); gfx->print(b);
+            snprintf(b, sizeof(b), "%.1f fps", dispOutFps(0));
+            gfx->setTextColor(col(accent)); gfx->setCursor(0, 62); gfx->print(b);
+            gfx->setTextColor(col(C_WHITE));
+            snprintf(b, sizeof(b), "B Uni %d", cfg.outputs[1].universe);
+            gfx->setCursor(0, 78); gfx->print(b);
+            snprintf(b, sizeof(b), "%.1f fps", dispOutFps(1));
+            gfx->setTextColor(col(accent)); gfx->setCursor(0, 90); gfx->print(b);
+            gfx->setTextColor(col(C_GREY));
+            gfx->setCursor(0, 102); gfx->print(dispProto());
+            gfx->print("  Sources "); gfx->print(activeSenderCount());
+        } else {
+            gfx->setTextColor(col(C_GREY)); gfx->setCursor(0, 48); gfx->print("FPS");
+            snprintf(b, sizeof(b), "%.1f", fps);
+            gfx->setTextSize(3); gfx->setTextColor(col(accent));
+            gfx->setCursor(0, 58); gfx->print(b);
+            gfx->setTextSize(1); gfx->setTextColor(col(C_WHITE));
+            gfx->setCursor(0, 88);  gfx->print("Uni "); gfx->print(dispUniverseLabel());
+            gfx->print("  "); gfx->print(dispProto());
+            gfx->setCursor(0, 100); gfx->print("Sources "); gfx->print(activeSenderCount());
+        }
         gfx->setCursor(0, 114);
 #ifdef USE_ETHERNET
         gfx->print(up ? "ETH up" : "ETH down");
@@ -1752,12 +1817,23 @@ static void dispDrawStatus() {
     gfx->setTextColor(col(C_WHITE));
     gfx->setCursor(0, y); gfx->print(up ? netLocalIP().toString() : String("no link"));
     y += rp;
-    gfx->setCursor(0, y); gfx->print('U'); gfx->print(cfg.outputs[0].universe);
-    gfx->print("  "); gfx->print(dispProto());
-    y += rp;
-    snprintf(b, sizeof(b), "FPS %.1f   Src %u", fps, activeSenderCount());
-    gfx->setCursor(0, y); gfx->print(b);
-    y += rp;
+    if (dual) {                          // one row per output: universe + its fps
+        snprintf(b, sizeof(b), "A U%d %.1ffps", cfg.outputs[0].universe, dispOutFps(0));
+        gfx->setCursor(0, y); gfx->print(b);
+        y += rp;
+        snprintf(b, sizeof(b), "B U%d %.1ffps", cfg.outputs[1].universe, dispOutFps(1));
+        gfx->setCursor(0, y); gfx->print(b);
+        { char s[12]; snprintf(s, sizeof(s), "Src %u", activeSenderCount());
+          gfx->setCursor(W - (int)strlen(s) * 6, y); gfx->print(s); }
+        y += rp;
+    } else {
+        gfx->setCursor(0, y); gfx->print("Uni "); gfx->print(dispUniverseLabel());
+        gfx->print("  "); gfx->print(dispProto());
+        y += rp;
+        snprintf(b, sizeof(b), "FPS %.1f  Sources %u", fps, activeSenderCount());
+        gfx->setCursor(0, y); gfx->print(b);
+        y += rp;
+    }
 #ifdef USE_ETHERNET
     gfx->setCursor(0, y); gfx->print(up ? "ETH up" : "ETH down");
 #else

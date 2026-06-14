@@ -563,18 +563,23 @@ Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48`
 ## Display (OLED / colour OLED)
 
 LumiGate can drive an **optional status display** that shows the gateway's live state
-without a browser — IP, universe, protocol, frame rate, source count and link / DMX
+without a browser — IP, output universe(s), protocol, frame rate, source count and link / DMX
 activity — and **auto-switches to a full-screen alert** when something needs attention
 (two consoles fighting over the universe, identify, or manual override). It's **off by
 default**; enable and pin it under **Settings → Display**.
 
 ![LumiGate display types](docs/display-preview.png)
 
-*Rendered from the firmware's own layout code with the real display font. **Top:** 0.96″ /
+*Rendered from the firmware's own layout code with the real display font &nbsp;·&nbsp; regenerate
+with [`docs/make_display_preview.py`](docs/make_display_preview.py). **Top:** 0.96″ /
 1.3″ mono OLED (status, then the conflict / identify / manual banners). **Middle:** the same
 panel in blue and yellow/blue-split, and the 0.91″ 128×32 compact layout. **Bottom:** the
 1.5″ SSD1351 colour panel, which mirrors the RGB status-LED language (green = live,
 amber = idle, red = conflict).*
+
+The status screen adapts to the number of outputs: a single output shows `Uni 0` with one frame
+rate, while **two enabled outputs get a row each** (`A`/`B`) with their own universe and **own
+FPS** (shown above). The source count is labelled **Sources** (active Art-Net / sACN senders).
 
 ### Supported panels
 
