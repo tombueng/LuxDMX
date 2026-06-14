@@ -248,6 +248,14 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 ## Flashing Pre-built Firmware
 
+> ### ⚡ Flash from your browser — no install, no command line
+>
+> Open **[the web flasher](https://tombueng.github.io/LumiGate/)** in desktop **Chrome or Edge**,
+> plug in your board over USB, pick your model, and click flash. That's it — no Python, no esptool,
+> no toolchain. It always installs the latest release.
+>
+> The manual / scripted methods below still work if you prefer them, or for the WT32-ETH01 (which has no USB port).
+
 No toolchain needed. GitHub CI builds the firmware on every push to master.
 
 **[Download latest release](https://github.com/tombueng/LumiGate/releases/tag/latest)** — includes `firmware.bin`, `bootloader.bin`, `partitions.bin`, `boot_app0.bin`.

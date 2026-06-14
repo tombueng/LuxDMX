@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flash LumiGate &mdash; Art-Net / sACN to DMX512 gateway</title>
+  <meta name="description"
+        content="Flash the LumiGate ESP32 Art-Net / sACN to DMX512 gateway straight from your browser. No install, no command line.">
+  <link rel="icon" href="https://raw.githubusercontent.com/tombueng/LumiGate/master/docs/logo.png">
+
+  <!-- ESP Web Tools: browser-based ESP32 flashing via Web Serial -->
+  <script type="module"
+          src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #9da7b3;
+      --accent: #2dd4bf;
+      --accent-2: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.55;
+    }
+    a { color: var(--accent-2); }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header img { width: 84px; height: 84px; }
+    h1 { font-size: 2rem; margin: 0.6rem 0 0.25rem; }
+    .tagline { color: var(--muted); font-size: 1.05rem; margin: 0 auto; max-width: 38rem; }
+    .pitch {
+      background: linear-gradient(135deg, rgba(45,212,191,.08), rgba(56,189,248,.08));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin: 1.75rem 0 2.5rem;
+      color: var(--text);
+    }
+    .pitch strong { color: var(--accent); }
+
+    .cards { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+    @media (min-width: 640px) { .cards { grid-template-columns: 1fr 1fr; } }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h3 { margin: 0 0 .25rem; font-size: 1.15rem; }
+    .card p { color: var(--muted); font-size: .9rem; margin: 0 0 1rem; flex: 1; }
+
+    esp-web-install-button {
+      --esp-tools-button-color: #06121a;
+      --esp-tools-button-text-color: #06121a;
+    }
+    .flash-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 8px;
+      padding: .7rem 1rem;
+      font-size: .98rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #06121a;
+      width: 100%;
+    }
+    .flash-btn:hover { background: #5eead4; }
+    .unsupported, .not-allowed {
+      display: block;
+      background: #2d1b1b;
+      border: 1px solid #5c2b2b;
+      color: #ffb4b4;
+      border-radius: 8px;
+      padding: .6rem .8rem;
+      font-size: .85rem;
+    }
+
+    h2 { margin: 3rem 0 1rem; font-size: 1.35rem; border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+    ol, ul { padding-left: 1.25rem; }
+    li { margin: .35rem 0; }
+    code {
+      background: #1f2630;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: .1rem .4rem;
+      font-size: .85em;
+    }
+    .note {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-2);
+      border-radius: 8px;
+      padding: .8rem 1rem;
+      margin: 1rem 0;
+      font-size: .92rem;
+    }
+    footer { text-align: center; color: var(--muted); margin-top: 3rem; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img src="https://raw.githubusercontent.com/tombueng/LumiGate/master/docs/logo.png" alt="LumiGate logo">
+      <h1>Flash LumiGate</h1>
+      <p class="tagline">Art-Net / sACN (E1.31) &rarr; DMX512 gateway for ESP32. Flash it straight from this page &mdash; no install, no command line.</p>
+    </header>
+
+    <div class="pitch">
+      Not just another Art-Net node: LumiGate is a node <strong>plus a live diagnostic tool</strong>.
+      Watch all 512 channels update in real time in your browser, get a warning the moment
+      <strong>two consoles fight over a universe</strong>, see per-sender FPS and frame jitter, and drive
+      <strong>galvanically-isolated</strong> DMX out. Fully open source, builds for a few dollars.
+    </div>
+
+    <p>Pick your board and click flash. The firmware is always the
+      <a href="https://github.com/tombueng/LumiGate/releases/tag/latest">latest release</a>.</p>
+
+    <div class="cards">
+      <div class="card">
+        <h3>ESP32 (WROOM-32)</h3>
+        <p>Classic ESP32 DevKit v1, 30-pin, CH340 / CP2102. WiFi build.</p>
+        <esp-web-install-button manifest="manifest-esp32.json">
+          <button class="flash-btn" slot="activate">Flash ESP32</button>
+          <span slot="unsupported" class="unsupported">Web Serial not supported. Use desktop <b>Chrome</b> or <b>Edge</b>.</span>
+          <span slot="not-allowed" class="not-allowed">Must be served over HTTPS (or localhost).</span>
+        </esp-web-install-button>
+      </div>
+
+      <div class="card">
+        <h3>ESP32-S3 (DevKitC-1)</h3>
+        <p>ESP32-S3 DevKitC-1. WiFi build. Use the <b>USB-UART</b> port, not the native USB port.</p>
+        <esp-web-install-button manifest="manifest-esp32s3.json">
+          <button class="flash-btn" slot="activate">Flash ESP32-S3</button>
+          <span slot="unsupported" class="unsupported">Web Serial not supported. Use desktop <b>Chrome</b> or <b>Edge</b>.</span>
+          <span slot="not-allowed" class="not-allowed">Must be served over HTTPS (or localhost).</span>
+        </esp-web-install-button>
+      </div>
+
+      <div class="card">
+        <h3>WT32-ETH01 (Ethernet)</h3>
+        <p>Wired LAN8720 Ethernet build. No on-board USB &mdash; needs an external USB-to-serial adapter (see note below).</p>
+        <esp-web-install-button manifest="manifest-wt32eth01.json">
+          <button class="flash-btn" slot="activate">Flash WT32-ETH01</button>
+          <span slot="unsupported" class="unsupported">Web Serial not supported. Use desktop <b>Chrome</b> or <b>Edge</b>.</span>
+          <span slot="not-allowed" class="not-allowed">Must be served over HTTPS (or localhost).</span>
+        </esp-web-install-button>
+      </div>
+
+      <div class="card">
+        <h3>Custom PCB &mdash; LumiGate v3</h3>
+        <p>Built the open-source 4-layer board? It uses the ESP32-S3 firmware &mdash; flash with the ESP32-S3 button.</p>
+        <a class="flash-btn" style="text-align:center;text-decoration:none;display:block"
+           href="https://github.com/tombueng/LumiGate/tree/master/hardware">View the PCB design</a>
+      </div>
+    </div>
+
+    <h2>Before you start</h2>
+    <ul>
+      <li>Use <b>desktop Chrome or Edge</b>. Web Serial does not work in Safari, Firefox, or any mobile browser.</li>
+      <li>Connect the board over USB, click flash, then pick its serial port in the dialog.</li>
+      <li>The installer offers an <b>Erase device</b> option. Leave it unchecked to keep your saved
+          config (universe, WiFi, labels); check it for a fully clean install.</li>
+    </ul>
+
+    <div class="note">
+      <b>If it fails to connect</b>, put the board in download mode manually, then retry:
+      hold <b>BOOT</b>, tap <b>EN/RST</b>, release <b>BOOT</b>.
+    </div>
+
+    <div class="note">
+      <b>WT32-ETH01:</b> this board has no USB port, so browser flashing needs an external
+      <b>USB-to-serial (3.3 V TTL)</b> adapter wired to <code>TXD0</code> / <code>RXD0</code> / <code>GND</code>,
+      with <code>IO0</code> pulled to <code>GND</code> while you tap <code>EN</code> to enter download mode.
+      If you would rather not, use the
+      <a href="https://github.com/tombueng/LumiGate#macos--linux--wt32-eth01">scripted esptool method</a> instead.
+    </div>
+
+    <h2>After flashing</h2>
+    <ol>
+      <li>Press <b>EN/RST</b> to boot.</li>
+      <li><b>WiFi builds:</b> the device opens an access point named <code>DMX-Gateway</code> (no password).
+          Connect to it, pick your network in the captive portal, and save.</li>
+      <li><b>WT32-ETH01:</b> plug in Ethernet and power. DHCP assigns an IP automatically.</li>
+      <li>Open <a href="http://dmx-gateway.local">http://dmx-gateway.local</a> (or the IP on the serial
+          monitor at 115200 baud) for the live status page.</li>
+    </ol>
+
+    <footer>
+      <p><a href="https://github.com/tombueng/LumiGate">LumiGate on GitHub</a> &middot;
+         MIT licensed &middot; powered by
+         <a href="https://esphome.github.io/esp-web-tools/">ESP Web Tools</a></p>
+    </footer>
+  </div>
+</body>
+</html>
