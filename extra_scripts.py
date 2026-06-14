@@ -56,26 +56,47 @@ def binary_to_header(path: pathlib.Path, out_dir: pathlib.Path, type_suffix: str
     print(f"  [embed] {path.name} -> {out.name}  ({len(data)} bytes)")
 
 def patch_esp_dmx():
-    """Fix an esp_dmx 4.1.0 bug that crashes a 2nd DMX port (UART2).
+    """Patch esp_dmx 4.1.0 so it builds + runs on arduino-esp32 v3 (ESP-IDF 5.5).
 
-    Its dmx_uart_context[] guards the UART2 entry with `#if DMX_NUM_MAX > 2`,
-    but DMX_NUM_MAX is an *enum* constant — invisible to the preprocessor, which
-    reads it as 0 — so `0 > 2` is false and the UART2 entry is never compiled,
-    even though the array is sized for it. Result: dmx_uart_context[2].dev is
-    NULL and installing a driver on port 2 panics (LoadProhibited). The array's
-    own size and types.h both use the real macro SOC_UART_NUM, so rewrite the
-    guard to match. Idempotent; safe to run every build.
+    Two fixes, both in dmx/hal/uart.c, both idempotent:
+
+    1. UART2 crash. dmx_uart_context[] guards the UART2 entry with
+       `#if DMX_NUM_MAX > 2`, but DMX_NUM_MAX is an *enum* constant — invisible to
+       the preprocessor, which reads it as 0 — so `0 > 2` is false and the UART2
+       entry is never compiled, even though the array is sized for it. Result:
+       dmx_uart_context[2].dev is NULL and installing a driver on port 2 panics
+       (LoadProhibited). The array's own size and types.h both use the real macro
+       SOC_UART_NUM, so rewrite the guard to match.
+
+    2. ESP-IDF 5.x removed the `.module` member of uart_periph_signal[] (the
+       periph_module_t per UART), so esp_dmx fails to compile on the v3 framework
+       ("'uart_signal_conn_t' has no member named 'module'"). periph_module_
+       enable/reset/disable still exist, so pass the module enum directly:
+       PERIPH_UART0_MODULE + dmx_num (PERIPH_UART0/1/2_MODULE are consecutive in
+       soc/periph_defs.h, matching what the removed field used to hold).
     """
     libdeps = pathlib.Path(env.subst("$PROJECT_LIBDEPS_DIR")) / env.subst("$PIOENV")
     uart_c = libdeps / "esp_dmx" / "src" / "dmx" / "hal" / "uart.c"
     if not uart_c.exists():
         print(f"  [patch] esp_dmx uart.c not present yet — skipped ({uart_c})")
         return
-    text = uart_c.read_text(encoding="utf-8")
-    if "#if DMX_NUM_MAX > 2" in text:
-        uart_c.write_text(text.replace("#if DMX_NUM_MAX > 2", "#if SOC_UART_NUM > 2"),
-                          encoding="utf-8")
-        print("  [patch] esp_dmx uart.c: UART2 guard DMX_NUM_MAX -> SOC_UART_NUM")
+    text = original = uart_c.read_text(encoding="utf-8")
+
+    text = text.replace("#if DMX_NUM_MAX > 2", "#if SOC_UART_NUM > 2")
+
+    for old, new in [
+        ("periph_module_enable(uart_periph_signal[dmx_num].module)",
+         "periph_module_enable((periph_module_t)(PERIPH_UART0_MODULE + dmx_num))"),
+        ("periph_module_reset(uart_periph_signal[dmx_num].module)",
+         "periph_module_reset((periph_module_t)(PERIPH_UART0_MODULE + dmx_num))"),
+        ("periph_module_disable(uart_periph_signal[uart->num].module)",
+         "periph_module_disable((periph_module_t)(PERIPH_UART0_MODULE + uart->num))"),
+    ]:
+        text = text.replace(old, new)
+
+    if text != original:
+        uart_c.write_text(text, encoding="utf-8")
+        print("  [patch] esp_dmx uart.c: UART2 guard + IDF5 periph_module fix applied")
     else:
         print("  [patch] esp_dmx uart.c: already patched")
 
