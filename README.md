@@ -1,8 +1,33 @@
-<img src="docs/logo.png" alt="LumiGate" width="120">
+<p align="center">
+  <img src="docs/logo.png" alt="LumiGate logo" width="120">
+</p>
 
-# LumiGate
+<h1 align="center">LumiGate</h1>
 
-**Art-Net / sACN (E1.31) → DMX512 Gateway** based on ESP32 / ESP32-S3 / WT32-ETH01 with a live web UI, WebSocket push, and manual DMX control via browser.
+<p align="center">
+  <b>Open-source Art-Net / sACN (E1.31) &rarr; DMX512 gateway for ESP32 / ESP32-S3 / Ethernet.</b>
+</p>
+
+<p align="center">
+  Not just another Art-Net node &mdash; a network DMX node <i>and</i> a live diagnostic tool.<br>
+  Watch all 512 channels update in real time in your browser, get warned the instant
+  <b>two consoles fight over a universe</b>, see per-sender FPS and frame jitter, and drive
+  <b>galvanically-isolated</b> DMX out. Builds for a few dollars.
+</p>
+
+<p align="center">
+  <a href="https://tombueng.github.io/LumiGate/"><img alt="Flash in browser" src="https://img.shields.io/badge/flash%20in-browser-2dd4bf"></a>
+  <a href="https://github.com/tombueng/LumiGate/actions/workflows/build.yml"><img alt="Build" src="https://github.com/tombueng/LumiGate/actions/workflows/build.yml/badge.svg"></a>
+  <a href="https://github.com/tombueng/LumiGate/releases"><img alt="Latest firmware" src="https://img.shields.io/github/v/tag/tombueng/LumiGate?filter=v*&sort=semver&label=firmware"></a>
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
+
+<p align="center">
+  <a href="https://tombueng.github.io/LumiGate/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
+  <a href="https://youtu.be/up8lIbRqosQ"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
+  <a href="hardware/README.md"><b>🛠 Custom PCB</b></a> &nbsp;·&nbsp;
+  <a href="#flashing-pre-built-firmware"><b>Install</b></a>
+</p>
 
 | Status page | Settings page |
 |---|---|
