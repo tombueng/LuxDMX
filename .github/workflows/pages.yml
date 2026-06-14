@@ -1,8 +1,9 @@
 name: Deploy web flasher (GitHub Pages)
 
 # Publishes the browser-based firmware flasher in web/ to GitHub Pages.
-# The flasher pulls firmware from the rolling 'latest' release at flash time,
-# so this only needs to redeploy when the web/ files themselves change.
+# The firmware binaries are bundled into web/fw at deploy time (same-origin,
+# so the browser flasher needs no cross-origin CORS access to release assets).
+# Redeploys when web/ changes, when a new firmware release is built, or manually.
 
 on:
   push:
@@ -10,6 +11,9 @@ on:
     paths:
       - 'web/**'
       - '.github/workflows/pages.yml'
+  workflow_run:
+    workflows: ["Build & Release"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -24,12 +28,27 @@ concurrency:
 
 jobs:
   deploy:
+    # Skip when triggered by a failed Build & Release run.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Bundle latest firmware into web/fw (same-origin, no CORS)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p web/fw
+          gh release download latest --dir web/fw --clobber \
+            --pattern 'firmware*.bin' \
+            --pattern 'bootloader*.bin' \
+            --pattern 'partitions*.bin' \
+            --pattern 'boot_app0.bin'
+          echo "Bundled firmware:" && ls -la web/fw
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
