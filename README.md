@@ -413,6 +413,10 @@ upload_port     = dmx-gateway.local
 upload_flags    = --auth=dmxota
 ```
 
+> The **OTA Password** (Settings → Device) guards **only** this IDE / PlatformIO
+> `espota` path. The browser "Firmware Update" above (`.bin` upload + GitHub install)
+> is **not** protected by it.
+
 ---
 
 ## First Setup
@@ -681,7 +685,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Auto-update | off | Web `/config` (Firmware) |
 | Channel labels | — | Status page (channel modal) |
 | Hostname | `dmx-gateway` | Web `/config` |
-| OTA Password | `dmxota` | Web `/config` |
+| OTA Password (IDE `espota` only) | `dmxota` | Web `/config` |
 | LED type / GPIO pin | board default | Web `/config` (Status LED) |
 | Per-output: enabled / universe / UART port / TX / RX / RTS | A on (uni 0, UART1, TX=17, RX=16, RTS=−1); B off | Web `/config` (DMX Outputs) |
 | Display type / pins | off | Web `/config` (Display) |
