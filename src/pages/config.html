@@ -26,6 +26,10 @@ body { background: var(--gh-bg); }
 footer { border-color:var(--gh-border)!important; color:var(--gh-muted); font-size:.77rem; }
 footer a { color:var(--gh-muted); text-decoration:none; }
 footer a:hover { color:var(--gh-text); }
+/* Generic confirm/info dialog (Bootstrap-styled, no Bootstrap JS needed) */
+.app-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1080; align-items:center; justify-content:center; padding:1rem; }
+.app-modal.show { display:flex; }
+.app-modal .card { width:min(440px,96vw); }
 </style>
 </head>
 <body>
@@ -270,6 +274,11 @@ footer a:hover { color:var(--gh-text); }
         <div class="mb-3">
           <label class="form-label text-secondary small mb-1">OTA Password</label>
           <input class="form-control" type="text" name="otapw" id="dev-otapw" maxlength="32" value="">
+          <div class="form-text text-secondary small">
+            Only used for network OTA from the Arduino IDE / PlatformIO
+            (<code>upload_protocol = espota</code>). The browser "Firmware Update" below
+            does not use it.
+          </div>
         </div>
         <button type="submit" class="btn btn-primary w-100" id="save-btn" disabled>Save &amp; Restart</button>
       </div>
@@ -451,6 +460,33 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   loadVersions();
 }).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; loadVersions(); });
 
+// Bootstrap-styled confirm/info dialog (no Bootstrap JS dependency).
+// opts: {title, body, okText, okClass, cancel:false}  ->  Promise<bool>
+function showModal(opts){
+  opts = opts || {};
+  return new Promise(function(resolve){
+    var ov = $('app-modal');
+    $('app-modal-title').textContent = opts.title || 'Confirm';
+    $('app-modal-body').textContent  = opts.body  || '';
+    var ok = $('app-modal-ok'), cancel = $('app-modal-cancel');
+    ok.textContent = opts.okText || 'OK';
+    ok.className    = 'btn btn-sm ' + (opts.okClass || 'btn-primary');
+    cancel.style.display = (opts.cancel === false) ? 'none' : '';
+    ov.classList.add('show');
+    function close(val){
+      ov.classList.remove('show');
+      ok.onclick = cancel.onclick = ov.onclick = null;
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    }
+    function onKey(ev){ if (ev.key === 'Escape') close(false); else if (ev.key === 'Enter') close(true); }
+    ok.onclick     = function(){ close(true); };
+    cancel.onclick = function(){ close(false); };
+    ov.onclick     = function(ev){ if (ev.target === ov) close(false); };
+    document.addEventListener('keydown', onKey);
+  });
+}
+
 // Guard: never submit an enabled output with no TX pin — it can't drive a line
 // and the device refuses it anyway. Catch it here with a clear message.
 document.querySelector('form[action="/config"]').addEventListener('submit', function(e){
@@ -461,8 +497,12 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
   });
   if (bad.length){
     e.preventDefault();
-    alert(bad.join(' and ') + ': enabled but no TX pin set.\n\n'
-      + 'Set a TX GPIO (0 or higher), or turn the output off. TX = −1 means "no data line".');
+    showModal({
+      title: 'Cannot save settings',
+      body: bad.join(' and ') + ': enabled but no TX pin set. Set a TX GPIO (0 or higher), '
+        + 'or turn the output off. TX = -1 means "no data line".',
+      okText: 'Got it', cancel: false
+    });
   }
 });
 
@@ -490,9 +530,15 @@ function extractChanges(body){
     .map(function(l){ return l.replace(/^[-•]\s*/, ''); });
 }
 function installVersion(ver){
-  if (!confirm('Install v' + ver + '? The device will reboot.')) return;
-  $('ota-version').value = ver;
-  $('ota-form').submit();
+  showModal({
+    title: 'Install firmware',
+    body: 'Install v' + ver + '? The device will reboot and be offline for about a minute.',
+    okText: 'Install & reboot', okClass: 'btn-warning'
+  }).then(function(ok){
+    if (!ok) return;
+    $('ota-version').value = ver;
+    $('ota-form').submit();
+  });
 }
 function loadVersions(){
   fetch('https://api.github.com/repos/tombueng/LumiGate/releases?per_page=50')
@@ -531,6 +577,20 @@ function loadVersions(){
     });
 }
 </script>
+
+<!-- Generic confirm / info dialog -->
+<div class="app-modal" id="app-modal">
+  <div class="card shadow">
+    <div class="card-header" id="app-modal-title">Confirm</div>
+    <div class="card-body">
+      <p class="mb-3" id="app-modal-body"></p>
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="app-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="app-modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

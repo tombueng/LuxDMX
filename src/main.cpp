@@ -216,8 +216,10 @@ static uint32_t identifyUntil   = 0;
 static uint32_t pendingRebootAt = 0;       // 0 = none; loop() reboots when due
 static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
 
-// WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512) = 528
-static uint8_t wsBuf[528];
+// WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1)
+// jitter(2) dmx(512) + per-output fps(2 x MAX_OUTPUTS) = 528 + 2*MAX_OUTPUTS
+static constexpr int WS_FRAME_LEN = 528 + 2 * MAX_OUTPUTS;
+static uint8_t wsBuf[WS_FRAME_LEN];
 
 // sACN receive buffer
 static uint8_t sacnBuf[638];
@@ -810,9 +812,17 @@ static void maybeLog(int outIdx, const uint8_t* data, uint16_t len, uint32_t ip,
     lastLogMs = now;
 }
 
+// Per-output frame rate: the live value, or 0 once that output's input has
+// stalled (>1.5 s), so a dead universe reads 0.0 instead of a stale rate. Used by
+// the WS push, dmx.json and the status display.
+static float outFpsLive(int i) {
+    return (millis() - outLastDmxMs[i] < 1500) ? outFps[i] : 0.0f;
+}
+
 // ---------------------------------------------------------------------------
-// WebSocket push (binary, 528 bytes)
-// frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2) dmx(512)
+// WebSocket push (binary, WS_FRAME_LEN bytes)
+// frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2)
+//        dmx(512) + per-output fps(2 x MAX_OUTPUTS)
 // ---------------------------------------------------------------------------
 static void wsPush() {
     if (ws.count() == 0) return;
@@ -832,9 +842,14 @@ static void wsPush() {
     wsBuf[13] = hasConflict() ? 1 : 0;
     wsBuf[14] = jitI >> 8;  wsBuf[15] = jitI & 0xFF;
     memcpy(&wsBuf[16], &dmxBuf[viewOutput()][1], 512);   // stream the viewed output
+    // Per-output frame rates (one universe each) appended after the DMX block.
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        uint16_t f = (uint16_t)(outFpsLive(i) * 10.0f);
+        wsBuf[528 + 2 * i] = f >> 8;  wsBuf[528 + 2 * i + 1] = f & 0xFF;
+    }
     // Only push if the async TCP queues have room, so a slow client never
     // backs up memory or blocks.
-    if (ws.availableForWriteAll()) ws.binaryAll(wsBuf, 528);
+    if (ws.availableForWriteAll()) ws.binaryAll(wsBuf, WS_FRAME_LEN);
 }
 
 // ---------------------------------------------------------------------------
@@ -1197,6 +1212,13 @@ static void handleDmxJson(AsyncWebServerRequest* req) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%.1f", fps);
     j  = "{\"fps\":";    j += buf;
+    j += ",\"outfps\":[";
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        snprintf(buf, sizeof(buf), "%.1f", outFpsLive(i));
+        if (i) j += ',';
+        j += buf;
+    }
+    j += "]";
     j += ",\"rssi\":";   j += netRSSI();
     j += ",\"up\":\"";   j += uptimeStr();
     j += "\",\"heap\":"; j += ESP.getFreeHeap();
@@ -1718,12 +1740,6 @@ static int dispEnabledOutputs() {
     return n;
 }
 
-// Per-output frame rate for the display: the live value, or 0 once that output's
-// input has stalled (>1.5 s), so a dead universe reads 0.0 instead of a stale rate.
-static float dispOutFps(int i) {
-    return (millis() - outLastDmxMs[i] < 1500) ? outFps[i] : 0.0f;
-}
-
 // Print s at text size ts, horizontally centred, top at y (built-in 6x8 font).
 static void dispCenter(const char* s, int ts, int y) {
     int w = (int)strlen(s) * 6 * ts;
@@ -1754,7 +1770,7 @@ static void dispDrawStatus() {
         gfx->print(' '); gfx->print(dispProto());
         if (dual)
             snprintf(b, sizeof(b), "%.1f/%.1f Sources %u",
-                     dispOutFps(0), dispOutFps(1), activeSenderCount());
+                     outFpsLive(0), outFpsLive(1), activeSenderCount());
         else
             snprintf(b, sizeof(b), "%.1ffps Sources %u", fps, activeSenderCount());
         gfx->setCursor(0, 22); gfx->print(b);
@@ -1774,12 +1790,12 @@ static void dispDrawStatus() {
             gfx->setTextColor(col(C_WHITE));
             snprintf(b, sizeof(b), "A Uni %d", cfg.outputs[0].universe);
             gfx->setCursor(0, 50); gfx->print(b);
-            snprintf(b, sizeof(b), "%.1f fps", dispOutFps(0));
+            snprintf(b, sizeof(b), "%.1f fps", outFpsLive(0));
             gfx->setTextColor(col(accent)); gfx->setCursor(0, 62); gfx->print(b);
             gfx->setTextColor(col(C_WHITE));
             snprintf(b, sizeof(b), "B Uni %d", cfg.outputs[1].universe);
             gfx->setCursor(0, 78); gfx->print(b);
-            snprintf(b, sizeof(b), "%.1f fps", dispOutFps(1));
+            snprintf(b, sizeof(b), "%.1f fps", outFpsLive(1));
             gfx->setTextColor(col(accent)); gfx->setCursor(0, 90); gfx->print(b);
             gfx->setTextColor(col(C_GREY));
             gfx->setCursor(0, 102); gfx->print(dispProto());
@@ -1818,10 +1834,10 @@ static void dispDrawStatus() {
     gfx->setCursor(0, y); gfx->print(up ? netLocalIP().toString() : String("no link"));
     y += rp;
     if (dual) {                          // one row per output: universe + its fps
-        snprintf(b, sizeof(b), "A U%d %.1ffps", cfg.outputs[0].universe, dispOutFps(0));
+        snprintf(b, sizeof(b), "A U%d %.1ffps", cfg.outputs[0].universe, outFpsLive(0));
         gfx->setCursor(0, y); gfx->print(b);
         y += rp;
-        snprintf(b, sizeof(b), "B U%d %.1ffps", cfg.outputs[1].universe, dispOutFps(1));
+        snprintf(b, sizeof(b), "B U%d %.1ffps", cfg.outputs[1].universe, outFpsLive(1));
         gfx->setCursor(0, y); gfx->print(b);
         { char s[12]; snprintf(s, sizeof(s), "Src %u", activeSenderCount());
           gfx->setCursor(W - (int)strlen(s) * 6, y); gfx->print(s); }

@@ -487,18 +487,22 @@ values are fetched as JSON.
 
 ### WebSocket (`ws://<device>/ws`, port 80)
 
-Binary status/DMX frame pushed ~10×/s (528 bytes):
+Binary status/DMX frame pushed ~10×/s (528 + 2 bytes per output):
 
 ```
-Bytes  0–1    fps × 10           uint16 big-endian
+Bytes  0–1    fps × 10           uint16 big-endian (aggregate, all inputs)
 Bytes  2–3    RSSI (dBm)         int16  big-endian
 Bytes  4–7    free heap          uint32 big-endian
 Bytes  8–11   uptime (s)         uint32 big-endian
 Byte   12     active sender count uint8
 Byte   13     conflict flag       uint8 (1 = multiple senders)
 Bytes  14–15  jitter × 10 (ms)   uint16 big-endian
-Bytes  16–527 DMX ch 1–512       uint8[512]
+Bytes  16–527 DMX ch 1–512       uint8[512] (the viewed output)
+Bytes  528…   per-output fps × 10 uint16 big-endian × number of outputs
 ```
+
+The web UI shows the **viewed output's** frame rate in the navbar and each output's own
+rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` alongside `"fps"`.
 
 A JSON **text** frame with the sender list + change log is pushed every 2 s
 (`{"meta":1,"senders":[…],"log":[…]}`) so the browser never has to poll.
