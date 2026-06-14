@@ -102,40 +102,15 @@ footer a:hover { color:var(--gh-text); }
             <option value="0">Disabled</option>
             <option value="1">Plain GPIO (active high)</option>
             <option value="2">WS2812 RGB (NeoPixel)</option>
-            <option value="3">5-LED status panel (LumiGate v3)</option>
           </select>
           <div class="form-text">
-            Single LED: blue blink = booting / connecting &nbsp;&middot;&nbsp; red blink = no network &nbsp;&middot;&nbsp; amber blink = idle &nbsp;&middot;&nbsp; green = DMX active.<br>
-            5-LED panel: <span class="text-danger">red</span> = no network &nbsp;&middot;&nbsp; <span class="text-success">green</span> = network up &nbsp;&middot;&nbsp; <span class="text-warning">yellow</span> = DMX activity &nbsp;&middot;&nbsp; <span class="text-primary">blue</span> = source conflict &nbsp;&middot;&nbsp; white = identify.
+            WS2812: blue blink = booting / connecting &nbsp;&middot;&nbsp; red blink = no WiFi &nbsp;&middot;&nbsp; amber blink = idle &nbsp;&middot;&nbsp; green = DMX active
           </div>
         </div>
         <div id="led-pin-row">
           <label class="form-label text-secondary small mb-1">GPIO pin</label>
           <input class="form-control" type="number" name="ledpin" id="led-pin" min="-1" max="48" value="2">
           <div class="form-text">−1 to disable</div>
-        </div>
-        <div id="led5-row" class="row g-2" style="display:none">
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">Red</label>
-            <input class="form-control" type="number" name="ledr" id="led-r" min="-1" max="48" value="-1">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">Green</label>
-            <input class="form-control" type="number" name="ledg" id="led-g" min="-1" max="48" value="-1">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">Yellow</label>
-            <input class="form-control" type="number" name="ledy" id="led-y" min="-1" max="48" value="-1">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">Blue</label>
-            <input class="form-control" type="number" name="ledb" id="led-b" min="-1" max="48" value="-1">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">White</label>
-            <input class="form-control" type="number" name="ledw" id="led-w" min="-1" max="48" value="-1">
-          </div>
-          <div class="form-text">Per-LED GPIO, active-high. −1 = absent.</div>
         </div>
       </div>
     </div>
@@ -446,11 +421,7 @@ function wireCard(cont, tpl, i, o){
   syncOutBody(node);
 }
 function updStatic(){ $('static-fields').style.display = $('static-sw').checked ? '' : 'none'; }
-function updLedPin(){
-  var t = $('led-type').value;
-  $('led-pin-row').style.display = (t === '0' || t === '3') ? 'none' : '';
-  $('led5-row').style.display    = (t === '3') ? '' : 'none';
-}
+function updLedPin(){ $('led-pin-row').style.display = $('led-type').value === '0' ? 'none' : ''; }
 function updDispPins(){
   var t = $('disp-type').value;
   $('disp-common').style.display = t === '0' ? 'none' : '';
@@ -471,11 +442,6 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('net-dns').value = d.dns || '';
   $('led-type').value = d.ledType;
   $('led-pin').value  = d.ledPin;
-  $('led-r').value = d.ledR !== undefined ? d.ledR : -1;
-  $('led-g').value = d.ledG !== undefined ? d.ledG : -1;
-  $('led-y').value = d.ledY !== undefined ? d.ledY : -1;
-  $('led-b').value = d.ledB !== undefined ? d.ledB : -1;
-  $('led-w').value = d.ledW !== undefined ? d.ledW : -1;
   buildOutputs(d.outputs || [{en:true, uni:d.universe||0, port:1, tx:17, rx:16, rts:-1}]);
   $('disp-type').value = d.dispType !== undefined ? d.dispType : 0;
   $('disp-sda').value  = d.dispSda  !== undefined ? d.dispSda  : 21;

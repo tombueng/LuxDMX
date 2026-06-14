@@ -81,64 +81,15 @@ struct DmxOutput {
     int  rtsPin;     // -1 = auto-direction module / no RDM
 };
 
-// GPIO0 = the BOOT button (config-portal / factory-reset trigger). Named
-// CFG_BOOT_PIN because arduino-esp32 v3 now defines its own global BOOT_PIN.
-static constexpr int CFG_BOOT_PIN = 0;
+static constexpr int BOOT_PIN = 0;
 static constexpr uint32_t   HOLD_MS     = 3000;
 
 #ifndef DEF_LED_PIN
 #define DEF_LED_PIN  2
 #endif
 #ifndef DEF_LED_TYPE
-#define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812, 3=5-LED discrete panel
+#define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812
 #endif
-
-// 5-LED discrete status panel (ledType 3) — the LumiGate v3 board. Five LEDs on
-// their own GPIOs, active-high (GPIO → R → LED anode, cathode → GND). -1 = absent.
-#ifndef DEF_LED_R
-#define DEF_LED_R -1   // red    — fault / no network
-#endif
-#ifndef DEF_LED_G
-#define DEF_LED_G -1   // green  — network up
-#endif
-#ifndef DEF_LED_Y
-#define DEF_LED_Y -1   // yellow — DMX activity
-#endif
-#ifndef DEF_LED_B
-#define DEF_LED_B -1   // blue   — connecting / source conflict
-#endif
-#ifndef DEF_LED_W
-#define DEF_LED_W -1   // white  — identify / boot
-#endif
-
-// W5500 SPI-Ethernet (USE_ETH_SPI) — pins come from the board env's build_flags;
-// these #ifndef fallbacks keep the file self-contained. host/addr rarely change.
-#ifdef USE_ETH_SPI
-#ifndef ETH_W5500_SPI_HOST
-#define ETH_W5500_SPI_HOST SPI3_HOST
-#endif
-#ifndef ETH_W5500_ADDR
-#define ETH_W5500_ADDR 1
-#endif
-#ifndef ETH_W5500_SCK
-#define ETH_W5500_SCK 12
-#endif
-#ifndef ETH_W5500_MOSI
-#define ETH_W5500_MOSI 11
-#endif
-#ifndef ETH_W5500_MISO
-#define ETH_W5500_MISO 13
-#endif
-#ifndef ETH_W5500_CS
-#define ETH_W5500_CS 10
-#endif
-#ifndef ETH_W5500_IRQ
-#define ETH_W5500_IRQ 14
-#endif
-#ifndef ETH_W5500_RST
-#define ETH_W5500_RST 9
-#endif
-#endif  // USE_ETH_SPI
 
 // Optional I2C status display (off by default; enable + pin it from /config)
 #ifndef DEF_DISP_TYPE
@@ -279,7 +230,6 @@ struct Config {
     int    protocol;
     int    ledPin;
     int    ledType;
-    int    ledR, ledG, ledY, ledB, ledW;   // 5-LED panel pins (ledType 3); -1 = absent
     DmxOutput outputs[MAX_OUTPUTS];
     int    dispType;       // 0=off, 1/2=SSD1306 128x64/32, 3=SH1106 128x64, 4=SSD1351 colour
     int    dispSda;        // I2C pins (dispType 1-3); -1 = unset
@@ -328,11 +278,6 @@ static void loadConfig() {
     cfg.protocol    = prefs.getInt("protocol",  DEF_PROTOCOL);
     cfg.ledPin      = prefs.getInt("ledpin",    DEF_LED_PIN);
     cfg.ledType     = prefs.getInt("ledtype",   DEF_LED_TYPE);
-    cfg.ledR        = constrain(prefs.getInt("ledr", DEF_LED_R), -1, 48);
-    cfg.ledG        = constrain(prefs.getInt("ledg", DEF_LED_G), -1, 48);
-    cfg.ledY        = constrain(prefs.getInt("ledy", DEF_LED_Y), -1, 48);
-    cfg.ledB        = constrain(prefs.getInt("ledb", DEF_LED_B), -1, 48);
-    cfg.ledW        = constrain(prefs.getInt("ledw", DEF_LED_W), -1, 48);
 
     // Output 0 falls back to the legacy single-universe keys, so devices
     // updated from an older firmware keep their existing DMX setup untouched.
@@ -383,11 +328,6 @@ static void saveConfig() {
     prefs.putInt("protocol",    cfg.protocol);
     prefs.putInt("ledpin",      cfg.ledPin);
     prefs.putInt("ledtype",     cfg.ledType);
-    prefs.putInt("ledr",        cfg.ledR);
-    prefs.putInt("ledg",        cfg.ledG);
-    prefs.putInt("ledy",        cfg.ledY);
-    prefs.putInt("ledb",        cfg.ledB);
-    prefs.putInt("ledw",        cfg.ledW);
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         prefs.putBool(okey(i,"en").c_str(),   cfg.outputs[i].enabled);
         prefs.putInt(okey(i,"uni").c_str(),   cfg.outputs[i].universe);
@@ -425,38 +365,6 @@ static constexpr uint32_t NEO_BLUE   = 0x000022;   // connecting to WiFi
 static constexpr uint32_t NEO_PURPLE = 0x180018;   // AP / config portal active
 static constexpr uint32_t NEO_WHITE  = 0x0a0a0a;   // booting
 
-// --- 5-LED discrete status panel (ledType 3) -------------------------------
-// Drive the five GPIO LEDs (active-high). One cached write so both the boot-time
-// setLedColor() path and the runtime ledTask() path share state and never clock
-// a pin redundantly.
-static void setLeds5(bool r, bool g, bool y, bool b, bool w) {
-    static uint8_t last = 0xFF;
-    uint8_t state = (r?1:0) | (g?2:0) | (y?4:0) | (b?8:0) | (w?16:0);
-    if (state == last) return;
-    last = state;
-    if (cfg.ledR >= 0) digitalWrite(cfg.ledR, r ? HIGH : LOW);
-    if (cfg.ledG >= 0) digitalWrite(cfg.ledG, g ? HIGH : LOW);
-    if (cfg.ledY >= 0) digitalWrite(cfg.ledY, y ? HIGH : LOW);
-    if (cfg.ledB >= 0) digitalWrite(cfg.ledB, b ? HIGH : LOW);
-    if (cfg.ledW >= 0) digitalWrite(cfg.ledW, w ? HIGH : LOW);
-}
-
-// Map the single-LED status colour onto the 5-LED panel. Used for the imperative
-// boot / connecting / portal phases that run before ledTask() takes over; once
-// the network is up, ledTask() drives the panel directly (multi-state).
-static void leds5FromColor(uint32_t c, bool& r, bool& g, bool& y, bool& b, bool& w) {
-    r = g = y = b = w = false;
-    switch (c) {
-        case NEO_GREEN:  g = true; break;            // active
-        case NEO_AMBER:  y = true; break;            // online, idle
-        case NEO_RED:    r = true; break;            // fault / no network
-        case NEO_BLUE:   b = true; break;            // connecting / link wait
-        case NEO_PURPLE: b = true; w = true; break;  // AP / config portal
-        case NEO_WHITE:  w = true; break;            // booting
-        case NEO_OFF: default: break;
-    }
-}
-
 static void initLed() {
     if (cfg.ledType == 1 && cfg.ledPin >= 0) {
         pinMode(cfg.ledPin, OUTPUT);
@@ -466,10 +374,6 @@ static void initLed() {
         neoPixel.begin();
         neoPixel.setPixelColor(0, NEO_OFF);
         neoPixel.show();
-    } else if (cfg.ledType == 3) {
-        const int pins[5] = { cfg.ledR, cfg.ledG, cfg.ledY, cfg.ledB, cfg.ledW };
-        for (int i = 0; i < 5; i++)
-            if (pins[i] >= 0) { pinMode(pins[i], OUTPUT); digitalWrite(pins[i], LOW); }
     }
 }
 
@@ -487,10 +391,6 @@ static void setLedColor(uint32_t neoColor, bool gpioOn) {
         lastNeo = neoColor;
         neoPixel.setPixelColor(0, neoColor);
         neoPixel.show();
-    } else if (cfg.ledType == 3) {
-        bool r, g, y, b, w;
-        leds5FromColor(neoColor, r, g, y, b, w);
-        setLeds5(r, g, y, b, w);
     }
 }
 static void setLed(bool on) { setLedColor(on ? NEO_GREEN : NEO_OFF, on); }
@@ -1273,11 +1173,6 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"protocol\":";   j += cfg.protocol;           j += ",";
     j += "\"ledType\":";    j += cfg.ledType;            j += ",";
     j += "\"ledPin\":";     j += cfg.ledPin;             j += ",";
-    j += "\"ledR\":";       j += cfg.ledR;               j += ",";
-    j += "\"ledG\":";       j += cfg.ledG;               j += ",";
-    j += "\"ledY\":";       j += cfg.ledY;               j += ",";
-    j += "\"ledB\":";       j += cfg.ledB;               j += ",";
-    j += "\"ledW\":";       j += cfg.ledW;               j += ",";
     j += "\"rdmOut\":";     j += rdmOut;                 j += ",";
     j += "\"outputs\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
@@ -1397,13 +1292,8 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "hostname", s) && s.length() > 0) cfg.hostname = s;
     if (argStr(req, "otapw", s)    && s.length() > 0) cfg.otaPassword = s;
     if (argStr(req, "protocol", s)) cfg.protocol = constrain(s.toInt(), 0, 2);
-    if (argStr(req, "ledtype", s))  cfg.ledType   = constrain(s.toInt(), 0, 3);
+    if (argStr(req, "ledtype", s))  cfg.ledType   = constrain(s.toInt(), 0, 2);
     if (argStr(req, "ledpin", s))   cfg.ledPin    = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledr", s))     cfg.ledR      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledg", s))     cfg.ledG      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledy", s))     cfg.ledY      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledb", s))     cfg.ledB      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledw", s))     cfg.ledW      = constrain(s.toInt(), -1, 48);
 
     // Per-output DMX config: o<i>_en / _uni / _port / _tx / _rx / _rts.
     // A missing o<i>_en checkbox means that output is disabled.
@@ -1799,20 +1689,7 @@ static void ledTask(void*) {
     const TickType_t period = pdMS_TO_TICKS(50);
     for (;;) {
         uint32_t now = millis();
-        if (cfg.ledType == 3) {
-            // 5-LED panel: each LED shows its own state simultaneously.
-            //   R = no network (blink)        G = network up (solid)
-            //   Y = DMX activity (fast blink) B = source conflict (slow blink)
-            //   W = identify active (blink)
-            bool up       = netConnected();
-            bool dmx      = (now - lastDmxMs) < 1500;
-            bool r = !up && ((now % 1000) < 500);
-            bool g = up;
-            bool y = up && dmx && ((now % 250) < 125);
-            bool b = hasConflict() && ((now % 600) < 300);
-            bool w = identifyCh && ((now % 400) < 200);
-            setLeds5(r, g, y, b, w);
-        } else if (!netConnected()) {
+        if (!netConnected()) {
             setLedColor((now % 1000) < 120 ? NEO_RED : NEO_OFF, (now % 1000) < 120);
         } else if (now - lastDmxMs < 1500) {
             // Hold "active" green through brief input gaps (lost multicast)
@@ -2044,21 +1921,10 @@ void setup() {
     initLed();
     setLedColor(NEO_WHITE, true);   // booting
     initDisplay();                  // optional status panel — shows boot splash
-    pinMode(CFG_BOOT_PIN, INPUT_PULLUP);
+    pinMode(BOOT_PIN, INPUT_PULLUP);
 
 #ifdef USE_ETHERNET
-#ifdef USE_ETH_SPI
-    // W5500 over SPI (ESP32-S3 v3 board): the S3 has no internal EMAC, so wired
-    // Ethernet is the W5500 SPI controller registered as an lwIP netif. v3 API.
-    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d\n",
-        ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
-    ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST,
-              ETH_W5500_SPI_HOST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
-#else
-    // RMII PHY (WT32-ETH01, LAN8720): v3 begin() arg order is
-    // (type, phy_addr, mdc, mdio, power, clk_mode).
-    ETH.begin(ETH_PHY_LAN8720, 1, 23, 18, 16, ETH_CLOCK_GPIO0_IN);
-#endif
+    ETH.begin(1, 16, 23, 18, ETH_PHY_LAN8720, ETH_CLOCK_GPIO0_IN);
     if (cfg.staticIp) {
         IPAddress ip, gw, sn, dns;
         parseIp(cfg.ip, ip); parseIp(cfg.gateway, gw);
@@ -2076,11 +1942,11 @@ void setup() {
     Serial.printf("[ETH] %s\n", netLocalIP().toString().c_str());
 #else
     bool forcePortal = false;
-    if (digitalRead(CFG_BOOT_PIN) == LOW) {
+    if (digitalRead(BOOT_PIN) == LOW) {
         Serial.print("[BOOT] button held, waiting...");
         uint32_t t = millis();
-        while (digitalRead(CFG_BOOT_PIN) == LOW && millis()-t < HOLD_MS) delay(50);
-        forcePortal = (digitalRead(CFG_BOOT_PIN) == LOW);
+        while (digitalRead(BOOT_PIN) == LOW && millis()-t < HOLD_MS) delay(50);
+        forcePortal = (digitalRead(BOOT_PIN) == LOW);
         Serial.println(forcePortal ? " → config portal" : " released");
     }
     if (forcePortal && cfg.staticIp) {   // recovery: come back on DHCP
@@ -2178,7 +2044,7 @@ void setup() {
 // whole input pipeline — sender tracking, change log, fps/jitter, WS push and
 // the 40 Hz DMX output — runs without an external console. A bright "head"
 // sweeps across the universe with a soft trail; channel 1 breathes on a sine.
-// Feeds the exact same routeFrame() path a real Art-Net packet would. Guarded
+// Feeds the exact same onDmxFrame() path a real Art-Net packet would. Guarded
 // by SIM_ARTNET (set in [env:wokwi]); never compiled into a real build.
 // ---------------------------------------------------------------------------
 static void simArtnetTick() {
@@ -2195,7 +2061,7 @@ static void simArtnetTick() {
     if (head + 1 < 512)   frame[head + 1] = 120;   // leading edge
     frame[0] = (uint8_t)(127.0f + 127.0f * sinf(now / 500.0f));  // ch1 breathe
 
-    routeFrame(0, frame, 512, (uint32_t)IPAddress(10, 13, 37, 1), 0);
+    onDmxFrame(frame, 512, (uint32_t)IPAddress(10, 13, 37, 1), 0);
 
     static uint32_t lastLog = 0;
     if (now - lastLog >= 1000) {            // 1 Hz proof-of-life on the console
