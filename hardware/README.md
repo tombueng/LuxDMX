@@ -176,6 +176,22 @@ fee. A complete, assembled prototype lands well under typical hobby budgets.
 | `easyeda/` | LCSC/easyeda footprints + 3D models for the specific parts |
 | `tools/` | Freerouting 2.2.4 jar + portable JDK 25 *(git-ignored — see Toolchain)* |
 | `board-pcb-1.png` · `board3d-1.png` · `board3d-2.png` | layout + 3D renders |
+| [`case/`](case/) | **3D-printable enclosure** (parametric OpenSCAD; openings + retention derived from this PCB) — see [`case/README.md`](case/README.md) |
+
+## Enclosure
+
+A fully parametric, code-defined 3D-printable housing lives in [`case/`](case/). It is
+a two-part clamshell (base tray + deep cover) with a **flush snap-fit closure** (no
+external screws). Connector openings (XLR/DMX round hole + flange screws, RJ45, USB-C),
+front-wall LED windows and board retention (ledge + snap clamps + cover hold-down lip)
+are all **extracted from this board** — re-run `case/extract_case_params.py` after a
+layout change and re-export the STLs. Connector opening sizes/heights were **measured
+at the wall plane** from the populated `kicad-cli` GLB (`case/measure_connectors.py`),
+and `case/validate_fit.py` cross-checks the case against the live PCB (28 assertions,
+incl. the board drop-in path). Closure is a **flush snap-fit** with rounded outer edges
+(no external screws). The ESP32 antenna overhang is fully enclosed; outer ≈ 87 × 57 × 40 mm.
+`case/lumigate_case_assembly.glb` opens the whole thing in any 3D viewer.
+See [`case/README.md`](case/README.md).
 
 ## Status
 

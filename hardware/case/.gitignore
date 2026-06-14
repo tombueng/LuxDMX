@@ -1,0 +1,10 @@
+# regeneratable populated-board model (kicad-cli pcb export glb ...)
+lumigate_board.glb
+# working OpenSCAD previews + cross-sections (regenerate with build.sh)
+prev/
+# diagnostic Blender frames
+render/diag_*.png
+render/mc_*.png
+render/xlr_face.png
+# OpenSCAD backups
+*.scad.bak

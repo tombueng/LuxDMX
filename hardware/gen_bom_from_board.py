@@ -1,6 +1,6 @@
 """Generate JLCPCB BOM (Comment, Designator, Footprint, LCSC) from the v3 board.
-Maps each designator -> part + LCSC#. 9 parts (5 LEDs + 12.4k/45.3k/180R) have no firm
-LCSC yet — pick them in the JLCPCB BOM tool at upload (value+package given in Comment)."""
+Maps each designator -> part + LCSC#. Every part now has a firm in-stock LCSC#; rows are
+grouped by LCSC# so each part appears on exactly one line (JLCPCB requirement)."""
 import pcbnew, csv, re
 from collections import defaultdict
 
@@ -18,7 +18,7 @@ INFO = {
     "J1": ("XLR-3 out (XLR-328P)", "C309326"),
     "J2": ("USB-C data (TYPE-C-31-M-12)", "C165948"),
     "J3": ("RJ45 MagJack HR961160C SMD 10/100", "C55683"),
-    "J4": ("JST SH 1.0mm 9-pin SMD (optional display; pre-crimped cables)", ""),
+    "J4": ("JST SH 1.0mm 9-pin SMD SM09B-SRSS-TB (optional display; pre-crimped cables)", "C160408"),
     "Y1": ("25MHz crystal 2520", "C2981622"),
     "L1": ("2.2uH power inductor (CKCS4030)", "C354584"),
     "D1": ("SM712 TVS SOT-23", "C404012"),
@@ -32,7 +32,7 @@ INFO = {
     "R13": ("1k 0402", "C11702"), "R15": ("1k 0402", "C11702"),
     "R14": ("150R 0402", "C25082"), "R16": ("150R 0402", "C25082"),
     "R17": ("150R 0402", "C25082"),
-    "R18": ("49.9R 1% 0402 W5500 TX center-tap bias (YAGEO RC0402FR-0749R9L)", "C87044"),
+    "R18": ("49.9R 1% 0402 W5500 TX center-tap bias", "C25120"),   # BASIC (UNI-ROYAL 0402WGF499, 1%) - no fee
     "R4": ("330R 0402", "C25104"), "R5": ("330R 0402", "C25104"),
     "R8": ("5k1 0402", "C25905"), "R9": ("5k1 0402", "C25905"),
     "R12": ("120R 0805", "C17437"),
@@ -47,26 +47,40 @@ INFO = {
     "C20": ("10uF 1206", "C13585"), "C21": ("10uF 1206", "C13585"), "C22": ("100nF 0402", "C1525"),
     # LEDs 0603 — all JLCPCB Basic, in stock
     "D2": ("LED red 0603", "C2286"), "D3": ("LED green 0603 KT-0603G", "C12624"),
-    "D4": ("LED yellow 0603 KT-0603Y", "C2287"), "D5": ("LED blue 0603 KT-0603B", "C2288"),
+    "D4": ("LED yellow 0603 NCD0603Y2", "C89811"),   # PREFERRED - no fee (KT-0603Y/C2287 was extended)
+    "D5": ("LED blue 0603 KT-0603B", "C2288"),       # extended: JLCPCB has NO basic/preferred 0603 blue
     "D6": ("LED white 0603", "C2290"),
 }
 
 b = pcbnew.LoadBoard(PCB)
+
+def k(r):
+    m = re.match(r"([A-Za-z]+)(\d+)", r)
+    return (m.group(1), int(m.group(2))) if m else (r, 0)
+
+# Group by LCSC# — JLCPCB matches on it, so each part must be on EXACTLY one BOM line
+# (otherwise it warns "multiple positions assigned to the same part", e.g. C3+C4=C52923).
+# Parts without an LCSC# fall back to comment+footprint.  Comment/footprint/LCSC are taken
+# from the lowest designator in the group.
 groups = defaultdict(list)
 for fp in b.GetFootprints():
     ref = fp.GetReference()
     if ref not in INFO:
         continue
     comment, lcsc = INFO[ref]
-    groups[(comment, str(fp.GetFPID().GetLibItemName()), lcsc)].append(ref)
-
-def k(r):
-    m = re.match(r"([A-Za-z]+)(\d+)", r)
-    return (m.group(1), int(m.group(2))) if m else (r, 0)
+    fpn = str(fp.GetFPID().GetLibItemName())
+    key = lcsc if lcsc else f"\x00{comment}\x00{fpn}"
+    groups[key].append((ref, comment, fpn, lcsc))
 
 rows = [["Comment", "Designator", "Footprint", "LCSC Part #"]]
-for (comment, fpn, lcsc), refs in sorted(groups.items(), key=lambda x: k(x[1][0])):
-    rows.append([comment, ",".join(sorted(refs, key=k)), fpn, lcsc])
+body = []
+for items in groups.values():
+    items.sort(key=lambda t: k(t[0]))
+    refs = [t[0] for t in items]
+    comment, fpn, lcsc = items[0][1], items[0][2], items[0][3]
+    body.append([comment, ",".join(refs), fpn, lcsc])
+body.sort(key=lambda row: k(row[1].split(",")[0]))
+rows += body
 
 with open(OUT, "w", newline="") as f:
     csv.writer(f).writerows(rows)
