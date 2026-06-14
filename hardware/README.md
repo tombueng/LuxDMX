@@ -201,6 +201,22 @@ of minor connector/edge DRC warnings remain (J3 magjack mask slivers, USB-C unus
 are inherent to the manufacturer footprints and are cleared in a short GUI pass or simply waived at the
 JLCPCB upload step.
 
+### Firmware support — TODO
+
+The board is electrically ready, but the **main firmware does not yet drive this board's Ethernet or
+LED panel**. Open firmware tasks:
+
+- [ ] **W5500 SPI-Ethernet driver.** The firmware's only Ethernet path today is LAN8720/RMII
+  (`ETH.begin(…, ETH_PHY_LAN8720, …)`, for the WT32-ETH01). The ESP32-S3 has no internal EMAC and the
+  W5500 is SPI, so this needs a new path — `ETH.begin(ETH_PHY_W5500, …)` (Arduino-ESP32 v3 SPI-Ethernet) —
+  on **SCLK=IO12, MOSI=IO11, MISO=IO13, CS=IO10, INT=IO14, RST=IO9**, in a dedicated `env:lumigate_v3`.
+- [ ] **5 discrete status LEDs.** The firmware currently drives a *single* status LED (`DEF_LED_PIN`,
+  one NeoPixel/GPIO). This board has five — **R=IO1, G=IO2, Y=IO6, B=IO7, W=IO15** — so it needs a
+  multi-LED status model (network / DMX-activity / conflict / identify).
+
+Working on this board today: **WiFi + DMX output.** (The RJ45 MagJack's link/act LEDs are driven by the
+W5500 itself — no firmware needed.)
+
 ## Toolchain
 
 - **KiCad 10** (bundled `python` + `kicad-cli`)
