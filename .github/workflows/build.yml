@@ -3,6 +3,15 @@ name: Build & Release
 on:
   push:
     branches: [master]
+    # Only rebuild/release when something that actually ends up in the firmware
+    # changes. Commits to hardware/, docs/, web/, README, etc. no longer bump the
+    # version, so devices on auto-update stop getting spammed with identical builds.
+    paths:
+      - 'src/**'
+      - 'platformio.ini'
+      - 'extra_scripts.py'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:   # allow a manual rebuild/release from the Actions tab
 
 permissions:
   contents: write
