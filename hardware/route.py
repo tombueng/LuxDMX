@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Headless auto-route of lumigate_carrier.kicad_pcb via Freerouting.
+"""Headless auto-route of lumigate.kicad_pcb via Freerouting.
 
 Pipeline (no KiCad GUI needed):
   load board -> ExportSpecctraDSN -> Freerouting (autoroute) -> ImportSpecctraSES
@@ -18,7 +18,7 @@ import os, sys, subprocess, tempfile
 import pcbnew
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BOARD = os.path.join(HERE, 'lumigate_carrier.kicad_pcb')
+BOARD = os.path.join(HERE, 'lumigate.kicad_pcb')
 JAR = os.environ.get('FREEROUTING_JAR', r'C:\tmp\freerouting19.jar')
 PASSES = 20
 

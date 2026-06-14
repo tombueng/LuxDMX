@@ -39,7 +39,7 @@
 	(fp_line (start 12.63 -4.80) (end 12.63 17.65) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 12.63 17.65) (end -12.93 17.65) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -12.93 17.65) (end -12.93 -4.80) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/XLR328P.3dshapes/CONN-TH_XLR-328P.wrl"
+	(model "C:/dev/DMX/hardware/easyeda/XLR328P.3dshapes/CONN-TH_XLR-328P.step"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))
