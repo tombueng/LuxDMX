@@ -22,3 +22,5 @@ docs/playwright-report/
 /sdkconfig.*
 /managed_components/
 /.dummy/
+/src/idf_component.yml
+/src/idf_component.yml.orig
