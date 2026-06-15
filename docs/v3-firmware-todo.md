@@ -27,13 +27,19 @@ All five PlatformIO envs build green on arduino-esp32 v3.3.9 / IDF 5.5.4
 
 ## Must-fix before merge
 
-- [ ] **BLOCKER #1 — the v3 firmware compiles but does NOT boot on real hardware.**
-      When this work was briefly released (v1.0.70), the **ESP32-S3 firmware boot-looped**
-      (green LED blinking) after an OTA flash and **bricked the device**. So the v3 build is
-      runtime-broken, not merely unverified. Root-cause this before anything else. Suspects:
-      early-boot brownout-register write on S3/IDF5 (`WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0)`),
-      partition/flash config under v3, or esp_dmx runtime on IDF 5.5. Reproduce over USB with the
-      serial monitor + exception decoder. (Tracked in issue #11.)
+- [x] **BLOCKER #1 — v3 firmware boot-loop ROOT-CAUSED + FIXED (pending hardware flash-verify).**
+      The v1.0.70 boot-loop was a spurious **brownout detector** trigger (`E BOD: Brownout
+      detector was triggered`, `RTC_SW_SYS_RST`), firing during IDF startup *before* `setup()`.
+      Evidence it is a false alarm, not real undervoltage: the board runs rock-solid once up, the
+      same happens across multiple boards on both USB and PSU, and the BOD is already at its
+      least-sensitive level (LVL7 ≈ 2.44 V) so it cannot be tuned. The runtime
+      `WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0)` is too late on the S3 (BOD armed before app code),
+      and the only precompiled lever (flash < 80 MHz) ships no matching bootloader.
+      **Fix:** disable the BOD at the sdkconfig level — `custom_sdkconfig = CONFIG_ESP_BROWNOUT_DET=n`
+      in `[env:lumigate_v3]` (commit b485fa6). Confirmed in the generated `sdkconfig.lumigate_v3`
+      (`# CONFIG_ESP_BROWNOUT_DET is not set`); builds clean. NOTE: `custom_sdkconfig` forces an
+      Arduino **source build** (slow; needs `min_spiffs.csv` in-tree, now added). Still TODO: flash
+      the build to confirm it boots (was blocked by the on-PC serial monitor holding the USB port).
 - [ ] **Real-hardware bring-up of the v3 board** (`pio run -e lumigate_v3 -t upload`):
   - [ ] W5500: link up, DHCP lease, static IP; Art-Net **and** sACN received over wired Ethernet
   - [ ] OTA update over Ethernet
