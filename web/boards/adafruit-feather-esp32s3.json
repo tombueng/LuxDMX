@@ -2,6 +2,152 @@
   "id": "adafruit-feather-esp32s3",
   "name": "Adafruit Feather ESP32-S3",
   "mcu": "esp32s3",
+  "fritzing": {
+    "svg": "fritzing/adafruit-feather-esp32s3.svg",
+    "viewBox": "0 0 147.24 64.8",
+    "credit": "Adafruit Fritzing-Library (CC BY-SA 3.0)",
+    "creditUrl": "https://github.com/adafruit/Fritzing-Library",
+    "hotspots": [
+      {
+        "gpio": 18,
+        "silk": "A0",
+        "x": 50.04,
+        "y": 61.2
+      },
+      {
+        "gpio": 17,
+        "silk": "A1",
+        "x": 57.24,
+        "y": 61.2
+      },
+      {
+        "gpio": 16,
+        "silk": "A2",
+        "x": 64.44,
+        "y": 61.2
+      },
+      {
+        "gpio": 15,
+        "silk": "A3",
+        "x": 71.64,
+        "y": 61.2
+      },
+      {
+        "gpio": 14,
+        "silk": "A4",
+        "x": 78.84,
+        "y": 61.2
+      },
+      {
+        "gpio": 8,
+        "silk": "A5",
+        "x": 86.04,
+        "y": 61.2
+      },
+      {
+        "gpio": 36,
+        "silk": "SCK",
+        "x": 93.24,
+        "y": 61.2
+      },
+      {
+        "gpio": 35,
+        "silk": "MOSI",
+        "x": 100.44,
+        "y": 61.2
+      },
+      {
+        "gpio": 37,
+        "silk": "MISO",
+        "x": 107.64,
+        "y": 61.2
+      },
+      {
+        "gpio": 38,
+        "silk": "RX",
+        "x": 114.84,
+        "y": 61.2
+      },
+      {
+        "gpio": 39,
+        "silk": "TX",
+        "x": 122.04,
+        "y": 61.2
+      },
+      {
+        "gpio": 43,
+        "silk": "TXD0",
+        "x": 129.24,
+        "y": 61.2
+      },
+      {
+        "gpio": 13,
+        "silk": "D13",
+        "x": 71.64,
+        "y": 3.6
+      },
+      {
+        "gpio": 12,
+        "silk": "D12",
+        "x": 78.84,
+        "y": 3.6
+      },
+      {
+        "gpio": 11,
+        "silk": "D11",
+        "x": 86.04,
+        "y": 3.6
+      },
+      {
+        "gpio": 10,
+        "silk": "D10",
+        "x": 93.24,
+        "y": 3.6
+      },
+      {
+        "gpio": 9,
+        "silk": "D9",
+        "x": 100.44,
+        "y": 3.6
+      },
+      {
+        "gpio": 6,
+        "silk": "D6",
+        "x": 107.64,
+        "y": 3.6
+      },
+      {
+        "gpio": 5,
+        "silk": "D5",
+        "x": 114.84,
+        "y": 3.6
+      },
+      {
+        "gpio": 3,
+        "silk": "SDA",
+        "x": 129.24,
+        "y": 3.6
+      },
+      {
+        "gpio": 4,
+        "silk": "SCL",
+        "x": 122.04,
+        "y": 3.6
+      },
+      {
+        "gpio": 3,
+        "silk": "SDA",
+        "x": 6.3,
+        "y": 8.51
+      },
+      {
+        "gpio": 4,
+        "silk": "SCL",
+        "x": 2.08,
+        "y": 8.51
+      }
+    ]
+  },
   "cols": [
     [
       {

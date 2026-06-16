@@ -122,6 +122,28 @@ WT32_BOT = [1, 3, 0, 39, 36, 15, 14, 12, 35, 4, 2]
 # Adafruit Feather ESP32-S3 (standard Feather layout, GPIOs from pins_arduino.h)
 FEAS3_L = [(18,"A0"),(17,"A1"),(16,"A2"),(15,"A3"),(14,"A4"),(8,"A5"),(36,"SCK"),(35,"MOSI"),(37,"MISO"),(38,"RX"),(39,"TX")]
 FEAS3_R = [(13,"D13"),(12,"D12"),(11,"D11"),(10,"D10"),(9,"D9"),(6,"D6"),(5,"D5"),(4,"SCL"),(3,"SDA"),(33,"NEO")]
+# Fritzing "real board" overlay (PoC): breadboard SVG + click hotspots whose (x,y) are
+# extracted from the part's .fzp connector terminals (Adafruit Fritzing-Library, CC BY-SA 3.0).
+FEAS3_FRITZING = {
+    "svg": "fritzing/adafruit-feather-esp32s3.svg",
+    "viewBox": "0 0 147.24 64.8",
+    "credit": "Adafruit Fritzing-Library (CC BY-SA 3.0)",
+    "creditUrl": "https://github.com/adafruit/Fritzing-Library",
+    "hotspots": [
+        {"gpio":18,"silk":"A0","x":50.04,"y":61.2}, {"gpio":17,"silk":"A1","x":57.24,"y":61.2},
+        {"gpio":16,"silk":"A2","x":64.44,"y":61.2}, {"gpio":15,"silk":"A3","x":71.64,"y":61.2},
+        {"gpio":14,"silk":"A4","x":78.84,"y":61.2}, {"gpio":8,"silk":"A5","x":86.04,"y":61.2},
+        {"gpio":36,"silk":"SCK","x":93.24,"y":61.2}, {"gpio":35,"silk":"MOSI","x":100.44,"y":61.2},
+        {"gpio":37,"silk":"MISO","x":107.64,"y":61.2}, {"gpio":38,"silk":"RX","x":114.84,"y":61.2},
+        {"gpio":39,"silk":"TX","x":122.04,"y":61.2}, {"gpio":43,"silk":"TXD0","x":129.24,"y":61.2},
+        {"gpio":13,"silk":"D13","x":71.64,"y":3.6}, {"gpio":12,"silk":"D12","x":78.84,"y":3.6},
+        {"gpio":11,"silk":"D11","x":86.04,"y":3.6}, {"gpio":10,"silk":"D10","x":93.24,"y":3.6},
+        {"gpio":9,"silk":"D9","x":100.44,"y":3.6}, {"gpio":6,"silk":"D6","x":107.64,"y":3.6},
+        {"gpio":5,"silk":"D5","x":114.84,"y":3.6}, {"gpio":3,"silk":"SDA","x":129.24,"y":3.6},
+        {"gpio":4,"silk":"SCL","x":122.04,"y":3.6}, {"gpio":3,"silk":"SDA","x":6.3,"y":8.51},
+        {"gpio":4,"silk":"SCL","x":2.08,"y":8.51},
+    ],
+}
 # Adafruit QT Py ESP32-S3
 QTPY_L = [(18,"A0"),(17,"A1"),(9,"A2"),(8,"A3"),(36,"SCK"),(37,"MISO"),(35,"MOSI")]
 QTPY_R = [(5,"TX"),(16,"RX"),(7,"SDA"),(6,"SCL"),(41,"SDA1"),(40,"SCL1"),(39,"NEO")]
@@ -220,6 +242,7 @@ def main():
         },
         {
             "id": "adafruit-feather-esp32s3", "name": "Adafruit Feather ESP32-S3", "mcu": "esp32s3",
+            "fritzing": FEAS3_FRITZING,
             "cols": cols_named(FEAS3_L, FEAS3_R, lambda g: s3_flags(g, set())),
             "preset": {"ledType": 2, "ledPin": 33, "dispType": 1, "dispsda": 3, "dispscl": 4,
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 5, "rx": 6, "rts": -1}]},

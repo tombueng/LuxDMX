@@ -49,6 +49,8 @@ footer a:hover { color:var(--gh-text); }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#238636; } .lg-warn::before{ background:#9e6a03; } .lg-bad::before{ background:#6e1a1a; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #58a6ff inset; }
+.fzwrap > svg { width:100%; height:auto; max-width:560px; display:block; margin:0 auto; }
+.fzhot { cursor:pointer; } .fzhot:hover circle { fill-opacity:.85; }
 </style>
 </head>
 <body>
@@ -897,7 +899,7 @@ function validate(){
   });
   renderWarnings(msgs);
   var sb = $('save-btn'); if (sb) sb.disabled = hard;
-  if ($('board-modal').classList.contains('show')) renderBoard();
+  if ($('board-modal').classList.contains('show')) renderCurrent();
   return !hard;
 }
 
@@ -986,7 +988,7 @@ function chooseRole(gpio){
     btn.addEventListener('click', function(){
       var r = btn.getAttribute('data-r');
       if (r){ var el = byRole(r); el.value = gpio; el.dispatchEvent(new Event('input', { bubbles:true })); }
-      h.classList.add('d-none'); renderBoard();
+      h.classList.add('d-none'); renderCurrent();
     });
   });
 }
@@ -1003,6 +1005,41 @@ function setupPhotoToggle(){
     };
   } else { w.style.display = 'none'; }
 }
+// Fritzing "real board" graphic + clickable hotspots (online, CC-BY-SA overlay).
+function renderFritzing(){
+  var b = diagramDesc(), wrap = $('board-svg-wrap');
+  if (!b || !b.fritzing){ renderBoard(); return; }
+  var fz = b.fritzing;
+  wrap.innerHTML = '<p class="text-secondary small">Loading board graphic…</p>';
+  var assign = {};
+  activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
+  fetch(CATALOG_URL + fz.svg).then(function(r){ if (!r.ok) throw 0; return r.text(); }).then(function(svg){
+    var dots = fz.hotspots.map(function(h){
+      var fl = (b.byGpio[h.gpio] && b.byGpio[h.gpio].flags) || [];
+      var used = assign[h.gpio];
+      var col = used ? '#58a6ff' : statusColor(padClass(fl));
+      var tip = 'GPIO' + h.gpio + ' (' + h.silk + ')' + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (used ? ' — ' + used.map(roleLabel).join(', ') : '');
+      return '<g class="fzhot" data-gpio="' + h.gpio + '"><title>' + esc(tip) + '</title>'
+        + '<circle cx="' + h.x + '" cy="' + h.y + '" r="2.7" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '" stroke-width="' + (used ? 1.3 : 0.8) + '"/></g>';
+    }).join('');
+    var idx = svg.lastIndexOf('</svg>');
+    if (idx < 0){ renderBoard(); return; }
+    wrap.innerHTML = '<div class="fzwrap">' + svg.slice(0, idx) + dots + svg.slice(idx) + '</div>'
+      + '<div class="text-secondary small mt-1">Graphic: ' + esc(fz.credit || 'Fritzing') + '</div>';
+    wrap.querySelectorAll('.fzhot').forEach(function(n){ n.addEventListener('click', function(){ onPinClick(+n.getAttribute('data-gpio')); }); });
+  }).catch(function(){ renderBoard(); });
+}
+function setupFritzingToggle(){
+  var b = diagramDesc(), w = $('fz-toggle-wrap'), t = $('fz-toggle');
+  t.checked = false;
+  if (b && b.fritzing){ w.style.display = ''; t.onchange = function(){ renderCurrent(); }; }
+  else { w.style.display = 'none'; }
+}
+// render whichever board view is currently selected (board-style SVG or Fritzing graphic)
+function renderCurrent(){
+  var t = $('fz-toggle'); var b = diagramDesc();
+  if (t && t.checked && b && b.fritzing) renderFritzing(); else renderBoard();
+}
 function openPicker(role){
   PICK_TARGET = role || null;
   var h = $('board-pick-hint');
@@ -1010,6 +1047,7 @@ function openPicker(role){
   else { h.classList.add('d-none'); }
   $('board-modal-title').textContent = role ? ('Pick pin: ' + roleLabel(role)) : (currentBoardName() + ' — pin map');
   setupPhotoToggle();
+  setupFritzingToggle();
   renderBoard();
   $('board-modal').classList.add('show');
 }
@@ -1120,6 +1158,9 @@ function initBoards(){
       <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
         <label class="form-check small mb-0" id="photo-toggle-wrap" style="display:none">
           <input type="checkbox" class="form-check-input me-1" id="photo-toggle"> show board photo (online)
+        </label>
+        <label class="form-check small mb-0" id="fz-toggle-wrap" style="display:none">
+          <input type="checkbox" class="form-check-input me-1" id="fz-toggle"> realistic board graphic (online)
         </label>
         <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="board-modal-done">Done</button>
       </div>
