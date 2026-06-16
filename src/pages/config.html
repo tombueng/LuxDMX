@@ -1027,18 +1027,23 @@ function renderFritzing(){
     wrap.innerHTML = '<div class="fzwrap">' + svg.slice(0, idx) + dots + svg.slice(idx) + '</div>'
       + '<div class="text-secondary small mt-1">Graphic: ' + esc(fz.credit || 'Fritzing') + '</div>';
     wrap.querySelectorAll('.fzhot').forEach(function(n){ n.addEventListener('click', function(){ onPinClick(+n.getAttribute('data-gpio')); }); });
-  }).catch(function(){ renderBoard(); });
+  }).catch(function(){
+    renderBoard();
+    $('board-svg-wrap').insertAdjacentHTML('afterbegin',
+      '<div class="alert alert-warning py-1 px-2 small mb-2">Realistic board graphic unavailable (offline) — showing the schematic.</div>');
+  });
 }
 function setupFritzingToggle(){
   var b = diagramDesc(), w = $('fz-toggle-wrap'), t = $('fz-toggle');
-  t.checked = false;
+  t.checked = false;   // unchecked = realistic graphic (the default when available)
   if (b && b.fritzing){ w.style.display = ''; t.onchange = function(){ renderCurrent(); }; }
   else { w.style.display = 'none'; }
 }
-// render whichever board view is currently selected (board-style SVG or Fritzing graphic)
+// Realistic Fritzing graphic is shown by default whenever a board has one (and it loads);
+// the toggle switches to the schematic, and a failed load falls back to it with a notice.
 function renderCurrent(){
   var t = $('fz-toggle'); var b = diagramDesc();
-  if (t && t.checked && b && b.fritzing) renderFritzing(); else renderBoard();
+  if (b && b.fritzing && !(t && t.checked)) renderFritzing(); else renderBoard();
 }
 function openPicker(role){
   PICK_TARGET = role || null;
@@ -1048,7 +1053,7 @@ function openPicker(role){
   $('board-modal-title').textContent = role ? ('Pick pin: ' + roleLabel(role)) : (currentBoardName() + ' — pin map');
   setupPhotoToggle();
   setupFritzingToggle();
-  renderBoard();
+  renderCurrent();
   $('board-modal').classList.add('show');
 }
 function closeBoard(){ $('board-modal').classList.remove('show'); PICK_TARGET = null; }
@@ -1085,14 +1090,15 @@ function fillBoardSelect(){
   $('board-sel').innerHTML = html;
 }
 function ensureBoard(id, cb){
-  if (BOARDS[id]) return cb(true);
+  // Network is authoritative when reachable; the localStorage copy (already in BOARDS[id])
+  // is only an offline fallback, so always try a fresh fetch and overwrite the cache.
   fetch(CATALOG_URL + id + '.json', { cache:'no-store' })
     .then(function(r){ if (!r.ok) throw 0; return r.json(); })
     .then(function(d){
       BOARDS[id] = finalizeDesc(d);
       try { var c = JSON.parse(localStorage.getItem('lg_boards') || '{}'); c[id] = d; localStorage.setItem('lg_boards', JSON.stringify(c)); } catch(e){}
       cb(true);
-    }).catch(function(){ cb(false); });
+    }).catch(function(){ cb(!!BOARDS[id]); });
 }
 function loadRemoteCatalog(){
   try {
@@ -1119,7 +1125,9 @@ function initBoards(){
   decorateAllPins();
   $('board-sel').addEventListener('change', function(){
     var id = $('board-sel').value;
-    if (id && id !== 'custom' && !BOARDS[id]){
+    // catalog (non-builtin) boards: always refresh the descriptor from the network so a
+    // stale localStorage copy can never hide newer data (e.g. a Fritzing graphic).
+    if (id && id !== 'custom' && BUILTINS.indexOf(id) < 0){
       ensureBoard(id, function(ok){
         if (!ok){ showModal({ title:'Board unavailable', body:'That board could not be loaded from the online catalog. Connect to the internet and retry, or use Custom.', cancel:false, okText:'OK' }); $('board-sel').value = 'custom'; }
         updBoardButtons(); validate();
@@ -1160,7 +1168,7 @@ function initBoards(){
           <input type="checkbox" class="form-check-input me-1" id="photo-toggle"> show board photo (online)
         </label>
         <label class="form-check small mb-0" id="fz-toggle-wrap" style="display:none">
-          <input type="checkbox" class="form-check-input me-1" id="fz-toggle"> realistic board graphic (online)
+          <input type="checkbox" class="form-check-input me-1" id="fz-toggle"> show schematic diagram instead
         </label>
         <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="board-modal-done">Done</button>
       </div>
