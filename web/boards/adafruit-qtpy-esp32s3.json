@@ -1,0 +1,98 @@
+{
+  "id": "adafruit-qtpy-esp32s3",
+  "name": "Adafruit QT Py ESP32-S3",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 18,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "A2",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "A3",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 37,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 35,
+        "silk": "MOSI",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 5,
+        "silk": "TX",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "RX",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 41,
+        "silk": "SDA1",
+        "flags": []
+      },
+      {
+        "gpio": 40,
+        "silk": "SCL1",
+        "flags": []
+      },
+      {
+        "gpio": 39,
+        "silk": "NEO",
+        "flags": []
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 39,
+    "dispType": 1,
+    "dispsda": 7,
+    "dispscl": 6,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 5,
+        "rx": 16,
+        "rts": -1
+      }
+    ]
+  }
+}

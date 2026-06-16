@@ -99,12 +99,23 @@ from the real board.
 
 ## Board coverage
 
-Built-in (offline) descriptors cover the common variants, which differ in pinout/layout:
-LumiGate v3, ESP32 DevKitC (WROOM-32, 38-pin), ESP32 DevKit v1 (DOIT, 30-pin),
-ESP32-S3 DevKitC-1 (44-pin), Seeed XIAO ESP32-S3. The 30-pin DOIT board notably omits
-the flash pins (6-11) and has a different header layout than the 38-pin DevKitC, so a
-single "ESP32" photo would mislead. That is exactly why the clickable diagram is
-data-driven per variant.
+Built-in (offline) descriptors: LumiGate v3, ESP32 DevKitC (WROOM-32, 38-pin),
+ESP32 DevKit v1 (DOIT, 30-pin), ESP32-S3 DevKitC-1 (44-pin), Seeed XIAO ESP32-S3.
+
+Catalog (online, lazy-fetched) descriptors add: NodeMCU-32S, WT32-ETH01,
+Adafruit Feather ESP32-S3, Adafruit QT Py ESP32-S3, Adafruit Feather ESP32 V2.
+
+Variants genuinely differ in pinout/layout, so each is its own descriptor rather than
+one misleading photo:
+- the 30-pin DOIT board omits the flash pins (6-11) and has a different header layout
+  than the 38-pin DevKitC,
+- the PICO-based Feather ESP32 V2 frees GPIO6-11 and reserves 16/17 for its embedded
+  flash (opposite of a WROOM board),
+- WT32-ETH01 reserves the RMII pins and uses GPIO0 as the Ethernet refclk.
+
+Descriptor data is sourced authoritatively, not guessed: `hardware/lumigate.py` (PCB
+netlist) for v3, and the Arduino core's `variants/<board>/pins_arduino.h` for the rest,
+via `hardware/gen_board_descriptor.py`. Adding a board = add its pinout there + rerun.
 
 Photos are optional online-only overlays from sources we may redistribute (own renders,
 CC0, or CC-BY/CC-BY-SA with attribution); see [../web/boards/CREDITS.md](../web/boards/CREDITS.md).

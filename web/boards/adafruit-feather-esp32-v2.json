@@ -1,0 +1,113 @@
+{
+  "id": "adafruit-feather-esp32-v2",
+  "name": "Adafruit Feather ESP32 V2 (PICO)",
+  "mcu": "esp32",
+  "cols": [
+    [
+      {
+        "gpio": 26,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 25,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 34,
+        "silk": "A2",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 39,
+        "silk": "A3",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 36,
+        "silk": "A4",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "SCK",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 19,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 21,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "RX",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "TX",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 13,
+        "silk": "D13",
+        "flags": []
+      },
+      {
+        "gpio": 20,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 22,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 0,
+        "silk": "NEO",
+        "flags": [
+          "strapping"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 0,
+    "dispType": 1,
+    "dispsda": 22,
+    "dispscl": 20,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 8,
+        "rx": 7,
+        "rts": -1
+      }
+    ]
+  }
+}

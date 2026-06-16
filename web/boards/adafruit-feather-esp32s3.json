@@ -1,0 +1,135 @@
+{
+  "id": "adafruit-feather-esp32s3",
+  "name": "Adafruit Feather ESP32-S3",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 18,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "A2",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "A3",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "A4",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 35,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 37,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 38,
+        "silk": "RX",
+        "flags": []
+      },
+      {
+        "gpio": 39,
+        "silk": "TX",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 13,
+        "silk": "D13",
+        "flags": []
+      },
+      {
+        "gpio": 12,
+        "silk": "D12",
+        "flags": []
+      },
+      {
+        "gpio": 11,
+        "silk": "D11",
+        "flags": []
+      },
+      {
+        "gpio": 10,
+        "silk": "D10",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "D9",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "D6",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "D5",
+        "flags": []
+      },
+      {
+        "gpio": 4,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "SDA",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 33,
+        "silk": "NEO",
+        "flags": []
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 33,
+    "dispType": 1,
+    "dispsda": 3,
+    "dispscl": 4,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 5,
+        "rx": 6,
+        "rts": -1
+      }
+    ]
+  }
+}

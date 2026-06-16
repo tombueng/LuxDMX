@@ -31,6 +31,36 @@
       "name": "Seeed XIAO ESP32-S3",
       "mcu": "esp32s3",
       "builtin": true
+    },
+    {
+      "id": "nodemcu-32s",
+      "name": "NodeMCU-32S (ESP32-WROOM-32, 38-pin)",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "wt32eth01",
+      "name": "WT32-ETH01 (Ethernet, LAN8720)",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "adafruit-feather-esp32s3",
+      "name": "Adafruit Feather ESP32-S3",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "adafruit-qtpy-esp32s3",
+      "name": "Adafruit QT Py ESP32-S3",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "adafruit-feather-esp32-v2",
+      "name": "Adafruit Feather ESP32 V2 (PICO)",
+      "mcu": "esp32",
+      "builtin": false
     }
   ]
 }

@@ -88,6 +88,49 @@ def cols_named(left, right, flag):
     return [[mk(p) for p in left], [mk(p) for p in right]]
 
 
+def wt32_flags(g):
+    f = []
+    if g == 0:
+        f.append("reserved:eth-rmii")        # GPIO0 = RMII reference clock on WT32-ETH01
+    if g in (1, 3):
+        f.append("serial")
+    if g in (0, 2, 5, 12, 15):
+        f.append("strapping")
+    if g in (34, 35, 36, 39):
+        f.append("input-only")
+    return f
+
+
+def e32pico_flags(g):
+    # ESP32-PICO module (Adafruit Feather ESP32 V2): embedded flash uses GPIO16/17,
+    # so the usual WROOM flash pins 6-11 are FREE here.
+    f = []
+    if g in (16, 17):
+        f.append("flash")
+    if g in (1, 3):
+        f.append("serial")
+    if g in (34, 35, 36, 39):
+        f.append("input-only")
+    if g in (0, 2, 5, 12, 15):
+        f.append("strapping")
+    return f
+
+
+# WT32-ETH01 header rows (egnor reference); GPIO0 is the Ethernet RMII refclk.
+WT32_TOP = [32, 33, 5, 17]
+WT32_BOT = [1, 3, 0, 39, 36, 15, 14, 12, 35, 4, 2]
+# Adafruit Feather ESP32-S3 (standard Feather layout, GPIOs from pins_arduino.h)
+FEAS3_L = [(18,"A0"),(17,"A1"),(16,"A2"),(15,"A3"),(14,"A4"),(8,"A5"),(36,"SCK"),(35,"MOSI"),(37,"MISO"),(38,"RX"),(39,"TX")]
+FEAS3_R = [(13,"D13"),(12,"D12"),(11,"D11"),(10,"D10"),(9,"D9"),(6,"D6"),(5,"D5"),(4,"SCL"),(3,"SDA"),(33,"NEO")]
+# Adafruit QT Py ESP32-S3
+QTPY_L = [(18,"A0"),(17,"A1"),(9,"A2"),(8,"A3"),(36,"SCK"),(37,"MISO"),(35,"MOSI")]
+QTPY_R = [(5,"TX"),(16,"RX"),(7,"SDA"),(6,"SCL"),(41,"SDA1"),(40,"SCL1"),(39,"NEO")]
+# Adafruit Feather ESP32 V2 (ESP32-PICO)
+FEAV2_L = [(26,"A0"),(25,"A1"),(34,"A2"),(39,"A3"),(36,"A4"),(4,"A5"),(5,"SCK"),(19,"MOSI"),(21,"MISO"),(7,"RX"),(8,"TX")]
+FEAV2_R = [(13,"D13"),(20,"SCL"),(22,"SDA"),(0,"NEO")]
+named = lambda gs, silk: [(g, silk(g)) for g in gs]
+
+
 def parse_v3():
     """Read U1['IOxx'] += NET lines from lumigate.py -> {gpio: net}."""
     text = open(os.path.join(HERE, "lumigate.py"), encoding="utf-8").read()
@@ -163,6 +206,36 @@ def main():
             "preset": {"ledType": 0, "dispType": 1, "dispsda": 5, "dispscl": 6,
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 1, "rx": 2, "rts": -1}]},
         },
+        {
+            "id": "nodemcu-32s", "name": "NodeMCU-32S (ESP32-WROOM-32, 38-pin)", "mcu": "esp32",
+            "cols": cols(E32L, E32R, e32_silk, e32_flags),
+            "preset": {"ledType": 1, "ledPin": 2, "dispType": 1, "dispsda": 21, "dispscl": 22,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
+        },
+        {
+            "id": "wt32eth01", "name": "WT32-ETH01 (Ethernet, LAN8720)", "mcu": "esp32",
+            "cols": cols_named(named(WT32_TOP, e32_silk), named(WT32_BOT, e32_silk), wt32_flags),
+            "preset": {"ledType": 1, "ledPin": 2, "dispType": 1, "dispsda": 14, "dispscl": 15,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 4, "rx": 5, "rts": -1}]},
+        },
+        {
+            "id": "adafruit-feather-esp32s3", "name": "Adafruit Feather ESP32-S3", "mcu": "esp32s3",
+            "cols": cols_named(FEAS3_L, FEAS3_R, lambda g: s3_flags(g, set())),
+            "preset": {"ledType": 2, "ledPin": 33, "dispType": 1, "dispsda": 3, "dispscl": 4,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 5, "rx": 6, "rts": -1}]},
+        },
+        {
+            "id": "adafruit-qtpy-esp32s3", "name": "Adafruit QT Py ESP32-S3", "mcu": "esp32s3",
+            "cols": cols_named(QTPY_L, QTPY_R, lambda g: s3_flags(g, set())),
+            "preset": {"ledType": 2, "ledPin": 39, "dispType": 1, "dispsda": 7, "dispscl": 6,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 5, "rx": 16, "rts": -1}]},
+        },
+        {
+            "id": "adafruit-feather-esp32-v2", "name": "Adafruit Feather ESP32 V2 (PICO)", "mcu": "esp32",
+            "cols": cols_named(FEAV2_L, FEAV2_R, e32pico_flags),
+            "preset": {"ledType": 2, "ledPin": 0, "dispType": 1, "dispsda": 22, "dispscl": 20,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 8, "rx": 7, "rts": -1}]},
+        },
     ]
 
     for b in boards:
@@ -171,12 +244,15 @@ def main():
             json.dump(b, fh, indent=2)
         print("wrote", os.path.relpath(path, ROOT))
 
+    # Boards also baked inline into src/pages/config.html (work fully offline).
+    INLINE = {"lumigate_v3", "esp32s3-devkitc-1", "esp32-devkitc", "esp32-devkit-v1", "xiao-esp32s3"}
     index = {
         "schema": 1,
         "updated": "auto",
-        # "builtin" = also baked into src/pages/config.html (works fully offline)
-        "boards": [{"id": b["id"], "name": b["name"], "mcu": b["mcu"], "builtin": True}
-                   for b in boards],
+        # "builtin" = also baked into src/pages/config.html (works fully offline);
+        # the rest are catalog-only (fetched on demand from GitHub Pages).
+        "boards": [{"id": b["id"], "name": b["name"], "mcu": b["mcu"],
+                    "builtin": b["id"] in INLINE} for b in boards],
     }
     with open(os.path.join(OUT, "index.json"), "w", encoding="utf-8") as fh:
         json.dump(index, fh, indent=2)

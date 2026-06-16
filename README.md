@@ -582,12 +582,17 @@ variants (which are **not** all the same pinout):
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
 | Seeed XIAO ESP32-S3 | tiny board, D0-D10 silk |
 
-Additional/community boards are pulled lazily from the online catalog
-([web/boards/](web/boards/), served via GitHub Pages) and cached in your browser. No
-network means you still get the built-ins plus manual entry. The board diagrams are tiny
-SVG/JSON descriptors generated from the pinout data; board *photos* are an optional,
-online-only overlay (own renders or CC0/CC-licensed images, see
-[web/boards/CREDITS.md](web/boards/CREDITS.md)), never embedded in flash.
+More boards are pulled lazily from the online catalog ([web/boards/](web/boards/), served
+via GitHub Pages) and cached in your browser: NodeMCU-32S, WT32-ETH01 (Ethernet),
+Adafruit Feather ESP32-S3, Adafruit QT Py ESP32-S3, Adafruit Feather ESP32 V2 (PICO), and
+growing. No network means you still get the built-ins plus manual entry. All descriptors
+are generated from authoritative pinout data (`hardware/gen_board_descriptor.py`, sourced
+from `hardware/lumigate.py` for v3 and the Arduino core `pins_arduino.h` variants for the
+rest), so the GPIO numbers and reserved/strapping/flash flags are accurate per variant
+(e.g. the PICO-based Feather V2 frees GPIO6-11 and reserves 16/17 instead). Board diagrams
+are tiny SVG; board *photos* are an optional, online-only overlay (own renders or
+CC0/CC-licensed images, see [web/boards/CREDITS.md](web/boards/CREDITS.md)), never embedded
+in flash.
 
 See [docs/pin-picker.md](docs/pin-picker.md) for the design, the descriptor schema and
 how to add a board.
