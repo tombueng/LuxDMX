@@ -98,6 +98,8 @@ def generate():
         html_to_header(f, gen_dir)
     for f in sorted((root / "src" / "assets").glob("*.png")):
         binary_to_header(f, gen_dir, "PNG")
+    for f in sorted((root / "src" / "assets").glob("*.svg")):
+        binary_to_header(f, gen_dir, "SVG")
     for f in sorted((root / "src" / "assets").glob("*.css")):
         # Gzip-compress CSS before embedding — reduces 232 KB bootstrap to ~40 KB
         raw = f.read_bytes()
