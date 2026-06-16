@@ -1007,6 +1007,11 @@ function setupPhotoToggle(){
   } else { w.style.display = 'none'; }
 }
 // Fritzing "real board" graphic + clickable hotspots (online, CC-BY-SA overlay).
+// fuller function label for the on-graphic callouts (e.g. "Status LED (WS2812)")
+function calloutLabel(role){
+  if (role === 'ledpin'){ var lt = $('led-type').value; return 'Status LED' + (lt === '2' ? ' (WS2812)' : lt === '1' ? ' (GPIO)' : ''); }
+  return roleLabel(role);
+}
 function renderFritzing(){
   var b = diagramDesc(), wrap = $('board-svg-wrap');
   if (!b || !b.fritzing){ renderBoard(); return; }
@@ -1015,24 +1020,69 @@ function renderFritzing(){
   var assign = {};
   activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
   fetch(CATALOG_URL + fz.svg).then(function(r){ if (!r.ok) throw 0; return r.text(); }).then(function(svg){
-    var dots = fz.hotspots.map(function(h){
-      var fl = (b.byGpio[h.gpio] && b.byGpio[h.gpio].flags) || [];
-      var used = assign[h.gpio];
+    var vbm = svg.match(/viewBox="([^"]+)"/);
+    var vb = (vbm ? vbm[1] : (fz.viewBox || '0 0 147 65')).split(/\s+/).map(parseFloat);
+    var W = vb[2] || 147, H = vb[3] || 65, midY = (vb[1] || 0) + H / 2;
+    var inner = svg.replace(/^[\s\S]*?<svg\b[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+    var FONT = 3.3, ROWH = 5.4, pinY = {};
+    fz.hotspots.forEach(function(h){ pinY[h.gpio] = h.y; });
+    // lay out callout labels for assigned pins (per side), stacking rows to avoid overlap
+    function layout(side){
+      var list = [];
+      fz.hotspots.forEach(function(h){
+        var used = assign[h.gpio]; if (!used) return;
+        if ((side === 'top') !== (h.y < midY)) return;
+        list.push({ x:h.x, gpio:h.gpio, text: used.map(calloutLabel).join(', ') + ' ·G' + h.gpio });
+      });
+      list.sort(function(a,c){ return a.x - c.x; });
+      var rowsEnd = [];
+      list.forEach(function(p){
+        var w = p.text.length * FONT * 0.55 + 3, L = p.x - w / 2, row = 0;
+        while (row < rowsEnd.length && rowsEnd[row] > L - 1.5) row++;
+        rowsEnd[row] = p.x + w / 2; p.row = row;
+      });
+      return { list:list, rows:rowsEnd.length };
+    }
+    var top = layout('top'), bot = layout('bottom');
+    var TOPM = top.rows ? top.rows * ROWH + 7 : 5;
+    var BOTM = bot.rows ? bot.rows * ROWH + 7 : 5;
+    var OH = H + TOPM + BOTM;
+    function dot(h){
+      var fl = (b.byGpio[h.gpio] && b.byGpio[h.gpio].flags) || [], used = assign[h.gpio];
       var col = used ? '#58a6ff' : statusColor(padClass(fl));
       var tip = 'GPIO' + h.gpio + ' (' + h.silk + ')' + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (used ? ' — ' + used.map(roleLabel).join(', ') : '');
       return '<g class="fzhot" data-gpio="' + h.gpio + '"><title>' + esc(tip) + '</title>'
-        + '<circle cx="' + h.x + '" cy="' + h.y + '" r="2.7" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '" stroke-width="' + (used ? 1.3 : 0.8) + '"/></g>';
-    }).join('');
-    var idx = svg.lastIndexOf('</svg>');
-    if (idx < 0){ renderBoard(); return; }
-    wrap.innerHTML = '<div class="fzwrap">' + svg.slice(0, idx) + dots + svg.slice(idx) + '</div>'
-      + '<div class="text-secondary small mt-1">Graphic: ' + esc(fz.credit || 'Fritzing') + '</div>';
+        + '<circle cx="' + h.x + '" cy="' + (h.y + TOPM) + '" r="2.7" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '" stroke-width="' + (used ? 1.3 : 0.8) + '"/></g>';
+    }
+    function callout(p, side){
+      var py = pinY[p.gpio] + TOPM;
+      var ly = side === 'top' ? (TOPM - 5 - p.row * ROWH) : (TOPM + H + 7 + p.row * ROWH);
+      var end = side === 'top' ? ly + 1.2 : ly - 3.4;
+      return '<line x1="' + p.x + '" y1="' + py + '" x2="' + p.x + '" y2="' + end + '" stroke="#58a6ff" stroke-width="0.5"/>'
+        + '<text x="' + p.x + '" y="' + ly + '" text-anchor="middle" font-size="' + FONT + '" font-weight="600" fill="#58a6ff">' + esc(p.text) + '</text>';
+    }
+    var calls = top.list.map(function(p){ return callout(p, 'top'); }).join('')
+              + bot.list.map(function(p){ return callout(p, 'bottom'); }).join('');
+    var out = '<svg class="fzsvg" viewBox="0 0 ' + W + ' ' + OH + '" preserveAspectRatio="xMidYMid meet">'
+      + '<g transform="translate(0,' + TOPM + ')">' + inner + '</g>' + fz.hotspots.map(dot).join('') + calls + '</svg>';
+    wrap.innerHTML = '<div class="fzwrap">' + out + '</div>'
+      + '<div class="text-secondary small mt-1">Graphic: ' + esc(fz.credit || 'Fritzing') + ' · blue callouts = your assignments</div>';
     wrap.querySelectorAll('.fzhot').forEach(function(n){ n.addEventListener('click', function(){ onPinClick(+n.getAttribute('data-gpio')); }); });
   }).catch(function(){
     renderBoard();
     $('board-svg-wrap').insertAdjacentHTML('afterbegin',
       '<div class="alert alert-warning py-1 px-2 small mb-2">Realistic board graphic unavailable (offline) — showing the schematic.</div>');
   });
+}
+function printBoard(){
+  var c = $('board-svg-wrap').innerHTML;
+  if (!c){ return; }
+  var w = window.open('', '_blank', 'width=900,height=700'); if (!w) return;
+  w.document.write('<!doctype html><html><head><title>' + esc(currentBoardName()) + ' — pin plan</title>'
+    + '<style>body{background:#0d1117;color:#c9d1d9;font-family:sans-serif;margin:0;padding:24px}'
+    + 'h3{margin:0 0 14px;font-weight:600}svg{width:100%;max-width:780px;height:auto;display:block;margin:0 auto}</style></head>'
+    + '<body><h3>' + esc(currentBoardName()) + ' — pin assignment</h3>' + c + '</body></html>');
+  w.document.close(); w.focus(); setTimeout(function(){ try { w.print(); } catch(e){} }, 450);
 }
 function setupFritzingToggle(){
   var b = diagramDesc(), w = $('fz-toggle-wrap'), t = $('fz-toggle');
@@ -1139,6 +1189,7 @@ function initBoards(){
   $('board-open').addEventListener('click', function(){ openPicker(null); });
   $('board-modal-close').addEventListener('click', closeBoard);
   $('board-modal-done').addEventListener('click', closeBoard);
+  $('board-print').addEventListener('click', printBoard);
   $('board-modal').addEventListener('click', function(e){ if (e.target === $('board-modal')) closeBoard(); });
   $('led-type').addEventListener('change', function(){ decorateAllPins(); validate(); });
   $('disp-type').addEventListener('change', function(){ decorateAllPins(); validate(); });
@@ -1171,7 +1222,8 @@ function initBoards(){
         <label class="form-check small mb-0" id="fz-toggle-wrap" style="display:none">
           <input type="checkbox" class="form-check-input me-1" id="fz-toggle"> show schematic diagram instead
         </label>
-        <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="board-modal-done">Done</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="board-print">Print plan</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="board-modal-done">Done</button>
       </div>
       <div id="board-photo-wrap" class="mt-2"></div>
     </div>
