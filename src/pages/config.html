@@ -902,7 +902,7 @@ function validate(){
 }
 
 // ---- SVG board diagram + picker --------------------------------------------
-var MOD_L = 150, MOD_R = 210, BRD_W = 360, ROW = 30, TOP = 26;
+var BRD_W = 380, ROW = 28, TOP = 70, BODY_X = 36, BODY_W = 308, RAIL_L = 62, RAIL_R = 318, CXM = BRD_W / 2;
 function padClass(flags){
   for (var i = 0; i < flags.length; i++){ var f = flags[i];
     if (f === 'flash' || f === 'serial' || f === 'range' || f.indexOf('reserved:') === 0) return 'bad'; }
@@ -910,28 +910,54 @@ function padClass(flags){
     if (f2 === 'strapping' || f2 === 'usb-jtag' || f2 === 'input-only') return 'warn'; }
   return 'free';
 }
+function statusColor(cls){ return cls === 'bad' ? '#f85149' : cls === 'warn' ? '#d29922' : '#2ea043'; }
+// compact tag shown on the board for an assigned pin (full label is in the tooltip)
+function shortRole(role){
+  var m = role.match(/^o(\d+)_(tx|rx|rts)$/);
+  if (m) return String.fromCharCode(65 + (+m[1])) + ':' + (m[2] === 'rts' ? 'DE' : m[2].toUpperCase());
+  var map = { ledpin:'LED', ledr:'LEDr', ledg:'LEDg', ledy:'LEDy', ledb:'LEDb', ledw:'LEDw',
+    dispsda:'SDA', dispscl:'SCL', dispcs:'CS', dispdc:'DC', disprst:'RST', dispsck:'SCK', dispmosi:'MOSI' };
+  return map[role] || role;
+}
 function padSvg(side, pin, y, assign){
-  var g = pin.gpio, used = assign[g];
-  var cx = side === 'L' ? MOD_L : MOD_R;
-  var lx = side === 'L' ? (MOD_L - 13) : (MOD_R + 13);
-  var anc = side === 'L' ? 'end' : 'start';
-  var dot = '<circle class="pin-dot ' + padClass(pin.flags || []) + '" cx="' + cx + '" cy="' + y + '" r="6"/>';
-  var t1 = '<text class="pad-lbl" x="' + lx + '" y="' + (y - 2) + '" text-anchor="' + anc + '">' + esc(pin.silk) + '</text>';
-  var t2 = '<text class="pad-gpio" x="' + lx + '" y="' + (y + 9) + '" text-anchor="' + anc + '">GPIO' + g + '</text>';
-  var t3 = used ? '<text class="pad-assign" x="' + lx + '" y="' + (y + 19) + '" text-anchor="' + anc + '">' + esc(used.join(', ')) + '</text>' : '';
-  return '<g class="pad' + (used ? ' used' : '') + '" data-gpio="' + g + '">' + dot + t1 + t2 + t3 + '</g>';
+  var g = pin.gpio, used = assign[g], cls = padClass(pin.flags || []);
+  var rx = side === 'L' ? RAIL_L : RAIL_R;
+  var lx = side === 'L' ? (rx + 13) : (rx - 13);
+  var anc = side === 'L' ? 'start' : 'end';
+  var ring = used ? '#58a6ff' : statusColor(cls);
+  var rw = used ? 3 : 2;
+  var tip = 'GPIO' + g + (pin.silk ? ' (' + pin.silk + ')' : '')
+          + (pin.flags && pin.flags.length ? ' — ' + pin.flags.join(', ') : ' — free')
+          + (used ? ' — ' + used.map(roleLabel).join(', ') : '');
+  var pad = '<rect x="' + (rx - 7) + '" y="' + (y - 7) + '" width="14" height="14" rx="2" fill="#d4af37" stroke="' + ring + '" stroke-width="' + rw + '"/>'
+          + '<circle cx="' + rx + '" cy="' + y + '" r="2.4" fill="#0d1117"/>';
+  var t1 = '<text class="pad-lbl" x="' + lx + '" y="' + (y - 1) + '" text-anchor="' + anc + '">' + esc(pin.silk || ('IO' + g)) + ' ·G' + g + '</text>';
+  var t2 = used ? '<text class="pad-assign" x="' + lx + '" y="' + (y + 9) + '" text-anchor="' + anc + '">▸ ' + esc(used.map(shortRole).join(',')) + '</text>' : '';
+  return '<g class="pad' + (used ? ' used' : '') + '" data-gpio="' + g + '"><title>' + esc(tip) + '</title>' + pad + t1 + t2 + '</g>';
 }
 function renderBoard(){
   var b = diagramDesc(), wrap = $('board-svg-wrap');
   if (!b){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
   var assign = {};
-  activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(roleLabel(role)); });
+  activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
   var L = b.cols[0], R = b.cols[1], n = Math.max(L.length, R.length);
-  var H = TOP + n * ROW + 16;
-  var cxm = (MOD_L + MOD_R) / 2;
+  var H = TOP + n * ROW + 22;
   var s = '<svg class="board-svg" viewBox="0 0 ' + BRD_W + ' ' + H + '" width="' + BRD_W + '">';
-  s += '<rect x="' + MOD_L + '" y="14" width="' + (MOD_R - MOD_L) + '" height="' + (H - 28) + '" rx="6" fill="#0d1117" stroke="#30363d"/>';
-  s += '<text x="' + cxm + '" y="' + (H / 2) + '" fill="#484f58" font-size="9" text-anchor="middle" transform="rotate(-90 ' + cxm + ' ' + (H / 2) + ')">' + esc(b.name) + '</text>';
+  // PCB body + inner silk edge + mounting holes
+  s += '<rect x="' + BODY_X + '" y="6" width="' + BODY_W + '" height="' + (H - 12) + '" rx="12" fill="#0e3b2c" stroke="#1f8a63" stroke-width="1.5"/>';
+  s += '<rect x="' + (BODY_X + 4) + '" y="10" width="' + (BODY_W - 8) + '" height="' + (H - 20) + '" rx="9" fill="none" stroke="#0a2a20"/>';
+  s += '<circle cx="' + (BODY_X + 14) + '" cy="20" r="4" fill="#0d1117" stroke="#1f8a63"/>';
+  s += '<circle cx="' + (BODY_X + BODY_W - 14) + '" cy="20" r="4" fill="#0d1117" stroke="#1f8a63"/>';
+  // USB connector at the top
+  s += '<rect x="' + (CXM - 17) + '" y="2" width="34" height="13" rx="2" fill="#aab2bd" stroke="#6b7480"/>';
+  s += '<rect x="' + (CXM - 12) + '" y="5" width="24" height="7" rx="1" fill="#5b636b"/>';
+  // module can (metal shield) + WiFi antenna + board name
+  var mTop = TOP - 16, mBot = H - 24, mx1 = 142, mx2 = 238, mcx = (mx1 + mx2) / 2, mcy = (mTop + mBot) / 2;
+  s += '<polyline points="' + (mcx-16) + ',' + (mTop-9) + ' ' + (mcx-8) + ',' + (mTop-3) + ' ' + mcx + ',' + (mTop-9) + ' ' + (mcx+8) + ',' + (mTop-3) + ' ' + (mcx+16) + ',' + (mTop-9) + '" fill="none" stroke="#d4af37" stroke-width="1.5"/>';
+  s += '<rect x="' + mx1 + '" y="' + mTop + '" width="' + (mx2-mx1) + '" height="' + (mBot-mTop) + '" rx="3" fill="#2b3138" stroke="#11151a"/>';
+  s += '<rect x="' + (mx1+5) + '" y="' + (mTop+5) + '" width="' + (mx2-mx1-10) + '" height="' + (mBot-mTop-10) + '" rx="2" fill="none" stroke="#3c444d"/>';
+  s += '<text x="' + mcx + '" y="' + mcy + '" fill="#9aa6b0" font-size="11" font-weight="600" text-anchor="middle" transform="rotate(-90 ' + mcx + ' ' + mcy + ')">' + esc(b.name) + '</text>';
+  // pin pads
   var i, y;
   for (i = 0; i < L.length; i++){ y = TOP + i * ROW; s += padSvg('L', L[i], y, assign); }
   for (i = 0; i < R.length; i++){ y = TOP + i * ROW; s += padSvg('R', R[i], y, assign); }
