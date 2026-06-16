@@ -664,7 +664,7 @@ function loadVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['lumigate_v3','esp32s3-devkitc-1','esp32-devkitc'];
+var BUILTINS = ['lumigate_v3','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://tombueng.github.io/LumiGate/boards/';
 
 // Chip families — used when no full board descriptor is selected (Custom).
@@ -716,6 +716,20 @@ function e32cols(){
   return [ E32L.map(function(g){ return P(g, e32silk(g), e32flags(g)); }),
            E32R.map(function(g){ return P(g, e32silk(g), e32flags(g)); }) ];
 }
+// ESP32 DevKit v1 (DOIT, 30-pin) — narrower; flash pins (6-11) NOT broken out.
+var E32_30L = [36,39,34,35,32,33,25,26,27,14,12,13];
+var E32_30R = [23,22,1,3,21,19,18,5,17,16,4,0,2,15];
+function e32cols30(){
+  return [ E32_30L.map(function(g){ return P(g, e32silk(g), e32flags(g)); }),
+           E32_30R.map(function(g){ return P(g, e32silk(g), e32flags(g)); }) ];
+}
+// Seeed XIAO ESP32-S3 — tiny board, D0..D10 silk labels ([gpio, silk]).
+var XIAO_L = [[1,'D0'],[2,'D1'],[3,'D2'],[4,'D3'],[5,'D4'],[6,'D5'],[43,'D6/TX']];
+var XIAO_R = [[44,'D7/RX'],[7,'D8'],[8,'D9'],[9,'D10']];
+function xiaocols(){
+  function m(p){ return P(p[0], p[1], s3flags(p[0], false)); }
+  return [ XIAO_L.map(m), XIAO_R.map(m) ];
+}
 function buildBoards(){
   BOARDS = {};
   BOARDS['lumigate_v3'] = finalizeDesc({ id:'lumigate_v3', name:'LumiGate v3 (ESP32-S3 + W5500)', mcu:'esp32s3',
@@ -726,10 +740,18 @@ function buildBoards(){
     cols:s3cols(false),
     preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:-1}] } });
-  BOARDS['esp32-devkitc'] = finalizeDesc({ id:'esp32-devkitc', name:'ESP32 DevKitC (WROOM-32)', mcu:'esp32',
-    cols:e32cols(),
+  BOARDS['esp32-devkitc'] = finalizeDesc({ id:'esp32-devkitc', name:'ESP32 DevKitC (WROOM-32, 38-pin)', mcu:'esp32',
+    cols:e32cols(), photo:'img/esp32-devkitc.jpg',
     preset:{ ledType:1, ledPin:2, dispType:1, dispsda:21, dispscl:22,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:16, rts:-1}] } });
+  BOARDS['esp32-devkit-v1'] = finalizeDesc({ id:'esp32-devkit-v1', name:'ESP32 DevKit v1 (DOIT, 30-pin)', mcu:'esp32',
+    cols:e32cols30(),
+    preset:{ ledType:1, ledPin:2, dispType:1, dispsda:21, dispscl:22,
+             outputs:[{en:true, uni:0, port:1, tx:17, rx:16, rts:-1}] } });
+  BOARDS['xiao-esp32s3'] = finalizeDesc({ id:'xiao-esp32s3', name:'Seeed XIAO ESP32-S3', mcu:'esp32s3',
+    cols:xiaocols(),
+    preset:{ ledType:0, dispType:1, dispsda:5, dispscl:6,
+             outputs:[{en:true, uni:0, port:1, tx:1, rx:2, rts:-1}] } });
 }
 
 // ---- Which board / family is in effect -------------------------------------

@@ -571,12 +571,23 @@ To make this idiot-proof, **Settings → Hardware board** offers:
 - **Live validation** — duplicate pins, strapping/flash/input-only pins and
   Ethernet-reserved pins are flagged in red/amber before you can save.
 
-The three core boards (LumiGate v3, ESP32 DevKitC, ESP32-S3 DevKitC-1) are built into
-the firmware and work fully offline. Additional/community boards are pulled lazily from
-the online catalog ([web/boards/](web/boards/), served via GitHub Pages) and cached in
-your browser. No network means you still get the built-ins plus manual entry. The board
-diagrams are tiny SVG/JSON descriptors (~7 KB total in flash); board *photos* are an
-online-only overlay, never embedded.
+Five boards are built into the firmware and work fully offline, covering the common
+variants (which are **not** all the same pinout):
+
+| Board | Notes |
+|---|---|
+| LumiGate v3 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
+| ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
+| ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
+| ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
+| Seeed XIAO ESP32-S3 | tiny board, D0-D10 silk |
+
+Additional/community boards are pulled lazily from the online catalog
+([web/boards/](web/boards/), served via GitHub Pages) and cached in your browser. No
+network means you still get the built-ins plus manual entry. The board diagrams are tiny
+SVG/JSON descriptors generated from the pinout data; board *photos* are an optional,
+online-only overlay (own renders or CC0/CC-licensed images, see
+[web/boards/CREDITS.md](web/boards/CREDITS.md)), never embedded in flash.
 
 See [docs/pin-picker.md](docs/pin-picker.md) for the design, the descriptor schema and
 how to add a board.

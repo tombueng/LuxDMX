@@ -16,8 +16,20 @@
     },
     {
       "id": "esp32-devkitc",
-      "name": "ESP32 DevKitC (WROOM-32)",
+      "name": "ESP32 DevKitC (WROOM-32, 38-pin)",
       "mcu": "esp32",
+      "builtin": true
+    },
+    {
+      "id": "esp32-devkit-v1",
+      "name": "ESP32 DevKit v1 (DOIT, 30-pin)",
+      "mcu": "esp32",
+      "builtin": true
+    },
+    {
+      "id": "xiao-esp32s3",
+      "name": "Seeed XIAO ESP32-S3",
+      "mcu": "esp32s3",
       "builtin": true
     }
   ]

@@ -32,9 +32,15 @@ OUT = os.path.join(ROOT, "web", "boards")
 # ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LumiGate v3 module)
 S3L = [4, 5, 6, 7, 15, 16, 17, 18, 8, 19, 20, 3, 46, 9, 10, 11, 12, 13, 14]
 S3R = [21, 47, 48, 45, 0, 35, 36, 37, 38, 39, 40, 41, 42, 44, 43, 2, 1]
-# ESP32 DevKitC (WROOM-32, 38-pin) headers
+# ESP32 DevKitC (WROOM-32, 38-pin) headers — breaks out the flash pins (6-11) too
 E32L = [36, 39, 34, 35, 32, 33, 25, 26, 27, 14, 12, 13, 9, 10, 11]
 E32R = [23, 22, 1, 3, 21, 19, 18, 5, 17, 16, 4, 0, 2, 15, 8, 7, 6]
+# ESP32 DevKit v1 (DOIT, 30-pin) — narrower, does NOT break out the flash pins (6-11)
+E32_30L = [36, 39, 34, 35, 32, 33, 25, 26, 27, 14, 12, 13]
+E32_30R = [23, 22, 1, 3, 21, 19, 18, 5, 17, 16, 4, 0, 2, 15]
+# Seeed XIAO ESP32-S3 — tiny board, silk uses D0..D10 labels (gpio, silk)
+XIAO_L = [(1, "D0"), (2, "D1"), (3, "D2"), (4, "D3"), (5, "D4"), (6, "D5"), (43, "D6/TX")]
+XIAO_R = [(44, "D7/RX"), (7, "D8"), (8, "D9"), (9, "D10")]
 
 
 def s3_silk(g):
@@ -74,6 +80,12 @@ def e32_flags(g):
 def cols(left, right, silk, flag):
     mk = lambda g: {"gpio": g, "silk": silk(g), "flags": flag(g)}
     return [[mk(g) for g in left], [mk(g) for g in right]]
+
+
+def cols_named(left, right, flag):
+    """Columns from explicit (gpio, silk) pairs (boards with custom silk like XIAO)."""
+    mk = lambda p: {"gpio": p[0], "silk": p[1], "flags": flag(p[0])}
+    return [[mk(p) for p in left], [mk(p) for p in right]]
 
 
 def parse_v3():
@@ -133,10 +145,23 @@ def main():
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 18, "rts": -1}]},
         },
         {
-            "id": "esp32-devkitc", "name": "ESP32 DevKitC (WROOM-32)", "mcu": "esp32",
+            "id": "esp32-devkitc", "name": "ESP32 DevKitC (WROOM-32, 38-pin)", "mcu": "esp32",
+            "photo": "img/esp32-devkitc.jpg",  # CC0, Wikimedia Commons (see web/boards/CREDITS.md)
             "cols": cols(E32L, E32R, e32_silk, e32_flags),
             "preset": {"ledType": 1, "ledPin": 2, "dispType": 1, "dispsda": 21, "dispscl": 22,
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
+        },
+        {
+            "id": "esp32-devkit-v1", "name": "ESP32 DevKit v1 (DOIT, 30-pin)", "mcu": "esp32",
+            "cols": cols(E32_30L, E32_30R, e32_silk, e32_flags),
+            "preset": {"ledType": 1, "ledPin": 2, "dispType": 1, "dispsda": 21, "dispscl": 22,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
+        },
+        {
+            "id": "xiao-esp32s3", "name": "Seeed XIAO ESP32-S3", "mcu": "esp32s3",
+            "cols": cols_named(XIAO_L, XIAO_R, lambda g: s3_flags(g, set())),
+            "preset": {"ledType": 0, "dispType": 1, "dispsda": 5, "dispscl": 6,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 1, "rx": 2, "rts": -1}]},
         },
     ]
 
@@ -149,8 +174,8 @@ def main():
     index = {
         "schema": 1,
         "updated": "auto",
-        "boards": [{"id": b["id"], "name": b["name"], "mcu": b["mcu"],
-                    "builtin": b["id"] in ("lumigate_v3", "esp32s3-devkitc-1", "esp32-devkitc")}
+        # "builtin" = also baked into src/pages/config.html (works fully offline)
+        "boards": [{"id": b["id"], "name": b["name"], "mcu": b["mcu"], "builtin": True}
                    for b in boards],
     }
     with open(os.path.join(OUT, "index.json"), "w", encoding="utf-8") as fh:

@@ -1,8 +1,7 @@
 {
-  "id": "esp32-devkitc",
-  "name": "ESP32 DevKitC (WROOM-32, 38-pin)",
+  "id": "esp32-devkit-v1",
+  "name": "ESP32 DevKit v1 (DOIT, 30-pin)",
   "mcu": "esp32",
-  "photo": "img/esp32-devkitc.jpg",
   "cols": [
     [
       {
@@ -74,27 +73,6 @@
         "gpio": 13,
         "silk": "IO13",
         "flags": []
-      },
-      {
-        "gpio": 9,
-        "silk": "IO9",
-        "flags": [
-          "flash"
-        ]
-      },
-      {
-        "gpio": 10,
-        "silk": "IO10",
-        "flags": [
-          "flash"
-        ]
-      },
-      {
-        "gpio": 11,
-        "silk": "IO11",
-        "flags": [
-          "flash"
-        ]
       }
     ],
     [
@@ -178,27 +156,6 @@
         "silk": "IO15",
         "flags": [
           "strapping"
-        ]
-      },
-      {
-        "gpio": 8,
-        "silk": "IO8",
-        "flags": [
-          "flash"
-        ]
-      },
-      {
-        "gpio": 7,
-        "silk": "IO7",
-        "flags": [
-          "flash"
-        ]
-      },
-      {
-        "gpio": 6,
-        "silk": "IO6",
-        "flags": [
-          "flash"
         ]
       }
     ]
