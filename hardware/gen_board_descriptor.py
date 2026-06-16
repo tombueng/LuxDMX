@@ -140,8 +140,9 @@ FEAS3_FRITZING = {
         {"gpio":11,"silk":"D11","x":86.04,"y":3.6}, {"gpio":10,"silk":"D10","x":93.24,"y":3.6},
         {"gpio":9,"silk":"D9","x":100.44,"y":3.6}, {"gpio":6,"silk":"D6","x":107.64,"y":3.6},
         {"gpio":5,"silk":"D5","x":114.84,"y":3.6}, {"gpio":3,"silk":"SDA","x":129.24,"y":3.6},
-        {"gpio":4,"silk":"SCL","x":122.04,"y":3.6}, {"gpio":3,"silk":"SDA","x":6.3,"y":8.51},
-        {"gpio":4,"silk":"SCL","x":2.08,"y":8.51},
+        {"gpio":4,"silk":"SCL","x":122.04,"y":3.6},
+        # NB: the board also has a STEMMA QT I2C connector (same GPIO3/4) on the left edge;
+        # omitted as a hotspot to avoid a confusing duplicate of SDA/SCL.
     ],
 }
 # Adafruit QT Py ESP32-S3
