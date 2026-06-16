@@ -48,6 +48,7 @@
 #include "generated/ota_progress_html.h"
 #include "generated/ota_done_html.h"
 #include "generated/logo_png.h"
+#include "generated/favicon_svg.h"
 #include "generated/bootstrap_min_css.h"
 
 // ---------------------------------------------------------------------------
@@ -1531,6 +1532,12 @@ static void handleLogo(AsyncWebServerRequest* req) {
     req->send(r);
 }
 
+static void handleFavicon(AsyncWebServerRequest* req) {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/svg+xml", FAVICON_SVG, FAVICON_SVG_LEN);
+    r->addHeader("Cache-Control", "max-age=604800");
+    req->send(r);
+}
+
 static void handleBootstrapCss(AsyncWebServerRequest* req) {
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/css", BOOTSTRAP_MIN_CSS, BOOTSTRAP_MIN_CSS_LEN);
     r->addHeader("Content-Encoding", "gzip");
@@ -2226,6 +2233,8 @@ void setup() {
     if (cfg.protocol != 0) startSacn();
 
     http.on("/logo.png",          HTTP_GET,  handleLogo);
+    http.on("/favicon.svg",       HTTP_GET,  handleFavicon);
+    http.on("/favicon.ico",       HTTP_GET,  handleFavicon);
     http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
     http.on("/",                  HTTP_GET,  handleRoot);
     http.on("/dmx.json",          HTTP_GET,  handleDmxJson);
