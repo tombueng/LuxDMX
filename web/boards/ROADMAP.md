@@ -63,9 +63,26 @@ locally). **Fritzing** = real CC-BY-SA board graphic to research next (✓/✗/?
 - **Pin layout vs functional grouping**: DevKit-class boards get true physical column
   layouts; compact/named-pin boards (Feather, QtPy, XIAO) use the functional pad set with
   accurate GPIOs (physical placement approximate).
-- **Fritzing column** is filled in the next step: for each board, find an official
-  CC-BY-SA Fritzing part, verify provenance, and (if clean) add the graphic as an
-  online-only overlay with attribution in [CREDITS.md](CREDITS.md). The board-style SVG
-  remains the always-available, MIT-clean default.
+- **Fritzing graphics** (optional online-only overlay) come from these license-clean
+  sources, all CC-BY-SA, no non-commercial clause (usable in our MIT project with
+  attribution; keep the SVG unmodified + overlay hotspots separately):
+
+  | Source | License | Covers |
+  |---|---|---|
+  | Fritzing core parts (`fritzing/fritzing-parts`) | CC BY-SA 3.0 | generic ESP32 DevKitC / WROOM-32 |
+  | Adafruit `Fritzing-Library` | CC BY-SA 3.0 | HUZZAH32, Feather ESP32 V2, Feather ESP32-S3, QT Py ESP32-S3, Metro ESP32-S3 |
+  | SparkFun `Fritzing_Parts` | CC BY-SA 4.0 (gfx) / MIT (code) | ESP32 Thing, Thing Plus, ESP32-S3 Thing Plus, IoT RedBoard |
+
+  The remaining vendors (WEMOS/LOLIN, Unexpected Maker, LilyGO, Heltec, M5Stack,
+  Olimex, wESP32, DOIT, NodeMCU) are community/vendor parts with **varied or unstated**
+  licensing, so each needs per-part provenance verification before use (or stays
+  SVG-only). The board-style SVG remains the always-available, MIT-clean default for
+  every board.
+
+- **Display pre-config**: boards with a built-in display set the firmware display
+  preset on template apply. Supported: **SSD1306/SH1106 (mono I2C)** and **SSD1351
+  (colour SPI)** -> e.g. Heltec WiFi Kit 32 (SSD1306) is pre-configured. NOT yet
+  supported: **ST7789 / ILI9342 TFTs** (LilyGO T-Display(-S3), M5Stack) -> those leave
+  the display off with a note until firmware TFT support is added (separate feature).
 
 Done so far: **10** descriptors (5 built-in offline + 5 catalog). Target list above: ~35.
