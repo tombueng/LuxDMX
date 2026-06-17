@@ -85,4 +85,13 @@ locally). **Fritzing** = real CC-BY-SA board graphic to research next (✓/✗/?
   supported: **ST7789 / ILI9342 TFTs** (LilyGO T-Display(-S3), M5Stack) -> those leave
   the display off with a note until firmware TFT support is added (separate feature).
 
-Done so far: **10** descriptors (5 built-in offline + 5 catalog). Target list above: ~35.
+Status: **12** descriptors (5 built-in offline + 7 catalog). **Realistic Fritzing
+graphics** (with click hotspots + assignment callouts) on **5** boards, all license-clean
+and GPIO-verified against `pins_arduino.h`:
+- Adafruit (CC BY-SA 3.0): Feather ESP32-S3, Feather ESP32 V2, QT Py ESP32-S3
+- SparkFun (CC BY-SA 4.0): ESP32 Thing, ESP32 Thing Plus
+
+Deferred Fritzing (board-style SVG works for them now): **HUZZAH32, Metro ESP32-S3** wrap
+their pins in transformed SVG groups, so they need transform-aware coordinate resolution
++ a visual check before their hotspots can be trusted. Every board always has the
+generated, license-free board-style SVG. Target list above: ~35.
