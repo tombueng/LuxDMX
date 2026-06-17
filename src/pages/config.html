@@ -67,6 +67,13 @@ footer a:hover { color:var(--gh-text); }
     <div class="card mb-3">
       <div class="card-header">Network</div>
       <div class="card-body">
+        <div id="net-mode-row" class="mb-3" style="display:none">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="useeth" id="useeth-sw" value="1">
+            <label class="form-check-label small" for="useeth-sw">Use wired Ethernet (W5500) instead of WiFi</label>
+          </div>
+          <div class="form-text">Off = WiFi (default). On = wired Ethernet via the RJ45 jack. Applied after reboot; reconnect at the new address.</div>
+        </div>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" name="staticip" id="static-sw" value="1">
           <label class="form-check-label small" for="static-sw">Use static IP (otherwise DHCP)</label>
@@ -464,6 +471,8 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   CURRENT = d.version || '';
   $('cur-ver').textContent = 'v' + CURRENT;
   $('proto-sel').value = d.protocol;
+  $('useeth-sw').checked = !!d.useEthernet;
+  if (d.ethSpi) $('net-mode-row').style.display = '';
   $('static-sw').checked = !!d.staticIp;
   $('net-ip').value  = d.sip || '';
   $('net-gw').value  = d.gateway || '';
