@@ -40,7 +40,21 @@ jobs:
 
       - name: Build firmware
         run: |
-          pio run -e esp32dev
+          # pioarduino 55.03.39's Xtensa toolchain archive carries a stray top-level
+          # package.json that aborts idf_tools.py (do_strip_container_dirs:
+          # "expected 1 entry, got ['package.json', ...]"), leaving the compiler
+          # uninstalled. Patch the install-time idf_tools.py to ignore that file.
+          # tool-esp_install is downloaded *before* it runs the strip, so if the
+          # first build aborts on it we patch the now-present file and retry.
+          patch_idf_tools() {
+            while IFS= read -r f; do
+              sed -i "s|^\([[:space:]]*\)contents = os\.listdir(base_path)\$|\1contents = [c for c in os.listdir(base_path) if c != 'package.json']|" "$f"
+              echo "patched $f"
+            done < <(find ~/.platformio -path '*tool-esp_install*idf_tools.py' 2>/dev/null)
+          }
+          patch_idf_tools   # no-op if tool-esp_install isn't downloaded yet
+
+          pio run -e esp32dev || { patch_idf_tools; pio run -e esp32dev; }
           cp .pio/build/esp32dev/firmware.bin   firmware.bin
           cp .pio/build/esp32dev/bootloader.bin bootloader.bin
           cp .pio/build/esp32dev/partitions.bin partitions.bin
