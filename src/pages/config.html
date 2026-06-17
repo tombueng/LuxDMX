@@ -1031,59 +1031,44 @@ function renderFritzing(){
     var W = vb[2] || 147, H = vb[3] || 65;
     var inner = svg.replace(/^[\s\S]*?<svg\b[^>]*>/, '').replace(/<\/svg>\s*$/, '');
     var FONT = 3.3, GAP = 5.2, estW = function(t){ return t.length * FONT * 0.55 + 3; };
-    var xs = fz.hotspots.map(function(h){ return h.x; }), ys = fz.hotspots.map(function(h){ return h.y; });
-    var minX = Math.min.apply(0, xs), maxX = Math.max.apply(0, xs), minY = Math.min.apply(0, ys), maxY = Math.max.apply(0, ys);
-    // Orientation from the pin layout itself, not the bounding box (a near-square board
-    // like the QT Py has spanX≈spanY but its pins sit in two vertical columns). If the pins
-    // take fewer distinct x-positions than y-positions they form vertical columns -> portrait
-    // (callouts left/right); otherwise they form horizontal rows -> landscape (top/bottom).
+    // Always show the board horizontally: pins along the top/bottom, labels above/below.
+    // If the part's pins sit in vertical columns (fewer distinct x than y positions), rotate
+    // the whole graphic 90° so the columns become horizontal rows.
     var nx = {}, ny = {};
     fz.hotspots.forEach(function(h){ nx[Math.round(h.x)] = 1; ny[Math.round(h.y)] = 1; });
-    var portrait = Object.keys(nx).length < Object.keys(ny).length;
-    var midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
+    var rot = Object.keys(nx).length < Object.keys(ny).length;
+    var DW = rot ? H : W, DH = rot ? W : H, midY = DH / 2;        // displayed (landscape) size
+    var disp = function(h){ return rot ? { x: H - h.y, y: h.x } : { x: h.x, y: h.y }; };
+    // assigned callouts in top/bottom bands, stacked to avoid horizontal overlap
     var A = [];
-    fz.hotspots.forEach(function(h){ var u = assign[h.gpio]; if (u) A.push({ x:h.x, y:h.y, gpio:h.gpio, text: u.map(calloutLabel).join(', ') + ' ·G' + h.gpio }); });
-    var TOPM = 4, BOTM = 4, LEFTM = 4, RIGHTM = 4;
-    if (portrait){
-      var wl = 4, wr = 4;
-      A.forEach(function(p){ if (p.x < midX) wl = Math.max(wl, estW(p.text)); else wr = Math.max(wr, estW(p.text)); });
-      LEFTM = wl + 6; RIGHTM = wr + 6;
-    } else {
-      ['T','B'].forEach(function(s){
-        var list = A.filter(function(p){ return s === 'T' ? p.y < midY : p.y >= midY; }).sort(function(a,c){ return a.x - c.x; });
-        var end = [];
-        list.forEach(function(p){ var w = estW(p.text), L = p.x - w/2, r = 0; while (r < end.length && end[r] > L - 1.5) r++; end[r] = p.x + w/2; p.row = r; });
-        var need = end.length ? end.length * GAP + 7 : 4;
-        if (s === 'T') TOPM = need; else BOTM = need;
-      });
-    }
-    var DX = LEFTM, DY = TOPM, OW = W + LEFTM + RIGHTM, OH = H + TOPM + BOTM;
+    fz.hotspots.forEach(function(h){ var u = assign[h.gpio]; if (u){ var p = disp(h); A.push({ x:p.x, y:p.y, gpio:h.gpio, text: u.map(calloutLabel).join(', ') + ' ·G' + h.gpio }); } });
+    var TOPM = 4, BOTM = 4;
+    ['T','B'].forEach(function(s){
+      var list = A.filter(function(p){ return s === 'T' ? p.y < midY : p.y >= midY; }).sort(function(a,c){ return a.x - c.x; });
+      var end = [];
+      list.forEach(function(p){ var w = estW(p.text), L = p.x - w/2, r = 0; while (r < end.length && end[r] > L - 1.5) r++; end[r] = p.x + w/2; p.row = r; });
+      var need = end.length ? end.length * GAP + 7 : 4;
+      if (s === 'T') TOPM = need; else BOTM = need;
+    });
+    var DX = 4, DY = TOPM, OW = DW + 8, OH = DH + TOPM + BOTM;
+    var boardT = rot ? ('translate(' + (DX + H) + ',' + DY + ') rotate(90)') : ('translate(' + DX + ',' + DY + ')');
     function dot(h){
       var fl = (b.byGpio[h.gpio] && b.byGpio[h.gpio].flags) || [], u = assign[h.gpio];
-      var col = u ? '#58a6ff' : statusColor(padClass(fl));
+      var col = u ? '#58a6ff' : statusColor(padClass(fl)), p = disp(h);
       var tip = 'GPIO' + h.gpio + ' (' + h.silk + ')' + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (u ? ' — ' + u.map(roleLabel).join(', ') : '');
       return '<g class="fzhot" data-gpio="' + h.gpio + '"><title>' + esc(tip) + '</title>'
-        + '<circle cx="' + (h.x + DX) + '" cy="' + (h.y + DY) + '" r="2.7" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '" stroke-width="' + (u ? 1.3 : 0.8) + '"/></g>';
+        + '<circle cx="' + (DX + p.x) + '" cy="' + (DY + p.y) + '" r="2.7" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '" stroke-width="' + (u ? 1.3 : 0.8) + '"/></g>';
     }
     function callout(p){
-      var px = p.x + DX, py = p.y + DY, lx, ly, anc, x2, y2;
-      if (portrait){
-        var lft = p.x < midX; ly = py + 1; anc = lft ? 'end' : 'start';
-        lx = lft ? (DX - 4) : (DX + W + 4); x2 = lft ? (DX - 2.5) : (DX + W + 2.5); y2 = py;
-      } else {
-        var top = p.y < midY; anc = 'middle'; lx = px;
-        ly = top ? (DY - 5 - p.row * GAP) : (DY + H + 7 + p.row * GAP);
-        x2 = px; y2 = top ? ly + 1.2 : ly - 3.4;
-      }
-      return '<line x1="' + px + '" y1="' + py + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#58a6ff" stroke-width="0.5"/>'
-        + '<text x="' + lx + '" y="' + ly + '" text-anchor="' + anc + '" font-size="' + FONT + '" font-weight="600" fill="#58a6ff">' + esc(p.text) + '</text>';
+      var px = DX + p.x, py = DY + p.y, top = p.y < midY;
+      var ly = top ? (DY - 5 - p.row * GAP) : (DY + DH + 7 + p.row * GAP), y2 = top ? ly + 1.2 : ly - 3.4;
+      return '<line x1="' + px + '" y1="' + py + '" x2="' + px + '" y2="' + y2 + '" stroke="#58a6ff" stroke-width="0.5"/>'
+        + '<text x="' + px + '" y="' + ly + '" text-anchor="middle" font-size="' + FONT + '" font-weight="600" fill="#58a6ff">' + esc(p.text) + '</text>';
     }
     // Fixed scale (px per viewBox unit) so pins + labels are the SAME size on every board.
-    // All Fritzing breadboard SVGs share the 0.1" grid (7.2 units/pin), so a constant
-    // scale keeps pin size identical; bigger boards simply render larger (container scrolls).
     var FZSCALE = 3.5;
     var out = '<svg class="fzsvg" width="' + Math.round(OW * FZSCALE) + '" viewBox="0 0 ' + OW + ' ' + OH + '" preserveAspectRatio="xMidYMid meet">'
-      + '<g transform="translate(' + DX + ',' + DY + ')">' + inner + '</g>'
+      + '<g transform="' + boardT + '">' + inner + '</g>'
       + fz.hotspots.map(dot).join('') + A.map(callout).join('') + '</svg>';
     wrap.innerHTML = '<div class="fzwrap">' + out + '</div>'
       + '<div class="text-secondary small mt-1">Graphic: ' + esc(fz.credit || 'Fritzing') + ' · blue callouts = your assignments</div>';
