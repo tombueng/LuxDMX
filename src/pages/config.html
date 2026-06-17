@@ -1033,9 +1033,14 @@ function renderFritzing(){
     var FONT = 3.3, GAP = 5.2, estW = function(t){ return t.length * FONT * 0.55 + 3; };
     var xs = fz.hotspots.map(function(h){ return h.x; }), ys = fz.hotspots.map(function(h){ return h.y; });
     var minX = Math.min.apply(0, xs), maxX = Math.max.apply(0, xs), minY = Math.min.apply(0, ys), maxY = Math.max.apply(0, ys);
-    // portrait boards (SparkFun Thing) carry pins in left/right columns -> callouts go
-    // left/right; landscape boards (Feather) carry pins in top/bottom rows -> top/bottom.
-    var portrait = (maxY - minY) > (maxX - minX), midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
+    // Orientation from the pin layout itself, not the bounding box (a near-square board
+    // like the QT Py has spanX≈spanY but its pins sit in two vertical columns). If the pins
+    // take fewer distinct x-positions than y-positions they form vertical columns -> portrait
+    // (callouts left/right); otherwise they form horizontal rows -> landscape (top/bottom).
+    var nx = {}, ny = {};
+    fz.hotspots.forEach(function(h){ nx[Math.round(h.x)] = 1; ny[Math.round(h.y)] = 1; });
+    var portrait = Object.keys(nx).length < Object.keys(ny).length;
+    var midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
     var A = [];
     fz.hotspots.forEach(function(h){ var u = assign[h.gpio]; if (u) A.push({ x:h.x, y:h.y, gpio:h.gpio, text: u.map(calloutLabel).join(', ') + ' ·G' + h.gpio }); });
     var TOPM = 4, BOTM = 4, LEFTM = 4, RIGHTM = 4;
