@@ -13,9 +13,9 @@ locally). **Fritzing** = real CC-BY-SA board graphic to research next (✓/✗/?
 
 | # | Board | Variant | Status | Fritzing |
 |---|---|---|---|---|
-| 1 | ESP32 DevKitC V4 (WROOM-32, 38-pin) | `esp32` | done | ? |
-| 2 | DOIT ESP32 DevKit v1 (30-pin) | `doitESP32devkitV1` | done | ? |
-| 3 | NodeMCU-32S | `nodemcu-32s` | done | ? |
+| 1 | ESP32 DevKitC V4 (WROOM-32, 38-pin) | `esp32` | done | ✓ own render |
+| 2 | DOIT ESP32 DevKit v1 (30-pin) | `doitESP32devkitV1` | done | ✓ own render |
+| 3 | NodeMCU-32S | `nodemcu-32s` | done | ✓ own render |
 | 4 | WEMOS LOLIN D32 | `d32` | plan | ? |
 | 5 | WEMOS LOLIN D32 Pro | `d32_pro` | plan | ? |
 | 6 | WEMOS LOLIN32 | `lolin32` | plan | ? |
@@ -38,7 +38,7 @@ locally). **Fritzing** = real CC-BY-SA board graphic to research next (✓/✗/?
 | # | Board | Variant | Status | Fritzing |
 |---|---|---|---|---|
 | 20 | LumiGate v3 (S3 + W5500) | (PCB source) | done | ✓ own render |
-| 21 | ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | done | ? |
+| 21 | ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | done | ✓ own render |
 | 22 | ESP32-S3 DevKitM-1 (MINI) | (custom) | plan | ? |
 | 23 | Seeed XIAO ESP32-S3 | `XIAO_ESP32S3` | done | ? |
 | 24 | Adafruit Feather ESP32-S3 | `adafruit_feather_esp32s3` | done | ? |
@@ -85,11 +85,15 @@ locally). **Fritzing** = real CC-BY-SA board graphic to research next (✓/✗/?
   supported: **ST7789 / ILI9342 TFTs** (LilyGO T-Display(-S3), M5Stack) -> those leave
   the display off with a note until firmware TFT support is added (separate feature).
 
-Status: **12** descriptors (5 built-in offline + 7 catalog). **Realistic Fritzing
-graphics** (with click hotspots + assignment callouts) on **5** boards, all license-clean
+Status: **12** descriptors (5 built-in offline + 7 catalog). **Realistic board
+graphics** (with click hotspots + assignment callouts) on **9** boards, all license-clean
 and GPIO-verified against `pins_arduino.h`:
-- Adafruit (CC BY-SA 3.0): Feather ESP32-S3, Feather ESP32 V2, QT Py ESP32-S3
-- SparkFun (CC BY-SA 4.0): ESP32 Thing, ESP32 Thing Plus
+- Adafruit Fritzing (CC BY-SA 3.0): Feather ESP32-S3, Feather ESP32 V2, QT Py ESP32-S3
+- SparkFun Fritzing (CC BY-SA 4.0): ESP32 Thing, ESP32 Thing Plus
+- **Own MIT render** (drawn by `own_board_graphic()` in `gen_board_descriptor.py`, exact
+  hotspots since we place the pads): ESP32 DevKitC, ESP32 DevKit v1 (DOIT), NodeMCU-32S,
+  ESP32-S3 DevKitC-1. These are the most widespread DevKit-class boards, for which no
+  clean-license Fritzing part exists.
 
 Deferred Fritzing (board-style SVG works for them now): **HUZZAH32, Metro ESP32-S3** wrap
 their pins in transformed SVG groups, so they need transform-aware coordinate resolution

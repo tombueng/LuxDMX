@@ -7,6 +7,10 @@ The optional, online-only board **photos** come from these sources:
 |---|---|---|---|
 | `img/lumigate-v3.png` | LumiGate v3 | our own KiCad render (`hardware/board-pcb-1.png`) | project (MIT, same as repo) |
 | `img/esp32-devkitc.jpg` | ESP32 DevKitC (WROOM-32) | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg) by Ubahnverleih | CC0 1.0 (public domain) |
+| `fritzing/esp32-devkitc.svg` | ESP32 DevKitC (WROOM-32) interactive board graphic | our own drawn SVG (`own_board_graphic()` in `hardware/gen_board_descriptor.py`) | project (MIT, same as repo) |
+| `fritzing/esp32-devkit-v1.svg` | ESP32 DevKit v1 (DOIT) | our own drawn SVG (`own_board_graphic()`) | project (MIT, same as repo) |
+| `fritzing/nodemcu-32s.svg` | NodeMCU-32S | our own drawn SVG (`own_board_graphic()`) | project (MIT, same as repo) |
+| `fritzing/esp32s3-devkitc-1.svg` | ESP32-S3 DevKitC-1 | our own drawn SVG (`own_board_graphic()`) | project (MIT, same as repo) |
 | `fritzing/adafruit-feather-esp32s3.svg` | Adafruit Feather ESP32-S3 (interactive "realistic board" graphic) | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified; click hotspots are a separate overlay) | CC BY-SA 3.0 |
 | `fritzing/adafruit-feather-esp32-v2.svg` | Adafruit Feather ESP32 V2 | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified) | CC BY-SA 3.0 |
 | `fritzing/adafruit-qtpy-esp32s3.svg` | Adafruit QT Py ESP32-S3 | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified) | CC BY-SA 3.0 |

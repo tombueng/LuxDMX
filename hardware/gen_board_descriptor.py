@@ -149,6 +149,47 @@ FEAV2_R = [(13,"D13"),(20,"SCL"),(22,"SDA"),(0,"NEO")]
 named = lambda gs, silk: [(g, silk(g)) for g in gs]
 
 
+def own_board_graphic(b):
+    """Draw our own license-free (MIT) realistic board SVG for DevKit-class boards that have
+    no clean Fritzing part (generic ESP32/-S3 DevKitC, DOIT, NodeMCU): a PCB with a USB jack,
+    a WROOM module and two 0.1" header rows of gold pads. Uses the same 0.1"-grid units as the
+    Fritzing SVGs so pin size stays consistent across boards. Returns the fritzing-style block;
+    hotspot coordinates are exact because we place the pads ourselves."""
+    top, bot = b["cols"][0], b["cols"][1]
+    PITCH, LM, RM, H, yTop, yBot = 7.2, 17.0, 8.0, 58.0, 9.0, 49.0
+    n = max(len(top), len(bot))
+    W = LM + (n - 1) * PITCH + RM
+    module = "ESP32-S3-WROOM-1" if b.get("mcu") == "esp32s3" else "ESP32-WROOM-32"
+    mx1, mx2, my1, my2 = LM - 5, W - RM + 3, yTop + 7, yBot - 7
+    s = ['<rect x="1" y="1" width="%.1f" height="%.1f" rx="6" fill="#0e3b2c" stroke="#1f8a63" stroke-width="0.8"/>' % (W - 2, H - 2),
+         '<rect x="3" y="3" width="%.1f" height="%.1f" rx="5" fill="none" stroke="#0a2a20" stroke-width="0.5"/>' % (W - 6, H - 6),
+         '<rect x="-2" y="%.1f" width="9" height="13" rx="1" fill="#aab2bd" stroke="#6b7480" stroke-width="0.4"/>' % (H / 2 - 6.5),
+         '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="2" fill="#3a4047" stroke="#11151a" stroke-width="0.6"/>' % (mx1, my1, mx2 - mx1, my2 - my1),
+         '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="1.5" fill="none" stroke="#565d66" stroke-width="0.4"/>' % (mx1 + 2, my1 + 2, mx2 - mx1 - 4, my2 - my1 - 4),
+         '<text x="%.1f" y="%.1f" fill="#aeb6bf" font-size="4.5" font-weight="600" text-anchor="middle" font-family="sans-serif">%s</text>' % ((mx1 + mx2) / 2, (my1 + my2) / 2 + 1.6, module)]
+    hot = []
+    for cx, cy in ((6, 6), (W - 6, 6), (6, H - 6), (W - 6, H - 6)):
+        s.append('<circle cx="%.1f" cy="%.1f" r="2" fill="#0d1117" stroke="#1f8a63" stroke-width="0.4"/>' % (cx, cy))
+    def row(pins, y, below):
+        for i, p in enumerate(pins):
+            x = LM + i * PITCH
+            s.append('<rect x="%.1f" y="%.1f" width="5" height="5" rx="0.8" fill="#d4af37" stroke="#8a6d1a" stroke-width="0.4"/>' % (x - 2.5, y - 2.5))
+            s.append('<circle cx="%.1f" cy="%.1f" r="1.3" fill="#0d1117"/>' % (x, y))
+            ly = (y + 5) if below else (y - 5)
+            anc = "start" if below else "end"
+            s.append('<text x="%.1f" y="%.1f" fill="#cdd6df" font-size="3" font-family="sans-serif" text-anchor="%s" transform="rotate(-90 %.1f %.1f)">%s</text>'
+                     % (x + 1, ly, anc, x + 1, ly, p["silk"]))
+            hot.append({"gpio": p["gpio"], "silk": p["silk"], "x": round(x, 2), "y": y})
+    row(top, yTop, True)
+    row(bot, yBot, False)
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.1f %.1f">%s</svg>' % (W, H, "".join(s))
+    os.makedirs(os.path.join(OUT, "fritzing"), exist_ok=True)
+    with open(os.path.join(OUT, "fritzing", b["id"] + ".svg"), "w", encoding="utf-8") as fh:
+        fh.write(svg)
+    return {"svg": "fritzing/%s.svg" % b["id"], "viewBox": "0 0 %.1f %.1f" % (W, H),
+            "credit": "LumiGate own render (MIT)", "hotspots": hot}
+
+
 def parse_v3():
     """Read U1['IOxx'] += NET lines from lumigate.py -> {gpio: net}."""
     text = open(os.path.join(HERE, "lumigate.py"), encoding="utf-8").read()
@@ -273,6 +314,14 @@ def main():
         frag = os.path.join(OUT, "fritzing", b["id"] + ".json")
         if os.path.exists(frag):
             b["fritzing"] = json.load(open(frag, encoding="utf-8"))
+
+    # The most widespread DevKit-class boards (generic ESP32/-S3 DevKitC, DOIT, NodeMCU)
+    # have no clean-license Fritzing part. Draw our own MIT realistic board graphic so they
+    # still get the interactive "realistic board" view (only if no Fritzing overlay exists).
+    OWN_GFX = {"esp32-devkitc", "esp32-devkit-v1", "nodemcu-32s", "esp32s3-devkitc-1"}
+    for b in boards:
+        if b["id"] in OWN_GFX and "fritzing" not in b:
+            b["fritzing"] = own_board_graphic(b)
 
     # Fixed on-board wiring (the user CAN change these in /config but normally should not,
     # because they are physically wired on the board). Shown as a hint per board.
