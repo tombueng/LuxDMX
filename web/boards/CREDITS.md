@@ -10,6 +10,8 @@ The optional, online-only board **photos** come from these sources:
 | `fritzing/adafruit-feather-esp32s3.svg` | Adafruit Feather ESP32-S3 (interactive "realistic board" graphic) | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified; click hotspots are a separate overlay) | CC BY-SA 3.0 |
 | `fritzing/adafruit-feather-esp32-v2.svg` | Adafruit Feather ESP32 V2 | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified) | CC BY-SA 3.0 |
 | `fritzing/adafruit-qtpy-esp32s3.svg` | Adafruit QT Py ESP32-S3 | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified) | CC BY-SA 3.0 |
+| `fritzing/sparkfun-esp32-thing.svg` | SparkFun ESP32 Thing | [SparkFun Fritzing_Parts](https://github.com/sparkfun/Fritzing_Parts) (breadboard view, unmodified) | CC BY-SA 4.0 |
+| `fritzing/sparkfun-esp32-thing-plus.svg` | SparkFun ESP32 Thing Plus | [SparkFun Fritzing_Parts](https://github.com/sparkfun/Fritzing_Parts) (breadboard view, unmodified) | CC BY-SA 4.0 |
 
 Notes:
 - `esp32-devkitc.jpg` is downscaled to 800 px from the CC0 original; CC0 requires no

@@ -61,6 +61,18 @@
       "name": "Adafruit Feather ESP32 V2 (PICO)",
       "mcu": "esp32",
       "builtin": false
+    },
+    {
+      "id": "sparkfun-esp32-thing",
+      "name": "SparkFun ESP32 Thing",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "sparkfun-esp32-thing-plus",
+      "name": "SparkFun ESP32 Thing Plus",
+      "mcu": "esp32",
+      "builtin": false
     }
   ]
 }

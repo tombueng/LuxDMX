@@ -1,0 +1,290 @@
+{
+  "id": "sparkfun-esp32-thing-plus",
+  "name": "SparkFun ESP32 Thing Plus",
+  "mcu": "esp32",
+  "cols": [
+    [
+      {
+        "gpio": 23,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 22,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "14",
+        "flags": []
+      },
+      {
+        "gpio": 32,
+        "silk": "32",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "15",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 33,
+        "silk": "33",
+        "flags": []
+      },
+      {
+        "gpio": 27,
+        "silk": "27",
+        "flags": []
+      },
+      {
+        "gpio": 12,
+        "silk": "12",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 13,
+        "silk": "13",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 21,
+        "silk": "21",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "17",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "16",
+        "flags": []
+      },
+      {
+        "gpio": 19,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "SCK",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "A4",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 39,
+        "silk": "A3",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 34,
+        "silk": "A2",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 25,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 26,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "3",
+        "flags": [
+          "serial"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 1,
+    "ledPin": 13,
+    "dispType": 0,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 16,
+        "rts": -1
+      }
+    ]
+  },
+  "fritzing": {
+    "svg": "fritzing/sparkfun-esp32-thing-plus.svg",
+    "viewBox": "0 0 64.8 169.824",
+    "credit": "SparkFun Fritzing_Parts (CC BY-SA 4.0)",
+    "creditUrl": "https://github.com/sparkfun/Fritzing_Parts",
+    "hotspots": [
+      {
+        "gpio": 13,
+        "silk": "13",
+        "x": 3.6,
+        "y": 75.85
+      },
+      {
+        "gpio": 12,
+        "silk": "12",
+        "x": 3.6,
+        "y": 68.65
+      },
+      {
+        "gpio": 27,
+        "silk": "27",
+        "x": 3.6,
+        "y": 61.45
+      },
+      {
+        "gpio": 33,
+        "silk": "33",
+        "x": 3.6,
+        "y": 54.25
+      },
+      {
+        "gpio": 15,
+        "silk": "15",
+        "x": 3.6,
+        "y": 47.05
+      },
+      {
+        "gpio": 32,
+        "silk": "32",
+        "x": 3.6,
+        "y": 39.85
+      },
+      {
+        "gpio": 14,
+        "silk": "14",
+        "x": 3.6,
+        "y": 32.65
+      },
+      {
+        "gpio": 22,
+        "silk": "SCL",
+        "x": 3.6,
+        "y": 25.45
+      },
+      {
+        "gpio": 23,
+        "silk": "SDA",
+        "x": 3.6,
+        "y": 18.25
+      },
+      {
+        "gpio": 3,
+        "silk": "3",
+        "x": 61.2,
+        "y": 111.85
+      },
+      {
+        "gpio": 26,
+        "silk": "A0",
+        "x": 61.2,
+        "y": 97.45
+      },
+      {
+        "gpio": 25,
+        "silk": "A1",
+        "x": 61.2,
+        "y": 90.25
+      },
+      {
+        "gpio": 34,
+        "silk": "A2",
+        "x": 61.2,
+        "y": 83.05
+      },
+      {
+        "gpio": 39,
+        "silk": "A3",
+        "x": 61.2,
+        "y": 75.85
+      },
+      {
+        "gpio": 36,
+        "silk": "A4",
+        "x": 61.2,
+        "y": 68.65
+      },
+      {
+        "gpio": 4,
+        "silk": "A5",
+        "x": 61.2,
+        "y": 61.45
+      },
+      {
+        "gpio": 5,
+        "silk": "SCK",
+        "x": 61.2,
+        "y": 54.25
+      },
+      {
+        "gpio": 18,
+        "silk": "MOSI",
+        "x": 61.2,
+        "y": 47.05
+      },
+      {
+        "gpio": 19,
+        "silk": "MISO",
+        "x": 61.2,
+        "y": 39.85
+      },
+      {
+        "gpio": 16,
+        "silk": "16",
+        "x": 61.2,
+        "y": 32.65
+      },
+      {
+        "gpio": 17,
+        "silk": "17",
+        "x": 61.2,
+        "y": 25.45
+      },
+      {
+        "gpio": 21,
+        "silk": "21",
+        "x": 61.2,
+        "y": 18.25
+      }
+    ]
+  }
+}

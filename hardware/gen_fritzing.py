@@ -113,14 +113,17 @@ def funcmap(variant):
             fm.setdefault(name.upper(), int(val))
     return fm
 
+ALIAS = {"U0TXD": "TX", "U0RXD": "RX", "TXD0": "TX", "RXD0": "RX", "TXD": "TX", "RXD": "RX"}
 def resolve_gpio(name, fm):
     n = name.strip()
     if n.upper() in POWER:
         return None
+    if re.fullmatch(r'\d{1,2}', n):            # bare GPIO number (SparkFun: "13", "4", "0")
+        return int(n)
     m = re.search(r'I(?:O)?(\d+)', n)          # IO13 / I34 / IO4 embedded
     if m:
         return int(m.group(1))
-    key = n.upper().split("/")[0].split("_")[0]  # SDA, A0, SCK, TX, RX, D5 ...
+    key = ALIAS.get(n.upper(), n.upper().split("/")[0].split("_")[0])  # SDA,A0,SCK,TX,RX,D5,U0TXD...
     if key in fm:
         return fm[key]
     if n.upper() in fm:
@@ -166,6 +169,8 @@ def extract(board):
 
 ADAFRUIT = "Adafruit Fritzing-Library (CC BY-SA 3.0)"
 AURL = "https://github.com/adafruit/Fritzing-Library"
+SPARKFUN = "SparkFun Fritzing_Parts (CC BY-SA 4.0)"
+SURL = "https://github.com/sparkfun/Fritzing_Parts"
 FZ = os.path.join(os.environ.get("TMP", r"C:\tmp"), "..", "..", "tmp", "fz")  # C:\tmp\fz
 FZ = r"C:\tmp\fz"
 # Only boards whose breadboard pins sit directly in viewBox space (no transformed pin
@@ -181,6 +186,10 @@ BOARDS = [
      "variant": "adafruit_feather_esp32_v2", "credit": ADAFRUIT, "creditUrl": AURL},
     {"id": "adafruit-qtpy-esp32s3",     "fzpz": os.path.join(FZ, "adafruit-qtpy-esp32s3.fzpz"),
      "variant": "adafruit_qtpy_esp32s3_n4r2", "credit": ADAFRUIT, "creditUrl": AURL},
+    {"id": "sparkfun-esp32-thing",      "fzpz": os.path.join(FZ, "sparkfun-esp32-thing.fzpz"),
+     "variant": "esp32thing", "credit": SPARKFUN, "creditUrl": SURL},
+    {"id": "sparkfun-esp32-thing-plus", "fzpz": os.path.join(FZ, "sparkfun-esp32-thing-plus.fzpz"),
+     "variant": "esp32thing_plus", "credit": SPARKFUN, "creditUrl": SURL},
 ]
 
 if __name__ == "__main__":

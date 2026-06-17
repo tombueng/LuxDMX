@@ -88,6 +88,22 @@ def cols_named(left, right, flag):
     return [[mk(p) for p in left], [mk(p) for p in right]]
 
 
+def fritz_cols(board_id, mcu):
+    """Derive board-style columns from a Fritzing fragment's hotspots: split by x into
+    two header columns, sort top-to-bottom by y, attach the chip-family flags. Keeps the
+    schematic layout consistent with the real board (run gen_fritzing.py first)."""
+    p = os.path.join(OUT, "fritzing", board_id + ".json")
+    if not os.path.exists(p):
+        return [[], []]
+    hs = json.load(open(p, encoding="utf-8"))["hotspots"]
+    flag = (lambda g: s3_flags(g, set())) if mcu == "esp32s3" else e32_flags
+    xs = [h["x"] for h in hs]; midx = (min(xs) + max(xs)) / 2 if xs else 0
+    mk = lambda h: {"gpio": h["gpio"], "silk": h["silk"], "flags": flag(h["gpio"])}
+    left = [mk(h) for h in sorted((h for h in hs if h["x"] < midx), key=lambda h: h["y"])]
+    right = [mk(h) for h in sorted((h for h in hs if h["x"] >= midx), key=lambda h: h["y"])]
+    return [left, right]
+
+
 def wt32_flags(g):
     f = []
     if g == 0:
@@ -237,6 +253,18 @@ def main():
             "cols": cols_named(FEAV2_L, FEAV2_R, e32pico_flags),
             "preset": {"ledType": 2, "ledPin": 0, "dispType": 1, "dispsda": 22, "dispscl": 20,
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 8, "rx": 7, "rts": -1}]},
+        },
+        {
+            "id": "sparkfun-esp32-thing", "name": "SparkFun ESP32 Thing", "mcu": "esp32",
+            "cols": fritz_cols("sparkfun-esp32-thing", "esp32"),
+            "preset": {"ledType": 1, "ledPin": 5, "dispType": 0,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
+        },
+        {
+            "id": "sparkfun-esp32-thing-plus", "name": "SparkFun ESP32 Thing Plus", "mcu": "esp32",
+            "cols": fritz_cols("sparkfun-esp32-thing-plus", "esp32"),
+            "preset": {"ledType": 1, "ledPin": 13, "dispType": 0,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
         },
     ]
 
