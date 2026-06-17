@@ -1977,7 +1977,10 @@ static void dispDrawStatus() {
     gfx->setCursor(0, y); gfx->print("LumiGate");
     { const char* v = FIRMWARE_VERSION; int vw = (int)strlen(v) * 6;
       gfx->setTextColor(col(C_GREY)); gfx->setCursor(W - vw, y); gfx->print(v); }
-    y += rp;
+    // Dual-colour 128x64 OLEDs are yellow rows 0-15 + a ~2px gap + blue rows 16-63.
+    // Keep the title alone in the yellow band and start the body at the seam, so no
+    // line (especially the IP) is sliced across the colour boundary (issue #16).
+    y = 16;
     gfx->setTextColor(col(C_WHITE));
     gfx->setCursor(0, y); gfx->print(up ? netLocalIP().toString() : String("no link"));
     y += rp;
