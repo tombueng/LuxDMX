@@ -1,81 +1,95 @@
 {
-  "id": "sparkfun-esp32-thing-plus",
-  "name": "SparkFun ESP32 Thing Plus",
+  "id": "heltec-wifi-kit-32",
+  "name": "Heltec WiFi Kit 32 (OLED)",
   "mcu": "esp32",
   "cols": [
     [
       {
         "gpio": 0,
-        "silk": "IO0",
-        "flags": [
-          "strapping"
-        ]
-      },
-      {
-        "gpio": 2,
-        "silk": "IO2",
-        "flags": [
-          "strapping"
-        ]
-      },
-      {
-        "gpio": 4,
-        "silk": "A5",
-        "flags": []
-      },
-      {
-        "gpio": 5,
-        "silk": "SCK",
-        "flags": [
-          "strapping"
-        ]
-      },
-      {
-        "gpio": 12,
         "silk": "A11",
         "flags": [
           "strapping"
         ]
       },
       {
+        "gpio": 1,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 2,
+        "silk": "A12",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 3,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "A10",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "SS",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 12,
+        "silk": "A15",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
         "gpio": 13,
-        "silk": "LED",
+        "silk": "A14",
         "flags": []
       },
       {
         "gpio": 14,
-        "silk": "A6",
+        "silk": "A16",
         "flags": []
       },
       {
         "gpio": 15,
-        "silk": "A8",
+        "silk": "A13",
         "flags": [
           "strapping"
         ]
       },
       {
         "gpio": 16,
-        "silk": "RX",
-        "flags": []
-      },
-      {
-        "gpio": 17,
-        "silk": "TX",
+        "silk": "IO16",
         "flags": []
       },
       {
         "gpio": 18,
-        "silk": "MOSI",
+        "silk": "SCK",
         "flags": []
-      }
-    ],
-    [
+      },
       {
         "gpio": 19,
         "silk": "MISO",
         "flags": []
       },
+      {
+        "gpio": 21,
+        "silk": "SDA",
+        "flags": []
+      }
+    ],
+    [
       {
         "gpio": 22,
         "silk": "SCL",
@@ -83,47 +97,64 @@
       },
       {
         "gpio": 23,
-        "silk": "SDA",
+        "silk": "MOSI",
         "flags": []
       },
       {
         "gpio": 25,
-        "silk": "A1",
+        "silk": "LED",
         "flags": []
       },
       {
         "gpio": 26,
-        "silk": "A0",
+        "silk": "A19",
         "flags": []
       },
       {
         "gpio": 27,
-        "silk": "A10",
+        "silk": "A17",
         "flags": []
       },
       {
         "gpio": 32,
-        "silk": "A7",
+        "silk": "A4",
         "flags": []
       },
       {
         "gpio": 33,
-        "silk": "SS",
+        "silk": "A5",
         "flags": []
       },
       {
         "gpio": 34,
-        "silk": "A2",
+        "silk": "A6",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 35,
+        "silk": "A7",
         "flags": [
           "input-only"
         ]
       },
       {
         "gpio": 36,
-        "silk": "A4",
+        "silk": "A0",
         "flags": [
           "input-only"
         ]
+      },
+      {
+        "gpio": 37,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 38,
+        "silk": "A2",
+        "flags": []
       },
       {
         "gpio": 39,
@@ -136,25 +167,25 @@
   ],
   "preset": {
     "ledType": 1,
-    "ledPin": 13,
+    "ledPin": 25,
     "dispType": 1,
-    "dispsda": 23,
-    "dispscl": 22,
+    "dispsda": 4,
+    "dispscl": 15,
     "outputs": [
       {
         "en": true,
         "uni": 0,
         "port": 1,
-        "tx": 17,
-        "rx": 16,
+        "tx": 16,
+        "rx": 5,
         "rts": -1
       }
     ]
   },
-  "_source": "auto from variants/esp32thing_plus/pins_arduino.h",
+  "_source": "auto from variants/heltec_wifi_kit_32/pins_arduino.h",
   "hardwired": [
     {
-      "gpio": 13,
+      "gpio": 25,
       "label": "onboard LED"
     }
   ]

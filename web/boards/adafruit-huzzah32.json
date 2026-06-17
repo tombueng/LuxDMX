@@ -1,6 +1,6 @@
 {
-  "id": "sparkfun-esp32-thing-plus",
-  "name": "SparkFun ESP32 Thing Plus",
+  "id": "adafruit-huzzah32",
+  "name": "Adafruit HUZZAH32 Feather",
   "mcu": "esp32",
   "cols": [
     [
@@ -68,14 +68,14 @@
         "gpio": 18,
         "silk": "MOSI",
         "flags": []
-      }
-    ],
-    [
+      },
       {
         "gpio": 19,
         "silk": "MISO",
         "flags": []
-      },
+      }
+    ],
+    [
       {
         "gpio": 22,
         "silk": "SCL",
@@ -119,6 +119,13 @@
         ]
       },
       {
+        "gpio": 35,
+        "silk": "A13",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
         "gpio": 36,
         "silk": "A4",
         "flags": [
@@ -151,7 +158,7 @@
       }
     ]
   },
-  "_source": "auto from variants/esp32thing_plus/pins_arduino.h",
+  "_source": "auto from variants/feather_esp32/pins_arduino.h",
   "hardwired": [
     {
       "gpio": 13,

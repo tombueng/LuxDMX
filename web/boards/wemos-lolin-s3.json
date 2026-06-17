@@ -1,145 +1,144 @@
 {
-  "id": "adafruit-feather-esp32s3",
-  "name": "Adafruit Feather ESP32-S3",
+  "id": "wemos-lolin-s3",
+  "name": "WEMOS LOLIN S3",
   "mcu": "esp32s3",
   "cols": [
     [
       {
-        "gpio": 18,
+        "gpio": 1,
         "silk": "A0",
         "flags": []
       },
       {
-        "gpio": 17,
+        "gpio": 2,
         "silk": "A1",
         "flags": []
       },
       {
-        "gpio": 16,
-        "silk": "A2",
-        "flags": []
-      },
-      {
-        "gpio": 15,
-        "silk": "A3",
-        "flags": []
-      },
-      {
-        "gpio": 14,
-        "silk": "A4",
-        "flags": []
-      },
-      {
-        "gpio": 8,
-        "silk": "A5",
-        "flags": []
-      },
-      {
-        "gpio": 36,
-        "silk": "SCK",
-        "flags": []
-      },
-      {
-        "gpio": 35,
-        "silk": "MOSI",
-        "flags": []
-      },
-      {
-        "gpio": 37,
-        "silk": "MISO",
-        "flags": []
-      },
-      {
-        "gpio": 38,
-        "silk": "RX",
-        "flags": []
-      },
-      {
-        "gpio": 39,
-        "silk": "TX",
-        "flags": []
-      }
-    ],
-    [
-      {
-        "gpio": 13,
-        "silk": "D13",
-        "flags": []
-      },
-      {
-        "gpio": 12,
-        "silk": "D12",
-        "flags": []
-      },
-      {
-        "gpio": 11,
-        "silk": "D11",
-        "flags": []
-      },
-      {
-        "gpio": 10,
-        "silk": "D10",
-        "flags": []
-      },
-      {
-        "gpio": 9,
-        "silk": "D9",
-        "flags": []
-      },
-      {
-        "gpio": 6,
-        "silk": "D6",
-        "flags": []
-      },
-      {
-        "gpio": 5,
-        "silk": "D5",
-        "flags": []
-      },
-      {
-        "gpio": 4,
-        "silk": "SCL",
-        "flags": []
-      },
-      {
         "gpio": 3,
-        "silk": "SDA",
+        "silk": "A2",
         "flags": [
           "strapping"
         ]
       },
       {
-        "gpio": 33,
-        "silk": "NEO",
+        "gpio": 4,
+        "silk": "A3",
         "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "A4",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "A6",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "A7",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "A8",
+        "flags": []
+      },
+      {
+        "gpio": 10,
+        "silk": "SS",
+        "flags": []
+      },
+      {
+        "gpio": 11,
+        "silk": "MOSI",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 12,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 13,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "A13",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "A14",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "A15",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "A16",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "A17",
+        "flags": []
+      },
+      {
+        "gpio": 41,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 42,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 43,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 44,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
       }
     ]
   ],
   "preset": {
-    "ledType": 2,
-    "ledPin": 33,
+    "ledType": 0,
     "dispType": 1,
-    "dispsda": 3,
-    "dispscl": 4,
+    "dispsda": 42,
+    "dispscl": 41,
     "outputs": [
       {
         "en": true,
         "uni": 0,
         "port": 1,
-        "tx": 5,
-        "rx": 6,
+        "tx": 17,
+        "rx": 18,
         "rts": -1
       }
     ]
   },
-  "hardwired": [
-    {
-      "gpio": 33,
-      "label": "NeoPixel"
-    },
-    {
-      "gpio": 13,
-      "label": "red LED"
-    }
-  ]
+  "_source": "auto from variants/lolin_s3/pins_arduino.h"
 }

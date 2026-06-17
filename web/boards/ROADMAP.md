@@ -1,101 +1,77 @@
-# Board catalog roadmap
+# Board catalog
 
-Target list of the most widespread ESP32 / ESP32-S3 dev boards for the pin picker.
-(The firmware only runs on the **esp32** and **esp32s3** families, so C3/C6/S2/H2/P4
-boards are out of scope.)
+The `/config` pin picker ships a descriptor for every ESP32 / ESP32-S3 board the
+LumiGate firmware can run on. Each descriptor drives a **generated horizontal pin
+diagram** (clickable pads, status colours, assignment callouts) plus a one-click
+"Apply template" pin map. The firmware only runs on the **esp32** and **esp32s3**
+families, so C3/C6/S2/H2/P4 boards are out of scope.
 
-Legend: **Status** done = descriptor shipped · plan = to add. **Variant** = the Arduino
-core `variants/<dir>/pins_arduino.h` we read for authoritative GPIOs (almost all exist
-locally). **Fritzing** = real CC-BY-SA board graphic to research next (✓/✗/? TBD).
 🌐 = wired-Ethernet board (especially relevant for a DMX gateway).
+**Layout** = how the two pin columns are built: *header* = hand-tuned physical header
+order; *auto* = generated from `variants/<dir>/pins_arduino.h` (GPIO numbers / silk /
+flags are real, physical column placement is approximate).
 
 ## ESP32 (classic, Xtensa / WROOM-32 etc.)
 
-| # | Board | Variant | Status | Fritzing |
-|---|---|---|---|---|
-| 1 | ESP32 DevKitC V4 (WROOM-32, 38-pin) | `esp32` | done | ✓ own render |
-| 2 | DOIT ESP32 DevKit v1 (30-pin) | `doitESP32devkitV1` | done | ✓ own render |
-| 3 | NodeMCU-32S | `nodemcu-32s` | done | ✓ own render |
-| 4 | WEMOS LOLIN D32 | `d32` | plan | ? |
-| 5 | WEMOS LOLIN D32 Pro | `d32_pro` | plan | ? |
-| 6 | WEMOS LOLIN32 | `lolin32` | plan | ? |
-| 7 | WEMOS LOLIN32 Lite | `lolin32-lite` | plan | ? |
-| 8 | Adafruit HUZZAH32 Feather | `feather_esp32` | plan | ? |
-| 9 | Adafruit Feather ESP32 V2 (PICO) | `adafruit_feather_esp32_v2` | done | ? |
-| 10 | SparkFun ESP32 Thing | `esp32thing` | plan | ? |
-| 11 | SparkFun ESP32 Thing Plus | `esp32thing_plus` | plan | ? |
-| 12 | LilyGO TTGO T-Display (1.14" TFT) | `lilygo_t_display` | plan | ? |
-| 13 | Heltec WiFi Kit 32 (OLED) | `heltec_wifi_kit_32` | plan | ? |
-| 14 | Heltec WiFi LoRa 32 V3 | `heltec_wifi_lora_32_V3` | plan | ? |
-| 15 | M5Stack Core | `m5stack_core` | plan | ? |
-| 16 | 🌐 WT32-ETH01 (Ethernet, LAN8720) | (custom) | done | ? |
-| 17 | 🌐 Olimex ESP32-POE / POE-ISO | `esp32-poe(-iso)` | plan | ? |
-| 18 | 🌐 Olimex ESP32-Gateway | `esp32-gateway` | plan | ? |
-| 19 | 🌐 wESP32 (PoE) | `wesp32` | plan | ? |
+| Board | Variant | Layout |
+|---|---|---|
+| ESP32 DevKitC V4 (WROOM-32, 38-pin) | `esp32` | header |
+| DOIT ESP32 DevKit v1 (30-pin) | `doitESP32devkitV1` | header |
+| NodeMCU-32S | `nodemcu-32s` | header |
+| WEMOS LOLIN D32 | `d32` | header (30-pin) |
+| WEMOS LOLIN32 | `lolin32` | header (30-pin) |
+| WEMOS LOLIN32 Lite | `lolin32-lite` | header (30-pin) |
+| Adafruit HUZZAH32 Feather | `feather_esp32` | auto |
+| Adafruit Feather ESP32 V2 (PICO) | `adafruit_feather_esp32_v2` | header |
+| SparkFun ESP32 Thing | `esp32thing` | auto |
+| SparkFun ESP32 Thing Plus | `esp32thing_plus` | auto |
+| Heltec WiFi Kit 32 (OLED) | `heltec_wifi_kit_32` | auto · OLED pre-config |
+| 🌐 WT32-ETH01 (Ethernet, LAN8720) | (custom) | header |
+| 🌐 Olimex ESP32-PoE | `esp32-poe` | auto |
+| 🌐 Olimex ESP32-PoE-ISO | `esp32-poe-iso` | auto |
+| 🌐 Olimex ESP32-Gateway | `esp32-gateway` | auto |
+| 🌐 wESP32 (PoE) | `wesp32` | auto |
 
 ## ESP32-S3
 
-| # | Board | Variant | Status | Fritzing |
-|---|---|---|---|---|
-| 20 | LumiGate v3 (S3 + W5500) | (PCB source) | done | ✓ own render |
-| 21 | ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | done | ✓ own render |
-| 22 | ESP32-S3 DevKitM-1 (MINI) | (custom) | plan | ? |
-| 23 | Seeed XIAO ESP32-S3 | `XIAO_ESP32S3` | done | ? |
-| 24 | Adafruit Feather ESP32-S3 | `adafruit_feather_esp32s3` | done | ? |
-| 25 | Adafruit QT Py ESP32-S3 | `adafruit_qtpy_esp32s3_n4r2` | done | ? |
-| 26 | Adafruit Metro ESP32-S3 | `adafruit_metro_esp32s3` | plan | ? |
-| 27 | WEMOS LOLIN S3 | `lolin_s3` | plan | ? |
-| 28 | WEMOS LOLIN S3 Mini | `lolin_s3_mini` | plan | ? |
-| 29 | Unexpected Maker FeatherS3 | `um_feathers3` | plan | ? |
-| 30 | Unexpected Maker ProS3 | `um_pros3` | plan | ? |
-| 31 | Unexpected Maker TinyS3 | `um_tinys3` | plan | ? |
-| 32 | SparkFun ESP32-S3 Thing Plus | `sparkfun_esp32s3_thing_plus` | plan | ? |
-| 33 | LilyGO T-Display-S3 (TFT) | `lilygo_t_display_s3` | plan | ? |
-| 34 | M5Stack AtomS3 | `m5stack_atoms3` | plan | ? |
-| 35 | M5Stack CoreS3 | `m5stack_cores3` | plan | ? |
+| Board | Variant | Layout |
+|---|---|---|
+| LumiGate v3 (S3 + W5500) | (PCB source) | header |
+| ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | header |
+| ESP32-S3 DevKitM-1 | `esp32s3` | header |
+| Seeed XIAO ESP32-S3 | `XIAO_ESP32S3` | header |
+| Adafruit Feather ESP32-S3 | `adafruit_feather_esp32s3` | header |
+| Adafruit QT Py ESP32-S3 | `adafruit_qtpy_esp32s3_n4r2` | header |
+| Adafruit Metro ESP32-S3 | `adafruit_metro_esp32s3` | auto |
+| WEMOS LOLIN S3 | `lolin_s3` | auto |
+| WEMOS LOLIN S3 Mini | `lolin_s3_mini` | auto |
+| Unexpected Maker FeatherS3 | `um_feathers3` | auto |
+| Unexpected Maker ProS3 | `um_pros3` | auto |
+| Unexpected Maker TinyS3 | `um_tinys3` | auto |
+| SparkFun ESP32-S3 Thing Plus | `sparkfun_esp32s3_thing_plus` | auto |
+| Heltec WiFi LoRa 32 V3 (OLED) | `heltec_wifi_lora_32_V3` | auto · OLED pre-config |
+| LilyGO T-Display-S3 (TFT) | `lilygo_t_display_s3` | auto · TFT (display off) |
+| M5Stack AtomS3 (TFT) | `m5stack_atoms3` | auto · TFT (display off) |
+| M5Stack CoreS3 (TFT) | `m5stack_cores3` | auto · TFT (display off) |
 
 ## Notes
 
 - **Accurate GPIOs**: pinouts come from `variants/<dir>/pins_arduino.h` (authoritative),
   generated via `hardware/gen_board_descriptor.py`; LumiGate v3 from `hardware/lumigate.py`.
-- **Boards with built-in peripherals** (Heltec/LilyGO TFT+OLED+LoRa, M5Stack) consume many
-  GPIOs internally; their descriptors should mark those pins reserved (per-board work).
-- **Pin layout vs functional grouping**: DevKit-class boards get true physical column
-  layouts; compact/named-pin boards (Feather, QtPy, XIAO) use the functional pad set with
-  accurate GPIOs (physical placement approximate).
-- **Fritzing graphics** (optional online-only overlay) come from these license-clean
-  sources, all CC-BY-SA, no non-commercial clause (usable in our MIT project with
-  attribution; keep the SVG unmodified + overlay hotspots separately):
+- **Diagram only**: the picker draws its own horizontal SVG diagram from each board's two
+  pin columns. There are no board photos or realistic/Fritzing graphics (too few clean-
+  license images to be worth it) - the generated diagram is the interactive tool and works
+  the same for every board.
+- **Display pre-config**: boards with a built-in **mono I2C OLED** (SSD1306/SH1106) set the
+  display preset on "Apply template" - e.g. Heltec WiFi Kit 32 / WiFi LoRa 32 V3. Boards
+  with a **TFT** (ST7789 / ILI9342 - LilyGO T-Display-S3, M5Stack) leave the display off:
+  the firmware only supports mono OLED and SSD1351 colour SPI for now (TFT is a separate
+  feature). SSD1351 colour SPI is set via the GPIO fields.
+- **Ethernet boards** mark the RMII PHY pins reserved + hard-wired so they are not reused.
+- **Offline**: five core boards (LumiGate v3, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3
+  DevKitC-1, XIAO ESP32-S3) are baked into `src/pages/config.html` and work with no network;
+  the rest are fetched on demand from GitHub Pages.
 
-  | Source | License | Covers |
-  |---|---|---|
-  | Fritzing core parts (`fritzing/fritzing-parts`) | CC BY-SA 3.0 | generic ESP32 DevKitC / WROOM-32 |
-  | Adafruit `Fritzing-Library` | CC BY-SA 3.0 | HUZZAH32, Feather ESP32 V2, Feather ESP32-S3, QT Py ESP32-S3, Metro ESP32-S3 |
-  | SparkFun `Fritzing_Parts` | CC BY-SA 4.0 (gfx) / MIT (code) | ESP32 Thing, Thing Plus, ESP32-S3 Thing Plus, IoT RedBoard |
-
-  The remaining vendors (WEMOS/LOLIN, Unexpected Maker, LilyGO, Heltec, M5Stack,
-  Olimex, wESP32, DOIT, NodeMCU) are community/vendor parts with **varied or unstated**
-  licensing, so each needs per-part provenance verification before use (or stays
-  SVG-only). The board-style SVG remains the always-available, MIT-clean default for
-  every board.
-
-- **Display pre-config**: boards with a built-in display set the firmware display
-  preset on template apply. Supported: **SSD1306/SH1106 (mono I2C)** and **SSD1351
-  (colour SPI)** -> e.g. Heltec WiFi Kit 32 (SSD1306) is pre-configured. NOT yet
-  supported: **ST7789 / ILI9342 TFTs** (LilyGO T-Display(-S3), M5Stack) -> those leave
-  the display off with a note until firmware TFT support is added (separate feature).
-
-Status: **12** descriptors (5 built-in offline + 7 catalog). **Realistic board
-graphics** (with click hotspots + assignment callouts) on **9** boards, all license-clean
-and GPIO-verified against `pins_arduino.h`:
-- Adafruit Fritzing (CC BY-SA 3.0): Feather ESP32-S3, Feather ESP32 V2, QT Py ESP32-S3
-- SparkFun Fritzing (CC BY-SA 4.0): ESP32 Thing, ESP32 Thing Plus
-- **Own MIT render** (drawn by `own_board_graphic()` in `gen_board_descriptor.py`, exact
-  hotspots since we place the pads): ESP32 DevKitC, ESP32 DevKit v1 (DOIT), NodeMCU-32S,
-  ESP32-S3 DevKitC-1. These are the most widespread DevKit-class boards, for which no
-  clean-license Fritzing part exists.
-
-Deferred Fritzing (board-style SVG works for them now): **HUZZAH32, Metro ESP32-S3** wrap
-their pins in transformed SVG groups, so they need transform-aware coordinate resolution
-+ a visual check before their hotspots can be trusted. Every board always has the
-generated, license-free board-style SVG. Target list above: ~35.
+Status: **33** board descriptors (5 baked-in offline + 28 catalog), every one with a
+generated clickable pin diagram and an "Apply template" pin map, all GPIO-verified against
+`pins_arduino.h`.

@@ -1,14 +1,15 @@
 {
-  "id": "sparkfun-esp32-thing",
-  "name": "SparkFun ESP32 Thing",
+  "id": "olimex-esp32-poe",
+  "name": "Olimex ESP32-PoE",
   "mcu": "esp32",
   "cols": [
     [
       {
         "gpio": 0,
-        "silk": "A11",
+        "silk": "IO0",
         "flags": [
-          "strapping"
+          "strapping",
+          "reserved:eth-rmii"
         ]
       },
       {
@@ -20,7 +21,7 @@
       },
       {
         "gpio": 2,
-        "silk": "SS",
+        "silk": "MOSI",
         "flags": [
           "strapping"
         ]
@@ -34,116 +35,84 @@
       },
       {
         "gpio": 4,
-        "silk": "A10",
+        "silk": "IO4",
         "flags": []
       },
       {
         "gpio": 5,
-        "silk": "LED",
+        "silk": "SS",
         "flags": [
           "strapping"
         ]
       },
       {
         "gpio": 12,
-        "silk": "A15",
+        "silk": "IO12",
         "flags": [
-          "strapping"
+          "strapping",
+          "reserved:eth-rmii"
         ]
       },
       {
         "gpio": 13,
-        "silk": "A14",
+        "silk": "SDA",
         "flags": []
       },
       {
         "gpio": 14,
-        "silk": "A16",
-        "flags": []
-      },
-      {
-        "gpio": 15,
-        "silk": "A13",
-        "flags": [
-          "strapping"
-        ]
-      },
-      {
-        "gpio": 18,
         "silk": "SCK",
-        "flags": []
-      },
-      {
-        "gpio": 19,
-        "silk": "MISO",
         "flags": []
       }
     ],
     [
       {
-        "gpio": 21,
-        "silk": "SDA",
-        "flags": []
+        "gpio": 15,
+        "silk": "MISO",
+        "flags": [
+          "strapping"
+        ]
       },
       {
-        "gpio": 22,
+        "gpio": 16,
         "silk": "SCL",
         "flags": []
       },
       {
+        "gpio": 18,
+        "silk": "IO18",
+        "flags": [
+          "reserved:eth-rmii"
+        ]
+      },
+      {
         "gpio": 23,
-        "silk": "MOSI",
-        "flags": []
-      },
-      {
-        "gpio": 25,
-        "silk": "A18",
-        "flags": []
-      },
-      {
-        "gpio": 26,
-        "silk": "A19",
-        "flags": []
-      },
-      {
-        "gpio": 27,
-        "silk": "A17",
-        "flags": []
-      },
-      {
-        "gpio": 32,
-        "silk": "A4",
-        "flags": []
+        "silk": "IO23",
+        "flags": [
+          "reserved:eth-rmii"
+        ]
       },
       {
         "gpio": 33,
-        "silk": "A5",
+        "silk": "SCL",
         "flags": []
       },
       {
         "gpio": 34,
-        "silk": "A6",
+        "silk": "IO34",
         "flags": [
           "input-only"
         ]
       },
       {
         "gpio": 35,
-        "silk": "A7",
+        "silk": "IO35",
         "flags": [
           "input-only"
         ]
       },
       {
         "gpio": 36,
-        "silk": "A0",
-        "flags": [
-          "input-only"
-        ]
-      },
-      {
-        "gpio": 39,
-        "silk": "A3",
+        "silk": "IO36",
         "flags": [
           "input-only"
         ]
@@ -151,27 +120,62 @@
     ]
   ],
   "preset": {
-    "ledType": 1,
-    "ledPin": 5,
+    "ledType": 0,
     "dispType": 1,
-    "dispsda": 21,
-    "dispscl": 22,
+    "dispsda": 13,
+    "dispscl": 16,
     "outputs": [
       {
         "en": true,
         "uni": 0,
         "port": 1,
         "tx": 4,
-        "rx": 0,
+        "rx": 5,
         "rts": -1
       }
     ]
   },
-  "_source": "auto from variants/esp32thing/pins_arduino.h",
+  "_source": "auto from variants/esp32-poe/pins_arduino.h",
   "hardwired": [
     {
-      "gpio": 5,
-      "label": "onboard LED"
+      "gpio": 0,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 12,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 18,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 19,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 21,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 22,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 23,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 25,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 26,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 27,
+      "label": "Ethernet"
     }
   ]
 }

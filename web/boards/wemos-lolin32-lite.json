@@ -1,6 +1,6 @@
 {
-  "id": "esp32-devkit-v1",
-  "name": "ESP32 DevKit v1 (DOIT, 30-pin)",
+  "id": "wemos-lolin32-lite",
+  "name": "WEMOS LOLIN32 Lite",
   "mcu": "esp32",
   "cols": [
     [
@@ -162,10 +162,10 @@
   ],
   "preset": {
     "ledType": 1,
-    "ledPin": 2,
+    "ledPin": 22,
     "dispType": 1,
-    "dispsda": 21,
-    "dispscl": 22,
+    "dispsda": 19,
+    "dispscl": 23,
     "outputs": [
       {
         "en": true,
@@ -177,9 +177,10 @@
       }
     ]
   },
+  "_source": "auto from variants/lolin32-lite/pins_arduino.h",
   "hardwired": [
     {
-      "gpio": 2,
+      "gpio": 22,
       "label": "onboard LED"
     }
   ]

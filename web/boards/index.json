@@ -73,6 +73,132 @@
       "name": "SparkFun ESP32 Thing Plus",
       "mcu": "esp32",
       "builtin": false
+    },
+    {
+      "id": "adafruit-huzzah32",
+      "name": "Adafruit HUZZAH32 Feather",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "wemos-lolin-d32",
+      "name": "WEMOS LOLIN D32",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "wemos-lolin32",
+      "name": "WEMOS LOLIN32",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "wemos-lolin32-lite",
+      "name": "WEMOS LOLIN32 Lite",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "heltec-wifi-kit-32",
+      "name": "Heltec WiFi Kit 32 (OLED)",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "olimex-esp32-poe",
+      "name": "Olimex ESP32-PoE",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "olimex-esp32-poe-iso",
+      "name": "Olimex ESP32-PoE-ISO",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "olimex-esp32-gateway",
+      "name": "Olimex ESP32-Gateway",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "wesp32",
+      "name": "wESP32 (PoE)",
+      "mcu": "esp32",
+      "builtin": false
+    },
+    {
+      "id": "esp32s3-devkitm-1",
+      "name": "ESP32-S3 DevKitM-1",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "adafruit-metro-esp32s3",
+      "name": "Adafruit Metro ESP32-S3",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "wemos-lolin-s3",
+      "name": "WEMOS LOLIN S3",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "wemos-lolin-s3-mini",
+      "name": "WEMOS LOLIN S3 Mini",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "um-feathers3",
+      "name": "Unexpected Maker FeatherS3",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "um-pros3",
+      "name": "Unexpected Maker ProS3",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "um-tinys3",
+      "name": "Unexpected Maker TinyS3",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "sparkfun-esp32s3-thing-plus",
+      "name": "SparkFun ESP32-S3 Thing Plus",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "heltec-wifi-lora-32-v3",
+      "name": "Heltec WiFi LoRa 32 V3 (OLED)",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "lilygo-t-display-s3",
+      "name": "LilyGO T-Display-S3 (TFT)",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "m5stack-atoms3",
+      "name": "M5Stack AtomS3 (TFT)",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
+      "id": "m5stack-cores3",
+      "name": "M5Stack CoreS3 (TFT)",
+      "mcu": "esp32s3",
+      "builtin": false
     }
   ]
 }

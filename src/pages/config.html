@@ -41,17 +41,11 @@ footer a:hover { color:var(--gh-text); }
 .board-wrap { overflow:auto; text-align:center; padding:10px 0; }
 .board-svg { max-width:100%; height:auto; font-family:ui-monospace,Menlo,Consolas,monospace; }
 .board-svg .pad { cursor:pointer; }
-.board-svg .pad:hover .pin-dot { stroke:#58a6ff; stroke-width:2.5; }
-.pin-dot { stroke:#30363d; stroke-width:1; }
-.pin-dot.free { fill:#238636; } .pin-dot.warn { fill:#9e6a03; } .pin-dot.bad { fill:#6e1a1a; }
-.pad.used .pin-dot { stroke:#58a6ff; stroke-width:2.5; }
-.pad-lbl { fill:#c9d1d9; font-size:11px; } .pad-gpio { fill:#8b949e; font-size:9px; } .pad-assign { fill:#58a6ff; font-size:9px; font-weight:600; }
+.board-svg .pad:hover .pin-pad { stroke:#58a6ff; stroke-width:2.6; }
+.pin-dot { fill:#0d1117; }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#238636; } .lg-warn::before{ background:#9e6a03; } .lg-bad::before{ background:#6e1a1a; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #58a6ff inset; }
-.fzwrap { padding:14px 0; }
-.fzwrap > svg { max-width:100%; height:auto; display:block; margin:0 auto; }
-.fzhot { cursor:pointer; } .fzhot:hover circle { fill-opacity:.85; }
 </style>
 </head>
 <body>
@@ -737,7 +731,7 @@ function xiaocols(){
 function buildBoards(){
   BOARDS = {};
   BOARDS['lumigate_v3'] = finalizeDesc({ id:'lumigate_v3', name:'LumiGate v3 (ESP32-S3 + W5500)', mcu:'esp32s3',
-    cols:s3cols(true), photo:'img/lumigate-v3.png',
+    cols:s3cols(true),
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15, dispType:1, dispsda:4, dispscl:5,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8}] } });
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
@@ -745,7 +739,7 @@ function buildBoards(){
     preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:-1}] } });
   BOARDS['esp32-devkitc'] = finalizeDesc({ id:'esp32-devkitc', name:'ESP32 DevKitC (WROOM-32, 38-pin)', mcu:'esp32',
-    cols:e32cols(), photo:'img/esp32-devkitc.jpg',
+    cols:e32cols(),
     preset:{ ledType:1, ledPin:2, dispType:1, dispsda:21, dispscl:22,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:16, rts:-1}] } });
   BOARDS['esp32-devkit-v1'] = finalizeDesc({ id:'esp32-devkit-v1', name:'ESP32 DevKit v1 (DOIT, 30-pin)', mcu:'esp32',
@@ -906,7 +900,6 @@ function validate(){
 }
 
 // ---- SVG board diagram + picker --------------------------------------------
-var BRD_W = 380, ROW = 28, TOP = 70, BODY_X = 36, BODY_W = 308, RAIL_L = 62, RAIL_R = 318, CXM = BRD_W / 2;
 function padClass(flags){
   for (var i = 0; i < flags.length; i++){ var f = flags[i];
     if (f === 'flash' || f === 'serial' || f === 'range' || f.indexOf('reserved:') === 0) return 'bad'; }
@@ -923,58 +916,68 @@ function shortRole(role){
     dispsda:'SDA', dispscl:'SCL', dispcs:'CS', dispdc:'DC', disprst:'RST', dispsck:'SCK', dispmosi:'MOSI' };
   return map[role] || role;
 }
-function padSvg(side, pin, y, assign){
-  var g = pin.gpio, used = assign[g], cls = padClass(pin.flags || []);
-  var rx = side === 'L' ? RAIL_L : RAIL_R;
-  var lin = side === 'L' ? (rx + 13) : (rx - 13);     // inward: silk + GPIO
-  var anin = side === 'L' ? 'start' : 'end';
-  var lout = side === 'L' ? (rx - 11) : (rx + 11);    // outward: assigned function (callout)
-  var anout = side === 'L' ? 'end' : 'start';
-  var ring = used ? '#58a6ff' : statusColor(cls);
-  var rw = used ? 3 : 2;
-  var tip = 'GPIO' + g + (pin.silk ? ' (' + pin.silk + ')' : '')
-          + (pin.flags && pin.flags.length ? ' — ' + pin.flags.join(', ') : ' — free')
-          + (used ? ' — ' + used.map(roleLabel).join(', ') : '');
-  var pad = '<rect x="' + (rx - 7) + '" y="' + (y - 7) + '" width="14" height="14" rx="2" fill="#d4af37" stroke="' + ring + '" stroke-width="' + rw + '"/>'
-          + '<circle cx="' + rx + '" cy="' + y + '" r="2.4" fill="#0d1117"/>';
-  var t1 = '<text class="pad-lbl" x="' + lin + '" y="' + (y + 3) + '" text-anchor="' + anin + '">' + esc(pin.silk || ('IO' + g)) + ' ·G' + g + '</text>';
-  var t2 = used ? '<line x1="' + (side === 'L' ? rx - 7 : rx + 7) + '" y1="' + y + '" x2="' + lout + '" y2="' + y + '" stroke="#58a6ff" stroke-width="0.6"/>'
-        + '<text class="pad-assign" x="' + (side === 'L' ? lout - 2 : lout + 2) + '" y="' + (y + 3) + '" text-anchor="' + anout + '">' + esc(used.map(calloutLabel).join(', ')) + '</text>' : '';
-  return '<g class="pad' + (used ? ' used' : '') + '" data-gpio="' + g + '"><title>' + esc(tip) + '</title>' + pad + t1 + t2 + '</g>';
-}
+// Horizontal board diagram: the two pin columns become the top and bottom rows
+// (pins along the horizon), silk + GPIO labels stand vertically just inside each
+// row, and assigned-function callouts stack outward above/below. Geometry is in
+// fixed board units at a fixed scale, so a pin is the SAME size on every board.
 function renderBoard(){
   var b = diagramDesc(), wrap = $('board-svg-wrap');
-  if (!b){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
+  if (!b || !b.cols){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
   var assign = {};
   activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
-  var L = b.cols[0], R = b.cols[1], n = Math.max(L.length, R.length);
-  var H = TOP + n * ROW + 22;
-  var SIDE = 100;  // side margins for the outward assignment callout labels
-  var s = '<svg class="board-svg" viewBox="0 0 ' + (BRD_W + 2 * SIDE) + ' ' + H + '" width="' + (BRD_W + 2 * SIDE) + '">';
-  s += '<g transform="translate(' + SIDE + ',0)">';
-  // PCB body + inner silk edge + mounting holes
-  s += '<rect x="' + BODY_X + '" y="6" width="' + BODY_W + '" height="' + (H - 12) + '" rx="12" fill="#0e3b2c" stroke="#1f8a63" stroke-width="1.5"/>';
-  s += '<rect x="' + (BODY_X + 4) + '" y="10" width="' + (BODY_W - 8) + '" height="' + (H - 20) + '" rx="9" fill="none" stroke="#0a2a20"/>';
-  s += '<circle cx="' + (BODY_X + 14) + '" cy="20" r="4" fill="#0d1117" stroke="#1f8a63"/>';
-  s += '<circle cx="' + (BODY_X + BODY_W - 14) + '" cy="20" r="4" fill="#0d1117" stroke="#1f8a63"/>';
-  // USB connector at the top
-  s += '<rect x="' + (CXM - 17) + '" y="2" width="34" height="13" rx="2" fill="#aab2bd" stroke="#6b7480"/>';
-  s += '<rect x="' + (CXM - 12) + '" y="5" width="24" height="7" rx="1" fill="#5b636b"/>';
-  // module can (metal shield) + WiFi antenna + board name
-  var mTop = TOP - 16, mBot = H - 24, mx1 = 142, mx2 = 238, mcx = (mx1 + mx2) / 2, mcy = (mTop + mBot) / 2;
-  s += '<polyline points="' + (mcx-16) + ',' + (mTop-9) + ' ' + (mcx-8) + ',' + (mTop-3) + ' ' + mcx + ',' + (mTop-9) + ' ' + (mcx+8) + ',' + (mTop-3) + ' ' + (mcx+16) + ',' + (mTop-9) + '" fill="none" stroke="#d4af37" stroke-width="1.5"/>';
-  s += '<rect x="' + mx1 + '" y="' + mTop + '" width="' + (mx2-mx1) + '" height="' + (mBot-mTop) + '" rx="3" fill="#2b3138" stroke="#11151a"/>';
-  s += '<rect x="' + (mx1+5) + '" y="' + (mTop+5) + '" width="' + (mx2-mx1-10) + '" height="' + (mBot-mTop-10) + '" rx="2" fill="none" stroke="#3c444d"/>';
-  s += '<text x="' + mcx + '" y="' + mcy + '" fill="#9aa6b0" font-size="11" font-weight="600" text-anchor="middle" transform="rotate(-90 ' + mcx + ' ' + mcy + ')">' + esc(b.name) + '</text>';
-  // pin pads
-  var i, y;
-  for (i = 0; i < L.length; i++){ y = TOP + i * ROW; s += padSvg('L', L[i], y, assign); }
-  for (i = 0; i < R.length; i++){ y = TOP + i * ROW; s += padSvg('R', R[i], y, assign); }
-  s += '</g></svg>';
-  wrap.innerHTML = s;
-  wrap.querySelectorAll('.pad').forEach(function(node){
-    node.addEventListener('click', function(){ onPinClick(+node.getAttribute('data-gpio')); });
+  var topPins = b.cols[0] || [], botPins = b.cols[1] || [];
+  var n = Math.max(topPins.length, botPins.length, 1);
+  var PITCH = 22, LM = 28, RM = 16, PAD = 13, PH = PAD / 2, SILK = 40, MOD = 42, GAPM = 8, SFONT = 7, SCALE = 1.5;
+  var BW = LM + (n - 1) * PITCH + RM;
+  var topPadY = SILK + PH + 2, botPadY = topPadY + PH + GAPM + MOD + GAPM + PH, BH = botPadY + PH + 2 + SILK;
+  var modY1 = topPadY + PH + GAPM, midY = BH / 2;
+  var xOf = function(i){ return LM + i * PITCH; };
+  // assigned-function callouts, stacked into rows so neighbours never overlap
+  var CFONT = 9, CGAP = 13, estW = function(t){ return t.length * CFONT * 0.55 + 5; };
+  var calls = [];
+  function addCalls(pins, padY){ for (var i = 0; i < pins.length; i++){ var p = pins[i], u = assign[p.gpio];
+    if (u) calls.push({ x: xOf(i), y: padY, gpio: p.gpio, text: u.map(calloutLabel).join(', ') + ' ·G' + p.gpio }); } }
+  addCalls(topPins, topPadY); addCalls(botPins, botPadY);
+  var TOPM = 6, BOTM = 6;
+  ['T','B'].forEach(function(side){
+    var list = calls.filter(function(p){ return side === 'T' ? p.y < midY : p.y >= midY; }).sort(function(a,c){ return a.x - c.x; });
+    var ends = [];
+    list.forEach(function(p){ var w = estW(p.text), L = p.x - w / 2, r = 0; while (r < ends.length && ends[r] > L - 2) r++; ends[r] = p.x + w / 2; p.row = r; });
+    var need = ends.length ? ends.length * CGAP + 8 : 6;
+    if (side === 'T') TOPM = need; else BOTM = need;
   });
+  var DX = 4, DY = TOPM, OW = BW + 8, OH = BH + TOPM + BOTM;
+  var s = '<svg class="board-svg" width="' + Math.round(OW * SCALE) + '" viewBox="0 0 ' + OW + ' ' + OH + '" preserveAspectRatio="xMidYMid meet">';
+  s += '<g transform="translate(' + DX + ',' + DY + ')">';
+  s += '<rect x="0" y="0" width="' + BW + '" height="' + BH + '" rx="9" fill="#0e3b2c" stroke="#1f8a63" stroke-width="1.2"/>';
+  s += '<rect x="3" y="3" width="' + (BW - 6) + '" height="' + (BH - 6) + '" rx="7" fill="none" stroke="#0a2a20"/>';
+  s += '<rect x="-4" y="' + (midY - 9) + '" width="12" height="18" rx="2" fill="#aab2bd" stroke="#6b7480"/>';   // USB on the left edge
+  var mcx = BW / 2;
+  s += '<rect x="' + (LM - 6) + '" y="' + modY1 + '" width="' + (BW - LM - RM + 12) + '" height="' + MOD + '" rx="3" fill="#2b3138" stroke="#11151a"/>';
+  s += '<text x="' + mcx + '" y="' + (modY1 + MOD / 2 + 4) + '" fill="#9aa6b0" font-size="11" font-weight="600" text-anchor="middle">' + esc(b.name) + '</text>';
+  [[8,8],[BW-8,8],[8,BH-8],[BW-8,BH-8]].forEach(function(c){ s += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="3" fill="#0d1117" stroke="#1f8a63" stroke-width="0.6"/>'; });
+  function drawRow(pins, padY, top){
+    for (var i = 0; i < pins.length; i++){ var p = pins[i], x = xOf(i), fl = p.flags || [], u = assign[p.gpio], col = u ? '#58a6ff' : statusColor(padClass(fl));
+      var tip = 'GPIO' + p.gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (u ? ' — ' + u.map(roleLabel).join(', ') : '');
+      var lbl = 'G' + p.gpio + (p.silk && p.silk !== ('IO' + p.gpio) ? ' ' + p.silk : '');
+      var ly = top ? (padY - PH - 2) : (padY + PH + 2), rot = top ? -90 : 90;
+      s += '<g class="pad' + (u ? ' used' : '') + '" data-gpio="' + p.gpio + '"><title>' + esc(tip) + '</title>'
+        + '<rect class="pin-pad" x="' + (x - PH) + '" y="' + (padY - PH) + '" width="' + PAD + '" height="' + PAD + '" rx="2" fill="' + col + '" fill-opacity="0.22" stroke="' + col + '" stroke-width="' + (u ? 2.4 : 1.3) + '"/>'
+        + '<circle class="pin-dot" cx="' + x + '" cy="' + padY + '" r="2.2"/>'
+        + '<text x="' + x + '" y="' + ly + '" text-anchor="start" font-size="' + SFONT + '" fill="#c9d1d9" transform="rotate(' + rot + ' ' + x + ' ' + ly + ')">' + esc(lbl) + '</text></g>';
+    }
+  }
+  drawRow(topPins, topPadY, true); drawRow(botPins, botPadY, false);
+  s += '</g>';
+  calls.forEach(function(p){
+    var px = DX + p.x, py = DY + p.y, top = p.y < midY;
+    var ly = top ? (DY - 6 - p.row * CGAP) : (DY + BH + 11 + p.row * CGAP), y2 = top ? ly + 1.5 : ly - 4;
+    s += '<line x1="' + px + '" y1="' + py + '" x2="' + px + '" y2="' + y2 + '" stroke="#58a6ff" stroke-width="0.7"/>'
+      + '<text x="' + px + '" y="' + ly + '" text-anchor="middle" font-size="' + CFONT + '" font-weight="600" fill="#58a6ff">' + esc(p.text) + '</text>';
+  });
+  s += '</svg>';
+  wrap.innerHTML = s;
+  wrap.querySelectorAll('.pad').forEach(function(node){ node.addEventListener('click', function(){ onPinClick(+node.getAttribute('data-gpio')); }); });
 }
 function onPinClick(gpio){
   if (PICK_TARGET){
@@ -999,85 +1002,10 @@ function chooseRole(gpio){
     });
   });
 }
-function setupPhotoToggle(){
-  var b = diagramDesc(), w = $('photo-toggle-wrap'), pw = $('board-photo-wrap'), t = $('photo-toggle');
-  pw.innerHTML = ''; t.checked = false;
-  if (b && b.photo){
-    w.style.display = '';
-    t.onchange = function(){
-      pw.innerHTML = t.checked
-        ? '<img src="' + CATALOG_URL + esc(b.photo) + '" alt="board photo" style="max-width:100%;border:1px solid #30363d;border-radius:6px" '
-          + 'onerror="this.parentNode.innerHTML=&quot;<span class=\'text-secondary small\'>photo unavailable offline</span>&quot;">'
-        : '';
-    };
-  } else { w.style.display = 'none'; }
-}
-// Fritzing "real board" graphic + clickable hotspots (online, CC-BY-SA overlay).
-// fuller function label for the on-graphic callouts (e.g. "Status LED (WS2812)")
+// fuller function label for the on-diagram callouts (e.g. "Status LED (WS2812)")
 function calloutLabel(role){
   if (role === 'ledpin'){ var lt = $('led-type').value; return 'Status LED' + (lt === '2' ? ' (WS2812)' : lt === '1' ? ' (GPIO)' : ''); }
   return roleLabel(role);
-}
-function renderFritzing(){
-  var b = diagramDesc(), wrap = $('board-svg-wrap');
-  if (!b || !b.fritzing){ renderBoard(); return; }
-  var fz = b.fritzing;
-  wrap.innerHTML = '<p class="text-secondary small">Loading board graphic…</p>';
-  var assign = {};
-  activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
-  fetch(CATALOG_URL + fz.svg).then(function(r){ if (!r.ok) throw 0; return r.text(); }).then(function(svg){
-    var vbm = svg.match(/viewBox="([^"]+)"/);
-    var vb = (vbm ? vbm[1] : (fz.viewBox || '0 0 147 65')).split(/\s+/).map(parseFloat);
-    var W = vb[2] || 147, H = vb[3] || 65;
-    var inner = svg.replace(/^[\s\S]*?<svg\b[^>]*>/, '').replace(/<\/svg>\s*$/, '');
-    var FONT = 3.3, GAP = 5.2, estW = function(t){ return t.length * FONT * 0.55 + 3; };
-    // Always show the board horizontally: pins along the top/bottom, labels above/below.
-    // If the part's pins sit in vertical columns (fewer distinct x than y positions), rotate
-    // the whole graphic 90° so the columns become horizontal rows.
-    var nx = {}, ny = {};
-    fz.hotspots.forEach(function(h){ nx[Math.round(h.x)] = 1; ny[Math.round(h.y)] = 1; });
-    var rot = Object.keys(nx).length < Object.keys(ny).length;
-    var DW = rot ? H : W, DH = rot ? W : H, midY = DH / 2;        // displayed (landscape) size
-    var disp = function(h){ return rot ? { x: H - h.y, y: h.x } : { x: h.x, y: h.y }; };
-    // assigned callouts in top/bottom bands, stacked to avoid horizontal overlap
-    var A = [];
-    fz.hotspots.forEach(function(h){ var u = assign[h.gpio]; if (u){ var p = disp(h); A.push({ x:p.x, y:p.y, gpio:h.gpio, text: u.map(calloutLabel).join(', ') + ' ·G' + h.gpio }); } });
-    var TOPM = 4, BOTM = 4;
-    ['T','B'].forEach(function(s){
-      var list = A.filter(function(p){ return s === 'T' ? p.y < midY : p.y >= midY; }).sort(function(a,c){ return a.x - c.x; });
-      var end = [];
-      list.forEach(function(p){ var w = estW(p.text), L = p.x - w/2, r = 0; while (r < end.length && end[r] > L - 1.5) r++; end[r] = p.x + w/2; p.row = r; });
-      var need = end.length ? end.length * GAP + 7 : 4;
-      if (s === 'T') TOPM = need; else BOTM = need;
-    });
-    var DX = 4, DY = TOPM, OW = DW + 8, OH = DH + TOPM + BOTM;
-    var boardT = rot ? ('translate(' + (DX + H) + ',' + DY + ') rotate(90)') : ('translate(' + DX + ',' + DY + ')');
-    function dot(h){
-      var fl = (b.byGpio[h.gpio] && b.byGpio[h.gpio].flags) || [], u = assign[h.gpio];
-      var col = u ? '#58a6ff' : statusColor(padClass(fl)), p = disp(h);
-      var tip = 'GPIO' + h.gpio + ' (' + h.silk + ')' + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (u ? ' — ' + u.map(roleLabel).join(', ') : '');
-      return '<g class="fzhot" data-gpio="' + h.gpio + '"><title>' + esc(tip) + '</title>'
-        + '<circle cx="' + (DX + p.x) + '" cy="' + (DY + p.y) + '" r="2.7" fill="' + col + '" fill-opacity="0.5" stroke="' + col + '" stroke-width="' + (u ? 1.3 : 0.8) + '"/></g>';
-    }
-    function callout(p){
-      var px = DX + p.x, py = DY + p.y, top = p.y < midY;
-      var ly = top ? (DY - 5 - p.row * GAP) : (DY + DH + 7 + p.row * GAP), y2 = top ? ly + 1.2 : ly - 3.4;
-      return '<line x1="' + px + '" y1="' + py + '" x2="' + px + '" y2="' + y2 + '" stroke="#58a6ff" stroke-width="0.5"/>'
-        + '<text x="' + px + '" y="' + ly + '" text-anchor="middle" font-size="' + FONT + '" font-weight="600" fill="#58a6ff">' + esc(p.text) + '</text>';
-    }
-    // Fixed scale (px per viewBox unit) so pins + labels are the SAME size on every board.
-    var FZSCALE = 3.5;
-    var out = '<svg class="fzsvg" width="' + Math.round(OW * FZSCALE) + '" viewBox="0 0 ' + OW + ' ' + OH + '" preserveAspectRatio="xMidYMid meet">'
-      + '<g transform="' + boardT + '">' + inner + '</g>'
-      + fz.hotspots.map(dot).join('') + A.map(callout).join('') + '</svg>';
-    wrap.innerHTML = '<div class="fzwrap">' + out + '</div>'
-      + '<div class="text-secondary small mt-1">Graphic: ' + esc(fz.credit || 'Fritzing') + ' · blue callouts = your assignments</div>';
-    wrap.querySelectorAll('.fzhot').forEach(function(n){ n.addEventListener('click', function(){ onPinClick(+n.getAttribute('data-gpio')); }); });
-  }).catch(function(){
-    renderBoard();
-    $('board-svg-wrap').insertAdjacentHTML('afterbegin',
-      '<div class="alert alert-warning py-1 px-2 small mb-2">Realistic board graphic unavailable (offline) — showing the schematic.</div>');
-  });
 }
 function printBoard(){
   var c = $('board-svg-wrap').innerHTML;
@@ -1089,17 +1017,14 @@ function printBoard(){
     + '<body><h3>' + esc(currentBoardName()) + ' — pin assignment</h3>' + c + '</body></html>');
   w.document.close(); w.focus(); setTimeout(function(){ try { w.print(); } catch(e){} }, 450);
 }
-function setupFritzingToggle(){
-  var b = diagramDesc(), w = $('fz-toggle-wrap'), t = $('fz-toggle');
-  t.checked = false;   // unchecked = realistic graphic (the default when available)
-  if (b && b.fritzing){ w.style.display = ''; t.onchange = function(){ renderCurrent(); }; }
-  else { w.style.display = 'none'; }
-}
-// Realistic Fritzing graphic is shown by default whenever a board has one (and it loads);
-// the toggle switches to the schematic, and a failed load falls back to it with a notice.
-function renderCurrent(){
-  var t = $('fz-toggle'); var b = diagramDesc();
-  if (b && b.fritzing && !(t && t.checked)) renderFritzing(); else renderBoard();
+function renderCurrent(){ renderBoard(); }
+// Mirror the main board <select> into the modal so the board can be switched while
+// picking pins; changes delegate to the real select (which handles catalog fetch).
+function syncModalBoardSel(){
+  var src = $('board-sel'), dst = $('board-sel-modal');
+  if (!dst) return;
+  dst.innerHTML = src.innerHTML;
+  dst.value = src.value;
 }
 function openPicker(role){
   PICK_TARGET = role || null;
@@ -1107,8 +1032,7 @@ function openPicker(role){
   if (role){ h.classList.remove('d-none'); h.textContent = 'Click the pin to assign to ' + roleLabel(role) + '.'; }
   else { h.classList.add('d-none'); }
   $('board-modal-title').textContent = role ? ('Pick pin: ' + roleLabel(role)) : (currentBoardName() + ' — pin map');
-  setupPhotoToggle();
-  setupFritzingToggle();
+  syncModalBoardSel();
   renderCurrent();
   $('board-modal').classList.add('show');
 }
@@ -1188,16 +1112,24 @@ function initBoards(){
   $('board-sel').value = BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom';
   $('board-detected').textContent = INFO_BOARD ? ('detected: ' + INFO_BOARD + (INFO_MCU ? (' / ' + INFO_MCU) : '')) : '';
   decorateAllPins();
+  // re-render the open picker (and re-sync the modal select) after a board change
+  var afterBoardChange = function(){ updBoardButtons(); validate();
+    if ($('board-modal').classList.contains('show')){ syncModalBoardSel(); renderCurrent(); } };
   $('board-sel').addEventListener('change', function(){
     var id = $('board-sel').value;
     // catalog (non-builtin) boards: always refresh the descriptor from the network so a
-    // stale localStorage copy can never hide newer data (e.g. a Fritzing graphic).
+    // stale localStorage copy can never hide newer data.
     if (id && id !== 'custom' && BUILTINS.indexOf(id) < 0){
       ensureBoard(id, function(ok){
         if (!ok){ showModal({ title:'Board unavailable', body:'That board could not be loaded from the online catalog. Connect to the internet and retry, or use Custom.', cancel:false, okText:'OK' }); $('board-sel').value = 'custom'; }
-        updBoardButtons(); validate();
+        afterBoardChange();
       });
-    } else { updBoardButtons(); validate(); }
+    } else { afterBoardChange(); }
+  });
+  // modal board <select> delegates to the main one (so catalog fetch + state stay in one place)
+  $('board-sel-modal').addEventListener('change', function(){
+    $('board-sel').value = this.value;
+    $('board-sel').dispatchEvent(new Event('change'));
   });
   $('board-apply').addEventListener('click', applyTemplate);
   $('board-open').addEventListener('click', function(){ openPicker(null); });
@@ -1221,6 +1153,10 @@ function initBoards(){
       <button type="button" class="btn-close btn-close-white" id="board-modal-close" aria-label="Close"></button>
     </div>
     <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <label class="form-label small mb-0 text-secondary">Board</label>
+        <select class="form-select form-select-sm" id="board-sel-modal" style="max-width:300px"></select>
+      </div>
       <div id="board-pick-hint" class="alert alert-info py-2 small d-none mb-2"></div>
       <div class="board-wrap" id="board-svg-wrap"></div>
       <div class="board-legend">
@@ -1229,17 +1165,10 @@ function initBoards(){
         <span class="lg-bad">do not use (flash / serial / Ethernet)</span>
         <span class="lg-used">assigned</span>
       </div>
-      <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-        <label class="form-check small mb-0" id="photo-toggle-wrap" style="display:none">
-          <input type="checkbox" class="form-check-input me-1" id="photo-toggle"> show board photo (online)
-        </label>
-        <label class="form-check small mb-0" id="fz-toggle-wrap" style="display:none">
-          <input type="checkbox" class="form-check-input me-1" id="fz-toggle"> show schematic diagram instead
-        </label>
-        <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="board-print">Print plan</button>
+      <div class="d-flex justify-content-end align-items-center mt-3 flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="board-print">Print plan</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" id="board-modal-done">Done</button>
       </div>
-      <div id="board-photo-wrap" class="mt-2"></div>
     </div>
   </div>
 </div>

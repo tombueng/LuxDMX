@@ -5,29 +5,46 @@ Single source of truth: the LumiGate v3 board descriptor is derived directly fro
 the PCB netlist source (lumigate.py) so the clickable diagram, the "Apply template"
 preset and the Ethernet-reserved-pin rules can never drift from the real board.
 
-The two generic dev-board descriptors (ESP32 DevKitC, ESP32-S3 DevKitC-1) use the
-fixed, published header pinouts.
+The hand-tuned dev-board descriptors (ESP32 DevKitC, ESP32-S3 DevKitC-1, the Feather /
+QtPy / XIAO / WT32-ETH01 boards) use fixed, published header pinouts. Every other
+supported esp32 / esp32s3 board is auto-generated from the arduino-esp32 core's
+variants/<dir>/pins_arduino.h (authoritative GPIOs); see auto_board().
 
 Outputs (committed; GitHub Pages serves web/ -> https://tombueng.github.io/LumiGate/):
     web/boards/index.json              catalog index (lazy-loaded by config.html)
+    web/boards/<id>.json               one descriptor per board
     web/boards/lumigate_v3.json        generated from lumigate.py
-    web/boards/esp32s3-devkitc-1.json
-    web/boards/esp32-devkitc.json
-    web/boards/img/lumigate-v3.png     board photo (online-only overlay)
 
-These mirror the descriptors baked into src/pages/config.html; the baked copies keep
-the three core boards working fully offline, the catalog adds the long tail.
+Five core boards are also baked into src/pages/config.html so they work fully offline;
+the catalog adds the long tail. The /config pin picker draws a generated horizontal
+diagram from each descriptor's two pin columns (no board photos / realistic graphics).
 
 Run:  python hardware/gen_board_descriptor.py
 """
+import glob
 import json
 import os
 import re
-import shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, "web", "boards")
+
+
+def _find_variants():
+    """Locate the arduino-esp32 core `variants/` dir (authoritative GPIO source).
+    Override with PIO_VARIANTS; otherwise search the local pioarduino install."""
+    env = os.environ.get("PIO_VARIANTS")
+    if env and os.path.isdir(env):
+        return env
+    base = os.path.join(os.path.expanduser("~"), ".platformio", "packages")
+    for p in glob.glob(os.path.join(base, "framework-arduinoespressif32*", "variants")):
+        if os.path.isdir(p):
+            return p
+    return None
+
+
+VARIANTS = _find_variants()
 
 # ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LumiGate v3 module)
 S3L = [4, 5, 6, 7, 15, 16, 17, 18, 8, 19, 20, 3, 46, 9, 10, 11, 12, 13, 14]
@@ -88,20 +105,150 @@ def cols_named(left, right, flag):
     return [[mk(p) for p in left], [mk(p) for p in right]]
 
 
-def fritz_cols(board_id, mcu):
-    """Derive board-style columns from a Fritzing fragment's hotspots: split by x into
-    two header columns, sort top-to-bottom by y, attach the chip-family flags. Keeps the
-    schematic layout consistent with the real board (run gen_fritzing.py first)."""
-    p = os.path.join(OUT, "fritzing", board_id + ".json")
-    if not os.path.exists(p):
-        return [[], []]
-    hs = json.load(open(p, encoding="utf-8"))["hotspots"]
-    flag = (lambda g: s3_flags(g, set())) if mcu == "esp32s3" else e32_flags
-    xs = [h["x"] for h in hs]; midx = (min(xs) + max(xs)) / 2 if xs else 0
-    mk = lambda h: {"gpio": h["gpio"], "silk": h["silk"], "flags": flag(h["gpio"])}
-    left = [mk(h) for h in sorted((h for h in hs if h["x"] < midx), key=lambda h: h["y"])]
-    right = [mk(h) for h in sorted((h for h in hs if h["x"] >= midx), key=lambda h: h["y"])]
-    return [left, right]
+def e32_flags_eth(g, eth):
+    f = e32_flags(g)
+    if g in eth:
+        f.append("reserved:eth-rmii")
+    return f
+
+
+# ── variant (pins_arduino.h) parsing -> auto descriptors ─────────────────────
+# The hand-tuned boards above keep their true physical header order; every other
+# supported esp32/esp32s3 board is derived here from the arduino-esp32 core's
+# variants/<dir>/pins_arduino.h (authoritative GPIOs). Physical column placement
+# is approximate (GPIO order); the GPIO numbers, silk names and flags are real.
+
+def parse_variant(vdir):
+    p = os.path.join(VARIANTS, vdir, "pins_arduino.h") if VARIANTS else None
+    if not p or not os.path.exists(p):
+        return None
+    txt = open(p, encoding="utf-8", errors="ignore").read()
+    pins = {}  # gpio -> set(alias names)
+    for m in re.finditer(r"static\s+const\s+uint8_t\s+(\w+)\s*=\s*(\d+)\s*;", txt):
+        pins.setdefault(int(m.group(2)), set()).add(m.group(1))
+    skip = {"F_XTAL_MHZ", "NUM_DIGITAL_PINS", "EXTERNAL_NUM_INTERRUPTS"}
+    for m in re.finditer(r"#define\s+(\w+)\s+(\d+)\b", txt):
+        nm, num = m.group(1), int(m.group(2))
+        if num <= 48 and not nm.startswith("USB_") and nm not in skip:
+            pins.setdefault(num, set()).add(nm)
+
+    def first(*names):
+        want = set(names)
+        for g in sorted(pins):
+            if pins[g] & want:
+                return g
+        return None
+
+    return {
+        "pins": pins,
+        "led": first("LED_BUILTIN", "BUILTIN_LED", "LED"),
+        "rgb": first("RGB_BUILTIN", "PIN_NEOPIXEL", "PIN_RGB_LED", "RGB_DATA", "NEOPIXEL"),
+        "sda": first("SDA"), "scl": first("SCL"),
+        "sda_oled": first("SDA_OLED"), "scl_oled": first("SCL_OLED"),
+        "eth": sorted(g for g, ns in pins.items() if any(n.startswith("ETH_PHY") for n in ns)),
+    }
+
+
+def pick_silk(g, names):
+    for p in ("SDA", "SCL", "SCK", "MOSI", "MISO", "SS", "TX", "RX"):
+        if p in names:
+            return p
+    for p, lbl in (("PIN_NEOPIXEL", "NEO"), ("RGB_BUILTIN", "RGB"), ("LED_BUILTIN", "LED")):
+        if p in names:
+            return lbl
+    for pat, key in ((r"D\d+", lambda s: int(s[1:])), (r"A\d+", lambda s: int(s[1:])), (r"G\d+", lambda s: int(s[1:]))):
+        hit = [n for n in names if re.fullmatch(pat, n)]
+        if hit:
+            return sorted(hit, key=key)[0]
+    return "IO%d" % g
+
+
+def auto_cols(pv, mcu, eth_set):
+    flag = (lambda g: s3_flags(g, eth_set)) if mcu == "esp32s3" else (lambda g: e32_flags_eth(g, eth_set))
+    items = [{"gpio": g, "silk": pick_silk(g, pv["pins"][g]), "flags": flag(g)} for g in sorted(pv["pins"])]
+    half = (len(items) + 1) // 2
+    return [items[:half], items[half:]]
+
+
+def pick_dmx(avail, mcu, eth_set, preset):
+    pref = [17, 16, 4, 5] if mcu == "esp32" else [17, 18, 4, 5, 43, 44]
+    used = set(eth_set)
+    for k in ("ledPin", "dispsda", "dispscl"):
+        if preset.get(k) is not None:
+            used.add(preset[k])
+    flag = (lambda g: s3_flags(g, eth_set)) if mcu == "esp32s3" else (lambda g: e32_flags_eth(g, eth_set))
+
+    def ok(g):
+        return g not in used and not (set(flag(g)) & {"flash", "input-only"}) \
+            and not any(x.startswith("reserved:eth") for x in flag(g))
+
+    picks = [g for g in pref if g in avail and ok(g)]
+    for g in sorted(avail):
+        if len(picks) >= 2:
+            break
+        if g not in picks and ok(g):
+            picks.append(g)
+    picks = (picks + [-1, -1])[:2]
+    return picks[0], picks[1]
+
+
+def auto_board(id, name, mcu, variant, dmx=None, oled=None, eth=False, tft=False,
+               layout="auto", led_type=None, led_pin=None):
+    pv = parse_variant(variant)
+    if pv is None:
+        print("  SKIP %s: variant %r not found" % (id, variant))
+        return None
+    eth_set = set(pv["eth"])
+    if eth:                       # ESP32 EMAC RMII data pins are fixed in silicon
+        eth_set |= {19, 21, 22, 25, 26, 27}
+    if layout == "e32":
+        cols_data = cols(E32L, E32R, e32_silk, lambda g: e32_flags_eth(g, eth_set))
+    elif layout == "e3230":
+        cols_data = cols(E32_30L, E32_30R, e32_silk, lambda g: e32_flags_eth(g, eth_set))
+    elif layout == "s3":
+        cols_data = cols(S3L, S3R, s3_silk, lambda g: s3_flags(g, eth_set))
+    else:
+        cols_data = auto_cols(pv, mcu, eth_set)
+    # LED preset (NeoPixel -> type 2, plain LED -> type 1)
+    if led_type is None:
+        if pv["rgb"] is not None:
+            led_type, led_pin = 2, pv["rgb"]
+        elif pv["led"] is not None:
+            led_type, led_pin = 1, pv["led"]
+        else:
+            led_type = 0
+    elif led_pin is None:
+        led_pin = pv["rgb"] if led_type == 2 else pv["led"]
+    preset = {"ledType": led_type}
+    if led_type in (1, 2) and led_pin is not None:
+        preset["ledPin"] = led_pin
+    # Display preset: explicit OLED pins > variant SDA_OLED/SCL_OLED > generic I2C.
+    # TFT-only boards leave the display off (mono OLED firmware support only).
+    if tft:
+        preset["dispType"] = 0
+    elif oled:
+        preset.update({"dispType": 1, "dispsda": oled[0], "dispscl": oled[1]})
+    elif pv["sda_oled"] is not None and pv["scl_oled"] is not None:
+        preset.update({"dispType": 1, "dispsda": pv["sda_oled"], "dispscl": pv["scl_oled"]})
+    elif pv["sda"] is not None and pv["scl"] is not None:
+        preset.update({"dispType": 1, "dispsda": pv["sda"], "dispscl": pv["scl"]})
+    else:
+        preset["dispType"] = 0
+    avail = {p["gpio"] for c in cols_data for p in c}
+    tx, rx = dmx if dmx else pick_dmx(avail, mcu, eth_set, preset)
+    preset["outputs"] = [{"en": True, "uni": 0, "port": 1, "tx": tx, "rx": rx, "rts": -1}]
+    d = {"id": id, "name": name, "mcu": mcu, "cols": cols_data, "preset": preset,
+         "_source": "auto from variants/%s/pins_arduino.h" % variant}
+    hw = []
+    if pv["rgb"] is not None:
+        hw.append((pv["rgb"], "NeoPixel"))
+    if pv["led"] is not None:
+        hw.append((pv["led"], "onboard LED"))
+    for g in sorted(eth_set):
+        hw.append((g, "Ethernet"))
+    if hw:
+        d["hardwired"] = [{"gpio": g, "label": l} for g, l in hw]
+    return d
 
 
 def wt32_flags(g):
@@ -138,8 +285,6 @@ WT32_BOT = [1, 3, 0, 39, 36, 15, 14, 12, 35, 4, 2]
 # Adafruit Feather ESP32-S3 (standard Feather layout, GPIOs from pins_arduino.h)
 FEAS3_L = [(18,"A0"),(17,"A1"),(16,"A2"),(15,"A3"),(14,"A4"),(8,"A5"),(36,"SCK"),(35,"MOSI"),(37,"MISO"),(38,"RX"),(39,"TX")]
 FEAS3_R = [(13,"D13"),(12,"D12"),(11,"D11"),(10,"D10"),(9,"D9"),(6,"D6"),(5,"D5"),(4,"SCL"),(3,"SDA"),(33,"NEO")]
-# Fritzing "realistic board" overlays are generated separately by gen_fritzing.py into
-# web/boards/fritzing/<id>.{svg,json} and merged into the descriptors below at build time.
 # Adafruit QT Py ESP32-S3
 QTPY_L = [(18,"A0"),(17,"A1"),(9,"A2"),(8,"A3"),(36,"SCK"),(37,"MISO"),(35,"MOSI")]
 QTPY_R = [(5,"TX"),(16,"RX"),(7,"SDA"),(6,"SCL"),(41,"SDA1"),(40,"SCL1"),(39,"NEO")]
@@ -147,47 +292,6 @@ QTPY_R = [(5,"TX"),(16,"RX"),(7,"SDA"),(6,"SCL"),(41,"SDA1"),(40,"SCL1"),(39,"NE
 FEAV2_L = [(26,"A0"),(25,"A1"),(34,"A2"),(39,"A3"),(36,"A4"),(4,"A5"),(5,"SCK"),(19,"MOSI"),(21,"MISO"),(7,"RX"),(8,"TX")]
 FEAV2_R = [(13,"D13"),(20,"SCL"),(22,"SDA"),(0,"NEO")]
 named = lambda gs, silk: [(g, silk(g)) for g in gs]
-
-
-def own_board_graphic(b):
-    """Draw our own license-free (MIT) realistic board SVG for DevKit-class boards that have
-    no clean Fritzing part (generic ESP32/-S3 DevKitC, DOIT, NodeMCU): a PCB with a USB jack,
-    a WROOM module and two 0.1" header rows of gold pads. Uses the same 0.1"-grid units as the
-    Fritzing SVGs so pin size stays consistent across boards. Returns the fritzing-style block;
-    hotspot coordinates are exact because we place the pads ourselves."""
-    top, bot = b["cols"][0], b["cols"][1]
-    PITCH, LM, RM, H, yTop, yBot = 7.2, 17.0, 8.0, 58.0, 9.0, 49.0
-    n = max(len(top), len(bot))
-    W = LM + (n - 1) * PITCH + RM
-    module = "ESP32-S3-WROOM-1" if b.get("mcu") == "esp32s3" else "ESP32-WROOM-32"
-    mx1, mx2, my1, my2 = LM - 5, W - RM + 3, yTop + 7, yBot - 7
-    s = ['<rect x="1" y="1" width="%.1f" height="%.1f" rx="6" fill="#0e3b2c" stroke="#1f8a63" stroke-width="0.8"/>' % (W - 2, H - 2),
-         '<rect x="3" y="3" width="%.1f" height="%.1f" rx="5" fill="none" stroke="#0a2a20" stroke-width="0.5"/>' % (W - 6, H - 6),
-         '<rect x="-2" y="%.1f" width="9" height="13" rx="1" fill="#aab2bd" stroke="#6b7480" stroke-width="0.4"/>' % (H / 2 - 6.5),
-         '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="2" fill="#3a4047" stroke="#11151a" stroke-width="0.6"/>' % (mx1, my1, mx2 - mx1, my2 - my1),
-         '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="1.5" fill="none" stroke="#565d66" stroke-width="0.4"/>' % (mx1 + 2, my1 + 2, mx2 - mx1 - 4, my2 - my1 - 4),
-         '<text x="%.1f" y="%.1f" fill="#aeb6bf" font-size="4.5" font-weight="600" text-anchor="middle" font-family="sans-serif">%s</text>' % ((mx1 + mx2) / 2, (my1 + my2) / 2 + 1.6, module)]
-    hot = []
-    for cx, cy in ((6, 6), (W - 6, 6), (6, H - 6), (W - 6, H - 6)):
-        s.append('<circle cx="%.1f" cy="%.1f" r="2" fill="#0d1117" stroke="#1f8a63" stroke-width="0.4"/>' % (cx, cy))
-    def row(pins, y, below):
-        for i, p in enumerate(pins):
-            x = LM + i * PITCH
-            s.append('<rect x="%.1f" y="%.1f" width="5" height="5" rx="0.8" fill="#d4af37" stroke="#8a6d1a" stroke-width="0.4"/>' % (x - 2.5, y - 2.5))
-            s.append('<circle cx="%.1f" cy="%.1f" r="1.3" fill="#0d1117"/>' % (x, y))
-            ly = (y + 5) if below else (y - 5)
-            anc = "start" if below else "end"
-            s.append('<text x="%.1f" y="%.1f" fill="#cdd6df" font-size="3" font-family="sans-serif" text-anchor="%s" transform="rotate(-90 %.1f %.1f)">%s</text>'
-                     % (x + 1, ly, anc, x + 1, ly, p["silk"]))
-            hot.append({"gpio": p["gpio"], "silk": p["silk"], "x": round(x, 2), "y": y})
-    row(top, yTop, True)
-    row(bot, yBot, False)
-    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.1f %.1f">%s</svg>' % (W, H, "".join(s))
-    os.makedirs(os.path.join(OUT, "fritzing"), exist_ok=True)
-    with open(os.path.join(OUT, "fritzing", b["id"] + ".svg"), "w", encoding="utf-8") as fh:
-        fh.write(svg)
-    return {"svg": "fritzing/%s.svg" % b["id"], "viewBox": "0 0 %.1f %.1f" % (W, H),
-            "credit": "LumiGate own render (MIT)", "hotspots": hot}
 
 
 def parse_v3():
@@ -228,7 +332,6 @@ def v3_descriptor():
         "id": "lumigate_v3",
         "name": "LumiGate v3 (ESP32-S3 + W5500)",
         "mcu": "esp32s3",
-        "photo": "img/lumigate-v3.png",
         "cols": cols(S3L, S3R, s3_silk, lambda g: s3_flags(g, eth_pins)),
         "preset": preset,
         "_source": "generated from hardware/lumigate.py",
@@ -236,8 +339,6 @@ def v3_descriptor():
 
 
 def main():
-    os.makedirs(os.path.join(OUT, "img"), exist_ok=True)
-
     boards = [
         v3_descriptor(),
         {
@@ -248,7 +349,6 @@ def main():
         },
         {
             "id": "esp32-devkitc", "name": "ESP32 DevKitC (WROOM-32, 38-pin)", "mcu": "esp32",
-            "photo": "img/esp32-devkitc.jpg",  # CC0, Wikimedia Commons (see web/boards/CREDITS.md)
             "cols": cols(E32L, E32R, e32_silk, e32_flags),
             "preset": {"ledType": 1, "ledPin": 2, "dispType": 1, "dispsda": 21, "dispscl": 22,
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
@@ -295,36 +395,40 @@ def main():
             "preset": {"ledType": 2, "ledPin": 0, "dispType": 1, "dispsda": 22, "dispscl": 20,
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 8, "rx": 7, "rts": -1}]},
         },
-        {
-            "id": "sparkfun-esp32-thing", "name": "SparkFun ESP32 Thing", "mcu": "esp32",
-            "cols": fritz_cols("sparkfun-esp32-thing", "esp32"),
-            "preset": {"ledType": 1, "ledPin": 5, "dispType": 0,
-                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
-        },
-        {
-            "id": "sparkfun-esp32-thing-plus", "name": "SparkFun ESP32 Thing Plus", "mcu": "esp32",
-            "cols": fritz_cols("sparkfun-esp32-thing-plus", "esp32"),
-            "preset": {"ledType": 1, "ledPin": 13, "dispType": 0,
-                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 17, "rx": 16, "rts": -1}]},
-        },
     ]
 
-    # merge Fritzing "realistic board" overlays produced by gen_fritzing.py (if present)
-    for b in boards:
-        frag = os.path.join(OUT, "fritzing", b["id"] + ".json")
-        if os.path.exists(frag):
-            b["fritzing"] = json.load(open(frag, encoding="utf-8"))
+    # SparkFun + the long tail of supported esp32 / esp32s3 boards, generated straight
+    # from the arduino-esp32 core variants (authoritative GPIOs). Physical column
+    # placement is approximate; GPIO numbers, silk names and flags are real.
+    auto = [
+        auto_board("sparkfun-esp32-thing", "SparkFun ESP32 Thing", "esp32", "esp32thing", led_type=1, led_pin=5),
+        auto_board("sparkfun-esp32-thing-plus", "SparkFun ESP32 Thing Plus", "esp32", "esp32thing_plus", led_type=1, led_pin=13),
+        auto_board("adafruit-huzzah32", "Adafruit HUZZAH32 Feather", "esp32", "feather_esp32"),
+        auto_board("wemos-lolin-d32", "WEMOS LOLIN D32", "esp32", "d32", layout="e3230"),
+        auto_board("wemos-lolin32", "WEMOS LOLIN32", "esp32", "lolin32", layout="e3230"),
+        auto_board("wemos-lolin32-lite", "WEMOS LOLIN32 Lite", "esp32", "lolin32-lite", layout="e3230"),
+        auto_board("heltec-wifi-kit-32", "Heltec WiFi Kit 32 (OLED)", "esp32", "heltec_wifi_kit_32", oled=(4, 15)),
+        auto_board("olimex-esp32-poe", "Olimex ESP32-PoE", "esp32", "esp32-poe", eth=True),
+        auto_board("olimex-esp32-poe-iso", "Olimex ESP32-PoE-ISO", "esp32", "esp32-poe-iso", eth=True),
+        auto_board("olimex-esp32-gateway", "Olimex ESP32-Gateway", "esp32", "esp32-gateway", eth=True),
+        auto_board("wesp32", "wESP32 (PoE)", "esp32", "wesp32", eth=True),
+        auto_board("esp32s3-devkitm-1", "ESP32-S3 DevKitM-1", "esp32s3", "esp32s3", layout="s3", led_type=2, led_pin=48),
+        auto_board("adafruit-metro-esp32s3", "Adafruit Metro ESP32-S3", "esp32s3", "adafruit_metro_esp32s3"),
+        auto_board("wemos-lolin-s3", "WEMOS LOLIN S3", "esp32s3", "lolin_s3"),
+        auto_board("wemos-lolin-s3-mini", "WEMOS LOLIN S3 Mini", "esp32s3", "lolin_s3_mini"),
+        auto_board("um-feathers3", "Unexpected Maker FeatherS3", "esp32s3", "um_feathers3"),
+        auto_board("um-pros3", "Unexpected Maker ProS3", "esp32s3", "um_pros3"),
+        auto_board("um-tinys3", "Unexpected Maker TinyS3", "esp32s3", "um_tinys3"),
+        auto_board("sparkfun-esp32s3-thing-plus", "SparkFun ESP32-S3 Thing Plus", "esp32s3", "sparkfun_esp32s3_thing_plus"),
+        auto_board("heltec-wifi-lora-32-v3", "Heltec WiFi LoRa 32 V3 (OLED)", "esp32s3", "heltec_wifi_lora_32_V3", oled=(17, 18)),
+        auto_board("lilygo-t-display-s3", "LilyGO T-Display-S3 (TFT)", "esp32s3", "lilygo_t_display_s3", tft=True),
+        auto_board("m5stack-atoms3", "M5Stack AtomS3 (TFT)", "esp32s3", "m5stack_atoms3", tft=True),
+        auto_board("m5stack-cores3", "M5Stack CoreS3 (TFT)", "esp32s3", "m5stack_cores3", tft=True),
+    ]
+    boards += [b for b in auto if b]
 
-    # The most widespread DevKit-class boards (generic ESP32/-S3 DevKitC, DOIT, NodeMCU)
-    # have no clean-license Fritzing part. Draw our own MIT realistic board graphic so they
-    # still get the interactive "realistic board" view (only if no Fritzing overlay exists).
-    OWN_GFX = {"esp32-devkitc", "esp32-devkit-v1", "nodemcu-32s", "esp32s3-devkitc-1"}
-    for b in boards:
-        if b["id"] in OWN_GFX and "fritzing" not in b:
-            b["fritzing"] = own_board_graphic(b)
-
-    # Fixed on-board wiring (the user CAN change these in /config but normally should not,
-    # because they are physically wired on the board). Shown as a hint per board.
+    # Fixed on-board wiring (changeable in /config but physically wired). Hand-tuned boards
+    # get curated labels here; auto boards already carry their own hardwired list.
     HARDWIRED = {
         "lumigate_v3": [(1,"LED Red"),(2,"LED Green"),(6,"LED Yellow"),(7,"LED Blue"),(15,"LED White"),
                         (17,"DMX TX"),(18,"DMX RX"),(8,"DMX DE/RE"),(12,"W5500 SCLK"),(11,"W5500 MOSI"),
@@ -341,8 +445,6 @@ def main():
         "adafruit-feather-esp32s3": [(33,"NeoPixel"),(13,"red LED")],
         "adafruit-feather-esp32-v2": [(0,"NeoPixel"),(13,"red LED")],
         "adafruit-qtpy-esp32s3": [(39,"NeoPixel")],
-        "sparkfun-esp32-thing": [(5,"onboard LED")],
-        "sparkfun-esp32-thing-plus": [(13,"onboard LED")],
     }
     for b in boards:
         if b["id"] in HARDWIRED:
@@ -367,14 +469,6 @@ def main():
     with open(os.path.join(OUT, "index.json"), "w", encoding="utf-8") as fh:
         json.dump(index, fh, indent=2)
     print("wrote", os.path.relpath(os.path.join(OUT, "index.json"), ROOT))
-
-    src_photo = os.path.join(HERE, "board-pcb-1.png")
-    if os.path.exists(src_photo):
-        dst = os.path.join(OUT, "img", "lumigate-v3.png")
-        shutil.copyfile(src_photo, dst)
-        print("copied photo ->", os.path.relpath(dst, ROOT))
-    else:
-        print("note: hardware/board-pcb-1.png not found, skipped photo copy")
 
 
 if __name__ == "__main__":
