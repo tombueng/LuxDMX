@@ -220,5 +220,11 @@
         "rts": -1
       }
     ]
-  }
+  },
+  "hardwired": [
+    {
+      "gpio": 48,
+      "label": "onboard RGB LED"
+    }
+  ]
 }

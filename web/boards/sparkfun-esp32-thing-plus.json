@@ -286,5 +286,11 @@
         "y": 18.25
       }
     ]
-  }
+  },
+  "hardwired": [
+    {
+      "gpio": 13,
+      "label": "onboard LED"
+    }
+  ]
 }

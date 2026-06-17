@@ -243,5 +243,71 @@
       }
     ]
   },
-  "_source": "generated from hardware/lumigate.py"
+  "_source": "generated from hardware/lumigate.py",
+  "hardwired": [
+    {
+      "gpio": 1,
+      "label": "LED Red"
+    },
+    {
+      "gpio": 2,
+      "label": "LED Green"
+    },
+    {
+      "gpio": 6,
+      "label": "LED Yellow"
+    },
+    {
+      "gpio": 7,
+      "label": "LED Blue"
+    },
+    {
+      "gpio": 15,
+      "label": "LED White"
+    },
+    {
+      "gpio": 17,
+      "label": "DMX TX"
+    },
+    {
+      "gpio": 18,
+      "label": "DMX RX"
+    },
+    {
+      "gpio": 8,
+      "label": "DMX DE/RE"
+    },
+    {
+      "gpio": 12,
+      "label": "W5500 SCLK"
+    },
+    {
+      "gpio": 11,
+      "label": "W5500 MOSI"
+    },
+    {
+      "gpio": 13,
+      "label": "W5500 MISO"
+    },
+    {
+      "gpio": 10,
+      "label": "W5500 CS"
+    },
+    {
+      "gpio": 14,
+      "label": "W5500 INT"
+    },
+    {
+      "gpio": 9,
+      "label": "W5500 RST"
+    },
+    {
+      "gpio": 4,
+      "label": "Display SDA (J4)"
+    },
+    {
+      "gpio": 5,
+      "label": "Display SCL (J4)"
+    }
+  ]
 }

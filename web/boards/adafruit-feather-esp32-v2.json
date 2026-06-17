@@ -243,5 +243,15 @@
         "y": 8.51
       }
     ]
-  }
+  },
+  "hardwired": [
+    {
+      "gpio": 0,
+      "label": "NeoPixel"
+    },
+    {
+      "gpio": 13,
+      "label": "red LED"
+    }
+  ]
 }

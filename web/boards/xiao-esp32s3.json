@@ -84,5 +84,11 @@
         "rts": -1
       }
     ]
-  }
+  },
+  "hardwired": [
+    {
+      "gpio": 21,
+      "label": "user LED (active-low)"
+    }
+  ]
 }

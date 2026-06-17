@@ -120,5 +120,47 @@
         "rts": -1
       }
     ]
-  }
+  },
+  "hardwired": [
+    {
+      "gpio": 0,
+      "label": "ETH ref-clock"
+    },
+    {
+      "gpio": 16,
+      "label": "ETH PHY power"
+    },
+    {
+      "gpio": 18,
+      "label": "ETH MDIO"
+    },
+    {
+      "gpio": 23,
+      "label": "ETH MDC"
+    },
+    {
+      "gpio": 19,
+      "label": "ETH TXD0"
+    },
+    {
+      "gpio": 22,
+      "label": "ETH TXD1"
+    },
+    {
+      "gpio": 21,
+      "label": "ETH TX_EN"
+    },
+    {
+      "gpio": 25,
+      "label": "ETH RXD0"
+    },
+    {
+      "gpio": 26,
+      "label": "ETH RXD1"
+    },
+    {
+      "gpio": 27,
+      "label": "ETH CRS_DV"
+    }
+  ]
 }

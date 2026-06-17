@@ -219,5 +219,11 @@
         "rts": -1
       }
     ]
-  }
+  },
+  "hardwired": [
+    {
+      "gpio": 2,
+      "label": "onboard LED"
+    }
+  ]
 }

@@ -180,5 +180,11 @@
         "y": 54.14
       }
     ]
-  }
+  },
+  "hardwired": [
+    {
+      "gpio": 39,
+      "label": "NeoPixel"
+    }
+  ]
 }

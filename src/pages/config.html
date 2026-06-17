@@ -50,7 +50,7 @@ footer a:hover { color:var(--gh-text); }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#238636; } .lg-warn::before{ background:#9e6a03; } .lg-bad::before{ background:#6e1a1a; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #58a6ff inset; }
 .fzwrap { padding:14px 0; }
-.fzwrap > svg { width:100%; height:auto; max-width:560px; display:block; margin:0 auto; }
+.fzwrap > svg { max-width:100%; height:auto; display:block; margin:0 auto; }
 .fzhot { cursor:pointer; } .fzhot:hover circle { fill-opacity:.85; }
 </style>
 </head>
@@ -92,6 +92,7 @@ footer a:hover { color:var(--gh-text); }
           <strong>Custom</strong> and the validator still flags strapping, flash, input-only and
           Ethernet-reserved pins for your chip.
         </div>
+        <div id="board-hardwired" class="form-text mt-2"></div>
         <div id="pin-warnings" class="mt-2"></div>
       </div>
     </div>
@@ -1072,7 +1073,11 @@ function renderFritzing(){
       return '<line x1="' + px + '" y1="' + py + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#58a6ff" stroke-width="0.5"/>'
         + '<text x="' + lx + '" y="' + ly + '" text-anchor="' + anc + '" font-size="' + FONT + '" font-weight="600" fill="#58a6ff">' + esc(p.text) + '</text>';
     }
-    var out = '<svg class="fzsvg" viewBox="0 0 ' + OW + ' ' + OH + '" preserveAspectRatio="xMidYMid meet">'
+    // Fixed scale (px per viewBox unit) so pins + labels are the SAME size on every board.
+    // All Fritzing breadboard SVGs share the 0.1" grid (7.2 units/pin), so a constant
+    // scale keeps pin size identical; bigger boards simply render larger (container scrolls).
+    var FZSCALE = 3.5;
+    var out = '<svg class="fzsvg" width="' + Math.round(OW * FZSCALE) + '" viewBox="0 0 ' + OW + ' ' + OH + '" preserveAspectRatio="xMidYMid meet">'
       + '<g transform="translate(' + DX + ',' + DY + ')">' + inner + '</g>'
       + fz.hotspots.map(dot).join('') + A.map(callout).join('') + '</svg>';
     wrap.innerHTML = '<div class="fzwrap">' + out + '</div>'
@@ -1138,7 +1143,16 @@ function applyTemplate(){
     updAllUniHints(); validate();
   });
 }
-function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply').disabled = !(b && b.preset); }
+function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply').disabled = !(b && b.preset); updHardwired(); }
+// List the board's fixed on-board wiring (LED, NeoPixel, Ethernet, etc.) — changeable but
+// usually best left alone; helps the user avoid clobbering a hard-wired pin.
+function updHardwired(){
+  var el = $('board-hardwired'); if (!el) return;
+  var b = currentBoardDesc(), hw = b && b.hardwired;
+  if (!hw || !hw.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<strong>On-board fixed wiring</strong> (changeable, but normally leave as-is): '
+    + hw.map(function(h){ return 'GPIO' + h.gpio + ' = ' + esc(h.label); }).join('  ·  ');
+}
 
 // ---- Board <select> + remote catalog (Phase 2) -----------------------------
 function appendBoardOption(id, name){

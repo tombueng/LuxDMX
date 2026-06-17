@@ -274,6 +274,31 @@ def main():
         if os.path.exists(frag):
             b["fritzing"] = json.load(open(frag, encoding="utf-8"))
 
+    # Fixed on-board wiring (the user CAN change these in /config but normally should not,
+    # because they are physically wired on the board). Shown as a hint per board.
+    HARDWIRED = {
+        "lumigate_v3": [(1,"LED Red"),(2,"LED Green"),(6,"LED Yellow"),(7,"LED Blue"),(15,"LED White"),
+                        (17,"DMX TX"),(18,"DMX RX"),(8,"DMX DE/RE"),(12,"W5500 SCLK"),(11,"W5500 MOSI"),
+                        (13,"W5500 MISO"),(10,"W5500 CS"),(14,"W5500 INT"),(9,"W5500 RST"),
+                        (4,"Display SDA (J4)"),(5,"Display SCL (J4)")],
+        "esp32-devkitc": [(2,"onboard LED")],
+        "esp32-devkit-v1": [(2,"onboard LED")],
+        "nodemcu-32s": [(2,"onboard LED")],
+        "esp32s3-devkitc-1": [(48,"onboard RGB LED")],
+        "xiao-esp32s3": [(21,"user LED (active-low)")],
+        "wt32eth01": [(0,"ETH ref-clock"),(16,"ETH PHY power"),(18,"ETH MDIO"),(23,"ETH MDC"),
+                      (19,"ETH TXD0"),(22,"ETH TXD1"),(21,"ETH TX_EN"),(25,"ETH RXD0"),
+                      (26,"ETH RXD1"),(27,"ETH CRS_DV")],
+        "adafruit-feather-esp32s3": [(33,"NeoPixel"),(13,"red LED")],
+        "adafruit-feather-esp32-v2": [(0,"NeoPixel"),(13,"red LED")],
+        "adafruit-qtpy-esp32s3": [(39,"NeoPixel")],
+        "sparkfun-esp32-thing": [(5,"onboard LED")],
+        "sparkfun-esp32-thing-plus": [(13,"onboard LED")],
+    }
+    for b in boards:
+        if b["id"] in HARDWIRED:
+            b["hardwired"] = [{"gpio": g, "label": l} for g, l in HARDWIRED[b["id"]]]
+
     for b in boards:
         path = os.path.join(OUT, b["id"] + ".json")
         with open(path, "w", encoding="utf-8") as fh:
