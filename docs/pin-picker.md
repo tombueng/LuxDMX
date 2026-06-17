@@ -10,32 +10,37 @@ two DMX outputs x TX/RX/RTS). Typing raw GPIO numbers invites mix-ups between *p
 number* vs *GPIO number* vs the silk label, and accidental use of strapping, flash,
 input-only or Ethernet-reserved pins. The picker removes the guesswork.
 
-## Design decision: data-driven SVG, not photos
+## Design decision: a generated diagram, not photos
 
-Each board is a small **JSON descriptor**. A generic renderer draws an interactive SVG
-board from it, where every pin is a real clickable element bound to its GPIO number, so
-there is no pixel imagemap to drift. One descriptor drives three features:
+Each board is a small **JSON descriptor**. A generic renderer draws an interactive,
+horizontal **diagram** from it (pins along the horizon, vertical silk+GPIO labels,
+assigned-function callouts above/below, status colours), where every pad is a real
+clickable element bound to its GPIO number, so there is no pixel imagemap to drift.
+One descriptor drives three features:
 
 - the **diagram / picker** (`cols`),
 - the **template** (`preset`),
 - the **validator** (per-pin `flags`).
 
-A photo would be both the heaviest asset and the least precise click target. SVG/JSON
-descriptors are a few KB gzipped, so hundreds fit where a single ~400 KB photo would not.
+There are deliberately **no board photos and no realistic/Fritzing graphics**: too few
+ESP32/-S3 boards have clean-license images to make that worthwhile, and a photo is both
+the heaviest asset and the least precise click target. The generated diagram works the
+same for every board and is a few KB of JSON, so the whole catalog fits where a single
+~400 KB photo would not.
 
 ### Flash budget (measured)
 
-App partition `0x1E0000` ≈ 1.875 MB. The whole feature added ~7.5 KB to the gzipped
-`config.html` embed (esp32dev: 1,545,744 → 1,553,292 bytes), leaving ~400 KB free.
-Board photos are therefore kept **online only** (GitHub Pages), never embedded.
+App partition `0x1E0000` ≈ 1.875 MB. The picker adds only a few KB to the gzipped
+`config.html` embed; the per-board catalog is fetched online and never embedded, so the
+firmware footprint stays small regardless of how many boards the catalog grows to.
 
 ## Architecture
 
 ```
-src/pages/config.html      renderer + validator + 3 built-in descriptors (offline)
+src/pages/config.html      renderer + validator + 5 built-in descriptors (offline)
 src/main.cpp /info.json     adds "board" + "mcu" so the UI auto-selects the right rules
-web/boards/                 catalog (index.json + per-board JSON + photos) -> GitHub Pages
-hardware/gen_board_descriptor.py   generates the v3 descriptor from the PCB source
+web/boards/                 catalog (index.json + per-board JSON) -> GitHub Pages
+hardware/gen_board_descriptor.py   generates every descriptor (see below)
 ```
 
 ### Deployment split
@@ -43,12 +48,11 @@ hardware/gen_board_descriptor.py   generates the v3 descriptor from the PCB sour
 | Part | Location | Why |
 |---|---|---|
 | Renderer + validator | firmware flash | small, must work offline |
-| 3 core descriptors (v3, ESP32 DevKitC, ESP32-S3 DevKitC-1) | firmware flash | covers our HW + the common dev boards, fully offline |
-| Long-tail / community boards | GitHub Pages, lazy-fetched + `localStorage` cache | keeps flash small |
-| Board photos | GitHub Pages only | too heavy for flash |
+| 5 core descriptors (v3, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3 DevKitC-1, XIAO S3) | firmware flash | covers our HW + the common dev boards, fully offline |
+| The rest of the catalog | GitHub Pages, lazy-fetched + `localStorage` cache | keeps flash small |
 
-The core flow never depends on the network. On an isolated stage LAN the three built-in
-boards and manual GPIO entry still work; catalog/photo fetch failures degrade silently.
+The core flow never depends on the network. On an isolated stage LAN the built-in
+boards and manual GPIO entry still work; catalog fetch failures degrade silently.
 
 ## Board auto-detection
 
@@ -62,7 +66,8 @@ boards and manual GPIO entry still work; catalog/photo fetch failures degrade si
 | `esp32dev` | `esp32-devkitc` | `esp32` |
 
 If the id matches a descriptor, the board is preselected; otherwise the page falls back
-to **Custom**, which still validates against the chip family rules for `mcu`.
+to **Custom**, which still validates against the chip family rules for `mcu`. The board
+can also be switched from a dropdown inside the pin-picker popup itself.
 
 ## Validation rules
 
@@ -87,41 +92,34 @@ esp32s3 : flash 26-32, serial 43/44, usb-jtag 19/20, strapping 0/3/45/46, max 48
 ## Descriptor schema and adding boards
 
 See [web/boards/README.md](../web/boards/README.md) for the JSON schema, the `flags`
-table, and the contribution flow. Regenerate the generated descriptors with:
+table, and the contribution flow. Regenerate every descriptor with:
 
 ```sh
 python hardware/gen_board_descriptor.py
 ```
 
-The LumiGate v3 descriptor is parsed straight from `hardware/lumigate.py` (the PCB
-netlist source), so its diagram, template and Ethernet-reserved-pin rules cannot drift
-from the real board.
-
 ## Board coverage
 
-Built-in (offline) descriptors: LumiGate v3, ESP32 DevKitC (WROOM-32, 38-pin),
-ESP32 DevKit v1 (DOIT, 30-pin), ESP32-S3 DevKitC-1 (44-pin), Seeed XIAO ESP32-S3.
+**33 boards** spanning every esp32 / esp32s3 board the firmware runs on (see
+[../web/boards/ROADMAP.md](../web/boards/ROADMAP.md) for the full list). Descriptor data
+is sourced authoritatively, not guessed:
 
-Catalog (online, lazy-fetched) descriptors add: NodeMCU-32S, WT32-ETH01,
-Adafruit Feather ESP32-S3, Adafruit QT Py ESP32-S3, Adafruit Feather ESP32 V2.
+- **LumiGate v3** is parsed straight from `hardware/lumigate.py` (the PCB netlist source),
+  so its diagram, template and Ethernet-reserved-pin rules cannot drift from the board.
+- **Hand-tuned** boards (DevKitC / DevKit v1 / NodeMCU / S3 DevKitC-1, Feather / QtPy /
+  XIAO / WT32-ETH01) use their real, published header order.
+- **Every other board** is auto-generated by `auto_board()` from the arduino-esp32 core's
+  `variants/<dir>/pins_arduino.h` (authoritative GPIO numbers / silk names / flags;
+  physical column placement approximate).
 
-Variants genuinely differ in pinout/layout, so each is its own descriptor rather than
-one misleading photo:
-- the 30-pin DOIT board omits the flash pins (6-11) and has a different header layout
-  than the 38-pin DevKitC,
-- the PICO-based Feather ESP32 V2 frees GPIO6-11 and reserves 16/17 for its embedded
-  flash (opposite of a WROOM board),
-- WT32-ETH01 reserves the RMII pins and uses GPIO0 as the Ethernet refclk.
-
-Descriptor data is sourced authoritatively, not guessed: `hardware/lumigate.py` (PCB
-netlist) for v3, and the Arduino core's `variants/<board>/pins_arduino.h` for the rest,
-via `hardware/gen_board_descriptor.py`. Adding a board = add its pinout there + rerun.
-
-Photos are optional online-only overlays from sources we may redistribute (own renders,
-CC0, or CC-BY/CC-BY-SA with attribution); see [../web/boards/CREDITS.md](../web/boards/CREDITS.md).
+Variants genuinely differ in pinout/layout, so each is its own descriptor: the 30-pin
+DOIT board omits the flash pins (6-11); the PICO-based Feather ESP32 V2 frees GPIO6-11
+and reserves 16/17 for its embedded flash; the Ethernet boards reserve their RMII pins.
+OLED boards (Heltec) pre-configure the mono display on "Apply template"; TFT boards
+(LilyGO T-Display-S3, M5Stack) leave the display off (mono OLED + SSD1351 colour SPI are
+the only supported panels for now).
 
 ## Roadmap / possible follow-ups
 
-- More community board descriptors in the catalog (PRs welcome).
-- A `wt32eth01` descriptor with the exact RMII-reserved pins.
+- More board descriptors in the catalog (one `auto_board()` line each; PRs welcome).
 - Optional device-side storage of a custom descriptor (today: browser `localStorage`).

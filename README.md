@@ -582,17 +582,21 @@ variants (which are **not** all the same pinout):
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
 | Seeed XIAO ESP32-S3 | tiny board, D0-D10 silk |
 
-More boards are pulled lazily from the online catalog ([web/boards/](web/boards/), served
-via GitHub Pages) and cached in your browser: NodeMCU-32S, WT32-ETH01 (Ethernet),
-Adafruit Feather ESP32-S3, Adafruit QT Py ESP32-S3, Adafruit Feather ESP32 V2 (PICO), and
-growing. No network means you still get the built-ins plus manual entry. All descriptors
-are generated from authoritative pinout data (`hardware/gen_board_descriptor.py`, sourced
-from `hardware/lumigate.py` for v3 and the Arduino core `pins_arduino.h` variants for the
-rest), so the GPIO numbers and reserved/strapping/flash flags are accurate per variant
-(e.g. the PICO-based Feather V2 frees GPIO6-11 and reserves 16/17 instead). Board diagrams
-are tiny SVG; board *photos* are an optional, online-only overlay (own renders or
-CC0/CC-licensed images, see [web/boards/CREDITS.md](web/boards/CREDITS.md)), never embedded
-in flash.
+The full catalog covers **33 boards** spanning every esp32 / esp32s3 board the firmware
+runs on (DevKit / DOIT / NodeMCU, WEMOS LOLIN, Adafruit Feather / QtPy / HUZZAH32 / Metro,
+Heltec OLED, Olimex PoE / Gateway / wESP32 Ethernet, Unexpected Maker, M5Stack, LilyGO,
+SparkFun ...). The boards beyond the five built-ins are pulled lazily from the online
+catalog ([web/boards/](web/boards/), served via GitHub Pages) and cached in your browser;
+no network means you still get the built-ins plus manual entry. You can switch boards from
+a dropdown inside the pin-picker popup itself.
+
+All descriptors are generated from authoritative pinout data
+(`hardware/gen_board_descriptor.py`): `hardware/lumigate.py` for v3, published header
+pinouts for the hand-tuned dev boards, and the Arduino core `variants/<dir>/pins_arduino.h`
+for the rest, so the GPIO numbers and reserved/strapping/flash flags are accurate per
+variant (e.g. the PICO-based Feather V2 frees GPIO6-11 and reserves 16/17 instead). The
+picker draws its own horizontal **diagram** for every board; there are no board photos or
+realistic graphics.
 
 See [docs/pin-picker.md](docs/pin-picker.md) for the design, the descriptor schema and
 how to add a board.
