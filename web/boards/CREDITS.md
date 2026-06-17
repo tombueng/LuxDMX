@@ -8,6 +8,8 @@ The optional, online-only board **photos** come from these sources:
 | `img/lumigate-v3.png` | LumiGate v3 | our own KiCad render (`hardware/board-pcb-1.png`) | project (MIT, same as repo) |
 | `img/esp32-devkitc.jpg` | ESP32 DevKitC (WROOM-32) | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:ESP32_Espressif_ESP-WROOM-32_Dev_Board.jpg) by Ubahnverleih | CC0 1.0 (public domain) |
 | `fritzing/adafruit-feather-esp32s3.svg` | Adafruit Feather ESP32-S3 (interactive "realistic board" graphic) | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified; click hotspots are a separate overlay) | CC BY-SA 3.0 |
+| `fritzing/adafruit-feather-esp32-v2.svg` | Adafruit Feather ESP32 V2 | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified) | CC BY-SA 3.0 |
+| `fritzing/adafruit-qtpy-esp32s3.svg` | Adafruit QT Py ESP32-S3 | [Adafruit Fritzing-Library](https://github.com/adafruit/Fritzing-Library) (breadboard view, unmodified) | CC BY-SA 3.0 |
 
 Notes:
 - `esp32-devkitc.jpg` is downscaled to 800 px from the CC0 original; CC0 requires no
