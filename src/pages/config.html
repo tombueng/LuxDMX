@@ -925,8 +925,10 @@ function shortRole(role){
 function padSvg(side, pin, y, assign){
   var g = pin.gpio, used = assign[g], cls = padClass(pin.flags || []);
   var rx = side === 'L' ? RAIL_L : RAIL_R;
-  var lx = side === 'L' ? (rx + 13) : (rx - 13);
-  var anc = side === 'L' ? 'start' : 'end';
+  var lin = side === 'L' ? (rx + 13) : (rx - 13);     // inward: silk + GPIO
+  var anin = side === 'L' ? 'start' : 'end';
+  var lout = side === 'L' ? (rx - 11) : (rx + 11);    // outward: assigned function (callout)
+  var anout = side === 'L' ? 'end' : 'start';
   var ring = used ? '#58a6ff' : statusColor(cls);
   var rw = used ? 3 : 2;
   var tip = 'GPIO' + g + (pin.silk ? ' (' + pin.silk + ')' : '')
@@ -934,8 +936,9 @@ function padSvg(side, pin, y, assign){
           + (used ? ' — ' + used.map(roleLabel).join(', ') : '');
   var pad = '<rect x="' + (rx - 7) + '" y="' + (y - 7) + '" width="14" height="14" rx="2" fill="#d4af37" stroke="' + ring + '" stroke-width="' + rw + '"/>'
           + '<circle cx="' + rx + '" cy="' + y + '" r="2.4" fill="#0d1117"/>';
-  var t1 = '<text class="pad-lbl" x="' + lx + '" y="' + (y - 1) + '" text-anchor="' + anc + '">' + esc(pin.silk || ('IO' + g)) + ' ·G' + g + '</text>';
-  var t2 = used ? '<text class="pad-assign" x="' + lx + '" y="' + (y + 9) + '" text-anchor="' + anc + '">▸ ' + esc(used.map(shortRole).join(',')) + '</text>' : '';
+  var t1 = '<text class="pad-lbl" x="' + lin + '" y="' + (y + 3) + '" text-anchor="' + anin + '">' + esc(pin.silk || ('IO' + g)) + ' ·G' + g + '</text>';
+  var t2 = used ? '<line x1="' + (side === 'L' ? rx - 7 : rx + 7) + '" y1="' + y + '" x2="' + lout + '" y2="' + y + '" stroke="#58a6ff" stroke-width="0.6"/>'
+        + '<text class="pad-assign" x="' + (side === 'L' ? lout - 2 : lout + 2) + '" y="' + (y + 3) + '" text-anchor="' + anout + '">' + esc(used.map(calloutLabel).join(', ')) + '</text>' : '';
   return '<g class="pad' + (used ? ' used' : '') + '" data-gpio="' + g + '"><title>' + esc(tip) + '</title>' + pad + t1 + t2 + '</g>';
 }
 function renderBoard(){
@@ -945,7 +948,9 @@ function renderBoard(){
   activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
   var L = b.cols[0], R = b.cols[1], n = Math.max(L.length, R.length);
   var H = TOP + n * ROW + 22;
-  var s = '<svg class="board-svg" viewBox="0 0 ' + BRD_W + ' ' + H + '" width="' + BRD_W + '">';
+  var SIDE = 100;  // side margins for the outward assignment callout labels
+  var s = '<svg class="board-svg" viewBox="0 0 ' + (BRD_W + 2 * SIDE) + ' ' + H + '" width="' + (BRD_W + 2 * SIDE) + '">';
+  s += '<g transform="translate(' + SIDE + ',0)">';
   // PCB body + inner silk edge + mounting holes
   s += '<rect x="' + BODY_X + '" y="6" width="' + BODY_W + '" height="' + (H - 12) + '" rx="12" fill="#0e3b2c" stroke="#1f8a63" stroke-width="1.5"/>';
   s += '<rect x="' + (BODY_X + 4) + '" y="10" width="' + (BODY_W - 8) + '" height="' + (H - 20) + '" rx="9" fill="none" stroke="#0a2a20"/>';
@@ -964,7 +969,7 @@ function renderBoard(){
   var i, y;
   for (i = 0; i < L.length; i++){ y = TOP + i * ROW; s += padSvg('L', L[i], y, assign); }
   for (i = 0; i < R.length; i++){ y = TOP + i * ROW; s += padSvg('R', R[i], y, assign); }
-  s += '</svg>';
+  s += '</g></svg>';
   wrap.innerHTML = s;
   wrap.querySelectorAll('.pad').forEach(function(node){
     node.addEventListener('click', function(){ onPinClick(+node.getAttribute('data-gpio')); });
