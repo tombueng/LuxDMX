@@ -192,7 +192,10 @@ def draw_status(p):
     y = 0
     p.set_text_color(accent); p.set_cursor(0, y); p.print("LumiGate")
     p.set_text_color(GREY); p.set_cursor(W - len(VERSION) * 6, y); p.print(VERSION)
-    y += rp
+    # Dual-colour 128x64 OLEDs are yellow rows 0-15 + a ~2px gap + blue rows 16-63.
+    # Keep the title alone in the yellow band and start the body at the seam, so no
+    # line (especially the IP) is sliced across the colour boundary (issue #16).
+    y = 16
     p.set_text_color(WHITE); p.set_cursor(0, y); p.print(IP)
     y += rp
     if dual:
