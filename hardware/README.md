@@ -201,21 +201,32 @@ of minor connector/edge DRC warnings remain (J3 magjack mask slivers, USB-C unus
 are inherent to the manufacturer footprints and are cleared in a short GUI pass or simply waived at the
 JLCPCB upload step.
 
-### Firmware support — TODO
+### Firmware support
 
-The board is electrically ready, but the **main firmware does not yet drive this board's Ethernet or
-LED panel**. Open firmware tasks:
+Both board-specific firmware features are implemented and build-verified in `env:lumigate_v3`
+(see [platformio.ini](../platformio.ini)) on **arduino-esp32 v3 / ESP-IDF 5.5**:
 
-- [ ] **W5500 SPI-Ethernet driver.** The firmware's only Ethernet path today is LAN8720/RMII
-  (`ETH.begin(…, ETH_PHY_LAN8720, …)`, for the WT32-ETH01). The ESP32-S3 has no internal EMAC and the
-  W5500 is SPI, so this needs a new path — `ETH.begin(ETH_PHY_W5500, …)` (Arduino-ESP32 v3 SPI-Ethernet) —
-  on **SCLK=IO12, MOSI=IO11, MISO=IO13, CS=IO10, INT=IO14, RST=IO9**, in a dedicated `env:lumigate_v3`.
-- [ ] **5 discrete status LEDs.** The firmware currently drives a *single* status LED (`DEF_LED_PIN`,
-  one NeoPixel/GPIO). This board has five — **R=IO1, G=IO2, Y=IO6, B=IO7, W=IO15** — so it needs a
-  multi-LED status model (network / DMX-activity / conflict / identify).
+- [x] **W5500 SPI-Ethernet driver.** `ETH.begin(ETH_PHY_W5500, …)` registers the W5500 as an lwIP
+  netif, so the existing AsyncWebServer / Art-Net / sACN / OTA stack runs over wired Ethernet
+  unchanged — on **SCLK=IO12, MOSI=IO11, MISO=IO13, CS=IO10, INT=IO14, RST=IO9** (SPI3 host),
+  selected by the `USE_ETH_SPI` build flag. This requires **arduino-esp32 v3** (v2.x has no
+  `ETH_PHY_W5500`), which is why the whole firmware moved to the v3 framework via the
+  [pioarduino](https://github.com/pioarduino/platform-espressif32) platform.
+- [x] **5 discrete status LEDs.** A new `ledType=3` model drives all five LEDs simultaneously —
+  <span>**R=IO1**</span> no network · **G=IO2** network up · **Y=IO6** DMX activity ·
+  **B=IO7** source conflict · **W=IO15** identify. Pins are configurable in `/config`.
 
-Working on this board today: **WiFi + DMX output.** (The RJ45 MagJack's link/act LEDs are driven by the
-W5500 itself — no firmware needed.)
+The RJ45 MagJack's link/act LEDs are driven by the W5500 itself — no firmware needed.
+
+> **Build caveats** (both handled, but worth knowing for a clean checkout / CI):
+> - **esp_dmx 4.1.0 on ESP-IDF 5.5** — needs a small fix (the removed `uart_periph_signal[].module`
+>   field, plus the older UART2 guard). Applied automatically at build time by
+>   [`extra_scripts.py`](../extra_scripts.py) — no manual step.
+> - **pioarduino toolchain installer** — release `55.03.39`'s Xtensa toolchain archive trips
+>   `idf_tools.py` (`do_strip_container_dirs`: *"expected 1 entry, got ['package.json', …]"*), which
+>   leaves the compiler uninstalled. This is an installer bug, **not** a repo issue; it needs a
+>   one-time host patch (ignore the stray `package.json`) or a different platform pin. **CI on this
+>   pinned release needs the same handling.**
 
 ## Toolchain
 
