@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="https://tombueng.github.io/LumiGate/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
-  <a href="https://youtu.be/up8lIbRqosQ"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
+  <a href="https://youtu.be/vYDyAZC2Ups"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
   <a href="hardware/README.md"><b>🛠 Custom PCB</b></a> &nbsp;·&nbsp;
   <a href="#flashing-pre-built-firmware"><b>Install</b></a>
 </p>
@@ -37,9 +37,9 @@
 
 A guided tour of every control — manual channel control, labels, sparkline history, identify, blackout, and all settings:
 
-[![LumiGate web UI walkthrough](docs/demo.gif)](https://youtu.be/up8lIbRqosQ)
+[![LumiGate web UI walkthrough](docs/demo.gif)](https://youtu.be/vYDyAZC2Ups)
 
-▶ **[Watch the full walkthrough on YouTube](https://youtu.be/up8lIbRqosQ)** &nbsp;·&nbsp; regenerate with [`docs/screenshot.mjs`](docs/screenshot.mjs)
+▶ **[Watch the full walkthrough on YouTube](https://youtu.be/vYDyAZC2Ups)** &nbsp;·&nbsp; regenerate with [`docs/screenshot.mjs`](docs/screenshot.mjs)
 
 ---
 
