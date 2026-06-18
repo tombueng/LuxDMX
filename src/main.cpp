@@ -19,12 +19,14 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
-#if defined(USE_ETHERNET) || defined(USE_ETH_SPI)
-#include <ETH.h>          // RMII (USE_ETHERNET) or W5500-SPI (USE_ETH_SPI)
+// Wired-Ethernet capable boards compile in <ETH.h>: USE_ETH_RMII = LAN8720 over
+// RMII (WT32-ETH01), USE_ETH_SPI = W5500 over SPI (LumiGate v3). Either way WiFi
+// is ALSO compiled in and the active interface is chosen at runtime (issue #14).
+#if defined(USE_ETH_RMII) || defined(USE_ETH_SPI)
+#include <ETH.h>
+#define HAS_WIRED_ETH 1
 #endif
-#ifndef USE_ETHERNET
-#include <WiFiManager.h>  // WiFi is the default unless the board is Ethernet-only
-#endif
+#include <WiFiManager.h>  // WiFi (STA config portal) is always available
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
@@ -163,7 +165,20 @@ static const char* DEF_OTA_PW   = "dmxota";
 static constexpr int DEF_UNIVERSE = 0;
 static constexpr int DEF_PROTOCOL = 2;
 static const char* PREF_NS = "dmxgw";
-static const char* AP_SSID = "DMX-Gateway";
+static const char* AP_SSID = "DMX-Gateway";   // SSID of the transient setup/config portal
+
+// WiFi interface mode (cfg.wifiMode)
+static constexpr int NET_WIFI_STA = 0;        // station / client (join an existing router)
+static constexpr int NET_WIFI_AP  = 1;        // standalone access point (no router needed)
+
+// Default interface per board. WT32-ETH01 (RMII) has historically been wired-only,
+// so it keeps Ethernet as the default; every other board defaults to WiFi. This
+// also makes an OTA from the old eth-only WT32 firmware come back on Ethernet.
+#if defined(USE_ETH_RMII)
+static constexpr bool DEF_USE_ETH = true;
+#else
+static constexpr bool DEF_USE_ETH = false;
+#endif
 
 // ---------------------------------------------------------------------------
 // Sender tracking
@@ -201,30 +216,46 @@ static uint8_t  logCount = 0;
 static uint32_t lastLogMs = 0;
 
 // ---------------------------------------------------------------------------
-// Network abstraction (WiFi vs Ethernet)
+// Network abstraction (issue #14 — runtime-selectable interface)
 // ---------------------------------------------------------------------------
-#if defined(USE_ETHERNET)
-// Ethernet-only board (e.g. WT32-ETH01, RMII) — no WiFi.
-static bool      netConnected() { return ETH.linkUp() && ETH.localIP() != IPAddress(0,0,0,0); }
-static IPAddress netLocalIP()   { return ETH.localIP(); }
-static String    netSSID()      { return "Ethernet"; }
-static int       netRSSI()      { return 0; }
-#elif defined(USE_ETH_SPI)
-// Board has a W5500 (e.g. LumiGate v3): WiFi by DEFAULT, wired Ethernet is an
-// opt-in toggled at runtime (g_useEth, mirrors cfg.useEthernet — set in setup()
-// before any net call). Both stacks are compiled in.
+// Two runtime flags decide which interface the net accessors report on:
+//   g_useEth  — wired Ethernet active (RMII or W5500). Only ever true on a board
+//               that compiled in <ETH.h> (HAS_WIRED_ETH); set in setup() from
+//               cfg.useEthernet before any net call.
+//   g_apMode  — WiFi running as a standalone access point (cfg.wifiMode == AP, or
+//               the automatic fallback when wired Ethernet has no link).
+// With both false the device is a WiFi station (the classic client mode).
 static bool g_useEth = false;
-static bool      netConnected() { return g_useEth ? (ETH.linkUp() && ETH.localIP() != IPAddress(0,0,0,0))
-                                                  : (WiFi.status() == WL_CONNECTED); }
-static IPAddress netLocalIP()   { return g_useEth ? ETH.localIP() : WiFi.localIP(); }
-static String    netSSID()      { return g_useEth ? String("Ethernet") : WiFi.SSID(); }
-static int       netRSSI()      { return g_useEth ? 0 : (int)WiFi.RSSI(); }
-#else
-static bool      netConnected() { return WiFi.status() == WL_CONNECTED; }
-static IPAddress netLocalIP()   { return WiFi.localIP(); }
-static String    netSSID()      { return WiFi.SSID(); }
-static int       netRSSI()      { return (int)WiFi.RSSI(); }
+static bool g_apMode = false;
+
+static bool netConnected() {
+#if defined(HAS_WIRED_ETH)
+    if (g_useEth) return ETH.linkUp() && ETH.localIP() != IPAddress(0,0,0,0);
 #endif
+    if (g_apMode) return WiFi.softAPIP() != IPAddress(0,0,0,0);   // AP is up once it has its IP
+    return WiFi.status() == WL_CONNECTED;
+}
+static IPAddress netLocalIP() {
+#if defined(HAS_WIRED_ETH)
+    if (g_useEth) return ETH.localIP();
+#endif
+    if (g_apMode) return WiFi.softAPIP();
+    return WiFi.localIP();
+}
+static String netSSID() {
+#if defined(HAS_WIRED_ETH)
+    if (g_useEth) return String("Ethernet");
+#endif
+    if (g_apMode) return WiFi.softAPSSID();
+    return WiFi.SSID();
+}
+static int netRSSI() {
+#if defined(HAS_WIRED_ETH)
+    if (g_useEth) return 0;
+#endif
+    if (g_apMode) return 0;   // RSSI is meaningless for an AP
+    return (int)WiFi.RSSI();
+}
 
 // Parse a dotted-quad into IPAddress; returns false (and 0.0.0.0) if invalid/empty
 static bool parseIp(const String& s, IPAddress& out) {
@@ -302,7 +333,10 @@ struct Config {
     int    dispRst;
     int    dispSck;
     int    dispMosi;
-    bool   useEthernet;    // W5500 boards only: true = wired Ethernet, false = WiFi (default)
+    bool   useEthernet;    // wired-Eth boards: true = wired Ethernet, false = WiFi
+    int    wifiMode;       // WiFi interface mode: 0 = STA (client), 1 = AP (standalone)
+    bool   apFallback;     // start the WiFi AP automatically if wired Eth has no link
+    String apPassword;     // standalone-AP passphrase (>=8 chars = WPA2, empty = open)
     bool   staticIp;       // false = DHCP
     String ip;             // dotted-quad strings; empty when unused
     String gateway;
@@ -378,7 +412,10 @@ static void loadConfig() {
     cfg.dispRst     = constrain(prefs.getInt("disprst",  -1), -1, 48);
     cfg.dispSck     = constrain(prefs.getInt("dispsck",  -1), -1, 48);
     cfg.dispMosi    = constrain(prefs.getInt("dispmosi", -1), -1, 48);
-    cfg.useEthernet = prefs.getBool("useeth",   false);
+    cfg.useEthernet = prefs.getBool("useeth",   DEF_USE_ETH);
+    cfg.wifiMode    = constrain(prefs.getInt("wifimode", NET_WIFI_STA), NET_WIFI_STA, NET_WIFI_AP);
+    cfg.apFallback  = prefs.getBool("apfb",     true);
+    cfg.apPassword  = prefs.getString("appw",   "");
     cfg.staticIp    = prefs.getBool("staticip", false);
     cfg.ip          = prefs.getString("ip",      "");
     cfg.gateway     = prefs.getString("gateway", "");
@@ -420,6 +457,9 @@ static void saveConfig() {
     prefs.putInt("dispsck",     cfg.dispSck);
     prefs.putInt("dispmosi",    cfg.dispMosi);
     prefs.putBool("useeth",     cfg.useEthernet);
+    prefs.putInt("wifimode",    cfg.wifiMode);
+    prefs.putBool("apfb",       cfg.apFallback);
+    prefs.putString("appw",     cfg.apPassword);
     prefs.putBool("staticip",   cfg.staticIp);
     prefs.putString("ip",       cfg.ip);
     prefs.putString("gateway",  cfg.gateway);
@@ -1317,11 +1357,14 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispSck\":";    j += cfg.dispSck;            j += ",";
     j += "\"dispMosi\":";   j += cfg.dispMosi;           j += ",";
     j += "\"useEthernet\":"; j += cfg.useEthernet ? "true" : "false"; j += ",";
-#if defined(USE_ETH_SPI) && !defined(USE_ETHERNET)
-    j += "\"ethSpi\":true,";   // board has a W5500 → show the WiFi/Ethernet selector
+#if defined(HAS_WIRED_ETH)
+    j += "\"hasEth\":true,";   // board has wired Ethernet → show the WiFi/Ethernet selector
 #else
-    j += "\"ethSpi\":false,";
+    j += "\"hasEth\":false,";
 #endif
+    j += "\"wifiMode\":";   j += cfg.wifiMode;           j += ",";
+    j += "\"apFallback\":"; j += cfg.apFallback ? "true" : "false"; j += ",";
+    j += "\"apPassword\":\""; j += cfg.apPassword;       j += "\",";
     j += "\"staticIp\":";   j += cfg.staticIp ? "true" : "false"; j += ",";
     j += "\"sip\":\"";      j += cfg.ip;                 j += "\",";
     j += "\"gateway\":\"";  j += cfg.gateway;            j += "\",";
@@ -1447,6 +1490,9 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "dispsck", s))  cfg.dispSck   = constrain(s.toInt(), -1, 48);
     if (argStr(req, "dispmosi", s)) cfg.dispMosi  = constrain(s.toInt(), -1, 48);
     cfg.useEthernet = req->hasParam("useeth", true) || req->hasParam("useeth");
+    if (argStr(req, "wifimode", s)) cfg.wifiMode = constrain(s.toInt(), NET_WIFI_STA, NET_WIFI_AP);
+    cfg.apFallback = req->hasParam("apfb", true) || req->hasParam("apfb");
+    if (argStr(req, "appw", s))    cfg.apPassword = s;
     cfg.staticIp = req->hasParam("staticip", true) || req->hasParam("staticip");
     if (argStr(req, "ip", s))      cfg.ip      = s;
     if (argStr(req, "gateway", s)) cfg.gateway = s;
@@ -1568,7 +1614,7 @@ static void versionCheckTask(void*) {
 // OTA handlers
 // ---------------------------------------------------------------------------
 // Firmware asset name for this build target
-#if defined(USE_ETHERNET)
+#if defined(USE_ETH_RMII)
 #define OTA_BIN "firmware-wt32eth01.bin"
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
 #define OTA_BIN "firmware-esp32s3.bin"
@@ -1636,9 +1682,8 @@ static void handleOtaUploadChunk(AsyncWebServerRequest* req, const String& filen
 }
 
 // ---------------------------------------------------------------------------
-// WiFiManager (WiFi builds only)
+// WiFiManager (STA config portal)
 // ---------------------------------------------------------------------------
-#ifndef USE_ETHERNET
 static bool wm_shouldSave = false;
 static char wm_universeStr[4] = "0";
 static void wmSaveCallback() { wm_shouldSave = true; }
@@ -1717,7 +1762,6 @@ static void connectStrongestAP() {
             (int)WiFi.RSSI(), WiFi.BSSIDstr().c_str());
     }
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // Peripheral init
@@ -1894,6 +1938,15 @@ static void dispCenter(const char* s, int ts, int y) {
     gfx->print(s);
 }
 
+// Compact link-status label for the status display: wired up/down, WiFi RSSI, or
+// the AP SSID. Empty when WiFi is down (the "no link" line already covers that).
+static void netStatusLabel(char* buf, size_t n, bool up) {
+    if (g_useEth)      snprintf(buf, n, "%s", up ? "ETH up" : "ETH down");
+    else if (g_apMode) snprintf(buf, n, "AP %s", WiFi.softAPSSID().c_str());
+    else if (up)       snprintf(buf, n, "WiFi %ddBm", netRSSI());
+    else               buf[0] = '\0';
+}
+
 static void dispDrawStatus() {
     const int W = gfx->width(), H = gfx->height();
     const bool live = (millis() - lastDmxMs) < 1500;
@@ -1956,14 +2009,8 @@ static void dispDrawStatus() {
             gfx->setCursor(0, 100); gfx->print("Sources "); gfx->print(activeSenderCount());
         }
         gfx->setCursor(0, 114);
-#if defined(USE_ETHERNET)
-        gfx->print(up ? "ETH up" : "ETH down");
-#elif defined(USE_ETH_SPI)
-        if (g_useEth)   gfx->print(up ? "ETH up" : "ETH down");
-        else if (up)  { snprintf(b, sizeof(b), "WiFi %ddBm", netRSSI()); gfx->print(b); }
-#else
-        if (up) { snprintf(b, sizeof(b), "WiFi %ddBm", netRSSI()); gfx->print(b); }
-#endif
+        netStatusLabel(b, sizeof(b), up);
+        gfx->print(b);
         gfx->setTextColor(col(accent));
         const char* st2 = live ? "LIVE" : "idle";
         gfx->setCursor(W - (int)strlen(st2) * 6, 114); gfx->print(st2);
@@ -1998,14 +2045,8 @@ static void dispDrawStatus() {
         gfx->setCursor(0, y); gfx->print(b);
         y += rp;
     }
-#if defined(USE_ETHERNET)
-    gfx->setCursor(0, y); gfx->print(up ? "ETH up" : "ETH down");
-#elif defined(USE_ETH_SPI)
-    if (g_useEth)  { gfx->setCursor(0, y); gfx->print(up ? "ETH up" : "ETH down"); }
-    else if (up)   { snprintf(b, sizeof(b), "WiFi %ddBm", netRSSI()); gfx->setCursor(0, y); gfx->print(b); }
-#else
-    if (up) { snprintf(b, sizeof(b), "WiFi %ddBm", netRSSI()); gfx->setCursor(0, y); gfx->print(b); }
-#endif
+    netStatusLabel(b, sizeof(b), up);
+    gfx->setCursor(0, y); gfx->print(b);
     gfx->setTextColor(col(accent));
     const char* st = live ? "LIVE" : "idle";
     gfx->setCursor(W - (int)strlen(st) * 6, y); gfx->print(st);
@@ -2059,22 +2100,19 @@ static void displayTask(void*) {
     }
 }
 
-#if defined(USE_ETH_SPI) && !defined(USE_ETHERNET)
-// Bring up the W5500 wired Ethernet (runtime opt-in via cfg.useEthernet/g_useEth).
-// Registered as an lwIP netif, so the web/Art-Net/sACN/OTA stack runs over it
-// unchanged. WiFi stays the default; this only runs when the user enabled Ethernet.
-static void startEthSpi() {
-    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d\n",
-        ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
-    ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST,
-              ETH_W5500_SPI_HOST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
-    if (cfg.staticIp) {
-        IPAddress ip, gw, sn, dns;
-        parseIp(cfg.ip, ip); parseIp(cfg.gateway, gw);
-        parseIp(cfg.subnet, sn); parseIp(cfg.dns, dns);
-        ETH.config(ip, gw, sn, dns);
-        Serial.printf("[ETH] static IP %s\n", cfg.ip.c_str());
-    }
+// Apply the configured static IP (if any) to the just-started wired interface.
+#if defined(HAS_WIRED_ETH)
+static void applyEthStaticIp() {
+    if (!cfg.staticIp) return;
+    IPAddress ip, gw, sn, dns;
+    parseIp(cfg.ip, ip); parseIp(cfg.gateway, gw);
+    parseIp(cfg.subnet, sn); parseIp(cfg.dns, dns);
+    ETH.config(ip, gw, sn, dns);
+    Serial.printf("[ETH] static IP %s\n", cfg.ip.c_str());
+}
+
+// Block (max 15 s) until the wired link comes up, blinking the boot LED.
+static void waitEthLink() {
     Serial.print("[ETH] waiting for link");
     uint32_t t = millis();
     while (!netConnected() && millis() - t < 15000) {
@@ -2085,6 +2123,109 @@ static void startEthSpi() {
     Serial.printf("[ETH] %s\n", netLocalIP().toString().c_str());
 }
 #endif
+
+#if defined(USE_ETH_SPI)
+// Bring up the W5500 wired Ethernet (runtime opt-in via cfg.useEthernet/g_useEth).
+// Registered as an lwIP netif, so the web/Art-Net/sACN/OTA stack runs over it
+// unchanged. WiFi stays the default; this only runs when the user enabled Ethernet.
+static void startEthSpi() {
+    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d\n",
+        ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
+    ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST,
+              ETH_W5500_SPI_HOST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
+    applyEthStaticIp();
+    waitEthLink();
+}
+#endif
+
+#if defined(USE_ETH_RMII)
+// Bring up the LAN8720 RMII Ethernet (WT32-ETH01). Runtime opt-in (g_useEth) now
+// that WiFi is also compiled in — the board is no longer wired-only. begin() arg
+// order: (type, phy_addr, mdc, mdio, power, clk_mode).
+static void startEthRmii() {
+    Serial.println("[ETH] LAN8720 RMII (WT32-ETH01)");
+    ETH.begin(ETH_PHY_LAN8720, 1, 23, 18, 16, ETH_CLOCK_GPIO0_IN);
+    applyEthStaticIp();
+    waitEthLink();
+}
+#endif
+
+#if defined(HAS_WIRED_ETH)
+// Dispatch to whichever wired PHY this board has.
+static void startWiredEth() {
+#if defined(USE_ETH_SPI)
+    startEthSpi();
+#elif defined(USE_ETH_RMII)
+    startEthRmii();
+#endif
+}
+#endif
+
+// Standalone WiFi access point (issue #14): a self-contained network for quick
+// field tests with no router, and the automatic fallback when wired Ethernet has
+// no link. SSID = device hostname; a passphrase of >=8 chars enables WPA2,
+// anything shorter (or empty) leaves the AP open.
+static void startWiFiAP() {
+    g_apMode = true;
+    g_useEth = false;
+    WiFi.mode(WIFI_AP);
+    const char* pw = cfg.apPassword.length() >= 8 ? cfg.apPassword.c_str() : nullptr;
+    bool ok = WiFi.softAP(cfg.hostname.c_str(), pw);
+    WiFi.setSleep(WIFI_PS_NONE);     // keep the radio awake for reliable multicast/UDP
+    setLedColor(NEO_PURPLE, true);   // purple = AP active (matches the config portal)
+    Serial.printf("[WiFi] AP \"%s\" %s %s  ip=%s\n",
+        cfg.hostname.c_str(), ok ? "up" : "FAILED",
+        pw ? "(WPA2)" : "(open)", WiFi.softAPIP().toString().c_str());
+}
+
+// WiFi station (client) bring-up: optional BOOT-held config portal, then connect
+// to the strongest AP for the stored SSID. Factored out of setup() so the network
+// dispatch there reads as interface → mode.
+static void startWiFiStation() {
+    bool forcePortal = false;
+    if (digitalRead(CFG_BOOT_PIN) == LOW) {
+        Serial.print("[BOOT] button held, waiting...");
+        uint32_t t = millis();
+        while (digitalRead(CFG_BOOT_PIN) == LOW && millis()-t < HOLD_MS) delay(50);
+        forcePortal = (digitalRead(CFG_BOOT_PIN) == LOW);
+        Serial.println(forcePortal ? " → config portal" : " released");
+    }
+    if (forcePortal && cfg.staticIp) {   // recovery: come back on DHCP
+        cfg.staticIp = false;
+        saveConfig();
+    }
+    WiFi.mode(WIFI_STA);
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+    setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
+#ifdef SIM_WIFI
+    // Simulation only (Wokwi): the WiFiManager config portal cannot be reached
+    // from the host, so join Wokwi's open virtual AP directly. Never compiled
+    // into a real build — guarded by the SIM_WIFI flag set in [env:wokwi].
+    (void)forcePortal;
+    Serial.print("[SIM] joining Wokwi-GUEST");
+    WiFi.begin("Wokwi-GUEST", "");
+    { uint32_t t = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - t < 20000) {
+          setLedColor((millis() % 600) < 300 ? NEO_BLUE : NEO_OFF, (millis() % 600) < 300);
+          delay(200); Serial.print(".");
+      } }
+    Serial.println();
+#else
+    startWiFiManager(forcePortal);
+    // The ESP32's auto-connect reliably sticks to whichever AP it used before,
+    // even a distant one on a mesh. Explicitly scan and hop to the strongest
+    // AP for our SSID on every boot (also logs all APs for diagnostics).
+    connectStrongestAP();
+#endif  // SIM_WIFI
+    // Disable WiFi power save: with modem-sleep the station misses buffered
+    // multicast (sACN) and IGMP queries, causing periodic ~0.3-0.5s reception
+    // gaps. WIFI_PS_NONE keeps the radio awake for reliable multicast.
+    WiFi.setSleep(WIFI_PS_NONE);
+    Serial.printf("[WiFi] %s / %s  rssi=%d  bssid=%s\n",
+        netSSID().c_str(), netLocalIP().toString().c_str(),
+        (int)WiFi.RSSI(), WiFi.BSSIDstr().c_str());
+}
 
 // ---------------------------------------------------------------------------
 // setup()
@@ -2101,86 +2242,32 @@ void setup() {
     Serial.println("\n[BOOT] LumiGate — Art-Net / sACN DMX Gateway");
 
     loadConfig();
-#if defined(USE_ETH_SPI) && !defined(USE_ETHERNET)
-    g_useEth = cfg.useEthernet;   // WiFi default; wired Ethernet only if enabled in config
+#if defined(HAS_WIRED_ETH)
+    g_useEth = cfg.useEthernet;   // wired Ethernet only if enabled in config; WiFi otherwise
 #endif
     initLed();
     setLedColor(NEO_WHITE, true);   // booting
     initDisplay();                  // optional status panel — shows boot splash
     pinMode(CFG_BOOT_PIN, INPUT_PULLUP);
 
-#if defined(USE_ETHERNET)
-    // RMII Ethernet-only board (WT32-ETH01, LAN8720). v3 begin() arg order is
-    // (type, phy_addr, mdc, mdio, power, clk_mode).
-    ETH.begin(ETH_PHY_LAN8720, 1, 23, 18, 16, ETH_CLOCK_GPIO0_IN);
-    if (cfg.staticIp) {
-        IPAddress ip, gw, sn, dns;
-        parseIp(cfg.ip, ip); parseIp(cfg.gateway, gw);
-        parseIp(cfg.subnet, sn); parseIp(cfg.dns, dns);
-        ETH.config(ip, gw, sn, dns);
-        Serial.printf("[ETH] static IP %s\n", cfg.ip.c_str());
-    }
-    Serial.print("[ETH] waiting for link");
-    { uint32_t t = millis();
-      while (!netConnected() && millis() - t < 15000) {
-          setLedColor((millis() % 600) < 300 ? NEO_BLUE : NEO_OFF, (millis() % 600) < 300);
-          delay(200); Serial.print(".");
-      } }
-    Serial.println();
-    Serial.printf("[ETH] %s\n", netLocalIP().toString().c_str());
-#else
-    // WiFi by default; W5500 wired Ethernet only if enabled in config (g_useEth).
-#if defined(USE_ETH_SPI)
+    // ── Network bring-up (issue #14) — interface → mode, with AP fallback ────
+    // Wired boards honour cfg.useEthernet (g_useEth). If wired Ethernet is chosen
+    // but has no link, optionally fall back to a standalone WiFi AP so the device
+    // is still reachable. Otherwise WiFi runs in the configured mode (STA or AP).
+#if defined(HAS_WIRED_ETH)
     if (g_useEth) {
-        startEthSpi();
+        startWiredEth();
+        if (!netConnected() && cfg.apFallback) {
+            Serial.println("[NET] wired Ethernet has no link → falling back to WiFi AP");
+            startWiFiAP();          // sets g_apMode, clears g_useEth
+        }
     } else
 #endif
-    {
-        bool forcePortal = false;
-        if (digitalRead(CFG_BOOT_PIN) == LOW) {
-            Serial.print("[BOOT] button held, waiting...");
-            uint32_t t = millis();
-            while (digitalRead(CFG_BOOT_PIN) == LOW && millis()-t < HOLD_MS) delay(50);
-            forcePortal = (digitalRead(CFG_BOOT_PIN) == LOW);
-            Serial.println(forcePortal ? " → config portal" : " released");
-        }
-        if (forcePortal && cfg.staticIp) {   // recovery: come back on DHCP
-            cfg.staticIp = false;
-            saveConfig();
-        }
-        WiFi.mode(WIFI_STA);
-        WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
-        WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-        setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
-#ifdef SIM_WIFI
-        // Simulation only (Wokwi): the WiFiManager config portal cannot be reached
-        // from the host, so join Wokwi's open virtual AP directly. Never compiled
-        // into a real build — guarded by the SIM_WIFI flag set in [env:wokwi].
-        (void)forcePortal;
-        Serial.print("[SIM] joining Wokwi-GUEST");
-        WiFi.begin("Wokwi-GUEST", "");
-        { uint32_t t = millis();
-          while (WiFi.status() != WL_CONNECTED && millis() - t < 20000) {
-              setLedColor((millis() % 600) < 300 ? NEO_BLUE : NEO_OFF, (millis() % 600) < 300);
-              delay(200); Serial.print(".");
-          } }
-        Serial.println();
-#else
-        startWiFiManager(forcePortal);
-        // The ESP32's auto-connect reliably sticks to whichever AP it used before,
-        // even a distant one on a mesh. Explicitly scan and hop to the strongest
-        // AP for our SSID on every boot (also logs all APs for diagnostics).
-        connectStrongestAP();
-#endif  // SIM_WIFI
-        // Disable WiFi power save: with modem-sleep the station misses buffered
-        // multicast (sACN) and IGMP queries, causing periodic ~0.3-0.5s reception
-        // gaps. WIFI_PS_NONE keeps the radio awake for reliable multicast.
-        WiFi.setSleep(WIFI_PS_NONE);
-        Serial.printf("[WiFi] %s / %s  rssi=%d  bssid=%s\n",
-            netSSID().c_str(), netLocalIP().toString().c_str(),
-            (int)WiFi.RSSI(), WiFi.BSSIDstr().c_str());
+    if (cfg.wifiMode == NET_WIFI_AP) {
+        startWiFiAP();
+    } else {
+        startWiFiStation();
     }
-#endif
 
     if (MDNS.begin(cfg.hostname.c_str())) {
         MDNS.addService("http",   "tcp", 80);
@@ -2326,20 +2413,14 @@ void loop() {
     // Deferred reboot (config save / reset / OTA done) so the HTTP response
     // can flush from the async task before we restart.
     if (pendingRebootAt && now >= pendingRebootAt) {
-#ifndef USE_ETHERNET
         if (pendingWifiReset) { WiFiManager wm; wm.resetSettings(); }
-#endif
         ESP.restart();
     }
 
-#ifndef USE_ETHERNET
     // WiFi link watchdog: if the association drops, force a reconnect so the
     // device comes back without waiting/rebooting (DMX output keeps running).
-    // Only when actually on WiFi (skip when the W5500 wired path is active).
-#if defined(USE_ETH_SPI)
-    if (!g_useEth)
-#endif
-    {
+    // Only in WiFi station mode — skip on wired Ethernet or when running as an AP.
+    if (!g_useEth && !g_apMode) {
         static uint32_t lastWifiOk = 0;
         static uint32_t lastReconnect = 0;
         if (WiFi.status() == WL_CONNECTED) {
@@ -2355,7 +2436,6 @@ void loop() {
             lastReconnect = now;
         }
     }
-#endif
 
     // Periodic health line (leaks/uptime visible on the serial console)
     static uint32_t lastHeapLog = 0;

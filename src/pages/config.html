@@ -70,11 +70,31 @@ footer a:hover { color:var(--gh-text); }
         <div id="net-mode-row" class="mb-3" style="display:none">
           <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" name="useeth" id="useeth-sw" value="1">
-            <label class="form-check-label small" for="useeth-sw">Use wired Ethernet (W5500) instead of WiFi</label>
+            <label class="form-check-label small" for="useeth-sw">Use wired Ethernet instead of WiFi</label>
           </div>
-          <div class="form-text">Off = WiFi (default). On = wired Ethernet via the RJ45 jack. Applied after reboot; reconnect at the new address.</div>
+          <div class="form-text">Off = WiFi. On = wired Ethernet via the RJ45 jack. Applied after reboot; reconnect at the new address.</div>
         </div>
-        <div class="form-check form-switch mb-3">
+        <div id="wifi-mode-row" class="mb-3">
+          <label class="form-label text-secondary small mb-1">WiFi mode</label>
+          <select class="form-select" name="wifimode" id="wifi-mode">
+            <option value="0">Client (join an existing network, STA)</option>
+            <option value="1">Standalone access point (AP)</option>
+          </select>
+          <div class="form-text">Client joins your router (set the password via the BOOT-button portal). Access point makes the device its own WiFi network for quick standalone tests, no router needed.</div>
+        </div>
+        <div id="ap-pw-row" class="mb-3" style="display:none">
+          <label class="form-label text-secondary small mb-1">AP password</label>
+          <input class="form-control" type="text" name="appw" id="ap-pw" value="" placeholder="(open network)">
+          <div class="form-text">The AP broadcasts the hostname below as its SSID. 8 or more characters enables WPA2; leave empty for an open network.</div>
+        </div>
+        <div id="ap-fb-row" class="mb-3" style="display:none">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="apfb" id="apfb-sw" value="1">
+            <label class="form-check-label small" for="apfb-sw">Start a WiFi AP if the Ethernet link is down</label>
+          </div>
+          <div class="form-text">Fallback so the device stays reachable when the cable is unplugged or the switch is off.</div>
+        </div>
+        <div id="static-row" class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" name="staticip" id="static-sw" value="1">
           <label class="form-check-label small" for="static-sw">Use static IP (otherwise DHCP)</label>
         </div>
@@ -453,6 +473,20 @@ function wireCard(cont, tpl, i, o){
   syncOutBody(node);
 }
 function updStatic(){ $('static-fields').style.display = $('static-sw').checked ? '' : 'none'; }
+// Show only the network fields that apply to the chosen interface/mode (issue #14):
+// wired Ethernet -> AP-fallback switch; WiFi -> mode selector (+ AP password in AP
+// mode). A standalone AP uses a fixed subnet, so static-IP config is hidden there.
+function updNetMode(){
+  var hasEth = $('net-mode-row').style.display !== 'none';
+  var eth = hasEth && $('useeth-sw').checked;
+  var ap  = !eth && $('wifi-mode').value === '1';
+  $('wifi-mode-row').style.display = eth ? 'none' : '';
+  $('ap-pw-row').style.display     = ap  ? '' : 'none';
+  $('ap-fb-row').style.display     = eth ? '' : 'none';
+  $('static-row').style.display    = ap  ? 'none' : '';
+  if (ap) $('static-fields').style.display = 'none';
+  else    updStatic();
+}
 function updLedPin(){
   var t = $('led-type').value;
   $('led-pin-row').style.display = (t === '0' || t === '3') ? 'none' : '';
@@ -472,7 +506,10 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('cur-ver').textContent = 'v' + CURRENT;
   $('proto-sel').value = d.protocol;
   $('useeth-sw').checked = !!d.useEthernet;
-  if (d.ethSpi) $('net-mode-row').style.display = '';
+  if (d.hasEth) $('net-mode-row').style.display = '';
+  $('wifi-mode').value = d.wifiMode !== undefined ? d.wifiMode : 0;
+  $('ap-pw').value = d.apPassword || '';
+  $('apfb-sw').checked = d.apFallback !== undefined ? !!d.apFallback : true;
   $('static-sw').checked = !!d.staticIp;
   $('net-ip').value  = d.sip || '';
   $('net-gw').value  = d.gateway || '';
@@ -498,7 +535,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('dev-host').value = d.hostname || '';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;
-  updStatic(); updLedPin(); updDispPins(); updHostUrl();
+  updNetMode(); updLedPin(); updDispPins(); updHostUrl();
   $('save-btn').disabled = false;
   loadVersions();
 }).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; loadVersions(); });
@@ -551,6 +588,8 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
 
 $('proto-sel').addEventListener('change', updAllUniHints);
 $('static-sw').addEventListener('change', updStatic);
+$('useeth-sw').addEventListener('change', updNetMode);
+$('wifi-mode').addEventListener('change', updNetMode);
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
 $('dev-host').addEventListener('input', updHostUrl);
