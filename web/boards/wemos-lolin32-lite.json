@@ -1,0 +1,187 @@
+{
+  "id": "wemos-lolin32-lite",
+  "name": "WEMOS LOLIN32 Lite",
+  "mcu": "esp32",
+  "cols": [
+    [
+      {
+        "gpio": 36,
+        "silk": "VP",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 39,
+        "silk": "VN",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 34,
+        "silk": "IO34",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 35,
+        "silk": "IO35",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 32,
+        "silk": "IO32",
+        "flags": []
+      },
+      {
+        "gpio": 33,
+        "silk": "IO33",
+        "flags": []
+      },
+      {
+        "gpio": 25,
+        "silk": "IO25",
+        "flags": []
+      },
+      {
+        "gpio": 26,
+        "silk": "IO26",
+        "flags": []
+      },
+      {
+        "gpio": 27,
+        "silk": "IO27",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "IO14",
+        "flags": []
+      },
+      {
+        "gpio": 12,
+        "silk": "IO12",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 13,
+        "silk": "IO13",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 23,
+        "silk": "IO23",
+        "flags": []
+      },
+      {
+        "gpio": 22,
+        "silk": "IO22",
+        "flags": []
+      },
+      {
+        "gpio": 1,
+        "silk": "TX0",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 3,
+        "silk": "RX0",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 21,
+        "silk": "IO21",
+        "flags": []
+      },
+      {
+        "gpio": 19,
+        "silk": "IO19",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "IO18",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "IO5",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 17,
+        "silk": "IO17",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "IO16",
+        "flags": []
+      },
+      {
+        "gpio": 4,
+        "silk": "IO4",
+        "flags": []
+      },
+      {
+        "gpio": 0,
+        "silk": "IO0",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 2,
+        "silk": "IO2",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 15,
+        "silk": "IO15",
+        "flags": [
+          "strapping"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 1,
+    "ledPin": 22,
+    "dispType": 1,
+    "dispsda": 19,
+    "dispscl": 23,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 16,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/lolin32-lite/pins_arduino.h",
+  "hardwired": [
+    {
+      "gpio": 22,
+      "label": "onboard LED"
+    }
+  ]
+}

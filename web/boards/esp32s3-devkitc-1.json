@@ -1,0 +1,230 @@
+{
+  "id": "esp32s3-devkitc-1",
+  "name": "ESP32-S3 DevKitC-1",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 4,
+        "silk": "IO4",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "IO5",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "IO6",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "IO7",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "IO15",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "IO16",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "IO17",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "IO18",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "IO8",
+        "flags": []
+      },
+      {
+        "gpio": 19,
+        "silk": "IO19",
+        "flags": [
+          "usb-jtag"
+        ]
+      },
+      {
+        "gpio": 20,
+        "silk": "IO20",
+        "flags": [
+          "usb-jtag"
+        ]
+      },
+      {
+        "gpio": 3,
+        "silk": "IO3",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 46,
+        "silk": "IO46",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 9,
+        "silk": "IO9",
+        "flags": []
+      },
+      {
+        "gpio": 10,
+        "silk": "IO10",
+        "flags": []
+      },
+      {
+        "gpio": 11,
+        "silk": "IO11",
+        "flags": []
+      },
+      {
+        "gpio": 12,
+        "silk": "IO12",
+        "flags": []
+      },
+      {
+        "gpio": 13,
+        "silk": "IO13",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "IO14",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 21,
+        "silk": "IO21",
+        "flags": []
+      },
+      {
+        "gpio": 47,
+        "silk": "IO47",
+        "flags": []
+      },
+      {
+        "gpio": 48,
+        "silk": "IO48",
+        "flags": []
+      },
+      {
+        "gpio": 45,
+        "silk": "IO45",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 0,
+        "silk": "IO0",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 35,
+        "silk": "IO35",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "IO36",
+        "flags": []
+      },
+      {
+        "gpio": 37,
+        "silk": "IO37",
+        "flags": []
+      },
+      {
+        "gpio": 38,
+        "silk": "IO38",
+        "flags": []
+      },
+      {
+        "gpio": 39,
+        "silk": "IO39",
+        "flags": []
+      },
+      {
+        "gpio": 40,
+        "silk": "IO40",
+        "flags": []
+      },
+      {
+        "gpio": 41,
+        "silk": "IO41",
+        "flags": []
+      },
+      {
+        "gpio": 42,
+        "silk": "IO42",
+        "flags": []
+      },
+      {
+        "gpio": 44,
+        "silk": "RX0",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 43,
+        "silk": "TX0",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 2,
+        "silk": "IO2",
+        "flags": []
+      },
+      {
+        "gpio": 1,
+        "silk": "IO1",
+        "flags": []
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 48,
+    "dispType": 1,
+    "dispsda": 8,
+    "dispscl": 9,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 18,
+        "rts": -1
+      }
+    ]
+  },
+  "hardwired": [
+    {
+      "gpio": 48,
+      "label": "onboard RGB LED"
+    }
+  ]
+}

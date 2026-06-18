@@ -1,0 +1,94 @@
+{
+  "id": "xiao-esp32s3",
+  "name": "Seeed XIAO ESP32-S3",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 1,
+        "silk": "D0",
+        "flags": []
+      },
+      {
+        "gpio": 2,
+        "silk": "D1",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "D2",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "D3",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "D4",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "D5",
+        "flags": []
+      },
+      {
+        "gpio": 43,
+        "silk": "D6/TX",
+        "flags": [
+          "serial"
+        ]
+      }
+    ],
+    [
+      {
+        "gpio": 44,
+        "silk": "D7/RX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 7,
+        "silk": "D8",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "D9",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "D10",
+        "flags": []
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 0,
+    "dispType": 1,
+    "dispsda": 5,
+    "dispscl": 6,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 1,
+        "rx": 2,
+        "rts": -1
+      }
+    ]
+  },
+  "hardwired": [
+    {
+      "gpio": 21,
+      "label": "user LED (active-low)"
+    }
+  ]
+}

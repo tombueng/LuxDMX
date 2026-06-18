@@ -75,6 +75,12 @@ All five PlatformIO envs build green on arduino-esp32 v3.3.9 / IDF 5.5.4
       device healthy after).
 - [ ] Decide version bump (**major** for the framework migration?) + changelog entry.
 - [ ] v3 display header (J4): default/document the OLED pins (I2C SDA=4 SCL=5; SPI 39/40/41/42/38) and test a panel.
+      (NB: the visual pin picker's v3 template — issue #12, branch `feature/lumigate-pin-picker` —
+      already pre-fills these J4 pins; they still need a physical panel test.)
+- [x] Visual pin picker + per-board templates (issue #12) — clickable board diagram, live
+      pin validation, and a v3 "Apply template" generated from `hardware/lumigate.py`.
+      Frontend-only + a tiny `/info.json` board/mcu hint; compiles green on esp32dev.
+      See `docs/pin-picker.md`. (UI not yet exercised on real v3 hardware.)
 - [ ] Optional: upstream the esp_dmx IDF5 + UART2 patches to someweisguy/esp_dmx.
 - [ ] Optional: clean up v3 deprecation warnings (`send_P`, const-qualifier).
 

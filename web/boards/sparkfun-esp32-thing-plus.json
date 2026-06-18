@@ -1,0 +1,161 @@
+{
+  "id": "sparkfun-esp32-thing-plus",
+  "name": "SparkFun ESP32 Thing Plus",
+  "mcu": "esp32",
+  "cols": [
+    [
+      {
+        "gpio": 0,
+        "silk": "IO0",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 2,
+        "silk": "IO2",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "SCK",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 12,
+        "silk": "A11",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 13,
+        "silk": "LED",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "A6",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "A8",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 16,
+        "silk": "RX",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "TX",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "MOSI",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 19,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 22,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 23,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 25,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 26,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 27,
+        "silk": "A10",
+        "flags": []
+      },
+      {
+        "gpio": 32,
+        "silk": "A7",
+        "flags": []
+      },
+      {
+        "gpio": 33,
+        "silk": "SS",
+        "flags": []
+      },
+      {
+        "gpio": 34,
+        "silk": "A2",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 36,
+        "silk": "A4",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 39,
+        "silk": "A3",
+        "flags": [
+          "input-only"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 1,
+    "ledPin": 13,
+    "dispType": 1,
+    "dispsda": 23,
+    "dispscl": 22,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 16,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/esp32thing_plus/pins_arduino.h",
+  "hardwired": [
+    {
+      "gpio": 13,
+      "label": "onboard LED"
+    }
+  ]
+}

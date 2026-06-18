@@ -1,0 +1,169 @@
+{
+  "id": "olimex-esp32-gateway",
+  "name": "Olimex ESP32-Gateway",
+  "mcu": "esp32",
+  "cols": [
+    [
+      {
+        "gpio": 0,
+        "silk": "IO0",
+        "flags": [
+          "strapping",
+          "reserved:eth-rmii"
+        ]
+      },
+      {
+        "gpio": 1,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 3,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 5,
+        "silk": "SS",
+        "flags": [
+          "strapping",
+          "reserved:eth-rmii"
+        ]
+      },
+      {
+        "gpio": 16,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "SCK",
+        "flags": [
+          "reserved:eth-rmii"
+        ]
+      },
+      {
+        "gpio": 19,
+        "silk": "MISO",
+        "flags": [
+          "reserved:eth-rmii"
+        ]
+      }
+    ],
+    [
+      {
+        "gpio": 23,
+        "silk": "MOSI",
+        "flags": [
+          "reserved:eth-rmii"
+        ]
+      },
+      {
+        "gpio": 32,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 33,
+        "silk": "LED",
+        "flags": []
+      },
+      {
+        "gpio": 34,
+        "silk": "IO34",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 35,
+        "silk": "A7",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 36,
+        "silk": "A0",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 39,
+        "silk": "A3",
+        "flags": [
+          "input-only"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 1,
+    "ledPin": 33,
+    "dispType": 1,
+    "dispsda": 32,
+    "dispscl": 16,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 1,
+        "rx": 3,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/esp32-gateway/pins_arduino.h",
+  "hardwired": [
+    {
+      "gpio": 33,
+      "label": "onboard LED"
+    },
+    {
+      "gpio": 0,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 5,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 18,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 19,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 21,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 22,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 23,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 25,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 26,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 27,
+      "label": "Ethernet"
+    }
+  ]
+}

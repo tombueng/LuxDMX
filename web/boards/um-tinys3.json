@@ -1,0 +1,136 @@
+{
+  "id": "um-tinys3",
+  "name": "Unexpected Maker TinyS3",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 1,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 2,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "A2",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "A3",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "A4",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "A6",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 10,
+        "silk": "IO10",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 17,
+        "silk": "IO17",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "IO18",
+        "flags": []
+      },
+      {
+        "gpio": 33,
+        "silk": "IO33",
+        "flags": []
+      },
+      {
+        "gpio": 34,
+        "silk": "SS",
+        "flags": []
+      },
+      {
+        "gpio": 35,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 37,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 43,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 44,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 18,
+    "dispType": 1,
+    "dispsda": 8,
+    "dispscl": 9,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 4,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/um_tinys3/pins_arduino.h",
+  "hardwired": [
+    {
+      "gpio": 18,
+      "label": "NeoPixel"
+    }
+  ]
+}

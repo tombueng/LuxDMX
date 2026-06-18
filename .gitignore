@@ -16,10 +16,12 @@ docs/playwright-report/
 /lumigate*_sklib.py
 /lumigate*.kicad_prl
 
-# pioarduino custom_sdkconfig source-build artifacts (generated from the
+# pioarduino custom_sdkconfig from-source core build artifacts (generated from the
 # custom_sdkconfig option in platformio.ini — that file is the source of truth)
+/CMakeLists.txt
 /sdkconfig.defaults
 /sdkconfig.*
+/dependencies.lock
 /managed_components/
 /.dummy/
 /src/idf_component.yml

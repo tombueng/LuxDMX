@@ -1,0 +1,187 @@
+{
+  "id": "adafruit-metro-esp32s3",
+  "name": "Adafruit Metro ESP32-S3",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 0,
+        "silk": "IO0",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 1,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 2,
+        "silk": "A8",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "A9",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "A10",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "A11",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "A12",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "A13",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "A14",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "A15",
+        "flags": []
+      },
+      {
+        "gpio": 10,
+        "silk": "A16",
+        "flags": []
+      },
+      {
+        "gpio": 11,
+        "silk": "A17",
+        "flags": []
+      },
+      {
+        "gpio": 12,
+        "silk": "A18",
+        "flags": []
+      },
+      {
+        "gpio": 13,
+        "silk": "LED",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 14,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "A2",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "A3",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "A4",
+        "flags": []
+      },
+      {
+        "gpio": 21,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 39,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 40,
+        "silk": "TX",
+        "flags": []
+      },
+      {
+        "gpio": 41,
+        "silk": "RX",
+        "flags": []
+      },
+      {
+        "gpio": 42,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 45,
+        "silk": "SS",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 46,
+        "silk": "NEO",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 47,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 48,
+        "silk": "SCL",
+        "flags": []
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 46,
+    "dispType": 1,
+    "dispsda": 47,
+    "dispscl": 48,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 18,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/adafruit_metro_esp32s3/pins_arduino.h",
+  "hardwired": [
+    {
+      "gpio": 46,
+      "label": "NeoPixel"
+    },
+    {
+      "gpio": 13,
+      "label": "onboard LED"
+    }
+  ]
+}

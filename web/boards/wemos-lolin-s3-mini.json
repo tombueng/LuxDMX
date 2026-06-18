@@ -1,0 +1,144 @@
+{
+  "id": "wemos-lolin-s3-mini",
+  "name": "WEMOS LOLIN S3 Mini",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 1,
+        "silk": "A0",
+        "flags": []
+      },
+      {
+        "gpio": 2,
+        "silk": "A1",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "A2",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "A3",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "A4",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "A6",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "A7",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "A8",
+        "flags": []
+      },
+      {
+        "gpio": 10,
+        "silk": "SS",
+        "flags": []
+      },
+      {
+        "gpio": 11,
+        "silk": "MOSI",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 12,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 13,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "A13",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "A14",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "A15",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "A16",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "A17",
+        "flags": []
+      },
+      {
+        "gpio": 35,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 43,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 44,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 0,
+    "dispType": 1,
+    "dispsda": 35,
+    "dispscl": 36,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 18,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/lolin_s3_mini/pins_arduino.h"
+}

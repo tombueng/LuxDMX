@@ -511,7 +511,7 @@ values are fetched as JSON.
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
 | `/config` | GET / POST | Change universe, protocol, static IP, hostname, OTA password, LED config, DMX pins (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
-| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, etc.) |
+| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, `board`/`mcu` id, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
@@ -553,6 +553,53 @@ Browser → ESP32 (JSON text):
 ```
 
 Channel labels are managed over REST (`GET /labels.json`, `POST /labels`).
+
+---
+
+## Visual pin configuration (board picker)
+
+LumiGate has a lot of GPIOs to set (status LED, 5-LED panel, OLED, two DMX outputs).
+To make this idiot-proof, **Settings → Hardware board** offers:
+
+- **Templates** — pick your board and click **Apply template** to fill every LED /
+  display / DMX pin with the tested map in one step. Selecting the *LumiGate v3*
+  board applies the exact pin map of the open-hardware PCB.
+- **Click pins on a board diagram** — the pick button next to each GPIO field opens an
+  interactive board so you click the actual pin instead of guessing GPIO numbers. The
+  diagram colour-codes pins (free / caution / do-not-use) and shows your current
+  assignments right on the board.
+- **Live validation** — duplicate pins, strapping/flash/input-only pins and
+  Ethernet-reserved pins are flagged in red/amber before you can save.
+
+Five boards are built into the firmware and work fully offline, covering the common
+variants (which are **not** all the same pinout):
+
+| Board | Notes |
+|---|---|
+| LumiGate v3 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
+| ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
+| ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
+| ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
+| Seeed XIAO ESP32-S3 | tiny board, D0-D10 silk |
+
+The full catalog covers **33 boards** spanning every esp32 / esp32s3 board the firmware
+runs on (DevKit / DOIT / NodeMCU, WEMOS LOLIN, Adafruit Feather / QtPy / HUZZAH32 / Metro,
+Heltec OLED, Olimex PoE / Gateway / wESP32 Ethernet, Unexpected Maker, M5Stack, LilyGO,
+SparkFun ...). The boards beyond the five built-ins are pulled lazily from the online
+catalog ([web/boards/](web/boards/), served via GitHub Pages) and cached in your browser;
+no network means you still get the built-ins plus manual entry. You can switch boards from
+a dropdown inside the pin-picker popup itself.
+
+All descriptors are generated from authoritative pinout data
+(`hardware/gen_board_descriptor.py`): `hardware/lumigate.py` for v3, published header
+pinouts for the hand-tuned dev boards, and the Arduino core `variants/<dir>/pins_arduino.h`
+for the rest, so the GPIO numbers and reserved/strapping/flash flags are accurate per
+variant (e.g. the PICO-based Feather V2 frees GPIO6-11 and reserves 16/17 instead). The
+picker draws its own horizontal **diagram** for every board; there are no board photos or
+realistic graphics.
+
+See [docs/pin-picker.md](docs/pin-picker.md) for the design, the descriptor schema and
+how to add a board.
 
 ---
 

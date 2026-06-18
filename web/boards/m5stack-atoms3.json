@@ -1,0 +1,146 @@
+{
+  "id": "m5stack-atoms3",
+  "name": "M5Stack AtomS3 (TFT)",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 0,
+        "silk": "G0",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 1,
+        "silk": "G1",
+        "flags": []
+      },
+      {
+        "gpio": 2,
+        "silk": "G2",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "G3",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "G4",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "G5",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "G6",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "G7",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "G8",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "SS",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "SCK",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 21,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 35,
+        "silk": "IO35",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "G36",
+        "flags": []
+      },
+      {
+        "gpio": 37,
+        "silk": "G37",
+        "flags": []
+      },
+      {
+        "gpio": 38,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 39,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 40,
+        "silk": "G40",
+        "flags": []
+      },
+      {
+        "gpio": 42,
+        "silk": "G42",
+        "flags": []
+      },
+      {
+        "gpio": 43,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 44,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 35,
+    "dispType": 0,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 4,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/m5stack_atoms3/pins_arduino.h",
+  "hardwired": [
+    {
+      "gpio": 35,
+      "label": "NeoPixel"
+    }
+  ]
+}

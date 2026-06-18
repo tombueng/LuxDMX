@@ -1,0 +1,188 @@
+{
+  "id": "wesp32",
+  "name": "wESP32 (PoE)",
+  "mcu": "esp32",
+  "cols": [
+    [
+      {
+        "gpio": 0,
+        "silk": "IO0",
+        "flags": [
+          "strapping",
+          "reserved:eth-rmii"
+        ]
+      },
+      {
+        "gpio": 1,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 2,
+        "silk": "IO2",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 3,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "SS",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 12,
+        "silk": "IO12",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 13,
+        "silk": "IO13",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "SDA",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 16,
+        "silk": "IO16",
+        "flags": [
+          "reserved:eth-rmii"
+        ]
+      }
+    ],
+    [
+      {
+        "gpio": 17,
+        "silk": "IO17",
+        "flags": [
+          "reserved:eth-rmii"
+        ]
+      },
+      {
+        "gpio": 18,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 23,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 32,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 33,
+        "silk": "A5",
+        "flags": []
+      },
+      {
+        "gpio": 34,
+        "silk": "A6",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 35,
+        "silk": "A7",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 36,
+        "silk": "A0",
+        "flags": [
+          "input-only"
+        ]
+      },
+      {
+        "gpio": 39,
+        "silk": "A3",
+        "flags": [
+          "input-only"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 0,
+    "dispType": 1,
+    "dispsda": 15,
+    "dispscl": 4,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 5,
+        "rx": 1,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/wesp32/pins_arduino.h",
+  "hardwired": [
+    {
+      "gpio": 0,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 16,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 17,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 19,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 21,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 22,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 25,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 26,
+      "label": "Ethernet"
+    },
+    {
+      "gpio": 27,
+      "label": "Ethernet"
+    }
+  ]
+}

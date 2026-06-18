@@ -1277,6 +1277,24 @@ static void handleRoot(AsyncWebServerRequest* req) {
     req->send(r);
 }
 
+// Compile-time board identity. Lets the /config pin-picker auto-select the right
+// board diagram and apply the correct strapping / flash / Ethernet-reserved rules
+// (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
+#if defined(USE_ETH_SPI)
+static const char BOARD_ID[] = "lumigate_v3";
+#elif defined(USE_ETHERNET)
+static const char BOARD_ID[] = "wt32eth01";
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+static const char BOARD_ID[] = "esp32s3-devkitc-1";
+#else
+static const char BOARD_ID[] = "esp32-devkitc";
+#endif
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+static const char MCU_ID[] = "esp32s3";
+#else
+static const char MCU_ID[] = "esp32";
+#endif
+
 static void handleInfoJson(AsyncWebServerRequest* req) {
     String j = "{";
     j += "\"ssid\":\"";     j += netSSID();              j += "\",";
@@ -1327,7 +1345,9 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"gateway\":\"";  j += cfg.gateway;            j += "\",";
     j += "\"subnet\":\"";   j += cfg.subnet;             j += "\",";
     j += "\"dns\":\"";      j += cfg.dns;                j += "\",";
-    j += "\"autoUpdate\":"; j += cfg.autoUpdate ? "true" : "false";
+    j += "\"autoUpdate\":"; j += cfg.autoUpdate ? "true" : "false"; j += ",";
+    j += "\"board\":\"";    j += BOARD_ID;               j += "\",";
+    j += "\"mcu\":\"";      j += MCU_ID;                 j += "\"";
     j += "}";
     req->send(200, "application/json", j);
 }

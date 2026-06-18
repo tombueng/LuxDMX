@@ -1,0 +1,197 @@
+{
+  "id": "m5stack-cores3",
+  "name": "M5Stack CoreS3 (TFT)",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 0,
+        "silk": "G0",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 1,
+        "silk": "G1",
+        "flags": []
+      },
+      {
+        "gpio": 2,
+        "silk": "G2",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "G3",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "G4",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "G5",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "G6",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "G7",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "G8",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "G9",
+        "flags": []
+      },
+      {
+        "gpio": 10,
+        "silk": "IO10",
+        "flags": []
+      },
+      {
+        "gpio": 11,
+        "silk": "SCL",
+        "flags": []
+      },
+      {
+        "gpio": 12,
+        "silk": "SDA",
+        "flags": []
+      },
+      {
+        "gpio": 13,
+        "silk": "G13",
+        "flags": []
+      },
+      {
+        "gpio": 14,
+        "silk": "G14",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "SS",
+        "flags": []
+      }
+    ],
+    [
+      {
+        "gpio": 17,
+        "silk": "G17",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "G18",
+        "flags": []
+      },
+      {
+        "gpio": 19,
+        "silk": "G19",
+        "flags": [
+          "usb-jtag"
+        ]
+      },
+      {
+        "gpio": 20,
+        "silk": "G20",
+        "flags": [
+          "usb-jtag"
+        ]
+      },
+      {
+        "gpio": 21,
+        "silk": "G21",
+        "flags": []
+      },
+      {
+        "gpio": 33,
+        "silk": "G33",
+        "flags": []
+      },
+      {
+        "gpio": 34,
+        "silk": "G34",
+        "flags": []
+      },
+      {
+        "gpio": 35,
+        "silk": "MISO",
+        "flags": []
+      },
+      {
+        "gpio": 36,
+        "silk": "SCK",
+        "flags": []
+      },
+      {
+        "gpio": 37,
+        "silk": "MOSI",
+        "flags": []
+      },
+      {
+        "gpio": 38,
+        "silk": "G38",
+        "flags": []
+      },
+      {
+        "gpio": 43,
+        "silk": "TX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 44,
+        "silk": "RX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 45,
+        "silk": "G45",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 46,
+        "silk": "G46",
+        "flags": [
+          "strapping"
+        ]
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 0,
+    "dispType": 0,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 18,
+        "rts": -1
+      }
+    ]
+  },
+  "_source": "auto from variants/m5stack_cores3/pins_arduino.h"
+}
