@@ -754,7 +754,14 @@ function buildBoards(){
 
 // ---- Which board / family is in effect -------------------------------------
 function currentBoardDesc(){ var id = $('board-sel').value; return (id && id !== 'custom' && BOARDS[id]) ? BOARDS[id] : null; }
-function genericForMcu(){ return BOARDS[(INFO_MCU === 'esp32') ? 'esp32-devkitc' : 'esp32s3-devkitc-1'] || null; }
+function genericForMcu(){
+  // Explicit per-family fallback. IMPORTANT: never *guess* a family — the old code
+  // returned the S3 board for anything that wasn't exactly 'esp32', so a device that
+  // reported an empty/unknown mcu showed an ESP32-S3 board on a plain ESP32.
+  if (INFO_MCU === 'esp32')   return BOARDS['esp32-devkitc']     || null;
+  if (INFO_MCU === 'esp32s3') return BOARDS['esp32s3-devkitc-1'] || null;
+  return null;   // unknown / not reported -> show no board rather than the wrong chip
+}
 function diagramDesc(){ return currentBoardDesc() || genericForMcu(); }
 function currentBoardName(){ var b = diagramDesc(); return b ? b.name : 'Board'; }
 function familyOf(){ var b = currentBoardDesc(); var m = (b && b.mcu) || INFO_MCU || 'esp32s3'; return FAMILIES[m] || FAMILIES.esp32s3; }
