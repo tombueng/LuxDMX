@@ -483,7 +483,11 @@ Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 bau
 - Live stats: framerate, RSSI, uptime, free heap, jitter
 - Conflict warning if multiple senders are detected
 - Active sender list with per-sender protocol and FPS
-- All 512 DMX channels as a color-coded grid (cyan = active)
+- All 512 DMX channels as a live grid — each cell shows the channel number large,
+  its current value small, a value-proportional brightness, **and** a bottom-to-top
+  gauge fill so levels read at a glance
+- Hover any cell for an instant (no-delay) 2.5× zoomed preview of that cell
+  (channel number, value, gauge and label)
 - Click any cell → slider + sparkline history appear → set value directly
 - Change log with recent DMX activity
 
