@@ -26,3 +26,8 @@ docs/playwright-report/
 /.dummy/
 /src/idf_component.yml
 /src/idf_component.yml.orig
+
+# Local-only private working assets — kept OUT of the public repo.
+# (UI simulator / video pipeline + promo plan; backed up privately in tombueng/LumiGate-ops.)
+/sim/
+PROMO_PLAN.local.md
