@@ -1,4 +1,8 @@
 <p align="center">
+  <a href="https://youtu.be/vYDyAZC2Ups"><img src="docs/mock.png" alt="LumiGate — open-source Art-Net / sACN to DMX512 gateway with a live diagnostic web UI" width="100%"></a>
+</p>
+
+<p align="center">
   <img src="docs/logo.png" alt="LumiGate logo" width="120">
 </p>
 
