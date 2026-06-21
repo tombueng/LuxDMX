@@ -66,4 +66,24 @@ test.describe('Web UI + REST', () => {
     expect(typeof d.available).toBe('boolean');
     expect(Array.isArray(d.devices)).toBeTruthy();
   });
+
+  test('/info.json advertises the W5500 SPI Ethernet config fields', async ({ request }) => {
+    const d = await (await request.get('/info.json')).json();
+    expect(typeof d.ethSpi).toBe('boolean');   // whether the W5500 driver is compiled in
+    if (d.ethSpi) {
+      for (const k of ['ethCs', 'ethSck', 'ethMosi', 'ethMiso', 'ethInt', 'ethRst', 'ethFreq']) {
+        expect(d, `info.json missing "${k}"`).toHaveProperty(k);
+        expect(typeof d[k]).toBe('number');
+      }
+    }
+  });
+
+  test('config page shows the W5500 pin card on builds with SPI Ethernet', async ({ page, request }) => {
+    const d = await (await request.get('/info.json')).json();
+    test.skip(!d.ethSpi, 'build has no W5500 SPI support');
+    await page.goto('/config');
+    await expect(page.locator('#w5500-card')).toBeVisible();
+    await expect(page.locator('input[name="ethcs"]')).toBeVisible();
+    await expect(page.locator('input[name="ethsck"]')).toBeVisible();
+  });
 });

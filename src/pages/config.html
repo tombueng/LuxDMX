@@ -115,7 +115,7 @@ footer a:hover { color:var(--gh-text); }
             <input class="form-check-input" type="checkbox" name="useeth" id="useeth-sw" value="1">
             <label class="form-check-label small" for="useeth-sw">Use wired Ethernet instead of WiFi</label>
           </div>
-          <div class="form-text">Off = WiFi. On = wired Ethernet via the RJ45 jack. Applied after reboot; reconnect at the new address.</div>
+          <div class="form-text">Off = WiFi. On = wired Ethernet (built-in PHY on the WT32-ETH01, or a W5500 module configured below). Applied after reboot; reconnect at the new address.</div>
         </div>
         <div id="wifi-mode-row" class="mb-3">
           <label class="form-label text-secondary small mb-1">WiFi mode</label>
@@ -160,6 +160,56 @@ footer a:hover { color:var(--gh-text); }
           </div>
         </div>
         <div class="form-text mt-2">Applied after reboot. Wrong values can make the device unreachable &mdash; use the BOOT-button reset to recover.</div>
+      </div>
+    </div>
+
+    <!-- Wired Ethernet (W5500) — runtime pins, so any ESP32/ESP32-S3 + a W5500 module -->
+    <div id="w5500-card" class="card mb-3" style="display:none">
+      <div class="card-header">Wired Ethernet (W5500)</div>
+      <div class="card-body">
+        <div class="form-text mb-2">
+          GPIO pins for an external <b>W5500</b> SPI Ethernet module. Wire one to any
+          ESP32 / ESP32-S3 and turn on <i>Use wired Ethernet</i> above to use it instead of WiFi.
+          Defaults are the classic-ESP32 VSPI pins.
+        </div>
+        <div class="row g-2">
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">CS</label>
+            <input class="form-control" type="number" name="ethcs" id="eth-cs" min="-1" max="48" value="5">
+          </div>
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">SCK</label>
+            <input class="form-control" type="number" name="ethsck" id="eth-sck" min="-1" max="48" value="18">
+          </div>
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">MOSI</label>
+            <input class="form-control" type="number" name="ethmosi" id="eth-mosi" min="-1" max="48" value="23">
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">MISO</label>
+            <input class="form-control" type="number" name="ethmiso" id="eth-miso" min="-1" max="48" value="19">
+          </div>
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">INT</label>
+            <input class="form-control" type="number" name="ethint" id="eth-int" min="-1" max="48" value="4">
+          </div>
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">RST</label>
+            <input class="form-control" type="number" name="ethrst" id="eth-rst" min="-1" max="48" value="25">
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-5">
+            <label class="form-label text-secondary small mb-1">SPI clock (MHz)</label>
+            <input class="form-control" type="number" name="ethfreq" id="eth-freq" min="1" max="80" value="20">
+          </div>
+        </div>
+        <div class="form-text mt-2">
+          If the module isn't detected, lower the SPI clock (e.g. <code>1</code>) to rule out
+          long/loose jumper wiring. Applied after reboot.
+        </div>
       </div>
     </div>
 
@@ -576,6 +626,14 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('disp-rst').value  = d.dispRst  !== undefined ? d.dispRst  : -1;
   $('disp-sck').value  = d.dispSck  !== undefined ? d.dispSck  : -1;
   $('disp-mosi').value = d.dispMosi !== undefined ? d.dispMosi : -1;
+  $('eth-cs').value   = d.ethCs   !== undefined ? d.ethCs   : 5;
+  $('eth-sck').value  = d.ethSck  !== undefined ? d.ethSck  : 18;
+  $('eth-mosi').value = d.ethMosi !== undefined ? d.ethMosi : 23;
+  $('eth-miso').value = d.ethMiso !== undefined ? d.ethMiso : 19;
+  $('eth-int').value  = d.ethInt  !== undefined ? d.ethInt  : 4;
+  $('eth-rst').value  = d.ethRst  !== undefined ? d.ethRst  : 25;
+  $('eth-freq').value = d.ethFreq !== undefined ? d.ethFreq : 20;
+  if (d.ethSpi) $('w5500-card').style.display = '';   // build has the W5500 driver
   $('dev-host').value = d.hostname || '';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;
