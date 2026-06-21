@@ -714,9 +714,10 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | Board | Build env | Net | Outputs | Output A — TX / RX / RTS | Suggested Output B | Notes |
 |---|---|---|---|---|---|---|
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
-| ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48 |
+| ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
 | LumiGate v3 (ESP32-S3 + W5500) | `lumigate_v3` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| ESP32 + W5500 module | `esp32dev_w5500` | WiFi **or** Ethernet (W5500 SPI) | 2 | GPIO17 / 16 / −1 | UART2 | Classic ESP32-WROOM with an off-the-shelf W5500 on VSPI/SPI3 (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25). Dual-stack: switch WiFi ↔ wired in `/config`. Tune the SPI clock with `ETH_W5500_SPI_FREQ_MHZ` (default 20) |
 
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the

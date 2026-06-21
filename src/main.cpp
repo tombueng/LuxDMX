@@ -141,6 +141,9 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #ifndef ETH_W5500_RST
 #define ETH_W5500_RST 9
 #endif
+#ifndef ETH_W5500_SPI_FREQ_MHZ
+#define ETH_W5500_SPI_FREQ_MHZ 20   // W5500 SPI clock; lower (e.g. 1) to debug long/loose wiring
+#endif
 #endif  // USE_ETH_SPI
 
 // Optional I2C status display (off by default; enable + pin it from /config)
@@ -2129,10 +2132,12 @@ static void waitEthLink() {
 // Registered as an lwIP netif, so the web/Art-Net/sACN/OTA stack runs over it
 // unchanged. WiFi stays the default; this only runs when the user enabled Ethernet.
 static void startEthSpi() {
-    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d\n",
-        ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
+    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz\n",
+        ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI,
+        ETH_W5500_SPI_FREQ_MHZ);
     ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST,
-              ETH_W5500_SPI_HOST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI);
+              ETH_W5500_SPI_HOST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI,
+              ETH_W5500_SPI_FREQ_MHZ);
     applyEthStaticIp();
     waitEthLink();
 }
