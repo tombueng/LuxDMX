@@ -38,7 +38,10 @@ export function artDmxPacket(universe, data, seq = 0) {
 }
 
 // ── sACN / E1.31 data packet (638 bytes, E1.31-2016) ────────────────────────
-export function e131Packet(universe, data, seq = 0, cid = Buffer.alloc(16, 0x2a)) {
+// opts.priority sets the E1.31 framing-layer priority (0–200, default 100);
+// opts.cid overrides the 16-byte source CID.
+export function e131Packet(universe, data, seq = 0, opts = {}) {
+  const { priority = 100, cid = Buffer.alloc(16, 0x2a) } = opts;
   const buf = Buffer.alloc(638);
   // Root layer
   buf.writeUInt16BE(0x0010, 0);                 // preamble size
@@ -51,7 +54,7 @@ export function e131Packet(universe, data, seq = 0, cid = Buffer.alloc(16, 0x2a)
   buf.writeUInt16BE(0x7000 | (638 - 38), 38);   // flags + framing PDU length
   buf.writeUInt32BE(0x00000002, 40);            // framing vector = VECTOR_E131_DATA_PACKET
   buf.write('LumiGate e2e', 44, 'latin1');      // source name (64)
-  buf[108] = 100;                               // priority
+  buf[108] = priority & 0xff;                    // priority
   buf.writeUInt16BE(0, 109);                    // sync address
   buf[111] = seq & 0xff;                        // sequence number
   buf[112] = 0;                                 // options

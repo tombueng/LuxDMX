@@ -349,6 +349,15 @@ footer a:hover { color:var(--gh-text); }
               <label class="form-label text-secondary small mb-1">RTS pin → EN</label>
               <input class="form-control out-rts" type="number" min="-1" max="48" value="-1">
             </div>
+            <div class="col-sm-6">
+              <label class="form-label text-secondary small mb-1">Merge mode</label>
+              <select class="form-select out-merge">
+                <option value="0">Off — last source wins</option>
+                <option value="1">HTP — highest takes precedence</option>
+                <option value="2">LTP — latest source wins</option>
+              </select>
+              <div class="form-text">Combine two consoles on this universe. sACN priority is honoured when merging is on.</div>
+            </div>
           </div>
           <div class="form-text mt-2 out-rdm-note">Set RTS/EN to a GPIO to enable RDM on this output; leave −1 to disable.</div>
         </div>
@@ -504,12 +513,14 @@ function wireCard(cont, tpl, i, o){
   var tx  = node.querySelector('.out-tx');
   var rx  = node.querySelector('.out-rx');
   var rts = node.querySelector('.out-rts');
+  var merge = node.querySelector('.out-merge');
   en.name  = 'o'+i+'_en';   en.id = 'o'+i+'_en';   en.checked = !!o.en;
   uni.name = 'o'+i+'_uni';  uni.value  = (o.uni  != null ? o.uni  : i);
   port.name= 'o'+i+'_port'; port.value = (o.port != null ? o.port : i + 1);
   tx.name  = 'o'+i+'_tx';   tx.value   = (o.tx   != null ? o.tx   : -1);
   rx.name  = 'o'+i+'_rx';   rx.value   = (o.rx   != null ? o.rx   : -1);
   rts.name = 'o'+i+'_rts';  rts.value  = (o.rts  != null ? o.rts  : -1);
+  merge.name = 'o'+i+'_merge'; merge.value = (o.merge != null ? o.merge : 0);
   en.addEventListener('change', function(){ syncOutBody(node); });
   uni.addEventListener('input', function(){ updCardHint(node); });
   cont.appendChild(node);
