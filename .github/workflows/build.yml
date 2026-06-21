@@ -11,6 +11,16 @@ on:
       - 'platformio.ini'
       - 'extra_scripts.py'
       - '.github/workflows/build.yml'
+  pull_request:
+    # Build-only verification on PRs (no release — see the `if:` guards on the
+    # release steps). Lets a v3/toolchain change be proven green before it ever
+    # touches the rolling `latest` release that devices auto-update from.
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'platformio.ini'
+      - 'extra_scripts.py'
+      - '.github/workflows/build.yml'
   workflow_dispatch:   # allow a manual rebuild/release from the Actions tab
 
 permissions:
@@ -111,6 +121,7 @@ jobs:
           } > notes.md
 
       - name: Publish preserved versioned release
+        if: github.ref == 'refs/heads/master'   # never release from a PR/branch build
         run: |
           gh release create "v1.0.${{ github.run_number }}" \
             --title "v1.0.${{ github.run_number }} ($(date -u '+%Y-%m-%d %H:%M UTC'))" \
@@ -125,6 +136,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update rolling 'latest' release
+        if: github.ref == 'refs/heads/master'   # never touch the OTA 'latest' from a PR/branch build
         run: |
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
           gh release create latest \

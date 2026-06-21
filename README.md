@@ -69,6 +69,9 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Static IP or DHCP** | Configurable static IP/gateway/subnet/DNS, or automatic DHCP |
 | **Mesh-aware WiFi** | Scans all channels and joins the **strongest** AP (multi-AP/mesh friendly) |
 | **WiFi Config Portal** | First-boot AP + captive portal via WiFiManager |
+| **Selectable network mode** | Pick the interface (WiFi or wired Ethernet) and WiFi mode (client/STA or standalone AP) in the web UI, on boards that have both |
+| **Standalone AP mode** | LumiGate hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
+| **Ethernet → AP fallback** | Auto-starts the WiFi AP if wired Ethernet is selected but the link is down, so the device stays reachable |
 | **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click GitHub update |
 | **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
@@ -79,7 +82,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Ethernet support** | WT32-ETH01: wired LAN via LAN8720, no WiFi required, DHCP |
+| **Ethernet support** | WT32-ETH01 (LAN8720) and v3 (W5500) run wired LAN *or* WiFi, switchable at runtime; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
@@ -460,11 +463,11 @@ upload_flags    = --auth=dmxota
 
 ### WT32-ETH01 (Ethernet)
 
-No configuration needed. Connect an Ethernet cable, power on — DHCP assigns an IP automatically. Open `http://dmx-gateway.local` or check your router for the assigned IP. There is no WiFi portal.
+Out of the box, connect an Ethernet cable and power on — DHCP assigns an IP automatically. Open `http://dmx-gateway.local` or check your router for the assigned IP. WT32-ETH01 also has WiFi: you can switch it to WiFi client or a standalone access point in **`/config` → Network** (see [Network mode](#network-mode-wifi-ethernet-or-standalone-ap) below).
 
-### 1. Config Portal (WiFi builds only)
+### 1. Config Portal (WiFi client mode)
 
-On first boot (or after WiFi reset), LumiGate opens a WiFi access point:
+On first boot (or after WiFi reset), a board in WiFi client mode opens a WiFi access point:
 
 - **SSID:** `DMX-Gateway` (no password)
 - Connect with phone or PC → browser auto-opens portal (or go to `192.168.4.1`)
@@ -480,6 +483,20 @@ On first boot (or after WiFi reset), LumiGate opens a WiFi access point:
 > 2.4 GHz IoT SSID, or the **WT32-ETH01 (Ethernet) build** for a wired,
 > rock-solid connection.
 
+### Network mode: WiFi, Ethernet, or standalone AP
+
+Choose how LumiGate connects in **`/config` → Network**. Changes apply after a reboot.
+
+- **Interface** (boards with both, i.e. WT32-ETH01 and v3): **WiFi** or **wired Ethernet**. These boards default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi instead.
+- **WiFi mode:**
+  - **Client (STA)** — join your existing 2.4 GHz network (the default; set credentials via the config portal above).
+  - **Standalone AP** — LumiGate hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
+- **Ethernet → AP fallback** (dual boards): if wired Ethernet is selected but the link is down at boot, LumiGate automatically brings up the WiFi AP so it stays reachable.
+
+**Using AP mode with an iPad / console app** (Luminair, Photon, etc.): set WiFi mode to Standalone AP and reboot, join the `dmx-gateway` network, then point the app's Art-Net output at **`192.168.4.1`** (or broadcast `192.168.4.255`).
+
+> **AP-mode caveats:** the joined device has **no internet** while on LumiGate's AP; it is **2.4 GHz only** with a small client limit; and **Art-Net** (unicast/broadcast) is more reliable than **sACN** multicast over a SoftAP, so prefer Art-Net in this mode.
+
 ### 2. Status Page
 
 Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 baud):
@@ -487,7 +504,11 @@ Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 bau
 - Live stats: framerate, RSSI, uptime, free heap, jitter
 - Conflict warning if multiple senders are detected
 - Active sender list with per-sender protocol and FPS
-- All 512 DMX channels as a color-coded grid (cyan = active)
+- All 512 DMX channels as a live grid — each cell shows the channel number large,
+  its current value small, a value-proportional brightness, **and** a bottom-to-top
+  gauge fill so levels read at a glance
+- Hover any cell for an instant (no-delay) 2.5× zoomed preview of that cell
+  (channel number, value, gauge and label)
 - Click any cell → slider + sparkline history appear → set value directly
 - Change log with recent DMX activity
 
@@ -744,9 +765,10 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | Board | Build env | Net | Outputs | Output A — TX / RX / RTS | Suggested Output B | Notes |
 |---|---|---|---|---|---|---|
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
-| ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48 |
+| ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
 | LumiGate v3 (ESP32-S3 + W5500) | `lumigate_v3` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| ESP32 + W5500 module | `esp32dev_w5500` | WiFi **or** Ethernet (W5500 SPI) | 2 | GPIO17 / 16 / −1 | UART2 | Classic ESP32-WROOM with an off-the-shelf W5500 on VSPI/SPI3 (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25). Dual-stack: switch WiFi ↔ wired in `/config`. Tune the SPI clock with `ETH_W5500_SPI_FREQ_MHZ` (default 20) |
 
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the

@@ -63,15 +63,43 @@ body { background: var(--gh-bg); }
   user-select: none;
   transition: transform .08s, border-color .1s;
   position: relative;
+  overflow: hidden;            /* clip the gauge fill to the rounded corners */
 }
 .ch:hover { transform: scale(1.15); border-color: var(--gh-accent); z-index: 1; }
-.ch .ch-n { font-size: 0.52rem; color: var(--gh-muted); line-height: 1; }
-.ch .ch-v { font-size: 0.72rem; font-weight: 700; color: #fff; line-height: 1.15; }
+/* Gauge: a frosted fill rising from the bottom; height ∝ channel value.
+   The cell's own background still carries the value brightness underneath. */
+.ch .gauge {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 0%;
+  background: rgba(255,255,255,.20);
+  border-top: 1px solid rgba(255,255,255,.55);
+  z-index: 0; pointer-events: none;
+  transition: height .12s linear;
+}
+.ch .ch-n, .ch .ch-v, .ch .ch-l { position: relative; z-index: 1; }
+/* tiny hard 1px seam (0-blur) — cheap to paint, keeps text crisp over the gauge */
+.ch .ch-n { font-size: 0.74rem; font-weight: 700; color: #fff; line-height: 1.05;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
+.ch .ch-v { font-size: 0.5rem; color: #fff; line-height: 1.1;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
 .ch .ch-l {
-  font-size: 0.4rem; color: var(--gh-accent); line-height: 1;
+  font-size: 0.4rem; color: #cfe2ff; font-weight: 600; line-height: 1;
   max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
 }
 .ch.labeled { border-color: #2d4f7c; }
+
+/* Custom hover tooltip: a 2.5x-zoomed live clone of the hovered cell, shown instantly. */
+#cell-tip {
+  position: fixed; display: none;
+  z-index: 2000; pointer-events: none;
+  width: 105px; height: 105px;
+  filter: drop-shadow(0 10px 24px rgba(0,0,0,.7));
+}
+#cell-tip .ch {
+  transform: scale(2.5); transform-origin: top left;
+  transition: none; cursor: default;
+}
 
 .form-check-input:checked { background-color: var(--gh-accent); border-color: var(--gh-accent); }
 
@@ -351,12 +379,46 @@ for (let i = 1; i <= 512; i++) {
   const el = document.createElement('div');
   el.className = 'ch';
   el.id = 'ch' + i;
-  el.innerHTML = '<span class="ch-n">' + i + '</span>' +
+  el.innerHTML = '<div class="gauge" id="g' + i + '"></div>' +
+                 '<span class="ch-n">' + i + '</span>' +
                  '<span class="ch-v" id="v' + i + '">0</span>' +
                  '<span class="ch-l" id="l' + i + '"></span>';
   el.onclick = () => openModal(i);
   grid.appendChild(el);
 }
+
+// Custom tooltip: a 4x clone of whatever cell is hovered, refreshed live.
+const cellTip = document.createElement('div');
+cellTip.id = 'cell-tip';
+document.body.appendChild(cellTip);
+let hoverCh = 0;
+function refreshTip() {
+  const cell = document.getElementById('ch' + hoverCh);
+  if (!cell) return;
+  const clone = cell.cloneNode(true);
+  clone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+  clone.removeAttribute('id');
+  cellTip.replaceChildren(clone);
+  const r = cell.getBoundingClientRect();
+  const W = 105, H = 105, gap = 8;
+  let left = r.left + r.width / 2 - W / 2;
+  let top = r.top - H - gap;
+  if (top < 4) top = r.bottom + gap;
+  left = Math.max(4, Math.min(left, window.innerWidth - W - 4));
+  cellTip.style.left = left + 'px';
+  cellTip.style.top = top + 'px';
+}
+grid.addEventListener('mouseover', (e) => {
+  const cell = e.target.closest('.ch');
+  if (!cell) return;
+  hoverCh = +cell.id.slice(2);
+  refreshTip();
+  cellTip.style.display = 'block';
+});
+grid.addEventListener('mouseout', (e) => {
+  const cell = e.target.closest('.ch');
+  if (cell && !cell.contains(e.relatedTarget)) { hoverCh = 0; cellTip.style.display = 'none'; }
+});
 
 // Channel labels
 function applyLabels() {
@@ -364,7 +426,7 @@ function applyLabels() {
     const lbl = labels[i] || '';
     document.getElementById('l' + i).textContent = lbl;
     const el = document.getElementById('ch' + i);
-    el.title = lbl ? (i + ': ' + lbl) : ('Channel ' + i);
+    el.setAttribute('aria-label', lbl ? (i + ': ' + lbl) : ('Channel ' + i));
     el.classList.toggle('labeled', !!lbl);
   }
 }
@@ -412,9 +474,11 @@ function applyDmx(data) {
     dmx[i] = v;
     const el = document.getElementById('ch' + (i + 1));
     el.style.background = cellBg(v);
+    document.getElementById('g' + (i + 1)).style.height = (v / 255 * 100) + '%';
     document.getElementById('v' + (i + 1)).textContent = v;
     if (activeCh === i + 1) syncModal(v);
   }
+  if (hoverCh) refreshTip();
 }
 
 // Modal
