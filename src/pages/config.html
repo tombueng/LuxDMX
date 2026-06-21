@@ -898,7 +898,10 @@ var ROLE_META = {
   ledb:{l:'LED Blue',t:'out'}, ledw:{l:'LED White',t:'out'},
   dispsda:{l:'Display SDA',t:'out'}, dispscl:{l:'Display SCL',t:'out'},
   dispcs:{l:'Display CS',t:'out'}, dispdc:{l:'Display DC',t:'out'}, disprst:{l:'Display RST',t:'out'},
-  dispsck:{l:'Display SCK',t:'out'}, dispmosi:{l:'Display MOSI',t:'out'}
+  dispsck:{l:'Display SCK',t:'out'}, dispmosi:{l:'Display MOSI',t:'out'},
+  ethcs:{l:'W5500 Ethernet CS',t:'out'},   ethsck:{l:'W5500 Ethernet SCK',t:'out'},
+  ethmosi:{l:'W5500 Ethernet MOSI',t:'out'}, ethmiso:{l:'W5500 Ethernet MISO',t:'in'},
+  ethint:{l:'W5500 Ethernet Interrupt',t:'in'}, ethrst:{l:'W5500 Ethernet Reset',t:'out'}
 };
 function roleLabel(role){
   if (ROLE_META[role]) return ROLE_META[role].l;
