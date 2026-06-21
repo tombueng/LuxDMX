@@ -350,6 +350,7 @@ struct Config {
     int    ethInt;
     int    ethRst;
     int    ethFreqMhz;     // W5500 SPI clock (MHz); lower to debug long/loose wiring
+    bool   ethW5500;       // W5500 module enabled — opt-in, default OFF (SPI-Eth boards)
     bool   useEthernet;    // wired-Eth boards: true = wired Ethernet, false = WiFi
     int    wifiMode;       // WiFi interface mode: 0 = STA (client), 1 = AP (standalone)
     bool   apFallback;     // start the WiFi AP automatically if wired Eth has no link
@@ -436,6 +437,7 @@ static void loadConfig() {
     cfg.ethInt      = constrain(prefs.getInt("ethint",  ETH_W5500_IRQ),  -1, 48);
     cfg.ethRst      = constrain(prefs.getInt("ethrst",  ETH_W5500_RST),  -1, 48);
     cfg.ethFreqMhz  = constrain(prefs.getInt("ethfreq", ETH_W5500_SPI_FREQ_MHZ), 1, 80);
+    cfg.ethW5500    = prefs.getBool("ethon",    false);   // W5500 opt-in, default off
     cfg.useEthernet = prefs.getBool("useeth",   DEF_USE_ETH);
     cfg.wifiMode    = constrain(prefs.getInt("wifimode", NET_WIFI_STA), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback  = prefs.getBool("apfb",     true);
@@ -487,6 +489,7 @@ static void saveConfig() {
     prefs.putInt("ethint",      cfg.ethInt);
     prefs.putInt("ethrst",      cfg.ethRst);
     prefs.putInt("ethfreq",     cfg.ethFreqMhz);
+    prefs.putBool("ethon",      cfg.ethW5500);
     prefs.putBool("useeth",     cfg.useEthernet);
     prefs.putInt("wifimode",    cfg.wifiMode);
     prefs.putBool("apfb",       cfg.apFallback);
@@ -1417,6 +1420,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
 #else
     j += "\"ethSpi\":false,";
 #endif
+    j += "\"ethW5500\":";  j += cfg.ethW5500 ? "true" : "false"; j += ",";   // module enabled (opt-in)
     j += "\"useEthernet\":"; j += cfg.useEthernet ? "true" : "false"; j += ",";
 #if defined(HAS_WIRED_ETH)
     j += "\"hasEth\":true,";   // board has wired Ethernet → show the WiFi/Ethernet selector
@@ -1559,6 +1563,7 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "ethint", s))   cfg.ethInt     = constrain(s.toInt(), -1, 48);
     if (argStr(req, "ethrst", s))   cfg.ethRst     = constrain(s.toInt(), -1, 48);
     if (argStr(req, "ethfreq", s))  cfg.ethFreqMhz = constrain(s.toInt(), 1, 80);
+    cfg.ethW5500 = req->hasParam("ethon", true) || req->hasParam("ethon");
     cfg.useEthernet = req->hasParam("useeth", true) || req->hasParam("useeth");
     if (argStr(req, "wifimode", s)) cfg.wifiMode = constrain(s.toInt(), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback = req->hasParam("apfb", true) || req->hasParam("apfb");
@@ -2322,8 +2327,10 @@ void setup() {
     Serial.println("\n[BOOT] LumiGate — Art-Net / sACN DMX Gateway");
 
     loadConfig();
-#if defined(HAS_WIRED_ETH)
-    g_useEth = cfg.useEthernet;   // wired Ethernet only if enabled in config; WiFi otherwise
+#if defined(USE_ETH_RMII)
+    g_useEth = cfg.useEthernet;                   // RMII boards: the wired-Ethernet toggle
+#elif defined(USE_ETH_SPI)
+    g_useEth = cfg.ethW5500 && cfg.useEthernet;   // W5500: opt-in module AND selected (both default off)
 #endif
     initLed();
     setLedColor(NEO_WHITE, true);   // booting

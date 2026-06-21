@@ -163,15 +163,21 @@ footer a:hover { color:var(--gh-text); }
       </div>
     </div>
 
-    <!-- Wired Ethernet (W5500) — runtime pins, so any ESP32/ESP32-S3 + a W5500 module -->
+    <!-- Wired Ethernet (W5500) — optional; runtime pins, so any ESP32/ESP32-S3 + a W5500 module -->
     <div id="w5500-card" class="card mb-3" style="display:none">
       <div class="card-header">Wired Ethernet (W5500)</div>
       <div class="card-body">
-        <div class="form-text mb-2">
-          GPIO pins for an external <b>W5500</b> SPI Ethernet module. Wire one to any
-          ESP32 / ESP32-S3 and turn on <i>Use wired Ethernet</i> above to use it instead of WiFi.
-          Defaults are the classic-ESP32 VSPI pins.
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" name="ethon" id="ethon-sw" value="1">
+          <label class="form-check-label small" for="ethon-sw">Use a W5500 Ethernet module</label>
         </div>
+        <div class="form-text mb-2">
+          Off by default. Wire an external <b>W5500</b> SPI module to any ESP32 / ESP32-S3 for wired
+          Ethernet, then turn this on to set its pins. The <i>Use wired Ethernet</i> switch above
+          (shown once this is on) picks wired vs WiFi.
+        </div>
+        <div id="w5500-pins" style="display:none">
+        <div class="form-text mb-2">GPIO pins for the W5500 module. Defaults are the classic-ESP32 VSPI pins.</div>
         <div class="row g-2">
           <div class="col">
             <label class="form-label text-secondary small mb-1">CS</label>
@@ -210,6 +216,7 @@ footer a:hover { color:var(--gh-text); }
           If the module isn't detected, lower the SPI clock (e.g. <code>1</code>) to rule out
           long/loose jumper wiring. Applied after reboot.
         </div>
+        </div><!-- /w5500-pins -->
       </div>
     </div>
 
@@ -600,7 +607,8 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('cur-ver').textContent = 'v' + CURRENT;
   $('proto-sel').value = d.protocol;
   $('useeth-sw').checked = !!d.useEthernet;
-  if (d.hasEth) $('net-mode-row').style.display = '';
+  // "Use wired Ethernet" applies to RMII boards always, or W5500 boards once the module is enabled
+  if (d.hasEth && (!d.ethSpi || d.ethW5500)) $('net-mode-row').style.display = '';
   $('wifi-mode').value = d.wifiMode !== undefined ? d.wifiMode : 0;
   $('ap-pw').value = d.apPassword || '';
   $('apfb-sw').checked = d.apFallback !== undefined ? !!d.apFallback : true;
@@ -633,7 +641,9 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('eth-int').value  = d.ethInt  !== undefined ? d.ethInt  : 4;
   $('eth-rst').value  = d.ethRst  !== undefined ? d.ethRst  : 25;
   $('eth-freq').value = d.ethFreq !== undefined ? d.ethFreq : 20;
-  if (d.ethSpi) $('w5500-card').style.display = '';   // build has the W5500 driver
+  $('ethon-sw').checked = !!d.ethW5500;
+  if (d.ethSpi)   $('w5500-card').style.display = '';   // build has the W5500 driver
+  if (d.ethW5500) $('w5500-pins').style.display = '';   // pins shown only when the module is enabled
   $('dev-host').value = d.hostname || '';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;
@@ -693,6 +703,14 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
 $('proto-sel').addEventListener('change', updAllUniHints);
 $('static-sw').addEventListener('change', updStatic);
 $('useeth-sw').addEventListener('change', updNetMode);
+$('ethon-sw').addEventListener('change', function(){
+  var on = this.checked;
+  $('w5500-pins').style.display = on ? '' : 'none';
+  $('net-mode-row').style.display = on ? '' : 'none';   // "Use wired Ethernet" only once W5500 is enabled
+  if (!on) $('useeth-sw').checked = false;               // module off → not on wired
+  updNetMode();
+  validate();
+});
 $('wifi-mode').addEventListener('change', updNetMode);
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
@@ -902,6 +920,7 @@ function activeRoles(){
   if (dt === '1' || dt === '2' || dt === '3') r = r.concat(['dispsda','dispscl']);
   if (dt === '4') r = r.concat(['dispcs','dispdc','disprst','dispsck','dispmosi']);
   document.querySelectorAll('.out-card').forEach(function(card, i){ r.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
+  if ($('ethon-sw') && $('ethon-sw').checked) r = r.concat(['ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst']);
   return r;
 }
 
@@ -928,7 +947,8 @@ function decoratePin(input){
 }
 function decorateAllPins(){
   var names = ['ledpin','ledr','ledg','ledy','ledb','ledw',
-               'dispsda','dispscl','dispcs','dispdc','disprst','dispsck','dispmosi'];
+               'dispsda','dispscl','dispcs','dispdc','disprst','dispsck','dispmosi',
+               'ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst'];
   document.querySelectorAll('.out-card').forEach(function(card, i){ names.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
   names.forEach(function(n){ decoratePin(byRole(n)); });
   document.querySelectorAll('.out-en').forEach(function(en){

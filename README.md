@@ -487,7 +487,7 @@ On first boot (or after WiFi reset), a board in WiFi client mode opens a WiFi ac
 
 Choose how LumiGate connects in **`/config` → Network**. Changes apply after a reboot.
 
-- **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 module** configured under *Wired Ethernet (W5500)*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, set the W5500 pins first, then enable it.
+- **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 module** enabled under *Wired Ethernet (W5500)*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first turn on "Use a W5500 Ethernet module" (off by default) and set its pins, then enable "Use wired Ethernet".
 - **WiFi mode:**
   - **Client (STA)** — join your existing 2.4 GHz network (the default; set credentials via the config portal above).
   - **Standalone AP** — LumiGate hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
@@ -770,10 +770,11 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | LumiGate v3 (ESP32-S3 + W5500) | `lumigate_v3` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external W5500 module** — the W5500
-driver is compiled into every build. Wire the module over SPI, set its pins in **`/config` &rarr;
-Wired Ethernet (W5500)**, and toggle **Use wired Ethernet**. Pins default to the classic-ESP32
-VSPI set (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25) and are fully configurable; lower
-the SPI clock there if a long-wired module isn't detected. No special build is needed.
+driver is compiled into every build. In **`/config` &rarr; Wired Ethernet (W5500)** turn on
+**Use a W5500 Ethernet module** (off by default), set its pins, then enable **Use wired Ethernet**.
+Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25) and
+are fully configurable (with the on-board pin-picker); lower the SPI clock there if a long-wired
+module isn't detected. No special build is needed.
 
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the
