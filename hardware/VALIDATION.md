@@ -46,8 +46,12 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 | 15 | Via current / annular | ✅/⚠️ | validate_geometry.py | via current fine; escape-via annular 0.125mm meets JLCPCB (tight) |
 | 16 | DFM vs JLCPCB 4-layer | ✅ | validate_geometry.py | min trace 0.2mm, drill 0.2mm OK |
 | 17 | Magjack HY931147C pinout | ✅ | datasheet | verified vs HanRun REV.A/1 (2026-06-22): TD=5/6, RD=1/2, RCT=3/TCT=4, V+=9/V-=10, LED-Y=11/12 (A/K), LED-G=13/14 (A/K); straight MDI correct (no auto-MDIX) |
-| 18 | W5500 crystal CL vs 22pF | 🔲 | datasheet | verify C2981622 CL (22pF ⇒ CL≈15pF) |
-| 19 | W5500 EXRES1 12k vs 12.4k | ⚠️ | datasheet | -3.2%, within tol; prefer 12.4k 1% |
+| 18 | W5500 crystal CL vs caps | ✅ | datasheet (2520-25-**20**) | **FIXED**: crystal is CL=20pF; caps 22pF→**33pF C0G** (presented 15pF→20.5pF). Was running the 25MHz fast. |
+| 19 | W5500 EXRES1 | ✅ | datasheet | **FIXED**: R3 12k→**12.4k 1%** (on-spec PHY bias) |
+| 27 | PoE TVS margin | ✅ | datasheet | **FIXED**: D10 SMAJ58A→**SMAJ60A** (58V standoff was only 1V over 57V max) |
+| 28 | Every part rating/value/datasheet | ✅/⚠️ | 4-agent datasheet pass | see **VALIDATION_REPORT.md**: all active parts + crystal + connectors read from official datasheets; ratings/values recomputed. 3 fixes applied, open items listed. |
+| 29 | ESP32-S3 GPIO map | ✅ | datasheet | **every pin validated, zero must-change**. IO35/36/37 free (N8 no PSRAM), strapping safe, no flash/input-only conflict, UART/SPI routable, IO19/20 native-USB noted |
+| 30 | SPICE power chain | ⚠️ | ngspice-42 (WSL) | DC + transient (sim/*.cir): VCC2≥4.5V needs VBUS≥~4.95V on USB; PoE 5.0V→4.56V ✓; load-step burst dips to 4.52V ✓. See report §3 (top open item: USB margin / ideal-diode OR). |
 | 20 | ESP32-S3 strapping pins | ⚠️ | schematic | IO0 pulled-up ✓; IO3/IO45/IO46 float (standard for WROOM-1, verify) |
 | 21 | ESD on USB data / DMX | ✅ | schematic | DMX has SM712 TVS ✓; **USB D+/D- now protected by U8 USBLC6-2SC6** ESD/TVS array (VBUS clamp at the connector) |
 | 22 | Self-healing input fuse | ✅ | schematic | **F1 BSMD1206-150-16V PPTC** (1.5A hold, 25mΩ) in series on USB VBUS; resets after an overcurrent/short. PoE path uses the DP9900M internal limit. |

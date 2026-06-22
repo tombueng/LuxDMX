@@ -1,0 +1,16 @@
+* LumiGate +5V power chain DC validation: source -> PTC -> SS54 OR-diode -> +5V -> FB1 -> B0505S input
+* SS54 Schottky tuned so Vf(0.8A,25C) ~= 0.40V (datasheet ~0.4-0.45V typ, 0.55 max)
+.model SS54 D(Is=2e-5 N=1.0 Rs=0.13 Cjo=300p)
+Vsrc src 0 DC 5.0
+Rptc src a 0.025          ; PTC F1 (25 mOhm)
+Dor  a p5v SS54          ; OR diode D8 (USB) -- only one diode conducts at a time
+Ibuck p5v 0 DC 0.40      ; buck + logic load on +5V (does NOT go through FB1)
+Rfb1 p5v dmx 0.10        ; ferrite FB1 (100 mOhm) to the DMX iso DC-DC inputs
+Idmx  dmx 0 DC 0.40      ; both B0505S input current through FB1
+.control
+echo "== USB power: sweep VBUS 4.70..5.25 (load 0.8A total) =="
+dc Vsrc 4.70 5.25 0.05
+print v(p5v) v(dmx)
+echo "== B0505S input (v(dmx)) is its unregulated Vout ~ VCC2; ISO3086 VCC2 min = 4.5V =="
+.endc
+.end

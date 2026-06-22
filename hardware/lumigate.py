@@ -150,7 +150,7 @@ U2['TXP'] += ETH_TXP; U2['TXN'] += ETH_TXN; U2['RXP'] += ETH_RXP; U2['RXN'] += E
 U2['LINKLED'] += ETH_LL; U2['ACTLED'] += ETH_AL
 # PMODE0..2 left to internal pull-ups (all-capable auto-negotiation)
 # W5500 support parts
-Rset = R('R3', '12k'); Rset[1] += U2['EXRES1']; Rset[2] += GND        # W5500 EXRES1 (12.4k spec; 12k basic, within 100BASE-TX tol)
+Rset = R('R3', '12.4k'); Rset[1] += U2['EXRES1']; Rset[2] += GND      # W5500 EXRES1: datasheet 12.4k 1% (was 12k -3.2%, on-spec now)
 C12a = C('C4', '1uF'); C12a[1] += V12; C12a[2] += GND
 C12b = C('C5', '100nF'); C12b[1] += V12; C12b[2] += GND
 Ctoc = C('C6', '4.7uF'); Ctoc[1] += TOCAP; Ctoc[2] += GND             # TOCAP ~4.7uF (datasheet)
@@ -163,8 +163,10 @@ XT = mk('Crystal', 'Y', 'Crystal:Crystal_SMD_2520-4Pin_2.5x2.0mm',
         value='25MHz')
 Y1 = XT(); Y1.ref = 'Y1'
 Y1[1] += XI; Y1[3] += XO; Y1[2] += GND; Y1[4] += GND
-Cx1 = C('C12', '22pF'); Cx1[1] += XI; Cx1[2] += GND
-Cx2 = C('C13', '22pF'); Cx2[1] += XO; Cx2[2] += GND
+# crystal load caps: the C2981622 is CL=20pF (part# 2520-25-20-...). CL=(C1*C2)/(C1+C2)+Cstray;
+# 33pF || 33pF + ~4pF stray = 20.5pF (was 22pF -> only 15pF presented, ran the W5500 clock fast). C0G/NP0.
+Cx1 = C('C12', '33pF C0G'); Cx1[1] += XI; Cx1[2] += GND
+Cx2 = C('C13', '33pF C0G'); Cx2[1] += XO; Cx2[2] += GND
 # MagJack HY931147C (C91754) — THT 10/100 PoE magjack: integrated magnetics + an INTEGRATED
 # PoE rectifier (Mode A+B bridge -> V+ pin9 / V- pin10) + 2 LEDs. Replaces the non-PoE
 # HR961160C: the internal bridge does the rectification, so no external BR1/BR2 are needed.
@@ -256,8 +258,9 @@ POE = mk('DP9900M-5V', 'U', 'C5380106:PWRM-SMD_DP9900M-5V',
 U7 = POE(); U7.ref = 'U7'
 U7[5] += VPOE_P; U7[6] += VPOE_P; U7[7] += VPOE_N; U7[8] += VPOE_N
 U7[1] += P5V_POE; U7[2] += P5V_POE; U7[3] += GND   # isolated 5V out; -VDC -> board GND; ADJ(4) open = nominal 5V
-TVSP = mk('SMAJ58A', 'D', 'Diode_SMD:D_SMA', [(1, 'K', PT.PASSIVE), (2, 'A', PT.PASSIVE)], value='SMAJ58A')
-D10 = TVSP(); D10.ref = 'D10'; D10['K'] += VPOE_P; D10['A'] += VPOE_N   # rectified-PoE surge clamp (58V standoff)
+TVSP = mk('SMAJ60A', 'D', 'Diode_SMD:D_SMA', [(1, 'K', PT.PASSIVE), (2, 'A', PT.PASSIVE)], value='SMAJ60A')
+D10 = TVSP(); D10.ref = 'D10'; D10['K'] += VPOE_P; D10['A'] += VPOE_N   # rectified-PoE surge clamp: 60V standoff
+# (was SMAJ58A: only 1V over the 57V PoE max -> nuisance leakage risk; SMAJ60A Vbr 66.7V, clamp ~96.8V)
 Cpoe1 = C('C27', '100uF', 'Capacitor_SMD:CP_Elec_6.3x7.7'); Cpoe1[1] += P5V_POE; Cpoe1[2] += GND   # module output bulk (datasheet 100uF/25V)
 Cpoe2 = C('C28', '10uF', 'Capacitor_SMD:C_0805_2012Metric'); Cpoe2[1] += P5V_POE; Cpoe2[2] += GND
 
