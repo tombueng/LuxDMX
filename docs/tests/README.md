@@ -50,7 +50,7 @@ They always restore the original configuration afterwards.
 
 | Spec | Feature (network → web UI) |
 |---|---|
-| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`) |
+| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card |
 | `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking |
 | `sacn.spec.mjs` | sACN / E1.31 → DMX values, live grid, sender tracking |
 | `conflict.spec.mjs` | Two simultaneous senders → conflict banner |

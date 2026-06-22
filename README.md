@@ -82,7 +82,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Ethernet support** | WT32-ETH01 (LAN8720) and v3 (W5500) run wired LAN *or* WiFi, switchable at runtime; DHCP or static |
+| **Ethernet support** | WT32-ETH01 (LAN8720) and v3 (W5500) run wired LAN *or* WiFi, switchable at runtime; **plus any ESP32 / ESP32-S3 + an external W5500 module** (enable & pin it in `/config`); DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
@@ -487,7 +487,7 @@ On first boot (or after WiFi reset), a board in WiFi client mode opens a WiFi ac
 
 Choose how LumiGate connects in **`/config` → Network**. Changes apply after a reboot.
 
-- **Interface** (boards with both, i.e. WT32-ETH01 and v3): **WiFi** or **wired Ethernet**. These boards default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi instead.
+- **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 module** enabled under *Wired Ethernet (W5500)*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first turn on "Use a W5500 Ethernet module" (off by default) and set its pins, then enable "Use wired Ethernet".
 - **WiFi mode:**
   - **Client (STA)** — join your existing 2.4 GHz network (the default; set credentials via the config portal above).
   - **Standalone AP** — LumiGate hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
@@ -768,7 +768,13 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
 | LumiGate v3 (ESP32-S3 + W5500) | `lumigate_v3` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
-| ESP32 + W5500 module | `esp32dev_w5500` | WiFi **or** Ethernet (W5500 SPI) | 2 | GPIO17 / 16 / −1 | UART2 | Classic ESP32-WROOM with an off-the-shelf W5500 on VSPI/SPI3 (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25). Dual-stack: switch WiFi ↔ wired in `/config`. Tune the SPI clock with `ETH_W5500_SPI_FREQ_MHZ` (default 20) |
+
+**Any ESP32 / ESP32-S3 build can add wired Ethernet with an external W5500 module** — the W5500
+driver is compiled into every build. In **`/config` &rarr; Wired Ethernet (W5500)** turn on
+**Use a W5500 Ethernet module** (off by default), set its pins, then enable **Use wired Ethernet**.
+Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25) and
+are fully configurable (with the on-board pin-picker); lower the SPI clock there if a long-wired
+module isn't detected. No special build is needed.
 
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the

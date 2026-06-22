@@ -115,35 +115,39 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #define DEF_LED_W -1   // white  — identify / boot
 #endif
 
-// W5500 SPI-Ethernet (USE_ETH_SPI) — pins come from the board env's build_flags;
-// these #ifndef fallbacks keep the file self-contained. host/addr rarely change.
+// W5500 SPI-Ethernet pin DEFAULTS — defined unconditionally so the W5500 pins are
+// runtime config (cfg.eth*) on ANY board: a DIY user can wire a W5500 module to a
+// plain ESP32 / ESP32-S3 and enable it in /config, not just boards that bake the
+// pins in at build time. Defaults are the classic-ESP32 VSPI pins (the most common
+// W5500 wiring); lumigate_v3 overrides them via build_flags. A build without
+// USE_ETH_SPI never calls ETH.begin() with these, so they cost nothing there.
+#ifndef ETH_W5500_SCK
+#define ETH_W5500_SCK 18
+#endif
+#ifndef ETH_W5500_MOSI
+#define ETH_W5500_MOSI 23
+#endif
+#ifndef ETH_W5500_MISO
+#define ETH_W5500_MISO 19
+#endif
+#ifndef ETH_W5500_CS
+#define ETH_W5500_CS 5
+#endif
+#ifndef ETH_W5500_IRQ
+#define ETH_W5500_IRQ 4
+#endif
+#ifndef ETH_W5500_RST
+#define ETH_W5500_RST 25
+#endif
+#ifndef ETH_W5500_SPI_FREQ_MHZ
+#define ETH_W5500_SPI_FREQ_MHZ 20   // W5500 SPI clock; lower (e.g. 1) to debug long/loose wiring
+#endif
 #ifdef USE_ETH_SPI
 #ifndef ETH_W5500_SPI_HOST
 #define ETH_W5500_SPI_HOST SPI3_HOST
 #endif
 #ifndef ETH_W5500_ADDR
 #define ETH_W5500_ADDR 1
-#endif
-#ifndef ETH_W5500_SCK
-#define ETH_W5500_SCK 12
-#endif
-#ifndef ETH_W5500_MOSI
-#define ETH_W5500_MOSI 11
-#endif
-#ifndef ETH_W5500_MISO
-#define ETH_W5500_MISO 13
-#endif
-#ifndef ETH_W5500_CS
-#define ETH_W5500_CS 10
-#endif
-#ifndef ETH_W5500_IRQ
-#define ETH_W5500_IRQ 14
-#endif
-#ifndef ETH_W5500_RST
-#define ETH_W5500_RST 9
-#endif
-#ifndef ETH_W5500_SPI_FREQ_MHZ
-#define ETH_W5500_SPI_FREQ_MHZ 20   // W5500 SPI clock; lower (e.g. 1) to debug long/loose wiring
 #endif
 #endif  // USE_ETH_SPI
 
@@ -337,6 +341,16 @@ struct Config {
     int    dispRst;
     int    dispSck;
     int    dispMosi;
+    // W5500 SPI wired Ethernet pins (runtime, like the display) — lets ANY board add
+    // an off-the-shelf W5500 module; defaults come from the ETH_W5500_* macros. -1 = unset.
+    int    ethCs;
+    int    ethSck;
+    int    ethMosi;
+    int    ethMiso;
+    int    ethInt;
+    int    ethRst;
+    int    ethFreqMhz;     // W5500 SPI clock (MHz); lower to debug long/loose wiring
+    bool   ethW5500;       // W5500 module enabled — opt-in, default OFF (SPI-Eth boards)
     bool   useEthernet;    // wired-Eth boards: true = wired Ethernet, false = WiFi
     int    wifiMode;       // WiFi interface mode: 0 = STA (client), 1 = AP (standalone)
     bool   apFallback;     // start the WiFi AP automatically if wired Eth has no link
@@ -416,6 +430,14 @@ static void loadConfig() {
     cfg.dispRst     = constrain(prefs.getInt("disprst",  -1), -1, 48);
     cfg.dispSck     = constrain(prefs.getInt("dispsck",  -1), -1, 48);
     cfg.dispMosi    = constrain(prefs.getInt("dispmosi", -1), -1, 48);
+    cfg.ethCs       = constrain(prefs.getInt("ethcs",   ETH_W5500_CS),   -1, 48);
+    cfg.ethSck      = constrain(prefs.getInt("ethsck",  ETH_W5500_SCK),  -1, 48);
+    cfg.ethMosi     = constrain(prefs.getInt("ethmosi", ETH_W5500_MOSI), -1, 48);
+    cfg.ethMiso     = constrain(prefs.getInt("ethmiso", ETH_W5500_MISO), -1, 48);
+    cfg.ethInt      = constrain(prefs.getInt("ethint",  ETH_W5500_IRQ),  -1, 48);
+    cfg.ethRst      = constrain(prefs.getInt("ethrst",  ETH_W5500_RST),  -1, 48);
+    cfg.ethFreqMhz  = constrain(prefs.getInt("ethfreq", ETH_W5500_SPI_FREQ_MHZ), 1, 80);
+    cfg.ethW5500    = prefs.getBool("ethon",    false);   // W5500 opt-in, default off
     cfg.useEthernet = prefs.getBool("useeth",   DEF_USE_ETH);
     cfg.wifiMode    = constrain(prefs.getInt("wifimode", NET_WIFI_STA), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback  = prefs.getBool("apfb",     true);
@@ -460,6 +482,14 @@ static void saveConfig() {
     prefs.putInt("disprst",     cfg.dispRst);
     prefs.putInt("dispsck",     cfg.dispSck);
     prefs.putInt("dispmosi",    cfg.dispMosi);
+    prefs.putInt("ethcs",       cfg.ethCs);
+    prefs.putInt("ethsck",      cfg.ethSck);
+    prefs.putInt("ethmosi",     cfg.ethMosi);
+    prefs.putInt("ethmiso",     cfg.ethMiso);
+    prefs.putInt("ethint",      cfg.ethInt);
+    prefs.putInt("ethrst",      cfg.ethRst);
+    prefs.putInt("ethfreq",     cfg.ethFreqMhz);
+    prefs.putBool("ethon",      cfg.ethW5500);
     prefs.putBool("useeth",     cfg.useEthernet);
     prefs.putInt("wifimode",    cfg.wifiMode);
     prefs.putBool("apfb",       cfg.apFallback);
@@ -1378,6 +1408,19 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispRst\":";    j += cfg.dispRst;            j += ",";
     j += "\"dispSck\":";    j += cfg.dispSck;            j += ",";
     j += "\"dispMosi\":";   j += cfg.dispMosi;           j += ",";
+    j += "\"ethCs\":";      j += cfg.ethCs;              j += ",";
+    j += "\"ethSck\":";     j += cfg.ethSck;             j += ",";
+    j += "\"ethMosi\":";    j += cfg.ethMosi;            j += ",";
+    j += "\"ethMiso\":";    j += cfg.ethMiso;            j += ",";
+    j += "\"ethInt\":";     j += cfg.ethInt;             j += ",";
+    j += "\"ethRst\":";     j += cfg.ethRst;             j += ",";
+    j += "\"ethFreq\":";    j += cfg.ethFreqMhz;         j += ",";
+#if defined(USE_ETH_SPI)
+    j += "\"ethSpi\":true,";    // W5500 SPI compiled in → UI shows the W5500 pin card
+#else
+    j += "\"ethSpi\":false,";
+#endif
+    j += "\"ethW5500\":";  j += cfg.ethW5500 ? "true" : "false"; j += ",";   // module enabled (opt-in)
     j += "\"useEthernet\":"; j += cfg.useEthernet ? "true" : "false"; j += ",";
 #if defined(HAS_WIRED_ETH)
     j += "\"hasEth\":true,";   // board has wired Ethernet → show the WiFi/Ethernet selector
@@ -1513,6 +1556,14 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "disprst", s))  cfg.dispRst   = constrain(s.toInt(), -1, 48);
     if (argStr(req, "dispsck", s))  cfg.dispSck   = constrain(s.toInt(), -1, 48);
     if (argStr(req, "dispmosi", s)) cfg.dispMosi  = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ethcs", s))    cfg.ethCs      = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ethsck", s))   cfg.ethSck     = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ethmosi", s))  cfg.ethMosi    = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ethmiso", s))  cfg.ethMiso    = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ethint", s))   cfg.ethInt     = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ethrst", s))   cfg.ethRst     = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "ethfreq", s))  cfg.ethFreqMhz = constrain(s.toInt(), 1, 80);
+    cfg.ethW5500 = req->hasParam("ethon", true) || req->hasParam("ethon");
     cfg.useEthernet = req->hasParam("useeth", true) || req->hasParam("useeth");
     if (argStr(req, "wifimode", s)) cfg.wifiMode = constrain(s.toInt(), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback = req->hasParam("apfb", true) || req->hasParam("apfb");
@@ -2163,11 +2214,10 @@ static void waitEthLink() {
 // unchanged. WiFi stays the default; this only runs when the user enabled Ethernet.
 static void startEthSpi() {
     Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz\n",
-        ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI,
-        ETH_W5500_SPI_FREQ_MHZ);
-    ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, ETH_W5500_CS, ETH_W5500_IRQ, ETH_W5500_RST,
-              ETH_W5500_SPI_HOST, ETH_W5500_SCK, ETH_W5500_MISO, ETH_W5500_MOSI,
-              ETH_W5500_SPI_FREQ_MHZ);
+        cfg.ethCs, cfg.ethInt, cfg.ethRst, cfg.ethSck, cfg.ethMiso, cfg.ethMosi, cfg.ethFreqMhz);
+    ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
+              ETH_W5500_SPI_HOST, cfg.ethSck, cfg.ethMiso, cfg.ethMosi,
+              cfg.ethFreqMhz);
     applyEthStaticIp();
     waitEthLink();
 }
@@ -2277,8 +2327,10 @@ void setup() {
     Serial.println("\n[BOOT] LumiGate — Art-Net / sACN DMX Gateway");
 
     loadConfig();
-#if defined(HAS_WIRED_ETH)
-    g_useEth = cfg.useEthernet;   // wired Ethernet only if enabled in config; WiFi otherwise
+#if defined(USE_ETH_RMII)
+    g_useEth = cfg.useEthernet;                   // RMII boards: the wired-Ethernet toggle
+#elif defined(USE_ETH_SPI)
+    g_useEth = cfg.ethW5500 && cfg.useEthernet;   // W5500: opt-in module AND selected (both default off)
 #endif
     initLed();
     setLedColor(NEO_WHITE, true);   // booting

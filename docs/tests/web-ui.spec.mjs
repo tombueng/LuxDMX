@@ -66,4 +66,34 @@ test.describe('Web UI + REST', () => {
     expect(typeof d.available).toBe('boolean');
     expect(Array.isArray(d.devices)).toBeTruthy();
   });
+
+  test('/info.json advertises the W5500 SPI Ethernet config fields', async ({ request }) => {
+    const d = await (await request.get('/info.json')).json();
+    expect(typeof d.ethSpi).toBe('boolean');   // whether the W5500 driver is compiled in
+    if (d.ethSpi) {
+      for (const k of ['ethCs', 'ethSck', 'ethMosi', 'ethMiso', 'ethInt', 'ethRst', 'ethFreq']) {
+        expect(d, `info.json missing "${k}"`).toHaveProperty(k);
+        expect(typeof d[k]).toBe('number');
+      }
+    }
+  });
+
+  test('W5500 card is opt-in: the enable switch reveals the pins', async ({ page, request }) => {
+    const d = await (await request.get('/info.json')).json();
+    test.skip(!d.ethSpi, 'build has no W5500 SPI support');
+    await page.goto('/config');
+    await expect(page.locator('#w5500-card')).toBeVisible();
+    await expect(page.locator('input[name="ethon"]')).toBeVisible();   // the on/off switch
+    const cs = page.locator('input[name="ethcs"]');
+    if (!d.ethW5500) {
+      await expect(cs).toBeHidden();                                   // pins hidden by default (off)
+      await expect(page.locator('#net-mode-row')).toBeHidden();        // "Use wired Ethernet" hidden too
+      await page.locator('#ethon-sw').check();                         // browser-only toggle (no save)
+    }
+    await expect(cs).toBeVisible();
+    await expect(page.locator('input[name="ethsck"]')).toBeVisible();
+    await expect(page.locator('#net-mode-row')).toBeVisible();         // appears once enabled
+    // pins get the board pin-picker button
+    await expect(page.locator('.pin-grp input[name="ethcs"]')).toHaveCount(1);
+  });
 });
