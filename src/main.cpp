@@ -327,7 +327,8 @@ static uint32_t identifyUntil   = 0;
 static uint32_t pendingRebootAt = 0;       // 0 = none; loop() reboots when due
 static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
 
-// WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1)
+// WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1)
+// (srcStatus: 0=normal 1=conflict 2=merging)
 // jitter(2) dmx(512) + per-output fps(2 x MAX_OUTPUTS) = 528 + 2*MAX_OUTPUTS
 static constexpr int WS_FRAME_LEN = 528 + 2 * MAX_OUTPUTS;
 static uint8_t wsBuf[WS_FRAME_LEN];
@@ -965,7 +966,46 @@ static uint8_t activeSenderCount() {
     return n;
 }
 
-static bool hasConflict() { return activeSenderCount() > 1; }
+// Count live sources (seen within windowMs) currently feeding `universe`.
+static int sourcesOnUniverse(int universe, uint32_t windowMs) {
+    uint32_t now = millis();
+    int n = 0;
+    for (int i = 0; i < MAX_SENDERS; i++) {
+        const Sender& s = senders[i];
+        if (s.ip == 0 || s.universe != universe) continue;
+        if (now - s.lastMs < windowMs) n++;
+    }
+    return n;
+}
+
+// A real conflict = 2+ live sources on an enabled output's universe while that
+// output is NOT merging (mergeMode OFF → unmanaged last-frame-wins clash). HTP/LTP
+// outputs are meant to be fed by several sources, so they never raise the warning.
+static bool hasConflict() {
+    for (int o = 0; o < MAX_OUTPUTS; o++) {
+        if (!cfg.outputs[o].enabled || cfg.outputs[o].mergeMode != MERGE_OFF) continue;
+        if (sourcesOnUniverse(cfg.outputs[o].universe, 5000) > 1) return true;
+    }
+    return false;
+}
+
+// Merging active = 2+ live sources on an enabled output that IS merging (HTP/LTP).
+// Uses the merge engine's own contribution window so the indicator matches reality.
+static bool isMerging() {
+    for (int o = 0; o < MAX_OUTPUTS; o++) {
+        if (!cfg.outputs[o].enabled || cfg.outputs[o].mergeMode == MERGE_OFF) continue;
+        if (sourcesOnUniverse(cfg.outputs[o].universe, SOURCE_TIMEOUT_MS) > 1) return true;
+    }
+    return false;
+}
+
+// Source state for the UI / LED / display: 0 = normal, 1 = conflict, 2 = merging.
+// An unmanaged clash (conflict) outranks intended merging.
+static uint8_t sourceStatus() {
+    if (hasConflict()) return 1;
+    if (isMerging())   return 2;
+    return 0;
+}
 
 // ---------------------------------------------------------------------------
 // Change log
@@ -1009,7 +1049,8 @@ static float outFpsLive(int i) {
 
 // ---------------------------------------------------------------------------
 // WebSocket push (binary, WS_FRAME_LEN bytes)
-// frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2)
+// frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
+//        srcStatus: 0=normal 1=conflict 2=merging
 //        dmx(512) + per-output fps(2 x MAX_OUTPUTS)
 // ---------------------------------------------------------------------------
 static void wsPush() {
@@ -1027,7 +1068,7 @@ static void wsPush() {
     wsBuf[8]  = upS >> 24;   wsBuf[9]  = (upS>>16)&0xFF;
     wsBuf[10] = (upS>>8)&0xFF; wsBuf[11] = upS & 0xFF;
     wsBuf[12] = activeSenderCount();
-    wsBuf[13] = hasConflict() ? 1 : 0;
+    wsBuf[13] = sourceStatus();   // 0 = normal, 1 = conflict, 2 = merging
     wsBuf[14] = jitI >> 8;  wsBuf[15] = jitI & 0xFF;
     memcpy(&wsBuf[16], &dmxBuf[viewOutput()][1], 512);   // stream the viewed output
     // Per-output frame rates (one universe each) appended after the DMX block.
@@ -1999,7 +2040,9 @@ static void ledTask(void*) {
             bool r = !up && ((now % 1000) < 500);
             bool g = up;
             bool y = up && dmx && ((now % 250) < 125);
-            bool b = hasConflict() && ((now % 600) < 300);
+            uint8_t ss = sourceStatus();
+            bool b = (ss == 1) ? ((now % 600) < 300)   // conflict: slow blink
+                   : (ss == 2);                         // merging: steady on
             bool w = identifyCh && ((now % 400) < 200);
             setLeds5(r, g, y, b, w);
         } else if (!netConnected()) {
@@ -2189,11 +2232,12 @@ static void dispDrawBanner(const char* l1, const char* l2, uint16_t accent) {
     dispCenter(l2, 1, H >= 64 ? H / 2 + 4 : 16);
 }
 
-// Priority: 1=conflict, 2=identify, 3=manual, 0=status.
+// Priority: 1=conflict, 2=identify, 3=manual, 4=merging, 0=status.
 static uint8_t dispPickScreen() {
     if (hasConflict()) return 1;
     if (identifyCh)    return 2;
     if (manualMode)    return 3;
+    if (isMerging())   return 4;
     return 0;
 }
 
@@ -2204,6 +2248,7 @@ static void dispRender(uint8_t screen) {
         case 2: snprintf(b, sizeof(b), "ch %u", identifyCh);
                 dispDrawBanner("IDENTIFY", b, C_AMBER); break;
         case 3: dispDrawBanner("MANUAL", "override", C_BLUE); break;
+        case 4: dispDrawBanner("MERGING", "2+ sources", C_GREEN); break;
         default: dispDrawStatus(); break;
     }
     dispFlush();

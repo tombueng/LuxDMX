@@ -163,7 +163,16 @@ footer a:hover { color: var(--gh-text); }
     <span style="color:#f85149">&#9888;</span>
     <span class="small" style="color:#f85149">
       Universe conflict &mdash; <strong id="conflict-count">2</strong> senders active simultaneously.
-      Only one source should control a universe.
+      Enable a merge mode (HTP/LTP) on the output, or leave only one source.
+    </span>
+  </div>
+
+  <!-- Merging indicator (positive: multiple sources combined on purpose) -->
+  <div id="merge-banner" style="display:none;background:#0d2818;border:1px solid #3fb950"
+       class="align-items-center gap-2 mb-3 px-3 py-2 rounded">
+    <span style="color:#3fb950">&#10227;</span>
+    <span class="small" style="color:#3fb950">
+      Merging <strong id="merge-count">2</strong> sources on this universe.
     </span>
   </div>
 
@@ -560,7 +569,7 @@ function connect() {
     var heap        = v.getUint32(4);
     var upS         = v.getUint32(8);
     var senderCount = v.getUint8(12);
-    var conflict    = v.getUint8(13);
+    var srcStatus   = v.getUint8(13);   // 0 = normal, 1 = conflict, 2 = merging
     var jitter      = (v.getUint16(14) / 10).toFixed(1);
 
     // Per-output frame rates appended after the 512-byte DMX block.
@@ -583,11 +592,18 @@ function connect() {
     document.getElementById('jitter').textContent = jitter + ' ms';
 
     var cb = document.getElementById('conflict-banner');
-    if (conflict) {
+    var mb = document.getElementById('merge-banner');
+    if (srcStatus === 1) {            // conflict (unmanaged clash)
       document.getElementById('conflict-count').textContent = senderCount;
       cb.style.display = 'flex';
+      mb.style.display = 'none';
+    } else if (srcStatus === 2) {     // merging (intended)
+      document.getElementById('merge-count').textContent = senderCount;
+      mb.style.display = 'flex';
+      cb.style.display = 'none';
     } else {
       cb.style.display = 'none';
+      mb.style.display = 'none';
     }
 
     applyDmx(new Uint8Array(e.data, 16, 512));

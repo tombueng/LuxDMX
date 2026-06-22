@@ -7,12 +7,18 @@
 import { test, expect } from '@playwright/test';
 import {
   deviceHost, UdpSender, streamFor, artDmxPacket, e131Packet, prepInput,
-  ART_PORT, SACN_PORT,
+  wsFirstBinary, ART_PORT, SACN_PORT,
 } from './lib/net.mjs';
 import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
 
 let host;
 test.beforeAll(async () => { host = await deviceHost(); });
+
+// Source state byte in the WS push frame: 0 = normal, 1 = conflict, 2 = merging.
+async function srcStatus(host) {
+  const v = await wsFirstBinary(host, 2500);
+  return v.getUint8(13);
+}
 
 // Full /config form from an /info.json snapshot, applying overrides to output A
 // (output 0). Sending every field avoids clobbering unrelated settings.
@@ -60,6 +66,27 @@ test.describe('Source merging (issue #10)', () => {
       await expect(page.locator(`[name="${n}"]`)).toHaveCount(1);
       await expect(page.locator(`[name="${n}"] option`)).toHaveCount(3);
     }
+  });
+
+  // Two sources on one universe while that output is in Off mode is a genuine
+  // unmanaged clash → the WS frame must report conflict (srcStatus 1). Default
+  // merge mode is Off, so this needs no config change.
+  test('two sources with merging off report the conflict status', async ({ request }) => {
+    const before = await info(request);
+    test.skip(before.outputs[0].merge !== 0, 'output A is not in Off merge mode');
+    const art = before.outputs[0].uni, sacn = art + 1;
+    await prepInput(host);
+    const a = new UdpSender(host), s = new UdpSender(host);
+    const d = Buffer.alloc(512); d[0] = 80;
+    try {
+      const streaming = Promise.all([
+        streamFor(a, ART_PORT,  (i) => artDmxPacket(art, d, i), { ms: 6000 }),
+        streamFor(s, SACN_PORT, (i) => e131Packet(sacn, d, i),  { ms: 6000 }),
+      ]);
+      const st = await pollFor(() => srcStatus(host), (x) => x === 1, { ms: 6000, every: 400 });
+      expect(st, 'srcStatus should be 1 (conflict) with merging off').toBe(1);
+      await streaming;
+    } finally { a.close(); s.close(); }
   });
 
   // ── behaviour (opt-in: mutates + reboots the device) ──────────────────────
@@ -114,6 +141,39 @@ test.describe('Source merging (issue #10)', () => {
           await streaming;
         } finally { a.close(); s.close(); }
       }
+    } finally {
+      await request.post('/config', { form: configForm(before) });
+      await waitForState(request, (d) => d.outputs[0].merge === before.outputs[0].merge);
+    }
+  });
+
+  test('HTP merge shows the merging indicator, not a conflict', async ({ page, request }) => {
+    test.skip(process.env.LUMIGATE_WRITE !== '1',
+      'set LUMIGATE_WRITE=1 to run device-mutating tests (reboots the device twice)');
+    test.setTimeout(120_000);   // two reboots
+    const before = await info(request);
+    const art = before.outputs[0].uni, sacn = art + 1;
+    try {
+      await request.post('/config', { form: configForm(before, { merge: 1 }) });
+      await waitForState(request, (d) => d.outputs[0].merge === 1);
+      await prepInput(host);
+      await page.goto('/');
+      await expect(page.locator('#ws-badge')).toHaveText(/Live/);
+      const a = new UdpSender(host), s = new UdpSender(host);
+      const d = Buffer.alloc(512); d[0] = 90;
+      try {
+        const streaming = Promise.all([
+          streamFor(a, ART_PORT,  (i) => artDmxPacket(art, d, i), { ms: 8000 }),
+          streamFor(s, SACN_PORT, (i) => e131Packet(sacn, d, i),  { ms: 8000 }),
+        ]);
+        // WS frame reports merging (2), never conflict (1), with HTP enabled.
+        const st = await pollFor(() => srcStatus(host), (x) => x === 2, { ms: 6000, every: 400 });
+        expect(st, 'srcStatus should be 2 (merging) under HTP').toBe(2);
+        // UI shows the positive banner and hides the conflict one.
+        await expect(page.locator('#merge-banner')).toBeVisible();
+        await expect(page.locator('#conflict-banner')).toBeHidden();
+        await streaming;
+      } finally { a.close(); s.close(); }
     } finally {
       await request.post('/config', { form: configForm(before) });
       await waitForState(request, (d) => d.outputs[0].merge === before.outputs[0].merge);
