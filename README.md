@@ -503,7 +503,7 @@ Choose how LumiGate connects in **`/config` → Network**. Changes apply after a
 Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 baud):
 
 - Live stats: framerate, RSSI, uptime, free heap, jitter
-- Conflict warning if multiple senders are detected
+- Conflict warning when sources clash on a universe, or a "merging" indicator when HTP/LTP merging is enabled for that output
 - Active sender list with per-sender protocol and FPS
 - All 512 DMX channels as a live grid — each cell shows the channel number large,
   its current value small, a value-proportional brightness, **and** a bottom-to-top
@@ -535,7 +535,7 @@ values are fetched as JSON.
 | URL | Method | Function |
 |---|---|---|
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
-| `/config` | GET / POST | Change universe, protocol, static IP, hostname, OTA password, LED config, DMX pins (gzip) |
+| `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP), static IP, hostname, OTA password, LED config, DMX pins (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, `board`/`mcu` id, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
@@ -558,7 +558,7 @@ Bytes  2–3    RSSI (dBm)         int16  big-endian
 Bytes  4–7    free heap          uint32 big-endian
 Bytes  8–11   uptime (s)         uint32 big-endian
 Byte   12     active sender count uint8
-Byte   13     conflict flag       uint8 (1 = multiple senders)
+Byte   13     source status       uint8 (0 = normal, 1 = conflict, 2 = merging)
 Bytes  14–15  jitter × 10 (ms)   uint16 big-endian
 Bytes  16–527 DMX ch 1–512       uint8[512] (the viewed output)
 Bytes  528…   per-output fps × 10 uint16 big-endian × number of outputs
@@ -566,6 +566,16 @@ Bytes  528…   per-output fps × 10 uint16 big-endian × number of outputs
 
 The web UI shows the **viewed output's** frame rate in the navbar and each output's own
 rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` alongside `"fps"`.
+
+### Source merging (HTP / LTP)
+
+When more than one console targets the same universe, pick a per-output **merge mode** in `/config`:
+
+- **Off** — last frame wins; a clash raises the conflict warning.
+- **HTP** (highest takes precedence) — each channel is the maximum across the active sources.
+- **LTP** (latest takes precedence) — the most recently seen source drives the output.
+
+The **sACN priority** field is honoured first: a higher-priority source wins outright, and equal priority falls back to the mode above (Art-Net joins at the default priority of 100). A source that stops sending drops out of the mix after ~2.5 s. While an output is actively merging, the status page shows a green "merging" indicator instead of the conflict banner.
 
 A JSON **text** frame with the sender list + change log is pushed every 2 s
 (`{"meta":1,"senders":[…],"log":[…]}`) so the browser never has to poll.
