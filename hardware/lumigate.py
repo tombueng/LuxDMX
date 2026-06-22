@@ -305,6 +305,9 @@ ISO = mk('ISO3086DWR', 'U', 'C183095:SOIC-16_L10.3-W7.5-P1.27-LS10.3-BL',
 U5 = ISO(); U5.ref = 'U5'
 U5['VCC1'] += P3V3; U5[2] += GND; U5[7] += GND; U5[8] += GND
 U5['R'] += DMX_RX; U5['D'] += DMX_TX; U5['nRE'] += DMX_EN; U5['DE'] += DMX_EN
+# NB: a 10k pull-down on DMX_EN (and DMX2_EN below) would hold the ISO3086 drivers OFF while IO8/IO47 are
+# high-Z during ESP32 boot (avoids a brief indeterminate DMX drive). Evaluated but NOT fitted: adding the
+# two resistors forces the W5500 Ethernet TX diff-pair to take a via, hurting 100BASE-TX SI. Next-spin item.
 U5['VCC2'] += VISO_DRV; U5[9] += GND2; U5[10] += GND2; U5[15] += GND2
 U5['Y'] += DMX_A; U5['A'] += DMX_A; U5['Z'] += DMX_B; U5['B'] += DMX_B   # 2-wire: Y-A=Data+, Z-B=Data-
 Ciso1 = C('C18', '100nF'); Ciso1[1] += P3V3; Ciso1[2] += GND

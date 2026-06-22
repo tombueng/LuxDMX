@@ -92,7 +92,17 @@ IO19/IO20 used as plain expansion GPIO on J6 (free because USB console is the CH
 pins 8/9 are the S3 native USB D−/D+ pads.** UART0 = IO43/44 (correct, crossed TX/RX to CH340). SPI=12/11/13,
 CS=10, INT=14, RST=9 (hold ≥500µs). DMX1 UART 17/18/8, DMX2 16/21/47 — all route to HW UARTs, all output-capable.
 LEDs 1/2/6/7/15 fine. Display 4/5/39/40/41/42/38 (39–42 are JTAG alt-func, harmless). **No flash/PSRAM/strap
-collision anywhere.** Firmware /config pin map must match this (cross-check vs src/main.cpp — open item).
+collision anywhere.**
+
+**Firmware cross-check (src/main.cpp) done:** ETH MOSI=11/MISO=13 and BOOT=0 match the netlist. The DMX
+and LED pins are **compile-time defaults (DMX TX=17/RX=16, single LED=2) that are runtime-configurable via
+web /config** — this dual-universe board must be configured as out#1 = tx17/rx18/de8, out#2 = tx16/rx21/de47,
+ledType=3 (5-LED) pins 1/2/6/7/15. Hardware wiring is correct; the /config (or updated compile defaults)
+must match it. **Recommended robustness add:** a 10k pull-down on each ISO3086 DE/nRE net (DMX_EN=IO8,
+DMX2_EN=IO47) so the drivers stay disabled while IO8/IO47 are high-Z during ESP32 boot (otherwise a brief
+indeterminate drive on the DMX line at power-up — harmless to compliant receivers but not clean).
+
+**Net sanity:** 87 nets, **0 single-pin/floating nets**, ERC clean.
 
 ---
 
@@ -143,22 +153,36 @@ ordering. `validate_electrical.py` models it.
 L1 7.2mm, C6 (TOCAP) 7.1mm, C5/C10 ~5.6–5.9mm. All are the user's tight-pack tradeoff; none breaks function,
 but C27 and the buck inductor loop are worth tightening on a future placement pass.
 
-## 7. Footprints / orientation
+## 7. Footprints / orientation / thermal
 - SY8089 pinout matches; B0505S/ISO3086/USB-C/XLR/JST/magjack pin maps confirmed vs datasheet (§1).
-- Pin-1 / polarity: connectors + modules validated; **3D-model + pin-1 silk audit still to do visually**
-  (open item — verify every polarized part's orientation in the 3D view before fab).
+- **3D top-view render audited (kicad-cli pcb render):** all connectors face their correct edges (XLR-5 ×2
+  right = DMX-OUT A/B, RJ45 left = Ethernet, USB-C bottom), modules + ICs sensibly oriented, plated GND
+  holes at the 4 corners, silk legible. Electrically, footprint rotation is correct by construction (pads
+  follow nets); the visual confirms physical/connector orientation. No orientation issue found.
+- **Thermal (rough):** total board dissipation ~1.5–2.5W (2× B0505S ~0.25W, DP9900M ~0.3W, buck ~0.1W,
+  W5500 ~0.4W, ESP32 ~0.1–0.5W). On a 99×79mm 4-layer board with GND/+3V3 plane copper this spreads easily
+  (well under any limit); no hotspot of concern. The two B0505S + DP9900M run warm but within their derated
+  ratings (§1). Not a constraint.
 
 ---
 
-## 8. Open items (postponed, do NOT block — for the user to weigh)
-1. **B0505S/ISO3086 USB margin** — accept operating guidance, or spin ideal-diode OR-ing (§3). [highest]
-2. **Escape-via annular 0.125 → 0.15mm** (or accept). [DFM]
-3. **Ethernet Bob-Smith** 75Ω+1nF-to-chassis for EMC margin. [next-rev]
-4. **DP9900M LCSC PDF** — confirm 5V/1.8A SKU + on-module 802.3af detection + pin order.
-5. **Firmware pin map** cross-check vs src/main.cpp + /config.
-6. **3D/orientation visual audit** of every polarized part.
-7. C27/L1 placement tightening; 4.7µF TOCAP 0402→0603 sourcing.
-8. BOM: force ≥10V on the 22µF buck caps; C0G on the 33pF crystal caps.
+## 8. Open / next-spin items (do NOT block fab — for the user to weigh)
+1. **B0505S/ISO3086 USB margin** [highest] — accept operating guidance (PoE or clean ≥5V USB), or spin
+   ideal-diode OR-ing (§3, 2× LM66100). SPICE-quantified: needs VBUS ≥ ~4.95V on USB.
+2. **ISO3086 DE/nRE boot pull-down** — 10k on DMX_EN(IO8)/DMX2_EN(IO47) → drivers stay OFF during boot.
+   Evaluated + reverted this pass: the 2 resistors push the W5500 Ethernet TX diff-pair onto a via (hurts
+   100BASE-TX SI). Re-do next spin with a small placement nudge so the pair stays via-less.
+3. **Escape-via annular 0.125mm** is right at JLCPCB's ~0.13mm limit — acceptable, bump pad 0.5→0.55mm
+   (→0.15mm) only if a W5500-fanout reroute is done (larger pads tighten the 0.137mm clearances). [DFM]
+4. **Ethernet Bob-Smith** 75Ω + 1nF-to-chassis network — the magjack has none; add for conducted-EMC margin.
+5. **DP9900M LCSC PDF** — confirm 5V/1.8A SKU + on-module 802.3af detection/classification + pin order.
+6. **Firmware /config** must set out#1 tx17/rx18/de8, out#2 tx16/rx21/de47, ledType=3 pins 1/2/6/7/15
+   (compile-time defaults are single-output). Hardware wiring is correct (§2).
+7. C27 (PoE bulk, 24mm) + C26 (B0505S#2 in-bulk at FB1, 30mm) + L1 (buck loop) placement could tighten on a
+   future pass — functional now (SPICE-confirmed); the user's tight-pack tradeoff. 4.7µF TOCAP 0402→0603.
+8. BOM notes: force **≥10V** on the 22µF buck caps; **C0G/NP0** on the 33pF crystal caps; XLR shell off chassis.
+
+The board is fab-ready as-is for PoE / clean-USB power; item 1 is the only thing to decide before ordering.
 
 ## 9. Methods run
 4 datasheet agents (every active part) · validate_electrical/geometry/placement.py · KiCad DRC · SKiDL ERC ·
