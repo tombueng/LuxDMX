@@ -54,6 +54,7 @@ They always restore the original configuration afterwards.
 | `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking |
 | `sacn.spec.mjs` | sACN / E1.31 → DMX values, live grid, sender tracking |
 | `conflict.spec.mjs` | Two simultaneous senders → conflict banner |
+| `merge.spec.mjs` | Issue #10: per-output merge mode shape + UI; HTP per-channel max, sACN priority override, LTP persistence (opt-in) |
 | `changelog.spec.mjs` | DMX changes appear in `/log.json` + the change-log card |
 | `manual-blackout.spec.mjs` | Manual override + per-channel set + blackout (via the UI) |
 | `labels.spec.mjs` | Channel labels round-trip + grid rendering |

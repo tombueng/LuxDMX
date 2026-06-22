@@ -83,6 +83,7 @@ struct DmxOutput {
     int  txPin;
     int  rxPin;      // -1 = output only (no RDM)
     int  rtsPin;     // -1 = auto-direction module / no RDM
+    int  mergeMode;  // how to combine multiple sources on this universe (issue #10)
 };
 
 // GPIO0 = the BOOT button (config-portal / factory-reset trigger). Named
@@ -193,13 +194,34 @@ static constexpr bool DEF_USE_ETH = false;
 // ---------------------------------------------------------------------------
 static constexpr int MAX_SENDERS = 8;
 
+// Source-merge engine (issue #10) -------------------------------------------
+// Per-output merge mode (DmxOutput.mergeMode) for two+ sources on one universe.
+static constexpr int MERGE_OFF = 0;   // most recent source wins (legacy behaviour)
+static constexpr int MERGE_HTP = 1;   // highest takes precedence (per-channel max)
+static constexpr int MERGE_LTP = 2;   // latest source wins (whole-frame arbitration)
+// A source that goes silent for this long stops contributing to the merge.
+static constexpr uint32_t SOURCE_TIMEOUT_MS = 2500;
+// Art-Net has no per-packet priority; sACN's default is 100 (E1.31). Sources at
+// the highest active priority win; equal priority falls back to the merge mode.
+static constexpr uint8_t  DEFAULT_PRIORITY  = 100;
+
+// Source state codes: WS frame byte 13 + LED/display. Keep in sync with the
+// matching values documented in src/pages/index.html.
+static constexpr uint8_t SRC_NORMAL   = 0;
+static constexpr uint8_t SRC_CONFLICT = 1;
+static constexpr uint8_t SRC_MERGING  = 2;
+
 struct Sender {
-    uint32_t ip;       // 0 = empty slot
-    uint8_t  proto;    // 0=ArtNet, 1=sACN
+    uint32_t ip;        // 0 = empty slot
+    uint8_t  proto;     // 0=ArtNet, 1=sACN
     uint32_t lastMs;
-    uint32_t winMs;    // fps window start
+    uint32_t winMs;     // fps window start
     uint16_t winCnt;
     float    fps;
+    int16_t  universe;  // Art-Net universe this source feeds (0-32767; -1 = unknown)
+    uint16_t dataLen;   // channels this source actually sends (<=512)
+    uint8_t  priority;  // E1.31 priority (sACN per-packet, Art-Net = DEFAULT_PRIORITY)
+    uint8_t  data[512]; // last frame from this source, for the merge engine
 };
 static Sender senders[MAX_SENDERS] = {};
 
@@ -316,7 +338,8 @@ static uint32_t identifyUntil   = 0;
 static uint32_t pendingRebootAt = 0;       // 0 = none; loop() reboots when due
 static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
 
-// WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1)
+// WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1)
+// (srcStatus: 0=normal 1=conflict 2=merging)
 // jitter(2) dmx(512) + per-output fps(2 x MAX_OUTPUTS) = 528 + 2*MAX_OUTPUTS
 static constexpr int WS_FRAME_LEN = 528 + 2 * MAX_OUTPUTS;
 static uint8_t wsBuf[WS_FRAME_LEN];
@@ -413,6 +436,7 @@ static void loadConfig() {
                                   prefs.getInt("dmxrx", DEF_DMX_RX_PIN)), -1, 48);
     cfg.outputs[0].rtsPin   = constrain(prefs.getInt(okey(0,"rts").c_str(),
                                   prefs.getInt("dmxrts", DEF_DMX_RTS_PIN)), -1, 48);
+    cfg.outputs[0].mergeMode = constrain(prefs.getInt(okey(0,"merge").c_str(), MERGE_OFF), MERGE_OFF, MERGE_LTP);
 
     cfg.outputs[1].enabled  = prefs.getBool(okey(1,"en").c_str(),  false);
     cfg.outputs[1].universe = constrain(prefs.getInt(okey(1,"uni").c_str(),  DEF_UNIVERSE + 1), 0, 15);
@@ -420,6 +444,7 @@ static void loadConfig() {
     cfg.outputs[1].txPin    = constrain(prefs.getInt(okey(1,"tx").c_str(),  -1), -1, 48);
     cfg.outputs[1].rxPin    = constrain(prefs.getInt(okey(1,"rx").c_str(),  -1), -1, 48);
     cfg.outputs[1].rtsPin   = constrain(prefs.getInt(okey(1,"rts").c_str(), -1), -1, 48);
+    cfg.outputs[1].mergeMode = constrain(prefs.getInt(okey(1,"merge").c_str(), MERGE_OFF), MERGE_OFF, MERGE_LTP);
 
     cfg.dispType    = constrain(prefs.getInt("disptype", DEF_DISP_TYPE),  0, 4);
     cfg.dispSda     = constrain(prefs.getInt("dispsda",  DEF_DISP_SDA),  -1, 48);
@@ -472,6 +497,7 @@ static void saveConfig() {
         prefs.putInt(okey(i,"tx").c_str(),    cfg.outputs[i].txPin);
         prefs.putInt(okey(i,"rx").c_str(),    cfg.outputs[i].rxPin);
         prefs.putInt(okey(i,"rts").c_str(),   cfg.outputs[i].rtsPin);
+        prefs.putInt(okey(i,"merge").c_str(), cfg.outputs[i].mergeMode);
     }
     prefs.putInt("disptype",    cfg.dispType);
     prefs.putInt("dispsda",     cfg.dispSda);
@@ -928,34 +954,60 @@ static void rdmService() {
 
 // ---------------------------------------------------------------------------
 // Sender tracking
+// True if any enabled output listens to `universe` (so a source on it can
+// actually contribute to a merge).
+static bool universeMapped(int universe) {
+    for (int o = 0; o < MAX_OUTPUTS; o++)
+        if (cfg.outputs[o].enabled && cfg.outputs[o].universe == universe) return true;
+    return false;
+}
+
 // ---------------------------------------------------------------------------
-static void updateSender(uint32_t ip, uint8_t proto) {
+// Track a source and cache its latest frame for the merge engine. Keyed by
+// ip+proto; records the target universe, priority and the raw frame (plus how
+// many channels it spans) so mergeOutput() can combine every live source later.
+static void updateSender(uint32_t ip, uint8_t proto, int16_t universe,
+                         uint8_t priority, const uint8_t* data, uint16_t length) {
     uint32_t now = millis();
-    for (int i = 0; i < MAX_SENDERS; i++) {
-        if (senders[i].ip == ip && senders[i].proto == proto) {
-            senders[i].lastMs = now;
-            senders[i].winCnt++;
-            if (now - senders[i].winMs >= 1000) {
-                senders[i].fps   = (float)senders[i].winCnt * 1000.0f
-                                   / (float)(now - senders[i].winMs);
-                senders[i].winCnt = 0;
-                senders[i].winMs  = now;
-            }
-            return;
+    int slot = -1;
+    for (int i = 0; i < MAX_SENDERS; i++)
+        if (senders[i].ip == ip && senders[i].proto == proto) { slot = i; break; }
+    bool fresh = false;
+    if (slot < 0) {
+        for (int i = 0; i < MAX_SENDERS; i++)
+            if (senders[i].ip == 0) { slot = i; break; }
+    }
+    if (slot < 0) {
+        // Table full: prefer evicting a source whose universe no enabled output
+        // listens to (it can't be a merge contributor); else least-recently-seen.
+        for (int i = 0; i < MAX_SENDERS; i++)
+            if (!universeMapped(senders[i].universe)) { slot = i; break; }
+        if (slot < 0) {
+            slot = 0;
+            for (int i = 1; i < MAX_SENDERS; i++)
+                if (senders[i].lastMs < senders[slot].lastMs) slot = i;
         }
     }
-    for (int i = 0; i < MAX_SENDERS; i++) {
-        if (senders[i].ip == 0) {
-            senders[i] = {ip, proto, now, now, 0, 0.0f};
-            Serial.printf("[SND] new sender %s proto=%d\n", ipStr(ip).c_str(), proto);
-            return;
-        }
+    Sender& s = senders[slot];
+    if (s.ip != ip || s.proto != proto) fresh = true;
+    if (fresh) {
+        memset(s.data, 0, sizeof(s.data));
+        s.ip = ip; s.proto = proto;
+        s.winMs = now; s.winCnt = 0; s.fps = 0.0f;
+        Serial.printf("[SND] new sender %s proto=%d\n", ipStr(ip).c_str(), proto);
     }
-    // evict least-recently-seen
-    int oldest = 0;
-    for (int i = 1; i < MAX_SENDERS; i++)
-        if (senders[i].lastMs < senders[oldest].lastMs) oldest = i;
-    senders[oldest] = {ip, proto, now, now, 0, 0.0f};
+    s.lastMs   = now;
+    s.universe = universe;
+    s.priority = priority;
+    s.dataLen  = length < 512 ? length : 512;
+    memcpy(s.data, data, s.dataLen);   // merge reads only [0, dataLen), so a short
+                                       // frame contributes only the channels it sends
+    s.winCnt++;
+    if (now - s.winMs >= 1000) {
+        s.fps   = (float)s.winCnt * 1000.0f / (float)(now - s.winMs);
+        s.winCnt = 0;
+        s.winMs  = now;
+    }
 }
 
 static uint8_t activeSenderCount() {
@@ -966,14 +1018,74 @@ static uint8_t activeSenderCount() {
     return n;
 }
 
-static bool hasConflict() { return activeSenderCount() > 1; }
+// Count live sources (seen within windowMs) currently feeding `universe`.
+static int sourcesOnUniverse(int universe, uint32_t windowMs) {
+    uint32_t now = millis();
+    int n = 0;
+    for (int i = 0; i < MAX_SENDERS; i++) {
+        const Sender& s = senders[i];
+        if (s.ip == 0 || s.universe != universe) continue;
+        if (now - s.lastMs < windowMs) n++;
+    }
+    return n;
+}
+
+// A real conflict = 2+ live sources on an enabled output's universe while that
+// output is NOT merging (mergeMode OFF → unmanaged last-frame-wins clash). HTP/LTP
+// outputs are meant to be fed by several sources, so they never raise the warning.
+// Uses the same liveness window as the merge engine so the warning and the actual
+// contribution agree (a source silent past SOURCE_TIMEOUT_MS stops counting).
+static bool hasConflict() {
+    for (int o = 0; o < MAX_OUTPUTS; o++) {
+        if (!cfg.outputs[o].enabled || cfg.outputs[o].mergeMode != MERGE_OFF) continue;
+        if (sourcesOnUniverse(cfg.outputs[o].universe, SOURCE_TIMEOUT_MS) > 1) return true;
+    }
+    return false;
+}
+
+// Merging active = 2+ live sources on an enabled output that IS merging (HTP/LTP).
+static bool isMerging() {
+    for (int o = 0; o < MAX_OUTPUTS; o++) {
+        if (!cfg.outputs[o].enabled || cfg.outputs[o].mergeMode == MERGE_OFF) continue;
+        if (sourcesOnUniverse(cfg.outputs[o].universe, SOURCE_TIMEOUT_MS) > 1) return true;
+    }
+    return false;
+}
+
+// Source state for the UI / LED / display. An unmanaged clash outranks merging.
+static uint8_t sourceStatus() {
+    if (hasConflict()) return SRC_CONFLICT;
+    if (isMerging())   return SRC_MERGING;
+    return SRC_NORMAL;
+}
+
+// Cached source state, recomputed on the loop task after each merge. The async
+// web task, LED task and display task read this single byte instead of each
+// re-scanning senders[] (avoids redundant work and cross-task torn reads of the
+// sender table). A byte read/write is atomic on the ESP32.
+static volatile uint8_t g_srcStatus = SRC_NORMAL;
 
 // ---------------------------------------------------------------------------
 // Change log
 // ---------------------------------------------------------------------------
-static void maybeLog(int outIdx, const uint8_t* data, uint16_t len, uint32_t ip, uint8_t proto) {
+// Sample the MERGED output buffer (`cur` = the post-merge channels going to the
+// wire) ~5x/s and log what changed since the last sample. Diffing the merged
+// result — not the raw incoming source frame — keeps the change log honest under
+// HTP/LTP, where the wire value is a combination of sources rather than any one
+// source's frame.
+static void maybeLog(int outIdx, const uint8_t* cur, uint16_t len, uint32_t ip, uint8_t proto) {
+    static uint8_t prev[512];
+    static int     prevOut = -1;
     uint32_t now = millis();
     if (now - lastLogMs < 200) return;
+    lastLogMs = now;
+    uint16_t lim = len < 512 ? len : 512;
+
+    if (outIdx != prevOut) {        // viewed output switched → reseed, skip one sample
+        memcpy(prev, cur, lim);
+        prevOut = outIdx;
+        return;
+    }
 
     LogEntry e;
     e.ms    = now;
@@ -982,23 +1094,22 @@ static void maybeLog(int outIdx, const uint8_t* data, uint16_t len, uint32_t ip,
     e.uni   = (uint8_t)cfg.outputs[outIdx].universe;
     e.total = 0;
     e.topN  = 0;
-    uint16_t lim = len < 512 ? len : 512;
     for (int i = 0; i < lim; i++) {
-        if (data[i] != dmxBuf[outIdx][i + 1]) {
+        if (cur[i] != prev[i]) {
             e.total++;
             if (e.topN < LOG_TOP) {
                 e.top[e.topN].ch  = (uint16_t)(i + 1);
-                e.top[e.topN].val = data[i];
+                e.top[e.topN].val = cur[i];
                 e.topN++;
             }
         }
     }
+    memcpy(prev, cur, lim);         // baseline for the next sample
     if (e.total == 0) return;
 
     dmxLog[logHead] = e;
     logHead  = (logHead + 1) % LOG_SIZE;
     if (logCount < LOG_SIZE) logCount++;
-    lastLogMs = now;
 }
 
 // Per-output frame rate: the live value, or 0 once that output's input has
@@ -1010,7 +1121,8 @@ static float outFpsLive(int i) {
 
 // ---------------------------------------------------------------------------
 // WebSocket push (binary, WS_FRAME_LEN bytes)
-// frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2)
+// frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
+//        srcStatus: 0=normal 1=conflict 2=merging
 //        dmx(512) + per-output fps(2 x MAX_OUTPUTS)
 // ---------------------------------------------------------------------------
 static void wsPush() {
@@ -1028,7 +1140,7 @@ static void wsPush() {
     wsBuf[8]  = upS >> 24;   wsBuf[9]  = (upS>>16)&0xFF;
     wsBuf[10] = (upS>>8)&0xFF; wsBuf[11] = upS & 0xFF;
     wsBuf[12] = activeSenderCount();
-    wsBuf[13] = hasConflict() ? 1 : 0;
+    wsBuf[13] = g_srcStatus;   // 0 = normal, 1 = conflict, 2 = merging
     wsBuf[14] = jitI >> 8;  wsBuf[15] = jitI & 0xFF;
     memcpy(&wsBuf[16], &dmxBuf[viewOutput()][1], 512);   // stream the viewed output
     // Per-output frame rates (one universe each) appended after the DMX block.
@@ -1123,25 +1235,77 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient*, AwsEventType type,
 // ---------------------------------------------------------------------------
 // Shared DMX frame handler
 // ---------------------------------------------------------------------------
-// Copy an incoming frame into one output's buffer. The monitored output is
-// frozen while manual mode is on (the web UI owns it then).
-static void applyToOutput(int outIdx, const uint8_t* data, uint16_t length) {
+// Recompute one output's DMX buffer from every live source feeding its universe
+// (issue #10). E1.31 priority is honoured first — only sources at the highest
+// active priority contribute — then the per-output merge mode decides:
+//   OFF — the most recently seen source wins the whole frame (legacy behaviour)
+//   HTP — per channel, the maximum across the contributing sources
+//   LTP — the most recently seen contributing source wins the whole frame
+// A source silent for SOURCE_TIMEOUT_MS drops out. With no live source the
+// buffer is left untouched, so the line holds its last frame as a failsafe.
+// The monitored output is frozen while manual mode is on (the web UI owns it).
+static void mergeOutput(int outIdx) {
     if (manualMode && outIdx == viewOutput()) return;
-    memcpy(&dmxBuf[outIdx][1], data, min((uint16_t)512, length));
+    const DmxOutput& out = cfg.outputs[outIdx];
+    uint32_t now = millis();
+
+    // Pass 1: collect this universe's live sources and their highest priority.
+    int     contrib[MAX_SENDERS], nc = 0;
+    uint8_t topPrio = 0;
+    for (int i = 0; i < MAX_SENDERS; i++) {
+        const Sender& s = senders[i];
+        if (s.ip == 0 || s.universe != out.universe) continue;
+        if (now - s.lastMs >= SOURCE_TIMEOUT_MS) continue;
+        contrib[nc++] = i;
+        if (s.priority > topPrio) topPrio = s.priority;
+    }
+    if (nc == 0) return;   // nothing live → hold the last frame as a failsafe
+
+    if (out.mergeMode == MERGE_HTP && nc > 1) {
+        // Per channel, the maximum across the top-priority sources. Each source
+        // covers only the channels it actually sends (dataLen), so a shrinking
+        // frame releases its old high channels instead of leaving ghosts.
+        uint8_t merged[512];
+        memset(merged, 0, sizeof(merged));
+        for (int k = 0; k < nc; k++) {
+            const Sender& s = senders[contrib[k]];
+            if (s.priority < topPrio) continue;          // E1.31 priority gate
+            for (int c = 0; c < s.dataLen; c++)
+                if (s.data[c] > merged[c]) merged[c] = s.data[c];
+        }
+        memcpy(&dmxBuf[outIdx][1], merged, 512);
+        return;
+    }
+
+    // OFF, LTP, or a single contributor: the most recently seen source wins the
+    // whole frame. OFF ignores priority (legacy last-frame-wins); HTP/LTP keep
+    // only the top-priority sources. Copy just the channels that source sends;
+    // the rest of the output holds its last value (DMX convention).
+    bool usePrio = (out.mergeMode != MERGE_OFF);
+    int newest = -1; uint32_t newestMs = 0;
+    for (int k = 0; k < nc; k++) {
+        const Sender& s = senders[contrib[k]];
+        if (usePrio && s.priority < topPrio) continue;
+        if (newest < 0 || s.lastMs >= newestMs) { newest = contrib[k]; newestMs = s.lastMs; }
+    }
+    if (newest >= 0) memcpy(&dmxBuf[outIdx][1], senders[newest].data, senders[newest].dataLen);
 }
 
 // Route one received universe to every enabled output mapped to it (so the
 // same universe on both outputs acts as a 1-in-2-out splitter), then update
 // the aggregate stats/sender tracking once per input frame.
 static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
-                       uint32_t senderIp, uint8_t proto) {
+                       uint32_t senderIp, uint8_t proto, uint8_t priority) {
     uint32_t now = millis();
+    // Cache this source's frame first so the merge engine sees current data.
+    updateSender(senderIp, proto, (int16_t)artUniverse, priority, data, length);
+
     bool matched = false;
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!cfg.outputs[i].enabled || cfg.outputs[i].universe != artUniverse) continue;
-        // Log changes for the viewed output before its buffer is overwritten.
-        if (i == viewOutput()) maybeLog(i, data, length, senderIp, proto);
-        applyToOutput(i, data, length);
+        mergeOutput(i);
+        // Log the merged result for the viewed output (what actually goes out).
+        if (i == viewOutput()) maybeLog(i, &dmxBuf[i][1], 512, senderIp, proto);
         // Per-output frame rate over a 1 s window (this universe only).
         outLastDmxMs[i] = now;
         outFrameCount[i]++;
@@ -1153,13 +1317,12 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
         matched = true;
     }
     if (!matched) return;
+    g_srcStatus = sourceStatus();   // refresh cached state for the UI/LED/display
 
     // [DEBUG] flag DMX reception gaps (input stalled)
     if (lastDmxMs && now - lastDmxMs > 300)
         Serial.printf("[GAP] dmx input gap=%lums proto=%d up=%lus\n",
             (unsigned long)(now - lastDmxMs), proto, (unsigned long)uptimeSec());
-
-    updateSender(senderIp, proto);
 
     // Jitter: deviation from expected inter-frame interval
     if (prevFrameMs > 0 && fps > 1.0f) {
@@ -1187,7 +1350,8 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
 // Art-Net callback
 // ---------------------------------------------------------------------------
 static void onArtDmx(uint16_t universe, uint16_t length, uint8_t, uint8_t* data) {
-    routeFrame((int)universe, data, length, (uint32_t)artnet.getSenderIp(), 0);
+    // Art-Net carries no per-packet priority, so it joins the merge at the default.
+    routeFrame((int)universe, data, length, (uint32_t)artnet.getSenderIp(), 0, DEFAULT_PRIORITY);
 }
 
 // ---------------------------------------------------------------------------
@@ -1196,6 +1360,7 @@ static void onArtDmx(uint16_t universe, uint16_t length, uint8_t, uint8_t* data)
 static constexpr int SACN_ACN_ID_OFF    = 4;
 static constexpr int SACN_ROOT_VEC_OFF  = 18;
 static constexpr int SACN_FRAME_VEC_OFF = 40;
+static constexpr int SACN_PRIORITY_OFF  = 108;   // E1.31 framing-layer priority byte
 static constexpr int SACN_UNIVERSE_OFF  = 113;
 static constexpr int SACN_STARTCODE_OFF = 125;
 static constexpr int SACN_DATA_OFF      = 126;
@@ -1248,7 +1413,8 @@ static void readSacnSocket(int outIdx) {
                            | sacnBuf[SACN_UNIVERSE_OFF + 1];
         if ((int)universe != cfg.outputs[outIdx].universe + 1) continue;
         if (sacnBuf[SACN_STARTCODE_OFF] != 0x00) continue;
-        routeFrame((int)universe - 1, sacnBuf + SACN_DATA_OFF, 512, senderIp, 1);
+        uint8_t priority = sacnBuf[SACN_PRIORITY_OFF];
+        routeFrame((int)universe - 1, sacnBuf + SACN_DATA_OFF, 512, senderIp, 1, priority);
     }
 }
 
@@ -1396,6 +1562,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
         j += ",\"tx\":";   j += o.txPin;
         j += ",\"rx\":";   j += o.rxPin;
         j += ",\"rts\":";  j += o.rtsPin;
+        j += ",\"merge\":"; j += o.mergeMode;
         j += "}";
     }
     j += "],";
@@ -1546,6 +1713,7 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
         if (argStr(req, okey(i,"tx").c_str(),   s)) o.txPin    = constrain(s.toInt(), -1, 48);
         if (argStr(req, okey(i,"rx").c_str(),   s)) o.rxPin    = constrain(s.toInt(), -1, 48);
         if (argStr(req, okey(i,"rts").c_str(),  s)) o.rtsPin   = constrain(s.toInt(), -1, 48);
+        if (argStr(req, okey(i,"merge").c_str(),s)) o.mergeMode= constrain(s.toInt(), MERGE_OFF, MERGE_LTP);
     }
     if (argStr(req, "disptype", s)) cfg.dispType  = constrain(s.toInt(), 0, 4);
     if (argStr(req, "dispsda", s))  cfg.dispSda   = constrain(s.toInt(), -1, 48);
@@ -1956,7 +2124,9 @@ static void ledTask(void*) {
             bool r = !up && ((now % 1000) < 500);
             bool g = up;
             bool y = up && dmx && ((now % 250) < 125);
-            bool b = hasConflict() && ((now % 600) < 300);
+            uint8_t ss = g_srcStatus;
+            bool b = (ss == SRC_CONFLICT) ? ((now % 600) < 300)   // conflict: slow blink
+                   : (ss == SRC_MERGING);                          // merging: steady on
             bool w = identifyCh && ((now % 400) < 200);
             setLeds5(r, g, y, b, w);
         } else if (!netConnected()) {
@@ -2146,11 +2316,12 @@ static void dispDrawBanner(const char* l1, const char* l2, uint16_t accent) {
     dispCenter(l2, 1, H >= 64 ? H / 2 + 4 : 16);
 }
 
-// Priority: 1=conflict, 2=identify, 3=manual, 0=status.
+// Priority: 1=conflict, 2=identify, 3=manual, 4=merging, 0=status.
 static uint8_t dispPickScreen() {
-    if (hasConflict()) return 1;
-    if (identifyCh)    return 2;
-    if (manualMode)    return 3;
+    if (g_srcStatus == SRC_CONFLICT) return 1;
+    if (identifyCh)                  return 2;
+    if (manualMode)                  return 3;
+    if (g_srcStatus == SRC_MERGING)  return 4;
     return 0;
 }
 
@@ -2161,6 +2332,7 @@ static void dispRender(uint8_t screen) {
         case 2: snprintf(b, sizeof(b), "ch %u", identifyCh);
                 dispDrawBanner("IDENTIFY", b, C_AMBER); break;
         case 3: dispDrawBanner("MANUAL", "override", C_BLUE); break;
+        case 4: dispDrawBanner("MERGING", "2+ sources", C_GREEN); break;
         default: dispDrawStatus(); break;
     }
     dispFlush();
@@ -2433,7 +2605,7 @@ static void simArtnetTick() {
     if (head + 1 < 512)   frame[head + 1] = 120;   // leading edge
     frame[0] = (uint8_t)(127.0f + 127.0f * sinf(now / 500.0f));  // ch1 breathe
 
-    routeFrame(0, frame, 512, (uint32_t)IPAddress(10, 13, 37, 1), 0);
+    routeFrame(0, frame, 512, (uint32_t)IPAddress(10, 13, 37, 1), 0, DEFAULT_PRIORITY);
 
     static uint32_t lastLog = 0;
     if (now - lastLog >= 1000) {            // 1 Hz proof-of-life on the console
@@ -2464,6 +2636,18 @@ void loop() {
 #endif
 
     uint32_t now = millis();
+
+    // Re-merge outputs whose input has gone quiet, so a source that stops sending
+    // drops out of the mix even without a new frame to trigger routeFrame()
+    // (issue #10 source timeout). Outputs still actively receiving are already
+    // merged per-frame in routeFrame(), so skip them here to avoid redundant work.
+    static uint32_t lastMergeMs = 0;
+    if (now - lastMergeMs >= 100) {
+        for (int i = 0; i < MAX_OUTPUTS; i++)
+            if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
+        g_srcStatus = sourceStatus();   // also refresh cached state when input is idle
+        lastMergeMs = now;
+    }
 
     // Continuous DMX output at ~40 Hz: holds the last frame as a failsafe so
     // brief input gaps (lost multicast on a weak link) never interrupt the

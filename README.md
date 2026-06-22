@@ -57,6 +57,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Live Web UI** | Bootstrap 5 dark theme, WebSocket push (~10/s), all 512 channels visible |
 | **Sender list** | Shows all active Art-Net / sACN senders with per-sender FPS |
 | **Conflict detection** | Warning banner when multiple senders are active simultaneously |
+| **Source merging** | Per-output HTP (highest takes precedence) / LTP (latest wins) / off, honouring the sACN priority field |
 | **Jitter stat** | Real-time inter-frame timing deviation (EMA) |
 | **Change log** | Live log of DMX value changes with top-N changed channels per frame |
 | **Sparkline** | Per-channel history sparkline in the channel detail modal |

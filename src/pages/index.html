@@ -162,8 +162,17 @@ footer a:hover { color: var(--gh-text); }
        class="align-items-center gap-2 mb-3 px-3 py-2 rounded">
     <span style="color:#f85149">&#9888;</span>
     <span class="small" style="color:#f85149">
-      Universe conflict &mdash; <strong id="conflict-count">2</strong> senders active simultaneously.
-      Only one source should control a universe.
+      Universe conflict &mdash; two or more sources are clashing on a universe.
+      Enable a merge mode (HTP/LTP) on that output, or leave only one source.
+    </span>
+  </div>
+
+  <!-- Merging indicator (positive: multiple sources combined on purpose) -->
+  <div id="merge-banner" style="display:none;background:#0d2818;border:1px solid #3fb950"
+       class="align-items-center gap-2 mb-3 px-3 py-2 rounded">
+    <span style="color:#3fb950">&#10227;</span>
+    <span class="small" style="color:#3fb950">
+      Merging multiple sources on a universe (HTP/LTP).
     </span>
   </div>
 
@@ -552,15 +561,16 @@ function connect() {
       return;
     }
     if (!(e.data instanceof ArrayBuffer)) return;
-    // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) conflict(1) jitter(2)
+    // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
+    //        srcStatus: 0=normal 1=conflict 2=merging
     //        dmx(512) + per-output fps(2 each)
     var v = new DataView(e.data);
     var fps         = (v.getUint16(0) / 10).toFixed(1);   // aggregate (fallback)
     var rssi        = v.getInt16(2);
     var heap        = v.getUint32(4);
     var upS         = v.getUint32(8);
-    var senderCount = v.getUint8(12);
-    var conflict    = v.getUint8(13);
+    // byte 12 = active sender count (shown via the senders table, not here)
+    var srcStatus   = v.getUint8(13);   // 0 = normal, 1 = conflict, 2 = merging
     var jitter      = (v.getUint16(14) / 10).toFixed(1);
 
     // Per-output frame rates appended after the 512-byte DMX block.
@@ -583,12 +593,9 @@ function connect() {
     document.getElementById('jitter').textContent = jitter + ' ms';
 
     var cb = document.getElementById('conflict-banner');
-    if (conflict) {
-      document.getElementById('conflict-count').textContent = senderCount;
-      cb.style.display = 'flex';
-    } else {
-      cb.style.display = 'none';
-    }
+    var mb = document.getElementById('merge-banner');
+    cb.style.display = srcStatus === 1 ? 'flex' : 'none';   // conflict (unmanaged clash)
+    mb.style.display = srcStatus === 2 ? 'flex' : 'none';   // merging (intended)
 
     applyDmx(new Uint8Array(e.data, 16, 512));
   };
