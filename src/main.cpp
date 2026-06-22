@@ -201,6 +201,12 @@ static constexpr uint32_t SOURCE_TIMEOUT_MS = 2500;
 // the highest active priority win; equal priority falls back to the merge mode.
 static constexpr uint8_t  DEFAULT_PRIORITY  = 100;
 
+// Source state codes: WS frame byte 13 + LED/display. Keep in sync with the
+// matching values documented in src/pages/index.html.
+static constexpr uint8_t SRC_NORMAL   = 0;
+static constexpr uint8_t SRC_CONFLICT = 1;
+static constexpr uint8_t SRC_MERGING  = 2;
+
 struct Sender {
     uint32_t ip;        // 0 = empty slot
     uint8_t  proto;     // 0=ArtNet, 1=sACN
@@ -208,7 +214,8 @@ struct Sender {
     uint32_t winMs;     // fps window start
     uint16_t winCnt;
     float    fps;
-    int8_t   universe;  // Art-Net universe this source feeds (-1 = unknown)
+    int16_t  universe;  // Art-Net universe this source feeds (0-32767; -1 = unknown)
+    uint16_t dataLen;   // channels this source actually sends (<=512)
     uint8_t  priority;  // E1.31 priority (sACN per-packet, Art-Net = DEFAULT_PRIORITY)
     uint8_t  data[512]; // last frame from this source, for the merge engine
 };
@@ -917,11 +924,19 @@ static void rdmService() {
 
 // ---------------------------------------------------------------------------
 // Sender tracking
+// True if any enabled output listens to `universe` (so a source on it can
+// actually contribute to a merge).
+static bool universeMapped(int universe) {
+    for (int o = 0; o < MAX_OUTPUTS; o++)
+        if (cfg.outputs[o].enabled && cfg.outputs[o].universe == universe) return true;
+    return false;
+}
+
 // ---------------------------------------------------------------------------
 // Track a source and cache its latest frame for the merge engine. Keyed by
-// ip+proto; records the target universe, priority and raw 512-channel frame so
-// mergeOutput() can combine every live source later.
-static void updateSender(uint32_t ip, uint8_t proto, int8_t universe,
+// ip+proto; records the target universe, priority and the raw frame (plus how
+// many channels it spans) so mergeOutput() can combine every live source later.
+static void updateSender(uint32_t ip, uint8_t proto, int16_t universe,
                          uint8_t priority, const uint8_t* data, uint16_t length) {
     uint32_t now = millis();
     int slot = -1;
@@ -932,10 +947,16 @@ static void updateSender(uint32_t ip, uint8_t proto, int8_t universe,
         for (int i = 0; i < MAX_SENDERS; i++)
             if (senders[i].ip == 0) { slot = i; break; }
     }
-    if (slot < 0) {                       // table full → evict least-recently-seen
-        slot = 0;
-        for (int i = 1; i < MAX_SENDERS; i++)
-            if (senders[i].lastMs < senders[slot].lastMs) slot = i;
+    if (slot < 0) {
+        // Table full: prefer evicting a source whose universe no enabled output
+        // listens to (it can't be a merge contributor); else least-recently-seen.
+        for (int i = 0; i < MAX_SENDERS; i++)
+            if (!universeMapped(senders[i].universe)) { slot = i; break; }
+        if (slot < 0) {
+            slot = 0;
+            for (int i = 1; i < MAX_SENDERS; i++)
+                if (senders[i].lastMs < senders[slot].lastMs) slot = i;
+        }
     }
     Sender& s = senders[slot];
     if (s.ip != ip || s.proto != proto) fresh = true;
@@ -948,8 +969,9 @@ static void updateSender(uint32_t ip, uint8_t proto, int8_t universe,
     s.lastMs   = now;
     s.universe = universe;
     s.priority = priority;
-    // Copy this frame's channels; bytes beyond `length` hold (DMX convention).
-    memcpy(s.data, data, length < 512 ? length : 512);
+    s.dataLen  = length < 512 ? length : 512;
+    memcpy(s.data, data, s.dataLen);   // merge reads only [0, dataLen), so a short
+                                       // frame contributes only the channels it sends
     s.winCnt++;
     if (now - s.winMs >= 1000) {
         s.fps   = (float)s.winCnt * 1000.0f / (float)(now - s.winMs);
@@ -981,16 +1003,17 @@ static int sourcesOnUniverse(int universe, uint32_t windowMs) {
 // A real conflict = 2+ live sources on an enabled output's universe while that
 // output is NOT merging (mergeMode OFF → unmanaged last-frame-wins clash). HTP/LTP
 // outputs are meant to be fed by several sources, so they never raise the warning.
+// Uses the same liveness window as the merge engine so the warning and the actual
+// contribution agree (a source silent past SOURCE_TIMEOUT_MS stops counting).
 static bool hasConflict() {
     for (int o = 0; o < MAX_OUTPUTS; o++) {
         if (!cfg.outputs[o].enabled || cfg.outputs[o].mergeMode != MERGE_OFF) continue;
-        if (sourcesOnUniverse(cfg.outputs[o].universe, 5000) > 1) return true;
+        if (sourcesOnUniverse(cfg.outputs[o].universe, SOURCE_TIMEOUT_MS) > 1) return true;
     }
     return false;
 }
 
 // Merging active = 2+ live sources on an enabled output that IS merging (HTP/LTP).
-// Uses the merge engine's own contribution window so the indicator matches reality.
 static bool isMerging() {
     for (int o = 0; o < MAX_OUTPUTS; o++) {
         if (!cfg.outputs[o].enabled || cfg.outputs[o].mergeMode == MERGE_OFF) continue;
@@ -999,20 +1022,40 @@ static bool isMerging() {
     return false;
 }
 
-// Source state for the UI / LED / display: 0 = normal, 1 = conflict, 2 = merging.
-// An unmanaged clash (conflict) outranks intended merging.
+// Source state for the UI / LED / display. An unmanaged clash outranks merging.
 static uint8_t sourceStatus() {
-    if (hasConflict()) return 1;
-    if (isMerging())   return 2;
-    return 0;
+    if (hasConflict()) return SRC_CONFLICT;
+    if (isMerging())   return SRC_MERGING;
+    return SRC_NORMAL;
 }
+
+// Cached source state, recomputed on the loop task after each merge. The async
+// web task, LED task and display task read this single byte instead of each
+// re-scanning senders[] (avoids redundant work and cross-task torn reads of the
+// sender table). A byte read/write is atomic on the ESP32.
+static volatile uint8_t g_srcStatus = SRC_NORMAL;
 
 // ---------------------------------------------------------------------------
 // Change log
 // ---------------------------------------------------------------------------
-static void maybeLog(int outIdx, const uint8_t* data, uint16_t len, uint32_t ip, uint8_t proto) {
+// Sample the MERGED output buffer (`cur` = the post-merge channels going to the
+// wire) ~5x/s and log what changed since the last sample. Diffing the merged
+// result — not the raw incoming source frame — keeps the change log honest under
+// HTP/LTP, where the wire value is a combination of sources rather than any one
+// source's frame.
+static void maybeLog(int outIdx, const uint8_t* cur, uint16_t len, uint32_t ip, uint8_t proto) {
+    static uint8_t prev[512];
+    static int     prevOut = -1;
     uint32_t now = millis();
     if (now - lastLogMs < 200) return;
+    lastLogMs = now;
+    uint16_t lim = len < 512 ? len : 512;
+
+    if (outIdx != prevOut) {        // viewed output switched → reseed, skip one sample
+        memcpy(prev, cur, lim);
+        prevOut = outIdx;
+        return;
+    }
 
     LogEntry e;
     e.ms    = now;
@@ -1021,23 +1064,22 @@ static void maybeLog(int outIdx, const uint8_t* data, uint16_t len, uint32_t ip,
     e.uni   = (uint8_t)cfg.outputs[outIdx].universe;
     e.total = 0;
     e.topN  = 0;
-    uint16_t lim = len < 512 ? len : 512;
     for (int i = 0; i < lim; i++) {
-        if (data[i] != dmxBuf[outIdx][i + 1]) {
+        if (cur[i] != prev[i]) {
             e.total++;
             if (e.topN < LOG_TOP) {
                 e.top[e.topN].ch  = (uint16_t)(i + 1);
-                e.top[e.topN].val = data[i];
+                e.top[e.topN].val = cur[i];
                 e.topN++;
             }
         }
     }
+    memcpy(prev, cur, lim);         // baseline for the next sample
     if (e.total == 0) return;
 
     dmxLog[logHead] = e;
     logHead  = (logHead + 1) % LOG_SIZE;
     if (logCount < LOG_SIZE) logCount++;
-    lastLogMs = now;
 }
 
 // Per-output frame rate: the live value, or 0 once that output's input has
@@ -1068,7 +1110,7 @@ static void wsPush() {
     wsBuf[8]  = upS >> 24;   wsBuf[9]  = (upS>>16)&0xFF;
     wsBuf[10] = (upS>>8)&0xFF; wsBuf[11] = upS & 0xFF;
     wsBuf[12] = activeSenderCount();
-    wsBuf[13] = sourceStatus();   // 0 = normal, 1 = conflict, 2 = merging
+    wsBuf[13] = g_srcStatus;   // 0 = normal, 1 = conflict, 2 = merging
     wsBuf[14] = jitI >> 8;  wsBuf[15] = jitI & 0xFF;
     memcpy(&wsBuf[16], &dmxBuf[viewOutput()][1], 512);   // stream the viewed output
     // Per-output frame rates (one universe each) appended after the DMX block.
@@ -1177,56 +1219,46 @@ static void mergeOutput(int outIdx) {
     const DmxOutput& out = cfg.outputs[outIdx];
     uint32_t now = millis();
 
-    int     live    = 0;
+    // Pass 1: collect this universe's live sources and their highest priority.
+    int     contrib[MAX_SENDERS], nc = 0;
     uint8_t topPrio = 0;
     for (int i = 0; i < MAX_SENDERS; i++) {
         const Sender& s = senders[i];
         if (s.ip == 0 || s.universe != out.universe) continue;
         if (now - s.lastMs >= SOURCE_TIMEOUT_MS) continue;
-        live++;
+        contrib[nc++] = i;
         if (s.priority > topPrio) topPrio = s.priority;
     }
-    if (live == 0) return;   // hold the last frame
+    if (nc == 0) return;   // nothing live → hold the last frame as a failsafe
 
-    // Off, or a single contributor: copy the newest source whole. This keeps the
-    // common one-console path byte-for-byte identical to the pre-merge firmware.
-    if (out.mergeMode == MERGE_OFF || live == 1) {
-        int newest = -1; uint32_t newestMs = 0;
-        for (int i = 0; i < MAX_SENDERS; i++) {
-            const Sender& s = senders[i];
-            if (s.ip == 0 || s.universe != out.universe) continue;
-            if (now - s.lastMs >= SOURCE_TIMEOUT_MS) continue;
-            if (out.mergeMode != MERGE_OFF && s.priority < topPrio) continue;
-            if (newest < 0 || s.lastMs >= newestMs) { newest = i; newestMs = s.lastMs; }
+    if (out.mergeMode == MERGE_HTP && nc > 1) {
+        // Per channel, the maximum across the top-priority sources. Each source
+        // covers only the channels it actually sends (dataLen), so a shrinking
+        // frame releases its old high channels instead of leaving ghosts.
+        uint8_t merged[512];
+        memset(merged, 0, sizeof(merged));
+        for (int k = 0; k < nc; k++) {
+            const Sender& s = senders[contrib[k]];
+            if (s.priority < topPrio) continue;          // E1.31 priority gate
+            for (int c = 0; c < s.dataLen; c++)
+                if (s.data[c] > merged[c]) merged[c] = s.data[c];
         }
-        if (newest >= 0) memcpy(&dmxBuf[outIdx][1], senders[newest].data, 512);
+        memcpy(&dmxBuf[outIdx][1], merged, 512);
         return;
     }
 
-    if (out.mergeMode == MERGE_LTP) {
-        int newest = -1; uint32_t newestMs = 0;
-        for (int i = 0; i < MAX_SENDERS; i++) {
-            const Sender& s = senders[i];
-            if (s.ip == 0 || s.universe != out.universe) continue;
-            if (now - s.lastMs >= SOURCE_TIMEOUT_MS) continue;
-            if (s.priority < topPrio) continue;
-            if (newest < 0 || s.lastMs >= newestMs) { newest = i; newestMs = s.lastMs; }
-        }
-        if (newest >= 0) memcpy(&dmxBuf[outIdx][1], senders[newest].data, 512);
-        return;
+    // OFF, LTP, or a single contributor: the most recently seen source wins the
+    // whole frame. OFF ignores priority (legacy last-frame-wins); HTP/LTP keep
+    // only the top-priority sources. Copy just the channels that source sends;
+    // the rest of the output holds its last value (DMX convention).
+    bool usePrio = (out.mergeMode != MERGE_OFF);
+    int newest = -1; uint32_t newestMs = 0;
+    for (int k = 0; k < nc; k++) {
+        const Sender& s = senders[contrib[k]];
+        if (usePrio && s.priority < topPrio) continue;
+        if (newest < 0 || s.lastMs >= newestMs) { newest = contrib[k]; newestMs = s.lastMs; }
     }
-
-    // HTP: per channel, the maximum across all top-priority live sources.
-    uint8_t merged[512];
-    memset(merged, 0, sizeof(merged));
-    for (int i = 0; i < MAX_SENDERS; i++) {
-        const Sender& s = senders[i];
-        if (s.ip == 0 || s.universe != out.universe) continue;
-        if (now - s.lastMs >= SOURCE_TIMEOUT_MS) continue;
-        if (s.priority < topPrio) continue;
-        for (int c = 0; c < 512; c++) if (s.data[c] > merged[c]) merged[c] = s.data[c];
-    }
-    memcpy(&dmxBuf[outIdx][1], merged, 512);
+    if (newest >= 0) memcpy(&dmxBuf[outIdx][1], senders[newest].data, senders[newest].dataLen);
 }
 
 // Route one received universe to every enabled output mapped to it (so the
@@ -1236,14 +1268,14 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
                        uint32_t senderIp, uint8_t proto, uint8_t priority) {
     uint32_t now = millis();
     // Cache this source's frame first so the merge engine sees current data.
-    updateSender(senderIp, proto, (int8_t)artUniverse, priority, data, length);
+    updateSender(senderIp, proto, (int16_t)artUniverse, priority, data, length);
 
     bool matched = false;
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!cfg.outputs[i].enabled || cfg.outputs[i].universe != artUniverse) continue;
-        // Log changes for the viewed output before its buffer is recomputed.
-        if (i == viewOutput()) maybeLog(i, data, length, senderIp, proto);
         mergeOutput(i);
+        // Log the merged result for the viewed output (what actually goes out).
+        if (i == viewOutput()) maybeLog(i, &dmxBuf[i][1], 512, senderIp, proto);
         // Per-output frame rate over a 1 s window (this universe only).
         outLastDmxMs[i] = now;
         outFrameCount[i]++;
@@ -1255,6 +1287,7 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
         matched = true;
     }
     if (!matched) return;
+    g_srcStatus = sourceStatus();   // refresh cached state for the UI/LED/display
 
     // [DEBUG] flag DMX reception gaps (input stalled)
     if (lastDmxMs && now - lastDmxMs > 300)
@@ -2040,9 +2073,9 @@ static void ledTask(void*) {
             bool r = !up && ((now % 1000) < 500);
             bool g = up;
             bool y = up && dmx && ((now % 250) < 125);
-            uint8_t ss = sourceStatus();
-            bool b = (ss == 1) ? ((now % 600) < 300)   // conflict: slow blink
-                   : (ss == 2);                         // merging: steady on
+            uint8_t ss = g_srcStatus;
+            bool b = (ss == SRC_CONFLICT) ? ((now % 600) < 300)   // conflict: slow blink
+                   : (ss == SRC_MERGING);                          // merging: steady on
             bool w = identifyCh && ((now % 400) < 200);
             setLeds5(r, g, y, b, w);
         } else if (!netConnected()) {
@@ -2234,10 +2267,10 @@ static void dispDrawBanner(const char* l1, const char* l2, uint16_t accent) {
 
 // Priority: 1=conflict, 2=identify, 3=manual, 4=merging, 0=status.
 static uint8_t dispPickScreen() {
-    if (hasConflict()) return 1;
-    if (identifyCh)    return 2;
-    if (manualMode)    return 3;
-    if (isMerging())   return 4;
+    if (g_srcStatus == SRC_CONFLICT) return 1;
+    if (identifyCh)                  return 2;
+    if (manualMode)                  return 3;
+    if (g_srcStatus == SRC_MERGING)  return 4;
     return 0;
 }
 
@@ -2552,13 +2585,15 @@ void loop() {
 
     uint32_t now = millis();
 
-    // Re-merge each output a few times a second so a source that goes silent
-    // stops contributing even without a new frame to trigger routeFrame()
-    // (issue #10 source timeout). Cheap: a couple of 512-channel passes.
+    // Re-merge outputs whose input has gone quiet, so a source that stops sending
+    // drops out of the mix even without a new frame to trigger routeFrame()
+    // (issue #10 source timeout). Outputs still actively receiving are already
+    // merged per-frame in routeFrame(), so skip them here to avoid redundant work.
     static uint32_t lastMergeMs = 0;
     if (now - lastMergeMs >= 100) {
         for (int i = 0; i < MAX_OUTPUTS; i++)
-            if (cfg.outputs[i].enabled) mergeOutput(i);
+            if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
+        g_srcStatus = sourceStatus();   // also refresh cached state when input is idle
         lastMergeMs = now;
     }
 
