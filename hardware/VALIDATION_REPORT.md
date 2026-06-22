@@ -138,6 +138,9 @@ ordering. `validate_electrical.py` models it.
 - DFM: min track 0.20mm, min drill 0.20mm — OK. Clearance per DRC (3 waivers: 2× W5500 0.137mm fan-out + USB-C
   CC2, all ≥ JLCPCB 0.0889mm).
 - Fuse coordination: PTC trips ~3A, trace fuses ~8–10A → fuse always wins.
+- **Silk-over-pad = 0, courtyard-overlap = 0** (no assembly/solder or body-collision issue). The ~78
+  remaining silk warnings are all silk-over-copper / silk-on-silk (cosmetic, mask-protected) — the standard
+  pre-fab silk-cleanup batch (VALIDATION item 3).
 
 ## 5. EMC / SI
 - CM chokes (L2/L3) + ferrites (FB1-3) + the chassis bond (plated GND holes) form the EMC story. Decoupling
@@ -146,6 +149,9 @@ ordering. `validate_electrical.py` models it.
   nodes for conducted-EMC margin (open item / next-rev improvement). Center-tap bias (R18 49.9R, C14/C22 100nF)
   present.
 - Crystal load now correct → clean 25MHz. SPI/DMX SI fine at these speeds.
+- **Ethernet diff-pair skew measured:** TX 24.2/23.2mm (skew 1.0mm), RX 26.3/29.1mm (skew 2.8mm) — both
+  ≪ the ~5mm that would matter at 100BASE-TX (skew ↔ ~18ps/3mm vs 10ns bit). Adequately matched; no
+  hand-routing needed. (Pairs aren't impedance-controlled by the autorouter but the runs are short.)
 
 ## 6. Placement (decoupling proximity) — real findings
 `validate_placement.py` (after ASSOC update for the new nets) flags a few caps slightly past target:
