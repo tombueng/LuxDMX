@@ -1,5 +1,9 @@
 # LumiGate v3 — hardware
 
+> [!WARNING]
+> **Work in progress, not yet fully tested. Use at your own risk for now!**
+> This board has **not yet been fabricated or verified in hardware** — the design is provided for experimentation only. The proven, supported path is the firmware on a plain ESP32 + an isolated RS-485 module (see the main README).
+
 A compact, open-source **Art-Net / sACN → galvanically-isolated DMX512 gateway**, built around
 an ESP32-S3 with **both** WiFi *and* wired Ethernet. Designed entirely as code (SKiDL netlist) and
 routed by a fully-scripted, placement-driven pipeline — so the board regenerates itself from your
