@@ -97,6 +97,29 @@ def table(title, rows, X, Y):
 table("EXPANSION  J6", J6, 106.0, 110.0)
 table("DISPLAY  J4", J4, 132.0, 110.0)
 
+# ---- BACK: key-features grid (mirrored). 2 cols; file order DETAIL|FEATURE so back view reads
+#      FEATURE | DETAIL. Isolation values are datasheet-confirmed (see VALIDATION_REPORT.md). ----
+FEAT = [("INPUT", "Art-Net / sACN"), ("OUTPUTS", "2x isolated DMX512-A"),
+        ("DMX ISO", "1kV galvanic (B0505S)"), ("ISO XCVR", "ISO3086 2.5kVrms"),
+        ("PoE", "802.3af, 1500V iso"), ("POWER", "USB-C 5V or PoE (OR-ed)"),
+        ("CORE", "ESP32-S3 + W5500 10/100"), ("GROUND", "M3 screws -> metal case"),
+        ("DMX SHELL", "keep OFF chassis (iso)")]
+FRH = 2.2
+WFE, WDE = 14.0, 34.0          # feature col, detail col (file: DETAIL left, FEATURE right)
+FTW = WFE + WDE
+FX, FY = 99.0, 137.0
+fn = len(FEAT) + 1
+for i in range(fn + 1):
+    line(FX, FY + i*FRH, FX + FTW, FY + i*FRH, BS, 0.12)
+for vx in (FX, FX + WDE, FX + FTW):
+    line(vx, FY, vx, FY + fn*FRH, BS, 0.12)
+cDE, cFE = FX + WDE/2, FX + WDE + WFE/2
+text("LumiGate v4 -- KEY FEATURES", FX + FTW/2, FY - 1.6, 1.5, BS, mirror=True)
+text("DETAIL", cDE, FY + FRH/2, 1.1, BS, mirror=True); text("FEATURE", cFE, FY + FRH/2, 1.1, BS, mirror=True)
+for r, (feat, det) in enumerate(FEAT):
+    yc = FY + (r+1)*FRH + FRH/2
+    text(det, cDE, yc, 1.15, BS, mirror=True); text(feat, cFE, yc, 1.15, BS, mirror=True)
+
 # ---- FRONT: status-LED legend as a grid, at its current hand-placed spot (top-centre). NOT mirrored. ----
 LED = [("RED", "FAULT / NO NET"), ("GRN", "NETWORK UP"), ("YEL", "DMX ACTIVITY"),
        ("BLU", "CONNECTING"), ("WHT", "IDENTIFY / BOOT")]

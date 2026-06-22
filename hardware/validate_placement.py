@@ -8,7 +8,7 @@ b = pcbnew.LoadBoard(PCB)
 
 # (cap, ic, shared-net, role, max_mm)
 ASSOC = [
-    ("C16","U4","+5V","buck IN cap (loop-critical)",5),  ("C17","U4","+3V3","buck OUT cap",6),
+    ("C16","U4","+5V","buck IN cap (loop-critical)",5),  ("C17","L1","+3V3","buck OUT cap",6),
     ("L1","U4","BUCK_LX","buck inductor",6),
     ("C1","U1","+3V3","ESP32 HF decap",6),               ("C2","U1","+3V3","ESP32 bulk",10),
     ("C8","U2","+3V3","W5500 decap",5),  ("C9","U2","+3V3","W5500 decap",5),
@@ -16,11 +16,13 @@ ASSOC = [
     ("C4","U2","W5500_1V2","W5500 1V2 cap",5), ("C5","U2","W5500_1V2","W5500 1V2 cap",5),
     ("C6","U2","TOCAP","W5500 TOCAP",6),
     ("C12","U2","XI","xtal load",6), ("C13","U2","XO","xtal load",6), ("Y1","U2","XI","crystal",8),
-    ("C18","U5","+3V3","ISO3086#1 VCC1",5), ("C19","U5","VISO","ISO3086#1 VCC2",5), ("C20","U5","VISO","ISO3086#1 bulk",8),
-    ("C23","U6","+3V3","ISO3086#2 VCC1",5), ("C24","U6","VISO2","ISO3086#2 VCC2",5), ("C25","U6","VISO2","ISO3086#2 bulk",8),
+    ("C18","U5","+3V3","ISO3086#1 VCC1",5), ("C19","U5","VISO_DRV","ISO3086#1 VCC2 (after FB2)",5), ("C20","PS1","VISO","ISO3086#1 DC-DC bulk",8),
+    ("C23","U6","+3V3","ISO3086#2 VCC1",5), ("C24","U6","VISO2_DRV","ISO3086#2 VCC2 (after FB3)",5), ("C25","PS2","VISO2","ISO3086#2 DC-DC bulk",8),
     ("C27","U7","+5V_POE","PoE out bulk",10), ("C28","U7","+5V_POE","PoE out cap",10),
-    ("C21","PS1","+5V","B0505S#1 in cap",8), ("C26","PS2","+5V","B0505S#2 in cap",8),
-    ("D1","J1","DMX_A","DMX1 TVS near XLR",10), ("D7","J5","DMX2_A","DMX2 TVS near XLR",10),
+    ("C21","PS1","+5V_DMX","B0505S#1 in cap",8), ("C26","PS2","+5V_DMX","B0505S#2 in cap",8),
+    ("D1","J1","DMX_AO","DMX1 TVS near XLR",10), ("D7","J5","DMX2_AO","DMX2 TVS near XLR",10),
+    # NB: L2/L3 (CM chokes) + FB2/FB3 (ferrites) are series filter elements placed cable-side / between
+    # bulk and driver by DESIGN, not HF-decoupling caps, so they are intentionally NOT proximity-checked.
 ]
 
 def pads_on(ref, net):

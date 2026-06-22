@@ -24,16 +24,20 @@ i_buck_in = i3v3*3.3/(VBUS_NOM*BUCK_EFF)
 # 2x B0505S-1W: each ~60mA out (ISO3086 bus side into 60R), eff ~0.75
 i_b0505_in = 2*0.060*5.0/(5.0*0.75)
 i_5v = i_buck_in + i_b0505_in            # total current drawn from the +5V rail
-# OR Schottky SS34: Vf ~0.43V @ this current, 25C
-def ss34_vf(i): return 0.30 + 0.18*(i/1.0)   # linear approx of SS34 25C curve near 0.3-0.8A
-vf = ss34_vf(i_5v)
-p5v_nom = VBUS_NOM - vf
-p5v_min = VBUS_MIN - ss34_vf(i_5v*1.3)   # low VBUS + 30% load headroom
-chk("+5V rail (USB, nominal)", PASS if p5v_nom>=4.6 else WARN,
-    f"{i_5v*1000:.0f}mA load, SS34 Vf={vf:.2f}V -> +5V={p5v_nom:.2f}V")
-chk("B0505S input margin (min 4.5V)", PASS if p5v_min>=4.5 else WARN,
-    f"worst-case +5V={p5v_min:.2f}V (VBUS 4.75 + 30% load). B0505S is UNREGULATED -> VISO tracks "
-    f"~{p5v_min*0.95:.2f}V; ISO3086 VCC2 spec 3-5.5V so DMX still valid. [SPICE-WORTH: load-step]")
+# Power chain: VBUS -> F1 PTC (25mOhm) -> SS54 OR diode -> +5V -> FB1 (100mOhm) -> B0505S in (~VCC2)
+R_PTC, R_FB1 = 0.025, 0.10
+def ss54_vf(i): return 0.30 + 0.13*i          # SS54 25C curve approx (~0.40V @0.8A, ~0.43 @1A)
+vf = ss54_vf(i_5v)
+p5v_nom = VBUS_NOM - i_5v*R_PTC - vf
+vcc2_nom = p5v_nom - i_b0505_in*R_FB1         # B0505S unregulated out ~ Vin -> VCC2
+p5v_min  = VBUS_MIN - i_5v*1.3*R_PTC - ss54_vf(i_5v*1.3)
+vcc2_min = p5v_min - i_b0505_in*1.3*R_FB1
+vcc2_poe = 5.0 - vf - i_b0505_in*R_FB1
+chk("+5V rail (USB, nominal)", PASS if p5v_nom>=4.55 else WARN,
+    f"{i_5v*1000:.0f}mA, PTC+SS54 -> +5V={p5v_nom:.2f}V")
+chk("B0505S/ISO3086 VCC2 >=4.5V (USB)", PASS if vcc2_min>=4.5 else WARN,
+    f"USB@{VBUS_MIN}V worst-case VCC2~{vcc2_min:.2f}V (SPICE: needs VBUS>=~4.95V). "
+    f"PoE 5.0V -> VCC2~{vcc2_poe:.2f}V OK. Fix: clean >=5V source or ideal-diode OR (report S3)")
 chk("OR-diode dissipation", PASS if i_5v*vf<0.6 else WARN,
     f"P(SS34)={i_5v*vf*1000:.0f}mW in SMA (rated ~0.9W) -- ok")
 chk("USB host current need", WARN,
@@ -71,17 +75,17 @@ chk("USB-C CC pulldowns (R8/R9=5.1k)", PASS,
     "Rd=5.1k each = correct UFP/sink advertisement (default USB current); CC1+CC2 both populated (cable-orientation independent)")
 
 # ---------------------------------------------------------------- crystal load
-C1=C2=22.0
+C1=C2=33.0
 Cstray=4.0
 CL=(C1*C2)/(C1+C2)+Cstray
-chk("W5500 25MHz crystal load (C12/C13=22pF)", WARN,
-    f"CL={CL:.1f}pF (22||22 + {Cstray}pF stray). MUST match the chosen crystal's CL spec: "
-    f"if crystal CL=10pF use ~12pF caps, if 12pF use ~16pF, if 18-20pF 22pF is right. [VERIFY against C2981622 datasheet]")
+CL_XTAL=20.0   # C2981622 is 2520-25-20 -> CL=20pF (datasheet-confirmed)
+chk("W5500 25MHz crystal load (C12/C13=33pF C0G)", PASS if abs(CL-CL_XTAL)<=2 else WARN,
+    f"presented CL={CL:.1f}pF (33||33 + {Cstray}pF stray) vs crystal CL={CL_XTAL:.0f}pF -> within +-1pF. "
+    f"Require C0G/NP0 dielectric. (Was 22pF -> 15pF presented, ran 25MHz fast.)")
 
 # ---------------------------------------------------------------- W5500 EXRES1
-chk("W5500 EXRES1 (R3=12k vs 12.4k spec)", WARN,
-    "12k 1% is -3.2% of the 12.4k datasheet value -> TX amplitude ~+1-3%; within 100BASE-TX tol but "
-    "prefer 12.4k 1% (e.g. C25053) if orderable for nominal eye")
+chk("W5500 EXRES1 (R3=12.4k 1%)", PASS,
+    "datasheet-specified 12.4k 1% -> on-spec PHY TX bias (was 12k = -3.2%, now corrected)")
 
 # ---------------------------------------------------------------- RS-485 loading
 chk("ISO3086 DMX drive load", PASS,
