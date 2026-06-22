@@ -15,9 +15,9 @@ INFO = {
     "U4": ("SY8089 buck 5->3.3V", "C78988"),
     "U5": ("ISO3086DWR isolated RS-485", "C183095"),
     "PS1": ("B0505S-1W iso DC-DC (EVISUN)", "C7465127"),
-    "J1": ("XLR-3 out (XLR-328P)", "C309326"),
+    "J1": ("Neutrik NC5FAH XLR-5 female horizontal PCB (E1.11 DMX out)", "C368501"),
     "J2": ("USB-C data (TYPE-C-31-M-12)", "C165948"),
-    "J3": ("RJ45 MagJack HR961160C SMD 10/100", "C55683"),
+    "J3": ("RJ45 MagJack HY931147C PoE 10/100 (integrated rectifier + magnetics)", "C91754"),
     "J4": ("JST SH 1.0mm 9-pin SMD SM09B-SRSS-TB (optional display; pre-crimped cables)", "C160408"),
     "Y1": ("25MHz crystal 2520", "C2981622"),
     "L1": ("2.2uH power inductor (CKCS4030)", "C354584"),
@@ -50,6 +50,22 @@ INFO = {
     "D4": ("LED yellow 0603 NCD0603Y2", "C89811"),   # PREFERRED - no fee (KT-0603Y/C2287 was extended)
     "D5": ("LED blue 0603 KT-0603B", "C2288"),       # extended: JLCPCB has NO basic/preferred 0603 blue
     "D6": ("LED white 0603", "C2290"),
+    # ---- 2nd isolated DMX universe (mirror of U5/PS1/J1/D1/R12/C18-20) ----
+    "U6": ("ISO3086DWR isolated RS-485 (universe 2)", "C183095"),
+    "PS2": ("B0505S-1W iso DC-DC (EVISUN, universe 2)", "C7465127"),
+    "J5": ("Neutrik NC5FAH XLR-5 female horizontal PCB (E1.11 DMX out, universe 2)", "C368501"),
+    "D7": ("SM712 TVS SOT-23 (universe 2)", "C404012"),
+    "R19": ("120R 0805 (DMX2 termination)", "C17437"),
+    "C23": ("100nF 0402", "C1525"), "C24": ("100nF 0402", "C1525"),
+    "C25": ("10uF 1206", "C13585"), "C26": ("10uF 1206", "C13585"),
+    # ---- PoE PD stage + 5V source OR-ing ----
+    "U7": ("DP9900M-5V PoE PD + isolated DC-DC module (802.3af)", "C5380106"),
+    "D10": ("SMAJ58A TVS SMA (rectified-PoE surge clamp)", "C110521"),
+    "D8": ("SS34 SMA schottky (USB 5V OR-ing)", "C8678"),
+    "D9": ("SS34 SMA schottky (PoE 5V OR-ing)", "C8678"),
+    "C27": ("100uF 25V SMD electrolytic (PoE output bulk)", "C970685"),
+    "C28": ("10uF 0805", "C15850"),
+    "C29": ("22uF 0805 (+5V rail bulk)", "C45783"),
 }
 
 b = pcbnew.LoadBoard(PCB)

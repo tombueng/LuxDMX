@@ -1,0 +1,36 @@
+#VRML V2.0 utf8
+# SDAPO DP9900M-5V PoE PD + isolated DC-DC module (LCSC C5380106).
+# No vendor 3D model exists, so this is a dimensionally-correct placeholder brick
+# (21.19 x 14.0 x 13.35 mm per the datasheet package drawing). Coordinates are in
+# 0.1-inch VRML units (mm / 2.54) to match KiCad's WRL scale convention; model scale (1,1,1).
+Transform {
+  translation 0 0 2.628
+  children [
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 0.10 0.10 0.11
+          specularColor 0.18 0.18 0.18
+          shininess 0.25
+          ambientIntensity 0.25
+        }
+      }
+      geometry Box { size 8.343 5.512 5.256 }
+    }
+  ]
+}
+Transform {
+  translation 0 0 5.06
+  children [
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 0.30 0.20 0.10
+          specularColor 0.25 0.25 0.25
+          shininess 0.35
+        }
+      }
+      geometry Box { size 4.5 4.7 0.4 }
+    }
+  ]
+}

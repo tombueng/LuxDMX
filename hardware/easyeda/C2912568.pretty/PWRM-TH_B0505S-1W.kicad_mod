@@ -26,7 +26,7 @@
 	(fp_line (start 5.80 -5.09) (end 5.80 0.91) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 5.80 0.91) (end -5.80 0.91) (layer F.CrtYd) (width 0.05))
 	(model "C:/dev/DMX/hardware/easyeda/C2912568.3dshapes/PWRM-TH_B0505S-1W.step"
-		(offset (xyz 0.000 0.000 0.000))
+		(offset (xyz 0 2.159 5.08))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))
 	)
