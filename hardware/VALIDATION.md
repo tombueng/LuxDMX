@@ -30,7 +30,7 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 | 1 | Routing complete | ✅ | autoroute + DRC connectivity | **0 unrouted** (full pipeline: rebuild_iso → escape_connectors → autoroute_fr2 → cleanup_pads → tighten_poe_void, + route_one for stragglers). 2 W5500 fan-out clearances at 0.174mm = JLCPCB-4L ok |
 | 1b | 4-layer power stackup | ✅ | rebuild_iso (In1=GND, In2=+3V3 LT_POWER) | signals F/B only, planes solid; +3V3/GND pads stitched to planes |
 | 2 | DRC (electrical) | ⚠️ | kicad-cli pcb drc | 0 shorts; 2 W5500 pin4/16 trace near-misses + 3 DISP_DC-near-edge (local hand-fix); waivable CC2↔SBU1 |
-| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | ~54 silk_over_copper / overlap / edge — cosmetic, fix before fab |
+| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | 37 (6 over-copper / 15 overlap / 16 edge), cosmetic + mask-protected; silk-over-pad = 0, courtyard = 0 (re-verified post-reroute) |
 | 4 | Net connectivity = intent | ✅ | board generated from `lumigate.net` (SKiDL) | by construction; schematic reviewed pin-by-pin |
 | 5 | Decoupling/xtal/switcher placement (EMC) | ✅ | validate_placement.py + place_decoupling.py | caps snapped to IC pins, 2mm min gap, 0 overlaps (was 20-56mm) |
 | 5b | Board outline / mounting holes | ✅ | set_outline_holes.py | **99 x 79mm**; 4 corner M3 holes at **90 x 70mm spacing, uniform 4.5mm inset** (all 4 equal edge distance); 0 hole-vs-body collisions. Holes are **plated + tied to GND** (MountingHole_3.2mm_M3_Pad) so the 4 corners bond board GND to a metal chassis — see docs/ruggedization.md "Grounding & shielding". |

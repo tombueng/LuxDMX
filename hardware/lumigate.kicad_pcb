@@ -28495,15 +28495,6 @@
 		(net "CC2")
 		(uuid "b150a5a6-0f20-483b-9542-4c3ba0a0a923")
 	)
-	(via
-		(at 144.603486 160.2498)
-		(size 0.5)
-		(drill 0.25)
-		(layers "F.Cu" "B.Cu")
-		(locked yes)
-		(net "CC2")
-		(uuid "554cd713-315e-4308-b30e-ea50ba190ba5")
-	)
 	(segment
 		(start 123.0883 97.5875)
 		(end 123.0652 97.5644)

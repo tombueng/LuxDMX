@@ -144,9 +144,9 @@ drop lets the +5V rail reach ~5.20V on a 5.25V USB — see the D11 TVS note in �
 - DFM: min track 0.20mm, min drill 0.20mm — OK. Clearance per DRC (3 waivers: 2× W5500 0.174mm fan-out + USB-C
   CC2, all ≥ JLCPCB 0.0889mm).
 - Fuse coordination: PTC trips ~3A, trace fuses ~8–10A → fuse always wins.
-- **Silk-over-pad = 0, courtyard-overlap = 0** (no assembly/solder or body-collision issue). The ~78
-  remaining silk warnings are all silk-over-copper / silk-on-silk (cosmetic, mask-protected) — the standard
-  pre-fab silk-cleanup batch (VALIDATION item 3).
+- **Silk-over-pad = 0, courtyard-overlap = 0** (no assembly/solder or body-collision issue). The 37
+  remaining silk warnings (16 near-edge, 15 silk-on-silk, 6 over-copper) are cosmetic + mask-protected,
+  re-verified after the re-route (VALIDATION item 3).
 
 ## 5. EMC / SI
 - CM chokes (L2/L3) + ferrites (FB1-3) + the chassis bond (plated GND holes) form the EMC story. Decoupling
