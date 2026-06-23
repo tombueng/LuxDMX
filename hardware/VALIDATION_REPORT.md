@@ -141,7 +141,7 @@ drop lets the +5V rail reach ~5.20V on a 5.25V USB — see the D11 TVS note in �
   0.2mm (heat sinks into the pad — acceptable). IPC-2221: 0.5mm/1oz = 1.45A@10°C ≫ 0.8A.
 - **Via current** fine; **min annular = 0.125mm** on the 0.5/0.25 escape vias — **0.005mm under JLCPCB's 0.13mm
   preferred** (open item: bump escape-via pad to 0.55mm → 0.15mm annular, or accept; JLCPCB often allows 0.1mm).
-- DFM: min track 0.20mm, min drill 0.20mm — OK. Clearance per DRC (3 waivers: 2× W5500 0.137mm fan-out + USB-C
+- DFM: min track 0.20mm, min drill 0.20mm — OK. Clearance per DRC (3 waivers: 2× W5500 0.174mm fan-out + USB-C
   CC2, all ≥ JLCPCB 0.0889mm).
 - Fuse coordination: PTC trips ~3A, trace fuses ~8–10A → fuse always wins.
 - **Silk-over-pad = 0, courtyard-overlap = 0** (no assembly/solder or body-collision issue). The ~78
@@ -185,7 +185,7 @@ but C27 and the buck inductor loop are worth tightening on a future placement pa
    Evaluated + reverted this pass: the 2 resistors push the W5500 Ethernet TX diff-pair onto a via (hurts
    100BASE-TX SI). Re-do next spin with a small placement nudge so the pair stays via-less.
 3. **Escape-via annular 0.125mm** is right at JLCPCB's ~0.13mm limit — acceptable, bump pad 0.5→0.55mm
-   (→0.15mm) only if a W5500-fanout reroute is done (larger pads tighten the 0.137mm clearances). [DFM]
+   (→0.15mm) only if a W5500-fanout reroute is done (larger pads tighten the 0.174mm clearances). [DFM]
 4. **Ethernet Bob-Smith** 75Ω + 1nF-to-chassis network — the magjack has none; add for conducted-EMC margin.
 5. **DP9900M LCSC PDF** — confirm 5V/1.8A SKU + on-module 802.3af detection/classification + pin order.
 6. **Firmware /config** must set out#1 tx17/rx18/de8, out#2 tx16/rx21/de47, ledType=3 pins 1/2/6/7/15

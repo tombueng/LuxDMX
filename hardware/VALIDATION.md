@@ -10,7 +10,7 @@ with **4 symmetric M3 holes at 90 x 70mm spacing, uniform 4.5mm edge inset**; pr
 **Fully routed (0 unrouted).** A **ruggedization pass** added USB ESD (U8), a self-healing PTC fuse (F1),
 a +5V transient clamp (D11), a **TPS2116 ideal-diode OR mux (U9)** for the USB/PoE inputs, DMX common-mode
 chokes (L2/L3) and ferrite supply filters (FB1-3) — see the Ruggedization section. Remaining before order:
-waive the 2 W5500-fanout 0.137mm clearance near-misses + the USB-C CC2 near-miss (all JLCPCB-4L ok).
+waive the 2 W5500-fanout 0.174mm clearance near-misses + the USB-C CC2 near-miss (all JLCPCB-4L ok).
 
 ## How to re-run the validation
 ```
@@ -27,7 +27,7 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 
 | # | Item | Status | Method | Result / action |
 |---|------|--------|--------|-----------------|
-| 1 | Routing complete | ✅ | autoroute + DRC connectivity | **0 unrouted** (full pipeline: rebuild_iso → escape_connectors → autoroute_fr2 → cleanup_pads → tighten_poe_void, + route_one for stragglers). 2 W5500 fan-out clearances at 0.137mm = JLCPCB-4L ok |
+| 1 | Routing complete | ✅ | autoroute + DRC connectivity | **0 unrouted** (full pipeline: rebuild_iso → escape_connectors → autoroute_fr2 → cleanup_pads → tighten_poe_void, + route_one for stragglers). 2 W5500 fan-out clearances at 0.174mm = JLCPCB-4L ok |
 | 1b | 4-layer power stackup | ✅ | rebuild_iso (In1=GND, In2=+3V3 LT_POWER) | signals F/B only, planes solid; +3V3/GND pads stitched to planes |
 | 2 | DRC (electrical) | ⚠️ | kicad-cli pcb drc | 0 shorts; 2 W5500 pin4/16 trace near-misses + 3 DISP_DC-near-edge (local hand-fix); waivable CC2↔SBU1 |
 | 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | ~54 silk_over_copper / overlap / edge — cosmetic, fix before fab |

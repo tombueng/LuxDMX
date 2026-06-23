@@ -6,6 +6,7 @@ BOARD = os.path.join(HERE, "lumigate.kicad_pcb")
 JAR = os.environ.get("FR2_JAR", os.path.join(HERE, "tools", "freerouting2.jar"))
 JAVA = os.environ.get("FR2_JAVA") or next(iter(glob.glob(os.path.join(HERE, "tools", "jdk*", "*", "bin", "java.exe"))), "java")
 PASSES = os.environ.get("FR2_PASSES", "30")
+TIMEOUT = int(os.environ.get("FR2_TIMEOUT", "600"))   # max wait for the GUI session (you close the window to export)
 dsn = os.path.join(tempfile.gettempdir(), "l_fr2.dsn")
 ses = os.path.join(tempfile.gettempdir(), "l_fr2.ses")
 runlog = os.path.join(tempfile.gettempdir(), "l_fr2_run.log")
@@ -34,12 +35,12 @@ print(f"running Freerouting 2.2.4 with GUI visible (-mp {PASSES})...", flush=Tru
 try:
     r = subprocess.run([JAVA, "-jar", JAR,
                         "-de", dsn, "-do", ses, "-mp", PASSES],
-                       capture_output=True, text=True, env=env, timeout=600)
+                       capture_output=True, text=True, env=env, timeout=TIMEOUT)
     with open(runlog, "w", encoding="utf-8") as f:
         f.write(r.stdout + "\n---STDERR---\n" + r.stderr)
     print("FR2 stdout tail:", r.stdout[-200:])
 except subprocess.TimeoutExpired:
-    print("FR2 timed out after 1500s", flush=True)
+    print(f"FR2 timed out after {TIMEOUT}s", flush=True)
 if not os.path.exists(ses):
     sys.exit(f"FR2 produced no SES -- see {runlog} and %TEMP%/freerouting/freerouting.log")
 pcbnew.ImportSpecctraSES(b, ses)
