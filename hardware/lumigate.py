@@ -264,12 +264,20 @@ D10 = TVSP(); D10.ref = 'D10'; D10['K'] += VPOE_P; D10['A'] += VPOE_N   # rectif
 Cpoe1 = C('C27', '100uF', 'Capacitor_SMD:CP_Elec_6.3x7.7'); Cpoe1[1] += P5V_POE; Cpoe1[2] += GND   # module output bulk (datasheet 100uF/25V)
 Cpoe2 = C('C28', '10uF', 'Capacitor_SMD:C_0805_2012Metric'); Cpoe2[1] += P5V_POE; Cpoe2[2] += GND
 
-# 5V source OR-ing: fused USB-C VBUS (D8) and PoE module output (D9) -> +5V rail, no backfeed.
-# SS54 (5A) instead of SS34 (3A): lower forward drop at load, preserves the B0505S >=4.5V input margin
-# once the PTC + ferrites are in series on the USB path.
-SCH = mk('SS54', 'D', 'Diode_SMD:D_SMA', [(1, 'K', PT.PASSIVE), (2, 'A', PT.PASSIVE)], value='SS54')
-D8 = SCH(); D8.ref = 'D8'; D8['A'] += P5V_USBF; D8['K'] += P5V
-D9 = SCH(); D9.ref = 'D9'; D9['A'] += P5V_POE; D9['K'] += P5V
+# 5V source OR-ing via the TPS2116 ideal power-mux (replaces the SS54 OR diodes D8/D9). With MODE=GND and
+# PR1=GND it automatically passes the HIGHER of VIN1 (fused USB) / VIN2 (PoE) to +5V, with reverse-current
+# blocking (no backfeed). Rdson ~40mOhm -> ~32mV drop at 0.8A (vs ~0.4V for a Schottky), restoring the
+# B0505S/ISO3086 VCC2 >=4.5V margin on USB power. LCSC C3235557, SOT-583 (8-pin). 1.6-5.5V in, 2.5A.
+MUX = mk('TPS2116', 'U', 'Package_TO_SOT_SMD:SOT-583-8',
+         [(1, 'GND', PT.PWRIN), (2, 'VOUT', PT.PWROUT), (3, 'VIN1', PT.PWRIN), (4, 'PR1', PT.INPUT),
+          (5, 'MODE', PT.INPUT), (6, 'VIN2', PT.PWRIN), (7, 'VOUT', PT.PASSIVE), (8, 'ST', PT.PASSIVE)],
+         value='TPS2116DRLR')
+U9 = MUX(); U9.ref = 'U9'
+U9['VIN1'] += P5V_USBF; U9['VIN2'] += P5V_POE; U9[2] += P5V; U9[7] += P5V; U9['GND'] += GND
+U9['PR1'] += GND; U9['MODE'] += GND          # PR1=GND -> auto highest-voltage select; MODE=GND -> non-priority
+# ST (pin 8) = open-drain status, left unconnected (optional 100k pull-up to +3V3 for a "which source" GPIO)
+Cmuxa = C('C30', '1uF', 'Capacitor_SMD:C_0603_1608Metric'); Cmuxa[1] += P5V_USBF; Cmuxa[2] += GND  # TPS2116 VIN1 cap
+Cmuxb = C('C31', '1uF', 'Capacitor_SMD:C_0603_1608Metric'); Cmuxb[1] += P5V_POE;  Cmuxb[2] += GND  # TPS2116 VIN2 cap
 Cor = C('C29', '22uF', 'Capacitor_SMD:C_0805_2012Metric'); Cor[1] += P5V; Cor[2] += GND
 # +5V rail transient clamp (D11) + EMC ferrite (FB1) feeding the isolated DMX DC-DC inputs
 TVS5 = mk('SMAJ5.0A', 'D', 'Diode_SMD:D_SMA', [(1, 'K', PT.PASSIVE), (2, 'A', PT.PASSIVE)], value='SMAJ5.0A')

@@ -35,7 +35,7 @@ INFO = {
     "R18": ("49.9R 1% 0402 W5500 TX center-tap bias", "C25120"),   # BASIC (UNI-ROYAL 0402WGF499, 1%) - no fee
     "R4": ("330R 0402", "C25104"), "R5": ("330R 0402", "C25104"),
     "R8": ("5k1 0402", "C25905"), "R9": ("5k1 0402", "C25905"),
-    "R12": ("120R 0805", "C17437"),
+    "R12": ("120R 0805 (DMX-A termination)", "C17437"),
     # caps
     "C1": ("100nF 0402", "C1525"), "C3": ("1uF 0402 (EN power-on RC)", "C52923"), "C5": ("100nF 0402", "C1525"),
     "C8": ("100nF 0402", "C1525"), "C9": ("100nF 0402", "C1525"), "C10": ("100nF 0402", "C1525"),
@@ -55,17 +55,31 @@ INFO = {
     "PS2": ("B0505S-1W iso DC-DC (EVISUN, universe 2)", "C7465127"),
     "J5": ("Neutrik NC5FAH XLR-5 female horizontal PCB (E1.11 DMX out, universe 2)", "C368501"),
     "D7": ("SM712 TVS SOT-23 (universe 2)", "C404012"),
-    "R19": ("120R 0805 (DMX2 termination)", "C17437"),
+    "R19": ("120R 0805 (DMX-B termination)", "C17437"),
     "C23": ("100nF 0402", "C1525"), "C24": ("100nF 0402", "C1525"),
     "C25": ("10uF 1206", "C13585"), "C26": ("10uF 1206", "C13585"),
     # ---- PoE PD stage + 5V source OR-ing ----
     "U7": ("DP9900M-5V PoE PD + isolated DC-DC module (802.3af)", "C5380106"),
     "D10": ("SMAJ58A TVS SMA (rectified-PoE surge clamp)", "C110521"),
-    "D8": ("SS34 SMA schottky (USB 5V OR-ing)", "C8678"),
-    "D9": ("SS34 SMA schottky (PoE 5V OR-ing)", "C8678"),
+    "U9": ("TPS2116DRLR ideal-diode power mux (USB/PoE 5V OR-ing)", "C3235557"),
+    "C30": ("1uF 0603 (TPS2116 VIN1 input cap)", "C15849"),
+    "C31": ("1uF 0603 (TPS2116 VIN2 input cap)", "C15849"),
     "C27": ("100uF 25V SMD electrolytic (PoE output bulk)", "C970685"),
     "C28": ("10uF 0805", "C15850"),
     "C29": ("22uF 0805 (+5V rail bulk)", "C45783"),
+    # ---- ruggedization: protection / EMC parts ----
+    "F1": ("BSMD1206-150-16V 1.5A/16V resettable PPTC fuse (USB VBUS)", "C883133"),
+    "U8": ("USBLC6-2SC6 USB ESD/TVS array (SOT-23-6)", "C7519"),
+    "D11": ("SMAJ5.0A TVS SMA (+5V transient clamp)", "C151932"),
+    "L2": ("ACM2012-201-2P common-mode choke (DMX-A pair)", "C383338"),
+    "L3": ("ACM2012-201-2P common-mode choke (DMX-B pair)", "C383338"),
+    "FB1": ("600R@100MHz ferrite bead 0805 (+5V to DMX DC-DC)", "C139168"),
+    "FB2": ("600R@100MHz ferrite bead 0805 (VISO driver)", "C139168"),
+    "FB3": ("600R@100MHz ferrite bead 0805 (VISO2 driver)", "C139168"),
+    # ---- expansion + DMX breakout headers ----
+    "J6": ("JST SH 1.0mm 9-pin SMD SM09B-SRSS-TB (expansion header)", "C160408"),
+    "J7": ("JST SH 1.0mm 3-pin SMD SM03B-SRSS-TB (DMX-A breakout)", "C160403"),
+    "J8": ("JST SH 1.0mm 3-pin SMD SM03B-SRSS-TB (DMX-B breakout)", "C160403"),
 }
 
 b = pcbnew.LoadBoard(PCB)
@@ -79,9 +93,12 @@ def k(r):
 # Parts without an LCSC# fall back to comment+footprint.  Comment/footprint/LCSC are taken
 # from the lowest designator in the group.
 groups = defaultdict(list)
+not_in_bom = []
 for fp in b.GetFootprints():
     ref = fp.GetReference()
     if ref not in INFO:
+        if not ref.startswith("MH"):     # mounting holes are board features, not placed parts
+            not_in_bom.append(ref)
         continue
     comment, lcsc = INFO[ref]
     fpn = str(fp.GetFPID().GetLibItemName())
@@ -101,7 +118,16 @@ rows += body
 with open(OUT, "w", newline="") as f:
     csv.writer(f).writerows(rows)
 
+import os, sys; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import csv_to_xlsx                               # real openpyxl xlsx; emit matching .xlsx so no stale spreadsheet
+    csv_to_xlsx.convert(OUT, OUT.replace(".csv", ".xlsx"))
+except Exception as e:
+    print("!! BOM .xlsx NOT written (upload the .csv -- JLCPCB accepts it):", e)
+
 placed = sum(len(v) for v in groups.values())
 missing = sorted([r for r, (c, l) in INFO.items() if not l], key=k)
 print(f"BOM written: {len(rows)-1} lines, {placed} parts")
 print(f"LCSC to pick in JLCPCB ({len(missing)}): {missing}")
+if not_in_bom:
+    print(f"!! WARNING: {len(not_in_bom)} placed part(s) NOT in BOM (would NOT be assembled): {sorted(not_in_bom, key=k)}")

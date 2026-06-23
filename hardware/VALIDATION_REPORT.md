@@ -11,11 +11,11 @@ Companion files: `VALIDATION_PLAN.md` (what we check), `VALIDATION.md` (status m
 
 ## 0. Overall verdict
 
-**Close to fab-ready. One blocker fixed, no remaining must-stop item, one bounded margin to accept-or-improve.**
+**Close to fab-ready. Blocker fixed, the one real margin now fixed too, no remaining must-stop item.**
 - Routing 0 unrouted; DRC = 3 known JLCPCB-OK waivers.
 - **Every ESP32-S3 GPIO assignment validated against the datasheet — zero must-change pins.** (Big result.)
-- Blocker found + fixed: crystal load caps. Three more value fixes applied. One topology-level margin
-  (USB-powered B0505S input) documented with a recommended improvement.
+- Blocker found + fixed: crystal load caps. Three more value fixes applied. The USB-powered B0505S/VCC2
+  margin (was the top open item) is now **fixed in-place** with a TPS2116 ideal-diode mux (§3), SPICE-verified.
 
 ### Fixes applied this pass (value-only, no reroute)
 | Ref | Was | Now | Why |
@@ -50,11 +50,14 @@ v1.0.2, WCH CH340, Suzhou-Liming 2520 crystal, TDK ACM2012, Fenghua CBM bead, Ne
   integrated Bob-Smith termination** (distributor claim is wrong; the schematic shows none) — see §5 EMC.
 
 ### Protection / power semis
-- **SS54 (C49420325):** 40V/5A Schottky, Vf ~0.40–0.45V @0.8A typ, 0.55V max. OR-diode. **Drives the §3 margin.**
-- **SMAJ5.0A (C151932):** Vrwm 5.0V, Vbr 6.4–7.0V, clamp 9.2V@43.5A. On the **post-OR +5V rail** whose real
-  max is ~4.83V (5.25V USB − PTC − SS54), **not** 5.25V — so it does **not** leak at the normal rail (the
-  research agent's "poor fit" assumed a pre-diode 5.25V rail). Clamp 9.2V exceeds the SY8089 6V abs-max but
-  only for ns–µs transients (the buck's Cin handles that); for sustained OV there is no source (post-diode).
+- **TPS2116 (U9, SOT-583):** dual-input ideal-diode power mux, RDSON ~40mΩ typ / 65mΩ max over temp, 1.6A.
+  Replaces the SS54 OR **diodes** (D8/D9, removed) so the OR drop is ~0.03V instead of ~0.40V — **this is
+  what fixes the §3 margin.** PR1/MODE tied low (priority off → simple highest-input-wins OR); ST/PG open.
+- **SMAJ5.0A (C151932):** Vrwm 5.0V, Vbr 6.4–7.0V, clamp 9.2V@43.5A, on the +5V rail. With the low-drop mux
+  the rail now reaches ~5.20V max (5.25V USB − PTC − mux), so it sits a touch above the 5.0V standoff only at
+  the USB ceiling → **µA reverse leakage, no clamping** (Vbr 6.4V ≫ 5.2V); fully protective, negligible. The
+  tight 9.2V clamp beats the SY8089 6V abs-max only on ns–µs transients (buck Cin handles those). Optional
+  purist swap is SMAJ5.5A (5.5V standoff); kept 5.0A for the tighter clamp.
   **Verdict: acceptable as a transient clamp.** Standoff has only ~0.17V over the 4.83V rail — fine.
 - **SMAJ58A→60A:** fixed (above).
 - **SM712 (D1/D7):** asymmetric +7/−12V standoff, clamps 14/26V, matches the RS-485/DMX −7…+12V common-mode
@@ -106,27 +109,30 @@ indeterminate drive on the DMX line at power-up — harmless to compliant receiv
 
 ---
 
-## 3. The one real margin: USB-powered B0505S / ISO3086 VCC2 (TOP open item)
+## 3. RESOLVED: USB-powered B0505S / ISO3086 VCC2 margin (was the top open item)
 
-The OR diode (SS54) + PTC + input ferrite drop, on **USB power at low VBUS**, can pull the +5V rail and hence
-the unregulated B0505S output below the **ISO3086 VCC2 minimum of 4.5V**:
-- USB 4.75V(min) − PTC 0.02V − SS54 0.4V = 4.33V at +5V; − FB1 0.04V = 4.29V at the B0505S input.
-- B0505S unregulated → VCC2 ≈ rail ≈ ~4.3V → **~0.2V under the ISO3086 4.5V min** with both universes loaded.
-- **On PoE (regulated 5.0V): +5V = 4.6V → VCC2 4.56V > 4.5V ✓.** Only USB-at-low-VBUS is marginal.
+The original OR **diode** (SS54, ~0.40V Vf) + PTC + input ferrite dropped the +5V rail, on **USB at low
+VBUS**, below the **ISO3086 VCC2 minimum of 4.5V** (USB 4.75V − PTC − SS54 − FB1 ≈ 4.29V at the B0505S input
+→ VCC2 ~0.2V under spec). **Fixed this pass:** the two OR diodes (D8/D9) are replaced by a **TPS2116
+ideal-diode power mux (U9)** — back-to-back pass-FETs, RDSON ~40mΩ typ — so the OR drop falls from ~0.40V to
+~0.03V at the ~0.8A worst-case load.
 
-Impact: at VCC2 < 4.5V the ISO3086 still toggles DMX but VOD may dip under the 1.5V/54Ω spec → marginal drive
-on long lines. **It is not a hard failure; it is out of spec on USB power with a sagging supply.**
+SPICE (`sim/power_chain.cir`, mux 40mΩ; load = both B0505S + buck/logic ≈ 0.8A through the mux):
 
-Options (in order):
-1. **Operating guidance (zero cost):** power via PoE or a ≥1A clean 5V source for full dual-universe drive;
-   treat a weak USB port as config/single-universe. Documented on the board + README.
-2. **Ideal-diode OR-ing (best fix, future rev):** replace D8/D9 with 2× LM66100 (or similar, ~80mΩ, ~60mV
-   drop) → recovers ~0.35V → VCC2 ≥4.6V even on USB. Costs 2 ICs + a reroute; recommended for the next spin.
-3. Lower-Vf Schottky (PMEG-class) buys ~0.1V — not enough on its own.
+| VBUS (USB)        | VCC2 before (SS54) | VCC2 now (TPS2116) |
+|-------------------|--------------------|--------------------|
+| 4.70 V (worst low)| ~4.29 V ❌         | **4.61 V ✓**       |
+| 5.00 V (nominal)  | ~4.54 V            | **4.91 V ✓**       |
+| 5.25 V (ceiling)  | ~4.79 V            | **5.16 V ✓**       |
 
-Decision this pass: **document + recommend (1)+(2); not implementing the ideal-diode autonomously** (topology
-change + reroute on a dense board is too risky to do unsupervised). This is the single item to weigh before
-ordering. `validate_electrical.py` models it.
+VCC2 now clears the 4.5V minimum across the whole USB range, including the 65mΩ max-RDSON-over-temp case
+(~4.59V at VBUS 4.70V). PoE (regulated 5.0V) was already fine. **No operating restriction is needed anymore.**
+
+Implementation: U9 (SOT-583) sits at the old OR junction with 1µF input caps (C30/C31, 0603) and the 22µF OR
+bulk (C29); PR1/MODE tied low (priority off → simple highest-input-wins OR); ST/PG open. Hand-routed (the
+fine-pitch fanout fought the autorouter) and DRC-clean; ERC 0 errors. One second-order effect: the mux's low
+drop lets the +5V rail reach ~5.20V on a 5.25V USB — see the D11 TVS note in §2 (still fine, µA leakage).
+`validate_electrical.py` + `sim/power_chain.cir` model the fixed chain.
 
 ---
 
@@ -173,8 +179,8 @@ but C27 and the buck inductor loop are worth tightening on a future placement pa
 ---
 
 ## 8. Open / next-spin items (do NOT block fab — for the user to weigh)
-1. **B0505S/ISO3086 USB margin** [highest] — accept operating guidance (PoE or clean ≥5V USB), or spin
-   ideal-diode OR-ing (§3, 2× LM66100). SPICE-quantified: needs VBUS ≥ ~4.95V on USB.
+1. ~~**B0505S/ISO3086 USB margin**~~ — **FIXED this pass** (§3): TPS2116 ideal-diode mux (U9) replaces the
+   OR diodes; VCC2 ≥ 4.61V across the full USB range, SPICE-verified. No longer an open item.
 2. **ISO3086 DE/nRE boot pull-down** — 10k on DMX_EN(IO8)/DMX2_EN(IO47) → drivers stay OFF during boot.
    Evaluated + reverted this pass: the 2 resistors push the W5500 Ethernet TX diff-pair onto a via (hurts
    100BASE-TX SI). Re-do next spin with a small placement nudge so the pair stays via-less.

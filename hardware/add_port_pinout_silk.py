@@ -52,14 +52,21 @@ for d in list(b.GetDrawings()):
     if not isinstance(d, (pcbnew.PCB_TEXT, pcbnew.PCB_SHAPE)):
         continue
     x, y = TM(d.GetPosition().x), TM(d.GetPosition().y)
-    s = d.GetText() if isinstance(d, pcbnew.PCB_TEXT) else ""
-    if lay == FS and (s in ("DISPLAY", "EXP I/O", "Display", "Expansion", "1")
-                      or (137 < x < 154 and 111 < y < 140)                 # connector silk
-                      or any(k in s.lower() for k in _LEDKW)               # old plain LED legend
-                      or (133 < x < 156 and 88.5 < y < 103.5)):            # LED grid region
-        b.Remove(d)
+    istext = isinstance(d, pcbnew.PCB_TEXT)
+    s = d.GetText() if istext else ""
+    rm = False
+    if lay == FS:
+        # connector/LED TEXT only by content -- never delete a chip-function label that drifted into the region
+        if istext and (s in ("DISPLAY", "EXP I/O", "Display", "Expansion", "1") or any(k in s.lower() for k in _LEDKW)):
+            rm = True
+        elif (not istext) and (137 < x < 154 and 117 < y < 140):           # our pin-1 dots (shapes only)
+            rm = True
+        elif (133 < x < 156 and 88.5 < y < 103.5):                         # LED legend region (text + grid lines we drew)
+            rm = True
     elif lay == BS:
-        b.Remove(d)   # all board-level back silk is ours (footprint silk is not in GetDrawings)
+        rm = True                                                          # all board-level back silk is ours
+    if rm:
+        b.Remove(d)
 
 # ---- FRONT: name labels + pin-1 markers ----
 text("Expansion", 145.0, 114.3, 1.0, FS)             # above J6 (pads at y122)
@@ -105,9 +112,9 @@ FEAT = [("INPUT", "Art-Net / sACN"), ("OUTPUTS", "2x isolated DMX512-A"),
         ("CORE", "ESP32-S3 + W5500 10/100"), ("GROUND", "M3 screws -> metal case"),
         ("DMX SHELL", "keep OFF chassis (iso)")]
 FRH = 2.2
-WFE, WDE = 14.0, 34.0          # feature col, detail col (file: DETAIL left, FEATURE right)
+WFE, WDE = 12.0, 27.0          # feature col, detail col (file: DETAIL left, FEATURE right)
 FTW = WFE + WDE
-FX, FY = 99.0, 137.0
+FX, FY = 115.0, 137.0          # x115..154: clears the J3 magjack THT pins (left) + PS2 (right) + MH3 hole
 fn = len(FEAT) + 1
 for i in range(fn + 1):
     line(FX, FY + i*FRH, FX + FTW, FY + i*FRH, BS, 0.12)

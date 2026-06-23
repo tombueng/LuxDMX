@@ -1,7 +1,7 @@
 > ⚠️ **WORK IN PROGRESS — `feature/htp-ltp-merging` / v4 hardware branch.**
 > This board is under active development. It is **not yet fully validated and not ready for
-> production.** A ruggedization pass (USB ESD, PTC fuse, +5V TVS, SS54 OR diodes, DMX
-> common-mode chokes, ferrite supply filters), plated GND mounting holes, and wider power
+> production.** A ruggedization pass (USB ESD, PTC fuse, +5V TVS, a TPS2116 ideal-diode OR
+> mux, DMX common-mode chokes, ferrite supply filters), plated GND mounting holes, and wider power
 > traces have been added but several items in **VALIDATION.md** are still open (datasheet
 > checks, silk cleanup, the W5500 fan-out + USB-C clearance waivers). Do not fabricate from
 > this branch without finishing that list and a final review.
@@ -92,10 +92,11 @@ Each universe is a self-contained galvanic island; the two share no copper with 
   **U7 — SDAPO DP9900M-5V** *(C5380106)*, an **isolated PD + DC-DC module** (36–57 V in, regulated 5 V out,
   1.5 kV isolation, class 0 ≈ 13 W — far more than this board's ~2–3 W). **D10 — SMAJ58A** *(C110521)* clamps
   surges on the rectified rail. The module's `-VDC` becomes board GND; its `+VDC` is the PoE 5 V source.
-- **5 V source OR-ing:** **D8 / D9 — SS34** *(C8678)* Schottkys diode-OR the **USB-C 5 V** (`+5V_USB`) and the
-  **PoE 5 V** (`+5V_POE`) onto the board **`+5V`** rail — whichever source is present runs the board (USB on
-  the bench, PoE in the rack), with no backfeed. (The ~0.3–0.4 V Schottky drop leaves `+5V` ≈ 4.6 V, within
-  the SY8089 and B0505S input ranges; swap to an ideal-diode ORing IC if you want the full 5 V.)
+- **5 V source OR-ing:** **U9 — TPS2116** ideal-diode power mux OR-s the **USB-C 5 V** (`+5V_USB`, through the
+  F1 PTC) and the **PoE 5 V** (`+5V_POE`) onto the board **`+5V`** rail — whichever source is higher runs the
+  board (USB on the bench, PoE in the rack), with no backfeed. The pass-FET drop is only ~30 mV (vs ~0.4 V for
+  a Schottky), so `+5V` stays ≈ 4.9 V on USB and the B0505S / ISO3086 VCC2 rail clears its 4.5 V minimum across
+  the whole USB range. Input caps **C30 / C31** (1 µF), OR bulk **C29** (22 µF).
 - **U4 — SY8089 buck** *(C78988)* + **L1 — 2.2 µH** — steps the OR'd 5 V down to **3.3 V**. The feedback
   divider is **R10 = 45.3 kΩ / R11 = 10 kΩ → 3.318 V** (SPICE-verified). Powers everything on the logic side.
 
@@ -269,9 +270,8 @@ See [`case/README.md`](case/README.md).
 >   swapped TX/RX pair means no Ethernet link (W5500 has no auto-MDIX). HY931147C omits Bob-Smith
 >   termination; HanRun **HR861153C** (C19724782) is a pin-different drop-in that includes it if you
 >   want the extra signal-integrity margin.
-> - **+5V rail under diode-OR ≈ 4.6 V.** Within the SY8089 and B0505S input ranges, but tight for the
->   B0505S 4.5 V minimum at peak current — swap D8/D9 for a low-V_f Schottky or an ideal-diode ORing IC
->   if you want margin.
+> - **+5V rail ≈ 4.9 V on USB** (TPS2116 ideal-diode OR, ~30 mV drop). Clears the B0505S 4.5 V minimum
+>   across the full USB range — SPICE-verified (VCC2 ≥ 4.6 V even at a sagging 4.7 V VBUS).
 > - **DP9900M min load** is 100 mA; the running board draws well over that, so no bleeder is needed.
 > - Re-run DRC after routing — the new domains add the 2nd 4 mm DMX rule + the 2.5 mm PoE rule.
 

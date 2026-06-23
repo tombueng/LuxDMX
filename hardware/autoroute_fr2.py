@@ -24,16 +24,17 @@ for t in list(b.GetTracks()):
     b.Remove(t); n += 1
 print("cleared", n, "unlocked tracks, kept", kept, "locked", flush=True)
 pcbnew.ExportSpecctraDSN(b, dsn)
-# Freerouting 2.2.4 MUST run headless with analytics off, or it pops the GUI welcome
-# screen / blocks on the api.freerouting.app telemetry call and never writes the .ses.
+# Run Freerouting with its GUI VISIBLE so the routing can be watched (user preference: never headless).
+# Analytics stays disabled so it doesn't block on the api.freerouting.app telemetry call. The window
+# opens, loads the DSN, autoroutes (-mp passes) while you watch, writes the .ses, and closes itself.
 env = dict(os.environ,
            FREEROUTING__USAGE_AND_DIAGNOSTIC_DATA__DISABLE_ANALYTICS="true",
-           FREEROUTING__GUI__ENABLED="false")
-print(f"running Freerouting 2.2.4 headless (-mp {PASSES})...", flush=True)
+           FREEROUTING__GUI__ENABLED="true")
+print(f"running Freerouting 2.2.4 with GUI visible (-mp {PASSES})...", flush=True)
 try:
-    r = subprocess.run([JAVA, "-Djava.awt.headless=true", "-jar", JAR,
+    r = subprocess.run([JAVA, "-jar", JAR,
                         "-de", dsn, "-do", ses, "-mp", PASSES],
-                       capture_output=True, text=True, env=env, timeout=1500)
+                       capture_output=True, text=True, env=env, timeout=600)
     with open(runlog, "w", encoding="utf-8") as f:
         f.write(r.stdout + "\n---STDERR---\n" + r.stderr)
     print("FR2 stdout tail:", r.stdout[-200:])

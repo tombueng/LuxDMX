@@ -24,22 +24,22 @@ i_buck_in = i3v3*3.3/(VBUS_NOM*BUCK_EFF)
 # 2x B0505S-1W: each ~60mA out (ISO3086 bus side into 60R), eff ~0.75
 i_b0505_in = 2*0.060*5.0/(5.0*0.75)
 i_5v = i_buck_in + i_b0505_in            # total current drawn from the +5V rail
-# Power chain: VBUS -> F1 PTC (25mOhm) -> SS54 OR diode -> +5V -> FB1 (100mOhm) -> B0505S in (~VCC2)
-R_PTC, R_FB1 = 0.025, 0.10
-def ss54_vf(i): return 0.30 + 0.13*i          # SS54 25C curve approx (~0.40V @0.8A, ~0.43 @1A)
-vf = ss54_vf(i_5v)
+# Power chain: VBUS -> F1 PTC (25mOhm) -> TPS2116 ideal-diode mux (~40mOhm) -> +5V -> FB1 (100mOhm) -> B0505S in (~VCC2)
+R_PTC, R_FB1, R_MUX = 0.025, 0.10, 0.040
+def mux_drop(i): return i*R_MUX               # TPS2116 RDSON ~40mOhm typ (65mOhm max over temp), 1.6A
+vf = mux_drop(i_5v)
 p5v_nom = VBUS_NOM - i_5v*R_PTC - vf
 vcc2_nom = p5v_nom - i_b0505_in*R_FB1         # B0505S unregulated out ~ Vin -> VCC2
-p5v_min  = VBUS_MIN - i_5v*1.3*R_PTC - ss54_vf(i_5v*1.3)
+p5v_min  = VBUS_MIN - i_5v*1.3*R_PTC - mux_drop(i_5v*1.3)
 vcc2_min = p5v_min - i_b0505_in*1.3*R_FB1
 vcc2_poe = 5.0 - vf - i_b0505_in*R_FB1
 chk("+5V rail (USB, nominal)", PASS if p5v_nom>=4.55 else WARN,
-    f"{i_5v*1000:.0f}mA, PTC+SS54 -> +5V={p5v_nom:.2f}V")
+    f"{i_5v*1000:.0f}mA, PTC+TPS2116 mux -> +5V={p5v_nom:.2f}V")
 chk("B0505S/ISO3086 VCC2 >=4.5V (USB)", PASS if vcc2_min>=4.5 else WARN,
-    f"USB@{VBUS_MIN}V worst-case VCC2~{vcc2_min:.2f}V (SPICE: needs VBUS>=~4.95V). "
-    f"PoE 5.0V -> VCC2~{vcc2_poe:.2f}V OK. Fix: clean >=5V source or ideal-diode OR (report S3)")
-chk("OR-diode dissipation", PASS if i_5v*vf<0.6 else WARN,
-    f"P(SS34)={i_5v*vf*1000:.0f}mW in SMA (rated ~0.9W) -- ok")
+    f"USB@{VBUS_MIN}V worst-case VCC2~{vcc2_min:.2f}V (TPS2116 ideal-diode OR, fixed this rev). "
+    f"PoE 5.0V -> VCC2~{vcc2_poe:.2f}V OK.")
+chk("OR mux dissipation", PASS if i_5v*vf<0.6 else WARN,
+    f"P(TPS2116)={i_5v*vf*1000:.0f}mW (RDSON 40mOhm, rated 1.6A) -- ok")
 chk("USB host current need", WARN,
     f"total ~{i_5v*1000:.0f}mA from VBUS: a 500mA PC port is marginal with both DMX universes; "
     f"use a >=1A 5V source or PoE")

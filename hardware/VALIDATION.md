@@ -8,9 +8,9 @@ electrical sound; placement **EMC-valid** (decoupling snapped to IC pins, 2mm sp
 with **4 symmetric M3 holes at 90 x 70mm spacing, uniform 4.5mm edge inset**; proper 4-layer stackup
 **F sig / In1 GND plane / In2 +3V3 plane / B sig** (power pads stitched to planes, signals on F/B only).
 **Fully routed (0 unrouted).** A **ruggedization pass** added USB ESD (U8), a self-healing PTC fuse (F1),
-a +5V transient clamp (D11), lower-drop SS54 OR diodes, DMX common-mode chokes (L2/L3) and ferrite supply
-filters (FB1-3) — see the Ruggedization section. Remaining before order: item 18 crystal CL, widen +5V
-trace, silk cleanup, waive the 2 W5500-fanout 0.137mm near-misses + CC2-to-SBU1 (all JLCPCB-4L ok).
+a +5V transient clamp (D11), a **TPS2116 ideal-diode OR mux (U9)** for the USB/PoE inputs, DMX common-mode
+chokes (L2/L3) and ferrite supply filters (FB1-3) — see the Ruggedization section. Remaining before order:
+waive the 2 W5500-fanout 0.137mm clearance near-misses + the USB-C CC2 near-miss (all JLCPCB-4L ok).
 
 ## How to re-run the validation
 ```
@@ -37,7 +37,7 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 | 6 | PoE module ↔ magjack distance | ⚠️ | geometry | VPOE runs ~50mm; functional, see PoE note |
 | 7 | Isolation surface creepage (DMX 4mm / PoE 2.5mm) | ✅ | DRC `.kicad_dru` | 0 isolation-clearance violations |
 | 8 | Isolation inner-plane (vertical) | ✅ | rebuild_iso + tighten_poe_void | DMX islands voided 4mm; PoE TH-pins moated 2.5mm; VPOE surface trace over plane = functional 58V (D10-clamped) |
-| 9 | +5V rail vs B0505S 4.5V min | ✅/⚠️ | validate_electrical.py | OR diodes now **SS54** (lower Vf): +5V ≈ 4.6V typ from a 5.0V USB after PTC(F1, 25mΩ) + FB1(100mΩ); ≈4.45V worst-case from a sagging USB. B0505S unregulated → ISO3086 still valid below 4.5V. PoE path (regulated 5V) is clean. |
+| 9 | +5V rail vs B0505S 4.5V min | ✅ | sim/power_chain.cir | **Fixed:** OR diodes (D8/D9) replaced by a **TPS2116 ideal-diode mux (U9)** — OR drop ~0.03V not ~0.40V. +5V ≈ 4.91V from a 5.0V USB; **VCC2 ≥ 4.61V even at VBUS 4.70V** (was ~4.29V ❌). PoE clean. SPICE-verified across the full USB range. |
 | 10 | Buck +3V3 output | ✅ | validate_electrical.py | 3.318V (R10/R11) |
 | 11 | LED currents | ✅ | validate_electrical.py | 1.3-8.7mA, all < GPIO 40mA |
 | 12 | EN power-on RC | ✅ | validate_electrical.py | 10ms |
@@ -51,7 +51,7 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 | 27 | PoE TVS margin | ✅ | datasheet | **FIXED**: D10 SMAJ58A→**SMAJ60A** (58V standoff was only 1V over 57V max) |
 | 28 | Every part rating/value/datasheet | ✅/⚠️ | 4-agent datasheet pass | see **VALIDATION_REPORT.md**: all active parts + crystal + connectors read from official datasheets; ratings/values recomputed. 3 fixes applied, open items listed. |
 | 29 | ESP32-S3 GPIO map | ✅ | datasheet | **every pin validated, zero must-change**. IO35/36/37 free (N8 no PSRAM), strapping safe, no flash/input-only conflict, UART/SPI routable, IO19/20 native-USB noted |
-| 30 | SPICE power chain | ⚠️ | ngspice-42 (WSL) | DC + transient (sim/*.cir): VCC2≥4.5V needs VBUS≥~4.95V on USB; PoE 5.0V→4.56V ✓; load-step burst dips to 4.52V ✓. See report §3 (top open item: USB margin / ideal-diode OR). |
+| 30 | SPICE power chain | ✅ | ngspice-42 (WSL) | DC + transient (sim/*.cir): with the TPS2116 mux, VCC2 ≥ 4.5V across the **whole** USB range (4.61V @ 4.70V VBUS, 65mΩ-max-over-temp case 4.59V); PoE 5.0V→4.91V ✓; load-step ok. See report §3 (margin now resolved). |
 | 20 | ESP32-S3 strapping pins | ⚠️ | schematic | IO0 pulled-up ✓; IO3/IO45/IO46 float (standard for WROOM-1, verify) |
 | 21 | ESD on USB data / DMX | ✅ | schematic | DMX has SM712 TVS ✓; **USB D+/D- now protected by U8 USBLC6-2SC6** ESD/TVS array (VBUS clamp at the connector) |
 | 22 | Self-healing input fuse | ✅ | schematic | **F1 BSMD1206-150-16V PPTC** (1.5A hold, 25mΩ) in series on USB VBUS; resets after an overcurrent/short. PoE path uses the DP9900M internal limit. |
@@ -71,7 +71,7 @@ Added a protection layer for touring/stage/field use. The DMX outputs were alrea
 (galvanic isolation via B0505S + ISO3086 + SM712 TVS); PoE is isolated (DP9900M 1500V + SMAJ58A). This
 pass closed the remaining gaps and improved EMC. Full rationale + part numbers in **docs/ruggedization.md**.
 - **U8 USBLC6-2SC6** — ESD/TVS array on USB D+/D- (+VBUS clamp), at the connector. (item 21)
-- **F1 PPTC (1.5A/16V, 25mΩ)** — self-healing fuse on USB VBUS; SS54 OR diodes keep the B0505S margin. (22/9)
+- **F1 PPTC (1.5A/16V, 25mΩ)** — self-healing fuse on USB VBUS; the TPS2116 OR mux (U9) keeps the B0505S margin. (22/9)
 - **D11 SMAJ5.0A** — +5V transient/overvoltage clamp. (23)
 - **L2/L3 ACM2012-201-2P** — common-mode chokes on each DMX pair, cable side, after the TVS. (24)
 - **FB1/FB2/FB3 (600Ω@100MHz)** — pi-filter the isolated DMX DC-DC input (+5V) and outputs (VISO/VISO2). (25)
@@ -81,7 +81,8 @@ pass closed the remaining gaps and improved EMC. Full rationale + part numbers i
   chassis (isolating XLR mount). Soft-ground bridge (GNDISO→GND via 1nF+1M) was evaluated but NOT
   fitted — it can't cross the 4mm void cleanly at the packed PS1/PS2 barrier. (docs/ruggedization.md)
 Net restructuring: DMX_A/B (transceiver) → choke → DMX_AO/BO (cable side, where the TVS, XLR and the
-J7/J8 breakouts now sit); +5V_USB → F1 → +5V_USBF; +5V → FB1 → +5V_DMX → PS1/PS2; VISO → FB2 → VISO_DRV.
+J7/J8 breakouts now sit); +5V_USB → F1 → +5V_USBF and +5V_POE → **U9 (TPS2116 OR mux)** → +5V → FB1 →
++5V_DMX → PS1/PS2; VISO → FB2 → VISO_DRV.
 
 ## PoE isolation note (item 6/8)
 PD module U7 is ~50mm from magjack J3, so VPOE (isolated 48V) crosses the board. Current mitigation:

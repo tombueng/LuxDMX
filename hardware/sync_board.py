@@ -75,7 +75,11 @@ def assign_nets(fp, ref):
             pad.SetNet(netobj[nm])
 
 
-existing = {fp.GetReference(): fp for fp in b.GetFootprints()}
+_fps0 = list(b.GetFootprints())
+existing = {f.GetReference(): f for f in _fps0}
+# capture footprint NAMES as plain strings NOW -- after a b.Remove() the wrappers go stale and
+# cur.GetFPID().GetLibItemName() segfaults/throws.
+existing_name = {f.GetReference(): str(f.GetFPID().GetLibItemName()) for f in _fps0}
 want = set(r for r, _, _ in comps)
 
 # drop footprints that left the netlist (keep mechanical mounting holes MH* — not in the netlist)
@@ -83,6 +87,9 @@ for ref in list(existing):
     if ref not in want and not ref.startswith("MH"):
         print("remove (not in netlist):", ref)
         b.Remove(existing.pop(ref))
+
+# re-materialise wrappers after the removals (the old ones are stale)
+existing = {f.GetReference(): f for f in b.GetFootprints()}
 
 # grid for new/changed parts: a strip inside the enlarged area, right of the old board
 gx0, gy0 = GX0, GY0
@@ -93,8 +100,8 @@ for ref, fpid, val in comps:
         missing.append((ref, fpid)); continue
     lib, name = fpid.split(":", 1)
     cur = existing.get(ref)
-    # compare by footprint NAME (board FPIDs carry no lib nickname once loaded from a dir)
-    if cur is not None and str(cur.GetFPID().GetLibItemName()) == name:
+    # compare by footprint NAME captured up-front (board FPIDs carry no lib nickname; wrappers may be stale)
+    if cur is not None and existing_name.get(ref) == name:
         cur.SetValue(val); assign_nets(cur, ref); kept.append(ref); continue
     if cur is not None:
         b.Remove(cur); replaced.append(ref)
