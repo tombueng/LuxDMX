@@ -144,12 +144,57 @@ for pour_net in ("GNDISO", "GNDISO2"):
 # resin-filled/capped vias at fab, or accept minor wicking.) Skip pads inside an iso void (no plane).
 def _in_hole(x, y):
     return any(hx0 <= x <= hx1 and hy0 <= y <= hy1 for (hx0, hy0, hx1, hy1) in holes)
+
+
+# Only U9 (TPS2116 ideal-diode mux, 8-pin 0.5mm) gets GND fanout: its GND pins are too tight for via-in-pad,
+# nothing else stitches them, and the router never fans them out (this was the recurring manual fix). U2's GND
+# is escaped by escape_connectors.py, U1's EP has footprint thermal vias, J2 shield the router does -- fanning
+# those out too would double-via and short against the W5500 escapes.
+FANOUT_REFS = {"U9"}
+
+
+def _fanout(p, fp, plane_net):
+    # Fine-pitch GND pad can't take a via-in-pad (0.6mm via hits a 0.5mm-pitch neighbour). Instead drop
+    # a GND via OUTWARD from the part centre in clear space + a short F.Cu stub. The board is otherwise
+    # bare at this stage, so there's room. This pre-stitches U9's GND so no router has to (and none ever did).
+    pos = p.GetPosition(); px, py = TM(pos.x), TM(pos.y)
+    fc = fp.GetPosition(); base = math.atan2(py - TM(fc.y), px - TM(fc.x))
+    padboxes = []; vias = []
+    for g in b.GetFootprints():
+        for q in g.Pads():
+            r = q.GetBoundingBox(); padboxes.append((TM(r.GetLeft()), TM(r.GetTop()), TM(r.GetRight()), TM(r.GetBottom()), q.GetNetname()))
+    for t in b.GetTracks():
+        if isinstance(t, pcbnew.PCB_VIA):
+            vq = t.GetPosition(); vias.append((TM(vq.x), TM(vq.y)))
+
+    def clearpt(x, y):
+        for (l, tp, rr, bo, nm) in padboxes:
+            if nm != plane_net and math.hypot(max(l-x, 0, x-rr), max(tp-y, 0, y-bo)) < 0.3:
+                return False
+        return all(math.hypot(x-vx2, y-vy2) >= 0.65 for (vx2, vy2) in vias)
+
+    def stubclear(a, c):
+        k = max(2, int(math.hypot(c[0]-a[0], c[1]-a[1]) / 0.08))
+        return all(clearpt(a[0]+(c[0]-a[0])*i/k, a[1]+(c[1]-a[1])*i/k) for i in range(k+1))
+
+    for rr in [v*0.3 for v in range(3, 22)]:
+        for da in [0, .4, -.4, .8, -.8, 1.2, -1.2, 1.7, -1.7]:
+            vx, vy = px + rr*math.cos(base+da), py + rr*math.sin(base+da)
+            if _in_hole(vx, vy) or not (clearpt(vx, vy) and stubclear((px, py), (vx, vy))):
+                continue
+            v = pcbnew.PCB_VIA(b); v.SetPosition(pcbnew.VECTOR2I(FM(vx), FM(vy)))
+            v.SetViaType(pcbnew.VIATYPE_THROUGH); v.SetDrill(FM(0.3)); v.SetWidth(FM(0.6))
+            v.SetNetCode(b.FindNet(plane_net).GetNetCode()); v.SetLayerPair(pcbnew.F_Cu, pcbnew.B_Cu); v.SetLocked(True); b.Add(v)
+            tr = pcbnew.PCB_TRACK(b); tr.SetStart(p.GetPosition()); tr.SetEnd(pcbnew.VECTOR2I(FM(vx), FM(vy)))
+            tr.SetWidth(FM(0.2)); tr.SetLayer(pcbnew.F_Cu); tr.SetNetCode(b.FindNet(plane_net).GetNetCode()); tr.SetLocked(True); b.Add(tr)
+            return True
+    return False
 for plane_net in ("GND", "+3V3"):
     net = b.FindNet(plane_net)
     if net is None:
         continue
-    n = 0
-    for fp in b.GetFootprints():
+    n = 0; fan = 0
+    for fp in list(b.GetFootprints()):
         fppads = list(fp.Pads())
         for p in fppads:
             if p.GetNetname() == plane_net and not p.HasHole():
@@ -162,12 +207,15 @@ for plane_net in ("GND", "+3V3"):
                 others = [q.GetPosition() for q in fppads if q.GetNumber() != p.GetNumber()]
                 nn = min((math.hypot(TM(pos.x-o.x), TM(pos.y-o.y)) for o in others), default=9.0)
                 if nn < 0.9:
+                    # too tight for via-in-pad -> fan GND out to a via in clear space (router never did this)
+                    if plane_net == "GND" and fp.GetReference() in FANOUT_REFS and _fanout(p, fp, plane_net):
+                        fan += 1
                     continue
                 v = pcbnew.PCB_VIA(b); v.SetPosition(pcbnew.VECTOR2I(pos.x, pos.y))
                 v.SetViaType(pcbnew.VIATYPE_THROUGH); v.SetDrill(FM(0.3)); v.SetWidth(FM(0.6))
                 v.SetNetCode(net.GetNetCode()); v.SetLayerPair(pcbnew.F_Cu, pcbnew.B_Cu)
                 v.SetLocked(True); b.Add(v); n += 1
-    print(f"  stitch {plane_net}: {n} locked via-in-pad to plane (fine-pitch pads left for the router)")
+    print(f"  stitch {plane_net}: {n} via-in-pad + {fan} fine-pitch fanned out (via+stub in clear space)")
 
 pcbnew.SaveBoard(PCB, b)
 print("rebuilt + saved")
