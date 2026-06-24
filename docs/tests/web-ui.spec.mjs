@@ -69,7 +69,9 @@ test.describe('Web UI + REST', () => {
 
   test('/info.json advertises the W5500 SPI Ethernet config fields', async ({ request }) => {
     const d = await (await request.get('/info.json')).json();
-    expect(typeof d.ethSpi).toBe('boolean');   // whether the W5500 driver is compiled in
+    expect(typeof d.ethSpi).toBe('boolean');    // whether the W5500 driver is compiled in
+    expect(typeof d.ethRmii).toBe('boolean');   // whether the internal-MAC RMII PHY is compiled in
+    expect(typeof d.wiredPhy).toBe('number');   // 0 = W5500, 1 = LAN8720 RMII
     if (d.ethSpi) {
       for (const k of ['ethCs', 'ethSck', 'ethMosi', 'ethMiso', 'ethInt', 'ethRst', 'ethFreq']) {
         expect(d, `info.json missing "${k}"`).toHaveProperty(k);
@@ -95,5 +97,22 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('#net-mode-row')).toBeVisible();         // appears once enabled
     // pins get the board pin-picker button
     await expect(page.locator('.pin-grp input[name="ethcs"]')).toHaveCount(1);
+  });
+
+  test('Wired PHY selector appears only when both PHYs are compiled (classic ESP32)', async ({ page, request }) => {
+    const d = await (await request.get('/info.json')).json();
+    await page.goto('/config');
+    const row = page.locator('#wired-phy-row');
+    if (d.ethSpi && d.ethRmii) {
+      await expect(row).toBeVisible();                                  // both PHYs -> offer the choice
+      // selecting RMII hides the W5500 sub-section and shows the RMII note (browser-only, no save)
+      await page.locator('#wired-phy').selectOption('1');
+      await expect(page.locator('#w5500-sub')).toBeHidden();
+      await expect(page.locator('#rmii-note')).toBeVisible();
+      await page.locator('#wired-phy').selectOption('0');              // back to W5500
+      await expect(page.locator('#w5500-sub')).toBeVisible();
+    } else {
+      await expect(row).toBeHidden();                                  // RMII-only or W5500-only -> no selector
+    }
   });
 });

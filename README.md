@@ -83,7 +83,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Ethernet support** | WT32-ETH01 (LAN8720) and v3 (W5500) run wired LAN *or* WiFi, switchable at runtime; **plus any ESP32 / ESP32-S3 + an external W5500 module** (enable & pin it in `/config`); DHCP or static |
+| **Ethernet support** | WT32-ETH01 (LAN8720) and v3 (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external W5500 module works too, and a **classic ESP32 can pick the W5500 (SPI) or the built-in MAC + LAN8720 (RMII)** PHY in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
@@ -781,11 +781,17 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | LumiGate v3 (ESP32-S3 + W5500) | `lumigate_v3` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external W5500 module** — the W5500
-driver is compiled into every build. In **`/config` &rarr; Wired Ethernet (W5500)** turn on
+driver is compiled into every build. In **`/config` &rarr; Wired Ethernet** turn on
 **Use a W5500 Ethernet module** (off by default), set its pins, then enable **Use wired Ethernet**.
 Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25) and
 are fully configurable (with the on-board pin-picker); lower the SPI clock there if a long-wired
 module isn't detected. No special build is needed.
+
+On a **classic ESP32** the card also shows a **Wired PHY** selector: pick the **W5500 (SPI module)**
+or the **ESP32 built-in MAC + LAN8720 (RMII)** (the WT32-ETH01-style wiring). The S3 has no internal
+MAC, so it stays W5500-only and the selector is hidden. When RMII is selected, the pin-picker
+reserves the LAN8720 GPIOs (0 / 16 / 18 / 19 / 21 / 22 / 23 / 25 / 26 / 27) so a DMX/LED pin clash is
+flagged.
 
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the
