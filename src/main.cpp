@@ -52,6 +52,41 @@
 #define DEF_WIRED_PHY WIRED_PHY_SPI
 #endif
 #endif
+
+// RMII PHY family + wiring (cfg.rmii*, used when wiredPhy = RMII). These indices are
+// stable in NVS and mapped to the arduino-esp32 ETH enums in startEthRmii(). The
+// defaults reproduce the LAN8720 / WT32-ETH01 wiring, so an existing RMII device is
+// unchanged across an OTA. The RMII DATA lines are fixed by the EMAC and not settable;
+// only the PHY type, address, MDC/MDIO/power pins and REF_CLK mode are configurable.
+#define RMII_PHY_LAN8720 0
+#define RMII_PHY_IP101   1
+#define RMII_PHY_RTL8201 2
+#define RMII_PHY_DP83848 3
+#define RMII_PHY_KSZ8081 4
+#define RMII_PHY_JL1101  5
+#define RMII_PHY_COUNT   6
+#define RMII_CLK_GPIO0_IN   0   // external 50MHz clock fed in on GPIO0 (WT32-ETH01)
+#define RMII_CLK_GPIO0_OUT  1
+#define RMII_CLK_GPIO16_OUT 2
+#define RMII_CLK_GPIO17_OUT 3
+#ifndef DEF_RMII_PHY
+#define DEF_RMII_PHY  RMII_PHY_LAN8720
+#endif
+#ifndef DEF_RMII_ADDR
+#define DEF_RMII_ADDR 1
+#endif
+#ifndef DEF_RMII_MDC
+#define DEF_RMII_MDC  23
+#endif
+#ifndef DEF_RMII_MDIO
+#define DEF_RMII_MDIO 18
+#endif
+#ifndef DEF_RMII_PWR
+#define DEF_RMII_PWR  16
+#endif
+#ifndef DEF_RMII_CLK
+#define DEF_RMII_CLK  RMII_CLK_GPIO0_IN
+#endif
 #include <WiFiManager.h>  // WiFi (STA config portal) is always available
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
@@ -215,6 +250,18 @@ static constexpr bool DEF_USE_ETH = true;
 static constexpr bool DEF_USE_ETH = false;
 #endif
 
+// Link-loss policy (cfg.linkLossMode): what to do when wired Ethernet is selected but
+// the link is down. RETRY is the show-safe default (no AP ever); the AP modes never open
+// an UNSECURED AP. A password is required (see startWiFiAP), so a show device cannot
+// spontaneously broadcast an open hotspot.
+#define WIRED_FB_RETRY  0   // keep retrying the wired link; recover when the cable is back
+#define WIRED_FB_AP     1   // standalone WPA2 AP (needs an AP password, else stays on retry)
+#define WIRED_FB_REBOOT 2   // reboot and re-attempt the wired link
+// NB: there is deliberately no automatic "WiFi setup portal" fallback. An auto-portal
+// would let anyone who can drop the link force the device onto their own WiFi (very bad
+// on a show). The setup portal stays BOOT-button-only (initial setup = physical access).
+#define WIRED_GRACE_MS  12000   // ride out brief link blips before acting on a runtime drop
+
 // ---------------------------------------------------------------------------
 // Sender tracking
 // ---------------------------------------------------------------------------
@@ -283,6 +330,7 @@ static uint32_t lastLogMs = 0;
 // With both false the device is a WiFi station (the classic client mode).
 static bool g_useEth = false;
 static bool g_apMode = false;
+static bool g_apWiredFallback = false;   // in the AP only because the wired link dropped (return to Eth when it's back)
 
 static bool netConnected() {
 #if defined(HAS_WIRED_ETH)
@@ -401,9 +449,14 @@ struct Config {
     int    ethFreqMhz;     // W5500 SPI clock (MHz); lower to debug long/loose wiring
     bool   ethW5500;       // W5500 module enabled — opt-in, default OFF (SPI-Eth boards)
     int    wiredPhy;       // wired PHY: 0=W5500 (SPI), 1=LAN8720 (RMII). Default per build.
+    int    rmiiPhy;        // RMII PHY family index (RMII_PHY_*); used when wiredPhy = RMII
+    int    rmiiAddr;       // RMII PHY SMI address (usually 0 or 1)
+    int    rmiiMdc, rmiiMdio, rmiiPwr;  // RMII MDC / MDIO / PHY-power GPIOs (data lines are fixed)
+    int    rmiiClk;        // RMII REF_CLK mode (RMII_CLK_*)
     bool   useEthernet;    // wired-Eth boards: true = wired Ethernet, false = WiFi
     int    wifiMode;       // WiFi interface mode: 0 = STA (client), 1 = AP (standalone)
-    bool   apFallback;     // start the WiFi AP automatically if wired Eth has no link
+    bool   apFallback;     // legacy mirror (kept for migration); = (linkLossMode == AP)
+    int    linkLossMode;   // WIRED_FB_*: what to do when wired Ethernet is up but has no link
     String apPassword;     // standalone-AP passphrase (>=8 chars = WPA2, empty = open)
     bool   staticIp;       // false = DHCP
     String ip;             // dotted-quad strings; empty when unused
@@ -493,9 +546,22 @@ static void loadConfig() {
     // Wired PHY default reproduces the pre-runtime-select behavior (see DEF_WIRED_PHY):
     // absent key on an existing device → its old PHY, so OTA changes nothing.
     cfg.wiredPhy    = constrain(prefs.getInt("wiredphy", DEF_WIRED_PHY), 0, 1);
+    cfg.rmiiPhy     = constrain(prefs.getInt("rmiiphy",  DEF_RMII_PHY),  0, RMII_PHY_COUNT - 1);
+    cfg.rmiiAddr    = constrain(prefs.getInt("rmiiaddr", DEF_RMII_ADDR), 0, 31);
+    cfg.rmiiMdc     = constrain(prefs.getInt("rmiimdc",  DEF_RMII_MDC),  0, 48);
+    cfg.rmiiMdio    = constrain(prefs.getInt("rmiimdio", DEF_RMII_MDIO), 0, 48);
+    cfg.rmiiPwr     = constrain(prefs.getInt("rmiipwr",  DEF_RMII_PWR), -1, 48);
+    cfg.rmiiClk     = constrain(prefs.getInt("rmiiclk",  DEF_RMII_CLK),  0, 3);
     cfg.useEthernet = prefs.getBool("useeth",   DEF_USE_ETH);
     cfg.wifiMode    = constrain(prefs.getInt("wifimode", NET_WIFI_STA), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback  = prefs.getBool("apfb",     true);
+    // New link-loss policy. Migrate from the old apFallback bool ONLY if it was explicitly
+    // saved: a device that had AP-fallback on -> the standalone-AP policy (which now refuses
+    // to open an OPEN AP), off -> keep retrying. A fresh device (no key) defaults to "keep
+    // retrying" so it never broadcasts a hotspot unless the user asks for one.
+    int fbDefault = WIRED_FB_RETRY;
+    if (prefs.isKey("apfb")) fbDefault = prefs.getBool("apfb") ? WIRED_FB_AP : WIRED_FB_RETRY;
+    cfg.linkLossMode = constrain(prefs.getInt("fbmode", fbDefault), 0, 2);
     cfg.apPassword  = prefs.getString("appw",   "");
     cfg.staticIp    = prefs.getBool("staticip", false);
     cfg.ip          = prefs.getString("ip",      "");
@@ -547,9 +613,16 @@ static void saveConfig() {
     prefs.putInt("ethfreq",     cfg.ethFreqMhz);
     prefs.putBool("ethon",      cfg.ethW5500);
     prefs.putInt("wiredphy",    cfg.wiredPhy);
+    prefs.putInt("rmiiphy",     cfg.rmiiPhy);
+    prefs.putInt("rmiiaddr",    cfg.rmiiAddr);
+    prefs.putInt("rmiimdc",     cfg.rmiiMdc);
+    prefs.putInt("rmiimdio",    cfg.rmiiMdio);
+    prefs.putInt("rmiipwr",     cfg.rmiiPwr);
+    prefs.putInt("rmiiclk",     cfg.rmiiClk);
     prefs.putBool("useeth",     cfg.useEthernet);
     prefs.putInt("wifimode",    cfg.wifiMode);
     prefs.putBool("apfb",       cfg.apFallback);
+    prefs.putInt("fbmode",      cfg.linkLossMode);
     prefs.putString("appw",     cfg.apPassword);
     prefs.putBool("staticip",   cfg.staticIp);
     prefs.putString("ip",       cfg.ip);
@@ -1153,6 +1226,8 @@ static float outFpsLive(int i) {
 // ---------------------------------------------------------------------------
 // WebSocket push (binary, WS_FRAME_LEN bytes)
 // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
+//        rssi doubles as a link indicator: <=0 WiFi STA dBm | >=10 wired link
+//        speed (Mbps) | 1 standalone AP  (no spare byte in the frame; see wsPush)
 //        srcStatus: 0=normal 1=conflict 2=merging
 //        dmx(512) + per-output fps(2 x MAX_OUTPUTS)
 // ---------------------------------------------------------------------------
@@ -1160,7 +1235,12 @@ static void wsPush() {
     if (ws.count() == 0) return;
     if (ESP.getFreeHeap() < 40000) return;   // never push under heap pressure
     uint16_t fpsI  = (uint16_t)(fps * 10.0f);
-    int16_t  rssi  = (int16_t)netRSSI();
+    // rssi field carries the active link: <=0 WiFi STA dBm, >=10 wired Ethernet
+    // link speed in Mbps, 1 standalone AP. Lets the navbar show WiFi/LAN/AP live.
+    int16_t  rssi;
+    if (g_apMode)      rssi = 1;
+    else if (g_useEth) { int s = ETH.linkSpeed(); rssi = (int16_t)(s >= 10 ? s : 100); }
+    else               rssi = (int16_t)WiFi.RSSI();
     uint32_t heap  = ESP.getFreeHeap();
     uint32_t upS   = uptimeSec();
     uint16_t jitI  = (uint16_t)(jitterMs * 10.0f < 65535.0f ? jitterMs * 10.0f : 65535.0f);
@@ -1620,6 +1700,12 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
 #endif
 #if defined(HAS_ETH_RMII)
     j += "\"ethRmii\":true,";   // internal-MAC RMII compiled in (classic ESP32) → offer the PHY selector
+    j += "\"rmiiPhy\":";   j += cfg.rmiiPhy;            j += ",";   // RMII PHY family index (RMII_PHY_*)
+    j += "\"rmiiAddr\":";  j += cfg.rmiiAddr;           j += ",";
+    j += "\"rmiiMdc\":";   j += cfg.rmiiMdc;            j += ",";
+    j += "\"rmiiMdio\":";  j += cfg.rmiiMdio;           j += ",";
+    j += "\"rmiiPwr\":";   j += cfg.rmiiPwr;            j += ",";
+    j += "\"rmiiClk\":";   j += cfg.rmiiClk;            j += ",";   // REF_CLK mode (RMII_CLK_*)
 #else
     j += "\"ethRmii\":false,";
 #endif
@@ -1633,6 +1719,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
 #endif
     j += "\"wifiMode\":";   j += cfg.wifiMode;           j += ",";
     j += "\"apFallback\":"; j += cfg.apFallback ? "true" : "false"; j += ",";
+    j += "\"linkLossMode\":"; j += cfg.linkLossMode;          j += ",";   // WIRED_FB_*
     j += "\"apPassword\":\""; j += cfg.apPassword;       j += "\",";
     j += "\"staticIp\":";   j += cfg.staticIp ? "true" : "false"; j += ",";
     j += "\"sip\":\"";      j += cfg.ip;                 j += "\",";
@@ -1770,9 +1857,16 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "ethfreq", s))  cfg.ethFreqMhz = constrain(s.toInt(), 1, 80);
     cfg.ethW5500 = req->hasParam("ethon", true) || req->hasParam("ethon");
     if (argStr(req, "wiredphy", s)) cfg.wiredPhy = constrain(s.toInt(), 0, 1);
+    if (argStr(req, "rmiiphy", s))  cfg.rmiiPhy  = constrain(s.toInt(), 0, RMII_PHY_COUNT - 1);
+    if (argStr(req, "rmiiaddr", s)) cfg.rmiiAddr = constrain(s.toInt(), 0, 31);
+    if (argStr(req, "rmiimdc", s))  cfg.rmiiMdc  = constrain(s.toInt(), 0, 48);
+    if (argStr(req, "rmiimdio", s)) cfg.rmiiMdio = constrain(s.toInt(), 0, 48);
+    if (argStr(req, "rmiipwr", s))  cfg.rmiiPwr  = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "rmiiclk", s))  cfg.rmiiClk  = constrain(s.toInt(), 0, 3);
     cfg.useEthernet = req->hasParam("useeth", true) || req->hasParam("useeth");
     if (argStr(req, "wifimode", s)) cfg.wifiMode = constrain(s.toInt(), NET_WIFI_STA, NET_WIFI_AP);
-    cfg.apFallback = req->hasParam("apfb", true) || req->hasParam("apfb");
+    if (argStr(req, "fbmode", s)) cfg.linkLossMode = constrain(s.toInt(), 0, 2);
+    cfg.apFallback = (cfg.linkLossMode == WIRED_FB_AP);   // keep the legacy mirror in sync
     if (argStr(req, "appw", s))    cfg.apPassword = s;
     cfg.staticIp = req->hasParam("staticip", true) || req->hasParam("staticip");
     if (argStr(req, "ip", s))      cfg.ip      = s;
@@ -2434,13 +2528,37 @@ static void startEthSpi() {
 #endif
 
 #if defined(HAS_ETH_RMII)
-// Bring up the LAN8720 RMII Ethernet via the ESP32 internal EMAC (WT32-ETH01 layout).
-// Runtime opt-in (g_useEth) now that WiFi is also compiled in — the board is no
-// longer wired-only. Pins are the LAN8720/WT32-ETH01 standard: MDC=23 MDIO=18
-// PHY-power=16 CLK=GPIO0-in. begin() arg order: (type, phy_addr, mdc, mdio, power, clk).
+static const char* RMII_PHY_NAMES[RMII_PHY_COUNT] =
+    { "LAN8720", "IP101", "RTL8201", "DP83848", "KSZ8081", "JL1101" };
+// Map the stable cfg.rmiiPhy index to the arduino-esp32 ETH enum. IP101 is the
+// TLK110 driver; JL1101 is the generic driver (both #defined in ETH.h).
+static eth_phy_type_t rmiiPhyType(int idx) {
+    switch (idx) {
+        case RMII_PHY_IP101:   return ETH_PHY_IP101;     // == ETH_PHY_TLK110
+        case RMII_PHY_RTL8201: return ETH_PHY_RTL8201;
+        case RMII_PHY_DP83848: return ETH_PHY_DP83848;
+        case RMII_PHY_KSZ8081: return ETH_PHY_KSZ8081;
+        case RMII_PHY_JL1101:  return ETH_PHY_JL1101;    // == ETH_PHY_GENERIC
+        default:               return ETH_PHY_LAN8720;
+    }
+}
+static eth_clock_mode_t rmiiClkMode(int idx) {
+    switch (idx) {
+        case RMII_CLK_GPIO0_OUT:  return ETH_CLOCK_GPIO0_OUT;
+        case RMII_CLK_GPIO16_OUT: return ETH_CLOCK_GPIO16_OUT;
+        case RMII_CLK_GPIO17_OUT: return ETH_CLOCK_GPIO17_OUT;
+        default:                  return ETH_CLOCK_GPIO0_IN;
+    }
+}
+// Bring up RMII Ethernet via the ESP32 internal EMAC. The PHY family, SMI address,
+// MDC/MDIO/PHY-power pins and REF_CLK mode are runtime config (cfg.rmii*); the RMII
+// data lines are fixed by the EMAC. Defaults reproduce the LAN8720/WT32-ETH01 wiring.
 static void startEthRmii() {
-    Serial.println("[ETH] LAN8720 RMII (ESP32 internal MAC)");
-    ETH.begin(ETH_PHY_LAN8720, 1, 23, 18, 16, ETH_CLOCK_GPIO0_IN);
+    int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
+    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d\n",
+        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
+    ETH.begin(rmiiPhyType(phy), cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio,
+              cfg.rmiiPwr, rmiiClkMode(cfg.rmiiClk));
     applyEthStaticIp();
     waitEthLink();
 }
@@ -2465,18 +2583,47 @@ static void startWiredEth() {
 // field tests with no router, and the automatic fallback when wired Ethernet has
 // no link. SSID = device hostname; a passphrase of >=8 chars enables WPA2,
 // anything shorter (or empty) leaves the AP open.
-static void startWiFiAP() {
+// requirePw = true (the wired link-loss fallback) refuses to open an UNSECURED AP, so a
+// show device never spontaneously broadcasts an open hotspot. Returns whether it came up.
+static bool startWiFiAP(bool requirePw = false) {
+    const char* pw = cfg.apPassword.length() >= 8 ? cfg.apPassword.c_str() : nullptr;
+    if (requirePw && !pw) {
+        Serial.println("[WiFi] AP fallback needs an AP password (>=8 chars); not opening an open AP");
+        return false;
+    }
     g_apMode = true;
     g_useEth = false;
     WiFi.mode(WIFI_AP);
-    const char* pw = cfg.apPassword.length() >= 8 ? cfg.apPassword.c_str() : nullptr;
     bool ok = WiFi.softAP(cfg.hostname.c_str(), pw);
     WiFi.setSleep(WIFI_PS_NONE);     // keep the radio awake for reliable multicast/UDP
     setLedColor(NEO_PURPLE, true);   // purple = AP active (matches the config portal)
     Serial.printf("[WiFi] AP \"%s\" %s %s  ip=%s\n",
         cfg.hostname.c_str(), ok ? "up" : "FAILED",
         pw ? "(WPA2)" : "(open)", WiFi.softAPIP().toString().c_str());
+    return ok;
 }
+
+#if defined(HAS_WIRED_ETH)
+// Apply the configured link-loss policy when wired Ethernet has no link. RETRY keeps the
+// wired netif (lwIP re-DHCPs when the cable returns). At boot we never reboot (it would
+// loop) and the portal may block; at runtime PORTAL/REBOOT restart so the portal opens
+// cleanly from setup(), while AP starts in place (non-blocking).
+static void applyWiredLinkLoss(bool atBoot) {
+    switch (cfg.linkLossMode) {
+        case WIRED_FB_AP:
+            // Stopgap AP: if it comes up, remember it was a wired fallback so we can hand
+            // back to Ethernet once the link returns (needs an AP password, else stays on retry).
+            if (startWiFiAP(true)) g_apWiredFallback = true;
+            break;
+        case WIRED_FB_REBOOT:
+            if (!atBoot) { Serial.println("[NET] wired link lost -> reboot"); delay(200); ESP.restart(); }
+            break;   // at boot: keep retrying (rebooting with no link would loop)
+        case WIRED_FB_RETRY:
+        default:
+            break;   // keep the wired netif; lwIP re-DHCPs when the link is back
+    }
+}
+#endif
 
 // WiFi station (client) bring-up: optional BOOT-held config portal, then connect
 // to the strongest AP for the stored SSID. Factored out of setup() so the network
@@ -2563,9 +2710,9 @@ void setup() {
 #if defined(HAS_WIRED_ETH)
     if (g_useEth) {
         startWiredEth();
-        if (!netConnected() && cfg.apFallback) {
-            Serial.println("[NET] wired Ethernet has no link → falling back to WiFi AP");
-            startWiFiAP();          // sets g_apMode, clears g_useEth
+        if (!netConnected()) {
+            Serial.printf("[NET] wired Ethernet has no link (link-loss policy %d)\n", cfg.linkLossMode);
+            applyWiredLinkLoss(true /*atBoot*/);
         }
     } else
 #endif
@@ -2756,6 +2903,41 @@ void loop() {
             lastReconnect = now;
         }
     }
+
+#if defined(HAS_WIRED_ETH)
+    // Wired-link watchdog: if we were on wired Ethernet and the link drops past the grace
+    // window, apply the link-loss policy so the device recovers or stays reachable (the
+    // old fallback only ran once at boot, so a cable pulled mid-run stranded the device).
+    if (g_useEth) {
+        static bool wiredUp = false;
+        static uint32_t wiredDownAt = 0;
+        if (netConnected()) { wiredUp = true; wiredDownAt = 0; }
+        else if (wiredUp) {
+            if (!wiredDownAt) wiredDownAt = now;
+            else if (now - wiredDownAt > WIRED_GRACE_MS) {
+                wiredDownAt = now;                 // re-arm; RETRY just keeps waiting (lwIP recovers)
+                if (cfg.linkLossMode != WIRED_FB_RETRY) {
+                    Serial.printf("[NET] wired link down >%lus, applying policy %d\n",
+                        (unsigned long)(WIRED_GRACE_MS / 1000), cfg.linkLossMode);
+                    applyWiredLinkLoss(false /*runtime*/);
+                }
+            }
+        }
+    }
+    // Return from the AP stopgap to Ethernet: if we fell back to the AP because the wired
+    // link dropped, watch the link and reboot back to wired once it's restored and stable.
+    // (A user-chosen AP, wifiMode==AP, never sets g_apWiredFallback, so it's left alone.)
+    else if (g_apMode && g_apWiredFallback) {
+        static uint32_t wiredBackAt = 0;
+        if (ETH.linkUp()) {
+            if (!wiredBackAt) wiredBackAt = now;
+            else if (now - wiredBackAt > WIRED_GRACE_MS) {
+                Serial.println("[NET] wired link restored -> reboot back to Ethernet");
+                delay(200); ESP.restart();
+            }
+        } else wiredBackAt = 0;
+    }
+#endif
 
     // Periodic health line (leaks/uptime visible on the serial console)
     static uint32_t lastHeapLog = 0;

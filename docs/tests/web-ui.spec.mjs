@@ -18,11 +18,30 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('.out-card')).toHaveCount(2);
     await expect(page.locator('input[name="hostname"]')).toBeVisible();
     await expect(page.locator('#save-btn')).toBeEnabled();
+    // Save & Restart is a fixed bar, always visible, wired to the config form
+    await expect(page.locator('#save-bar')).toBeVisible();
+    expect(await page.locator('#save-bar').evaluate(el => getComputedStyle(el).position)).toBe('fixed');
+    expect(await page.locator('#save-btn').evaluate(el => el.form && el.form.id)).toBe('cfg-form');
   });
 
   test('live status badge connects (WebSocket)', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#ws-badge')).toHaveText(/Live/, { timeout: 10000 });
+  });
+
+  test('navbar link indicator reflects the active interface (WiFi/LAN/AP)', async ({ page, request }) => {
+    await page.goto('/');
+    // wait for the first WS frame to populate the navbar (value leaves the "—" default)
+    await expect(page.locator('#rssi')).not.toHaveText('—', { timeout: 10000 });
+    const label = (await page.locator('#net-label').textContent()).trim();
+    const value = (await page.locator('#rssi').textContent()).trim();
+    expect(['WiFi', 'LAN', 'AP']).toContain(label);
+    if (label === 'LAN')  expect(value).toMatch(/^\d+M$/);   // wired link speed, e.g. 100M
+    if (label === 'WiFi') expect(value).toMatch(/dBm$/);     // signal strength
+    if (label === 'AP')   expect(value).toBe('active');
+    // cross-check: a wired device reports ssid "Ethernet" in /info.json
+    const info = await (await request.get('/info.json')).json();
+    if (info.ssid === 'Ethernet') expect(label).toBe('LAN');
   });
 
   test('/info.json has the expected top-level fields', async ({ request }) => {
@@ -72,47 +91,55 @@ test.describe('Web UI + REST', () => {
     expect(typeof d.ethSpi).toBe('boolean');    // whether the W5500 driver is compiled in
     expect(typeof d.ethRmii).toBe('boolean');   // whether the internal-MAC RMII PHY is compiled in
     expect(typeof d.wiredPhy).toBe('number');   // 0 = W5500, 1 = LAN8720 RMII
+    expect(typeof d.linkLossMode).toBe('number'); // WIRED_FB_* link-loss policy
     if (d.ethSpi) {
       for (const k of ['ethCs', 'ethSck', 'ethMosi', 'ethMiso', 'ethInt', 'ethRst', 'ethFreq']) {
         expect(d, `info.json missing "${k}"`).toHaveProperty(k);
         expect(typeof d[k]).toBe('number');
       }
     }
+    if (d.ethRmii) {   // classic ESP32: RMII PHY family + wiring is configurable
+      for (const k of ['rmiiPhy', 'rmiiAddr', 'rmiiMdc', 'rmiiMdio', 'rmiiPwr', 'rmiiClk']) {
+        expect(d, `info.json missing "${k}"`).toHaveProperty(k);
+        expect(typeof d[k]).toBe('number');
+      }
+    }
   });
 
-  test('W5500 card is opt-in: the enable switch reveals the pins', async ({ page, request }) => {
+  test('W5500 pins appear when W5500 is picked in the wired selector', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi, 'build has no W5500 SPI support');
     await page.goto('/config');
     await expect(page.locator('#w5500-card')).toBeVisible();
-    await expect(page.locator('input[name="ethon"]')).toBeVisible();   // the on/off switch
-    const cs = page.locator('input[name="ethcs"]');
-    if (!d.ethW5500) {
-      await expect(cs).toBeHidden();                                   // pins hidden by default (off)
-      await expect(page.locator('#net-mode-row')).toBeHidden();        // "Use wired Ethernet" hidden too
-      await page.locator('#ethon-sw').check();                         // browser-only toggle (no save)
-    }
-    await expect(cs).toBeVisible();
+    await page.locator('#wired-sel').selectOption('w5500');             // browser-only, no save
+    await expect(page.locator('input[name="ethcs"]')).toBeVisible();
     await expect(page.locator('input[name="ethsck"]')).toBeVisible();
-    await expect(page.locator('#net-mode-row')).toBeVisible();         // appears once enabled
-    // pins get the board pin-picker button
-    await expect(page.locator('.pin-grp input[name="ethcs"]')).toHaveCount(1);
+    await expect(page.locator('#net-mode-row')).toBeVisible();          // "Use wired Ethernet" appears
+    await expect(page.locator('.pin-grp input[name="ethcs"]')).toHaveCount(1);   // pin-picker button
   });
 
-  test('Wired PHY selector appears only when both PHYs are compiled (classic ESP32)', async ({ page, request }) => {
+  test('Wired selector: one list of None + the build PHYs, swaps the pin sections', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
+    test.skip(!d.ethSpi && !d.ethRmii, 'build has no wired Ethernet');
     await page.goto('/config');
-    const row = page.locator('#wired-phy-row');
-    if (d.ethSpi && d.ethRmii) {
-      await expect(row).toBeVisible();                                  // both PHYs -> offer the choice
-      // selecting RMII hides the W5500 sub-section and shows the RMII note (browser-only, no save)
-      await page.locator('#wired-phy').selectOption('1');
-      await expect(page.locator('#w5500-sub')).toBeHidden();
-      await expect(page.locator('#rmii-note')).toBeVisible();
-      await page.locator('#wired-phy').selectOption('0');              // back to W5500
-      await expect(page.locator('#w5500-sub')).toBeVisible();
-    } else {
-      await expect(row).toBeHidden();                                  // RMII-only or W5500-only -> no selector
+    const sel = page.locator('#wired-sel');
+    await expect(sel).toBeVisible();
+    await expect(sel.locator('option[value="none"]')).toHaveCount(1);   // None always present
+    if (d.ethSpi) {
+      await expect(sel.locator('option[value="w5500"]')).toHaveCount(1);
+      await sel.selectOption('w5500');
+      await expect(page.locator('#w5500-pins')).toBeVisible();
+      await expect(page.locator('#rmii-pins')).toBeHidden();
     }
+    if (d.ethRmii) {
+      await expect(sel.locator('option[value^="rmii"]')).toHaveCount(6);   // all six RMII PHYs
+      await sel.selectOption('rmii0');
+      await expect(page.locator('#rmii-pins')).toBeVisible();
+      await expect(page.locator('#w5500-pins')).toBeHidden();
+    }
+    await sel.selectOption('none');                                     // None hides both + forces WiFi
+    await expect(page.locator('#w5500-pins')).toBeHidden();
+    await expect(page.locator('#rmii-pins')).toBeHidden();
+    await expect(page.locator('#net-mode-row')).toBeHidden();
   });
 });
