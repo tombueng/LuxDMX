@@ -1,4 +1,4 @@
-# LumiGate board catalog
+# LuxDMX board catalog
 
 Board descriptors for the visual pin picker in the device `/config` page (issue #12).
 
@@ -64,7 +64,7 @@ red = do-not-use (`flash`/`serial`/`reserved:*`), blue ring = currently assigned
 
 ## Regenerating
 
-Every descriptor is generated so it cannot drift from the hardware: LumiGate v4 from the
+Every descriptor is generated so it cannot drift from the hardware: LuxDMX v4 from the
 PCB netlist (`hardware/lumigate.py`), the hand-tuned dev boards from published header
 pinouts, and the long tail auto-derived from the arduino-esp32 core
 `variants/<dir>/pins_arduino.h`:

@@ -1,5 +1,5 @@
 """
-LumiGate pre-build script.
+LuxDMX pre-build script.
 Converts src/pages/*.html and src/assets/*.{png,css} into C PROGMEM headers
 under src/generated/ — runs at script-load time (before compilation).
 Also writes src/generated/version.h from the LUMIGATE_VERSION env var.
@@ -112,7 +112,7 @@ def generate():
     root    = pathlib.Path(env.subst("$PROJECT_DIR"))
     gen_dir = root / "src" / "generated"
     gen_dir.mkdir(exist_ok=True)
-    print("LumiGate: generating embedded assets...")
+    print("LuxDMX: generating embedded assets...")
     patch_esp_dmx()
     generate_version(gen_dir)
     for f in sorted((root / "src" / "pages").glob("*.html")):
@@ -132,7 +132,7 @@ def generate():
         binary_to_header(tmp, gen_dir, "CSS")
         tmp.unlink()
         print(f"  [gzip]  {f.name}: {len(raw)} -> {len(compressed)} bytes ({100*len(compressed)//len(raw)}%)")
-    print("LumiGate: done.")
+    print("LuxDMX: done.")
 
 # Run immediately so headers exist before main.cpp is compiled
 generate()

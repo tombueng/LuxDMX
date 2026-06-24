@@ -1,6 +1,6 @@
 {
   "id": "lumigate_v4",
-  "name": "LumiGate v4 (ESP32-S3 + W5500)",
+  "name": "LuxDMX v4 (ESP32-S3 + W5500)",
   "mcu": "esp32s3",
   "cols": [
     [

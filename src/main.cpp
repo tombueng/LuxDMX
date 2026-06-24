@@ -1,5 +1,5 @@
 /*
- * LumiGate — Art-Net / sACN → DMX Gateway
+ * LuxDMX — Art-Net / sACN → DMX Gateway
  * ESP32 / ESP32-S3 / WT32-ETH01 + Waveshare RS485 (C)
  *
  * Default pins: DMX TX=17, RX=16 (compile-time: DEF_DMX_TX_PIN/DEF_DMX_RX_PIN; runtime: web /config)
@@ -111,7 +111,7 @@
 #include "generated/ota_progress_html.h"
 #include "generated/ota_done_html.h"
 #include "generated/logo_png.h"
-#include "generated/favicon_svg.h"
+#include "generated/favicon_png.h"
 #include "generated/bootstrap_min_css.h"
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@
 
 // Second DMX universe (output #2). Defaults to -1 / disabled on boards with a
 // single transceiver; a board that wires a 2nd isolated driver sets real pins via
-// build_flags (e.g. the LumiGate board: TX=16 RX=21 DE/nRE=47) so its 2nd XLR
+// build_flags (e.g. the LuxDMX board: TX=16 RX=21 DE/nRE=47) so its 2nd XLR
 // comes up ready out of the box.
 #ifndef DEF_DMX2_TX_PIN
 #define DEF_DMX2_TX_PIN -1
@@ -177,7 +177,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812, 3=5-LED discrete panel
 #endif
 
-// 5-LED discrete status panel (ledType 3) — the LumiGate v4 board. Five LEDs on
+// 5-LED discrete status panel (ledType 3) — the LuxDMX v4 board. Five LEDs on
 // their own GPIOs, active-high (GPIO → R → LED anode, cathode → GND). -1 = absent.
 #ifndef DEF_LED_R
 #define DEF_LED_R -1   // red    — fault / no network
@@ -266,12 +266,12 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // ---------------------------------------------------------------------------
 // Defaults / NVS keys
 // ---------------------------------------------------------------------------
-static const char* DEF_HOSTNAME = "dmx-gateway";
+static const char* DEF_HOSTNAME = "luxdmx";
 static const char* DEF_OTA_PW   = "dmxota";
 static constexpr int DEF_UNIVERSE = 0;
 static constexpr int DEF_PROTOCOL = 2;
 static const char* PREF_NS = "dmxgw";
-static const char* AP_SSID = "DMX-Gateway";   // SSID of the transient setup/config portal
+static const char* AP_SSID = "LuxDMX";   // SSID of the transient setup/config portal
 
 // WiFi interface mode (cfg.wifiMode)
 static constexpr int NET_WIFI_STA = 0;        // station / client (join an existing router)
@@ -788,7 +788,7 @@ static void dispSplash() {
     gfx->setTextColor(dispFg());
     gfx->setTextSize(big ? 2 : 1);
     gfx->setCursor(0, 0);
-    gfx->print("LumiGate");
+    gfx->print("LuxDMX");
     gfx->setTextSize(1);
     gfx->setCursor(0, big ? 22 : 12);
     gfx->print('v'); gfx->print(FIRMWARE_VERSION);
@@ -1969,7 +1969,7 @@ static void handleLogo(AsyncWebServerRequest* req) {
 }
 
 static void handleFavicon(AsyncWebServerRequest* req) {
-    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/svg+xml", FAVICON_SVG, FAVICON_SVG_LEN);
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/png", FAVICON_PNG, FAVICON_PNG_LEN);
     r->addHeader("Cache-Control", "max-age=604800");
     req->send(r);
 }
@@ -2397,7 +2397,7 @@ static void dispDrawStatus() {
     if (H >= 96) {                       // tall colour panel (SSD1351 128x128)
         char b[24];
         gfx->setTextSize(2); gfx->setTextColor(col(accent));
-        gfx->setCursor(0, 0);  gfx->print("LumiGate");
+        gfx->setCursor(0, 0);  gfx->print("LuxDMX");
         gfx->setTextSize(1); gfx->setTextColor(col(C_GREY));
         gfx->setCursor(0, 18); gfx->print('v'); gfx->print(FIRMWARE_VERSION);
         gfx->setTextColor(col(C_WHITE));
@@ -2440,7 +2440,7 @@ static void dispDrawStatus() {
     int rp = (H - 8) / 5; if (rp > 20) rp = 20;
     int y = 0;
     gfx->setTextColor(col(accent));      // title lands in the yellow band on split panels
-    gfx->setCursor(0, y); gfx->print("LumiGate");
+    gfx->setCursor(0, y); gfx->print("LuxDMX");
     { const char* v = FIRMWARE_VERSION; int vw = (int)strlen(v) * 6;
       gfx->setTextColor(col(C_GREY)); gfx->setCursor(W - vw, y); gfx->print(v); }
     // Dual-colour 128x64 OLEDs are yellow rows 0-15 + a ~2px gap + blue rows 16-63.
@@ -2722,7 +2722,7 @@ void setup() {
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
     Serial.begin(115200);
     startMs = millis();
-    Serial.println("\n[BOOT] LumiGate — Art-Net / sACN DMX Gateway");
+    Serial.println("\n[BOOT] LuxDMX — Art-Net / sACN DMX Gateway");
 
     loadConfig();
 #if defined(HAS_WIRED_ETH)
@@ -2779,7 +2779,7 @@ void setup() {
     if (cfg.protocol != 0) startSacn();
 
     http.on("/logo.png",          HTTP_GET,  handleLogo);
-    http.on("/favicon.svg",       HTTP_GET,  handleFavicon);
+    http.on("/favicon.png",       HTTP_GET,  handleFavicon);
     http.on("/favicon.ico",       HTTP_GET,  handleFavicon);
     http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
     http.on("/",                  HTTP_GET,  handleRoot);
