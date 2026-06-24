@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""LumiGate v3 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
+"""LumiGate v4 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
 
 Self-contained board (no plug-in module):
   ESP32-S3-WROOM-1-N8  +  W5500 SPI-Ethernet + HR911105A MagJack

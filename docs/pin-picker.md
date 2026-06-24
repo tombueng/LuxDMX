@@ -60,7 +60,7 @@ boards and manual GPIO entry still work; catalog fetch failures degrade silently
 
 | Build | `board` | `mcu` |
 |---|---|---|
-| `lumigate_v3` (USE_ETH_SPI) | `lumigate_v3` | `esp32s3` |
+| `lumigate_v4` (USE_ETH_SPI) | `lumigate_v4` | `esp32s3` |
 | `wt32eth01` (USE_ETHERNET) | `wt32eth01` | `esp32` |
 | `esp32s3dev` | `esp32s3-devkitc-1` | `esp32s3` |
 | `esp32dev` | `esp32-devkitc` | `esp32` |
@@ -104,7 +104,7 @@ python hardware/gen_board_descriptor.py
 [../web/boards/ROADMAP.md](../web/boards/ROADMAP.md) for the full list). Descriptor data
 is sourced authoritatively, not guessed:
 
-- **LumiGate v3** is parsed straight from `hardware/lumigate.py` (the PCB netlist source),
+- **LumiGate v4** is parsed straight from `hardware/lumigate.py` (the PCB netlist source),
   so its diagram, template and Ethernet-reserved-pin rules cannot drift from the board.
 - **Hand-tuned** boards (DevKitC / DevKit v1 / NodeMCU / S3 DevKitC-1, Feather / QtPy /
   XIAO / WT32-ETH01) use their real, published header order.

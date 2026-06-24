@@ -36,7 +36,7 @@ flags are real, physical column placement is approximate).
 
 | Board | Variant | Layout |
 |---|---|---|
-| LumiGate v3 (S3 + W5500) | (PCB source) | header |
+| LumiGate v4 (S3 + W5500) | (PCB source) | header |
 | ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | header |
 | ESP32-S3 DevKitM-1 | `esp32s3` | header |
 | Seeed XIAO ESP32-S3 | `XIAO_ESP32S3` | header |
@@ -57,7 +57,7 @@ flags are real, physical column placement is approximate).
 ## Notes
 
 - **Accurate GPIOs**: pinouts come from `variants/<dir>/pins_arduino.h` (authoritative),
-  generated via `hardware/gen_board_descriptor.py`; LumiGate v3 from `hardware/lumigate.py`.
+  generated via `hardware/gen_board_descriptor.py`; LumiGate v4 from `hardware/lumigate.py`.
 - **Diagram only**: the picker draws its own horizontal SVG diagram from each board's two
   pin columns. There are no board photos or realistic/Fritzing graphics (too few clean-
   license images to be worth it) - the generated diagram is the interactive tool and works
@@ -68,7 +68,7 @@ flags are real, physical column placement is approximate).
   the firmware only supports mono OLED and SSD1351 colour SPI for now (TFT is a separate
   feature). SSD1351 colour SPI is set via the GPIO fields.
 - **Ethernet boards** mark the RMII PHY pins reserved + hard-wired so they are not reused.
-- **Offline**: five core boards (LumiGate v3, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3
+- **Offline**: five core boards (LumiGate v4, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3
   DevKitC-1, XIAO ESP32-S3) are baked into `src/pages/config.html` and work with no network;
   the rest are fetched on demand from GitHub Pages.
 

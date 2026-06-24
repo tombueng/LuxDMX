@@ -248,7 +248,7 @@ See **VALIDATION.md** for the full matrix. Open items to confirm before fab (non
 
 ### Firmware support
 
-Both board-specific firmware features are implemented and build-verified in `env:lumigate_v3`
+Both board-specific firmware features are implemented and build-verified in `env:lumigate_v4`
 (see [platformio.ini](../platformio.ini)) on **arduino-esp32 v3 / ESP-IDF 5.5**:
 
 - [x] **W5500 SPI-Ethernet driver.** `ETH.begin(ETH_PHY_W5500, …)` registers the W5500 as an lwIP

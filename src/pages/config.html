@@ -254,7 +254,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="0">Disabled</option>
             <option value="1">Plain GPIO (active high)</option>
             <option value="2">WS2812 RGB (NeoPixel)</option>
-            <option value="3">5-LED status panel (LumiGate v3)</option>
+            <option value="3">5-LED status panel (LumiGate v4)</option>
           </select>
           <div class="form-text">
             Single LED: blue blink = booting / connecting &nbsp;&middot;&nbsp; red blink = no network &nbsp;&middot;&nbsp; amber blink = idle &nbsp;&middot;&nbsp; green = DMX active.<br>
@@ -866,7 +866,7 @@ function loadVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['lumigate_v3','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var BUILTINS = ['lumigate_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://tombueng.github.io/LumiGate/boards/';
 
 // Chip families — used when no full board descriptor is selected (Custom).
@@ -886,7 +886,7 @@ function finalizeDesc(d){
   (d.cols || []).forEach(function(col){ col.forEach(function(p){ d.byGpio[p.gpio] = p; }); });
   return d;
 }
-// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LumiGate v3 module).
+// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LumiGate v4 module).
 var S3L = [4,5,6,7,15,16,17,18,8,19,20,3,46,9,10,11,12,13,14];
 var S3R = [21,47,48,45,0,35,36,37,38,39,40,41,42,44,43,2,1];
 function s3silk(g){ return g===43 ? 'TX0' : g===44 ? 'RX0' : 'IO'+g; }
@@ -934,7 +934,7 @@ function xiaocols(){
 }
 function buildBoards(){
   BOARDS = {};
-  BOARDS['lumigate_v3'] = finalizeDesc({ id:'lumigate_v3', name:'LumiGate v3 (ESP32-S3 + W5500)', mcu:'esp32s3',
+  BOARDS['lumigate_v4'] = finalizeDesc({ id:'lumigate_v4', name:'LumiGate v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
     cols:s3cols(true),
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15, dispType:1, dispsda:4, dispscl:5,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8}] } });

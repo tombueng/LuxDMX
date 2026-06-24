@@ -130,6 +130,24 @@
 #define DEF_DMX_PORT 1
 #endif
 
+// Second DMX universe (output #2). Defaults to -1 / disabled on boards with a
+// single transceiver; a board that wires a 2nd isolated driver sets real pins via
+// build_flags (e.g. the LumiGate board: TX=16 RX=21 DE/nRE=47) so its 2nd XLR
+// comes up ready out of the box.
+#ifndef DEF_DMX2_TX_PIN
+#define DEF_DMX2_TX_PIN -1
+#endif
+#ifndef DEF_DMX2_RX_PIN
+#define DEF_DMX2_RX_PIN -1
+#endif
+#ifndef DEF_DMX2_RTS_PIN
+#define DEF_DMX2_RTS_PIN -1
+#endif
+// Output #2 ships enabled only when the board actually wired it a TX pin.
+#ifndef DEF_DMX2_ENABLED
+#define DEF_DMX2_ENABLED (DEF_DMX2_TX_PIN >= 0)
+#endif
+
 // ---------------------------------------------------------------------------
 // DMX outputs — up to MAX_OUTPUTS independent universes, each driven by its own
 // hardware UART + RS485 transceiver. Hardware ceiling is 2: the ESP32 / ESP32-S3
@@ -159,7 +177,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812, 3=5-LED discrete panel
 #endif
 
-// 5-LED discrete status panel (ledType 3) — the LumiGate v3 board. Five LEDs on
+// 5-LED discrete status panel (ledType 3) — the LumiGate v4 board. Five LEDs on
 // their own GPIOs, active-high (GPIO → R → LED anode, cathode → GND). -1 = absent.
 #ifndef DEF_LED_R
 #define DEF_LED_R -1   // red    — fault / no network
@@ -181,7 +199,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // runtime config (cfg.eth*) on ANY board: a DIY user can wire a W5500 module to a
 // plain ESP32 / ESP32-S3 and enable it in /config, not just boards that bake the
 // pins in at build time. Defaults are the classic-ESP32 VSPI pins (the most common
-// W5500 wiring); lumigate_v3 overrides them via build_flags. A build without
+// W5500 wiring); lumigate_v4 overrides them via build_flags. A build without
 // USE_ETH_SPI never calls ETH.begin() with these, so they cost nothing there.
 #ifndef ETH_W5500_SCK
 #define ETH_W5500_SCK 18
@@ -225,6 +243,24 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #endif
 #ifndef DEF_DISP_ROT
 #define DEF_DISP_ROT 0   // 0=normal, 1=flipped 180 deg
+#endif
+
+// Colour SPI panel pins (dispType 4). -1 = unset; a board with a display header
+// pins them via build_flags so the panel only needs dispType set in /config.
+#ifndef DEF_DISP_CS
+#define DEF_DISP_CS -1
+#endif
+#ifndef DEF_DISP_DC
+#define DEF_DISP_DC -1
+#endif
+#ifndef DEF_DISP_RST
+#define DEF_DISP_RST -1
+#endif
+#ifndef DEF_DISP_SCK
+#define DEF_DISP_SCK -1
+#endif
+#ifndef DEF_DISP_MOSI
+#define DEF_DISP_MOSI -1
 #endif
 
 // ---------------------------------------------------------------------------
@@ -518,23 +554,23 @@ static void loadConfig() {
                                   prefs.getInt("dmxrts", DEF_DMX_RTS_PIN)), -1, 48);
     cfg.outputs[0].mergeMode = constrain(prefs.getInt(okey(0,"merge").c_str(), MERGE_OFF), MERGE_OFF, MERGE_LTP);
 
-    cfg.outputs[1].enabled  = prefs.getBool(okey(1,"en").c_str(),  false);
+    cfg.outputs[1].enabled  = prefs.getBool(okey(1,"en").c_str(),  DEF_DMX2_ENABLED);
     cfg.outputs[1].universe = constrain(prefs.getInt(okey(1,"uni").c_str(),  DEF_UNIVERSE + 1), 0, 15);
     cfg.outputs[1].port     = constrain(prefs.getInt(okey(1,"port").c_str(), 2), 1, 2);
-    cfg.outputs[1].txPin    = constrain(prefs.getInt(okey(1,"tx").c_str(),  -1), -1, 48);
-    cfg.outputs[1].rxPin    = constrain(prefs.getInt(okey(1,"rx").c_str(),  -1), -1, 48);
-    cfg.outputs[1].rtsPin   = constrain(prefs.getInt(okey(1,"rts").c_str(), -1), -1, 48);
+    cfg.outputs[1].txPin    = constrain(prefs.getInt(okey(1,"tx").c_str(),  DEF_DMX2_TX_PIN),  -1, 48);
+    cfg.outputs[1].rxPin    = constrain(prefs.getInt(okey(1,"rx").c_str(),  DEF_DMX2_RX_PIN),  -1, 48);
+    cfg.outputs[1].rtsPin   = constrain(prefs.getInt(okey(1,"rts").c_str(), DEF_DMX2_RTS_PIN), -1, 48);
     cfg.outputs[1].mergeMode = constrain(prefs.getInt(okey(1,"merge").c_str(), MERGE_OFF), MERGE_OFF, MERGE_LTP);
 
     cfg.dispType    = constrain(prefs.getInt("disptype", DEF_DISP_TYPE),  0, 4);
     cfg.dispSda     = constrain(prefs.getInt("dispsda",  DEF_DISP_SDA),  -1, 48);
     cfg.dispScl     = constrain(prefs.getInt("dispscl",  DEF_DISP_SCL),  -1, 48);
     cfg.dispRot     = constrain(prefs.getInt("disprot",  DEF_DISP_ROT),   0, 1);
-    cfg.dispCs      = constrain(prefs.getInt("dispcs",   -1), -1, 48);
-    cfg.dispDc      = constrain(prefs.getInt("dispdc",   -1), -1, 48);
-    cfg.dispRst     = constrain(prefs.getInt("disprst",  -1), -1, 48);
-    cfg.dispSck     = constrain(prefs.getInt("dispsck",  -1), -1, 48);
-    cfg.dispMosi    = constrain(prefs.getInt("dispmosi", -1), -1, 48);
+    cfg.dispCs      = constrain(prefs.getInt("dispcs",   DEF_DISP_CS),   -1, 48);
+    cfg.dispDc      = constrain(prefs.getInt("dispdc",   DEF_DISP_DC),   -1, 48);
+    cfg.dispRst     = constrain(prefs.getInt("disprst",  DEF_DISP_RST),  -1, 48);
+    cfg.dispSck     = constrain(prefs.getInt("dispsck",  DEF_DISP_SCK),  -1, 48);
+    cfg.dispMosi    = constrain(prefs.getInt("dispmosi", DEF_DISP_MOSI), -1, 48);
     cfg.ethCs       = constrain(prefs.getInt("ethcs",   ETH_W5500_CS),   -1, 48);
     cfg.ethSck      = constrain(prefs.getInt("ethsck",  ETH_W5500_SCK),  -1, 48);
     cfg.ethMosi     = constrain(prefs.getInt("ethmosi", ETH_W5500_MOSI), -1, 48);
@@ -1632,7 +1668,7 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
 #if defined(USE_ETH_SPI)
-static const char BOARD_ID[] = "lumigate_v3";
+static const char BOARD_ID[] = "lumigate_v4";
 #elif defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)

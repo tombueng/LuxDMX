@@ -604,7 +604,7 @@ LumiGate has a lot of GPIOs to set (status LED, 5-LED panel, OLED, two DMX outpu
 To make this idiot-proof, **Settings → Hardware board** offers:
 
 - **Templates** — pick your board and click **Apply template** to fill every LED /
-  display / DMX pin with the tested map in one step. Selecting the *LumiGate v3*
+  display / DMX pin with the tested map in one step. Selecting the *LumiGate v4*
   board applies the exact pin map of the open-hardware PCB.
 - **Click pins on a board diagram** — the pick button next to each GPIO field opens an
   interactive board so you click the actual pin instead of guessing GPIO numbers. The
@@ -618,7 +618,7 @@ variants (which are **not** all the same pinout):
 
 | Board | Notes |
 |---|---|
-| LumiGate v3 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
+| LumiGate v4 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
 | ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
 | ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
@@ -784,7 +784,7 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
-| LumiGate v3 (ESP32-S3 + W5500) | `lumigate_v3` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| LumiGate v4 (ESP32-S3 + W5500) | `lumigate_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external W5500 module** — the W5500
 driver is compiled into every build. In **`/config` &rarr; Wired Ethernet** turn on
