@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate a fancy ~30-minute QLC+ light show (.qxw) for LumiGate.
+Generate a fancy ~30-minute QLC+ light show (.qxw) for LuxDMX.
 
 20 generic dimmers on Universe 1 (DMX channels 1..20). Produces a rich library
 of building-block scenes and many effect chasers (smooth sine waves, comets with
@@ -253,7 +253,7 @@ doc = f'''<?xml version="1.0" encoding="UTF-8"?>
  <Creator>
   <Name>Q Light Controller Plus</Name>
   <Version>4.12.7</Version>
-  <Author>LumiGate show generator</Author>
+  <Author>LuxDMX show generator</Author>
  </Creator>
  <Engine>
   <InputOutputMap>

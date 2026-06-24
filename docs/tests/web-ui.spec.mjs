@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Web UI + REST', () => {
   test('status page loads with the channel grid and key cards', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/LumiGate/i);
+    await expect(page).toHaveTitle(/LuxDMX/i);
     await expect(page.locator('#grid .ch')).toHaveCount(512);
     await expect(page.locator('#senders-body')).toBeVisible();
     await expect(page.locator('#log-body')).toBeVisible();

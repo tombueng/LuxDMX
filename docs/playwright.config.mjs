@@ -1,4 +1,4 @@
-// Playwright config for the LumiGate web-UI / API test suite.
+// Playwright config for the LuxDMX web-UI / API test suite.
 //
 // Tests run against a *live device* (the same one screenshot.mjs drives).
 // Resolve order: LUMIGATE_URL > mDNS lookup of LUMIGATE_HOST > fallback IP.
@@ -20,7 +20,7 @@ async function resolveBase() {
 }
 
 const baseURL = await resolveBase();
-console.log('LumiGate test target:', baseURL);
+console.log('LuxDMX test target:', baseURL);
 
 export default defineConfig({
   testDir: './tests',

@@ -1,6 +1,6 @@
 // Multi-universe / multi-output feature tests (issue #4).
 //
-// Runs against a live LumiGate (see playwright.config.mjs for target resolution).
+// Runs against a live LuxDMX (see playwright.config.mjs for target resolution).
 // The default tests are read-only (safe to run any time). The config round-trip
 // test mutates + reboots the device and is opt-in via LUMIGATE_WRITE=1.
 import { test, expect } from '@playwright/test';

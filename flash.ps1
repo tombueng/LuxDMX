@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Download and flash the latest LumiGate firmware.
+    Download and flash the latest LuxDMX firmware.
     Auto-detects ESP32 vs ESP32-S3.
 #>
 
@@ -108,7 +108,7 @@ Write-Ok "Detected: $boardName"
 # 6. Download firmware
 # ---------------------------------------------------------------------------
 Write-Step "Fetching latest release from github.com/$REPO ..."
-$headers = @{ "User-Agent" = "LumiGate-flash-script" }
+$headers = @{ "User-Agent" = "LuxDMX-flash-script" }
 try {
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$REPO/releases/tags/latest" -Headers $headers
 } catch {

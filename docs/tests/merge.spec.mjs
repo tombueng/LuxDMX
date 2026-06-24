@@ -1,6 +1,6 @@
 // Source merging (issue #10): HTP / LTP / off and sACN priority.
 //
-// Runs against a live LumiGate. The shape + UI tests are read-only (safe any
+// Runs against a live LuxDMX. The shape + UI tests are read-only (safe any
 // time). The behavioural tests set a merge mode, reboot, drive two simultaneous
 // sources on output A's universe, assert the merged DMX, then restore the
 // original config — opt-in via LUMIGATE_WRITE=1.

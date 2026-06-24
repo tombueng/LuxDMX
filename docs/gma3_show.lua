@@ -1,5 +1,5 @@
 --[[
-  LumiGate Live Show — grandMA3 v2.4.2.2 Plugin
+  LuxDMX Live Show — grandMA3 v2.4.2.2 Plugin
   ================================================
   Builds a 60-minute, 20-channel light show entirely inside grandMA3
   using the Cmd() API (most stable across versions).
@@ -30,7 +30,7 @@ local function C(cmd)
 end
 
 local function log(msg)
-    Printf("[LumiGate] " .. tostring(msg))
+    Printf("[LuxDMX] " .. tostring(msg))
 end
 
 -- ── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,14 +105,14 @@ end
 
 -- ── Main ──────────────────────────────────────────────────────────────────────
 local function main(display)
-    log("LumiGate 60-min show builder starting...")
+    log("LuxDMX 60-min show builder starting...")
     log("grandMA3 v2.4 | 20 dimmers | ~147 cues")
 
     -- Sequence 1 = the main show
     local SEQ = 1
     C(string.format("Delete Sequence %d /NoConfirm", SEQ))
     sleep(100)
-    C(string.format('Assign Sequence %d "LumiGate 60min Show"', SEQ))
+    C(string.format('Assign Sequence %d "LuxDMX 60min Show"', SEQ))
     C(string.format("Sequence %d Property \"AutoStop\" \"Off\"", SEQ))
     C(string.format("Sequence %d Property \"Loop\" \"On\"", SEQ))
 
