@@ -19,12 +19,38 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
-// Wired-Ethernet capable boards compile in <ETH.h>: USE_ETH_RMII = LAN8720 over
-// RMII (WT32-ETH01), USE_ETH_SPI = W5500 over SPI (LumiGate v3). Either way WiFi
-// is ALSO compiled in and the active interface is chosen at runtime (issue #14).
-#if defined(USE_ETH_RMII) || defined(USE_ETH_SPI)
+// Wired-Ethernet capability (compile-time). WiFi is ALWAYS compiled in too; the
+// active interface — and, on the classic ESP32, which wired PHY — is chosen at
+// runtime (issue #14).
+//   HAS_ETH_SPI  : W5500 over SPI. Works on any ESP32 variant; on when USE_ETH_SPI.
+//   HAS_ETH_RMII : LAN8720 over RMII. Uses the ESP32's INTERNAL EMAC, which only the
+//                  original ESP32 has — so it is available on the classic ESP32
+//                  regardless of board (the S3 never gets it). cfg.wiredPhy picks it.
+//   USE_ETH_RMII : the WT32-ETH01 build marker only — drives OTA_BIN + its RMII /
+//                  useEthernet=true defaults. RMII compilation is the chip macro now.
+#if defined(USE_ETH_SPI)
+#define HAS_ETH_SPI 1
+#endif
+#if defined(CONFIG_IDF_TARGET_ESP32)   // original ESP32 → has the internal EMAC for RMII
+#define HAS_ETH_RMII 1
+#endif
+#if defined(HAS_ETH_SPI) || defined(HAS_ETH_RMII)
 #include <ETH.h>
 #define HAS_WIRED_ETH 1
+#endif
+
+// Wired PHY runtime selection (cfg.wiredPhy). DEF_WIRED_PHY is the per-OTA-artifact
+// default and MUST reproduce what the device used before, so an OTA to a both-PHY
+// build never changes behavior: the WT32 artifact (USE_ETH_RMII) defaults to RMII,
+// every other build defaults to W5500 — exactly the old compile-time split.
+#define WIRED_PHY_SPI  0   // W5500 over SPI (external module)
+#define WIRED_PHY_RMII 1   // LAN8720 over RMII (ESP32 internal EMAC)
+#ifndef DEF_WIRED_PHY
+#if defined(USE_ETH_RMII)
+#define DEF_WIRED_PHY WIRED_PHY_RMII
+#else
+#define DEF_WIRED_PHY WIRED_PHY_SPI
+#endif
 #endif
 #include <WiFiManager.h>  // WiFi (STA config portal) is always available
 #include <ESPAsyncWebServer.h>
@@ -374,6 +400,7 @@ struct Config {
     int    ethRst;
     int    ethFreqMhz;     // W5500 SPI clock (MHz); lower to debug long/loose wiring
     bool   ethW5500;       // W5500 module enabled — opt-in, default OFF (SPI-Eth boards)
+    int    wiredPhy;       // wired PHY: 0=W5500 (SPI), 1=LAN8720 (RMII). Default per build.
     bool   useEthernet;    // wired-Eth boards: true = wired Ethernet, false = WiFi
     int    wifiMode;       // WiFi interface mode: 0 = STA (client), 1 = AP (standalone)
     bool   apFallback;     // start the WiFi AP automatically if wired Eth has no link
@@ -463,6 +490,9 @@ static void loadConfig() {
     cfg.ethRst      = constrain(prefs.getInt("ethrst",  ETH_W5500_RST),  -1, 48);
     cfg.ethFreqMhz  = constrain(prefs.getInt("ethfreq", ETH_W5500_SPI_FREQ_MHZ), 1, 80);
     cfg.ethW5500    = prefs.getBool("ethon",    false);   // W5500 opt-in, default off
+    // Wired PHY default reproduces the pre-runtime-select behavior (see DEF_WIRED_PHY):
+    // absent key on an existing device → its old PHY, so OTA changes nothing.
+    cfg.wiredPhy    = constrain(prefs.getInt("wiredphy", DEF_WIRED_PHY), 0, 1);
     cfg.useEthernet = prefs.getBool("useeth",   DEF_USE_ETH);
     cfg.wifiMode    = constrain(prefs.getInt("wifimode", NET_WIFI_STA), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback  = prefs.getBool("apfb",     true);
@@ -516,6 +546,7 @@ static void saveConfig() {
     prefs.putInt("ethrst",      cfg.ethRst);
     prefs.putInt("ethfreq",     cfg.ethFreqMhz);
     prefs.putBool("ethon",      cfg.ethW5500);
+    prefs.putInt("wiredphy",    cfg.wiredPhy);
     prefs.putBool("useeth",     cfg.useEthernet);
     prefs.putInt("wifimode",    cfg.wifiMode);
     prefs.putBool("apfb",       cfg.apFallback);
@@ -1582,11 +1613,17 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ethInt\":";     j += cfg.ethInt;             j += ",";
     j += "\"ethRst\":";     j += cfg.ethRst;             j += ",";
     j += "\"ethFreq\":";    j += cfg.ethFreqMhz;         j += ",";
-#if defined(USE_ETH_SPI)
+#if defined(HAS_ETH_SPI)
     j += "\"ethSpi\":true,";    // W5500 SPI compiled in → UI shows the W5500 pin card
 #else
     j += "\"ethSpi\":false,";
 #endif
+#if defined(HAS_ETH_RMII)
+    j += "\"ethRmii\":true,";   // internal-MAC RMII compiled in (classic ESP32) → offer the PHY selector
+#else
+    j += "\"ethRmii\":false,";
+#endif
+    j += "\"wiredPhy\":";  j += cfg.wiredPhy;            j += ",";   // 0=W5500, 1=LAN8720 RMII
     j += "\"ethW5500\":";  j += cfg.ethW5500 ? "true" : "false"; j += ",";   // module enabled (opt-in)
     j += "\"useEthernet\":"; j += cfg.useEthernet ? "true" : "false"; j += ",";
 #if defined(HAS_WIRED_ETH)
@@ -1732,6 +1769,7 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "ethrst", s))   cfg.ethRst     = constrain(s.toInt(), -1, 48);
     if (argStr(req, "ethfreq", s))  cfg.ethFreqMhz = constrain(s.toInt(), 1, 80);
     cfg.ethW5500 = req->hasParam("ethon", true) || req->hasParam("ethon");
+    if (argStr(req, "wiredphy", s)) cfg.wiredPhy = constrain(s.toInt(), 0, 1);
     cfg.useEthernet = req->hasParam("useeth", true) || req->hasParam("useeth");
     if (argStr(req, "wifimode", s)) cfg.wifiMode = constrain(s.toInt(), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback = req->hasParam("apfb", true) || req->hasParam("apfb");
@@ -2380,7 +2418,7 @@ static void waitEthLink() {
 }
 #endif
 
-#if defined(USE_ETH_SPI)
+#if defined(HAS_ETH_SPI)
 // Bring up the W5500 wired Ethernet (runtime opt-in via cfg.useEthernet/g_useEth).
 // Registered as an lwIP netif, so the web/Art-Net/sACN/OTA stack runs over it
 // unchanged. WiFi stays the default; this only runs when the user enabled Ethernet.
@@ -2395,12 +2433,13 @@ static void startEthSpi() {
 }
 #endif
 
-#if defined(USE_ETH_RMII)
-// Bring up the LAN8720 RMII Ethernet (WT32-ETH01). Runtime opt-in (g_useEth) now
-// that WiFi is also compiled in — the board is no longer wired-only. begin() arg
-// order: (type, phy_addr, mdc, mdio, power, clk_mode).
+#if defined(HAS_ETH_RMII)
+// Bring up the LAN8720 RMII Ethernet via the ESP32 internal EMAC (WT32-ETH01 layout).
+// Runtime opt-in (g_useEth) now that WiFi is also compiled in — the board is no
+// longer wired-only. Pins are the LAN8720/WT32-ETH01 standard: MDC=23 MDIO=18
+// PHY-power=16 CLK=GPIO0-in. begin() arg order: (type, phy_addr, mdc, mdio, power, clk).
 static void startEthRmii() {
-    Serial.println("[ETH] LAN8720 RMII (WT32-ETH01)");
+    Serial.println("[ETH] LAN8720 RMII (ESP32 internal MAC)");
     ETH.begin(ETH_PHY_LAN8720, 1, 23, 18, 16, ETH_CLOCK_GPIO0_IN);
     applyEthStaticIp();
     waitEthLink();
@@ -2408,11 +2447,15 @@ static void startEthRmii() {
 #endif
 
 #if defined(HAS_WIRED_ETH)
-// Dispatch to whichever wired PHY this board has.
+// Dispatch to the runtime-selected wired PHY. On a build with both compiled (classic
+// ESP32) cfg.wiredPhy picks; otherwise only the one compiled PHY is callable.
 static void startWiredEth() {
-#if defined(USE_ETH_SPI)
+#if defined(HAS_ETH_SPI) && defined(HAS_ETH_RMII)
+    if (cfg.wiredPhy == WIRED_PHY_RMII) startEthRmii();
+    else                                startEthSpi();
+#elif defined(HAS_ETH_SPI)
     startEthSpi();
-#elif defined(USE_ETH_RMII)
+#elif defined(HAS_ETH_RMII)
     startEthRmii();
 #endif
 }
@@ -2499,10 +2542,14 @@ void setup() {
     Serial.println("\n[BOOT] LumiGate — Art-Net / sACN DMX Gateway");
 
     loadConfig();
-#if defined(USE_ETH_RMII)
-    g_useEth = cfg.useEthernet;                   // RMII boards: the wired-Ethernet toggle
-#elif defined(USE_ETH_SPI)
-    g_useEth = cfg.ethW5500 && cfg.useEthernet;   // W5500: opt-in module AND selected (both default off)
+#if defined(HAS_WIRED_ETH)
+    // Wired Ethernet is active when the user selected it; the W5500 path additionally
+    // needs the module opt-in (cfg.ethW5500). At default cfg.wiredPhy this reduces to
+    // the old per-build behavior — RMII boards: useEthernet; W5500: ethW5500 && useEthernet.
+    g_useEth = cfg.useEthernet;
+#if defined(HAS_ETH_SPI)
+    if (cfg.wiredPhy == WIRED_PHY_SPI) g_useEth = g_useEth && cfg.ethW5500;
+#endif
 #endif
     initLed();
     setLedColor(NEO_WHITE, true);   // booting
