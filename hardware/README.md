@@ -1,33 +1,20 @@
-> ⚠️ **WORK IN PROGRESS — `feature/htp-ltp-merging` / v4 hardware branch.**
-> This board is under active development. It is **not yet fully validated and not ready for
-> production.** A ruggedization pass (USB ESD, PTC fuse, +5V TVS, a TPS2116 ideal-diode OR
-> mux, DMX common-mode chokes, ferrite supply filters), plated GND mounting holes, and wider power
-> traces have been added but several items in **VALIDATION.md** are still open (datasheet
-> checks, silk cleanup, the W5500 fan-out + USB-C clearance waivers). Do not fabricate from
-> this branch without finishing that list and a final review.
+> [!WARNING]
+> **Not yet fabricated or tested.** This board (the `v4-hardware` branch) is design-complete and passes
+> the full scripted validation (DRC, isolation, SPICE, Ethernet skew; see **VALIDATION.md**), but no
+> physical board has been built or bench-tested yet. The proven, supported path is the firmware on a plain
+> ESP32 + an isolated RS-485 module (see the main README). A ruggedization pass (USB ESD, PTC fuse, +5V
+> TVS, a TPS2116 ideal-diode OR mux, DMX common-mode chokes, ferrite supply filters), plated GND mounting
+> holes, and wider power traces are in; a few datasheet/silk items remain open (see **Status**). Treat the
+> first build as a prototype and do a final review before ordering.
 
 # LumiGate v4 — hardware
-
-> [!WARNING]
-> **Work in progress, not yet fully tested. Use at your own risk for now!**
-> This board has **not yet been fabricated or verified in hardware** — the design is provided for experimentation only. The proven, supported path is the firmware on a plain ESP32 + an isolated RS-485 module (see the main README).
 
 A compact, open-source **Art-Net / sACN → galvanically-isolated DMX512 gateway**, built around
 an ESP32-S3 with **both** WiFi *and* wired Ethernet. Designed entirely as code (SKiDL netlist) and
 routed by a fully-scripted, placement-driven pipeline — so the board regenerates itself from your
 component placement, isolation barrier and all.
 
-> **v3.1 (in progress) — dual universe + PoE.** The board is being extended to **two
-> independent, separately-isolated DMX universes** (two XLR-3 outputs, each with its own
-> ISO3086 transceiver + B0505S isolated supply + isolated ground island) and **802.3af
-> Power-over-Ethernet** (an HY931147C integrated-rectifier PoE magjack feeds a DP9900M
-> isolated PD/DC-DC module; USB-C 5 V and PoE 5 V are diode-OR'd, so either powers the
-> board). The board outline was enlarged to **125 × 90 mm** to fit it. The new parts are
-> in the netlist with footprints and are dropped on the board ready to **place + re-route**
-> (see *Design-as-code & the routing pipeline*). Verify the items flagged under **Status**
-> before fabricating.
-
-![LumiGate v3 — PCB layout](board-pcb-1.png)
+![LumiGate v4 — PCB layout](board-pcb-1.png)
 
 <p align="center">
   <img src="board3d-1.png" width="49%" alt="3D render — front">
@@ -231,55 +218,33 @@ fee. A complete, assembled prototype lands well under typical hobby budgets.
 | `easyeda/` | LCSC/easyeda footprints + 3D models for the specific parts |
 | `tools/` | Freerouting 2.2.4 jar + portable JDK 25 *(git-ignored — see Toolchain)* |
 | `board-pcb-1.png` · `board3d-1.png` · `board3d-2.png` | layout + 3D renders |
-| [`case/`](case/) | **3D-printable enclosure** (parametric OpenSCAD; openings + retention derived from this PCB) — see [`case/README.md`](case/README.md) |
-
-## Enclosure
-
-A fully parametric, code-defined 3D-printable housing lives in [`case/`](case/). It is
-a two-part clamshell (base tray + deep cover) with a **flush snap-fit closure** (no
-external screws). Connector openings (XLR/DMX round hole + flange screws, RJ45, USB-C),
-front-wall LED windows and board retention (ledge + snap clamps + cover hold-down lip)
-are all **extracted from this board** — re-run `case/extract_case_params.py` after a
-layout change and re-export the STLs. Connector opening sizes/heights were **measured
-at the wall plane** from the populated `kicad-cli` GLB (`case/measure_connectors.py`),
-and `case/validate_fit.py` cross-checks the case against the live PCB (28 assertions,
-incl. the board drop-in path). Closure is a **flush snap-fit** with rounded outer edges
-(no external screws). The ESP32 antenna overhang is fully enclosed; outer ≈ 87 × 57 × 40 mm.
-`case/lumigate_case_assembly.glb` opens the whole thing in any 3D viewer.
-See [`case/README.md`](case/README.md).
 
 ## Status
 
-> **v3.1 dual-universe + PoE — placed & autorouted; electrical validation still pending.**
-> `lumigate.py`, the footprints (`easyeda2kicad`-pulled DP9900M + HY931147C), the BOM/DRU and the
-> board outline (now **125 × 90 mm**) are updated; the parts are placed, **4 corner M3 mounting holes**
-> added, isolation regenerated (holed inner-GND planes + GNDISO/GNDISO2 pours) and the board is
-> **Freerouted (206/208 nets, ~1130 tracks/vias)** — see `board-pcb-v31-top.png` / `-bot.png`.
-> Two **ground-plane stitch points** remain to finalize in a short KiCad GUI pass (R11's GND island
-> inside the PoE inner-plane cutout; a GNDISO F-pour split on universe 1) plus the usual waivable
-> silk/USB-C-pad warnings. Before fabricating v3.1, verify:
->
-> - **Routing toolchain note:** Freerouting **2.2.4 must run headless with telemetry disabled** or it
->   pops a GUI / hangs on `api.freerouting.app` and writes no `.ses`; and the inner-plane cutouts must be
->   **polygon holes, not keepout rule-areas** (rule-areas send FR2 into a runaway trace-normalization
->   loop). Both are now handled in `autoroute_fr2.py` / `rebuild_iso.py`.
->
-> - **PoE magjack pinout.** J3's pin→function map (1=RD- 2=RD+ 3=RX-CT 4=TX-CT 5=TD- 6=TD+ 9=V+ 10=V-,
->   LEDs 11–14) is taken from the **HY931147C datasheet** via the pulled EasyEDA model. Confirm the
->   **TX↔RX pair assignment** and **LED anode/cathode** against the datasheet/footprint before fab — a
->   swapped TX/RX pair means no Ethernet link (W5500 has no auto-MDIX). HY931147C omits Bob-Smith
->   termination; HanRun **HR861153C** (C19724782) is a pin-different drop-in that includes it if you
->   want the extra signal-integrity margin.
-> - **+5V rail ≈ 4.9 V on USB** (TPS2116 ideal-diode OR, ~30 mV drop). Clears the B0505S 4.5 V minimum
->   across the full USB range — SPICE-verified (VCC2 ≥ 4.6 V even at a sagging 4.7 V VBUS).
-> - **DP9900M min load** is 100 mA; the running board draws well over that, so no bleeder is needed.
-> - Re-run DRC after routing — the new domains add the 2nd 4 mm DMX rule + the 2.5 mm PoE rule.
+> **Design-complete and fully validated, but NOT yet fabricated or tested on real hardware.** Treat the
+> first build as a prototype and do a final review before ordering.
 
-**Single-universe v3 baseline — electrically production-ready & validated:** 0 unconnected, 0 shorts,
-**0 isolation (4 mm) violations**, SPICE-validated analog (buck 3.318 V, EN reset-RC 13.9 ms, auto-reset
-sequence, LED currents). A handful of minor connector/edge DRC warnings remain (magjack mask slivers,
-USB-C unused-pad clearance) — inherent to the manufacturer footprints, cleared in a short GUI pass or
-waived at the JLCPCB upload step.
+The v4 board (two isolated DMX universes + PoE, **99 × 79 mm**, 4 corner plated M3 mounting holes) is
+**fully routed** (0 unrouted, 0 unconnected) and passes the scripted validation:
+
+- **DRC:** 3 clearance waivers only (2× W5500 0.5 mm-pitch escapes at 0.174 mm, USB-C CC2 at 0.160 mm),
+  all above JLCPCB's 0.0889 mm floor. 0 silk-over-pad, 0 courtyard overlaps, 0 dangling vias.
+- **Isolation:** 0 violations of the two 4 mm DMX and the 2.5 mm PoE creepage rules (`lumigate.kicad_dru`).
+- **Power:** SPICE-verified. The TPS2116 ideal-diode OR holds +5V at ~4.9 V on USB, so the B0505S / ISO3086
+  VCC2 stays above its 4.5 V minimum across the whole USB range (>= 4.6 V even at a sagging 4.7 V VBUS);
+  buck output 3.318 V.
+- **Ethernet:** diff-pair skew TX 0.35 mm / RX 2.14 mm, well inside the 100BASE-TX margin.
+
+See **VALIDATION.md** for the full matrix. Open items to confirm before fab (none electrical-blocking):
+
+- **PoE magjack pinout.** J3's pin/function map (1=RD- 2=RD+ 3=RX-CT 4=TX-CT 5=TD- 6=TD+ 9=V+ 10=V-,
+  LEDs 11-14) comes from the **HY931147C datasheet** via the pulled EasyEDA model. Confirm the **TX/RX
+  pair assignment** and **LED anode/cathode** against the datasheet before fab; a swapped TX/RX pair means
+  no Ethernet link (W5500 has no auto-MDIX). HY931147C omits Bob-Smith termination; HanRun **HR861153C**
+  (C19724782) is a pin-different drop-in that includes it for extra signal-integrity margin.
+- **DP9900M LCSC SKU** — confirm the 5 V / 1.8 A part, its on-module 802.3af detection/classification and
+  pin order. Min load is 100 mA; the running board draws well over that, so no bleeder is needed.
+- Cosmetic silk (37 warnings, all mask-protected) to clear in a short GUI pass or waive at upload.
 
 ### Firmware support
 
