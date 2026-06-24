@@ -165,8 +165,28 @@ footer a:hover { color:var(--gh-text); }
 
     <!-- Wired Ethernet (W5500) — optional; runtime pins, so any ESP32/ESP32-S3 + a W5500 module -->
     <div id="w5500-card" class="card mb-3" style="display:none">
-      <div class="card-header">Wired Ethernet (W5500)</div>
+      <div class="card-header">Wired Ethernet</div>
       <div class="card-body">
+        <!-- Wired PHY chooser — only shown when the build compiled BOTH PHYs (classic ESP32) -->
+        <div id="wired-phy-row" class="mb-3" style="display:none">
+          <label class="form-label text-secondary small mb-1">Wired Ethernet PHY</label>
+          <select class="form-select" name="wiredphy" id="wired-phy">
+            <option value="0">W5500 — external SPI module</option>
+            <option value="1">ESP32 built-in MAC + LAN8720 (RMII)</option>
+          </select>
+          <div class="form-text">
+            <b>W5500</b> = external SPI Ethernet chip, works on any ESP32 (pins below).
+            <b>RMII</b> = the classic ESP32's internal MAC driving an external LAN8720 PHY
+            (e.g. WT32-ETH01), on fixed GPIOs: MDC 23, MDIO 18, PHY-power 16, CLK 0.
+            Only the original ESP32 has the internal MAC.
+          </div>
+        </div>
+        <div id="rmii-note" class="form-text mb-2" style="display:none">
+          Internal-MAC (LAN8720 RMII) — no pins to set here. Turn on <i>Use wired Ethernet</i>
+          below to run on the wired link. Make sure your DMX / LED GPIOs don't clash with the
+          RMII pins (16 / 0 / 18 / 23).
+        </div>
+        <div id="w5500-sub">
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" name="ethon" id="ethon-sw" value="1">
           <label class="form-check-label small" for="ethon-sw">Use a W5500 Ethernet module</label>
@@ -217,6 +237,7 @@ footer a:hover { color:var(--gh-text); }
           long/loose jumper wiring. Applied after reboot.
         </div>
         </div><!-- /w5500-pins -->
+        </div><!-- /w5500-sub -->
       </div>
     </div>
 
@@ -585,6 +606,28 @@ function wireCard(cont, tpl, i, o){
   syncOutBody(node);
 }
 function updStatic(){ $('static-fields').style.display = $('static-sw').checked ? '' : 'none'; }
+// Wired-Ethernet capability flags from the firmware build (set in populate()).
+var ETH_SPI = false, ETH_RMII = false, HAS_ETH = false;
+// The PHY in effect: the dropdown when both are compiled, else the only one available.
+function currentPhy(){
+  if (ETH_SPI && ETH_RMII) return parseInt($('wired-phy').value, 10) || 0;
+  if (ETH_RMII) return 1;   // RMII-only build (e.g. WT32-ETH01)
+  return 0;                 // W5500-only / no wired
+}
+// Drive the Wired-Ethernet card from the selected PHY: W5500 shows its module switch +
+// pins; RMII shows a note. The "Use wired Ethernet" toggle is offered once the chosen
+// PHY is ready (RMII always; W5500 once the module is enabled).
+function updWired(){
+  var rmii = currentPhy() === 1;
+  $('w5500-sub').style.display  = rmii ? 'none' : '';
+  $('rmii-note').style.display  = rmii ? '' : 'none';
+  var ethon = $('ethon-sw').checked;
+  $('w5500-pins').style.display = (!rmii && ethon) ? '' : 'none';
+  var wiredReady = HAS_ETH && (rmii || ethon);
+  $('net-mode-row').style.display = wiredReady ? '' : 'none';
+  if (!wiredReady) $('useeth-sw').checked = false;   // no usable wired PHY → can't be on wired
+  updNetMode();
+}
 // Show only the network fields that apply to the chosen interface/mode (issue #14):
 // wired Ethernet -> AP-fallback switch; WiFi -> mode selector (+ AP password in AP
 // mode). A standalone AP uses a fixed subnet, so static-IP config is hidden there.
@@ -618,8 +661,6 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('cur-ver').textContent = 'v' + CURRENT;
   $('proto-sel').value = d.protocol;
   $('useeth-sw').checked = !!d.useEthernet;
-  // "Use wired Ethernet" applies to RMII boards always, or W5500 boards once the module is enabled
-  if (d.hasEth && (!d.ethSpi || d.ethW5500)) $('net-mode-row').style.display = '';
   $('wifi-mode').value = d.wifiMode !== undefined ? d.wifiMode : 0;
   $('ap-pw').value = d.apPassword || '';
   $('apfb-sw').checked = d.apFallback !== undefined ? !!d.apFallback : true;
@@ -653,8 +694,11 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('eth-rst').value  = d.ethRst  !== undefined ? d.ethRst  : 25;
   $('eth-freq').value = d.ethFreq !== undefined ? d.ethFreq : 20;
   $('ethon-sw').checked = !!d.ethW5500;
-  if (d.ethSpi)   $('w5500-card').style.display = '';   // build has the W5500 driver
-  if (d.ethW5500) $('w5500-pins').style.display = '';   // pins shown only when the module is enabled
+  ETH_SPI = !!d.ethSpi; ETH_RMII = !!d.ethRmii; HAS_ETH = !!d.hasEth;
+  $('wired-phy').value = (d.wiredPhy !== undefined ? d.wiredPhy : 0);
+  if (ETH_SPI)              $('w5500-card').style.display = '';    // build has the W5500 driver / wired card
+  if (ETH_SPI && ETH_RMII)  $('wired-phy-row').style.display = ''; // both PHYs compiled → offer the chooser
+  updWired();                                                      // set sub-section + net-mode-row visibility
   $('dev-host').value = d.hostname || '';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;
@@ -714,14 +758,8 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
 $('proto-sel').addEventListener('change', updAllUniHints);
 $('static-sw').addEventListener('change', updStatic);
 $('useeth-sw').addEventListener('change', updNetMode);
-$('ethon-sw').addEventListener('change', function(){
-  var on = this.checked;
-  $('w5500-pins').style.display = on ? '' : 'none';
-  $('net-mode-row').style.display = on ? '' : 'none';   // "Use wired Ethernet" only once W5500 is enabled
-  if (!on) $('useeth-sw').checked = false;               // module off → not on wired
-  updNetMode();
-  validate();
-});
+$('ethon-sw').addEventListener('change', function(){ updWired(); validate(); });
+$('wired-phy').addEventListener('change', function(){ updWired(); validate(); });
 $('wifi-mode').addEventListener('change', updNetMode);
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
@@ -971,17 +1009,30 @@ function decorateAllPins(){
 }
 
 // ---- Validation ------------------------------------------------------------
+// ESP32 internal-EMAC RMII (LAN8720) GPIOs. The RMII data lines are FIXED by the
+// EMAC hardware (TXD0=19 TXD1=22 TX_EN=21 RXD0=25 RXD1=26 RX_DV=27); plus the
+// configured REF_CLK=0, MDC=23, MDIO=18 and PHY-power=16 (see startEthRmii()).
+var RMII_PINS = [0, 16, 18, 19, 21, 22, 23, 25, 26, 27];
+// RMII reserves its pins only while it is the selected wired PHY (classic ESP32).
+function rmiiActive(){ return ETH_RMII && currentPhy() === 1; }
 function pinFlags(g){
   if (isNaN(g)) return [];
+  var fl;
   var b = currentBoardDesc();
-  if (b && b.byGpio){ var p = b.byGpio[g]; return p ? (p.flags || []) : ['absent']; }
-  var fam = familyOf(), fl = [];
-  if (fam.flash.indexOf(g) >= 0) fl.push('flash');
-  if (fam.serial.indexOf(g) >= 0) fl.push('serial');
-  if (fam.inputOnly.indexOf(g) >= 0) fl.push('input-only');
-  if (fam.strapping.indexOf(g) >= 0) fl.push('strapping');
-  if (fam.usbjtag.indexOf(g) >= 0) fl.push('usb-jtag');
-  if (g > fam.max || g < 0) fl.push('range');
+  if (b && b.byGpio){ var p = b.byGpio[g]; fl = p ? (p.flags || []).slice() : ['absent']; }
+  else {
+    var fam = familyOf(); fl = [];
+    if (fam.flash.indexOf(g) >= 0) fl.push('flash');
+    if (fam.serial.indexOf(g) >= 0) fl.push('serial');
+    if (fam.inputOnly.indexOf(g) >= 0) fl.push('input-only');
+    if (fam.strapping.indexOf(g) >= 0) fl.push('strapping');
+    if (fam.usbjtag.indexOf(g) >= 0) fl.push('usb-jtag');
+    if (g > fam.max || g < 0) fl.push('range');
+  }
+  // Runtime overlay: while RMII is the selected wired PHY, its fixed GPIOs are
+  // reserved — so a DMX / LED / display pin landing on one is flagged as a conflict.
+  if (rmiiActive() && RMII_PINS.indexOf(g) >= 0 && fl.indexOf('reserved:eth-rmii') < 0)
+    fl.push('reserved:eth-rmii');
   return fl;
 }
 function flagSeverity(flags, t){
@@ -992,7 +1043,7 @@ function flagSeverity(flags, t){
     if (f === 'serial') return r('err', 'is the USB-serial console pin');
     if (f === 'range')  return r('err', 'is out of range for this chip');
     if (f.indexOf('reserved:') === 0)
-      return r('err', 'is reserved for ' + f.slice(9).replace('eth-spi', 'the W5500 Ethernet').replace('eth-rmii', 'Ethernet'));
+      return r('err', 'is reserved for ' + f.slice(9).replace('eth-spi', 'the W5500 Ethernet').replace('eth-rmii', 'the RMII (internal-MAC) Ethernet'));
   }
   if (flags.indexOf('input-only') >= 0 && t === 'out') return r('err', 'is input-only and cannot drive an output');
   if (flags.indexOf('absent') >= 0)    return r('warn', 'is not broken out on this board');
