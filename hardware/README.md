@@ -71,7 +71,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
   ground with anything else.
 - **D1 / D7 — SM712 TVS** *(C404012)* + **R12 / R19 — 120 Ω termination** — per-universe surge protection
   clamped to that universe's isolated ground, and the standard RS-485 line termination.
-- **J1 / J5 — XLR-3** *(C309326)* — the two DMX output connectors, each living entirely on its isolated domain.
+- **J1 / J5 — XLR-5** *(C309326)* — the two DMX output connectors (Neutrik NC5FAH), each living entirely on its isolated domain.
 - Nets: universe 1 = `VISO`/`GNDISO`/`DMX_A`/`DMX_B`; universe 2 = `VISO2`/`GNDISO2`/`DMX2_A`/`DMX2_B`.
 
 ### Power — USB-C **or** PoE (diode-OR'd)
@@ -107,7 +107,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
 ## Feature summary
 
 - 🎛 **Art-Net + sACN (E1.31)** input, configurable universe(s)
-- 🎚 **Two independent, separately-isolated DMX512 universes** — two XLR-3 outputs, each on its own
+- 🎚 **Two independent, separately-isolated DMX512 universes** — two XLR-5 outputs, each on its own
   isolation island (RDM-capable transceivers); drive two universes from one box
 - 🌐 **Dual connectivity** — WiFi (captive-portal setup) *and* wired Ethernet (W5500)
 - ⚡ **Power-over-Ethernet (802.3af)** — single Cat-5 cable for data *and* power; **or** USB-C — the two
