@@ -144,7 +144,7 @@ footer a:hover { color: var(--gh-text); }
   </a>
   <div class="nav-stats">
     <div class="nav-stat"><span class="ns-label">FPS</span><span class="ns-val" id="fps">—</span></div>
-    <div class="nav-stat"><span class="ns-label">WiFi</span><span class="ns-val" id="rssi">—</span></div>
+    <div class="nav-stat"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">—</span></div>
     <div class="nav-stat"><span class="ns-label">Heap</span><span class="ns-val" id="heap">—</span></div>
     <div class="nav-stat"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">—</span></div>
     <div class="nav-stat"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">—</span></div>
@@ -562,6 +562,8 @@ function connect() {
     }
     if (!(e.data instanceof ArrayBuffer)) return;
     // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
+    //        rssi doubles as the link indicator: <=0 WiFi STA dBm | >=10 wired
+    //        link speed (Mbps) | 1 standalone AP
     //        srcStatus: 0=normal 1=conflict 2=merging
     //        dmx(512) + per-output fps(2 each)
     var v = new DataView(e.data);
@@ -584,9 +586,16 @@ function connect() {
 
     document.getElementById('fps').textContent =
       perOut[viewOut] != null ? perOut[viewOut].toFixed(1) : fps;
-    var re = document.getElementById('rssi');
-    re.textContent = rssi + ' dBm';
-    re.style.color = rssi > -65 ? '#3fb950' : rssi > -80 ? '#e3b341' : '#f85149';
+    // rssi field is typed: <=0 WiFi STA dBm, >=10 wired link speed (Mbps), 1 = AP.
+    var re = document.getElementById('rssi'), nl = document.getElementById('net-label');
+    if (rssi >= 10) {                       // wired Ethernet
+      nl.textContent = 'LAN';  re.textContent = rssi + 'M';   re.style.color = '#3fb950';
+    } else if (rssi >= 1) {                 // standalone AP fallback
+      nl.textContent = 'AP';   re.textContent = 'active';     re.style.color = '#a371f7';
+    } else {                                // WiFi STA, real signal strength
+      nl.textContent = 'WiFi'; re.textContent = rssi + ' dBm';
+      re.style.color = rssi > -65 ? '#3fb950' : rssi > -80 ? '#e3b341' : '#f85149';
+    }
     document.getElementById('heap').textContent   = (heap / 1024).toFixed(0) + ' KB';
     var h = Math.floor(upS / 3600), m = Math.floor((upS % 3600) / 60), s = upS % 60;
     document.getElementById('uptime').textContent = (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + s + 's';

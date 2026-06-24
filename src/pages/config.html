@@ -47,6 +47,12 @@ footer a:hover { color:var(--gh-text); }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#238636; } .lg-warn::before{ background:#9e6a03; } .lg-bad::before{ background:#6e1a1a; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #58a6ff inset; }
+/* Always-visible save bar. The config form submits via the button's form="cfg-form" */
+#save-bar { position:fixed; left:0; right:0; bottom:0; z-index:1030; padding:.55rem 1rem;
+  background:rgba(13,17,23,.93); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  border-top:1px solid var(--gh-border); box-shadow:0 -3px 14px rgba(0,0,0,.45); }
+#save-bar .save-inner { max-width:960px; margin:0 auto; }
+body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 </style>
 </head>
 <body>
@@ -65,7 +71,7 @@ footer a:hover { color:var(--gh-text); }
 <div class="container py-4" style="max-width:960px">
 
   <!-- Art-Net + Device config form -->
-  <form method="POST" action="/config">
+  <form method="POST" action="/config" id="cfg-form">
 
     <!-- Hardware board / pin picker (issue #12) -->
     <div class="card mb-3">
@@ -131,11 +137,20 @@ footer a:hover { color:var(--gh-text); }
           <div class="form-text">The AP broadcasts the hostname below as its SSID. 8 or more characters enables WPA2; leave empty for an open network.</div>
         </div>
         <div id="ap-fb-row" class="mb-3" style="display:none">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" name="apfb" id="apfb-sw" value="1">
-            <label class="form-check-label small" for="apfb-sw">Start a WiFi AP if the Ethernet link is down</label>
+          <label class="form-label text-secondary small mb-1">If the wired Ethernet link is down</label>
+          <select class="form-select" name="fbmode" id="fb-mode">
+            <option value="0">Keep retrying the wired link (recommended)</option>
+            <option value="1">Standalone WiFi AP (needs an AP password)</option>
+            <option value="2">Reboot and retry</option>
+          </select>
+          <div class="form-text">
+            What to do when wired Ethernet is selected but the cable is unplugged or the switch is off.
+            <b>Keep retrying</b> stays reachable once the link is back and never opens a hotspot (best on a show).
+            <b>Standalone AP</b> makes the device its own network (set an AP password below; it refuses to open an
+            unsecured AP). <b>Reboot</b> power-cycles to re-attempt the link. To put the device on a new WiFi,
+            hold the BOOT button at power-up for the setup portal (it is deliberately not an automatic fallback,
+            so nobody can force the device onto their network by dropping the link).
           </div>
-          <div class="form-text">Fallback so the device stays reachable when the cable is unplugged or the switch is off.</div>
         </div>
         <div id="static-row" class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" name="staticip" id="static-sw" value="1">
@@ -163,127 +178,70 @@ footer a:hover { color:var(--gh-text); }
       </div>
     </div>
 
-    <!-- Wired Ethernet (W5500) — optional; runtime pins, so any ESP32/ESP32-S3 + a W5500 module -->
+    <!-- Wired Ethernet: one selector for the PHY (or None). Replaces the old W5500
+         enable switch + the separate PHY/RMII dropdowns. -->
     <div id="w5500-card" class="card mb-3" style="display:none">
       <div class="card-header">Wired Ethernet</div>
       <div class="card-body">
-        <!-- Wired PHY chooser — only shown when the build compiled BOTH PHYs (classic ESP32) -->
-        <div id="wired-phy-row" class="mb-3" style="display:none">
-          <label class="form-label text-secondary small mb-1">Wired Ethernet PHY</label>
-          <select class="form-select" name="wiredphy" id="wired-phy">
-            <option value="0">W5500 — external SPI module</option>
-            <option value="1">ESP32 built-in MAC + LAN8720 (RMII)</option>
-          </select>
-          <div class="form-text">
-            <b>W5500</b> = external SPI Ethernet chip, works on any ESP32 (pins below).
-            <b>RMII</b> = the classic ESP32's internal MAC driving an external LAN8720 PHY
-            (e.g. WT32-ETH01), on fixed GPIOs: MDC 23, MDIO 18, PHY-power 16, CLK 0.
-            Only the original ESP32 has the internal MAC.
-          </div>
+        <label class="form-label text-secondary small mb-1">Wired Ethernet PHY</label>
+        <select class="form-select" id="wired-sel"><option value="none">None (WiFi only)</option></select>
+        <div class="form-text">
+          Pick the wired hardware, or <b>None</b> to run on WiFi. <b>W5500</b> is an external SPI
+          module (any ESP32 / ESP32-S3). The <b>RMII</b> PHYs use the classic ESP32's built-in MAC
+          (an S3 has none, so it only offers W5500). Choosing a PHY reveals its pins and the
+          <i>Use wired Ethernet</i> switch in the Network card above.
         </div>
-        <div id="rmii-sub" style="display:none">
-          <div class="form-text mb-2">
-            Internal-MAC RMII PHY. The data lines are fixed by the ESP32 EMAC; set the PHY type,
-            address and the management / clock / power pins for your board. Defaults match the
-            WT32-ETH01 (LAN8720) wiring.
-          </div>
+        <!-- Hidden, JS-driven fields the firmware reads (kept so the NVS keys / OTA stay the same) -->
+        <input type="checkbox" name="ethon" id="ethon-sw" value="1" hidden>
+        <select name="wiredphy" id="wired-phy" hidden><option value="0"></option><option value="1"></option></select>
+        <select name="rmiiphy" id="rmii-phy" hidden><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option><option value="5"></option></select>
+
+        <div id="w5500-pins" class="mt-3" style="display:none">
+          <div class="form-text mb-2">GPIO pins for the W5500 module. Defaults are the classic-ESP32 VSPI pins.</div>
           <div class="row g-2">
-            <div class="col">
-              <label class="form-label text-secondary small mb-1">PHY type</label>
-              <select class="form-select" name="rmiiphy" id="rmii-phy">
-                <option value="0">LAN8720 / LAN8742</option>
-                <option value="1">IP101</option>
-                <option value="2">RTL8201</option>
-                <option value="3">DP83848</option>
-                <option value="4">KSZ8081</option>
-                <option value="5">JL1101</option>
-              </select>
-            </div>
-            <div class="col">
-              <label class="form-label text-secondary small mb-1">REF_CLK</label>
-              <select class="form-select" name="rmiiclk" id="rmii-clk">
-                <option value="0">GPIO0 in (ext)</option>
-                <option value="1">GPIO0 out</option>
-                <option value="2">GPIO16 out</option>
-                <option value="3">GPIO17 out</option>
-              </select>
-            </div>
-            <div class="col">
-              <label class="form-label text-secondary small mb-1">PHY addr</label>
-              <input class="form-control" type="number" name="rmiiaddr" id="rmii-addr" min="0" max="31" value="1">
-            </div>
+            <div class="col"><label class="form-label text-secondary small mb-1">CS</label>
+              <input class="form-control" type="number" name="ethcs" id="eth-cs" min="-1" max="48" value="5"></div>
+            <div class="col"><label class="form-label text-secondary small mb-1">SCK</label>
+              <input class="form-control" type="number" name="ethsck" id="eth-sck" min="-1" max="48" value="18"></div>
+            <div class="col"><label class="form-label text-secondary small mb-1">MOSI</label>
+              <input class="form-control" type="number" name="ethmosi" id="eth-mosi" min="-1" max="48" value="23"></div>
           </div>
           <div class="row g-2 mt-1">
-            <div class="col">
-              <label class="form-label text-secondary small mb-1">MDC</label>
-              <input class="form-control" type="number" name="rmiimdc" id="rmii-mdc" min="0" max="48" value="23">
-            </div>
-            <div class="col">
-              <label class="form-label text-secondary small mb-1">MDIO</label>
-              <input class="form-control" type="number" name="rmiimdio" id="rmii-mdio" min="0" max="48" value="18">
-            </div>
-            <div class="col">
-              <label class="form-label text-secondary small mb-1">PHY power</label>
-              <input class="form-control" type="number" name="rmiipwr" id="rmii-pwr" min="-1" max="48" value="16">
-            </div>
+            <div class="col"><label class="form-label text-secondary small mb-1">MISO</label>
+              <input class="form-control" type="number" name="ethmiso" id="eth-miso" min="-1" max="48" value="19"></div>
+            <div class="col"><label class="form-label text-secondary small mb-1">INT</label>
+              <input class="form-control" type="number" name="ethint" id="eth-int" min="-1" max="48" value="4"></div>
+            <div class="col"><label class="form-label text-secondary small mb-1">RST</label>
+              <input class="form-control" type="number" name="ethrst" id="eth-rst" min="-1" max="48" value="25"></div>
           </div>
-          <div class="form-text mt-2">
-            Data lines are fixed by the EMAC: TXD0 19, TXD1 22, TX_EN 21, RXD0 25, RXD1 26, RX_DV 27.
-            Keep DMX / LED off those plus the MDC / MDIO / clock / power pins above. Applied after reboot.
+          <div class="row g-2 mt-1">
+            <div class="col-5"><label class="form-label text-secondary small mb-1">SPI clock (MHz)</label>
+              <input class="form-control" type="number" name="ethfreq" id="eth-freq" min="1" max="80" value="20"></div>
           </div>
+          <div class="form-text mt-2">If the module isn't detected, lower the SPI clock (e.g. <code>1</code>) to rule out long/loose jumper wiring. Applied after reboot.</div>
         </div>
-        <div id="w5500-sub">
-        <div class="form-check form-switch mb-2">
-          <input class="form-check-input" type="checkbox" name="ethon" id="ethon-sw" value="1">
-          <label class="form-check-label small" for="ethon-sw">Use a W5500 Ethernet module</label>
+
+        <div id="rmii-pins" class="mt-3" style="display:none">
+          <div class="form-text mb-2">RMII wiring. The data lines are fixed by the EMAC; set the PHY address, REF_CLK and the management / power pins. Defaults match the WT32-ETH01 (LAN8720) wiring.</div>
+          <div class="row g-2">
+            <div class="col"><label class="form-label text-secondary small mb-1">REF_CLK</label>
+              <select class="form-select" name="rmiiclk" id="rmii-clk">
+                <option value="0">GPIO0 in (ext)</option><option value="1">GPIO0 out</option>
+                <option value="2">GPIO16 out</option><option value="3">GPIO17 out</option>
+              </select></div>
+            <div class="col"><label class="form-label text-secondary small mb-1">PHY addr</label>
+              <input class="form-control" type="number" name="rmiiaddr" id="rmii-addr" min="0" max="31" value="1"></div>
+          </div>
+          <div class="row g-2 mt-1">
+            <div class="col"><label class="form-label text-secondary small mb-1">MDC</label>
+              <input class="form-control" type="number" name="rmiimdc" id="rmii-mdc" min="0" max="48" value="23"></div>
+            <div class="col"><label class="form-label text-secondary small mb-1">MDIO</label>
+              <input class="form-control" type="number" name="rmiimdio" id="rmii-mdio" min="0" max="48" value="18"></div>
+            <div class="col"><label class="form-label text-secondary small mb-1">PHY power</label>
+              <input class="form-control" type="number" name="rmiipwr" id="rmii-pwr" min="-1" max="48" value="16"></div>
+          </div>
+          <div class="form-text mt-2">Data lines are fixed by the EMAC: TXD0 19, TXD1 22, TX_EN 21, RXD0 25, RXD1 26, RX_DV 27. Keep DMX / LED off those plus the pins above. Applied after reboot.</div>
         </div>
-        <div class="form-text mb-2">
-          Off by default. Wire an external <b>W5500</b> SPI module to any ESP32 / ESP32-S3 for wired
-          Ethernet, then turn this on to set its pins. The <i>Use wired Ethernet</i> switch above
-          (shown once this is on) picks wired vs WiFi.
-        </div>
-        <div id="w5500-pins" style="display:none">
-        <div class="form-text mb-2">GPIO pins for the W5500 module. Defaults are the classic-ESP32 VSPI pins.</div>
-        <div class="row g-2">
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">CS</label>
-            <input class="form-control" type="number" name="ethcs" id="eth-cs" min="-1" max="48" value="5">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">SCK</label>
-            <input class="form-control" type="number" name="ethsck" id="eth-sck" min="-1" max="48" value="18">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">MOSI</label>
-            <input class="form-control" type="number" name="ethmosi" id="eth-mosi" min="-1" max="48" value="23">
-          </div>
-        </div>
-        <div class="row g-2 mt-1">
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">MISO</label>
-            <input class="form-control" type="number" name="ethmiso" id="eth-miso" min="-1" max="48" value="19">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">INT</label>
-            <input class="form-control" type="number" name="ethint" id="eth-int" min="-1" max="48" value="4">
-          </div>
-          <div class="col">
-            <label class="form-label text-secondary small mb-1">RST</label>
-            <input class="form-control" type="number" name="ethrst" id="eth-rst" min="-1" max="48" value="25">
-          </div>
-        </div>
-        <div class="row g-2 mt-1">
-          <div class="col-5">
-            <label class="form-label text-secondary small mb-1">SPI clock (MHz)</label>
-            <input class="form-control" type="number" name="ethfreq" id="eth-freq" min="1" max="80" value="20">
-          </div>
-        </div>
-        <div class="form-text mt-2">
-          If the module isn't detected, lower the SPI clock (e.g. <code>1</code>) to rule out
-          long/loose jumper wiring. Applied after reboot.
-        </div>
-        </div><!-- /w5500-pins -->
-        </div><!-- /w5500-sub -->
       </div>
     </div>
 
@@ -508,7 +466,7 @@ footer a:hover { color:var(--gh-text); }
             does not use it.
           </div>
         </div>
-        <button type="submit" class="btn btn-primary w-100" id="save-btn" disabled>Save &amp; Restart</button>
+        <!-- Save & Restart lives in the fixed #save-bar at the bottom of the page -->
       </div>
     </div>
   </form>
@@ -601,6 +559,12 @@ footer a:hover { color:var(--gh-text); }
   &nbsp;&mdash;&nbsp; MIT License
 </footer>
 
+<div id="save-bar">
+  <div class="save-inner">
+    <button type="submit" form="cfg-form" class="btn btn-primary w-100" id="save-btn" disabled>Save &amp; Restart</button>
+  </div>
+</div>
+
 <script>
 var CURRENT = '';
 var INFO_BOARD = '', INFO_MCU = '';
@@ -654,24 +618,33 @@ function wireCard(cont, tpl, i, o){
 function updStatic(){ $('static-fields').style.display = $('static-sw').checked ? '' : 'none'; }
 // Wired-Ethernet capability flags from the firmware build (set in populate()).
 var ETH_SPI = false, ETH_RMII = false, HAS_ETH = false;
-// The PHY in effect: the dropdown when both are compiled, else the only one available.
-function currentPhy(){
-  if (ETH_SPI && ETH_RMII) return parseInt($('wired-phy').value, 10) || 0;
-  if (ETH_RMII) return 1;   // RMII-only build (e.g. WT32-ETH01)
-  return 0;                 // W5500-only / no wired
+// RMII PHY family labels (index = cfg.rmiiPhy / the firmware enum order).
+var RMII_PHY_LABELS = ['LAN8720 / LAN8742', 'IP101', 'RTL8201', 'DP83848', 'KSZ8081', 'JL1101'];
+// Build the single Wired-Ethernet selector from what the build supports: None, W5500
+// (if compiled), then each RMII PHY (only on a classic ESP32). One list replaces the
+// old enable switch + the separate PHY/RMII dropdowns.
+function buildWiredSelect(){
+  var sel = $('wired-sel'); if (!sel) return;
+  var html = '<option value="none">None (WiFi only)</option>';
+  if (ETH_SPI)  html += '<option value="w5500">W5500 (SPI module)</option>';
+  if (ETH_RMII) for (var i = 0; i < RMII_PHY_LABELS.length; i++)
+    html += '<option value="rmii' + i + '">' + RMII_PHY_LABELS[i] + ' (RMII)</option>';
+  sel.innerHTML = html;
 }
-// Drive the Wired-Ethernet card from the selected PHY: W5500 shows its module switch +
-// pins; RMII shows its PHY-type + pin settings. The "Use wired Ethernet" toggle is offered
-// once the chosen PHY is ready (RMII always; W5500 once the module is enabled).
+function wiredSel(){ var el = $('wired-sel'); return el ? el.value : 'none'; }
+// 0 = W5500/none, 1 = RMII. Used by the pin-conflict overlay (rmiiActive).
+function currentPhy(){ return wiredSel().indexOf('rmii') === 0 ? 1 : 0; }
+// Drive the card + the hidden firmware fields from the one selector. None = no wired
+// (forces WiFi); W5500 or an RMII PHY shows its pins + the "Use wired Ethernet" switch.
 function updWired(){
-  var rmii = currentPhy() === 1;
-  $('w5500-sub').style.display  = rmii ? 'none' : '';
-  $('rmii-sub').style.display   = rmii ? '' : 'none';
-  var ethon = $('ethon-sw').checked;
-  $('w5500-pins').style.display = (!rmii && ethon) ? '' : 'none';
-  var wiredReady = HAS_ETH && (rmii || ethon);
-  $('net-mode-row').style.display = wiredReady ? '' : 'none';
-  if (!wiredReady) $('useeth-sw').checked = false;   // no usable wired PHY → can't be on wired
+  var v = wiredSel(), rmii = v.indexOf('rmii') === 0, w5500 = v === 'w5500', none = v === 'none';
+  $('ethon-sw').checked = w5500;                 // ethW5500 = W5500 selected
+  $('wired-phy').value  = rmii ? '1' : '0';      // wiredPhy 0=SPI, 1=RMII
+  if (rmii) $('rmii-phy').value = v.slice(4);    // rmiiPhy index from "rmiiN"
+  $('w5500-pins').style.display = w5500 ? '' : 'none';
+  $('rmii-pins').style.display  = rmii  ? '' : 'none';
+  $('net-mode-row').style.display = none ? 'none' : '';   // "Use wired Ethernet" only once a PHY is picked
+  if (none) $('useeth-sw').checked = false;               // None forces WiFi
   updNetMode();
 }
 // Show only the network fields that apply to the chosen interface/mode (issue #14):
@@ -681,8 +654,9 @@ function updNetMode(){
   var hasEth = $('net-mode-row').style.display !== 'none';
   var eth = hasEth && $('useeth-sw').checked;
   var ap  = !eth && $('wifi-mode').value === '1';
+  var fbAp = eth && $('fb-mode').value === '1';   // the standalone-AP fallback uses the AP password too
   $('wifi-mode-row').style.display = eth ? 'none' : '';
-  $('ap-pw-row').style.display     = ap  ? '' : 'none';
+  $('ap-pw-row').style.display     = (ap || fbAp) ? '' : 'none';
   $('ap-fb-row').style.display     = eth ? '' : 'none';
   $('static-row').style.display    = ap  ? 'none' : '';
   if (ap) $('static-fields').style.display = 'none';
@@ -709,7 +683,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('useeth-sw').checked = !!d.useEthernet;
   $('wifi-mode').value = d.wifiMode !== undefined ? d.wifiMode : 0;
   $('ap-pw').value = d.apPassword || '';
-  $('apfb-sw').checked = d.apFallback !== undefined ? !!d.apFallback : true;
+  $('fb-mode').value = String(d.linkLossMode !== undefined ? d.linkLossMode : (d.apFallback ? 1 : 0));
   $('static-sw').checked = !!d.staticIp;
   $('net-ip').value  = d.sip || '';
   $('net-gw').value  = d.gateway || '';
@@ -739,18 +713,18 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('eth-int').value  = d.ethInt  !== undefined ? d.ethInt  : 4;
   $('eth-rst').value  = d.ethRst  !== undefined ? d.ethRst  : 25;
   $('eth-freq').value = d.ethFreq !== undefined ? d.ethFreq : 20;
-  $('ethon-sw').checked = !!d.ethW5500;
   ETH_SPI = !!d.ethSpi; ETH_RMII = !!d.ethRmii; HAS_ETH = !!d.hasEth;
-  $('wired-phy').value = (d.wiredPhy !== undefined ? d.wiredPhy : 0);
-  $('rmii-phy').value  = (d.rmiiPhy  !== undefined ? d.rmiiPhy  : 0);
   $('rmii-clk').value  = (d.rmiiClk  !== undefined ? d.rmiiClk  : 0);
   $('rmii-addr').value = (d.rmiiAddr !== undefined ? d.rmiiAddr : 1);
   $('rmii-mdc').value  = (d.rmiiMdc  !== undefined ? d.rmiiMdc  : 23);
   $('rmii-mdio').value = (d.rmiiMdio !== undefined ? d.rmiiMdio : 18);
   $('rmii-pwr').value  = (d.rmiiPwr  !== undefined ? d.rmiiPwr  : 16);
-  if (ETH_SPI)              $('w5500-card').style.display = '';    // build has the W5500 driver / wired card
-  if (ETH_SPI && ETH_RMII)  $('wired-phy-row').style.display = ''; // both PHYs compiled → offer the chooser
-  updWired();                                                      // set sub-section + net-mode-row visibility
+  // One Wired-Ethernet selector: build its options, then pick the current PHY from the
+  // saved state (RMII -> rmiiN; else W5500 if the module is enabled; else None).
+  buildWiredSelect();
+  $('wired-sel').value = (d.wiredPhy === 1) ? ('rmii' + (d.rmiiPhy || 0)) : (d.ethW5500 ? 'w5500' : 'none');
+  if (ETH_SPI || ETH_RMII)  $('w5500-card').style.display = '';    // build has a wired PHY -> show the card
+  updWired();                                                      // map selection -> hidden fields + visibility
   $('dev-host').value = d.hostname || '';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;
@@ -810,13 +784,13 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
 $('proto-sel').addEventListener('change', updAllUniHints);
 $('static-sw').addEventListener('change', updStatic);
 $('useeth-sw').addEventListener('change', updNetMode);
-$('ethon-sw').addEventListener('change', function(){ updWired(); validate(); });
-$('wired-phy').addEventListener('change', function(){ updWired(); validate(); });
+$('wired-sel').addEventListener('change', function(){ updWired(); validate(); });
 // RMII MDC/MDIO/power/clock changes move the reserved pin set, so re-validate.
 ['rmii-mdc', 'rmii-mdio', 'rmii-pwr', 'rmii-clk'].forEach(function(id){
-  $(id).addEventListener(id === 'rmii-clk' ? 'change' : 'input', validate);
+  $(id).addEventListener(id === 'rmii-clk' ? 'change' : 'input', function(){ validate(); });
 });
 $('wifi-mode').addEventListener('change', updNetMode);
+$('fb-mode').addEventListener('change', updNetMode);
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
 $('dev-host').addEventListener('input', updHostUrl);

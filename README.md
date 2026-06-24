@@ -72,7 +72,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **WiFi Config Portal** | First-boot AP + captive portal via WiFiManager |
 | **Selectable network mode** | Pick the interface (WiFi or wired Ethernet) and WiFi mode (client/STA or standalone AP) in the web UI, on boards that have both |
 | **Standalone AP mode** | LumiGate hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
-| **Ethernet → AP fallback** | Auto-starts the WiFi AP if wired Ethernet is selected but the link is down, so the device stays reachable |
+| **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, or reboot. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
 | **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click GitHub update |
 | **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
@@ -492,7 +492,12 @@ Choose how LumiGate connects in **`/config` → Network**. Changes apply after a
 - **WiFi mode:**
   - **Client (STA)** — join your existing 2.4 GHz network (the default; set credentials via the config portal above).
   - **Standalone AP** — LumiGate hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
-- **Ethernet → AP fallback** (dual boards): if wired Ethernet is selected but the link is down at boot, LumiGate automatically brings up the WiFi AP so it stays reachable.
+- **Wired link-loss policy** (boards on wired Ethernet), for when *the wired Ethernet link is down*:
+  - **Keep retrying the wired link** (default): never opens a hotspot, reconnects on its own when the cable is back. Best on a show.
+  - **Standalone WiFi AP**: the device becomes its own network (needs an **AP password**; it refuses to open an *unsecured* AP).
+  - **Reboot and retry**: power-cycle to re-attempt the link.
+
+  A runtime watchdog applies the policy even if the cable is pulled while running (the old fallback only ran at boot, so a mid-show unplug used to strand the device). There is **no automatic WiFi setup portal** on link loss, on purpose: that would let anyone who can drop the link force the device onto their own WiFi. To move the device to a new WiFi, hold the **BOOT button** at power-up for the setup portal (physical access required).
 
 **Using AP mode with an iPad / console app** (Luminair, Photon, etc.): set WiFi mode to Standalone AP and reboot, join the `dmx-gateway` network, then point the app's Art-Net output at **`192.168.4.1`** (or broadcast `192.168.4.255`).
 
@@ -502,7 +507,7 @@ Choose how LumiGate connects in **`/config` → Network**. Changes apply after a
 
 Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 baud):
 
-- Live stats: framerate, RSSI, uptime, free heap, jitter
+- Live stats: framerate, link (**WiFi** signal in dBm, **LAN** with link speed, or **AP**), uptime, free heap, jitter
 - Conflict warning when sources clash on a universe, or a "merging" indicator when HTP/LTP merging is enabled for that output
 - Active sender list with per-sender protocol and FPS
 - All 512 DMX channels as a live grid — each cell shows the channel number large,
@@ -554,7 +559,8 @@ Binary status/DMX frame pushed ~10×/s (528 + 2 bytes per output):
 
 ```
 Bytes  0–1    fps × 10           uint16 big-endian (aggregate, all inputs)
-Bytes  2–3    RSSI (dBm)         int16  big-endian
+Bytes  2–3    link metric        int16  big-endian (≤0 = WiFi RSSI dBm,
+                                   ≥10 = wired link speed Mbps, 1 = standalone AP)
 Bytes  4–7    free heap          uint32 big-endian
 Bytes  8–11   uptime (s)         uint32 big-endian
 Byte   12     active sender count uint8
