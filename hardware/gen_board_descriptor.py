@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate the board descriptors served by the /config pin picker (issue #12).
 
-Single source of truth: the LumiGate v3 board descriptor is derived directly from
+Single source of truth: the LumiGate v4 board descriptor is derived directly from
 the PCB netlist source (lumigate.py) so the clickable diagram, the "Apply template"
 preset and the Ethernet-reserved-pin rules can never drift from the real board.
 
@@ -13,7 +13,7 @@ variants/<dir>/pins_arduino.h (authoritative GPIOs); see auto_board().
 Outputs (committed; GitHub Pages serves web/ -> https://tombueng.github.io/LumiGate/):
     web/boards/index.json              catalog index (lazy-loaded by config.html)
     web/boards/<id>.json               one descriptor per board
-    web/boards/lumigate_v3.json        generated from lumigate.py
+    web/boards/lumigate_v4.json        generated from lumigate.py
 
 Five core boards are also baked into src/pages/config.html so they work fully offline;
 the catalog adds the long tail. The /config pin picker draws a generated horizontal
@@ -46,7 +46,7 @@ def _find_variants():
 
 VARIANTS = _find_variants()
 
-# ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LumiGate v3 module)
+# ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LumiGate v4 module)
 S3L = [4, 5, 6, 7, 15, 16, 17, 18, 8, 19, 20, 3, 46, 9, 10, 11, 12, 13, 14]
 S3R = [21, 47, 48, 45, 0, 35, 36, 37, 38, 39, 40, 41, 42, 44, 43, 2, 1]
 # ESP32 DevKitC (WROOM-32, 38-pin) headers — breaks out the flash pins (6-11) too
@@ -329,8 +329,8 @@ def v3_descriptor():
     preset["outputs"] = [dmx]
 
     return {
-        "id": "lumigate_v3",
-        "name": "LumiGate v3 (ESP32-S3 + W5500)",
+        "id": "lumigate_v4",
+        "name": "LumiGate v4 (ESP32-S3 + W5500)",
         "mcu": "esp32s3",
         "cols": cols(S3L, S3R, s3_silk, lambda g: s3_flags(g, eth_pins)),
         "preset": preset,
@@ -430,7 +430,7 @@ def main():
     # Fixed on-board wiring (changeable in /config but physically wired). Hand-tuned boards
     # get curated labels here; auto boards already carry their own hardwired list.
     HARDWIRED = {
-        "lumigate_v3": [(1,"LED Red"),(2,"LED Green"),(6,"LED Yellow"),(7,"LED Blue"),(15,"LED White"),
+        "lumigate_v4": [(1,"LED Red"),(2,"LED Green"),(6,"LED Yellow"),(7,"LED Blue"),(15,"LED White"),
                         (17,"DMX TX"),(18,"DMX RX"),(8,"DMX DE/RE"),(12,"W5500 SCLK"),(11,"W5500 MOSI"),
                         (13,"W5500 MISO"),(10,"W5500 CS"),(14,"W5500 INT"),(9,"W5500 RST"),
                         (4,"Display SDA (J4)"),(5,"Display SCL (J4)")],
@@ -457,7 +457,7 @@ def main():
         print("wrote", os.path.relpath(path, ROOT))
 
     # Boards also baked inline into src/pages/config.html (work fully offline).
-    INLINE = {"lumigate_v3", "esp32s3-devkitc-1", "esp32-devkitc", "esp32-devkit-v1", "xiao-esp32s3"}
+    INLINE = {"lumigate_v4", "esp32s3-devkitc-1", "esp32-devkitc", "esp32-devkit-v1", "xiao-esp32s3"}
     index = {
         "schema": 1,
         "updated": "auto",
