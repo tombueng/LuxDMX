@@ -52,6 +52,41 @@
 #define DEF_WIRED_PHY WIRED_PHY_SPI
 #endif
 #endif
+
+// RMII PHY family + wiring (cfg.rmii*, used when wiredPhy = RMII). These indices are
+// stable in NVS and mapped to the arduino-esp32 ETH enums in startEthRmii(). The
+// defaults reproduce the LAN8720 / WT32-ETH01 wiring, so an existing RMII device is
+// unchanged across an OTA. The RMII DATA lines are fixed by the EMAC and not settable;
+// only the PHY type, address, MDC/MDIO/power pins and REF_CLK mode are configurable.
+#define RMII_PHY_LAN8720 0
+#define RMII_PHY_IP101   1
+#define RMII_PHY_RTL8201 2
+#define RMII_PHY_DP83848 3
+#define RMII_PHY_KSZ8081 4
+#define RMII_PHY_JL1101  5
+#define RMII_PHY_COUNT   6
+#define RMII_CLK_GPIO0_IN   0   // external 50MHz clock fed in on GPIO0 (WT32-ETH01)
+#define RMII_CLK_GPIO0_OUT  1
+#define RMII_CLK_GPIO16_OUT 2
+#define RMII_CLK_GPIO17_OUT 3
+#ifndef DEF_RMII_PHY
+#define DEF_RMII_PHY  RMII_PHY_LAN8720
+#endif
+#ifndef DEF_RMII_ADDR
+#define DEF_RMII_ADDR 1
+#endif
+#ifndef DEF_RMII_MDC
+#define DEF_RMII_MDC  23
+#endif
+#ifndef DEF_RMII_MDIO
+#define DEF_RMII_MDIO 18
+#endif
+#ifndef DEF_RMII_PWR
+#define DEF_RMII_PWR  16
+#endif
+#ifndef DEF_RMII_CLK
+#define DEF_RMII_CLK  RMII_CLK_GPIO0_IN
+#endif
 #include <WiFiManager.h>  // WiFi (STA config portal) is always available
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
@@ -401,6 +436,10 @@ struct Config {
     int    ethFreqMhz;     // W5500 SPI clock (MHz); lower to debug long/loose wiring
     bool   ethW5500;       // W5500 module enabled — opt-in, default OFF (SPI-Eth boards)
     int    wiredPhy;       // wired PHY: 0=W5500 (SPI), 1=LAN8720 (RMII). Default per build.
+    int    rmiiPhy;        // RMII PHY family index (RMII_PHY_*); used when wiredPhy = RMII
+    int    rmiiAddr;       // RMII PHY SMI address (usually 0 or 1)
+    int    rmiiMdc, rmiiMdio, rmiiPwr;  // RMII MDC / MDIO / PHY-power GPIOs (data lines are fixed)
+    int    rmiiClk;        // RMII REF_CLK mode (RMII_CLK_*)
     bool   useEthernet;    // wired-Eth boards: true = wired Ethernet, false = WiFi
     int    wifiMode;       // WiFi interface mode: 0 = STA (client), 1 = AP (standalone)
     bool   apFallback;     // start the WiFi AP automatically if wired Eth has no link
@@ -493,6 +532,12 @@ static void loadConfig() {
     // Wired PHY default reproduces the pre-runtime-select behavior (see DEF_WIRED_PHY):
     // absent key on an existing device → its old PHY, so OTA changes nothing.
     cfg.wiredPhy    = constrain(prefs.getInt("wiredphy", DEF_WIRED_PHY), 0, 1);
+    cfg.rmiiPhy     = constrain(prefs.getInt("rmiiphy",  DEF_RMII_PHY),  0, RMII_PHY_COUNT - 1);
+    cfg.rmiiAddr    = constrain(prefs.getInt("rmiiaddr", DEF_RMII_ADDR), 0, 31);
+    cfg.rmiiMdc     = constrain(prefs.getInt("rmiimdc",  DEF_RMII_MDC),  0, 48);
+    cfg.rmiiMdio    = constrain(prefs.getInt("rmiimdio", DEF_RMII_MDIO), 0, 48);
+    cfg.rmiiPwr     = constrain(prefs.getInt("rmiipwr",  DEF_RMII_PWR), -1, 48);
+    cfg.rmiiClk     = constrain(prefs.getInt("rmiiclk",  DEF_RMII_CLK),  0, 3);
     cfg.useEthernet = prefs.getBool("useeth",   DEF_USE_ETH);
     cfg.wifiMode    = constrain(prefs.getInt("wifimode", NET_WIFI_STA), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback  = prefs.getBool("apfb",     true);
@@ -547,6 +592,12 @@ static void saveConfig() {
     prefs.putInt("ethfreq",     cfg.ethFreqMhz);
     prefs.putBool("ethon",      cfg.ethW5500);
     prefs.putInt("wiredphy",    cfg.wiredPhy);
+    prefs.putInt("rmiiphy",     cfg.rmiiPhy);
+    prefs.putInt("rmiiaddr",    cfg.rmiiAddr);
+    prefs.putInt("rmiimdc",     cfg.rmiiMdc);
+    prefs.putInt("rmiimdio",    cfg.rmiiMdio);
+    prefs.putInt("rmiipwr",     cfg.rmiiPwr);
+    prefs.putInt("rmiiclk",     cfg.rmiiClk);
     prefs.putBool("useeth",     cfg.useEthernet);
     prefs.putInt("wifimode",    cfg.wifiMode);
     prefs.putBool("apfb",       cfg.apFallback);
@@ -1620,6 +1671,12 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
 #endif
 #if defined(HAS_ETH_RMII)
     j += "\"ethRmii\":true,";   // internal-MAC RMII compiled in (classic ESP32) → offer the PHY selector
+    j += "\"rmiiPhy\":";   j += cfg.rmiiPhy;            j += ",";   // RMII PHY family index (RMII_PHY_*)
+    j += "\"rmiiAddr\":";  j += cfg.rmiiAddr;           j += ",";
+    j += "\"rmiiMdc\":";   j += cfg.rmiiMdc;            j += ",";
+    j += "\"rmiiMdio\":";  j += cfg.rmiiMdio;           j += ",";
+    j += "\"rmiiPwr\":";   j += cfg.rmiiPwr;            j += ",";
+    j += "\"rmiiClk\":";   j += cfg.rmiiClk;            j += ",";   // REF_CLK mode (RMII_CLK_*)
 #else
     j += "\"ethRmii\":false,";
 #endif
@@ -1770,6 +1827,12 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     if (argStr(req, "ethfreq", s))  cfg.ethFreqMhz = constrain(s.toInt(), 1, 80);
     cfg.ethW5500 = req->hasParam("ethon", true) || req->hasParam("ethon");
     if (argStr(req, "wiredphy", s)) cfg.wiredPhy = constrain(s.toInt(), 0, 1);
+    if (argStr(req, "rmiiphy", s))  cfg.rmiiPhy  = constrain(s.toInt(), 0, RMII_PHY_COUNT - 1);
+    if (argStr(req, "rmiiaddr", s)) cfg.rmiiAddr = constrain(s.toInt(), 0, 31);
+    if (argStr(req, "rmiimdc", s))  cfg.rmiiMdc  = constrain(s.toInt(), 0, 48);
+    if (argStr(req, "rmiimdio", s)) cfg.rmiiMdio = constrain(s.toInt(), 0, 48);
+    if (argStr(req, "rmiipwr", s))  cfg.rmiiPwr  = constrain(s.toInt(), -1, 48);
+    if (argStr(req, "rmiiclk", s))  cfg.rmiiClk  = constrain(s.toInt(), 0, 3);
     cfg.useEthernet = req->hasParam("useeth", true) || req->hasParam("useeth");
     if (argStr(req, "wifimode", s)) cfg.wifiMode = constrain(s.toInt(), NET_WIFI_STA, NET_WIFI_AP);
     cfg.apFallback = req->hasParam("apfb", true) || req->hasParam("apfb");
@@ -2434,13 +2497,37 @@ static void startEthSpi() {
 #endif
 
 #if defined(HAS_ETH_RMII)
-// Bring up the LAN8720 RMII Ethernet via the ESP32 internal EMAC (WT32-ETH01 layout).
-// Runtime opt-in (g_useEth) now that WiFi is also compiled in — the board is no
-// longer wired-only. Pins are the LAN8720/WT32-ETH01 standard: MDC=23 MDIO=18
-// PHY-power=16 CLK=GPIO0-in. begin() arg order: (type, phy_addr, mdc, mdio, power, clk).
+static const char* RMII_PHY_NAMES[RMII_PHY_COUNT] =
+    { "LAN8720", "IP101", "RTL8201", "DP83848", "KSZ8081", "JL1101" };
+// Map the stable cfg.rmiiPhy index to the arduino-esp32 ETH enum. IP101 is the
+// TLK110 driver; JL1101 is the generic driver (both #defined in ETH.h).
+static eth_phy_type_t rmiiPhyType(int idx) {
+    switch (idx) {
+        case RMII_PHY_IP101:   return ETH_PHY_IP101;     // == ETH_PHY_TLK110
+        case RMII_PHY_RTL8201: return ETH_PHY_RTL8201;
+        case RMII_PHY_DP83848: return ETH_PHY_DP83848;
+        case RMII_PHY_KSZ8081: return ETH_PHY_KSZ8081;
+        case RMII_PHY_JL1101:  return ETH_PHY_JL1101;    // == ETH_PHY_GENERIC
+        default:               return ETH_PHY_LAN8720;
+    }
+}
+static eth_clock_mode_t rmiiClkMode(int idx) {
+    switch (idx) {
+        case RMII_CLK_GPIO0_OUT:  return ETH_CLOCK_GPIO0_OUT;
+        case RMII_CLK_GPIO16_OUT: return ETH_CLOCK_GPIO16_OUT;
+        case RMII_CLK_GPIO17_OUT: return ETH_CLOCK_GPIO17_OUT;
+        default:                  return ETH_CLOCK_GPIO0_IN;
+    }
+}
+// Bring up RMII Ethernet via the ESP32 internal EMAC. The PHY family, SMI address,
+// MDC/MDIO/PHY-power pins and REF_CLK mode are runtime config (cfg.rmii*); the RMII
+// data lines are fixed by the EMAC. Defaults reproduce the LAN8720/WT32-ETH01 wiring.
 static void startEthRmii() {
-    Serial.println("[ETH] LAN8720 RMII (ESP32 internal MAC)");
-    ETH.begin(ETH_PHY_LAN8720, 1, 23, 18, 16, ETH_CLOCK_GPIO0_IN);
+    int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
+    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d\n",
+        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
+    ETH.begin(rmiiPhyType(phy), cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio,
+              cfg.rmiiPwr, rmiiClkMode(cfg.rmiiClk));
     applyEthStaticIp();
     waitEthLink();
 }

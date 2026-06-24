@@ -181,10 +181,56 @@ footer a:hover { color:var(--gh-text); }
             Only the original ESP32 has the internal MAC.
           </div>
         </div>
-        <div id="rmii-note" class="form-text mb-2" style="display:none">
-          Internal-MAC (LAN8720 RMII) — no pins to set here. Turn on <i>Use wired Ethernet</i>
-          below to run on the wired link. Make sure your DMX / LED GPIOs don't clash with the
-          RMII pins (16 / 0 / 18 / 23).
+        <div id="rmii-sub" style="display:none">
+          <div class="form-text mb-2">
+            Internal-MAC RMII PHY. The data lines are fixed by the ESP32 EMAC; set the PHY type,
+            address and the management / clock / power pins for your board. Defaults match the
+            WT32-ETH01 (LAN8720) wiring.
+          </div>
+          <div class="row g-2">
+            <div class="col">
+              <label class="form-label text-secondary small mb-1">PHY type</label>
+              <select class="form-select" name="rmiiphy" id="rmii-phy">
+                <option value="0">LAN8720 / LAN8742</option>
+                <option value="1">IP101</option>
+                <option value="2">RTL8201</option>
+                <option value="3">DP83848</option>
+                <option value="4">KSZ8081</option>
+                <option value="5">JL1101</option>
+              </select>
+            </div>
+            <div class="col">
+              <label class="form-label text-secondary small mb-1">REF_CLK</label>
+              <select class="form-select" name="rmiiclk" id="rmii-clk">
+                <option value="0">GPIO0 in (ext)</option>
+                <option value="1">GPIO0 out</option>
+                <option value="2">GPIO16 out</option>
+                <option value="3">GPIO17 out</option>
+              </select>
+            </div>
+            <div class="col">
+              <label class="form-label text-secondary small mb-1">PHY addr</label>
+              <input class="form-control" type="number" name="rmiiaddr" id="rmii-addr" min="0" max="31" value="1">
+            </div>
+          </div>
+          <div class="row g-2 mt-1">
+            <div class="col">
+              <label class="form-label text-secondary small mb-1">MDC</label>
+              <input class="form-control" type="number" name="rmiimdc" id="rmii-mdc" min="0" max="48" value="23">
+            </div>
+            <div class="col">
+              <label class="form-label text-secondary small mb-1">MDIO</label>
+              <input class="form-control" type="number" name="rmiimdio" id="rmii-mdio" min="0" max="48" value="18">
+            </div>
+            <div class="col">
+              <label class="form-label text-secondary small mb-1">PHY power</label>
+              <input class="form-control" type="number" name="rmiipwr" id="rmii-pwr" min="-1" max="48" value="16">
+            </div>
+          </div>
+          <div class="form-text mt-2">
+            Data lines are fixed by the EMAC: TXD0 19, TXD1 22, TX_EN 21, RXD0 25, RXD1 26, RX_DV 27.
+            Keep DMX / LED off those plus the MDC / MDIO / clock / power pins above. Applied after reboot.
+          </div>
         </div>
         <div id="w5500-sub">
         <div class="form-check form-switch mb-2">
@@ -615,12 +661,12 @@ function currentPhy(){
   return 0;                 // W5500-only / no wired
 }
 // Drive the Wired-Ethernet card from the selected PHY: W5500 shows its module switch +
-// pins; RMII shows a note. The "Use wired Ethernet" toggle is offered once the chosen
-// PHY is ready (RMII always; W5500 once the module is enabled).
+// pins; RMII shows its PHY-type + pin settings. The "Use wired Ethernet" toggle is offered
+// once the chosen PHY is ready (RMII always; W5500 once the module is enabled).
 function updWired(){
   var rmii = currentPhy() === 1;
   $('w5500-sub').style.display  = rmii ? 'none' : '';
-  $('rmii-note').style.display  = rmii ? '' : 'none';
+  $('rmii-sub').style.display   = rmii ? '' : 'none';
   var ethon = $('ethon-sw').checked;
   $('w5500-pins').style.display = (!rmii && ethon) ? '' : 'none';
   var wiredReady = HAS_ETH && (rmii || ethon);
@@ -696,6 +742,12 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('ethon-sw').checked = !!d.ethW5500;
   ETH_SPI = !!d.ethSpi; ETH_RMII = !!d.ethRmii; HAS_ETH = !!d.hasEth;
   $('wired-phy').value = (d.wiredPhy !== undefined ? d.wiredPhy : 0);
+  $('rmii-phy').value  = (d.rmiiPhy  !== undefined ? d.rmiiPhy  : 0);
+  $('rmii-clk').value  = (d.rmiiClk  !== undefined ? d.rmiiClk  : 0);
+  $('rmii-addr').value = (d.rmiiAddr !== undefined ? d.rmiiAddr : 1);
+  $('rmii-mdc').value  = (d.rmiiMdc  !== undefined ? d.rmiiMdc  : 23);
+  $('rmii-mdio').value = (d.rmiiMdio !== undefined ? d.rmiiMdio : 18);
+  $('rmii-pwr').value  = (d.rmiiPwr  !== undefined ? d.rmiiPwr  : 16);
   if (ETH_SPI)              $('w5500-card').style.display = '';    // build has the W5500 driver / wired card
   if (ETH_SPI && ETH_RMII)  $('wired-phy-row').style.display = ''; // both PHYs compiled → offer the chooser
   updWired();                                                      // set sub-section + net-mode-row visibility
@@ -760,6 +812,10 @@ $('static-sw').addEventListener('change', updStatic);
 $('useeth-sw').addEventListener('change', updNetMode);
 $('ethon-sw').addEventListener('change', function(){ updWired(); validate(); });
 $('wired-phy').addEventListener('change', function(){ updWired(); validate(); });
+// RMII MDC/MDIO/power/clock changes move the reserved pin set, so re-validate.
+['rmii-mdc', 'rmii-mdio', 'rmii-pwr', 'rmii-clk'].forEach(function(id){
+  $(id).addEventListener(id === 'rmii-clk' ? 'change' : 'input', validate);
+});
 $('wifi-mode').addEventListener('change', updNetMode);
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
@@ -1009,12 +1065,22 @@ function decorateAllPins(){
 }
 
 // ---- Validation ------------------------------------------------------------
-// ESP32 internal-EMAC RMII (LAN8720) GPIOs. The RMII data lines are FIXED by the
-// EMAC hardware (TXD0=19 TXD1=22 TX_EN=21 RXD0=25 RXD1=26 RX_DV=27); plus the
-// configured REF_CLK=0, MDC=23, MDIO=18 and PHY-power=16 (see startEthRmii()).
-var RMII_PINS = [0, 16, 18, 19, 21, 22, 23, 25, 26, 27];
+// ESP32 internal-EMAC RMII GPIOs. The data lines are FIXED by the EMAC hardware
+// (TXD0=19 TXD1=22 TX_EN=21 RXD0=25 RXD1=26 RX_DV=27); the MDC/MDIO/power pins and the
+// REF_CLK GPIO are configurable in the RMII settings, so the reserved set is dynamic.
+var RMII_DATA_PINS = [19, 21, 22, 25, 26, 27];
 // RMII reserves its pins only while it is the selected wired PHY (classic ESP32).
 function rmiiActive(){ return ETH_RMII && currentPhy() === 1; }
+function rmiiReservedPins(){
+  var pins = RMII_DATA_PINS.slice();
+  ['rmii-mdc', 'rmii-mdio', 'rmii-pwr'].forEach(function(id){
+    var el = $(id); if (!el) return;
+    var v = parseInt(el.value, 10); if (!isNaN(v) && v >= 0) pins.push(v);
+  });
+  var clkEl = $('rmii-clk'); var clk = clkEl ? parseInt(clkEl.value, 10) : 0;
+  pins.push(clk === 2 ? 16 : clk === 3 ? 17 : 0);   // REF_CLK on GPIO16/17 out, else GPIO0
+  return pins;
+}
 function pinFlags(g){
   if (isNaN(g)) return [];
   var fl;
@@ -1031,7 +1097,7 @@ function pinFlags(g){
   }
   // Runtime overlay: while RMII is the selected wired PHY, its fixed GPIOs are
   // reserved — so a DMX / LED / display pin landing on one is flagged as a conflict.
-  if (rmiiActive() && RMII_PINS.indexOf(g) >= 0 && fl.indexOf('reserved:eth-rmii') < 0)
+  if (rmiiActive() && rmiiReservedPins().indexOf(g) >= 0 && fl.indexOf('reserved:eth-rmii') < 0)
     fl.push('reserved:eth-rmii');
   return fl;
 }

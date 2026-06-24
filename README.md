@@ -83,7 +83,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Ethernet support** | WT32-ETH01 (LAN8720) and v3 (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external W5500 module works too, and a **classic ESP32 can pick the W5500 (SPI) or the built-in MAC + LAN8720 (RMII)** PHY in `/config`; DHCP or static |
+| **Ethernet support** | WT32-ETH01 (LAN8720) and v3 (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external W5500 module works too, and a **classic ESP32 can pick the W5500 (SPI) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
@@ -788,10 +788,15 @@ are fully configurable (with the on-board pin-picker); lower the SPI clock there
 module isn't detected. No special build is needed.
 
 On a **classic ESP32** the card also shows a **Wired PHY** selector: pick the **W5500 (SPI module)**
-or the **ESP32 built-in MAC + LAN8720 (RMII)** (the WT32-ETH01-style wiring). The S3 has no internal
-MAC, so it stays W5500-only and the selector is hidden. When RMII is selected, the pin-picker
-reserves the LAN8720 GPIOs (0 / 16 / 18 / 19 / 21 / 22 / 23 / 25 / 26 / 27) so a DMX/LED pin clash is
-flagged.
+or the **ESP32 built-in MAC + RMII PHY** (the WT32-ETH01 style). The S3 has no internal MAC, so it
+stays W5500-only and the selector is hidden.
+
+When **RMII** is selected you can set the **PHY family** (LAN8720/LAN8742, IP101, RTL8201, DP83848,
+KSZ8081, JL1101), the **PHY address**, the **MDC / MDIO / PHY-power** GPIOs and the **REF_CLK mode**
+(GPIO0 in, or GPIO0 / 16 / 17 out). Defaults match the WT32-ETH01 (LAN8720) wiring, so a board wired
+that way needs no changes. The RMII **data lines are fixed by the EMAC** (TXD0 19, TXD1 22, TX_EN 21,
+RXD0 25, RXD1 26, RX_DV 27) and can't be moved; the pin-picker reserves those plus your configured
+management / clock / power pins, so a DMX or LED pin that lands on one is flagged.
 
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the

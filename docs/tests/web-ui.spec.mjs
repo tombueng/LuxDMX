@@ -78,6 +78,12 @@ test.describe('Web UI + REST', () => {
         expect(typeof d[k]).toBe('number');
       }
     }
+    if (d.ethRmii) {   // classic ESP32: RMII PHY family + wiring is configurable
+      for (const k of ['rmiiPhy', 'rmiiAddr', 'rmiiMdc', 'rmiiMdio', 'rmiiPwr', 'rmiiClk']) {
+        expect(d, `info.json missing "${k}"`).toHaveProperty(k);
+        expect(typeof d[k]).toBe('number');
+      }
+    }
   });
 
   test('W5500 card is opt-in: the enable switch reveals the pins', async ({ page, request }) => {
@@ -108,7 +114,8 @@ test.describe('Web UI + REST', () => {
       // selecting RMII hides the W5500 sub-section and shows the RMII note (browser-only, no save)
       await page.locator('#wired-phy').selectOption('1');
       await expect(page.locator('#w5500-sub')).toBeHidden();
-      await expect(page.locator('#rmii-note')).toBeVisible();
+      await expect(page.locator('#rmii-sub')).toBeVisible();
+      await expect(page.locator('select[name="rmiiphy"]')).toBeVisible();   // PHY family chooser
       await page.locator('#wired-phy').selectOption('0');              // back to W5500
       await expect(page.locator('#w5500-sub')).toBeVisible();
     } else {
