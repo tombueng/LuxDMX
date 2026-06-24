@@ -1,4 +1,4 @@
-# LumiGate v4 — detailed pre-fabrication validation report
+# LuxDMX v4 — detailed pre-fabrication validation report
 
 Date: 2026-06-23. Branch: `v4-hardware`. Method: 4 parallel datasheet-research passes (every active part +
 crystal + connectors read from official datasheets), the re-runnable validation scripts

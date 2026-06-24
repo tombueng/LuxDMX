@@ -131,7 +131,7 @@ displayTask():  pick screen (priority, §5) → render via Adafruit_GFX* → flu
 
 - `initDisplay()` is a no-op when `dispType == 0`; on probe/begin failure it logs and leaves
   `gfx == nullptr` (no hang — I²C `begin()` NAK-times out; SPI begin always returns).
-- Boot sequence on the panel: **"LumiGate vX.Y.Z"** splash → **"Connecting…"** → status once
+- Boot sequence on the panel: **"LuxDMX vX.Y.Z"** splash → **"Connecting…"** → status once
   `netConnected()`.
 - Color path is **double-buffered**: the renderer draws into a `GFXcanvas16` (32 KB, allocated
   only when `dispType == 4`) and `dispFlush()` blits the whole frame with one `drawRGBBitmap()`.
@@ -154,7 +154,7 @@ Single output (resting):
 
 ```
 ┌────────────────────────────┐
-│ LumiGate           1.0.42  │  title + FIRMWARE_VERSION
+│ LuxDMX           1.0.42  │  title + FIRMWARE_VERSION
 │ 192.168.1.50               │  netLocalIP()  — the #1 walk-up info
 │ Uni 0    Both              │  output universe + protocol
 │ FPS 44.0  Sources 1        │  fps + activeSenderCount()
@@ -167,7 +167,7 @@ showing its own universe and its own frame rate (source count moves to the right
 
 ```
 ┌────────────────────────────┐
-│ LumiGate           1.0.42  │
+│ LuxDMX           1.0.42  │
 │ 192.168.1.50               │
 │ A U0 44.0fps               │  output A: universe + dispOutFps(0)
 │ B U5 43.8fps        Src 1  │  output B + activeSenderCount()

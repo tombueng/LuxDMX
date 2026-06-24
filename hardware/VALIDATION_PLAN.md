@@ -1,4 +1,4 @@
-# LumiGate v4 — Pre-fabrication validation plan
+# LuxDMX v4 — Pre-fabrication validation plan
 
 Goal: be as close to certain as possible that a fabricated + assembled board works on the first spin.
 Multilayer + assembly errors are effectively unfixable, so over-validate. This plan is worked top to

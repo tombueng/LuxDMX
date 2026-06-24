@@ -1,12 +1,12 @@
-# LumiGate end-to-end test suite
+# LuxDMX end-to-end test suite
 
-Playwright tests that drive a **live LumiGate device** end-to-end: they send real
+Playwright tests that drive a **live LuxDMX device** end-to-end: they send real
 Art-Net and sACN/E1.31 packets over the network and assert the device's REST API,
 WebSocket, and web UI react correctly.
 
 ## Prerequisites
 
-- A LumiGate on the same LAN, reachable and powered.
+- A LuxDMX on the same LAN, reachable and powered.
 - Node 21+ (uses the built-in global `WebSocket`).
 - Dependencies + the Chromium browser:
 

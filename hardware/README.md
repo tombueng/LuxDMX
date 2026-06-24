@@ -7,14 +7,14 @@
 > holes, and wider power traces are in; a few datasheet/silk items remain open (see **Status**). Treat the
 > first build as a prototype and do a final review before ordering.
 
-# LumiGate v4 — hardware
+# LuxDMX v4 — hardware
 
 A compact, open-source **Art-Net / sACN → galvanically-isolated DMX512 gateway**, built around
 an ESP32-S3 with **both** WiFi *and* wired Ethernet. Designed entirely as code (SKiDL netlist) and
 routed by a fully-scripted, placement-driven pipeline — so the board regenerates itself from your
 component placement, isolation barrier and all.
 
-![LumiGate v4 — PCB layout](board-pcb-1.png)
+![LuxDMX v4 — PCB layout](board-pcb-1.png)
 
 <p align="center">
   <img src="board3d-1.png" width="49%" alt="3D render — front">
@@ -26,7 +26,7 @@ component placement, isolation barrier and all.
 ## What problem does it solve?
 
 Lighting consoles and media servers speak **Art-Net** or **sACN (E1.31)** over a network. Fixtures —
-dimmers, moving heads, hazers, LED bars — speak **DMX512** over an isolated RS-485 bus. LumiGate sits
+dimmers, moving heads, hazers, LED bars — speak **DMX512** over an isolated RS-485 bus. LuxDMX sits
 between them: it receives Art-Net/sACN over WiFi or Ethernet and emits a clean, **opto-isolated DMX512**
 signal. It's the box that lets you drive a rack of conventional stage gear from QLab, a grandMA, or any
 Art-Net source — without dragging a laptop and a USB-DMX dongle around backstage.

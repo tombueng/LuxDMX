@@ -1,4 +1,4 @@
-# LumiGate v4.0 — Hardware Validation Tracking
+# LuxDMX v4.0 — Hardware Validation Tracking
 
 Single source of truth for "is this board safe to fabricate?" Re-run the scripts after **any**
 board change and update the table. Status: ✅ pass · ⚠️ pass-with-caveat · ❌ blocker · 🔲 needs manual/datasheet check.
