@@ -2,7 +2,7 @@
   (version "D")
   (design
     (source "lumigate.py")
-    (date "06/14/2026 02:52 AM")
+    (date "06/23/2026 06:08 PM")
     (tool "SKiDL (2.2.3)")
     (sheet
       (number 1)
@@ -13,7 +13,7 @@
         (company)
         (rev)
         (date)
-        (source "..\lumigate.py")
+        (source "lumigate.py")
         (comment
           (number "1")
           (value ""))
@@ -55,7 +55,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "dy9bsmteuG")
+          (name "SKiDL Tag") "9KayEULp8o")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -65,7 +65,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "db2f9960-54f8-5347-b69b-1d8b1f7faead"))
+      (tstamps "cd3e15ee-aff5-580d-b540-801080403d1e"))
     (comp
       (ref "C10")
       (value "100nF")
@@ -79,7 +79,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "VZ1Y8_IA5X")
+          (name "SKiDL Tag") "lbJyuDBtOz")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -89,7 +89,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "0ab7f74c-6ced-5243-a44c-4737e6142d75"))
+      (tstamps "891d1719-b0a0-50ce-81b8-5d4e7e22615a"))
     (comp
       (ref "C11")
       (value "100nF")
@@ -103,7 +103,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "n7jz2vGukb")
+          (name "SKiDL Tag") "f6GehuJcZa")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -113,10 +113,10 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "3fd99906-0ed8-5ca6-aac6-599de7f044a2"))
+      (tstamps "98f81962-eb3b-5476-8004-9962ea39457d"))
     (comp
       (ref "C12")
-      (value "22pF")
+      (value "33pF C0G")
       (description "")
       (footprint "Capacitor_SMD:C_0402_1005Metric")
       (fields
@@ -127,7 +127,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "oHkfhpcsKq")
+          (name "SKiDL Tag") "SbEUBkLmDt")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -137,10 +137,10 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "8eeeac4b-2c25-5d52-9f2c-51b2c110825d"))
+      (tstamps "3691e170-d6d2-520b-ac93-8adaaae48041"))
     (comp
       (ref "C13")
-      (value "22pF")
+      (value "33pF C0G")
       (description "")
       (footprint "Capacitor_SMD:C_0402_1005Metric")
       (fields
@@ -151,7 +151,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "7u_DzSwARB")
+          (name "SKiDL Tag") "2C_2ANTsB3")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -161,7 +161,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "c8a18185-bdff-5cb0-bae4-95b399e15dfe"))
+      (tstamps "24df4160-26d7-577a-b66b-c12cdf5c0d0e"))
     (comp
       (ref "C14")
       (value "100nF")
@@ -175,7 +175,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "6lX3zwooWe")
+          (name "SKiDL Tag") "DCTHp0so_V")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -185,7 +185,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "e3e8849d-f997-505e-971f-fd6d3f23995f"))
+      (tstamps "bb1a555e-62de-5b4b-8d79-e9d5f738f239"))
     (comp
       (ref "C15")
       (value "100nF")
@@ -199,7 +199,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "8cA0KpsimF")
+          (name "SKiDL Tag") "tF1ETQQHTv")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -209,7 +209,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "20314b99-047b-55ff-8441-0ed3f64f1e50"))
+      (tstamps "8c87b85f-e499-58e8-a5b2-808ff0503144"))
     (comp
       (ref "C16")
       (value "22uF")
@@ -223,7 +223,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "qam9rneewb")
+          (name "SKiDL Tag") "o79JLYRGnz")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -233,7 +233,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "272f85bb-42a7-55ec-956a-1bfd41b2c79f"))
+      (tstamps "f2a2d191-b443-5f9e-8e0e-30d535bbc43a"))
     (comp
       (ref "C17")
       (value "22uF")
@@ -247,7 +247,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "iHFTno3UWz")
+          (name "SKiDL Tag") "dN6doC9odW")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -257,7 +257,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "d0946b72-b6b6-5262-b16b-02e7c2fe5ae9"))
+      (tstamps "f4a5d37d-d7fb-5ca2-a103-f157fa1fff7a"))
     (comp
       (ref "C18")
       (value "100nF")
@@ -271,7 +271,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "Bdnu8_6nJZ")
+          (name "SKiDL Tag") "62JpzZGLr3")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -281,7 +281,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "daebc260-5e95-5bda-9e01-74ae314aea46"))
+      (tstamps "3bd54630-7945-5634-bc03-eb740b1f841d"))
     (comp
       (ref "C19")
       (value "100nF")
@@ -295,7 +295,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "n3ZAVXkh1m")
+          (name "SKiDL Tag") "BW7o68FtO6")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -305,7 +305,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "a45cbd44-2b42-5e57-91df-ec954d15c9a4"))
+      (tstamps "a478273a-8f73-520b-9e87-e2b04f99e3c9"))
     (comp
       (ref "C2")
       (value "10uF")
@@ -319,7 +319,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "H_1KHC_yTE")
+          (name "SKiDL Tag") "ad6aDbV7Wm")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -329,7 +329,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "64f0c8c6-2867-52a6-9529-88572d6519e3"))
+      (tstamps "de9d35ae-81c9-5984-b2b8-64f5237204bc"))
     (comp
       (ref "C20")
       (value "10uF")
@@ -343,7 +343,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "ZCGNOo81D3")
+          (name "SKiDL Tag") "0H1yOs9ygM")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -353,7 +353,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "74bd8982-dc6a-5a25-9861-cff039eed9b2"))
+      (tstamps "100e43dd-1a8f-54b4-842f-2e83b63c6e37"))
     (comp
       (ref "C21")
       (value "10uF")
@@ -367,7 +367,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "NmF8KQvbPo")
+          (name "SKiDL Tag") "srSkfbOdIX")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -377,7 +377,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "7613a1e8-c495-59a2-b010-5f50c91c4be3"))
+      (tstamps "d0ae5e25-bff8-567a-8b0a-b9266349ebb5"))
     (comp
       (ref "C22")
       (value "100nF")
@@ -391,7 +391,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "Q2gEAKFSoH")
+          (name "SKiDL Tag") "quoTeY3d_C")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -401,7 +401,175 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "013ae6b5-1204-51cd-b507-a8962e536236"))
+      (tstamps "9839aa18-74a5-51cd-b2e2-5f6dac69d306"))
+    (comp
+      (ref "C23")
+      (value "100nF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0402_1005Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0402_1005Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "Ja1e4C9bXb")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "34e44405-ee0f-5b57-b0a0-bf862a99547f"))
+    (comp
+      (ref "C24")
+      (value "100nF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0402_1005Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0402_1005Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "mhdg8tqOHC")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "c528810c-2875-5939-8367-909e829b12ea"))
+    (comp
+      (ref "C25")
+      (value "10uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_1206_3216Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_1206_3216Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "fA9QsXxkuL")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "076ccb68-127c-524b-a2e3-199224a96418"))
+    (comp
+      (ref "C26")
+      (value "10uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_1206_3216Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_1206_3216Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "usohKlzsFE")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "cbc8604a-7d20-5a30-89a5-edd6d904e869"))
+    (comp
+      (ref "C27")
+      (value "100uF")
+      (description "")
+      (footprint "Capacitor_SMD:CP_Elec_6.3x7.7")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:CP_Elec_6.3x7.7")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "YjofkBVnXm")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "123d4b3d-b890-5764-87c0-ce5618a338b1"))
+    (comp
+      (ref "C28")
+      (value "10uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "GPROQkYNH5")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "839eca6e-75d5-59a7-aaf2-0bf813f3172f"))
+    (comp
+      (ref "C29")
+      (value "22uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "_2oQ1fgAZX")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "80775a62-5eb2-5086-ba97-a05183b13fae"))
     (comp
       (ref "C3")
       (value "1uF")
@@ -415,7 +583,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "IQFLiyGBw3")
+          (name "SKiDL Tag") "QJntKFEl9p")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -425,7 +593,55 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "346acb4e-a593-5dd4-8fcd-2e08ef6ba2b9"))
+      (tstamps "878ab01b-8962-55a5-ba19-f7abc9d992f2"))
+    (comp
+      (ref "C30")
+      (value "1uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0603_1608Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "cQwWLxln3x")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "bb7e6daf-bd53-54f5-93d5-d4069ca1fd5f"))
+    (comp
+      (ref "C31")
+      (value "1uF")
+      (description "")
+      (footprint "Capacitor_SMD:C_0603_1608Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "wy3w03ddm8")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "C"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "4f707ab3-95f3-59ac-8d91-8043ec835d92"))
     (comp
       (ref "C4")
       (value "1uF")
@@ -439,7 +655,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "rTn1rU7MVh")
+          (name "SKiDL Tag") "NYBZosmK7T")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -449,7 +665,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "b805557a-31c6-5d1a-a495-e2eb63883908"))
+      (tstamps "13d4fc7c-ece9-5fca-a9cb-0a19849adf2a"))
     (comp
       (ref "C5")
       (value "100nF")
@@ -463,7 +679,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "XcXJVxXXLj")
+          (name "SKiDL Tag") "B8QPrlwVLF")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -473,7 +689,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "34e739fa-24f2-5a29-b7cf-8dcc755555bc"))
+      (tstamps "7f9eacfe-f9d8-5bf2-9ab4-9580e8ed9eb7"))
     (comp
       (ref "C6")
       (value "4.7uF")
@@ -487,7 +703,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "8gmRgGYg2D")
+          (name "SKiDL Tag") "q_er_XRDOm")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -497,7 +713,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "cb6b7a93-faff-5dac-9785-3a8593c559fc"))
+      (tstamps "3160e8c7-2d2c-5e76-bec4-39d41d8c7e70"))
     (comp
       (ref "C8")
       (value "100nF")
@@ -511,7 +727,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "ola57qeczk")
+          (name "SKiDL Tag") "johlxvOZDE")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -521,7 +737,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "0f8c6515-a1c0-59b6-92b6-fcb7d213a24f"))
+      (tstamps "0557b959-0a92-55b5-b811-8cc9e49c2f3f"))
     (comp
       (ref "C9")
       (value "100nF")
@@ -535,7 +751,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "E3y1RUwZjY")
+          (name "SKiDL Tag") "AAVXAo0uq5")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -545,7 +761,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "1fc0a031-7f5e-5c01-8219-a0b5002c3aa3"))
+      (tstamps "6aa6c812-393e-5018-bef4-eed49c1f8a50"))
     (comp
       (ref "D1")
       (value "SM712")
@@ -559,9 +775,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "nQmeSPZcyj")
+          (name "SKiDL Tag") "U81oWWiR77")
         (field
-          (name "SKiDL Line") "lumigate.py:255"))
+          (name "SKiDL Line") "lumigate.py:342"))
       (libsource
         (lib "NO_LIB")
         (part "SM712"))
@@ -569,7 +785,55 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "e2a0995f-efed-5ff1-8455-f8b02f7f046b"))
+      (tstamps "444e4526-9576-5b73-a7a0-db1d426e9666"))
+    (comp
+      (ref "D10")
+      (value "SMAJ60A")
+      (description "")
+      (footprint "Diode_SMD:D_SMA")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Diode_SMD:D_SMA")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "DYV4bKGKR9")
+        (field
+          (name "SKiDL Line") "lumigate.py:262"))
+      (libsource
+        (lib "NO_LIB")
+        (part "SMAJ60A"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "a53336f0-60a3-5388-9ed1-df08bf87cd19"))
+    (comp
+      (ref "D11")
+      (value "SMAJ5.0A")
+      (description "")
+      (footprint "Diode_SMD:D_SMA")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Diode_SMD:D_SMA")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "VkpqRq9dgz")
+        (field
+          (name "SKiDL Line") "lumigate.py:284"))
+      (libsource
+        (lib "NO_LIB")
+        (part "SMAJ5.0A"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "a7cf2f6a-95eb-55be-a677-0b4912b0e830"))
     (comp
       (ref "D2")
       (value "LED")
@@ -583,9 +847,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "U0yNngCF0I")
+          (name "SKiDL Tag") "gzeTwRZCYQ")
         (field
-          (name "SKiDL Line") "lumigate.py:270"))
+          (name "SKiDL Line") "lumigate.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -593,7 +857,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "ef7a640c-555b-5f60-8189-0ecc52fe4d92"))
+      (tstamps "1e272470-fe81-55ca-9ae5-520017c8d1d8"))
     (comp
       (ref "D3")
       (value "LED")
@@ -607,9 +871,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "oZuclcW4uH")
+          (name "SKiDL Tag") "yyTectP0Zr")
         (field
-          (name "SKiDL Line") "lumigate.py:270"))
+          (name "SKiDL Line") "lumigate.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -617,7 +881,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "764fbc6c-ff0c-5257-bc9c-70f575cef10f"))
+      (tstamps "ce6343be-c552-5fb5-9700-4f434dd13031"))
     (comp
       (ref "D4")
       (value "LED")
@@ -631,9 +895,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "9BNf0NGTt6")
+          (name "SKiDL Tag") "CRdf1zpuu8")
         (field
-          (name "SKiDL Line") "lumigate.py:270"))
+          (name "SKiDL Line") "lumigate.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -641,7 +905,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "84e25180-07b2-5175-93a0-8438a40353af"))
+      (tstamps "d68ccc94-6efc-5390-befa-8a1b0373440a"))
     (comp
       (ref "D5")
       (value "LED")
@@ -655,9 +919,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "cMuy113DsK")
+          (name "SKiDL Tag") "QnLls1VkIT")
         (field
-          (name "SKiDL Line") "lumigate.py:270"))
+          (name "SKiDL Line") "lumigate.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -665,7 +929,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "39709ad1-14d6-563d-a181-720c208be66e"))
+      (tstamps "419ce9b9-19ed-5816-be8d-34ebe8c69643"))
     (comp
       (ref "D6")
       (value "LED")
@@ -679,9 +943,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "SqPavlBvhF")
+          (name "SKiDL Tag") "Mt8cKLwlxu")
         (field
-          (name "SKiDL Line") "lumigate.py:270"))
+          (name "SKiDL Line") "lumigate.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -689,31 +953,151 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "06d1ce26-aac9-58b6-8e2d-b58ae1db6db7"))
+      (tstamps "bc7b13b5-3c22-5782-9a3f-d961af92b2ef"))
     (comp
-      (ref "J1")
-      (value "XLR-3 out")
+      (ref "D7")
+      (value "SM712")
       (description "")
-      (footprint "XLR328P:CONN-TH_XLR-328P")
+      (footprint "Package_TO_SOT_SMD:SOT-23")
       (fields
         (field
           (name "Description"))
         (field
-          (name "Footprint") "XLR328P:CONN-TH_XLR-328P")
+          (name "Footprint") "Package_TO_SOT_SMD:SOT-23")
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "iC6atzVpZT")
+          (name "SKiDL Tag") "vsttdL4PmM")
         (field
-          (name "SKiDL Line") "lumigate.py:259"))
+          (name "SKiDL Line") "lumigate.py:378"))
       (libsource
         (lib "NO_LIB")
-        (part "XLR3"))
+        (part "SM712"))
       (sheetpath
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "2832c1f4-42d2-5f60-9862-5c220eabc210"))
+      (tstamps "045fdebd-8e09-5403-88a9-9b2bd6034ba2"))
+    (comp
+      (ref "F1")
+      (value "1.5A 16V PPTC")
+      (description "")
+      (footprint "Fuse:Fuse_1206_3216Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Fuse:Fuse_1206_3216Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "PysvLan9iL")
+        (field
+          (name "SKiDL Line") "lumigate.py:240"))
+      (libsource
+        (lib "NO_LIB")
+        (part "PPTC"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "9beb7bc2-5abf-5944-9eee-a7c644a6c03b"))
+    (comp
+      (ref "FB1")
+      (value "600R@100MHz")
+      (description "")
+      (footprint "Inductor_SMD:L_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Inductor_SMD:L_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "FrSAyZ5i1a")
+        (field
+          (name "SKiDL Line") "lumigate.py:287"))
+      (libsource
+        (lib "NO_LIB")
+        (part "FerriteBead"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "36770cb4-4d3f-5405-af27-4fbfb8240d9f"))
+    (comp
+      (ref "FB2")
+      (value "600R@100MHz")
+      (description "")
+      (footprint "Inductor_SMD:L_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Inductor_SMD:L_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "MNtiXNdXx8")
+        (field
+          (name "SKiDL Line") "lumigate.py:324"))
+      (libsource
+        (lib "NO_LIB")
+        (part "FerriteBead"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "7f5253ca-733a-5bed-9271-0c54544ed5ec"))
+    (comp
+      (ref "FB3")
+      (value "600R@100MHz")
+      (description "")
+      (footprint "Inductor_SMD:L_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Inductor_SMD:L_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "znPHcuGX8I")
+        (field
+          (name "SKiDL Line") "lumigate.py:368"))
+      (libsource
+        (lib "NO_LIB")
+        (part "FerriteBead"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "36c82fcf-9301-57a5-8e56-f6fb6a2f8034"))
+    (comp
+      (ref "J1")
+      (value "XLR-5 NC5FAH")
+      (description "")
+      (footprint "C368501:CONN-TH_NC5FAH")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "C368501:CONN-TH_NC5FAH")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "pQwkjom4gJ")
+        (field
+          (name "SKiDL Line") "lumigate.py:351"))
+      (libsource
+        (lib "NO_LIB")
+        (part "NC5FAH"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "cdfd3c2b-d893-5fdd-929b-50d720a32989"))
     (comp
       (ref "J2")
       (value "USB-C")
@@ -727,9 +1111,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "fTZsJiJ4tx")
+          (name "SKiDL Tag") "rq1xxLnGFt")
         (field
-          (name "SKiDL Line") "lumigate.py:202"))
+          (name "SKiDL Line") "lumigate.py:229"))
       (libsource
         (lib "NO_LIB")
         (part "USB_C"))
@@ -737,31 +1121,31 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "41250136-4a4b-50dd-a84f-2f6516134a91"))
+      (tstamps "7176012e-98e3-5e75-b5ce-566ac6d07f8b"))
     (comp
       (ref "J3")
-      (value "HR961160C")
+      (value "HY931147C")
       (description "")
-      (footprint "C55683:RJ45-SMD_HR961160C")
+      (footprint "C91754:RJ45-TH_HY931147C")
       (fields
         (field
           (name "Description"))
         (field
-          (name "Footprint") "C55683:RJ45-SMD_HR961160C")
+          (name "Footprint") "C91754:RJ45-TH_HY931147C")
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "c9T6Zj2AFF")
+          (name "SKiDL Tag") "LrHA8F3BUa")
         (field
-          (name "SKiDL Line") "lumigate.py:158"))
+          (name "SKiDL Line") "lumigate.py:184"))
       (libsource
         (lib "NO_LIB")
-        (part "HR961160C"))
+        (part "HY931147C"))
       (sheetpath
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "442aff31-a248-52c3-9075-3e3b75fa0df5"))
+      (tstamps "8a97419b-e4e9-5ac0-8e09-3b6fba40b564"))
     (comp
       (ref "J4")
       (value "DISP SH9")
@@ -775,9 +1159,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "M9_FV9zn1Z")
+          (name "SKiDL Tag") "NMgAuod43M")
         (field
-          (name "SKiDL Line") "lumigate.py:289"))
+          (name "SKiDL Line") "lumigate.py:410"))
       (libsource
         (lib "NO_LIB")
         (part "Conn_JSTSH9"))
@@ -785,7 +1169,103 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "0cc47dab-91d4-5996-9c47-a8fe8e721293"))
+      (tstamps "1dd9816d-0eaf-5411-9abd-a972cfcf656e"))
+    (comp
+      (ref "J5")
+      (value "XLR-5 NC5FAH")
+      (description "")
+      (footprint "C368501:CONN-TH_NC5FAH")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "C368501:CONN-TH_NC5FAH")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "xmWGSul9uv")
+        (field
+          (name "SKiDL Line") "lumigate.py:379"))
+      (libsource
+        (lib "NO_LIB")
+        (part "NC5FAH"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "fd3ddade-1c93-58a9-a95c-23669d37a135"))
+    (comp
+      (ref "J6")
+      (value "EXP SH9")
+      (description "")
+      (footprint "Connector_JST:JST_SH_SM09B-SRSS-TB_1x09-1MP_P1.00mm_Horizontal")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Connector_JST:JST_SH_SM09B-SRSS-TB_1x09-1MP_P1.00mm_Horizontal")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "IQ_8qM18gZ")
+        (field
+          (name "SKiDL Line") "lumigate.py:429"))
+      (libsource
+        (lib "NO_LIB")
+        (part "Conn_JSTSH9"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "90558f4a-00ad-5a33-9da3-de2c3c5b56d7"))
+    (comp
+      (ref "J7")
+      (value "DMX-OUT A")
+      (description "")
+      (footprint "Connector_JST:JST_SH_SM03B-SRSS-TB_1x03-1MP_P1.00mm_Horizontal")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Connector_JST:JST_SH_SM03B-SRSS-TB_1x03-1MP_P1.00mm_Horizontal")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "qnbUm4I3Ch")
+        (field
+          (name "SKiDL Line") "lumigate.py:445"))
+      (libsource
+        (lib "NO_LIB")
+        (part "Conn_JSTSH3"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "ac9f8132-98d1-55fe-a656-82778921fb26"))
+    (comp
+      (ref "J8")
+      (value "DMX-OUT B")
+      (description "")
+      (footprint "Connector_JST:JST_SH_SM03B-SRSS-TB_1x03-1MP_P1.00mm_Horizontal")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Connector_JST:JST_SH_SM03B-SRSS-TB_1x03-1MP_P1.00mm_Horizontal")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "WYKYk8kf07")
+        (field
+          (name "SKiDL Line") "lumigate.py:447"))
+      (libsource
+        (lib "NO_LIB")
+        (part "Conn_JSTSH3"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "2515f1bb-209d-5302-9718-cffbabbd4cd6"))
     (comp
       (ref "L1")
       (value "2.2uH")
@@ -799,9 +1279,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "pV4TxnFNM7")
+          (name "SKiDL Tag") "SD17sleWps")
         (field
-          (name "SKiDL Line") "lumigate.py:219"))
+          (name "SKiDL Line") "lumigate.py:297"))
       (libsource
         (lib "NO_LIB")
         (part "L"))
@@ -809,7 +1289,151 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "242a5ac5-9789-5784-8200-6e375e129900"))
+      (tstamps "5a2ba951-0aff-5310-9ef3-ed6c121582da"))
+    (comp
+      (ref "L2")
+      (value "ACM2012-201-2P")
+      (description "")
+      (footprint "Inductor_SMD:L_CommonModeChoke_Coilank_ACM2012")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Inductor_SMD:L_CommonModeChoke_Coilank_ACM2012")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "3G9hRhnsdC")
+        (field
+          (name "SKiDL Line") "lumigate.py:338"))
+      (libsource
+        (lib "NO_LIB")
+        (part "ACM2012-201-2P"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "659b315e-297c-54f6-977c-3c40cf9d89f1"))
+    (comp
+      (ref "L3")
+      (value "ACM2012-201-2P")
+      (description "")
+      (footprint "Inductor_SMD:L_CommonModeChoke_Coilank_ACM2012")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Inductor_SMD:L_CommonModeChoke_Coilank_ACM2012")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "GKU9GUb5F5")
+        (field
+          (name "SKiDL Line") "lumigate.py:376"))
+      (libsource
+        (lib "NO_LIB")
+        (part "ACM2012-201-2P"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "846b6a1d-a69e-5e6b-932c-398d71e13a67"))
+    (comp
+      (ref "MH1")
+      (value "M3 GND")
+      (description "")
+      (footprint "MountingHole:MountingHole_3.2mm_M3_Pad")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "MountingHole:MountingHole_3.2mm_M3_Pad")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "heNcRGavvG")
+        (field
+          (name "SKiDL Line") "lumigate.py:461"))
+      (libsource
+        (lib "NO_LIB")
+        (part "MountingHole"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "d1df9965-6839-5dd0-98d8-7c927d138f5f"))
+    (comp
+      (ref "MH2")
+      (value "M3 GND")
+      (description "")
+      (footprint "MountingHole:MountingHole_3.2mm_M3_Pad")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "MountingHole:MountingHole_3.2mm_M3_Pad")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "IrZUw1oZPR")
+        (field
+          (name "SKiDL Line") "lumigate.py:461"))
+      (libsource
+        (lib "NO_LIB")
+        (part "MountingHole"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "5b149763-de56-518c-be3a-60331a99e386"))
+    (comp
+      (ref "MH3")
+      (value "M3 GND")
+      (description "")
+      (footprint "MountingHole:MountingHole_3.2mm_M3_Pad")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "MountingHole:MountingHole_3.2mm_M3_Pad")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "zK77v1XJyC")
+        (field
+          (name "SKiDL Line") "lumigate.py:461"))
+      (libsource
+        (lib "NO_LIB")
+        (part "MountingHole"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "56c8c014-f122-544e-a336-abb4080a341a"))
+    (comp
+      (ref "MH4")
+      (value "M3 GND")
+      (description "")
+      (footprint "MountingHole:MountingHole_3.2mm_M3_Pad")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "MountingHole:MountingHole_3.2mm_M3_Pad")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "Xx0gVy0Tt0")
+        (field
+          (name "SKiDL Line") "lumigate.py:461"))
+      (libsource
+        (lib "NO_LIB")
+        (part "MountingHole"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "69dab53b-1bcd-5f84-90a2-2ac81c3ed40b"))
     (comp
       (ref "PS1")
       (value "B0505S-1W")
@@ -823,9 +1447,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "9NFqG4o2nH")
+          (name "SKiDL Tag") "rmArMiG1Vz")
         (field
-          (name "SKiDL Line") "lumigate.py:247"))
+          (name "SKiDL Line") "lumigate.py:329"))
       (libsource
         (lib "NO_LIB")
         (part "B0505S-1W"))
@@ -833,7 +1457,31 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "d57ec20a-69cb-5e22-9e77-c041c6cccc5d"))
+      (tstamps "cd2e2de8-aedc-5643-95a7-2383bfe316f1"))
+    (comp
+      (ref "PS2")
+      (value "B0505S-1W")
+      (description "")
+      (footprint "C2912568:PWRM-TH_B0505S-1W")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "C2912568:PWRM-TH_B0505S-1W")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "vXnZMr4jvw")
+        (field
+          (name "SKiDL Line") "lumigate.py:370"))
+      (libsource
+        (lib "NO_LIB")
+        (part "B0505S-1W"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "dc9e4c8b-c759-52f9-af14-ec4a51777640"))
     (comp
       (ref "Q1")
       (value "MMBT3904")
@@ -847,9 +1495,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "F0_Vpgqma5")
+          (name "SKiDL Tag") "YG_vqw7cM2")
         (field
-          (name "SKiDL Line") "lumigate.py:188"))
+          (name "SKiDL Line") "lumigate.py:215"))
       (libsource
         (lib "NO_LIB")
         (part "MMBT3904"))
@@ -857,7 +1505,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "31b42064-5564-5e82-ac7e-976b55a0d5d2"))
+      (tstamps "884bca46-c7c7-58a3-9f51-f541e4a56458"))
     (comp
       (ref "Q2")
       (value "MMBT3904")
@@ -871,9 +1519,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "ICbcokG6TP")
+          (name "SKiDL Tag") "zqEW8QLONI")
         (field
-          (name "SKiDL Line") "lumigate.py:188"))
+          (name "SKiDL Line") "lumigate.py:215"))
       (libsource
         (lib "NO_LIB")
         (part "MMBT3904"))
@@ -881,7 +1529,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "5f37f035-cb9f-535a-8e0a-b79c73f2b554"))
+      (tstamps "8bc7ff36-ae77-55d1-bea5-cd0db1a70c9e"))
     (comp
       (ref "R1")
       (value "10k")
@@ -895,7 +1543,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "2bhneivy0X")
+          (name "SKiDL Tag") "nXfKvw8mpv")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -905,7 +1553,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "7337bed2-2c38-5c88-931f-320216a1b588"))
+      (tstamps "c87a30e5-6624-5ea0-923b-e9f11602f12c"))
     (comp
       (ref "R10")
       (value "45.3k")
@@ -919,7 +1567,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "5hFt5XXWUs")
+          (name "SKiDL Tag") "DpXFmY4gRZ")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -929,7 +1577,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "3ef82487-fa07-5d3b-b71b-8ee5f478e3cb"))
+      (tstamps "09cc507b-bb6a-5987-8e61-9baeb464da0c"))
     (comp
       (ref "R11")
       (value "10k")
@@ -943,7 +1591,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "Yer_ohZEpC")
+          (name "SKiDL Tag") "XfBtU_AzWc")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -953,7 +1601,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "e51fc36f-c1b2-540e-8323-8bcb2bb08556"))
+      (tstamps "c5d31f24-1b57-5757-9879-bbabd9cec6c1"))
     (comp
       (ref "R12")
       (value "120R")
@@ -967,7 +1615,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "H5cEGbNgCk")
+          (name "SKiDL Tag") "WitMTsTYMX")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -977,7 +1625,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "42e46a92-61b6-5eaa-8ea7-67beabe73b08"))
+      (tstamps "4e377074-06e0-5374-89ec-eabe6467c663"))
     (comp
       (ref "R13")
       (value "1k")
@@ -991,7 +1639,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "dZcGhQts6T")
+          (name "SKiDL Tag") "b4MWUeUoeh")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1001,7 +1649,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "9df56d70-1638-5f02-be33-87a27e802e26"))
+      (tstamps "d7f28add-176a-5243-a3f3-0d79d34dacab"))
     (comp
       (ref "R14")
       (value "150R")
@@ -1015,7 +1663,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "yg7HZufuX8")
+          (name "SKiDL Tag") "Gs0bY9Lc1A")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1025,7 +1673,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "dc4d2228-b8d1-53e0-b01b-c7370ab5d3e4"))
+      (tstamps "23636063-43e9-5976-aa67-2c48e57fee93"))
     (comp
       (ref "R15")
       (value "1k")
@@ -1039,7 +1687,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "wU6SUFtIfw")
+          (name "SKiDL Tag") "UHwUohKPtE")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1049,7 +1697,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "fd1550b0-7072-5c5f-8a3b-44f5d79d3fc7"))
+      (tstamps "74838a92-bbcc-5355-8625-93bfb012145c"))
     (comp
       (ref "R16")
       (value "150R")
@@ -1063,7 +1711,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "1isNxJQrpt")
+          (name "SKiDL Tag") "eCpbTrNVSl")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1073,7 +1721,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "755697a2-eacc-5847-9731-13217712310b"))
+      (tstamps "cc3fed5a-bf6a-578c-b3da-dc89fd656ebc"))
     (comp
       (ref "R17")
       (value "150R")
@@ -1087,7 +1735,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "pqepsfPbT5")
+          (name "SKiDL Tag") "DWl1wXgGAk")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1097,7 +1745,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "2ce95433-e13c-57fe-8a2c-837e6d71dfb3"))
+      (tstamps "88b29c4c-8343-5bad-9991-425b9ac486b4"))
     (comp
       (ref "R18")
       (value "49.9R")
@@ -1111,7 +1759,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "NBapW7QyNY")
+          (name "SKiDL Tag") "3vuvgnLInE")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1121,7 +1769,31 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "c4d96f2d-dbb2-5fb4-9354-7450a3650bf8"))
+      (tstamps "015b9f47-2740-583f-a0b3-71879a4b2946"))
+    (comp
+      (ref "R19")
+      (value "120R")
+      (description "")
+      (footprint "Resistor_SMD:R_0805_2012Metric")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Resistor_SMD:R_0805_2012Metric")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "SQ3D6j2ijm")
+        (field
+          (name "SKiDL Line") "lumigate.py:37"))
+      (libsource
+        (lib "NO_LIB")
+        (part "R"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "a98b4ea9-a088-58c8-8c2a-e79c047ff7bb"))
     (comp
       (ref "R2")
       (value "10k")
@@ -1135,7 +1807,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "ma8mB41aHG")
+          (name "SKiDL Tag") "E40YwLVz_Z")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1145,10 +1817,10 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "094ae8cd-9957-5350-8f7d-05d51c5ed5d2"))
+      (tstamps "b68760f9-fc3e-5201-bb2e-44c5fbcd7381"))
     (comp
       (ref "R3")
-      (value "12k")
+      (value "12.4k")
       (description "")
       (footprint "Resistor_SMD:R_0402_1005Metric")
       (fields
@@ -1159,7 +1831,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "F8rejLyZV1")
+          (name "SKiDL Tag") "ba3HDhm2Ur")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1169,7 +1841,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "3b976044-d050-5468-b239-90de5132e832"))
+      (tstamps "ae7aa124-a3e4-5096-a8c5-156c5d68b69c"))
     (comp
       (ref "R4")
       (value "330R")
@@ -1183,7 +1855,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "aN2aQ3f0x2")
+          (name "SKiDL Tag") "Byy09K62x9")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1193,7 +1865,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "233f7c11-75fb-56e6-8c4d-702e50314629"))
+      (tstamps "8f0b8abb-3678-5c78-9649-9c8e8d386cfe"))
     (comp
       (ref "R5")
       (value "330R")
@@ -1207,7 +1879,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "adtjDITs3D")
+          (name "SKiDL Tag") "tmlaOF423v")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1217,7 +1889,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "913eaab8-dcb7-5dc0-92d7-2f9d4d3b3235"))
+      (tstamps "39d523c0-44cb-551c-8ccf-747f640bb6f7"))
     (comp
       (ref "R6")
       (value "10k")
@@ -1231,7 +1903,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "UT0v5g43YP")
+          (name "SKiDL Tag") "nHLmc3qPkz")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1241,7 +1913,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "b709fc2b-df83-539e-8ac6-d3c7fd6646b7"))
+      (tstamps "7b6aa940-24cd-528b-9b7c-c842185ff4ef"))
     (comp
       (ref "R7")
       (value "10k")
@@ -1255,7 +1927,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "WtBeMVzGlw")
+          (name "SKiDL Tag") "XR7tvPK4ZR")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1265,7 +1937,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "d03e69c2-dfc1-5d2d-bc3c-de81505db38f"))
+      (tstamps "2d304382-dd23-51df-836f-505d14aae319"))
     (comp
       (ref "R8")
       (value "5k1")
@@ -1279,7 +1951,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "2_q147wfql")
+          (name "SKiDL Tag") "rkzRE2NOux")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1289,7 +1961,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "1cdb89c0-2a44-5b6a-9ac1-945f5b832adb"))
+      (tstamps "6a87b2c6-dd7a-580e-bfc4-674f9dfb9364"))
     (comp
       (ref "R9")
       (value "5k1")
@@ -1303,7 +1975,7 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "LuO9rt8WFJ")
+          (name "SKiDL Tag") "ygp3ISAhda")
         (field
           (name "SKiDL Line") "lumigate.py:37"))
       (libsource
@@ -1313,7 +1985,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "51e18ad6-7069-5232-8736-7f69a879d0d6"))
+      (tstamps "db0fac2e-6d9d-5bc3-890a-814bee53d2f0"))
     (comp
       (ref "SW1")
       (value "BOOT")
@@ -1327,9 +1999,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "DtDeGRnViV")
+          (name "SKiDL Tag") "GSPCgaubor")
         (field
-          (name "SKiDL Line") "lumigate.py:102"))
+          (name "SKiDL Line") "lumigate.py:118"))
       (libsource
         (lib "NO_LIB")
         (part "SW_PUSH"))
@@ -1337,7 +2009,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "295d00ed-9a43-50a6-867b-bb82aa67ef12"))
+      (tstamps "dcb7e0e0-81ca-5680-a93e-ff02b4732dba"))
     (comp
       (ref "SW2")
       (value "RST")
@@ -1351,9 +2023,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "BbICNUNYqg")
+          (name "SKiDL Tag") "qsjfkiOToJ")
         (field
-          (name "SKiDL Line") "lumigate.py:103"))
+          (name "SKiDL Line") "lumigate.py:119"))
       (libsource
         (lib "NO_LIB")
         (part "SW_PUSH"))
@@ -1361,7 +2033,199 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "ef516d36-6d4c-59b6-83ed-c3ee1bae50d6"))
+      (tstamps "ee697887-5276-54c2-90b9-e4f8c00d4a02"))
+    (comp
+      (ref "TP1")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "FYEIouT2Ho")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "b9c33b1d-ec6d-5ccd-8e0f-252544284c94"))
+    (comp
+      (ref "TP2")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "mgC875Jxb7")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "e2d969e7-2233-5b17-9e9a-43f3171a9376"))
+    (comp
+      (ref "TP3")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "hDrIp8R8iC")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "d72e63b3-4804-5e77-b1a0-09acbceef15c"))
+    (comp
+      (ref "TP4")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "QnNTcDECRC")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "eb95e48e-4f49-5589-bd8d-6fe57eca4a84"))
+    (comp
+      (ref "TP5")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "9O93_Hi_z9")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "ea4e03a0-24ba-5c06-97cf-42909d16742a"))
+    (comp
+      (ref "TP6")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "3lGMczRVm1")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "97554071-d63b-56c5-a815-1956cace00eb"))
+    (comp
+      (ref "TP7")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "w5cG4Gx3BX")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "cdc52ec4-cf48-5e3c-ac5a-78981d9116dd"))
+    (comp
+      (ref "TP8")
+      (value "TP")
+      (description "")
+      (footprint "TestPoint:TestPoint_Pad_D1.5mm")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "TestPoint:TestPoint_Pad_D1.5mm")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "RtYKV_v69Z")
+        (field
+          (name "SKiDL Line") "lumigate.py:469"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TestPoint"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "f665ae9b-32a2-5a56-ba12-a3cb105f3ec3"))
     (comp
       (ref "U1")
       (value "ESP32-S3-WROOM-1-N8")
@@ -1375,9 +2239,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "EnlQBgawMV")
+          (name "SKiDL Tag") "nXn14xgVzT")
         (field
-          (name "SKiDL Line") "lumigate.py:80"))
+          (name "SKiDL Line") "lumigate.py:94"))
       (libsource
         (lib "NO_LIB")
         (part "ESP32-S3-WROOM-1-N8"))
@@ -1385,7 +2249,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "83b46724-a98b-53f6-a570-3fb5c47f2568"))
+      (tstamps "397b623f-7109-55e8-a415-8bbe0213b11b"))
     (comp
       (ref "U2")
       (value "W5500")
@@ -1399,9 +2263,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "O0QVFd_HDb")
+          (name "SKiDL Tag") "nQdB2hmcjF")
         (field
-          (name "SKiDL Line") "lumigate.py:122"))
+          (name "SKiDL Line") "lumigate.py:138"))
       (libsource
         (lib "NO_LIB")
         (part "W5500"))
@@ -1409,7 +2273,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "b56cd583-55a4-54f3-bb28-44189459be0b"))
+      (tstamps "45884e06-8198-56ce-88e8-5419a93c46a4"))
     (comp
       (ref "U3")
       (value "CH340C")
@@ -1423,9 +2287,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "4LS79P91a_")
+          (name "SKiDL Tag") "Pabcy4sLch")
         (field
-          (name "SKiDL Line") "lumigate.py:179"))
+          (name "SKiDL Line") "lumigate.py:206"))
       (libsource
         (lib "NO_LIB")
         (part "CH340C"))
@@ -1433,7 +2297,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "8af1cdea-cd17-5536-9272-0342be13356e"))
+      (tstamps "e04aec49-b392-5ccb-987a-160369c412ff"))
     (comp
       (ref "U4")
       (value "SY8089")
@@ -1447,9 +2311,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "boeq_RuD3Q")
+          (name "SKiDL Tag") "hX9IAtKHZw")
         (field
-          (name "SKiDL Line") "lumigate.py:217"))
+          (name "SKiDL Line") "lumigate.py:295"))
       (libsource
         (lib "NO_LIB")
         (part "SY8089"))
@@ -1457,7 +2321,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "2a3b9a6f-87b1-5e5b-a678-4109ca86c276"))
+      (tstamps "5661cb72-b595-5891-b00b-9c873a407995"))
     (comp
       (ref "U5")
       (value "ISO3086DWR")
@@ -1471,9 +2335,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "wpkUcxc3SS")
+          (name "SKiDL Tag") "6VsJN5x7jG")
         (field
-          (name "SKiDL Line") "lumigate.py:235"))
+          (name "SKiDL Line") "lumigate.py:313"))
       (libsource
         (lib "NO_LIB")
         (part "ISO3086DWR"))
@@ -1481,7 +2345,103 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "c3400ff7-29e6-5e12-84b9-547bb0f5762b"))
+      (tstamps "4f114e35-82e7-55b5-b455-614f31861fed"))
+    (comp
+      (ref "U6")
+      (value "ISO3086DWR")
+      (description "")
+      (footprint "C183095:SOIC-16_L10.3-W7.5-P1.27-LS10.3-BL")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "C183095:SOIC-16_L10.3-W7.5-P1.27-LS10.3-BL")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "KVhD1VsvdG")
+        (field
+          (name "SKiDL Line") "lumigate.py:360"))
+      (libsource
+        (lib "NO_LIB")
+        (part "ISO3086DWR"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "9f7ce218-63c0-5e89-b9f1-32bc397fcc1c"))
+    (comp
+      (ref "U7")
+      (value "DP9900M-5V")
+      (description "")
+      (footprint "C5380106:PWRM-SMD_DP9900M-5V")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "C5380106:PWRM-SMD_DP9900M-5V")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "xxv5ec98hx")
+        (field
+          (name "SKiDL Line") "lumigate.py:258"))
+      (libsource
+        (lib "NO_LIB")
+        (part "DP9900M-5V"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "f97ac72b-f67d-550f-bce2-86211b8221b4"))
+    (comp
+      (ref "U8")
+      (value "USBLC6-2SC6")
+      (description "")
+      (footprint "Package_TO_SOT_SMD:SOT-23-6")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Package_TO_SOT_SMD:SOT-23-6")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "qrQ3BBTsBh")
+        (field
+          (name "SKiDL Line") "lumigate.py:244"))
+      (libsource
+        (lib "NO_LIB")
+        (part "USBLC6-2SC6"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "7cf4e68b-b1d9-53cf-92dd-74e0090a1089"))
+    (comp
+      (ref "U9")
+      (value "TPS2116DRLR")
+      (description "")
+      (footprint "Package_TO_SOT_SMD:SOT-583-8")
+      (fields
+        (field
+          (name "Description"))
+        (field
+          (name "Footprint") "Package_TO_SOT_SMD:SOT-583-8")
+        (field
+          (name "Datasheet"))
+        (field
+          (name "SKiDL Tag") "OOMCCe6bLS")
+        (field
+          (name "SKiDL Line") "lumigate.py:275"))
+      (libsource
+        (lib "NO_LIB")
+        (part "TPS2116"))
+      (sheetpath
+        (names "/")
+        (tstamps "/"))
+      (component_classes)
+      (tstamps "cc4b88ee-fe7f-542c-ada1-325091fb9083"))
     (comp
       (ref "Y1")
       (value "25MHz")
@@ -1495,9 +2455,9 @@
         (field
           (name "Datasheet"))
         (field
-          (name "SKiDL Tag") "K80GeR_s0q")
+          (name "SKiDL Tag") "_JXvMroDdq")
         (field
-          (name "SKiDL Line") "lumigate.py:148"))
+          (name "SKiDL Line") "lumigate.py:164"))
       (libsource
         (lib "NO_LIB")
         (part "Crystal"))
@@ -1505,7 +2465,7 @@
         (names "/")
         (tstamps "/"))
       (component_classes)
-      (tstamps "5e29c04f-9efb-5ccc-bd05-b25624567e86")))
+      (tstamps "c5688a71-1127-5daf-82df-e2ca01eac148")))
   (nets
     (net
       (code 1)
@@ -1540,6 +2500,10 @@
         (pin "1")
         (pintype "PASSIVE"))
       (node
+        (ref "C23")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
         (ref "C8")
         (pin "1")
         (pintype "PASSIVE"))
@@ -1550,6 +2514,10 @@
       (node
         (ref "J4")
         (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J6")
+        (pin "2")
         (pintype "PASSIVE"))
       (node
         (ref "L1")
@@ -1577,6 +2545,10 @@
         (pintype "PASSIVE"))
       (node
         (ref "R5")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "TP1")
         (pin "1")
         (pintype "PASSIVE"))
       (node
@@ -1622,6 +2594,10 @@
       (node
         (ref "U5")
         (pin "1")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U6")
+        (pin "1")
         (pintype "POWER-IN")))
     (net
       (code 2)
@@ -1632,7 +2608,99 @@
         (pin "1")
         (pintype "PASSIVE"))
       (node
+        (ref "C29")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "D11")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "FB1")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J6")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "TP2")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U4")
+        (pin "1")
+        (pintype "INPUT"))
+      (node
+        (ref "U4")
+        (pin "4")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U9")
+        (pin "2")
+        (pintype "POWER-OUT"))
+      (node
+        (ref "U9")
+        (pin "7")
+        (pintype "PASSIVE")))
+    (net
+      (code 3)
+      (name "+5V_DMX")
+      (class "Default")
+      (node
         (ref "C21")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C26")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "FB1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "PS1")
+        (pin "2")
+        (pintype "POWER-IN"))
+      (node
+        (ref "PS2")
+        (pin "2")
+        (pintype "POWER-IN")))
+    (net
+      (code 4)
+      (name "+5V_POE")
+      (class "Default")
+      (node
+        (ref "C27")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C28")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C31")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U7")
+        (pin "1")
+        (pintype "POWER-OUT"))
+      (node
+        (ref "U7")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U9")
+        (pin "6")
+        (pintype "POWER-IN")))
+    (net
+      (code 5)
+      (name "+5V_USB")
+      (class "Default")
+      (node
+        (ref "F1")
         (pin "1")
         (pintype "PASSIVE"))
       (node
@@ -1644,19 +2712,27 @@
         (pin "B4A9")
         (pintype "PASSIVE"))
       (node
-        (ref "PS1")
-        (pin "2")
-        (pintype "POWER-IN"))
+        (ref "U8")
+        (pin "5")
+        (pintype "PASSIVE")))
+    (net
+      (code 6)
+      (name "+5V_USBF")
+      (class "Default")
       (node
-        (ref "U4")
+        (ref "C30")
         (pin "1")
-        (pintype "INPUT"))
+        (pintype "PASSIVE"))
       (node
-        (ref "U4")
-        (pin "4")
+        (ref "F1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U9")
+        (pin "3")
         (pintype "POWER-IN")))
     (net
-      (code 3)
+      (code 7)
       (name "BUCK_FB")
       (class "Default")
       (node
@@ -1672,7 +2748,7 @@
         (pin "5")
         (pintype "INPUT")))
     (net
-      (code 4)
+      (code 8)
       (name "BUCK_LX")
       (class "Default")
       (node
@@ -1680,11 +2756,15 @@
         (pin "1")
         (pintype "PASSIVE"))
       (node
+        (ref "TP8")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
         (ref "U4")
         (pin "3")
         (pintype "OUTPUT")))
     (net
-      (code 5)
+      (code 9)
       (name "CC1")
       (class "Default")
       (node
@@ -1696,7 +2776,7 @@
         (pin "1")
         (pintype "PASSIVE")))
     (net
-      (code 6)
+      (code 10)
       (name "CC2")
       (class "Default")
       (node
@@ -1708,7 +2788,7 @@
         (pin "1")
         (pintype "PASSIVE")))
     (net
-      (code 7)
+      (code 11)
       (name "DISP_CS")
       (class "Default")
       (node
@@ -1720,7 +2800,7 @@
         (pin "34")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 8)
+      (code 12)
       (name "DISP_DC")
       (class "Default")
       (node
@@ -1732,7 +2812,7 @@
         (pin "35")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 9)
+      (code 13)
       (name "DISP_MOSI")
       (class "Default")
       (node
@@ -1744,7 +2824,7 @@
         (pin "33")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 10)
+      (code 14)
       (name "DISP_RST")
       (class "Default")
       (node
@@ -1756,7 +2836,7 @@
         (pin "31")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 11)
+      (code 15)
       (name "DISP_SCK")
       (class "Default")
       (node
@@ -1768,7 +2848,7 @@
         (pin "32")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 12)
+      (code 16)
       (name "DISP_SCL")
       (class "Default")
       (node
@@ -1780,7 +2860,7 @@
         (pin "5")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 13)
+      (code 17)
       (name "DISP_SDA")
       (class "Default")
       (node
@@ -1792,16 +2872,132 @@
         (pin "4")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 14)
-      (name "DMX_A")
+      (code 18)
+      (name "DMX2_A")
       (class "Default")
       (node
-        (ref "D1")
+        (ref "L3")
         (pin "1")
         (pintype "PASSIVE"))
       (node
-        (ref "J1")
+        (ref "R19")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U6")
+        (pin "11")
+        (pintype "OUTPUT"))
+      (node
+        (ref "U6")
+        (pin "14")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 19)
+      (name "DMX2_AO")
+      (class "Default")
+      (node
+        (ref "D7")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J5")
         (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J8")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "L3")
+        (pin "4")
+        (pintype "PASSIVE")))
+    (net
+      (code 20)
+      (name "DMX2_B")
+      (class "Default")
+      (node
+        (ref "L3")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "R19")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U6")
+        (pin "12")
+        (pintype "OUTPUT"))
+      (node
+        (ref "U6")
+        (pin "13")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 21)
+      (name "DMX2_BO")
+      (class "Default")
+      (node
+        (ref "D7")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J5")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J8")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "L3")
+        (pin "3")
+        (pintype "PASSIVE")))
+    (net
+      (code 22)
+      (name "DMX2_EN")
+      (class "Default")
+      (node
+        (ref "U1")
+        (pin "24")
+        (pintype "BIDIRECTIONAL"))
+      (node
+        (ref "U6")
+        (pin "4")
+        (pintype "INPUT"))
+      (node
+        (ref "U6")
+        (pin "5")
+        (pintype "INPUT")))
+    (net
+      (code 23)
+      (name "DMX2_RX")
+      (class "Default")
+      (node
+        (ref "U1")
+        (pin "23")
+        (pintype "BIDIRECTIONAL"))
+      (node
+        (ref "U6")
+        (pin "3")
+        (pintype "OUTPUT")))
+    (net
+      (code 24)
+      (name "DMX2_TX")
+      (class "Default")
+      (node
+        (ref "U1")
+        (pin "9")
+        (pintype "BIDIRECTIONAL"))
+      (node
+        (ref "U6")
+        (pin "6")
+        (pintype "INPUT")))
+    (net
+      (code 25)
+      (name "DMX_A")
+      (class "Default")
+      (node
+        (ref "L2")
+        (pin "1")
         (pintype "PASSIVE"))
       (node
         (ref "R12")
@@ -1816,15 +3012,31 @@
         (pin "14")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 15)
-      (name "DMX_B")
+      (code 26)
+      (name "DMX_AO")
       (class "Default")
       (node
         (ref "D1")
-        (pin "3")
+        (pin "1")
         (pintype "PASSIVE"))
       (node
         (ref "J1")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J7")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "L2")
+        (pin "4")
+        (pintype "PASSIVE")))
+    (net
+      (code 27)
+      (name "DMX_B")
+      (class "Default")
+      (node
+        (ref "L2")
         (pin "2")
         (pintype "PASSIVE"))
       (node
@@ -1840,7 +3052,27 @@
         (pin "13")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 16)
+      (code 28)
+      (name "DMX_BO")
+      (class "Default")
+      (node
+        (ref "D1")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J1")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J7")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "L2")
+        (pin "3")
+        (pintype "PASSIVE")))
+    (net
+      (code 29)
       (name "DMX_EN")
       (class "Default")
       (node
@@ -1856,7 +3088,7 @@
         (pin "5")
         (pintype "INPUT")))
     (net
-      (code 17)
+      (code 30)
       (name "DMX_RX")
       (class "Default")
       (node
@@ -1868,7 +3100,7 @@
         (pin "3")
         (pintype "OUTPUT")))
     (net
-      (code 18)
+      (code 31)
       (name "DMX_TX")
       (class "Default")
       (node
@@ -1880,7 +3112,7 @@
         (pin "6")
         (pintype "INPUT")))
     (net
-      (code 19)
+      (code 32)
       (name "DTR")
       (class "Default")
       (node
@@ -1896,7 +3128,7 @@
         (pin "13")
         (pintype "OUTPUT")))
     (net
-      (code 20)
+      (code 33)
       (name "EN")
       (class "Default")
       (node
@@ -1916,23 +3148,27 @@
         (pin "1")
         (pintype "PASSIVE"))
       (node
+        (ref "TP5")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
         (ref "U1")
         (pin "3")
         (pintype "INPUT")))
     (net
-      (code 21)
+      (code 34)
       (name "ETH_ACTLED")
       (class "Default")
       (node
         (ref "J3")
-        (pin "11")
+        (pin "12")
         (pintype "PASSIVE"))
       (node
         (ref "U2")
         (pin "27")
         (pintype "OUTPUT")))
     (net
-      (code 22)
+      (code 35)
       (name "ETH_CS")
       (class "Default")
       (node
@@ -1944,7 +3180,7 @@
         (pin "32")
         (pintype "INPUT")))
     (net
-      (code 23)
+      (code 36)
       (name "ETH_INT")
       (class "Default")
       (node
@@ -1956,19 +3192,19 @@
         (pin "36")
         (pintype "OUTPUT")))
     (net
-      (code 24)
+      (code 37)
       (name "ETH_LINKLED")
       (class "Default")
       (node
         (ref "J3")
-        (pin "2")
+        (pin "14")
         (pintype "PASSIVE"))
       (node
         (ref "U2")
         (pin "25")
         (pintype "OUTPUT")))
     (net
-      (code 25)
+      (code 38)
       (name "ETH_RCT")
       (class "Default")
       (node
@@ -1977,12 +3213,16 @@
         (pintype "PASSIVE"))
       (node
         (ref "J3")
-        (pin "6")
+        (pin "3")
         (pintype "PASSIVE")))
     (net
-      (code 26)
+      (code 39)
       (name "ETH_RST")
       (class "Default")
+      (node
+        (ref "TP7")
+        (pin "1")
+        (pintype "PASSIVE"))
       (node
         (ref "U1")
         (pin "17")
@@ -1992,31 +3232,31 @@
         (pin "37")
         (pintype "INPUT")))
     (net
-      (code 27)
+      (code 40)
       (name "ETH_RXN")
       (class "Default")
       (node
         (ref "J3")
-        (pin "8")
+        (pin "1")
         (pintype "PASSIVE"))
       (node
         (ref "U2")
         (pin "5")
         (pintype "PASSIVE")))
     (net
-      (code 28)
+      (code 41)
       (name "ETH_RXP")
       (class "Default")
       (node
         (ref "J3")
-        (pin "7")
+        (pin "2")
         (pintype "PASSIVE"))
       (node
         (ref "U2")
         (pin "6")
         (pintype "PASSIVE")))
     (net
-      (code 29)
+      (code 42)
       (name "ETH_TCT")
       (class "Default")
       (node
@@ -2025,38 +3265,110 @@
         (pintype "PASSIVE"))
       (node
         (ref "J3")
-        (pin "5")
+        (pin "4")
         (pintype "PASSIVE"))
       (node
         (ref "R18")
         (pin "1")
         (pintype "PASSIVE")))
     (net
-      (code 30)
+      (code 43)
       (name "ETH_TXN")
       (class "Default")
       (node
         (ref "J3")
-        (pin "4")
+        (pin "5")
         (pintype "PASSIVE"))
       (node
         (ref "U2")
         (pin "1")
         (pintype "PASSIVE")))
     (net
-      (code 31)
+      (code 44)
       (name "ETH_TXP")
       (class "Default")
       (node
         (ref "J3")
-        (pin "3")
+        (pin "6")
         (pintype "PASSIVE"))
       (node
         (ref "U2")
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 32)
+      (code 45)
+      (name "EXP_IO19")
+      (class "Default")
+      (node
+        (ref "J6")
+        (pin "8")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U1")
+        (pin "13")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 46)
+      (name "EXP_IO20")
+      (class "Default")
+      (node
+        (ref "J6")
+        (pin "9")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U1")
+        (pin "14")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 47)
+      (name "EXP_IO35")
+      (class "Default")
+      (node
+        (ref "J6")
+        (pin "4")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U1")
+        (pin "28")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 48)
+      (name "EXP_IO36")
+      (class "Default")
+      (node
+        (ref "J6")
+        (pin "5")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U1")
+        (pin "29")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 49)
+      (name "EXP_IO37")
+      (class "Default")
+      (node
+        (ref "J6")
+        (pin "6")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U1")
+        (pin "30")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 50)
+      (name "EXP_IO48")
+      (class "Default")
+      (node
+        (ref "J6")
+        (pin "7")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U1")
+        (pin "25")
+        (pintype "BIDIRECTIONAL")))
+    (net
+      (code 51)
       (name "GND")
       (class "Default")
       (node
@@ -2112,7 +3424,35 @@
         (pin "2")
         (pintype "PASSIVE"))
       (node
+        (ref "C23")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C26")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C27")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C28")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C29")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
         (ref "C3")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C30")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C31")
         (pin "2")
         (pintype "PASSIVE"))
       (node
@@ -2133,6 +3473,10 @@
         (pintype "PASSIVE"))
       (node
         (ref "C9")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "D11")
         (pin "2")
         (pintype "PASSIVE"))
       (node
@@ -2181,15 +3525,11 @@
         (pintype "PASSIVE"))
       (node
         (ref "J3")
-        (pin "10")
+        (pin "GND1")
         (pintype "PASSIVE"))
       (node
         (ref "J3")
-        (pin "13")
-        (pintype "PASSIVE"))
-      (node
-        (ref "J3")
-        (pin "14")
+        (pin "GND2")
         (pintype "PASSIVE"))
       (node
         (ref "J4")
@@ -2200,7 +3540,35 @@
         (pin "MP")
         (pintype "PASSIVE"))
       (node
+        (ref "J6")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J6")
+        (pin "MP")
+        (pintype "PASSIVE"))
+      (node
+        (ref "MH1")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "MH2")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "MH3")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "MH4")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
         (ref "PS1")
+        (pin "1")
+        (pintype "POWER-IN"))
+      (node
+        (ref "PS2")
         (pin "1")
         (pintype "POWER-IN"))
       (node
@@ -2226,6 +3594,14 @@
       (node
         (ref "SW2")
         (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "TP3")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "TP4")
+        (pin "1")
         (pintype "PASSIVE"))
       (node
         (ref "U1")
@@ -2288,6 +3664,38 @@
         (pin "8")
         (pintype "POWER-IN"))
       (node
+        (ref "U6")
+        (pin "2")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U6")
+        (pin "7")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U6")
+        (pin "8")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U7")
+        (pin "3")
+        (pintype "POWER-OUT"))
+      (node
+        (ref "U8")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U9")
+        (pin "1")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U9")
+        (pin "4")
+        (pintype "INPUT"))
+      (node
+        (ref "U9")
+        (pin "5")
+        (pintype "INPUT"))
+      (node
         (ref "Y1")
         (pin "2")
         (pintype "PASSIVE"))
@@ -2296,7 +3704,7 @@
         (pin "4")
         (pintype "PASSIVE")))
     (net
-      (code 33)
+      (code 52)
       (name "GNDISO")
       (class "Default")
       (node
@@ -2316,6 +3724,26 @@
         (pin "1")
         (pintype "PASSIVE"))
       (node
+        (ref "J1")
+        (pin "6")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J1")
+        (pin "7")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J1")
+        (pin "G")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J7")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J7")
+        (pin "MP")
+        (pintype "PASSIVE"))
+      (node
         (ref "PS1")
         (pin "3")
         (pintype "POWER-OUT"))
@@ -2332,7 +3760,63 @@
         (pin "9")
         (pintype "POWER-IN")))
     (net
-      (code 34)
+      (code 53)
+      (name "GNDISO2")
+      (class "Default")
+      (node
+        (ref "C24")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "C25")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "D7")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J5")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J5")
+        (pin "6")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J5")
+        (pin "7")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J5")
+        (pin "G")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J8")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J8")
+        (pin "MP")
+        (pintype "PASSIVE"))
+      (node
+        (ref "PS2")
+        (pin "3")
+        (pintype "POWER-OUT"))
+      (node
+        (ref "U6")
+        (pin "10")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U6")
+        (pin "15")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U6")
+        (pin "9")
+        (pintype "POWER-IN")))
+    (net
+      (code 54)
       (name "IO0")
       (class "Default")
       (node
@@ -2348,11 +3832,15 @@
         (pin "1")
         (pintype "PASSIVE"))
       (node
+        (ref "TP6")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
         (ref "U1")
         (pin "27")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 35)
+      (code 55)
       (name "LED_B")
       (class "Default")
       (node
@@ -2364,7 +3852,7 @@
         (pin "7")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 36)
+      (code 56)
       (name "LED_G")
       (class "Default")
       (node
@@ -2376,7 +3864,7 @@
         (pin "38")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 37)
+      (code 57)
       (name "LED_R")
       (class "Default")
       (node
@@ -2388,7 +3876,7 @@
         (pin "39")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 38)
+      (code 58)
       (name "LED_W")
       (class "Default")
       (node
@@ -2400,7 +3888,7 @@
         (pin "8")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 39)
+      (code 59)
       (name "LED_Y")
       (class "Default")
       (node
@@ -2412,7 +3900,7 @@
         (pin "6")
         (pintype "BIDIRECTIONAL")))
     (net
-      (code 40)
+      (code 60)
       (name "MISO")
       (class "Default")
       (node
@@ -2424,7 +3912,7 @@
         (pin "34")
         (pintype "OUTPUT")))
     (net
-      (code 41)
+      (code 61)
       (name "MOSI")
       (class "Default")
       (node
@@ -2436,7 +3924,7 @@
         (pin "35")
         (pintype "INPUT")))
     (net
-      (code 42)
+      (code 62)
       (name "N$1")
       (class "Default")
       (node
@@ -2448,7 +3936,7 @@
         (pin "10")
         (pintype "PASSIVE")))
     (net
-      (code 43)
+      (code 63)
       (name "N$10")
       (class "Default")
       (node
@@ -2460,31 +3948,31 @@
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 44)
+      (code 64)
       (name "N$2")
       (class "Default")
       (node
         (ref "J3")
-        (pin "1")
+        (pin "13")
         (pintype "PASSIVE"))
       (node
         (ref "R4")
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 45)
+      (code 65)
       (name "N$3")
       (class "Default")
       (node
         (ref "J3")
-        (pin "12")
+        (pin "11")
         (pintype "PASSIVE"))
       (node
         (ref "R5")
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 46)
+      (code 66)
       (name "N$4")
       (class "Default")
       (node
@@ -2496,7 +3984,7 @@
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 47)
+      (code 67)
       (name "N$5")
       (class "Default")
       (node
@@ -2508,7 +3996,7 @@
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 48)
+      (code 68)
       (name "N$6")
       (class "Default")
       (node
@@ -2520,7 +4008,7 @@
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 49)
+      (code 69)
       (name "N$7")
       (class "Default")
       (node
@@ -2532,7 +4020,7 @@
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 50)
+      (code 70)
       (name "N$8")
       (class "Default")
       (node
@@ -2544,7 +4032,7 @@
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 51)
+      (code 71)
       (name "N$9")
       (class "Default")
       (node
@@ -2556,7 +4044,7 @@
         (pin "2")
         (pintype "PASSIVE")))
     (net
-      (code 52)
+      (code 72)
       (name "RTS")
       (class "Default")
       (node
@@ -2572,7 +4060,7 @@
         (pin "14")
         (pintype "OUTPUT")))
     (net
-      (code 53)
+      (code 73)
       (name "S3_RX")
       (class "Default")
       (node
@@ -2584,7 +4072,7 @@
         (pin "2")
         (pintype "OUTPUT")))
     (net
-      (code 54)
+      (code 74)
       (name "S3_TX")
       (class "Default")
       (node
@@ -2596,7 +4084,7 @@
         (pin "3")
         (pintype "INPUT")))
     (net
-      (code 55)
+      (code 75)
       (name "SCLK")
       (class "Default")
       (node
@@ -2608,7 +4096,7 @@
         (pin "33")
         (pintype "INPUT")))
     (net
-      (code 56)
+      (code 76)
       (name "TOCAP")
       (class "Default")
       (node
@@ -2620,7 +4108,7 @@
         (pin "20")
         (pintype "PASSIVE")))
     (net
-      (code 57)
+      (code 77)
       (name "USB_DM")
       (class "Default")
       (node
@@ -2634,9 +4122,17 @@
       (node
         (ref "U3")
         (pin "6")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U8")
+        (pin "3")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U8")
+        (pin "4")
         (pintype "PASSIVE")))
     (net
-      (code 58)
+      (code 78)
       (name "USB_DP")
       (class "Default")
       (node
@@ -2650,29 +4146,121 @@
       (node
         (ref "U3")
         (pin "5")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U8")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U8")
+        (pin "6")
         (pintype "PASSIVE")))
     (net
-      (code 59)
+      (code 79)
       (name "VISO")
+      (class "Default")
+      (node
+        (ref "C20")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "FB2")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "PS1")
+        (pin "4")
+        (pintype "POWER-OUT")))
+    (net
+      (code 80)
+      (name "VISO2")
+      (class "Default")
+      (node
+        (ref "C25")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "FB3")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "PS2")
+        (pin "4")
+        (pintype "POWER-OUT")))
+    (net
+      (code 81)
+      (name "VISO2_DRV")
+      (class "Default")
+      (node
+        (ref "C24")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "FB3")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U6")
+        (pin "16")
+        (pintype "POWER-IN")))
+    (net
+      (code 82)
+      (name "VISO_DRV")
       (class "Default")
       (node
         (ref "C19")
         (pin "1")
         (pintype "PASSIVE"))
       (node
-        (ref "C20")
-        (pin "1")
+        (ref "FB2")
+        (pin "2")
         (pintype "PASSIVE"))
-      (node
-        (ref "PS1")
-        (pin "4")
-        (pintype "POWER-OUT"))
       (node
         (ref "U5")
         (pin "16")
         (pintype "POWER-IN")))
     (net
-      (code 60)
+      (code 83)
+      (name "VPOE+")
+      (class "Default")
+      (node
+        (ref "D10")
+        (pin "1")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J3")
+        (pin "9")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U7")
+        (pin "5")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U7")
+        (pin "6")
+        (pintype "PASSIVE")))
+    (net
+      (code 84)
+      (name "VPOE-")
+      (class "Default")
+      (node
+        (ref "D10")
+        (pin "2")
+        (pintype "PASSIVE"))
+      (node
+        (ref "J3")
+        (pin "10")
+        (pintype "PASSIVE"))
+      (node
+        (ref "U7")
+        (pin "7")
+        (pintype "POWER-IN"))
+      (node
+        (ref "U7")
+        (pin "8")
+        (pintype "PASSIVE")))
+    (net
+      (code 85)
       (name "W5500_1V2")
       (class "Default")
       (node
@@ -2688,7 +4276,7 @@
         (pin "22")
         (pintype "POWER-OUT")))
     (net
-      (code 61)
+      (code 86)
       (name "XI")
       (class "Default")
       (node
@@ -2704,7 +4292,7 @@
         (pin "1")
         (pintype "PASSIVE")))
     (net
-      (code 62)
+      (code 87)
       (name "XO")
       (class "Default")
       (node

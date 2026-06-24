@@ -53,6 +53,8 @@ out = [["Designator", "Mid X", "Mid Y", "Layer", "Rotation"]]
 flipped = []
 for f in sorted(b.GetFootprints(), key=lambda x: x.GetReference()):
     ref = f.GetReference()
+    if ref.startswith("MH"):                            # mounting holes are board features, not placed components
+        continue
     pads = list(f.Pads())
     if not pads:
         continue
@@ -73,15 +75,13 @@ for f in sorted(b.GetFootprints(), key=lambda x: x.GetReference()):
 with open(OUT, "w", newline="") as fh:
     csv.writer(fh).writerows(out)
 
+import sys; sys.path.insert(0, HERE)
 try:
-    import openpyxl
-    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Sheet1"
-    ws.append(out[0])
-    for r in out[1:]:
-        ws.append([r[0], r[1], r[2], r[3], int(float(r[4]))])
-    wb.save(OUT.replace(".csv", ".xlsx"))
-except ImportError:
-    pass
+    import csv_to_xlsx                               # real openpyxl xlsx (JLCPCB rejects a hand-rolled one)
+    csv_to_xlsx.convert(OUT, OUT.replace(".csv", ".xlsx"))
+    print("CPL .xlsx written:", OUT.replace(".csv", ".xlsx"))
+except Exception as e:
+    print("!! CPL .xlsx NOT written (upload the .csv -- JLCPCB accepts it):", e)
 
 print(f"JLCPCB CPL written: {len(out)-1} placements (pad-center, bottom-left origin)")
 if flipped:
