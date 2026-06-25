@@ -6,7 +6,7 @@
 #>
 
 $ErrorActionPreference = "Stop"
-$REPO = "tombueng/LumiGate"
+$REPO = "tombueng/LuxDMX"
 
 function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "    OK: $msg" -ForegroundColor Green }

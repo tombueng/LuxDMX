@@ -9,7 +9,7 @@ The GPIO data behind each diagram comes from:
 
 | Board(s) | Source | License |
 |---|---|---|
-| LuxDMX v4 | the PCB netlist (`hardware/lumigate.py`) | project (MIT) |
+| LuxDMX v4 | the PCB netlist (`hardware/luxdmx.py`) | project (MIT) |
 | ESP32 DevKitC / DevKit v1 / NodeMCU-32S / ESP32-S3 DevKitC-1, Feather / QtPy / XIAO / WT32-ETH01 | hand-tuned published header pinouts in `hardware/gen_board_descriptor.py` | project (MIT) |
 | every other esp32 / esp32s3 board | the arduino-esp32 core `variants/<dir>/pins_arduino.h` (authoritative GPIOs), via `auto_board()` | arduino-esp32 (LGPL-2.1) — data only, not redistributed here |
 

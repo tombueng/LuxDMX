@@ -2,7 +2,7 @@
 LuxDMX pre-build script.
 Converts src/pages/*.html and src/assets/*.{png,css} into C PROGMEM headers
 under src/generated/ — runs at script-load time (before compilation).
-Also writes src/generated/version.h from the LUMIGATE_VERSION env var.
+Also writes src/generated/version.h from the LUXDMX_VERSION env var.
 """
 Import("env")
 import os
@@ -119,7 +119,7 @@ def patch_esp_dmx():
         print("  [patch] esp_dmx uart.c: already patched")
 
 def generate_version(gen_dir: pathlib.Path):
-    version = os.environ.get("LUMIGATE_VERSION", "dev")
+    version = os.environ.get("LUXDMX_VERSION", "dev")
     (gen_dir / "version.h").write_text(
         f'static const char FIRMWARE_VERSION[] = "{version}";\n',
         encoding="utf-8"

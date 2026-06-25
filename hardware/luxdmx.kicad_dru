@@ -1,4 +1,4 @@
-# LumiGate — custom design rules (auto-loaded by KiCad as <project>.kicad_dru)
+# LuxDMX — custom design rules (auto-loaded by KiCad as <project>.kicad_dru)
 # Enforces the galvanic isolation gaps:
 #   * >=4mm around each isolated DMX domain (universe 1: GNDISO/VISO/DMX_A/DMX_B;
 #     universe 2: GNDISO2/VISO2/DMX2_A/DMX2_B) vs. everything else (logic side).

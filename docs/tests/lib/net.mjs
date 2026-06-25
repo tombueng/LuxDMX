@@ -11,8 +11,8 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Resolve the device to a bare IP (headless Chromium / dgram can't use *.local).
 export async function deviceHost() {
-  if (process.env.LUMIGATE_URL) return new URL(process.env.LUMIGATE_URL).hostname;
-  const host = process.env.LUMIGATE_HOST || 'dmx-gateway.local';
+  if (process.env.LUXDMX_URL) return new URL(process.env.LUXDMX_URL).hostname;
+  const host = process.env.LUXDMX_HOST || 'dmx-gateway.local';
   try {
     const { address } = await dns.lookup(host, { family: 4 });
     return address;

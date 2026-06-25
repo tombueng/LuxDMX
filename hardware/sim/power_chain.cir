@@ -1,4 +1,4 @@
-* LumiGate +5V power chain DC validation: source -> PTC -> TPS2116 ideal-diode mux -> +5V -> FB1 -> B0505S input
+* LuxDMX +5V power chain DC validation: source -> PTC -> TPS2116 ideal-diode mux -> +5V -> FB1 -> B0505S input
 * OR-ing element is now the TPS2116 power mux (U9), not a Schottky. RDSON ~= 40 mOhm typ (65 mOhm max
 * over temp). Replaces the old SS54 (~0.40V Vf), which dropped +5V below the ISO3086 VCC2 4.5V min on USB.
 * Worst case here: both B0505S at full input + buck/logic, ~0.8A total through the mux.

@@ -1,4 +1,4 @@
 (sym_lib_table
   (version 7)
-  (lib (name "luxdmx")(type "KiCad")(uri "${KIPRJMOD}/luxdmx.kicad_sym")(options "")(descr "LumiGate generated symbols"))
+  (lib (name "luxdmx")(type "KiCad")(uri "${KIPRJMOD}/luxdmx.kicad_sym")(options "")(descr "LuxDMX generated symbols"))
 )

@@ -57,7 +57,7 @@ flags are real, physical column placement is approximate).
 ## Notes
 
 - **Accurate GPIOs**: pinouts come from `variants/<dir>/pins_arduino.h` (authoritative),
-  generated via `hardware/gen_board_descriptor.py`; LuxDMX v4 from `hardware/lumigate.py`.
+  generated via `hardware/gen_board_descriptor.py`; LuxDMX v4 from `hardware/luxdmx.py`.
 - **Diagram only**: the picker draws its own horizontal SVG diagram from each board's two
   pin columns. There are no board photos or realistic/Fritzing graphics (too few clean-
   license images to be worth it) - the generated diagram is the interactive tool and works
