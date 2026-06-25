@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LuxDMX — Settings</title>
-<link rel="icon" type="image/png" href="/favicon.png">
-<link rel="stylesheet" href="/bootstrap.min.css">
+<link rel="icon" type="image/png" href="/favicon.png?v=__FWVER__">
+<link rel="stylesheet" href="/bootstrap.min.css?v=__FWVER__">
 <style>
 :root { --gh-bg:#0d1117; --gh-surface:#161b22; --gh-border:#30363d; --gh-text:#c9d1d9; --gh-muted:#8b949e; --gh-accent:#58a6ff; }
 [data-bs-theme="dark"] {
@@ -59,7 +59,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <nav class="site-nav">
   <a class="brand" href="/">
-    <img src="/logo.png" alt="LuxDMX">
+    <img src="/logo.png?v=__FWVER__" alt="LuxDMX">
     <span class="brand-text">LuxDMX</span>
   </a>
   <div class="nav-links">
@@ -1312,9 +1312,12 @@ function appendBoardOption(id, name){
   if (document.querySelector('#board-sel option[value="' + id + '"]')) return;
   var o = document.createElement('option'); o.value = id; o.textContent = name; $('board-sel').appendChild(o);
 }
+// Only offer boards that match the detected chip family — a classic-ESP32 pin map
+// can't run on an ESP32-S3 and vice-versa. Unknown mcu on either side => show it.
+function mcuMatch(m){ return !INFO_MCU || !m || m === INFO_MCU; }
 function fillBoardSelect(){
   var html = '<option value="custom">Custom / manual</option>';
-  BUILTINS.forEach(function(id){ if (BOARDS[id]) html += '<option value="' + id + '">' + esc(BOARDS[id].name) + '</option>'; });
+  BUILTINS.forEach(function(id){ if (BOARDS[id] && mcuMatch(BOARDS[id].mcu)) html += '<option value="' + id + '">' + esc(BOARDS[id].name) + '</option>'; });
   $('board-sel').innerHTML = html;
 }
 function ensureBoard(id, cb){
@@ -1331,13 +1334,14 @@ function ensureBoard(id, cb){
 function loadRemoteCatalog(){
   try {
     var cache = JSON.parse(localStorage.getItem('lg_boards') || '{}');
-    Object.keys(cache).forEach(function(k){ if (!BOARDS[k]){ BOARDS[k] = finalizeDesc(cache[k]); appendBoardOption(k, cache[k].name); } });
+    Object.keys(cache).forEach(function(k){ if (!BOARDS[k] && mcuMatch(cache[k].mcu)){ BOARDS[k] = finalizeDesc(cache[k]); appendBoardOption(k, cache[k].name); } });
   } catch(e){}
   fetch(CATALOG_URL + 'index.json', { cache:'no-store' })
     .then(function(r){ if (!r.ok) throw 0; return r.json(); })
     .then(function(idx){
       (idx.boards || []).forEach(function(e){
         if (BUILTINS.indexOf(e.id) >= 0) return;
+        if (!mcuMatch(e.mcu)) return;   // hide boards for a different chip family
         REMOTE_INDEX[e.id] = e;
         appendBoardOption(e.id, e.name);
       });

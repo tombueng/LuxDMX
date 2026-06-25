@@ -1661,6 +1661,9 @@ static void handleRoot(AsyncWebServerRequest* req) {
     httpReqCount++;
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
+    // Always revalidate the page itself after a firmware update; the versioned
+    // ?v= asset URLs keep css/logo/favicon cacheable.
+    r->addHeader("Cache-Control", "no-cache");
     req->send(r);
 }
 
@@ -1847,6 +1850,7 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
 static void handleConfigGet(AsyncWebServerRequest* req) {
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", CONFIG_HTML, CONFIG_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
+    r->addHeader("Cache-Control", "no-cache");   // revalidate after OTA (assets stay versioned)
     req->send(r);
 }
 
@@ -1951,7 +1955,11 @@ static void handleAutoUpdatePost(AsyncWebServerRequest* req) {
         String("{\"autoUpdate\":") + (cfg.autoUpdate ? "true" : "false") + "}");
 }
 
-static void handleResetGet(AsyncWebServerRequest* req)  { req->send_P(200, "text/html", RESET_HTML); }
+static void handleResetGet(AsyncWebServerRequest* req)  {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", RESET_HTML);
+    r->addHeader("Cache-Control", "no-cache");   // revalidate after OTA (assets stay versioned)
+    req->send(r);
+}
 
 static void handleResetPost(AsyncWebServerRequest* req) {
     req->send_P(200, "text/html", RESET_DONE_HTML);
