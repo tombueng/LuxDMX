@@ -856,7 +856,7 @@ packets over the network and assert the REST API, WebSocket and web UI react cor
 
 ```bash
 cd docs && npm install && npx playwright install chromium
-LUMIGATE_HOST=dmx-gateway.local npm test
+LUXDMX_HOST=dmx-gateway.local npm test
 ```
 
 ---

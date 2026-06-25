@@ -3,7 +3,7 @@
 Board descriptors for the visual pin picker in the device `/config` page (issue #12).
 
 This folder is published by GitHub Pages together with the rest of `web/`, so the
-config page fetches it from `https://tombueng.github.io/LumiGate/boards/`.
+config page fetches it from `https://tombueng.github.io/LuxDMX/boards/`.
 
 ## How it is used
 

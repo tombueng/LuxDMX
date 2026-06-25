@@ -35,3 +35,4 @@ PROMO_PLAN.local.md
 
 # Private deploy secrets for luxdmx.org Strato hosting (SSH key + credentials/URLs)
 /.secrets/
+*.bak
