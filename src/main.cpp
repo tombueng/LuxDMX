@@ -266,12 +266,12 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // ---------------------------------------------------------------------------
 // Defaults / NVS keys
 // ---------------------------------------------------------------------------
-static const char* DEF_HOSTNAME = "luxdmx";
+static const char* DEF_HOSTNAME = "dmx-gateway";
 static const char* DEF_OTA_PW   = "dmxota";
 static constexpr int DEF_UNIVERSE = 0;
 static constexpr int DEF_PROTOCOL = 2;
 static const char* PREF_NS = "dmxgw";
-static const char* AP_SSID = "LuxDMX";   // SSID of the transient setup/config portal
+static const char* AP_SSID = "DMX-Gateway";   // SSID of the transient setup/config portal
 
 // WiFi interface mode (cfg.wifiMode)
 static constexpr int NET_WIFI_STA = 0;        // station / client (join an existing router)
