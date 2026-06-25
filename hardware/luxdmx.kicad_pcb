@@ -8,9 +8,9 @@
 	)
 	(paper "A4")
 	(title_block
-		(title "LumiGate")
+		(title "LuxDMX")
 		(rev "v4.0")
-		(company "github.com/tombueng/LumiGate")
+		(company "luxdmx.org")
 	)
 	(layers
 		(0 "F.Cu" signal)
@@ -21282,7 +21282,7 @@
 			)
 		)
 	)
-	(gr_text "LumiGate v4.0"
+	(gr_text "LuxDMX v4.0"
 		(at 107.5 162 0)
 		(layer "F.SilkS")
 		(uuid "1868f937-c2df-41a9-987e-c36112b4f393")
@@ -21294,7 +21294,7 @@
 			(justify left)
 		)
 	)
-	(gr_text "github.com/tombueng/LumiGate"
+	(gr_text "luxdmx.org"
 		(at 107.5 165 0)
 		(layer "F.SilkS")
 		(uuid "b6bafd61-7168-4be9-8890-eee583a6c5d1")
@@ -22324,7 +22324,7 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "LumiGate v4 -- KEY FEATURES"
+	(gr_text "LuxDMX v4 -- KEY FEATURES"
 		(at 134.5 135.4 0)
 		(layer "B.SilkS")
 		(uuid "3ee9d3cd-4dbe-47b6-ba42-22de4d56dd6d")
