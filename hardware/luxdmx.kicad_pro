@@ -259,12 +259,17 @@
   "cvpcb": {
     "equivalence_files": []
   },
+  "erc": {
+    "rule_severities": {
+      "power_pin_not_driven": "ignore"
+    }
+  },
   "libraries": {
     "pinned_footprint_libs": [],
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "lumigate.kicad_pro",
+    "filename": "luxdmx.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -312,8 +317,8 @@
     "legacy_lib_list": [],
     "top_level_sheets": [
       {
-        "filename": "lumigate.kicad_sch",
-        "name": "lumigate",
+        "filename": "luxdmx.kicad_sch",
+        "name": "luxdmx",
         "uuid": "00000000-0000-0000-0000-000000000000"
       }
     ]
@@ -325,10 +330,5 @@
       "version": 0
     },
     "tuning_profiles_impedance_geometric": []
-  },
-  "erc": {
-    "rule_severities": {
-      "power_pin_not_driven": "ignore"
-    }
   }
 }
