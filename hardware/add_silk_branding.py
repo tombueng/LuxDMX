@@ -1,6 +1,6 @@
 """Stamp the board branding onto the REAL silkscreen (F.Silkscreen) so it actually prints:
    line 1:  LuxDMX v<VERSION>
-   line 2:  github.com/tombueng/LuxDMX
+   line 2:  luxdmx.org
 
 Single source of truth = HW_VERSION in hw_version.py (the hardware version, SEPARATE from
 the firmware version). Bump it there and re-run; the script is idempotent (it removes any
@@ -11,14 +11,14 @@ re-running when HW_VERSION changes. Text height matches the unified 1.0mm board 
 import pcbnew
 from hw_version import HW_VERSION      # hardware (PCB) revision -- source of truth
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"  # TODO: rename to luxdmx.kicad_pcb in Phase 5
 FM = pcbnew.FromMM
 VERSION = HW_VERSION
-GITHUB  = "github.com/tombueng/LuxDMX"
+WEB_URL = "luxdmx.org"
 
 LINES = [                             # (text, x_mm, y_mm)  centred anchor
     (f"LuxDMX v{VERSION}", 122.5, 176.0),
-    (GITHUB,                 122.5, 178.0),
+    (WEB_URL,                122.5, 178.0),
 ]
 H = 1.0          # mm, matches board silk standard
 TH = 0.15        # mm stroke
@@ -29,7 +29,7 @@ b = pcbnew.LoadBoard(PCB)
 for d in list(b.GetDrawings()):
     if isinstance(d, pcbnew.PCB_TEXT):
         t = d.GetText().lower()
-        if t.startswith("luxdmx") or "github.com" in t:
+        if t.startswith("luxdmx") or "luxdmx.org" in t or "github.com" in t:
             b.Remove(d)
 
 for text, x, y in LINES:
@@ -48,9 +48,9 @@ for text, x, y in LINES:
 tb = pcbnew.TITLE_BLOCK()
 tb.SetTitle("LuxDMX")
 tb.SetRevision(f"v{VERSION}")
-tb.SetCompany(GITHUB)
+tb.SetCompany(WEB_URL)
 b.SetTitleBlock(tb)
-print(f"  title block: title='LuxDMX' rev='v{VERSION}' company='{GITHUB}'")
+print(f"  title block: title='LuxDMX' rev='v{VERSION}' company='{WEB_URL}'")
 
 pcbnew.SaveBoard(PCB, b)
 print(f"branding stamped: LuxDMX v{VERSION} + {GITHUB}")
