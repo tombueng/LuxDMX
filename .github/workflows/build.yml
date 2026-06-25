@@ -68,22 +68,21 @@ jobs:
           cp .pio/build/esp32dev/firmware.bin   firmware.bin
           cp .pio/build/esp32dev/bootloader.bin bootloader.bin
           cp .pio/build/esp32dev/partitions.bin partitions.bin
+          # Gzip the ELF (debug symbols) right away: a later full-source build can
+          # evict .pio/build/esp32dev to free runner disk, so don't defer it (#34).
+          gzip -c .pio/build/esp32dev/firmware.elf > firmware.elf.gz
 
           pio run -e esp32s3dev
           cp .pio/build/esp32s3dev/firmware.bin   firmware-esp32s3.bin
           cp .pio/build/esp32s3dev/bootloader.bin bootloader-esp32s3.bin
           cp .pio/build/esp32s3dev/partitions.bin partitions-esp32s3.bin
+          gzip -c .pio/build/esp32s3dev/firmware.elf > firmware-esp32s3.elf.gz
 
           pio run -e wt32eth01
           cp .pio/build/wt32eth01/firmware.bin   firmware-wt32eth01.bin
           cp .pio/build/wt32eth01/bootloader.bin bootloader-wt32eth01.bin
           cp .pio/build/wt32eth01/partitions.bin partitions-wt32eth01.bin
-
-          # Gzipped ELFs (debug symbols) so a panic can be decoded with addr2line
-          # later (issue #34) — the .elf is ~22 MB each, gzip keeps the release lean.
-          gzip -c .pio/build/esp32dev/firmware.elf   > firmware.elf.gz
-          gzip -c .pio/build/esp32s3dev/firmware.elf > firmware-esp32s3.elf.gz
-          gzip -c .pio/build/wt32eth01/firmware.elf  > firmware-wt32eth01.elf.gz
+          gzip -c .pio/build/wt32eth01/firmware.elf > firmware-wt32eth01.elf.gz
 
           BOOT_APP0=$(find ~/.platformio/packages -name "boot_app0.bin" | head -1)
           cp "$BOOT_APP0" boot_app0.bin
