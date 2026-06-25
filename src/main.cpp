@@ -199,7 +199,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // runtime config (cfg.eth*) on ANY board: a DIY user can wire a W5500 module to a
 // plain ESP32 / ESP32-S3 and enable it in /config, not just boards that bake the
 // pins in at build time. Defaults are the classic-ESP32 VSPI pins (the most common
-// W5500 wiring); lumigate_v4 overrides them via build_flags. A build without
+// W5500 wiring); luxdmx_v4 overrides them via build_flags. A build without
 // USE_ETH_SPI never calls ETH.begin() with these, so they cost nothing there.
 #ifndef ETH_W5500_SCK
 #define ETH_W5500_SCK 18

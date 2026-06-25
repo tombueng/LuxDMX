@@ -1,7 +1,7 @@
 (export 
   (version "D")
   (design
-    (source "lumigate.py")
+    (source "luxdmx.py")
     (date "06/23/2026 06:08 PM")
     (tool "SKiDL (2.2.3)")
     (sheet
@@ -13,7 +13,7 @@
         (company)
         (rev)
         (date)
-        (source "lumigate.py")
+        (source "luxdmx.py")
         (comment
           (number "1")
           (value ""))

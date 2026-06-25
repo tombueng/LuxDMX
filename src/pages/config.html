@@ -866,7 +866,7 @@ function loadVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['lumigate_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var BUILTINS = ['luxdmx_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families — used when no full board descriptor is selected (Custom).
@@ -934,7 +934,7 @@ function xiaocols(){
 }
 function buildBoards(){
   BOARDS = {};
-  BOARDS['lumigate_v4'] = finalizeDesc({ id:'lumigate_v4', name:'LuxDMX v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
+  BOARDS['luxdmx_v4'] = finalizeDesc({ id:'luxdmx_v4', name:'LuxDMX v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
     cols:s3cols(true),
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15, dispType:1, dispsda:4, dispscl:5,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8}] } });

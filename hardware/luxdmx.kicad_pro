@@ -240,7 +240,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": ""
+      "sch_revision": "v4"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -645,13 +645,18 @@
       {
         "filename": "luxdmx.kicad_sch",
         "name": "luxdmx",
-        "uuid": "00000000-0000-0000-0000-000000000000"
+        "uuid": "0e6a8546-be13-56eb-a233-4ae278c9df61"
       }
     ],
     "used_designators": "",
     "variants": []
   },
-  "sheets": [],
+  "sheets": [
+    [
+      "0e6a8546-be13-56eb-a233-4ae278c9df61",
+      "luxdmx"
+    ]
+  ],
   "text_variables": {},
   "tuning_profiles": {
     "meta": {

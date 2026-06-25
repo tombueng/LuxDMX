@@ -1,6 +1,6 @@
 (footprint "Olimex_ESP32-POE-ISO_socket"
   (version 20240108)
-  (generator "lumigate")
+  (generator "luxdmx")
   (generator_version "9.0")
   (layer "F.Cu")
   (descr "Socket for Olimex ESP32-POE-ISO module. Two 1x10 female headers, 2.54mm pitch, 25.4mm apart. Pads 1-10=EXT1, 11-20=EXT2. Geometry from Rev.I PCB.")

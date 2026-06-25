@@ -129,7 +129,7 @@ test.describe('Multi-output (issue #4)', () => {
     test.setTimeout(120_000);   // two reboots
     // Output B needs a real TX GPIO to be accepted (the sanitizer drops pin-less
     // outputs). Default is an ESP32-S3-safe free pin; override per board.
-    const txB = Number(process.env.LUMIGATE_TXB || 18);
+    const txB = Number(process.env.LUXDMX_TXB || 18);
     const before = await getInfo(request);
     try {
       await request.post('/config', {

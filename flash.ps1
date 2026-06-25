@@ -115,7 +115,7 @@ try {
     Write-Err "Could not reach GitHub API: $_"
 }
 
-$tmpDir = Join-Path $env:TEMP "lumigate_flash"
+$tmpDir = Join-Path $env:TEMP "luxdmx_flash"
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
 foreach ($file in $files.Keys) {
