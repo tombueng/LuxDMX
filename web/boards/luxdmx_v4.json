@@ -1,5 +1,5 @@
 {
-  "id": "lumigate_v4",
+  "id": "luxdmx_v4",
   "name": "LuxDMX v4 (ESP32-S3 + W5500)",
   "mcu": "esp32s3",
   "cols": [
@@ -242,7 +242,7 @@
       }
     ]
   },
-  "_source": "generated from hardware/lumigate.py",
+  "_source": "generated from hardware/luxdmx.py",
   "hardwired": [
     {
       "gpio": 1,
