@@ -1,5 +1,5 @@
 (fp_lib_table
-  (lib (name "LuxDMX")(type "KiCad")(uri "${KIPRJMOD}/LuxDMX.pretty")(options "")(descr "LumiGate project footprints (ESP32-POE-ISO socket)"))
+  (lib (name "LuxDMX")(type "KiCad")(uri "${KIPRJMOD}/LuxDMX.pretty")(options "")(descr "LuxDMX project footprints (ESP32-POE-ISO socket)"))
   (lib (name "C165948")(type "KiCad")(uri "${KIPRJMOD}/easyeda/C165948.pretty")(options "")(descr ""))
   (lib (name "C183095")(type "KiCad")(uri "${KIPRJMOD}/easyeda/C183095.pretty")(options "")(descr ""))
   (lib (name "C2912568")(type "KiCad")(uri "${KIPRJMOD}/easyeda/C2912568.pretty")(options "")(descr ""))
