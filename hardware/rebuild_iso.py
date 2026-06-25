@@ -14,7 +14,7 @@ Domains are data-driven; each domain's pad bbox (+ its creepage margin) drives t
 Run after placing, then escape_connectors -> autoroute_fr2 -> cleanup_pads. KiCad 10 python."""
 import pcbnew, math
 
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM = pcbnew.FromMM; TM = pcbnew.ToMM
 
 # name -> (set of nets, F/B pour net or None, creepage margin mm)

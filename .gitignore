@@ -8,6 +8,7 @@ docs/playwright-report/
 
 # local editor/agent config (never publish)
 .claude/
+CLAUDE.md
 .vscode/
 .history/
 # stray SKiDL byproducts if lumigate.py is run from repo root
@@ -31,3 +32,6 @@ docs/playwright-report/
 # (UI simulator / video pipeline + promo plan; backed up privately in tombueng/LumiGate-ops.)
 /sim/
 PROMO_PLAN.local.md
+
+# Private deploy secrets for luxdmx.org Strato hosting (SSH key + credentials/URLs)
+/.secrets/

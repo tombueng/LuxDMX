@@ -7,7 +7,7 @@ NB: the STATUS-LED legend and the J4/J6 pinout grids live in add_port_pinout_sil
 tables). This script no longer touches them, so the hand-placed LED table stays where it is."""
 import pcbnew
 from hw_version import HW_VERSION
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 
@@ -19,7 +19,7 @@ LABELS = {
     "J2": ("USB-C", 0.0, -5.0, 0),         # USB-C inlet, above
     # J4 (display) + J6 (expansion) get per-pin pinout grids instead — see add_port_pinout_silk.py
 }
-BRAND = [f"LumiGate v{HW_VERSION}", "github.com/tombueng/LumiGate"]
+BRAND = [f"LuxDMX v{HW_VERSION}", "github.com/tombueng/LuxDMX"]
 
 # read all footprint positions BEFORE mutating the board (re-reading after Remove() returns
 # raw SwigPyObjects). branding bottom-left.
@@ -29,7 +29,7 @@ BR_X, BR_Y = 116.0, 163.0
 
 # idempotent: drop ANY earlier connector-label / branding copy (match by keyword). Deliberately does NOT
 # include the LED-legend keywords -- that table is owned by add_port_pinout_silk.py and must not be moved.
-_kw = ("dmx-out", "ethernet", "usb-c", "display", "exp i/o", "lumigate", "github.com")
+_kw = ("dmx-out", "ethernet", "usb-c", "display", "exp i/o", "luxdmx", "github.com")
 for d in list(b.GetDrawings()):
     if isinstance(d, pcbnew.PCB_TEXT) and any(k in d.GetText().lower() for k in _kw):
         b.Remove(d)

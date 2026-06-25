@@ -4,8 +4,8 @@ grouped by LCSC# so each part appears on exactly one line (JLCPCB requirement)."
 import pcbnew, csv, re
 from collections import defaultdict
 
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
-OUT = r"C:\dev\DMX\hardware\lumigate_BOM_jlcpcb.csv"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+OUT = r"C:\dev\DMX\hardware\luxdmx_BOM_jlcpcb.csv"
 
 # ref -> (comment, LCSC#)   ("" = choose in JLCPCB picker)
 INFO = {

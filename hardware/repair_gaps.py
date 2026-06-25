@@ -3,7 +3,7 @@ Same approach as route_en.py: for each gap, drop a via near each endpoint (short
 and haul between them on B.Cu with a grid-A* pathfinder. Re-queries obstacles per gap so each new route is
 seen by the next. KiCad 10 bundled python."""
 import pcbnew, math, heapq
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 

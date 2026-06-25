@@ -10,7 +10,7 @@ Run: python validate_geometry.py   (KiCad 10 python)."""
 import pcbnew, math
 from collections import defaultdict
 
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 TM = pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 

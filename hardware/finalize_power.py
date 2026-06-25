@@ -5,7 +5,7 @@ we don't create co-located/hole-clearance errors. With In1/In2 now solid POWER p
 inner-layer signals to short against. Reads C:/tmp/drcU.json (regenerate DRC first if board changed).
 KiCad 10 python."""
 import pcbnew, json, re, math
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 d = json.load(open(r"C:\tmp\drcU.json"))

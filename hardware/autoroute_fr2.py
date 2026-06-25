@@ -1,6 +1,6 @@
 import os, sys, subprocess, tempfile, glob, pcbnew
 HERE = os.path.dirname(os.path.abspath(__file__))
-BOARD = os.path.join(HERE, "lumigate.kicad_pcb")
+BOARD = os.path.join(HERE, "luxdmx.kicad_pcb")
 # Freerouting 2.x jar + portable JDK 25 live in hardware/tools/ (gitignored).
 # Override with env FR2_JAR / FR2_JAVA / FR2_PASSES. FR2 needs Java 25+ (class file v69).
 JAR = os.environ.get("FR2_JAR", os.path.join(HERE, "tools", "freerouting2.jar"))

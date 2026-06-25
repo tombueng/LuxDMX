@@ -2,7 +2,7 @@
 (straight / L / Z), going around other-net copper. For the recurring single unrouted net in the dense
 W5500 fan-out. Usage: route_one.py NET x0 y0 x1 y1   (mm). KiCad 10."""
 import pcbnew, math, sys
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 NET = sys.argv[1]; P0 = (float(sys.argv[2]), float(sys.argv[3])); P1 = (float(sys.argv[4]), float(sys.argv[5]))
 b = pcbnew.LoadBoard(PCB); NC = b.FindNet(NET).GetNetCode()

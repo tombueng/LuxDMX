@@ -555,7 +555,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <footer class="text-center py-3 mt-2 border-top">
   &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
-  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LumiGate">LuxDMX</a>
+  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
   &nbsp;&mdash;&nbsp; MIT License
 </footer>
 
@@ -824,7 +824,7 @@ function installVersion(ver){
   });
 }
 function loadVersions(){
-  fetch('https://api.github.com/repos/tombueng/LumiGate/releases?per_page=50')
+  fetch('https://luxdmx.org/firmware/releases/releases?per_page=50')
     .then(function(r){ return r.json(); })
     .then(function(list){
       var rows = (list||[])
@@ -867,7 +867,7 @@ var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
 var BUILTINS = ['lumigate_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
-var CATALOG_URL = 'https://tombueng.github.io/LumiGate/boards/';
+var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families — used when no full board descriptor is selected (Custom).
 var FAMILIES = {

@@ -13,7 +13,7 @@ pipeline (rebuild_iso wipes tracks). KiCad 10 python.
   L3  CM choke    -> U6  DMX2_A   (DMX2 island)
 """
 import pcbnew, math
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 

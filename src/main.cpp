@@ -1668,7 +1668,7 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
 #if defined(USE_ETH_SPI)
-static const char BOARD_ID[] = "lumigate_v4";
+static const char BOARD_ID[] = "luxdmx_v4";
 #elif defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -2007,7 +2007,7 @@ static bool httpsGet(const char* url, String& out, size_t maxLen) {
 
 static void checkForUpdate() {
     String v;
-    if (!httpsGet("https://github.com/tombueng/LumiGate/releases/download/latest/version.txt", v, 24)) return;
+    if (!httpsGet("https://luxdmx.org/firmware/version", v, 24)) return;
     latestVersion   = v;
     updateAvailable = parseBuild(v) > parseBuild(String(FIRMWARE_VERSION));
     Serial.printf("[VER] latest=%s current=%s update=%s\n",
@@ -2040,8 +2040,7 @@ static void versionCheckTask(void*) {
 #endif
 
 static void doGithubOta() {
-    String otaUrl = "https://github.com/tombueng/LumiGate/releases/download/"
-                    + otaTarget + "/" + OTA_BIN;
+    String otaUrl = "https://luxdmx.org/firmware/ota/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
     WiFiClientSecure client;

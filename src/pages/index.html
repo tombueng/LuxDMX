@@ -309,7 +309,7 @@ footer a:hover { color: var(--gh-text); }
 
 <footer class="text-center py-3 mt-1 border-top">
   &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
-  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LumiGate">LuxDMX</a>
+  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
   &nbsp;&mdash;&nbsp; MIT License
 </footer>
 
@@ -749,7 +749,7 @@ function extractChanges(body) {
 // always reflects the true newest version (the device only polls once at boot).
 fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
   var curNum = vNum(d.current);
-  fetch('https://api.github.com/repos/tombueng/LumiGate/releases?per_page=50')
+  fetch('https://luxdmx.org/firmware/releases')
     .then(function(r) { return r.json(); })
     .then(function(list) {
       var rels = (list || [])

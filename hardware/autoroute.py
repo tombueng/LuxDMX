@@ -1,4 +1,4 @@
-"""Complete automatic re-route of lumigate.kicad_pcb after a placement change.
+"""Complete automatic re-route of luxdmx.kicad_pcb after a placement change.
 
 Workflow: place/move parts in KiCad -> save -> run this:
    "C:\\Program Files\\KiCad\\10.0\\bin\\python.exe" autoroute.py
@@ -18,12 +18,12 @@ import os, sys, subprocess, tempfile
 import pcbnew
 
 HERE  = os.path.dirname(os.path.abspath(__file__))
-BOARD = os.path.join(HERE, 'lumigate.kicad_pcb')
+BOARD = os.path.join(HERE, 'luxdmx.kicad_pcb')
 JAR   = os.environ.get('FREEROUTING_JAR', r'C:\tmp\freerouting19.jar')
 PASSES = 50
 
-dsn = os.path.join(tempfile.gettempdir(), 'lumigate_auto.dsn')
-ses = os.path.join(tempfile.gettempdir(), 'lumigate_auto.ses')
+dsn = os.path.join(tempfile.gettempdir(), 'luxdmx_auto.dsn')
+ses = os.path.join(tempfile.gettempdir(), 'luxdmx_auto.ses')
 
 # single board object throughout (saving+reloading mid-script breaks swig iteration)
 b = pcbnew.LoadBoard(BOARD)

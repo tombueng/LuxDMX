@@ -12,7 +12,7 @@ refills every zone. Run AFTER autoroute_fr2 + cleanup_pads (it needs the routed 
 Re-runnable / idempotent. KiCad 10 python."""
 import pcbnew
 
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM = pcbnew.FromMM
 POE_MARGIN = 2.5     # mm, isolation around the 48 V PD-side copper
 DMX = [("DMX1", {"GNDISO", "VISO", "DMX_A", "DMX_B", "DMX_A_TERM"}, 4.0),

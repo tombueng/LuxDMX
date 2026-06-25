@@ -20,14 +20,14 @@
 </p>
 
 <p align="center">
-  <a href="https://tombueng.github.io/LumiGate/"><img alt="Flash in browser" src="https://img.shields.io/badge/flash%20in-browser-2dd4bf"></a>
-  <a href="https://github.com/tombueng/LumiGate/actions/workflows/build.yml"><img alt="Build" src="https://github.com/tombueng/LumiGate/actions/workflows/build.yml/badge.svg"></a>
-  <a href="https://github.com/tombueng/LumiGate/releases"><img alt="Latest firmware" src="https://img.shields.io/github/v/tag/tombueng/LumiGate?filter=v*&sort=semver&label=firmware"></a>
+  <a href="https://tombueng.github.io/LuxDMX/"><img alt="Flash in browser" src="https://img.shields.io/badge/flash%20in-browser-2dd4bf"></a>
+  <a href="https://github.com/tombueng/LuxDMX/actions/workflows/build.yml"><img alt="Build" src="https://github.com/tombueng/LuxDMX/actions/workflows/build.yml/badge.svg"></a>
+  <a href="https://github.com/tombueng/LuxDMX/releases"><img alt="Latest firmware" src="https://img.shields.io/github/v/tag/tombueng/LuxDMX?filter=v*&sort=semver&label=firmware"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 <p align="center">
-  <a href="https://tombueng.github.io/LumiGate/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
+  <a href="https://tombueng.github.io/LuxDMX/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
   <a href="https://youtu.be/vYDyAZC2Ups"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
   <a href="hardware/README.md"><b>🛠 Custom PCB</b></a> &nbsp;·&nbsp;
   <a href="#flashing-pre-built-firmware"><b>Install</b></a>
@@ -283,7 +283,7 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 > ### ⚡ Flash from your browser — no install, no command line
 >
-> Open **[the web flasher](https://tombueng.github.io/LumiGate/)** in desktop **Chrome or Edge**,
+> Open **[the web flasher](https://tombueng.github.io/LuxDMX/)** in desktop **Chrome or Edge**,
 > plug in your board over USB, pick your model, and click flash. That's it — no Python, no esptool,
 > no toolchain. It always installs the latest release.
 >
@@ -291,7 +291,7 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 No toolchain needed. GitHub CI builds the firmware on every push to master.
 
-**[Download latest release](https://github.com/tombueng/LumiGate/releases/tag/latest)** — includes `firmware.bin`, `bootloader.bin`, `partitions.bin`, `boot_app0.bin`.
+**[Download latest release](https://github.com/tombueng/LuxDMX/releases/tag/latest)** — includes `firmware.bin`, `bootloader.bin`, `partitions.bin`, `boot_app0.bin`.
 
 ### Boot mode (required for all methods)
 
@@ -309,14 +309,14 @@ You must manually enter download mode before flashing:
 Downloads and runs [`flash.ps1`](flash.ps1), which installs Python + esptool automatically:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass; irm https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 | iex
+Set-ExecutionPolicy -Scope Process Bypass; irm https://raw.githubusercontent.com/tombueng/LuxDMX/master/flash.ps1 | iex
 ```
 
 Or save and run it manually:
 
 ```powershell
 # Download
-Invoke-WebRequest https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 -OutFile flash.ps1
+Invoke-WebRequest https://raw.githubusercontent.com/tombueng/LuxDMX/master/flash.ps1 -OutFile flash.ps1
 # Run
 Set-ExecutionPolicy -Scope Process Bypass
 .\flash.ps1
@@ -329,7 +329,7 @@ The script: installs Python 3 via `winget` if missing → installs `esptool` via
 ```bash
 pip install esptool
 
-REPO=tombueng/LumiGate
+REPO=tombueng/LuxDMX
 for f in firmware.bin bootloader.bin partitions.bin boot_app0.bin; do
   curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
     | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
@@ -351,7 +351,7 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
 ```bash
 pip install esptool
 
-REPO=tombueng/LumiGate
+REPO=tombueng/LuxDMX
 for f in firmware-esp32s3.bin bootloader-esp32s3.bin partitions-esp32s3.bin boot_app0.bin; do
   curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
     | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
@@ -373,7 +373,7 @@ esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 \
 ```bash
 pip install esptool
 
-REPO=tombueng/LumiGate
+REPO=tombueng/LuxDMX
 for f in firmware-wt32eth01.bin bootloader-wt32eth01.bin partitions-wt32eth01.bin boot_app0.bin; do
   curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
     | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
@@ -633,7 +633,7 @@ no network means you still get the built-ins plus manual entry. You can switch b
 a dropdown inside the pin-picker popup itself.
 
 All descriptors are generated from authoritative pinout data
-(`hardware/gen_board_descriptor.py`): `hardware/lumigate.py` for v3, published header
+(`hardware/gen_board_descriptor.py`): `hardware/luxdmx.py` for v3, published header
 pinouts for the hand-tuned dev boards, and the Arduino core `variants/<dir>/pins_arduino.h`
 for the rest, so the GPIO numbers and reserved/strapping/flash flags are accurate per
 variant (e.g. the PICO-based Feather V2 frees GPIO6-11 and reserves 16/17 instead). The
@@ -784,7 +784,7 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
-| LuxDMX v4 (ESP32-S3 + W5500) | `lumigate_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| LuxDMX v4 (ESP32-S3 + W5500) | `luxdmx_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external W5500 module** — the W5500
 driver is compiled into every build. In **`/config` &rarr; Wired Ethernet** turn on

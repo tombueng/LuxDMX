@@ -9,7 +9,7 @@ Idempotent (clears its own front+back silk first). Does NOT touch the LED legend
 outside the connector region). Run standalone after placement. KiCad 10 python.
 """
 import pcbnew
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 FS, BS = pcbnew.F_SilkS, pcbnew.B_SilkS
 b = pcbnew.LoadBoard(PCB)
@@ -121,7 +121,7 @@ for i in range(fn + 1):
 for vx in (FX, FX + WDE, FX + FTW):
     line(vx, FY, vx, FY + fn*FRH, BS, 0.12)
 cDE, cFE = FX + WDE/2, FX + WDE + WFE/2
-text("LumiGate v4 -- KEY FEATURES", FX + FTW/2, FY - 1.6, 1.5, BS, mirror=True)
+text("LuxDMX v4 -- KEY FEATURES", FX + FTW/2, FY - 1.6, 1.5, BS, mirror=True)
 text("DETAIL", cDE, FY + FRH/2, 1.1, BS, mirror=True); text("FEATURE", cFE, FY + FRH/2, 1.1, BS, mirror=True)
 for r, (feat, det) in enumerate(FEAT):
     yc = FY + (r+1)*FRH + FRH/2

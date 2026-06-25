@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""LumiGate v4 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
+"""LuxDMX v4 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
 
 Self-contained board (no plug-in module):
   ESP32-S3-WROOM-1-N8  +  W5500 SPI-Ethernet + HR911105A MagJack
@@ -13,7 +13,7 @@ Pin map (ESP32-S3): SPI SCLK=IO12 MOSI=IO11 MISO=IO13 CS=IO10 INT=IO14 ETHRST=IO
 NB: the W5500<->MagJack analog section (TX/RX pairs, center-tap/TOCAP) follows the WIZnet
 reference; verify against the W5500 datasheet + HR911105A before fabricating.
 
-Regenerate:  python lumigate.py   -> lumigate.net
+Regenerate:  python luxdmx.py   -> luxdmx.net
 """
 import os
 from skidl import Part, Pin, Net, TEMPLATE, SKIDL, generate_netlist, ERC, set_default_tool, KICAD9
@@ -471,5 +471,5 @@ for _i in range(1, 5):
 # ============================================================================
 
 ERC()
-generate_netlist(file_=os.path.join(HERE, 'lumigate.net'))
-print('NETLIST GENERATED OK ->', os.path.join(HERE, 'lumigate.net'))
+generate_netlist(file_=os.path.join(HERE, 'luxdmx.net'))
+print('NETLIST GENERATED OK ->', os.path.join(HERE, 'luxdmx.net'))

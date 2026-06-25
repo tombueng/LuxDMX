@@ -1,4 +1,4 @@
-"""Incrementally sync lumigate.kicad_pcb to lumigate.net WITHOUT discarding the
+"""Incrementally sync luxdmx.kicad_pcb to luxdmx.net WITHOUT discarding the
 existing placement.
 
   * parts already on the board keep their position; their pad nets are refreshed
@@ -18,8 +18,8 @@ Run with the KiCad 10 bundled python (ships pcbnew)."""
 import pcbnew, re, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PCB = os.path.join(HERE, "lumigate.kicad_pcb")
-NET = os.path.join(HERE, "lumigate.net")
+PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
+NET = os.path.join(HERE, "luxdmx.net")
 STOCK = r"C:\Program Files\KiCad\10.0\share\kicad\footprints"
 EZ = os.path.join(HERE, "easyeda")
 fm = pcbnew.FromMM; mm = pcbnew.ToMM

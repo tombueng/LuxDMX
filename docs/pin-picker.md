@@ -60,7 +60,7 @@ boards and manual GPIO entry still work; catalog fetch failures degrade silently
 
 | Build | `board` | `mcu` |
 |---|---|---|
-| `lumigate_v4` (USE_ETH_SPI) | `lumigate_v4` | `esp32s3` |
+| `luxdmx_v4` (USE_ETH_SPI) | `luxdmx_v4` | `esp32s3` |
 | `wt32eth01` (USE_ETHERNET) | `wt32eth01` | `esp32` |
 | `esp32s3dev` | `esp32s3-devkitc-1` | `esp32s3` |
 | `esp32dev` | `esp32-devkitc` | `esp32` |

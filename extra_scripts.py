@@ -58,7 +58,7 @@ def binary_to_header(path: pathlib.Path, out_dir: pathlib.Path, type_suffix: str
 def patch_esp_dmx():
     """Patch esp_dmx 4.1.0 so it builds + runs on arduino-esp32 v3 (ESP-IDF 5.5).
 
-    Two fixes, both in dmx/hal/uart.c, both idempotent:
+    Three fixes, all in dmx/hal/uart.c, all idempotent:
 
     1. UART2 crash. dmx_uart_context[] guards the UART2 entry with
        `#if DMX_NUM_MAX > 2`, but DMX_NUM_MAX is an *enum* constant — invisible to
@@ -74,6 +74,14 @@ def patch_esp_dmx():
        enable/reset/disable still exist, so pass the module enum directly:
        PERIPH_UART0_MODULE + dmx_num (PERIPH_UART0/1/2_MODULE are consecutive in
        soc/periph_defs.h, matching what the removed field used to hold).
+
+    3. Fresh-boot Art-Net brick (issue #34). On a fresh board the TX ISR can fire
+       with a corrupt driver->dmx_num (a stomp on the heap-allocated driver struct
+       that only turns fatal in the release binary's memory layout). It then indexes
+       past the 3-entry dmx_uart_context[] and writes to a garbage UART base
+       (0x40000000) -> LoadStoreError boot loop on the first Art-Net frame. Drop any
+       ISR entry whose dmx_num is out of range instead of dereferencing junk. This is
+       a safety net; the underlying stomp still wants a root fix.
     """
     libdeps = pathlib.Path(env.subst("$PROJECT_LIBDEPS_DIR")) / env.subst("$PIOENV")
     uart_c = libdeps / "esp_dmx" / "src" / "dmx" / "hal" / "uart.c"
@@ -83,6 +91,16 @@ def patch_esp_dmx():
     text = original = uart_c.read_text(encoding="utf-8")
 
     text = text.replace("#if DMX_NUM_MAX > 2", "#if SOC_UART_NUM > 2")
+
+    # Fix 3 (issue #34): guard the TX/RX ISR against a corrupt driver->dmx_num so it
+    # cannot index past dmx_uart_context[] and dereference a garbage UART base.
+    guard = "if (dmx_num < 0 || dmx_num >= DMX_NUM_MAX) return;"
+    if guard not in text:
+        text = text.replace(
+            "  const dmx_port_t dmx_num = driver->dmx_num;\n",
+            "  const dmx_port_t dmx_num = driver->dmx_num;\n"
+            "  " + guard + "  // issue #34: drop a stray ISR with an out-of-range dmx_num\n",
+            1)
 
     for old, new in [
         ("periph_module_enable(uart_periph_signal[dmx_num].module)",
@@ -96,7 +114,7 @@ def patch_esp_dmx():
 
     if text != original:
         uart_c.write_text(text, encoding="utf-8")
-        print("  [patch] esp_dmx uart.c: UART2 guard + IDF5 periph_module fix applied")
+        print("  [patch] esp_dmx uart.c: UART2 guard + IDF5 periph_module + dmx_num ISR guard applied")
     else:
         print("  [patch] esp_dmx uart.c: already patched")
 

@@ -3,7 +3,7 @@ via 1.46mm away (already on the plane), clearance-checked against non-GND copper
 gathered into plain lists up-front so it stays valid after we delete the autorouter's bad local stub
 (a single LoadBoard per process; no reload). KiCad 10."""
 import pcbnew, math
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 GNDNC = b.FindNet("GND").GetNetCode()

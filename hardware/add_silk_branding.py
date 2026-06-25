@@ -1,23 +1,23 @@
 """Stamp the board branding onto the REAL silkscreen (F.Silkscreen) so it actually prints:
-   line 1:  LumiGate v<VERSION>
-   line 2:  github.com/tombueng/LumiGate
+   line 1:  LuxDMX v<VERSION>
+   line 2:  github.com/tombueng/LuxDMX
 
 Single source of truth = HW_VERSION in hw_version.py (the hardware version, SEPARATE from
 the firmware version). Bump it there and re-run; the script is idempotent (it removes any
-prior LumiGate/github silk on ANY layer first, incl. the stray User.Drawings copy KiCad
+prior LuxDMX/github silk on ANY layer first, incl. the stray User.Drawings copy KiCad
 creates when you "add text" without picking the silk layer). Free drawings survive
 build_v3.py / sync_board.py (they only wipe footprints/zones/tracks), so this only needs
 re-running when HW_VERSION changes. Text height matches the unified 1.0mm board silk. KiCad 10."""
 import pcbnew
 from hw_version import HW_VERSION      # hardware (PCB) revision -- source of truth
 
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM = pcbnew.FromMM
 VERSION = HW_VERSION
-GITHUB  = "github.com/tombueng/LumiGate"
+GITHUB  = "github.com/tombueng/LuxDMX"
 
 LINES = [                             # (text, x_mm, y_mm)  centred anchor
-    (f"LumiGate v{VERSION}", 122.5, 176.0),
+    (f"LuxDMX v{VERSION}", 122.5, 176.0),
     (GITHUB,                 122.5, 178.0),
 ]
 H = 1.0          # mm, matches board silk standard
@@ -29,7 +29,7 @@ b = pcbnew.LoadBoard(PCB)
 for d in list(b.GetDrawings()):
     if isinstance(d, pcbnew.PCB_TEXT):
         t = d.GetText().lower()
-        if t.startswith("lumigate") or "github.com" in t:
+        if t.startswith("luxdmx") or "github.com" in t:
             b.Remove(d)
 
 for text, x, y in LINES:
@@ -46,11 +46,11 @@ for text, x, y in LINES:
 # Build a fresh TITLE_BLOCK + SetTitleBlock -- GetTitleBlock() returns a read-only handle
 # after the board has been mutated above.
 tb = pcbnew.TITLE_BLOCK()
-tb.SetTitle("LumiGate")
+tb.SetTitle("LuxDMX")
 tb.SetRevision(f"v{VERSION}")
 tb.SetCompany(GITHUB)
 b.SetTitleBlock(tb)
-print(f"  title block: title='LumiGate' rev='v{VERSION}' company='{GITHUB}'")
+print(f"  title block: title='LuxDMX' rev='v{VERSION}' company='{GITHUB}'")
 
 pcbnew.SaveBoard(PCB, b)
-print(f"branding stamped: LumiGate v{VERSION} + {GITHUB}")
+print(f"branding stamped: LuxDMX v{VERSION} + {GITHUB}")

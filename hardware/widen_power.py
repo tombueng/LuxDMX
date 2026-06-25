@@ -8,7 +8,7 @@ but 0.2mm/1oz is only ~0.74A @10C rise and the board pulls ~0.8A -- thin. Wideni
 steady-state thermal margin, survives the 3A fault without cooking, and drops the IR loss feeding the
 B0505S (helps the 4.5V margin). Isolated/low-current rails (VISO*, VPOE*) are left at 0.2mm."""
 import pcbnew, math
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 POWER = {"+5V", "+5V_USB", "+5V_USBF", "+5V_DMX", "+5V_POE"}
 MAXW, CLR, EDGE_CLR = 0.5, 0.2, 0.25

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Generate the board descriptors served by the /config pin picker (issue #12).
 
-Single source of truth: the LumiGate v4 board descriptor is derived directly from
-the PCB netlist source (lumigate.py) so the clickable diagram, the "Apply template"
+Single source of truth: the LuxDMX v4 board descriptor is derived directly from
+the PCB netlist source (luxdmx.py) so the clickable diagram, the "Apply template"
 preset and the Ethernet-reserved-pin rules can never drift from the real board.
 
 The hand-tuned dev-board descriptors (ESP32 DevKitC, ESP32-S3 DevKitC-1, the Feather /
@@ -10,10 +10,10 @@ QtPy / XIAO / WT32-ETH01 boards) use fixed, published header pinouts. Every othe
 supported esp32 / esp32s3 board is auto-generated from the arduino-esp32 core's
 variants/<dir>/pins_arduino.h (authoritative GPIOs); see auto_board().
 
-Outputs (committed; GitHub Pages serves web/ -> https://tombueng.github.io/LumiGate/):
+Outputs (committed; GitHub Pages serves web/ -> https://tombueng.github.io/LuxDMX/):
     web/boards/index.json              catalog index (lazy-loaded by config.html)
     web/boards/<id>.json               one descriptor per board
-    web/boards/lumigate_v4.json        generated from lumigate.py
+    web/boards/luxdmx_v4.json        generated from luxdmx.py
 
 Five core boards are also baked into src/pages/config.html so they work fully offline;
 the catalog adds the long tail. The /config pin picker draws a generated horizontal
@@ -46,7 +46,7 @@ def _find_variants():
 
 VARIANTS = _find_variants()
 
-# ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LumiGate v4 module)
+# ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LuxDMX v4 module)
 S3L = [4, 5, 6, 7, 15, 16, 17, 18, 8, 19, 20, 3, 46, 9, 10, 11, 12, 13, 14]
 S3R = [21, 47, 48, 45, 0, 35, 36, 37, 38, 39, 40, 41, 42, 44, 43, 2, 1]
 # ESP32 DevKitC (WROOM-32, 38-pin) headers — breaks out the flash pins (6-11) too
@@ -295,8 +295,8 @@ named = lambda gs, silk: [(g, silk(g)) for g in gs]
 
 
 def parse_v3():
-    """Read U1['IOxx'] += NET lines from lumigate.py -> {gpio: net}."""
-    text = open(os.path.join(HERE, "lumigate.py"), encoding="utf-8").read()
+    """Read U1['IOxx'] += NET lines from luxdmx.py -> {gpio: net}."""
+    text = open(os.path.join(HERE, "luxdmx.py"), encoding="utf-8").read()
     pin_net = {}
     for g, net in re.findall(r"U1\['IO(\d+)'\]\s*\+=\s*(\w+)", text):
         pin_net[int(g)] = net
@@ -329,12 +329,12 @@ def v3_descriptor():
     preset["outputs"] = [dmx]
 
     return {
-        "id": "lumigate_v4",
-        "name": "LumiGate v4 (ESP32-S3 + W5500)",
+        "id": "luxdmx_v4",
+        "name": "LuxDMX v4 (ESP32-S3 + W5500)",
         "mcu": "esp32s3",
         "cols": cols(S3L, S3R, s3_silk, lambda g: s3_flags(g, eth_pins)),
         "preset": preset,
-        "_source": "generated from hardware/lumigate.py",
+        "_source": "generated from hardware/luxdmx.py",
     }
 
 
@@ -430,7 +430,7 @@ def main():
     # Fixed on-board wiring (changeable in /config but physically wired). Hand-tuned boards
     # get curated labels here; auto boards already carry their own hardwired list.
     HARDWIRED = {
-        "lumigate_v4": [(1,"LED Red"),(2,"LED Green"),(6,"LED Yellow"),(7,"LED Blue"),(15,"LED White"),
+        "luxdmx_v4": [(1,"LED Red"),(2,"LED Green"),(6,"LED Yellow"),(7,"LED Blue"),(15,"LED White"),
                         (17,"DMX TX"),(18,"DMX RX"),(8,"DMX DE/RE"),(12,"W5500 SCLK"),(11,"W5500 MOSI"),
                         (13,"W5500 MISO"),(10,"W5500 CS"),(14,"W5500 INT"),(9,"W5500 RST"),
                         (4,"Display SDA (J4)"),(5,"Display SCL (J4)")],
@@ -457,7 +457,7 @@ def main():
         print("wrote", os.path.relpath(path, ROOT))
 
     # Boards also baked inline into src/pages/config.html (work fully offline).
-    INLINE = {"lumigate_v4", "esp32s3-devkitc-1", "esp32-devkitc", "esp32-devkit-v1", "xiao-esp32s3"}
+    INLINE = {"luxdmx_v4", "esp32s3-devkitc-1", "esp32-devkitc", "esp32-devkit-v1", "xiao-esp32s3"}
     index = {
         "schema": 1,
         "updated": "auto",
