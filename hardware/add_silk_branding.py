@@ -11,7 +11,7 @@ re-running when HW_VERSION changes. Text height matches the unified 1.0mm board 
 import pcbnew
 from hw_version import HW_VERSION      # hardware (PCB) revision -- source of truth
 
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"  # TODO: rename to luxdmx.kicad_pcb in Phase 5
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb" 
 FM = pcbnew.FromMM
 VERSION = HW_VERSION
 WEB_URL = "luxdmx.org"
