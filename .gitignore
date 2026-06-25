@@ -11,11 +11,11 @@ docs/playwright-report/
 CLAUDE.md
 .vscode/
 .history/
-# stray SKiDL byproducts if lumigate.py is run from repo root
-/lumigate.erc
-/lumigate.log
-/lumigate*_sklib.py
-/lumigate*.kicad_prl
+# stray SKiDL byproducts if luxdmx.py is run from repo root
+/luxdmx.erc
+/luxdmx.log
+/luxdmx*_sklib.py
+/luxdmx*.kicad_prl
 
 # pioarduino custom_sdkconfig from-source core build artifacts (generated from the
 # custom_sdkconfig option in platformio.ini — that file is the source of truth)

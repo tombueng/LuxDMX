@@ -27,12 +27,12 @@ npm run report           # open the last HTML report
 
 ### Targeting the device
 
-Resolution order: `LUMIGATE_URL` → mDNS lookup of `LUMIGATE_HOST` → fallback IP
+Resolution order: `LUXDMX_URL` → mDNS lookup of `LUXDMX_HOST` → fallback IP
 (`192.168.178.197`).
 
 ```bash
-LUMIGATE_HOST=dmx-gateway.local npm test
-LUMIGATE_URL=http://192.168.1.50 npm test
+LUXDMX_HOST=dmx-gateway.local npm test
+LUXDMX_URL=http://192.168.1.50 npm test
 ```
 
 ### Device-mutating tests (opt-in)
@@ -41,7 +41,7 @@ A few tests change config and reboot the device (multi-output round-trip, the
 boot-loop regression). They are skipped unless you opt in:
 
 ```bash
-LUMIGATE_WRITE=1 npm test
+LUXDMX_WRITE=1 npm test
 ```
 
 They always restore the original configuration afterwards.
