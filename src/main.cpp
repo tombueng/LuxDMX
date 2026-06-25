@@ -2040,11 +2040,10 @@ static void versionCheckTask(void*) {
 #endif
 
 static void doGithubOta() {
-    // luxdmx.org/firmware/ota/<file> 301-redirects to the latest release asset
-    // (see the .htaccess rule). otaTarget is currently always "latest" here; the
-    // redirect doesn't take a version segment, so per-version OTA would need a
-    // matching .htaccess rule before it can be wired back through this URL.
-    String otaUrl = String("https://luxdmx.org/firmware/ota/") + OTA_BIN;
+    // luxdmx.org/firmware/ota/<target>/<file> 301-redirects to the matching GitHub
+    // release asset (releases/download/<target>/<file>) -- target is "latest" or a
+    // "vX.Y.Z" tag, so per-version OTA / downgrade still works through the redirect.
+    String otaUrl = String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
     WiFiClientSecure client;

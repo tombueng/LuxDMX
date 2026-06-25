@@ -2,8 +2,8 @@
 
 Board descriptors for the visual pin picker in the device `/config` page (issue #12).
 
-This folder is published by GitHub Pages together with the rest of `web/`, so the
-config page fetches it from `https://tombueng.github.io/LuxDMX/boards/`.
+This folder is deployed to luxdmx.org alongside the site, so the config page
+fetches it from `https://luxdmx.org/web/boards/`.
 
 ## How it is used
 
