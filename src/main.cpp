@@ -19,6 +19,13 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
+// Schema-driven config engine (src/config/). config_schema.h defines the Config +
+// DmxOutput structs + MAX_OUTPUTS (moved here out of main.cpp); config_core.h is
+// the transport-agnostic load/save/setValue/toJson engine the handlers drive. The
+// per-board default VALUES live in templates/*.ini (embedded via extra_scripts.py),
+// not in -D macros. The structural enums (MERGE_*, NET_*, WIRED_FB_*, RMII_*) stay
+// defined below in main.cpp; config_enums.h mirrors them for the engine TU.
+#include "config/config_core.h"
 // Wired-Ethernet capability (compile-time). WiFi is ALWAYS compiled in too; the
 // active interface — and, on the classic ESP32, which wired PHY — is chosen at
 // runtime (issue #14).
@@ -152,18 +159,8 @@
 // DMX outputs — up to MAX_OUTPUTS independent universes, each driven by its own
 // hardware UART + RS485 transceiver. Hardware ceiling is 2: the ESP32 / ESP32-S3
 // expose 3 UARTs and UART0 is the serial console, leaving UART1 + UART2.
+// MAX_OUTPUTS + struct DmxOutput now live in config/config_schema.h (included above).
 // ---------------------------------------------------------------------------
-static constexpr int MAX_OUTPUTS = 2;
-
-struct DmxOutput {
-    bool enabled;
-    int  universe;   // Art-Net universe; sACN listens on (universe + 1)
-    int  port;       // dmx_port_t: 1 or 2
-    int  txPin;
-    int  rxPin;      // -1 = output only (no RDM)
-    int  rtsPin;     // -1 = auto-direction module / no RDM
-    int  mergeMode;  // how to combine multiple sources on this universe (issue #10)
-};
 
 // GPIO0 = the BOOT button (config-portal / factory-reset trigger). Named
 // CFG_BOOT_PIN because arduino-esp32 v3 now defines its own global BOOT_PIN.
@@ -264,27 +261,16 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #endif
 
 // ---------------------------------------------------------------------------
-// Defaults / NVS keys
+// NVS namespace + AP SSID. The per-field default VALUES (hostname/otapw/protocol/
+// universe/pins/...) moved into templates/*.ini and the config engine; they are
+// no longer #defined here.
 // ---------------------------------------------------------------------------
-static const char* DEF_HOSTNAME = "dmx-gateway";
-static const char* DEF_OTA_PW   = "dmxota";
-static constexpr int DEF_UNIVERSE = 0;
-static constexpr int DEF_PROTOCOL = 2;
 static const char* PREF_NS = "dmxgw";
 static const char* AP_SSID = "DMX-Gateway";   // SSID of the transient setup/config portal
 
 // WiFi interface mode (cfg.wifiMode)
 static constexpr int NET_WIFI_STA = 0;        // station / client (join an existing router)
 static constexpr int NET_WIFI_AP  = 1;        // standalone access point (no router needed)
-
-// Default interface per board. WT32-ETH01 (RMII) has historically been wired-only,
-// so it keeps Ethernet as the default; every other board defaults to WiFi. This
-// also makes an OTA from the old eth-only WT32 firmware come back on Ethernet.
-#if defined(USE_ETH_RMII)
-static constexpr bool DEF_USE_ETH = true;
-#else
-static constexpr bool DEF_USE_ETH = false;
-#endif
 
 // Link-loss policy (cfg.linkLossMode): what to do when wired Ethernet is selected but
 // the link is down. RETRY is the show-safe default (no AP ever); the AP modes never open
@@ -457,50 +443,10 @@ static uint8_t wsBuf[WS_FRAME_LEN];
 // sACN receive buffer
 static uint8_t sacnBuf[638];
 
-struct Config {
-    String hostname;
-    String otaPassword;
-    int    protocol;
-    int    ledPin;
-    int    ledType;
-    int    ledR, ledG, ledY, ledB, ledW;   // 5-LED panel pins (ledType 3); -1 = absent
-    DmxOutput outputs[MAX_OUTPUTS];
-    int    dispType;       // 0=off, 1/2=SSD1306 128x64/32, 3=SH1106 128x64, 4=SSD1351 colour
-    int    dispSda;        // I2C pins (dispType 1-3); -1 = unset
-    int    dispScl;
-    int    dispRot;        // 0=normal, 1=flipped 180 deg
-    int    dispCs;         // SPI pins for the colour panel (dispType 4); -1 = unset
-    int    dispDc;
-    int    dispRst;
-    int    dispSck;
-    int    dispMosi;
-    // W5500 SPI wired Ethernet pins (runtime, like the display) — lets ANY board add
-    // an off-the-shelf W5500 module; defaults come from the ETH_W5500_* macros. -1 = unset.
-    int    ethCs;
-    int    ethSck;
-    int    ethMosi;
-    int    ethMiso;
-    int    ethInt;
-    int    ethRst;
-    int    ethFreqMhz;     // W5500 SPI clock (MHz); lower to debug long/loose wiring
-    bool   ethW5500;       // W5500 module enabled — opt-in, default OFF (SPI-Eth boards)
-    int    wiredPhy;       // wired PHY: 0=W5500 (SPI), 1=LAN8720 (RMII). Default per build.
-    int    rmiiPhy;        // RMII PHY family index (RMII_PHY_*); used when wiredPhy = RMII
-    int    rmiiAddr;       // RMII PHY SMI address (usually 0 or 1)
-    int    rmiiMdc, rmiiMdio, rmiiPwr;  // RMII MDC / MDIO / PHY-power GPIOs (data lines are fixed)
-    int    rmiiClk;        // RMII REF_CLK mode (RMII_CLK_*)
-    bool   useEthernet;    // wired-Eth boards: true = wired Ethernet, false = WiFi
-    int    wifiMode;       // WiFi interface mode: 0 = STA (client), 1 = AP (standalone)
-    bool   apFallback;     // legacy mirror (kept for migration); = (linkLossMode == AP)
-    int    linkLossMode;   // WIRED_FB_*: what to do when wired Ethernet is up but has no link
-    String apPassword;     // standalone-AP passphrase (>=8 chars = WPA2, empty = open)
-    bool   staticIp;       // false = DHCP
-    String ip;             // dotted-quad strings; empty when unused
-    String gateway;
-    String subnet;
-    String dns;
-    bool   autoUpdate;     // auto-install newer firmware when detected
-} cfg;
+// struct Config + DmxOutput are defined in config/config_schema.h (the schema's
+// single source of truth, included near the top). This is the one live instance
+// the engine + every handler operate on.
+Config cfg;
 
 // Channel labels — stored verbatim as a JSON blob. The browser owns the
 // structure (now per output: {"0":{"1":"Front L"},"1":{...}}); the device just
@@ -525,148 +471,21 @@ static void sanitizeOutputs() {
             cfg.outputs[i].enabled = false;
 }
 
+// Config load/save are now driven by the schema engine (src/config/). The engine
+// resolves neutral -> active board template -> saved NVS (same PREF_NS = "dmxgw"
+// + the output-0 legacy-key fallback, so OTA never loses a device's config), and
+// writes every schema field on save. The channel-label blob ("labels") lives
+// outside the schema, so it's read/written here around the engine call.
 static void loadConfig() {
-    prefs.begin(PREF_NS, false);
-    cfg.hostname    = prefs.getString("hostname", DEF_HOSTNAME);
-    cfg.otaPassword = prefs.getString("otapw",   DEF_OTA_PW);
-    cfg.protocol    = prefs.getInt("protocol",  DEF_PROTOCOL);
-    cfg.ledPin      = prefs.getInt("ledpin",    DEF_LED_PIN);
-    cfg.ledType     = prefs.getInt("ledtype",   DEF_LED_TYPE);
-    cfg.ledR        = constrain(prefs.getInt("ledr", DEF_LED_R), -1, 48);
-    cfg.ledG        = constrain(prefs.getInt("ledg", DEF_LED_G), -1, 48);
-    cfg.ledY        = constrain(prefs.getInt("ledy", DEF_LED_Y), -1, 48);
-    cfg.ledB        = constrain(prefs.getInt("ledb", DEF_LED_B), -1, 48);
-    cfg.ledW        = constrain(prefs.getInt("ledw", DEF_LED_W), -1, 48);
-
-    // Output 0 falls back to the legacy single-universe keys, so devices
-    // updated from an older firmware keep their existing DMX setup untouched.
-    // Output 1 ships disabled. Once saved, the new o<i>_* keys take over.
-    cfg.outputs[0].enabled  = prefs.getBool(okey(0,"en").c_str(),  true);
-    cfg.outputs[0].universe = constrain(prefs.getInt(okey(0,"uni").c_str(),
-                                  prefs.getInt("universe", DEF_UNIVERSE)), 0, 15);
-    cfg.outputs[0].port     = constrain(prefs.getInt(okey(0,"port").c_str(),
-                                  prefs.getInt("dmxport", DEF_DMX_PORT)), 1, 2);
-    cfg.outputs[0].txPin    = constrain(prefs.getInt(okey(0,"tx").c_str(),
-                                  prefs.getInt("dmxtx", DEF_DMX_TX_PIN)), -1, 48);
-    cfg.outputs[0].rxPin    = constrain(prefs.getInt(okey(0,"rx").c_str(),
-                                  prefs.getInt("dmxrx", DEF_DMX_RX_PIN)), -1, 48);
-    cfg.outputs[0].rtsPin   = constrain(prefs.getInt(okey(0,"rts").c_str(),
-                                  prefs.getInt("dmxrts", DEF_DMX_RTS_PIN)), -1, 48);
-    cfg.outputs[0].mergeMode = constrain(prefs.getInt(okey(0,"merge").c_str(), MERGE_OFF), MERGE_OFF, MERGE_LTP);
-
-    cfg.outputs[1].enabled  = prefs.getBool(okey(1,"en").c_str(),  DEF_DMX2_ENABLED);
-    cfg.outputs[1].universe = constrain(prefs.getInt(okey(1,"uni").c_str(),  DEF_UNIVERSE + 1), 0, 15);
-    cfg.outputs[1].port     = constrain(prefs.getInt(okey(1,"port").c_str(), 2), 1, 2);
-    cfg.outputs[1].txPin    = constrain(prefs.getInt(okey(1,"tx").c_str(),  DEF_DMX2_TX_PIN),  -1, 48);
-    cfg.outputs[1].rxPin    = constrain(prefs.getInt(okey(1,"rx").c_str(),  DEF_DMX2_RX_PIN),  -1, 48);
-    cfg.outputs[1].rtsPin   = constrain(prefs.getInt(okey(1,"rts").c_str(), DEF_DMX2_RTS_PIN), -1, 48);
-    cfg.outputs[1].mergeMode = constrain(prefs.getInt(okey(1,"merge").c_str(), MERGE_OFF), MERGE_OFF, MERGE_LTP);
-
-    cfg.dispType    = constrain(prefs.getInt("disptype", DEF_DISP_TYPE),  0, 4);
-    cfg.dispSda     = constrain(prefs.getInt("dispsda",  DEF_DISP_SDA),  -1, 48);
-    cfg.dispScl     = constrain(prefs.getInt("dispscl",  DEF_DISP_SCL),  -1, 48);
-    cfg.dispRot     = constrain(prefs.getInt("disprot",  DEF_DISP_ROT),   0, 1);
-    cfg.dispCs      = constrain(prefs.getInt("dispcs",   DEF_DISP_CS),   -1, 48);
-    cfg.dispDc      = constrain(prefs.getInt("dispdc",   DEF_DISP_DC),   -1, 48);
-    cfg.dispRst     = constrain(prefs.getInt("disprst",  DEF_DISP_RST),  -1, 48);
-    cfg.dispSck     = constrain(prefs.getInt("dispsck",  DEF_DISP_SCK),  -1, 48);
-    cfg.dispMosi    = constrain(prefs.getInt("dispmosi", DEF_DISP_MOSI), -1, 48);
-    cfg.ethCs       = constrain(prefs.getInt("ethcs",   ETH_W5500_CS),   -1, 48);
-    cfg.ethSck      = constrain(prefs.getInt("ethsck",  ETH_W5500_SCK),  -1, 48);
-    cfg.ethMosi     = constrain(prefs.getInt("ethmosi", ETH_W5500_MOSI), -1, 48);
-    cfg.ethMiso     = constrain(prefs.getInt("ethmiso", ETH_W5500_MISO), -1, 48);
-    cfg.ethInt      = constrain(prefs.getInt("ethint",  ETH_W5500_IRQ),  -1, 48);
-    cfg.ethRst      = constrain(prefs.getInt("ethrst",  ETH_W5500_RST),  -1, 48);
-    cfg.ethFreqMhz  = constrain(prefs.getInt("ethfreq", ETH_W5500_SPI_FREQ_MHZ), 1, 80);
-    cfg.ethW5500    = prefs.getBool("ethon",    false);   // W5500 opt-in, default off
-    // Wired PHY default reproduces the pre-runtime-select behavior (see DEF_WIRED_PHY):
-    // absent key on an existing device → its old PHY, so OTA changes nothing.
-    cfg.wiredPhy    = constrain(prefs.getInt("wiredphy", DEF_WIRED_PHY), 0, 1);
-    cfg.rmiiPhy     = constrain(prefs.getInt("rmiiphy",  DEF_RMII_PHY),  0, RMII_PHY_COUNT - 1);
-    cfg.rmiiAddr    = constrain(prefs.getInt("rmiiaddr", DEF_RMII_ADDR), 0, 31);
-    cfg.rmiiMdc     = constrain(prefs.getInt("rmiimdc",  DEF_RMII_MDC),  0, 48);
-    cfg.rmiiMdio    = constrain(prefs.getInt("rmiimdio", DEF_RMII_MDIO), 0, 48);
-    cfg.rmiiPwr     = constrain(prefs.getInt("rmiipwr",  DEF_RMII_PWR), -1, 48);
-    cfg.rmiiClk     = constrain(prefs.getInt("rmiiclk",  DEF_RMII_CLK),  0, 3);
-    cfg.useEthernet = prefs.getBool("useeth",   DEF_USE_ETH);
-    cfg.wifiMode    = constrain(prefs.getInt("wifimode", NET_WIFI_STA), NET_WIFI_STA, NET_WIFI_AP);
-    cfg.apFallback  = prefs.getBool("apfb",     true);
-    // New link-loss policy. Migrate from the old apFallback bool ONLY if it was explicitly
-    // saved: a device that had AP-fallback on -> the standalone-AP policy (which now refuses
-    // to open an OPEN AP), off -> keep retrying. A fresh device (no key) defaults to "keep
-    // retrying" so it never broadcasts a hotspot unless the user asks for one.
-    int fbDefault = WIRED_FB_RETRY;
-    if (prefs.isKey("apfb")) fbDefault = prefs.getBool("apfb") ? WIRED_FB_AP : WIRED_FB_RETRY;
-    cfg.linkLossMode = constrain(prefs.getInt("fbmode", fbDefault), 0, 2);
-    cfg.apPassword  = prefs.getString("appw",   "");
-    cfg.staticIp    = prefs.getBool("staticip", false);
-    cfg.ip          = prefs.getString("ip",      "");
-    cfg.gateway     = prefs.getString("gateway", "");
-    cfg.subnet      = prefs.getString("subnet",  "255.255.255.0");
-    cfg.dns         = prefs.getString("dns",     "");
-    cfg.autoUpdate  = prefs.getBool("autoupd",   false);
-    g_labels        = prefs.getString("labels",  "{}");
+    cfgcore::load();
+    prefs.begin(PREF_NS, true);
+    g_labels = prefs.getString("labels", "{}");
     prefs.end();
     sanitizeOutputs();
 }
 
 static void saveConfig() {
-    prefs.begin(PREF_NS, false);
-    prefs.putString("hostname", cfg.hostname);
-    prefs.putString("otapw",    cfg.otaPassword);
-    prefs.putInt("protocol",    cfg.protocol);
-    prefs.putInt("ledpin",      cfg.ledPin);
-    prefs.putInt("ledtype",     cfg.ledType);
-    prefs.putInt("ledr",        cfg.ledR);
-    prefs.putInt("ledg",        cfg.ledG);
-    prefs.putInt("ledy",        cfg.ledY);
-    prefs.putInt("ledb",        cfg.ledB);
-    prefs.putInt("ledw",        cfg.ledW);
-    for (int i = 0; i < MAX_OUTPUTS; i++) {
-        prefs.putBool(okey(i,"en").c_str(),   cfg.outputs[i].enabled);
-        prefs.putInt(okey(i,"uni").c_str(),   cfg.outputs[i].universe);
-        prefs.putInt(okey(i,"port").c_str(),  cfg.outputs[i].port);
-        prefs.putInt(okey(i,"tx").c_str(),    cfg.outputs[i].txPin);
-        prefs.putInt(okey(i,"rx").c_str(),    cfg.outputs[i].rxPin);
-        prefs.putInt(okey(i,"rts").c_str(),   cfg.outputs[i].rtsPin);
-        prefs.putInt(okey(i,"merge").c_str(), cfg.outputs[i].mergeMode);
-    }
-    prefs.putInt("disptype",    cfg.dispType);
-    prefs.putInt("dispsda",     cfg.dispSda);
-    prefs.putInt("dispscl",     cfg.dispScl);
-    prefs.putInt("disprot",     cfg.dispRot);
-    prefs.putInt("dispcs",      cfg.dispCs);
-    prefs.putInt("dispdc",      cfg.dispDc);
-    prefs.putInt("disprst",     cfg.dispRst);
-    prefs.putInt("dispsck",     cfg.dispSck);
-    prefs.putInt("dispmosi",    cfg.dispMosi);
-    prefs.putInt("ethcs",       cfg.ethCs);
-    prefs.putInt("ethsck",      cfg.ethSck);
-    prefs.putInt("ethmosi",     cfg.ethMosi);
-    prefs.putInt("ethmiso",     cfg.ethMiso);
-    prefs.putInt("ethint",      cfg.ethInt);
-    prefs.putInt("ethrst",      cfg.ethRst);
-    prefs.putInt("ethfreq",     cfg.ethFreqMhz);
-    prefs.putBool("ethon",      cfg.ethW5500);
-    prefs.putInt("wiredphy",    cfg.wiredPhy);
-    prefs.putInt("rmiiphy",     cfg.rmiiPhy);
-    prefs.putInt("rmiiaddr",    cfg.rmiiAddr);
-    prefs.putInt("rmiimdc",     cfg.rmiiMdc);
-    prefs.putInt("rmiimdio",    cfg.rmiiMdio);
-    prefs.putInt("rmiipwr",     cfg.rmiiPwr);
-    prefs.putInt("rmiiclk",     cfg.rmiiClk);
-    prefs.putBool("useeth",     cfg.useEthernet);
-    prefs.putInt("wifimode",    cfg.wifiMode);
-    prefs.putBool("apfb",       cfg.apFallback);
-    prefs.putInt("fbmode",      cfg.linkLossMode);
-    prefs.putString("appw",     cfg.apPassword);
-    prefs.putBool("staticip",   cfg.staticIp);
-    prefs.putString("ip",       cfg.ip);
-    prefs.putString("gateway",  cfg.gateway);
-    prefs.putString("subnet",   cfg.subnet);
-    prefs.putString("dns",      cfg.dns);
-    prefs.putBool("autoupd",    cfg.autoUpdate);
-    prefs.end();
+    cfgcore::save();
 }
 
 // ---------------------------------------------------------------------------
@@ -1854,65 +1673,40 @@ static void handleConfigGet(AsyncWebServerRequest* req) {
     req->send(r);
 }
 
-static void handleConfigPost(AsyncWebServerRequest* req) {
-    String s;
-    if (argStr(req, "hostname", s) && s.length() > 0) cfg.hostname = s;
-    if (argStr(req, "otapw", s)    && s.length() > 0) cfg.otaPassword = s;
-    if (argStr(req, "protocol", s)) cfg.protocol = constrain(s.toInt(), 0, 2);
-    if (argStr(req, "ledtype", s))  cfg.ledType   = constrain(s.toInt(), 0, 3);
-    if (argStr(req, "ledpin", s))   cfg.ledPin    = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledr", s))     cfg.ledR      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledg", s))     cfg.ledG      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledy", s))     cfg.ledY      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledb", s))     cfg.ledB      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ledw", s))     cfg.ledW      = constrain(s.toInt(), -1, 48);
+// A web-form checkbox is "on" iff its param is present (value ignored), matching
+// the old hasParam() handling for every bool field.
+static bool formChecked(AsyncWebServerRequest* req, const String& name) {
+    return req->hasParam(name, true) || req->hasParam(name);
+}
 
-    // Per-output DMX config: o<i>_en / _uni / _port / _tx / _rx / _rts.
-    // A missing o<i>_en checkbox means that output is disabled.
-    for (int i = 0; i < MAX_OUTPUTS; i++) {
-        DmxOutput& o = cfg.outputs[i];
-        o.enabled = req->hasParam(okey(i,"en"), true) || req->hasParam(okey(i,"en"));
-        if (argStr(req, okey(i,"uni").c_str(),  s)) o.universe = constrain(s.toInt(), 0, 15);
-        if (argStr(req, okey(i,"port").c_str(), s)) o.port     = constrain(s.toInt(), 1, 2);
-        if (argStr(req, okey(i,"tx").c_str(),   s)) o.txPin    = constrain(s.toInt(), -1, 48);
-        if (argStr(req, okey(i,"rx").c_str(),   s)) o.rxPin    = constrain(s.toInt(), -1, 48);
-        if (argStr(req, okey(i,"rts").c_str(),  s)) o.rtsPin   = constrain(s.toInt(), -1, 48);
-        if (argStr(req, okey(i,"merge").c_str(),s)) o.mergeMode= constrain(s.toInt(), MERGE_OFF, MERGE_LTP);
+static void handleConfigPost(AsyncWebServerRequest* req) {
+    String s, e;
+    // Drive every field from the schema (config_schema.cpp), preserving the old
+    // web-form semantics exactly: a bool/checkbox is set from presence; an int /
+    // enum / string is updated only when its param is present (and clamped to the
+    // schema range inside setValue); hostname/otapw (CFG_KEEPNE) ignore a blank
+    // field so they can't be wiped; CFG_NOWEB fields (autoUpdate) have their own
+    // route and are skipped here.
+    for (size_t k = 0; k < CONFIG_FIELD_COUNT; k++) {
+        const CfgField& f = CONFIG_FIELDS[k];
+        if (f.flags & CFG_NOWEB) continue;
+        if (f.kind == CfgKind::Bool) {
+            cfgcore::setValue(f.key, formChecked(req, f.key) ? "1" : "0", e);
+        } else if (argStr(req, f.key, s)) {
+            if ((f.flags & CFG_KEEPNE) && s.length() == 0) continue;
+            cfgcore::setValue(f.key, s, e);
+        }
     }
-    if (argStr(req, "disptype", s)) cfg.dispType  = constrain(s.toInt(), 0, 4);
-    if (argStr(req, "dispsda", s))  cfg.dispSda   = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "dispscl", s))  cfg.dispScl   = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "disprot", s))  cfg.dispRot   = constrain(s.toInt(), 0, 1);
-    if (argStr(req, "dispcs", s))   cfg.dispCs    = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "dispdc", s))   cfg.dispDc    = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "disprst", s))  cfg.dispRst   = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "dispsck", s))  cfg.dispSck   = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "dispmosi", s)) cfg.dispMosi  = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ethcs", s))    cfg.ethCs      = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ethsck", s))   cfg.ethSck     = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ethmosi", s))  cfg.ethMosi    = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ethmiso", s))  cfg.ethMiso    = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ethint", s))   cfg.ethInt     = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ethrst", s))   cfg.ethRst     = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "ethfreq", s))  cfg.ethFreqMhz = constrain(s.toInt(), 1, 80);
-    cfg.ethW5500 = req->hasParam("ethon", true) || req->hasParam("ethon");
-    if (argStr(req, "wiredphy", s)) cfg.wiredPhy = constrain(s.toInt(), 0, 1);
-    if (argStr(req, "rmiiphy", s))  cfg.rmiiPhy  = constrain(s.toInt(), 0, RMII_PHY_COUNT - 1);
-    if (argStr(req, "rmiiaddr", s)) cfg.rmiiAddr = constrain(s.toInt(), 0, 31);
-    if (argStr(req, "rmiimdc", s))  cfg.rmiiMdc  = constrain(s.toInt(), 0, 48);
-    if (argStr(req, "rmiimdio", s)) cfg.rmiiMdio = constrain(s.toInt(), 0, 48);
-    if (argStr(req, "rmiipwr", s))  cfg.rmiiPwr  = constrain(s.toInt(), -1, 48);
-    if (argStr(req, "rmiiclk", s))  cfg.rmiiClk  = constrain(s.toInt(), 0, 3);
-    cfg.useEthernet = req->hasParam("useeth", true) || req->hasParam("useeth");
-    if (argStr(req, "wifimode", s)) cfg.wifiMode = constrain(s.toInt(), NET_WIFI_STA, NET_WIFI_AP);
-    if (argStr(req, "fbmode", s)) cfg.linkLossMode = constrain(s.toInt(), 0, 2);
+    for (int i = 0; i < MAX_OUTPUTS; i++)
+        for (size_t k = 0; k < OUTPUT_FIELD_COUNT; k++) {
+            const CfgOutputField& f = OUTPUT_FIELDS[k];
+            String key = okey(i, f.suffix);
+            if (f.kind == CfgKind::Bool)
+                cfgcore::setValue(key, formChecked(req, key) ? "1" : "0", e);
+            else if (argStr(req, key.c_str(), s))
+                cfgcore::setValue(key, s, e);
+        }
     cfg.apFallback = (cfg.linkLossMode == WIRED_FB_AP);   // keep the legacy mirror in sync
-    if (argStr(req, "appw", s))    cfg.apPassword = s;
-    cfg.staticIp = req->hasParam("staticip", true) || req->hasParam("staticip");
-    if (argStr(req, "ip", s))      cfg.ip      = s;
-    if (argStr(req, "gateway", s)) cfg.gateway = s;
-    if (argStr(req, "subnet", s))  cfg.subnet  = s;
-    if (argStr(req, "dns", s))     cfg.dns     = s;
     sanitizeOutputs();   // never persist an enabled output with no TX pin
     dmxReady = false;
     saveConfig();

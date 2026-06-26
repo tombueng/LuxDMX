@@ -17,7 +17,7 @@ static const char* const ENUM_LEDTYPE[]  = {"off", "plain GPIO", "WS2812 RGB", "
 static const char* const ENUM_DISPTYPE[] = {"off", "SSD1306 128x64", "SSD1306 128x32", "SH1106", "SSD1351 colour"};
 static const char* const ENUM_WIREDPHY[] = {"W5500 (SPI)", "LAN8720 (RMII)"};
 static const char* const ENUM_WIFIMODE[] = {"STA (client)", "AP (standalone)"};
-static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "setup portal"};
+static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "reboot"};
 
 // ---- compact row builders (no defaults — neutral is derived from min) -------
 #define IFIELD(key, json, member, mn, mx, label, group) \
@@ -31,8 +31,8 @@ static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "se
 
 const CfgField CONFIG_FIELDS[] = {
     // --- Identity / general -------------------------------------------------
-    SFIELD("hostname", "hostname", hostname,    "Hostname",       "Identity", CFG_NONE),
-    SFIELD("otapw",    "otapw",    otaPassword, "OTA password",   "Identity", CFG_SECRET),
+    SFIELD("hostname", "hostname", hostname,    "Hostname",       "Identity", CFG_KEEPNE),
+    SFIELD("otapw",    "otapw",    otaPassword, "OTA password",   "Identity", CFG_SECRET | CFG_KEEPNE),
     EFIELD("protocol", "protocol", protocol,    "Input protocol", "Identity", ENUM_PROTOCOL),
 
     // --- Status LED ---------------------------------------------------------

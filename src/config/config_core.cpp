@@ -152,6 +152,11 @@ void resetToTemplate() {
     String err; applyTemplate(CFG_STR(DEFAULT_TEMPLATE), err);   // missing template -> stay neutral
 }
 
+bool resetTo(const String& name, String& err) {
+    applyNeutral();
+    return applyTemplate(name, err);
+}
+
 // ---- NVS load / save -------------------------------------------------------
 void load() {
     resetToTemplate();   // neutral -> active template

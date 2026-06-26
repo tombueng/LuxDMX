@@ -35,11 +35,15 @@ bool applyTemplateText(const char* text, String& err, int depth = 0);
 
 // Reset cfg to neutral + the active template (no NVS) — the "factory" baseline.
 void resetToTemplate();
+// Reset cfg to neutral + a named board template (the "apply board preset" action
+// and the per-board parity tests). Returns false + err on an unknown template.
+bool resetTo(const String& name, String& err);
 
 } // namespace cfgcore
 
-// Embedded template registry. Hand-written config_templates.cpp for now; later
-// generated from templates/*.ini by extra_scripts.py.
+// Embedded template registry. Defined in src/generated/config_templates.cpp,
+// generated from templates/*.ini by tools/gen_config_templates.py (run from
+// extra_scripts.py at build time, and from test/native/run.bat for the host test).
 struct CfgTemplate { const char* name; const char* text; };
 extern const CfgTemplate CONFIG_TEMPLATES[];
 extern const size_t      CONFIG_TEMPLATE_COUNT;
