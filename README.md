@@ -804,6 +804,12 @@ that way needs no changes. The RMII **data lines are fixed by the EMAC** (TXD0 1
 RXD0 25, RXD1 26, RX_DV 27) and can't be moved; the pin-picker reserves those plus your configured
 management / clock / power pins, so a DMX or LED pin that lands on one is flagged.
 
+> **Not supported: ENC28J60.** The old blue ENC28J60 SPI modules don't work here. arduino-esp32's
+> `ETH` library has no driver for them (its SPI options are W5500 / W6100 / DM9051), so there's
+> nothing to call. They're also only 10 Mbit with an 8 KB buffer and no hardware TCP/IP stack, which
+> is the wrong end of the trade for Art-Net/sACN under full DMX load. Use a **W5500** instead: same
+> SPI bus, costs about the same, full hardware stack, and it's already built in.
+
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the
 > preprocessor reads as 0, so it was compiled out (null peripheral pointer). That, plus an ESP-IDF 5.x
