@@ -1095,7 +1095,9 @@ static void wsPush() {
     // link speed in Mbps, 1 standalone AP. Lets the navbar show WiFi/LAN/AP live.
     int16_t  rssi;
     if (g_apMode)      rssi = 1;
+#if defined(HAS_WIRED_ETH)
     else if (g_useEth) { int s = ETH.linkSpeed(); rssi = (int16_t)(s >= 10 ? s : 100); }
+#endif
     else               rssi = (int16_t)WiFi.RSSI();
     uint32_t heap  = ESP.getFreeHeap();
     uint32_t upS   = uptimeSec();
