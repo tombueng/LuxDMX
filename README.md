@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://youtu.be/vYDyAZC2Ups"><img src="docs/mock.png" alt="LuxDMX — open-source Art-Net / sACN to DMX512 gateway with a live diagnostic web UI" width="100%"></a>
+  <a href="https://luxdmx.org/video"><img src="docs/mock.png" alt="LuxDMX — open-source Art-Net / sACN to DMX512 gateway with a live diagnostic web UI" width="100%"></a>
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@
 
 <p align="center">
   <a href="https://tombueng.github.io/LuxDMX/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
-  <a href="https://youtu.be/vYDyAZC2Ups"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
+  <a href="https://luxdmx.org/video"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
   <a href="hardware/README.md"><b>🛠 Custom PCB</b></a> &nbsp;·&nbsp;
   <a href="#flashing-pre-built-firmware"><b>Install</b></a>
 </p>
@@ -41,9 +41,9 @@
 
 A guided tour of every control — manual channel control, labels, sparkline history, identify, blackout, and all settings:
 
-[![LuxDMX web UI walkthrough](docs/demo.gif)](https://youtu.be/vYDyAZC2Ups)
+[![LuxDMX web UI walkthrough](docs/demo.gif)](https://luxdmx.org/video)
 
-▶ **[Watch the full walkthrough on YouTube](https://youtu.be/vYDyAZC2Ups)** &nbsp;·&nbsp; regenerate with [`docs/screenshot.mjs`](docs/screenshot.mjs)
+▶ **[Watch the full walkthrough on YouTube](https://luxdmx.org/video)** &nbsp;·&nbsp; regenerate with [`docs/screenshot.mjs`](docs/screenshot.mjs)
 
 ---
 
