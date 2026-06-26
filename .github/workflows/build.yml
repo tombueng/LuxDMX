@@ -68,16 +68,21 @@ jobs:
           cp .pio/build/esp32dev/firmware.bin   firmware.bin
           cp .pio/build/esp32dev/bootloader.bin bootloader.bin
           cp .pio/build/esp32dev/partitions.bin partitions.bin
+          # Gzip the ELF (debug symbols) right away: a later full-source build can
+          # evict .pio/build/esp32dev to free runner disk, so don't defer it (#34).
+          gzip -c .pio/build/esp32dev/firmware.elf > firmware.elf.gz
 
           pio run -e esp32s3dev
           cp .pio/build/esp32s3dev/firmware.bin   firmware-esp32s3.bin
           cp .pio/build/esp32s3dev/bootloader.bin bootloader-esp32s3.bin
           cp .pio/build/esp32s3dev/partitions.bin partitions-esp32s3.bin
+          gzip -c .pio/build/esp32s3dev/firmware.elf > firmware-esp32s3.elf.gz
 
           pio run -e wt32eth01
           cp .pio/build/wt32eth01/firmware.bin   firmware-wt32eth01.bin
           cp .pio/build/wt32eth01/bootloader.bin bootloader-wt32eth01.bin
           cp .pio/build/wt32eth01/partitions.bin partitions-wt32eth01.bin
+          gzip -c .pio/build/wt32eth01/firmware.elf > firmware-wt32eth01.elf.gz
 
           BOOT_APP0=$(find ~/.platformio/packages -name "boot_app0.bin" | head -1)
           cp "$BOOT_APP0" boot_app0.bin
@@ -137,6 +142,8 @@ jobs:
             echo "- **ESP32-S3** (DevKitC-1): \`firmware-esp32s3.bin\`"
             echo "- **WT32-ETH01** (Ethernet): \`firmware-wt32eth01.bin\`"
             echo ""
+            echo "Debug symbols (decode a panic): \`firmware*.elf.gz\` — \`gunzip\` it, then \`xtensa-esp32-elf-addr2line -pfiaC -e firmware.elf 0x...\`"
+            echo ""
             echo "_Build 1.0.${{ github.run_number }} from ${{ github.sha }}_"
           } > notes.md
 
@@ -151,6 +158,7 @@ jobs:
             firmware.bin bootloader.bin partitions.bin boot_app0.bin \
             firmware-esp32s3.bin bootloader-esp32s3.bin partitions-esp32s3.bin \
             firmware-wt32eth01.bin bootloader-wt32eth01.bin partitions-wt32eth01.bin \
+            firmware.elf.gz firmware-esp32s3.elf.gz firmware-wt32eth01.elf.gz \
             version.txt changes.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
