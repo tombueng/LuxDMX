@@ -305,10 +305,12 @@ async function recordDemo(browser) {
   await pickOption('#proto-sel', '1');              // sACN only
   await pickOption('#proto-sel', '2');              // Both (back to device default)
 
-  // Universe spinner (hint text below updates live)
-  await click('#uni-inp');
-  await page.fill('#uni-inp', '4'); await page.dispatchEvent('#uni-inp', 'input'); await pause(1000);
-  await page.fill('#uni-inp', '0'); await page.dispatchEvent('#uni-inp', 'input'); await pause(700);
+  // Universe field (first output) — multi-output replaced the single #uni-inp with per-output .out-uni
+  await scrollToEl('.out-uni', 200);
+  await click('.out-uni');
+  const uniInp = page.locator('.out-uni').first();
+  await uniInp.fill('4'); await uniInp.dispatchEvent('input'); await pause(1000);
+  await uniInp.fill('0'); await uniInp.dispatchEvent('input'); await pause(700);
 
   // Network — static IP toggle reveals the address fields
   await scrollToEl('.card:has(#static-sw)', 130);
