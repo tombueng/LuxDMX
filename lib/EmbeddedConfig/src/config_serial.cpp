@@ -9,11 +9,25 @@ namespace cfgserial {
 static Stream* g_io = nullptr;
 static Hooks   g_hooks;
 static String  g_line;
+static bool    g_announced = false;
 
 void begin(Stream& io, const Hooks& hooks) {
-    g_io    = &io;
-    g_hooks = hooks;
-    g_line  = "";
+    g_io        = &io;
+    g_hooks     = hooks;
+    g_line      = "";
+    g_announced = false;
+}
+
+static void prompt() { if (g_io) g_io->print("cfg> "); }
+
+// Printed once, the first time the console is polled (so it lands after the boot
+// log), telling a human how to drive it.
+static void announce() {
+    if (!g_io) return;
+    g_io->println();
+    g_io->println("== LuxDMX serial config console ==");
+    g_io->println("Type 'help' for commands.  e.g.  list  |  get o0_tx  |  set hostname studio  |  save");
+    prompt();
 }
 
 // ---- formatting helpers ----------------------------------------------------
@@ -172,6 +186,7 @@ String execute(const String& line) {
 // ---- non-blocking line reader ----------------------------------------------
 void poll() {
     if (!g_io) return;
+    if (!g_announced) { g_announced = true; announce(); }   // greet once, after the boot log
     while (g_io->available() > 0) {
         int c = g_io->read();
         if (c < 0) break;
@@ -180,6 +195,7 @@ void poll() {
             String resp = execute(g_line);
             g_line = "";
             if (resp.length()) g_io->println(resp);
+            prompt();
         } else if (g_line.length() < 600) {
             appendChar(g_line, (char)c);
         }

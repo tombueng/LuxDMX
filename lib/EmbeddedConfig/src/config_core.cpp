@@ -165,7 +165,11 @@ void load() {
     for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++) {
         const CfgField& f = CONFIG_FIELDS[j]; void* a = rootAddr(f);
         if (f.kind == CfgKind::Bool)      *(bool*)a   = prefs.getBool(f.key, *(bool*)a);
-        else if (f.kind == CfgKind::Str)  *(String*)a = prefs.getString(f.key, *(String*)a);
+        // Guard string reads with isKey(): the Arduino Preferences lib logs a noisy
+        // "nvs_get_str len fail: <key> NOT_FOUND" error for every absent string key
+        // (i.e. every string field on a fresh device). Skipping the read keeps the
+        // template/neutral default already in *a and the console stays clean.
+        else if (f.kind == CfgKind::Str) { if (prefs.isKey(f.key)) *(String*)a = prefs.getString(f.key, *(String*)a); }
         else { int v = prefs.getInt(f.key, *(int*)a); *(int*)a = (int)constrain(v, f.min, f.max); }
     }
     for (int i = 0; i < MAX_OUTPUTS; i++)

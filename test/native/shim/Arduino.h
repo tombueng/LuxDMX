@@ -56,6 +56,7 @@ public:
     virtual void print(const char* c) = 0;
     void print(const String& v) { print(v.c_str()); }
     void print(int v) { char b[16]; snprintf(b, sizeof(b), "%d", v); print(b); }
+    void println() { print("\n"); }
     void println(const char* c) { print(c); print("\n"); }
     void println(const String& v) { print(v); print("\n"); }
 };

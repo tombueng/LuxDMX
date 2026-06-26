@@ -480,7 +480,7 @@ static void sanitizeOutputs() {
 static void loadConfig() {
     cfgcore::load();
     prefs.begin(PREF_NS, true);
-    g_labels = prefs.getString("labels", "{}");
+    if (prefs.isKey("labels")) g_labels = prefs.getString("labels", "{}");   // isKey: avoid the NOT_FOUND log on a fresh device
     prefs.end();
     sanitizeOutputs();
 }
