@@ -23,10 +23,10 @@ void save();
 bool setValue(const String& key, const String& val, String& err);
 bool getValue(const String& key, String& out);   // false if the key is unknown
 
-// Serialize all schema fields as a JSON object body, "key":value pairs plus an
-// "outputs":[...] array. maskSecrets replaces CFG_SECRET values with "***"
-// (serial dumps pass true; /info.json passes false so the UI can prefill).
-void toJson(Print& out, bool maskSecrets);
+// Append all schema fields to `out` as a JSON object body, "key":value pairs plus
+// an "outputs":[...] array. maskSecrets replaces CFG_SECRET values with "***"
+// (serial dumps pass true). No Print dependency, so the engine stays transport-free.
+void toJson(String& out, bool maskSecrets);
 
 // Apply a board template by name from the embedded registry (resolves extends=).
 bool applyTemplate(const String& name, String& err);

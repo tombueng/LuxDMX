@@ -26,6 +26,7 @@
 // not in -D macros. The structural enums (MERGE_*, NET_*, WIRED_FB_*, RMII_*) stay
 // defined below in main.cpp; config_enums.h mirrors them for the engine TU.
 #include "config/config_core.h"
+#include "config/config_serial.h"   // serial configuration console (Phase 2/3)
 // Wired-Ethernet capability (compile-time). WiFi is ALWAYS compiled in too; the
 // active interface — and, on the classic ESP32, which wired PHY — is chosen at
 // runtime (issue #14).
@@ -2517,6 +2518,32 @@ static void startWiFiStation() {
 // ---------------------------------------------------------------------------
 // setup()
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Serial config console hooks — the device-side actions the console triggers.
+// The console itself (config_serial) is schema-driven and transport-free; these
+// wire its verbs to this firmware's persistence / reboot / WiFi.
+// ---------------------------------------------------------------------------
+static void cfgserialSave(bool reboot) {
+    saveConfig();
+    if (reboot) pendingRebootAt = millis() + 300;
+}
+static void cfgserialReboot() { pendingRebootAt = millis() + 300; }
+static void cfgserialFactory() {
+    Preferences p; p.begin(PREF_NS, false); p.clear(); p.end();   // wipe config + labels
+    pendingWifiReset = true;                                       // also drop WiFi creds
+    pendingRebootAt  = millis() + 300;
+}
+static bool cfgserialWifi(const String& ssid, const String& pass) {
+    // Keep WiFiManager for the portal; this just sets STA creds persistently and
+    // reconnects (the recover-a-stuck-board path). WiFi stays out of the schema.
+    WiFi.persistent(true);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), pass.c_str());
+    return true;
+}
+static const cfgserial::Hooks SERIAL_HOOKS = {
+    cfgserialSave, cfgserialReboot, cfgserialFactory, cfgserialWifi };
+
 void setup() {
     // Brownout detector: on the classic ESP32 (esp32dev/wt32eth01) this register
     // write disables it. On the ESP32-S3 under arduino-esp32 v3 / IDF 5 the BOD is
@@ -2529,6 +2556,7 @@ void setup() {
     Serial.println("\n[BOOT] LuxDMX — Art-Net / sACN DMX Gateway");
 
     loadConfig();
+    cfgserial::begin(Serial, SERIAL_HOOKS);   // serial config console: type 'help'
 #if defined(HAS_WIRED_ETH)
     // Wired Ethernet is active when the user selected it; the W5500 path additionally
     // needs the module opt-in (cfg.ethW5500). At default cfg.wiredPhy this reduces to
@@ -2654,6 +2682,8 @@ static void simArtnetTick() {
 // loop()
 // ---------------------------------------------------------------------------
 void loop() {
+    cfgserial::poll();   // serial config console (non-blocking line reader)
+
     // AsyncWebServer + AsyncWebSocket run in their own task, so loop() never
     // blocks on the network — only Art-Net/sACN input and DMX output here.
     // Only poll the UDP sockets while a link is actually up: on arduino-esp32 v3,

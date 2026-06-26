@@ -207,48 +207,51 @@ void save() {
 }
 
 // ---- JSON serialization ----------------------------------------------------
-static void emitStr(Print& out, const String& v) {
-    out.print("\"");
+// Appends to a String (no Print dependency) so the engine has no transport ties:
+// works identically on the device and in the native host test, and the serial
+// console can capture the dump straight into a String.
+static void emitStr(String& out, const String& v) {
+    out += "\"";
     const char* c = v.c_str();
     for (; *c; c++) {
-        if (*c == '"' || *c == '\\') { char b[3] = {'\\', *c, 0}; out.print(b); }
-        else { char b[2] = {*c, 0}; out.print(b); }
+        if (*c == '"' || *c == '\\') { char b[3] = {'\\', *c, 0}; out += b; }
+        else { char b[2] = {*c, 0}; out += b; }
     }
-    out.print("\"");
+    out += "\"";
 }
-static void emitField(Print& out, void* a, CfgKind kind, uint16_t flags, bool mask) {
+static void emitField(String& out, void* a, CfgKind kind, uint16_t flags, bool mask) {
     if (kind == CfgKind::Str) {
-        if (mask && (flags & CFG_SECRET)) out.print("\"***\"");
+        if (mask && (flags & CFG_SECRET)) out += "\"***\"";
         else emitStr(out, *(String*)a);
     } else if (kind == CfgKind::Bool) {
-        out.print(*(bool*)a ? "true" : "false");
+        out += (*(bool*)a ? "true" : "false");
     } else {
-        out.print(*(int*)a);
+        out += String(*(int*)a);
     }
 }
 
-void toJson(Print& out, bool maskSecrets) {
+void toJson(String& out, bool maskSecrets) {
     bool first = true;
     for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++) {
         const CfgField& f = CONFIG_FIELDS[j];
-        if (!first) out.print(",");
+        if (!first) out += ",";
         first = false;
-        out.print("\""); out.print(f.jsonKey); out.print("\":");
+        out += "\""; out += f.jsonKey; out += "\":";
         emitField(out, rootAddr(f), f.kind, f.flags, maskSecrets);
     }
-    out.print(",\"outputs\":[");
+    out += ",\"outputs\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
-        if (i) out.print(",");
-        out.print("{");
+        if (i) out += ",";
+        out += "{";
         for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
             const CfgOutputField& f = OUTPUT_FIELDS[j];
-            if (j) out.print(",");
-            out.print("\""); out.print(f.jsonKey); out.print("\":");
+            if (j) out += ",";
+            out += "\""; out += f.jsonKey; out += "\":";
             emitField(out, outAddr(i, f), f.kind, f.flags, maskSecrets);
         }
-        out.print("}");
+        out += "}";
     }
-    out.print("]");
+    out += "]";
 }
 
 } // namespace cfgcore

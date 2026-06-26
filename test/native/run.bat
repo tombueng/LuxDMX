@@ -14,7 +14,8 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliar
 cl /nologo /EHsc /std:c++17 /I test\native\shim /I src\config ^
    /DDEFAULT_TEMPLATE=luxdmx_v4 ^
    test\native\test_main.cpp ^
-   src\config\config_core.cpp src\config\config_schema.cpp src\generated\config_templates.cpp ^
+   src\config\config_core.cpp src\config\config_schema.cpp src\config\config_serial.cpp ^
+   src\generated\config_templates.cpp ^
    /Fe:build\cfgtest.exe /Fobuild\ > build\compile.log 2>&1
 if errorlevel 1 ( type build\compile.log & popd & exit /b 1 )
 build\cfgtest.exe

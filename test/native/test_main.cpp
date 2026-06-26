@@ -4,17 +4,22 @@
 // key fallback, JSON output, secret masking, AND full per-board fresh-device
 // byte-parity (every template reproduces the old loadConfig DEF_* defaults).
 #include "config_core.h"
+#include "config_serial.h"
 #include "Preferences.h"
 #include <string>
 #include <cstdio>
 
 Config cfg;   // the one instance the engine + schema operate on
 
-struct StringPrint : Print {
-    std::string out;
-    void print(const char* c) override { out += c; }
-};
-static bool has(const std::string& h, const char* n) { return h.find(n) != std::string::npos; }
+static bool hasS(const String& h, const char* n) { return strstr(h.c_str(), n) != nullptr; }
+
+// stub serial-console hooks (record that the device-side actions were invoked)
+static int g_saveCalls = 0, g_rebootCalls = 0, g_factoryCalls = 0;
+static String g_wifiSsid, g_wifiPass;
+static void hSave(bool reboot)  { g_saveCalls++; (void)reboot; }
+static void hReboot()           { g_rebootCalls++; }
+static void hFactory()          { g_factoryCalls++; }
+static bool hWifi(const String& ssid, const String& pass) { g_wifiSsid = ssid; g_wifiPass = pass; return true; }
 
 static int g_pass = 0, g_fail = 0;
 #define CHECK(cond, msg) do { if (cond) { g_pass++; } else { g_fail++; \
@@ -137,15 +142,15 @@ int main() {
     cfgcore::resetToTemplate();
     cfgcore::setValue("hostname", "box", err);
     cfgcore::setValue("otapw", "s3cret", err);
-    StringPrint j; cfgcore::toJson(j, false);
-    CHECK(has(j.out, "\"ledType\":3"),         "json: ledType");
-    CHECK(has(j.out, "\"hostname\":\"box\""),  "json: hostname");
-    CHECK(has(j.out, "\"outputs\":["),         "json: outputs array");
-    CHECK(has(j.out, "\"tx\":17"),             "json: nested output tx");
-    CHECK(has(j.out, "\"otapw\":\"s3cret\""),  "json: secret shown when unmasked");
-    StringPrint jm; cfgcore::toJson(jm, true);
-    CHECK(has(jm.out, "\"otapw\":\"***\""),    "json: secret masked");
-    CHECK(!has(jm.out, "s3cret"),              "json: secret not leaked when masked");
+    String j; cfgcore::toJson(j, false);
+    CHECK(hasS(j, "\"ledType\":3"),         "json: ledType");
+    CHECK(hasS(j, "\"hostname\":\"box\""),  "json: hostname");
+    CHECK(hasS(j, "\"outputs\":["),         "json: outputs array");
+    CHECK(hasS(j, "\"tx\":17"),             "json: nested output tx");
+    CHECK(hasS(j, "\"otapw\":\"s3cret\""),  "json: secret shown when unmasked");
+    String jm; cfgcore::toJson(jm, true);
+    CHECK(hasS(jm, "\"otapw\":\"***\""),    "json: secret masked");
+    CHECK(!hasS(jm, "s3cret"),              "json: secret not leaked when masked");
 
     // 6) FULL per-board fresh-device byte-parity (every template vs old DEF_* defaults)
     checkBoard("esp32dev");
@@ -153,6 +158,38 @@ int main() {
     checkBoard("wt32eth01");
     checkBoard("wokwi");
     checkBoard("luxdmx_v4");
+
+    // 7) serial console grammar (cfgserial::execute), all schema-driven
+    using cfgserial::execute;
+    cfgserial::Hooks hk; hk.save = hSave; hk.reboot = hReboot; hk.factory = hFactory; hk.wifi = hWifi;
+    static Stream dummy; cfgserial::begin(dummy, hk);
+    cfgcore::resetTo("luxdmx_v4", err);
+
+    CHECK(execute("get o0_tx") == "o0_tx=17",          "serial: get o0_tx");
+    CHECK(execute("GET o0_rts") == "o0_rts=8",          "serial: verb case-insensitive");
+    CHECK(hasS(execute("get nope"), "ERR unknown key"), "serial: get unknown -> ERR");
+    CHECK(execute("set o0_tx 9") == "OK",               "serial: set ok");
+    CHECK(cfg.outputs[0].txPin == 9,                     "serial: set applied");
+    CHECK(execute("set o0_tx 999") == "OK",             "serial: set high still OK");
+    CHECK(cfg.outputs[0].txPin == 48,                    "serial: set clamped to 48");
+    CHECK(hasS(execute("set bogus 1"), "ERR"),          "serial: set unknown -> ERR");
+    CHECK(hasS(execute("json"), "\"ledType\":3"),       "serial: json dump");
+    CHECK(hasS(execute("json"), "\"otapw\":\"***\""),   "serial: json masks secret");
+    execute("load ledtype=2 o1_uni=5");
+    CHECK(cfg.ledType == 2 && cfg.outputs[1].universe == 5, "serial: load batch applied");
+    CHECK(hasS(execute("template esp32s3dev"), "OK"),   "serial: template apply ok");
+    CHECK(cfg.ledPin == 48 && cfg.ledType == 2,          "serial: template values applied");
+    CHECK(hasS(execute("template nope"), "ERR"),        "serial: template unknown -> ERR");
+    CHECK(hasS(execute("list Network"), "wifimode"),    "serial: list group filter");
+    CHECK(execute("help").length() > 0,                  "serial: help");
+    execute("save");        CHECK(g_saveCalls == 1,      "serial: save hook");
+    execute("save reboot"); CHECK(g_saveCalls == 2,      "serial: save reboot hook");
+    execute("reboot");      CHECK(g_rebootCalls == 1,    "serial: reboot hook");
+    execute("factory");     CHECK(g_factoryCalls == 1,   "serial: factory hook");
+    CHECK(hasS(execute("wifi dropsnet s3cret"), "OK"),  "serial: wifi ok");
+    CHECK(g_wifiSsid == "dropsnet" && g_wifiPass == "s3cret", "serial: wifi creds parsed");
+    CHECK(hasS(execute("wifi"), "ERR"),                 "serial: wifi no-ssid -> ERR");
+    CHECK(hasS(execute("frobnicate"), "unknown command"), "serial: unknown command");
 
     printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
