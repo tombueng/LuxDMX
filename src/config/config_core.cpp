@@ -4,10 +4,10 @@
 #include <string.h>
 #include <stdlib.h>
 
-// NVS namespace — MUST match main.cpp's PREF_NS when wired in (Phase 1) so an
-// existing device's saved keys are found. Overridable for the native test.
+// NVS namespace — MUST match main.cpp's PREF_NS ("dmxgw") so an existing device's
+// saved keys are found after the engine takes over load/save. Overridable at build.
 #ifndef CFG_PREF_NS
-#define CFG_PREF_NS "config"
+#define CFG_PREF_NS "dmxgw"
 #endif
 
 // Board template compiled into this binary (a plain build flag). Stringized.

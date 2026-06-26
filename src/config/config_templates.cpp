@@ -9,7 +9,7 @@ static const char* const T_BASE =
     "o1_uni=1\n"
     "o1_port=2\n";
 
-static const char* const T_LUMIGATE_V4 =
+static const char* const T_LUXDMX_V4 =
     "extends=_base\n"
     "ledtype=3\n"
     "ledr=1\nledg=2\nledy=6\nledb=7\nledw=15\n"
@@ -27,8 +27,8 @@ static const char* const T_WT32ETH01 =
     "dispsda=14\ndispscl=15\n";
 
 const CfgTemplate CONFIG_TEMPLATES[] = {
-    {"_base",        T_BASE},
-    {"lumigate_v4",  T_LUMIGATE_V4},
-    {"wt32eth01",    T_WT32ETH01},
+    {"_base",      T_BASE},
+    {"luxdmx_v4",  T_LUXDMX_V4},
+    {"wt32eth01",  T_WT32ETH01},
 };
 const size_t CONFIG_TEMPLATE_COUNT = sizeof(CONFIG_TEMPLATES) / sizeof(CONFIG_TEMPLATES[0]);
