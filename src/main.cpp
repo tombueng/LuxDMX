@@ -1926,8 +1926,25 @@ static void startWiFiManager(bool forcePortal) {
     snprintf(wm_universeStr, sizeof(wm_universeStr), "%d", cfg.outputs[0].universe);
     WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-15)", wm_universeStr, 3);
     wm.addParameter(&param_universe);
+    // Run the captive portal NON-blocking so the serial config console stays alive
+    // while it's up: a fresh / stuck board (no WiFi yet) can then be recovered over
+    // USB with `wifi <ssid> <pass>`, the whole point of the serial console. The
+    // saved-credential connect attempt inside autoConnect still blocks briefly (up
+    // to setConnectTimeout), which is fine; only the open portal becomes non-blocking.
+    wm.setConfigPortalBlocking(false);
     bool connected = forcePortal ? wm.startConfigPortal(AP_SSID)
                                  : wm.autoConnect(AP_SSID);
+    if (!connected) {
+        // Portal is up (or no creds): pump it + the serial console until the user
+        // configures WiFi (via the portal page OR `wifi` over serial) or it times out.
+        uint32_t start = millis();
+        while (!WiFi.isConnected() && millis() - start < 180000) {
+            wm.process();
+            cfgserial::poll();
+            delay(5);
+        }
+        connected = WiFi.isConnected();
+    }
     if (!connected) ESP.restart();
     if (wm_shouldSave) {
         cfg.outputs[0].universe = constrain(atoi(param_universe.getValue()), 0, 15);
