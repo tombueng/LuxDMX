@@ -5,7 +5,7 @@ board diagram, and live constraint-aware validation, without bloating firmware f
 
 ## Why
 
-LumiGate exposes a lot of GPIO fields (status LED, 5-LED panel, mono/colour display,
+LuxDMX exposes a lot of GPIO fields (status LED, 5-LED panel, mono/colour display,
 two DMX outputs x TX/RX/RTS). Typing raw GPIO numbers invites mix-ups between *pin
 number* vs *GPIO number* vs the silk label, and accidental use of strapping, flash,
 input-only or Ethernet-reserved pins. The picker removes the guesswork.
@@ -60,7 +60,7 @@ boards and manual GPIO entry still work; catalog fetch failures degrade silently
 
 | Build | `board` | `mcu` |
 |---|---|---|
-| `lumigate_v4` (USE_ETH_SPI) | `lumigate_v4` | `esp32s3` |
+| `luxdmx_v4` (USE_ETH_SPI) | `luxdmx_v4` | `esp32s3` |
 | `wt32eth01` (USE_ETHERNET) | `wt32eth01` | `esp32` |
 | `esp32s3dev` | `esp32s3-devkitc-1` | `esp32s3` |
 | `esp32dev` | `esp32-devkitc` | `esp32` |
@@ -104,7 +104,7 @@ python hardware/gen_board_descriptor.py
 [../web/boards/ROADMAP.md](../web/boards/ROADMAP.md) for the full list). Descriptor data
 is sourced authoritatively, not guessed:
 
-- **LumiGate v4** is parsed straight from `hardware/lumigate.py` (the PCB netlist source),
+- **LuxDMX v4** is parsed straight from `hardware/luxdmx.py` (the PCB netlist source),
   so its diagram, template and Ethernet-reserved-pin rules cannot drift from the board.
 - **Hand-tuned** boards (DevKitC / DevKit v1 / NodeMCU / S3 DevKitC-1, Feather / QtPy /
   XIAO / WT32-ETH01) use their real, published header order.

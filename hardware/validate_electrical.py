@@ -1,4 +1,4 @@
-"""Electrical operating-point validation for LumiGate v4.0 -- re-runnable.
+"""Electrical operating-point validation for LuxDMX v4.0 -- re-runnable.
 
 Computes the DC/RC operating points of every critical node from the schematic values and checks
 each against the relevant device limit. For these nodes (resistive dividers, diode-OR, LED current

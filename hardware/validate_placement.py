@@ -2,7 +2,7 @@
 the IC it serves (pad-to-pad on the shared net). Loop area / decoupling effectiveness scales with this
 distance, so switching + HF-decoupling caps must be very close. Re-runnable. KiCad 10 python."""
 import pcbnew, math
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 TM = pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""Populate lumigate.kicad_sch from the SKiDL netlist + part library.
+"""Populate luxdmx.kicad_sch from the SKiDL netlist + part library.
 
-The LumiGate board is code-driven: lumigate.py -> lumigate.net -> PCB. The
+The LuxDMX board is code-driven: luxdmx.py -> luxdmx.net -> PCB. The
 schematic file was never captured. This builds a real, readable KiCad-9 schematic
 that matches the netlist exactly:
 
@@ -16,19 +16,19 @@ that matches the netlist exactly:
   * unused pins get no-connect flags; rails without a driver pin get a PWR_FLAG,
   * blocks are tiled into balanced columns for a roughly square sheet.
 
-Verify:  kicad-cli sch export netlist  ->  diff nets vs lumigate.net
+Verify:  kicad-cli sch export netlist  ->  diff nets vs luxdmx.net
 Regenerate:  python gen_schematic.py
 """
 import os
 import uuid
 
-import lumigate_sklib as sklib
+import luxdmx_sklib as sklib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-NET = os.path.join(HERE, 'lumigate.net')
-OUT = os.path.join(HERE, 'lumigate.kicad_sch')
-PROJECT = 'lumigate'
-NS = uuid.uuid5(uuid.NAMESPACE_URL, 'lumigate-schematic')
+NET = os.path.join(HERE, 'luxdmx.net')
+OUT = os.path.join(HERE, 'luxdmx.kicad_sch')
+PROJECT = 'luxdmx'
+NS = uuid.uuid5(uuid.NAMESPACE_URL, 'luxdmx-schematic')
 
 
 def uid(*p):
@@ -150,7 +150,7 @@ FUNC = {
     'UNSPEC': 'unspecified', 'FREE': 'free',
 }
 templates = {}
-for p in sklib.lumigate.parts:
+for p in sklib.luxdmx.parts:
     templates[p.name] = [(str(pin.num), str(pin.name), FUNC.get(pin.func.name, 'passive'))
                          for pin in p.pins]
 
@@ -1051,8 +1051,8 @@ PAGE_H = page_bottom + 14.0
 out = ['(kicad_sch', '\t(version 20250114)', '\t(generator "eeschema")',
        '\t(generator_version "9.0")', '\t(uuid "%s")' % uid('root'),
        '\t(paper "User" %s %s)' % (fnum(PAGE_W), fnum(PAGE_H)),
-       '\t(title_block (title "LumiGate v4 - Art-Net/sACN -> isolated DMX gateway") '
-       '(rev "v4") (comment 1 "auto-generated from lumigate.net by gen_schematic.py"))',
+       '\t(title_block (title "LuxDMX v4 - Art-Net/sACN -> isolated DMX gateway") '
+       '(rev "v4") (comment 1 "auto-generated from luxdmx.net by gen_schematic.py"))',
        '\t(lib_symbols']
 for k in sorted(symbols):
     out.append('\t\t' + symbols[k].lib)
@@ -1081,7 +1081,7 @@ with open(OUT, 'w', encoding='utf-8') as fh:
     fh.write('\n'.join(out) + '\n')
 
 # standalone symbol lib + registration
-SYMLIB = os.path.join(HERE, 'lumigate.kicad_sym')
+SYMLIB = os.path.join(HERE, 'luxdmx.kicad_sym')
 lib_out = ['(kicad_symbol_lib', '\t(version 20241209)',
            '\t(generator "kicad_symbol_editor")', '\t(generator_version "9.0")']
 for k in sorted(symbols):
@@ -1096,8 +1096,8 @@ with open(SYMLIB, 'w', encoding='utf-8') as fh:
 SLT = os.path.join(HERE, 'sym-lib-table')
 if not os.path.exists(SLT):
     with open(SLT, 'w', encoding='utf-8') as fh:
-        fh.write('(sym_lib_table\n  (version 7)\n  (lib (name "lumigate")(type "KiCad")'
-                 '(uri "${KIPRJMOD}/lumigate.kicad_sym")(options "")(descr "LumiGate generated symbols"))\n)\n')
+        fh.write('(sym_lib_table\n  (version 7)\n  (lib (name "luxdmx")(type "KiCad")'
+                 '(uri "${KIPRJMOD}/luxdmx.kicad_sym")(options "")(descr "LuxDMX generated symbols"))\n)\n')
 
 FLT = os.path.join(HERE, 'fp-lib-table')
 fp_libs = sorted({c['footprint'].split(':', 1)[0] for c in comps.values() if ':' in c['footprint']})
@@ -1120,7 +1120,7 @@ if os.path.exists(FLT):
 
 # with the PWR_FLAGs gone, tell ERC to ignore "power input not driven" for the
 # intermediate rails (they are driven through passives the netlist marks PASSIVE).
-PRO = os.path.join(HERE, 'lumigate.kicad_pro')
+PRO = os.path.join(HERE, 'luxdmx.kicad_pro')
 if os.path.exists(PRO):
     import json
     with open(PRO, encoding='utf-8') as fh:

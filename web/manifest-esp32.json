@@ -1,5 +1,5 @@
 {
-  "name": "LumiGate (ESP32 / WROOM-32)",
+  "name": "LuxDMX (ESP32 / WROOM-32)",
   "version": "latest",
   "new_install_prompt_erase": false,
   "builds": [

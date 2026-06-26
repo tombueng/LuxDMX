@@ -1,6 +1,6 @@
 # Ruggedization (making it battle-ready)
 
-LumiGate gets used in places that aren't kind to electronics: touring racks, damp
+LuxDMX gets used in places that aren't kind to electronics: touring racks, damp
 basements, dimmer-heavy stages, cables that get yanked and occasionally plugged into
 the wrong thing. This is the rundown of what protects the board and why.
 
@@ -87,7 +87,7 @@ for a board that lives in a damp basement or a truck.
 
 ## Grounding & shielding (metal enclosure)
 
-If you put LumiGate in a metal box, one rule sorts out almost everything: **bond the digital
+If you put LuxDMX in a metal box, one rule sorts out almost everything: **bond the digital
 ground to the chassis, keep the isolated DMX grounds off it.**
 
 How the board is wired:

@@ -7,7 +7,7 @@ RF keepout is ignored -- an NPTH hole may sit there). KiCad 10 python.
 NB: all footprint geometry is read up-front, because re-reading footprints after a board edit
 (remove/add drawings) returns raw SwigPyObjects."""
 import pcbnew
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 MARGIN = 1.5
 INSET = 5.0

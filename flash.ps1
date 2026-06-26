@@ -1,12 +1,12 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Download and flash the latest LumiGate firmware.
+    Download and flash the latest LuxDMX firmware.
     Auto-detects ESP32 vs ESP32-S3.
 #>
 
 $ErrorActionPreference = "Stop"
-$REPO = "tombueng/LumiGate"
+$REPO = "tombueng/LuxDMX"
 
 function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "    OK: $msg" -ForegroundColor Green }
@@ -108,14 +108,14 @@ Write-Ok "Detected: $boardName"
 # 6. Download firmware
 # ---------------------------------------------------------------------------
 Write-Step "Fetching latest release from github.com/$REPO ..."
-$headers = @{ "User-Agent" = "LumiGate-flash-script" }
+$headers = @{ "User-Agent" = "LuxDMX-flash-script" }
 try {
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$REPO/releases/tags/latest" -Headers $headers
 } catch {
     Write-Err "Could not reach GitHub API: $_"
 }
 
-$tmpDir = Join-Path $env:TEMP "lumigate_flash"
+$tmpDir = Join-Path $env:TEMP "luxdmx_flash"
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
 foreach ($file in $files.Keys) {

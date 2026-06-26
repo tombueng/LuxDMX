@@ -8,7 +8,7 @@ auto-reset transistors. Every part in PLACE is snapped to its shared-net pin on 
 outward (pin side first) with collision avoidance against everything already down. Run BEFORE the
 routing pipeline (rebuild_iso wipes tracks anyway). KiCad 10 python."""
 import pcbnew, math
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 

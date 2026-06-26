@@ -7,14 +7,14 @@
 > holes, and wider power traces are in; a few datasheet/silk items remain open (see **Status**). Treat the
 > first build as a prototype and do a final review before ordering.
 
-# LumiGate v4 — hardware
+# LuxDMX v4 — hardware
 
 A compact, open-source **Art-Net / sACN → galvanically-isolated DMX512 gateway**, built around
 an ESP32-S3 with **both** WiFi *and* wired Ethernet. Designed entirely as code (SKiDL netlist) and
 routed by a fully-scripted, placement-driven pipeline — so the board regenerates itself from your
 component placement, isolation barrier and all.
 
-![LumiGate v4 — PCB layout](board-pcb-1.png)
+![LuxDMX v4 — PCB layout](board-pcb-1.png)
 
 <p align="center">
   <img src="board3d-1.png" width="49%" alt="3D render — front">
@@ -26,7 +26,7 @@ component placement, isolation barrier and all.
 ## What problem does it solve?
 
 Lighting consoles and media servers speak **Art-Net** or **sACN (E1.31)** over a network. Fixtures —
-dimmers, moving heads, hazers, LED bars — speak **DMX512** over an isolated RS-485 bus. LumiGate sits
+dimmers, moving heads, hazers, LED bars — speak **DMX512** over an isolated RS-485 bus. LuxDMX sits
 between them: it receives Art-Net/sACN over WiFi or Ethernet and emits a clean, **opto-isolated DMX512**
 signal. It's the box that lets you drive a rack of conventional stage gear from QLab, a grandMA, or any
 Art-Net source — without dragging a laptop and a USB-DMX dongle around backstage.
@@ -126,7 +126,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
 autorouter will happily route ground (and fine-pitch escapes) to the inner copper, while the fill still
 gives every trace a solid 0.21 mm-away reference. The result: clean ~100 Ω Ethernet pairs and good EMI.
 
-**Isolation:** three barriers, all enforced by net-based rules in [`lumigate.kicad_dru`](lumigate.kicad_dru):
+**Isolation:** three barriers, all enforced by net-based rules in [`luxdmx.kicad_dru`](luxdmx.kicad_dru):
 - **DMX universe 1** (`GNDISO`/`VISO`/`DMX_A`/`DMX_B`) and **universe 2** (`GNDISO2`/`VISO2`/`DMX2_A`/`DMX2_B`)
   are each held **≥ 4 mm** from all other copper. Their barrier parts — **PS1/PS2** (B0505S, 2.5 mm pitch)
   and **U5/U6** (ISO3086) — are *courtyard-exempted* (isolation internal/rated), like the USB-C pads.
@@ -142,12 +142,12 @@ the live part positions.
 
 ## Design-as-code & the routing pipeline
 
-The board is **generated, not hand-drawn**. [`lumigate.py`](lumigate.py) is a [SKiDL](https://github.com/devbisme/skidl)
+The board is **generated, not hand-drawn**. [`luxdmx.py`](luxdmx.py) is a [SKiDL](https://github.com/devbisme/skidl)
 netlist — the single source of truth for every part and connection. From a placement, the rest is scripted
 and **adapts to wherever you put the parts**:
 
 ```text
-0. python lumigate.py            # SKiDL → lumigate.net (only after editing the netlist source)
+0. python luxdmx.py            # SKiDL → luxdmx.net (only after editing the netlist source)
 0b python sync_board.py          # add NEW/changed parts to the board, KEEPING existing placement,
                                  #   gridded in the enlarged area (build_v3.py = full from-scratch grid)
 1. place / move parts in KiCad   →  save
@@ -176,15 +176,15 @@ get done once. Move a part, re-run — done.
 Everything you upload is already generated in this folder.
 
 ### 1 — Bare PCB
-1. Go to [jlcpcb.com](https://jlcpcb.com) → **Add gerber file** → upload **`lumigate_gerbers.zip`**.
+1. Go to [jlcpcb.com](https://jlcpcb.com) → **Add gerber file** → upload **`luxdmx_gerbers.zip`**.
 2. It auto-detects **4 layers**. Set: **Layers = 4**, Thickness **1.6 mm**, Impedance control =
    **JLC04161H-3313** stackup (the one this board is designed for). Surface finish your choice (ENIG
    recommended for the fine-pitch parts).
 
 ### 2 — Assembly (SMT)
 3. Enable **PCB Assembly**, then upload:
-   - **BOM** → `lumigate_BOM_jlcpcb.csv`
-   - **CPL / pick-and-place** → `lumigate_CPL.csv`
+   - **BOM** → `luxdmx_BOM_jlcpcb.csv`
+   - **CPL / pick-and-place** → `luxdmx_CPL.csv`
 4. In the BOM matching step, confirm each LCSC part (they're pre-filled). **J4** (the optional display
    header) has no LCSC assigned — either pick a JST SH 9-pin part there or mark it **Do Not Populate**.
 5. **Review the placement preview** — the CPL is rotation/position-corrected by `gen_cpl.py`, so parts
@@ -205,16 +205,16 @@ fee. A complete, assembled prototype lands well under typical hobby budgets.
 
 | File | What |
 |---|---|
-| `lumigate.py` | **SKiDL source** — authoritative netlist (`python lumigate.py` → `lumigate.net`) |
-| `lumigate.kicad_pcb` / `.kicad_pro` | the board + KiCad project |
-| `lumigate.kicad_dru` | custom design rules — the two 4 mm DMX isolations, the 2.5 mm PoE isolation + exemptions |
+| `luxdmx.py` | **SKiDL source** — authoritative netlist (`python luxdmx.py` → `luxdmx.net`) |
+| `luxdmx.kicad_pcb` / `.kicad_pro` | the board + KiCad project |
+| `luxdmx.kicad_dru` | custom design rules — the two 4 mm DMX isolations, the 2.5 mm PoE isolation + exemptions |
 | `sync_board.py` | **incremental** netlist→board: keep existing placement, grid the new parts (dual-universe + PoE) |
 | `build_v3.py` | full from-scratch grid build (clears + re-drops every part) |
 | `rebuild_iso.py` · `escape_connectors.py` · `autoroute_fr2.py` · `cleanup_pads.py` | the routing pipeline |
 | `route.py` · `autoroute.py` | older Freerouting-1.9 fallbacks (no Java 25 needed) |
-| `gen_bom_from_board.py` → `lumigate_BOM_jlcpcb.csv` | JLCPCB assembly BOM |
-| `gen_cpl.py` → `lumigate_CPL.csv` / `.xlsx` | JLCPCB pick-and-place (corrected) |
-| `lumigate_gerbers.zip` | 4-layer gerbers + PTH/NPTH drill — the fab upload |
+| `gen_bom_from_board.py` → `luxdmx_BOM_jlcpcb.csv` | JLCPCB assembly BOM |
+| `gen_cpl.py` → `luxdmx_CPL.csv` / `.xlsx` | JLCPCB pick-and-place (corrected) |
+| `luxdmx_gerbers.zip` | 4-layer gerbers + PTH/NPTH drill — the fab upload |
 | `easyeda/` | LCSC/easyeda footprints + 3D models for the specific parts |
 | `tools/` | Freerouting 2.2.4 jar + portable JDK 25 *(git-ignored — see Toolchain)* |
 | `board-pcb-1.png` · `board3d-1.png` · `board3d-2.png` | layout + 3D renders |
@@ -229,7 +229,7 @@ The v4 board (two isolated DMX universes + PoE, **99 × 79 mm**, 4 corner plated
 
 - **DRC:** 3 clearance waivers only (2× W5500 0.5 mm-pitch escapes at 0.174 mm, USB-C CC2 at 0.160 mm),
   all above JLCPCB's 0.0889 mm floor. 0 silk-over-pad, 0 courtyard overlaps, 0 dangling vias.
-- **Isolation:** 0 violations of the two 4 mm DMX and the 2.5 mm PoE creepage rules (`lumigate.kicad_dru`).
+- **Isolation:** 0 violations of the two 4 mm DMX and the 2.5 mm PoE creepage rules (`luxdmx.kicad_dru`).
 - **Power:** SPICE-verified. The TPS2116 ideal-diode OR holds +5V at ~4.9 V on USB, so the B0505S / ISO3086
   VCC2 stays above its 4.5 V minimum across the whole USB range (>= 4.6 V even at a sagging 4.7 V VBUS);
   buck output 3.318 V.
@@ -248,7 +248,7 @@ See **VALIDATION.md** for the full matrix. Open items to confirm before fab (non
 
 ### Firmware support
 
-Both board-specific firmware features are implemented and build-verified in `env:lumigate_v4`
+Both board-specific firmware features are implemented and build-verified in `env:luxdmx_v4`
 (see [platformio.ini](../platformio.ini)) on **arduino-esp32 v3 / ESP-IDF 5.5**:
 
 - [x] **W5500 SPI-Ethernet driver.** `ETH.begin(ETH_PHY_W5500, …)` registers the W5500 as an lwIP

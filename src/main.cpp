@@ -1,5 +1,5 @@
 /*
- * LumiGate — Art-Net / sACN → DMX Gateway
+ * LuxDMX — Art-Net / sACN → DMX Gateway
  * ESP32 / ESP32-S3 / WT32-ETH01 + Waveshare RS485 (C)
  *
  * Default pins: DMX TX=17, RX=16 (compile-time: DEF_DMX_TX_PIN/DEF_DMX_RX_PIN; runtime: web /config)
@@ -111,7 +111,7 @@
 #include "generated/ota_progress_html.h"
 #include "generated/ota_done_html.h"
 #include "generated/logo_png.h"
-#include "generated/favicon_svg.h"
+#include "generated/favicon_png.h"
 #include "generated/bootstrap_min_css.h"
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@
 
 // Second DMX universe (output #2). Defaults to -1 / disabled on boards with a
 // single transceiver; a board that wires a 2nd isolated driver sets real pins via
-// build_flags (e.g. the LumiGate board: TX=16 RX=21 DE/nRE=47) so its 2nd XLR
+// build_flags (e.g. the LuxDMX board: TX=16 RX=21 DE/nRE=47) so its 2nd XLR
 // comes up ready out of the box.
 #ifndef DEF_DMX2_TX_PIN
 #define DEF_DMX2_TX_PIN -1
@@ -177,7 +177,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812, 3=5-LED discrete panel
 #endif
 
-// 5-LED discrete status panel (ledType 3) — the LumiGate v4 board. Five LEDs on
+// 5-LED discrete status panel (ledType 3) — the LuxDMX v4 board. Five LEDs on
 // their own GPIOs, active-high (GPIO → R → LED anode, cathode → GND). -1 = absent.
 #ifndef DEF_LED_R
 #define DEF_LED_R -1   // red    — fault / no network
@@ -199,7 +199,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // runtime config (cfg.eth*) on ANY board: a DIY user can wire a W5500 module to a
 // plain ESP32 / ESP32-S3 and enable it in /config, not just boards that bake the
 // pins in at build time. Defaults are the classic-ESP32 VSPI pins (the most common
-// W5500 wiring); lumigate_v4 overrides them via build_flags. A build without
+// W5500 wiring); luxdmx_v4 overrides them via build_flags. A build without
 // USE_ETH_SPI never calls ETH.begin() with these, so they cost nothing there.
 #ifndef ETH_W5500_SCK
 #define ETH_W5500_SCK 18
@@ -788,7 +788,7 @@ static void dispSplash() {
     gfx->setTextColor(dispFg());
     gfx->setTextSize(big ? 2 : 1);
     gfx->setCursor(0, 0);
-    gfx->print("LumiGate");
+    gfx->print("LuxDMX");
     gfx->setTextSize(1);
     gfx->setCursor(0, big ? 22 : 12);
     gfx->print('v'); gfx->print(FIRMWARE_VERSION);
@@ -1661,6 +1661,9 @@ static void handleRoot(AsyncWebServerRequest* req) {
     httpReqCount++;
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
+    // Always revalidate the page itself after a firmware update; the versioned
+    // ?v= asset URLs keep css/logo/favicon cacheable.
+    r->addHeader("Cache-Control", "no-cache");
     req->send(r);
 }
 
@@ -1668,7 +1671,7 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
 #if defined(USE_ETH_SPI)
-static const char BOARD_ID[] = "lumigate_v4";
+static const char BOARD_ID[] = "luxdmx_v4";
 #elif defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -1847,6 +1850,7 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
 static void handleConfigGet(AsyncWebServerRequest* req) {
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", CONFIG_HTML, CONFIG_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
+    r->addHeader("Cache-Control", "no-cache");   // revalidate after OTA (assets stay versioned)
     req->send(r);
 }
 
@@ -1951,7 +1955,11 @@ static void handleAutoUpdatePost(AsyncWebServerRequest* req) {
         String("{\"autoUpdate\":") + (cfg.autoUpdate ? "true" : "false") + "}");
 }
 
-static void handleResetGet(AsyncWebServerRequest* req)  { req->send_P(200, "text/html", RESET_HTML); }
+static void handleResetGet(AsyncWebServerRequest* req)  {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", RESET_HTML);
+    r->addHeader("Cache-Control", "no-cache");   // revalidate after OTA (assets stay versioned)
+    req->send(r);
+}
 
 static void handleResetPost(AsyncWebServerRequest* req) {
     req->send_P(200, "text/html", RESET_DONE_HTML);
@@ -1969,7 +1977,7 @@ static void handleLogo(AsyncWebServerRequest* req) {
 }
 
 static void handleFavicon(AsyncWebServerRequest* req) {
-    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/svg+xml", FAVICON_SVG, FAVICON_SVG_LEN);
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/png", FAVICON_PNG, FAVICON_PNG_LEN);
     r->addHeader("Cache-Control", "max-age=604800");
     req->send(r);
 }
@@ -2007,7 +2015,7 @@ static bool httpsGet(const char* url, String& out, size_t maxLen) {
 
 static void checkForUpdate() {
     String v;
-    if (!httpsGet("https://github.com/tombueng/LumiGate/releases/download/latest/version.txt", v, 24)) return;
+    if (!httpsGet("https://luxdmx.org/firmware/version", v, 24)) return;
     latestVersion   = v;
     updateAvailable = parseBuild(v) > parseBuild(String(FIRMWARE_VERSION));
     Serial.printf("[VER] latest=%s current=%s update=%s\n",
@@ -2040,8 +2048,10 @@ static void versionCheckTask(void*) {
 #endif
 
 static void doGithubOta() {
-    String otaUrl = "https://github.com/tombueng/LumiGate/releases/download/"
-                    + otaTarget + "/" + OTA_BIN;
+    // luxdmx.org/firmware/ota/<target>/<file> 301-redirects to the matching GitHub
+    // release asset (releases/download/<target>/<file>) -- target is "latest" or a
+    // "vX.Y.Z" tag, so per-version OTA / downgrade still works through the redirect.
+    String otaUrl = String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
     WiFiClientSecure client;
@@ -2397,7 +2407,7 @@ static void dispDrawStatus() {
     if (H >= 96) {                       // tall colour panel (SSD1351 128x128)
         char b[24];
         gfx->setTextSize(2); gfx->setTextColor(col(accent));
-        gfx->setCursor(0, 0);  gfx->print("LumiGate");
+        gfx->setCursor(0, 0);  gfx->print("LuxDMX");
         gfx->setTextSize(1); gfx->setTextColor(col(C_GREY));
         gfx->setCursor(0, 18); gfx->print('v'); gfx->print(FIRMWARE_VERSION);
         gfx->setTextColor(col(C_WHITE));
@@ -2440,7 +2450,7 @@ static void dispDrawStatus() {
     int rp = (H - 8) / 5; if (rp > 20) rp = 20;
     int y = 0;
     gfx->setTextColor(col(accent));      // title lands in the yellow band on split panels
-    gfx->setCursor(0, y); gfx->print("LumiGate");
+    gfx->setCursor(0, y); gfx->print("LuxDMX");
     { const char* v = FIRMWARE_VERSION; int vw = (int)strlen(v) * 6;
       gfx->setTextColor(col(C_GREY)); gfx->setCursor(W - vw, y); gfx->print(v); }
     // Dual-colour 128x64 OLEDs are yellow rows 0-15 + a ~2px gap + blue rows 16-63.
@@ -2722,7 +2732,7 @@ void setup() {
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
     Serial.begin(115200);
     startMs = millis();
-    Serial.println("\n[BOOT] LumiGate — Art-Net / sACN DMX Gateway");
+    Serial.println("\n[BOOT] LuxDMX — Art-Net / sACN DMX Gateway");
 
     loadConfig();
 #if defined(HAS_WIRED_ETH)
@@ -2779,7 +2789,7 @@ void setup() {
     if (cfg.protocol != 0) startSacn();
 
     http.on("/logo.png",          HTTP_GET,  handleLogo);
-    http.on("/favicon.svg",       HTTP_GET,  handleFavicon);
+    http.on("/favicon.png",       HTTP_GET,  handleFavicon);
     http.on("/favicon.ico",       HTTP_GET,  handleFavicon);
     http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
     http.on("/",                  HTTP_GET,  handleRoot);

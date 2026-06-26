@@ -1,8 +1,8 @@
 """
-LumiGate pre-build script.
+LuxDMX pre-build script.
 Converts src/pages/*.html and src/assets/*.{png,css} into C PROGMEM headers
 under src/generated/ — runs at script-load time (before compilation).
-Also writes src/generated/version.h from the LUMIGATE_VERSION env var.
+Also writes src/generated/version.h from the LUXDMX_VERSION env var.
 """
 Import("env")
 import os
@@ -17,12 +17,14 @@ def escape_c(s: str) -> str:
 # (dynamic values are fetched client-side from /info.json).
 GZIP_PAGES = {"index", "config"}
 
-def html_to_header(path: pathlib.Path, out_dir: pathlib.Path):
+def html_to_header(path: pathlib.Path, out_dir: pathlib.Path, version: str):
     var = path.stem.upper().replace("-", "_").replace(".", "_") + "_HTML"
     out = out_dir / (path.stem + "_html.h")
+    # Cache-bust static asset URLs (?v=__FWVER__) with the build's firmware version so a
+    # new firmware always serves fresh css/logo/favicon while still caching them hard.
+    content = path.read_text(encoding="utf-8").replace("__FWVER__", version)
     if path.stem in GZIP_PAGES:
-        raw = path.read_bytes()
-        gz  = gzip.compress(raw, compresslevel=9)
+        gz  = gzip.compress(content.encode("utf-8"), compresslevel=9)
         rows = ["  " + ", ".join(f"0x{b:02x}" for b in gz[i:i+16]) + ","
                 for i in range(0, len(gz), 16)]
         h  = f"// Auto-generated from {path.name} (gzip) — do not edit\n"
@@ -30,9 +32,8 @@ def html_to_header(path: pathlib.Path, out_dir: pathlib.Path):
         h += "\n".join(rows) + "\n};\n"
         h += f"static const size_t  {var}_LEN = {len(gz)};\n"
         out.write_text(h, encoding="utf-8")
-        print(f"  [embed] {path.name} -> {out.name}  gzip {len(raw)} -> {len(gz)} bytes")
+        print(f"  [embed] {path.name} -> {out.name}  gzip {len(content.encode('utf-8'))} -> {len(gz)} bytes")
         return
-    content = path.read_text(encoding="utf-8")
     lines = content.split("\n")
     body = "\n".join(f'    "{escape_c(l)}\\n"' for l in lines)
     h = f"// Auto-generated from {path.name} — do not edit\n"
@@ -118,23 +119,24 @@ def patch_esp_dmx():
     else:
         print("  [patch] esp_dmx uart.c: already patched")
 
-def generate_version(gen_dir: pathlib.Path):
-    version = os.environ.get("LUMIGATE_VERSION", "dev")
+def generate_version(gen_dir: pathlib.Path) -> str:
+    version = os.environ.get("LUXDMX_VERSION", "dev")
     (gen_dir / "version.h").write_text(
         f'static const char FIRMWARE_VERSION[] = "{version}";\n',
         encoding="utf-8"
     )
     print(f"  [version] FIRMWARE_VERSION = {version}")
+    return version
 
 def generate():
     root    = pathlib.Path(env.subst("$PROJECT_DIR"))
     gen_dir = root / "src" / "generated"
     gen_dir.mkdir(exist_ok=True)
-    print("LumiGate: generating embedded assets...")
+    print("LuxDMX: generating embedded assets...")
     patch_esp_dmx()
-    generate_version(gen_dir)
+    version = generate_version(gen_dir)
     for f in sorted((root / "src" / "pages").glob("*.html")):
-        html_to_header(f, gen_dir)
+        html_to_header(f, gen_dir, version)
     for f in sorted((root / "src" / "assets").glob("*.png")):
         binary_to_header(f, gen_dir, "PNG")
     for f in sorted((root / "src" / "assets").glob("*.svg")):
@@ -150,7 +152,7 @@ def generate():
         binary_to_header(tmp, gen_dir, "CSS")
         tmp.unlink()
         print(f"  [gzip]  {f.name}: {len(raw)} -> {len(compressed)} bytes ({100*len(compressed)//len(raw)}%)")
-    print("LumiGate: done.")
+    print("LuxDMX: done.")
 
 # Run immediately so headers exist before main.cpp is compiled
 generate()

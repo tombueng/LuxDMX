@@ -1,8 +1,8 @@
 // Multi-universe / multi-output feature tests (issue #4).
 //
-// Runs against a live LumiGate (see playwright.config.mjs for target resolution).
+// Runs against a live LuxDMX (see playwright.config.mjs for target resolution).
 // The default tests are read-only (safe to run any time). The config round-trip
-// test mutates + reboots the device and is opt-in via LUMIGATE_WRITE=1.
+// test mutates + reboots the device and is opt-in via LUXDMX_WRITE=1.
 import { test, expect } from '@playwright/test';
 
 const OUT_KEYS = ['en', 'uni', 'port', 'tx', 'rx', 'rts'];
@@ -124,12 +124,12 @@ test.describe('Multi-output (issue #4)', () => {
   // Opt-in: mutates and reboots the device (twice). Enable Output B as a
   // same-universe splitter, confirm it persists, then restore the original.
   test('config round-trip: enable Output B as a splitter, then restore', async ({ request }) => {
-    test.skip(process.env.LUMIGATE_WRITE !== '1',
-      'set LUMIGATE_WRITE=1 to run device-mutating tests (reboots the device twice)');
+    test.skip(process.env.LUXDMX_WRITE !== '1',
+      'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device twice)');
     test.setTimeout(120_000);   // two reboots
     // Output B needs a real TX GPIO to be accepted (the sanitizer drops pin-less
     // outputs). Default is an ESP32-S3-safe free pin; override per board.
-    const txB = Number(process.env.LUMIGATE_TXB || 18);
+    const txB = Number(process.env.LUXDMX_TXB || 18);
     const before = await getInfo(request);
     try {
       await request.post('/config', {
@@ -150,8 +150,8 @@ test.describe('Multi-output (issue #4)', () => {
   // device (esp_dmx crashed in initDmx). It must now be sanitized to disabled
   // and the device must stay reachable.
   test('enabling an output with no TX pin is sanitized, not bricked', async ({ request }) => {
-    test.skip(process.env.LUMIGATE_WRITE !== '1',
-      'set LUMIGATE_WRITE=1 to run device-mutating tests (reboots the device)');
+    test.skip(process.env.LUXDMX_WRITE !== '1',
+      'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device)');
     test.setTimeout(120_000);   // two reboots
     const before = await getInfo(request);
     try {

@@ -3,7 +3,7 @@ Idempotent: removes any existing MH1..MH4 first. Run with KiCad 10 bundled pytho
 import pcbnew, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PCB = os.path.join(HERE, "lumigate.kicad_pcb")
+PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
 STOCK = r"C:\Program Files\KiCad\10.0\share\kicad\footprints"
 MM = pcbnew.ToMM; FM = pcbnew.FromMM
 INSET = 4.5   # mm from each edge to hole centre

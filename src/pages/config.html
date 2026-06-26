@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LumiGate — Settings</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="stylesheet" href="/bootstrap.min.css">
+<title>LuxDMX — Settings</title>
+<link rel="icon" type="image/png" href="/favicon.png?v=__FWVER__">
+<link rel="stylesheet" href="/bootstrap.min.css?v=__FWVER__">
 <style>
 :root { --gh-bg:#0d1117; --gh-surface:#161b22; --gh-border:#30363d; --gh-text:#c9d1d9; --gh-muted:#8b949e; --gh-accent:#58a6ff; }
 [data-bs-theme="dark"] {
@@ -59,8 +59,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <nav class="site-nav">
   <a class="brand" href="/">
-    <img src="/logo.png" alt="LumiGate">
-    <span class="brand-text">LumiGate</span>
+    <img src="/logo.png?v=__FWVER__" alt="LuxDMX">
+    <span class="brand-text">LuxDMX</span>
   </a>
   <div class="nav-links">
     <a href="/" class="btn btn-outline-secondary btn-sm">Status</a>
@@ -254,7 +254,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="0">Disabled</option>
             <option value="1">Plain GPIO (active high)</option>
             <option value="2">WS2812 RGB (NeoPixel)</option>
-            <option value="3">5-LED status panel (LumiGate v4)</option>
+            <option value="3">5-LED status panel (LuxDMX v4)</option>
           </select>
           <div class="form-text">
             Single LED: blue blink = booting / connecting &nbsp;&middot;&nbsp; red blink = no network &nbsp;&middot;&nbsp; amber blink = idle &nbsp;&middot;&nbsp; green = DMX active.<br>
@@ -555,7 +555,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <footer class="text-center py-3 mt-2 border-top">
   &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
-  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LumiGate">LumiGate</a>
+  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
   &nbsp;&mdash;&nbsp; MIT License
 </footer>
 
@@ -824,7 +824,7 @@ function installVersion(ver){
   });
 }
 function loadVersions(){
-  fetch('https://api.github.com/repos/tombueng/LumiGate/releases?per_page=50')
+  fetch('https://luxdmx.org/firmware/releases')
     .then(function(r){ return r.json(); })
     .then(function(list){
       var rows = (list||[])
@@ -866,8 +866,8 @@ function loadVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['lumigate_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
-var CATALOG_URL = 'https://tombueng.github.io/LumiGate/boards/';
+var BUILTINS = ['luxdmx_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families — used when no full board descriptor is selected (Custom).
 var FAMILIES = {
@@ -886,7 +886,7 @@ function finalizeDesc(d){
   (d.cols || []).forEach(function(col){ col.forEach(function(p){ d.byGpio[p.gpio] = p; }); });
   return d;
 }
-// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LumiGate v4 module).
+// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LuxDMX v4 module).
 var S3L = [4,5,6,7,15,16,17,18,8,19,20,3,46,9,10,11,12,13,14];
 var S3R = [21,47,48,45,0,35,36,37,38,39,40,41,42,44,43,2,1];
 function s3silk(g){ return g===43 ? 'TX0' : g===44 ? 'RX0' : 'IO'+g; }
@@ -934,8 +934,9 @@ function xiaocols(){
 }
 function buildBoards(){
   BOARDS = {};
-  BOARDS['lumigate_v4'] = finalizeDesc({ id:'lumigate_v4', name:'LumiGate v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
+  BOARDS['luxdmx_v4'] = finalizeDesc({ id:'luxdmx_v4', name:'LuxDMX v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
     cols:s3cols(true),
+    hardwired:[{gpio:1,label:'LED Red'},{gpio:2,label:'LED Green'},{gpio:6,label:'LED Yellow'},{gpio:7,label:'LED Blue'},{gpio:15,label:'LED White'},{gpio:17,label:'DMX TX'},{gpio:18,label:'DMX RX'},{gpio:8,label:'DMX DE/RE'},{gpio:12,label:'W5500 SCLK'},{gpio:11,label:'W5500 MOSI'},{gpio:13,label:'W5500 MISO'},{gpio:10,label:'W5500 CS'},{gpio:14,label:'W5500 INT'},{gpio:9,label:'W5500 RST'},{gpio:4,label:'Display SDA (J4)'},{gpio:5,label:'Display SCL (J4)'}],
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15, dispType:1, dispsda:4, dispscl:5,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8}] } });
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
@@ -1312,9 +1313,12 @@ function appendBoardOption(id, name){
   if (document.querySelector('#board-sel option[value="' + id + '"]')) return;
   var o = document.createElement('option'); o.value = id; o.textContent = name; $('board-sel').appendChild(o);
 }
+// Only offer boards that match the detected chip family — a classic-ESP32 pin map
+// can't run on an ESP32-S3 and vice-versa. Unknown mcu on either side => show it.
+function mcuMatch(m){ return !INFO_MCU || !m || m === INFO_MCU; }
 function fillBoardSelect(){
   var html = '<option value="custom">Custom / manual</option>';
-  BUILTINS.forEach(function(id){ if (BOARDS[id]) html += '<option value="' + id + '">' + esc(BOARDS[id].name) + '</option>'; });
+  BUILTINS.forEach(function(id){ if (BOARDS[id] && mcuMatch(BOARDS[id].mcu)) html += '<option value="' + id + '">' + esc(BOARDS[id].name) + '</option>'; });
   $('board-sel').innerHTML = html;
 }
 function ensureBoard(id, cb){
@@ -1331,13 +1335,14 @@ function ensureBoard(id, cb){
 function loadRemoteCatalog(){
   try {
     var cache = JSON.parse(localStorage.getItem('lg_boards') || '{}');
-    Object.keys(cache).forEach(function(k){ if (!BOARDS[k]){ BOARDS[k] = finalizeDesc(cache[k]); appendBoardOption(k, cache[k].name); } });
+    Object.keys(cache).forEach(function(k){ if (!BOARDS[k] && mcuMatch(cache[k].mcu)){ BOARDS[k] = finalizeDesc(cache[k]); appendBoardOption(k, cache[k].name); } });
   } catch(e){}
   fetch(CATALOG_URL + 'index.json', { cache:'no-store' })
     .then(function(r){ if (!r.ok) throw 0; return r.json(); })
     .then(function(idx){
       (idx.boards || []).forEach(function(e){
         if (BUILTINS.indexOf(e.id) >= 0) return;
+        if (!mcuMatch(e.mcu)) return;   // hide boards for a different chip family
         REMOTE_INDEX[e.id] = e;
         appendBoardOption(e.id, e.name);
       });

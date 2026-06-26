@@ -1,5 +1,5 @@
 import pcbnew
-PCB=r"C:\dev\DMX\hardware\lumigate.kicad_pcb"; FM=pcbnew.FromMM; TM=pcbnew.ToMM
+PCB=r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"; FM=pcbnew.FromMM; TM=pcbnew.ToMM
 b=pcbnew.LoadBoard(PCB)
 npth=0; widened=0
 for fp in b.GetFootprints():

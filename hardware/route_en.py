@@ -3,7 +3,7 @@ on this dense board. F.Cu is congested, so haul it on B.Cu: short F.Cu stub Q1.3
 B.Cu to via2, short F.Cu stub via2->T (a point on the existing EN copper). All added segments locked.
 KiCad 10 bundled python."""
 import pcbnew, math, heapq
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 NET = "EN"; NC = b.FindNet(NET).GetNetCode()

@@ -1,6 +1,6 @@
-# RDM Plan — Remote Device Management (E1.20) for LumiGate
+# RDM Plan — Remote Device Management (E1.20) for LuxDMX
 
-Add **RDM** to LumiGate: auto-discovery + bidirectional comms, on top of the existing
+Add **RDM** to LuxDMX: auto-discovery + bidirectional comms, on top of the existing
 Art-Net / sACN → DMX output.
 
 > **TL;DR** — RDM needs a transceiver whose **DE/RE (direction) pin is controlled by a GPIO**,
@@ -19,7 +19,7 @@ Art-Net / sACN → DMX output.
 RDM (ANSI **E1.20**) is a bidirectional layer over DMX512 — same two wires & connector, but the
 controller can now query and configure fixtures, interleaved between normal DMX frames.
 
-| Capability | What it gives LumiGate |
+| Capability | What it gives LuxDMX |
 |---|---|
 | **Discovery** | Auto-find every RDM fixture by 48-bit **UID** (16-bit ESTA mfr ID + 32-bit device ID). |
 | **Remote addressing** | Read/**set each fixture's DMX start address** over the wire — no DIP switches. |
@@ -41,12 +41,12 @@ Timing is strict (~2 ms response window) — **esp_dmx handles all of it.**
 
 | Transport | Carries RDM? | Notes |
 |---|---|---|
-| **Physical DMX (RS485)** | ✅ | Where RDM actually happens; LumiGate is the line's **RDM controller**. |
-| **Art-Net** | ✅ | RDM opcodes `ArtTodRequest`/`ArtTodData`/`ArtTodControl` (Table-of-Devices) + `ArtRdm` (tunnel GET/SET). LumiGate can be an **Art-Net→RDM gateway** for PC consoles. |
+| **Physical DMX (RS485)** | ✅ | Where RDM actually happens; LuxDMX is the line's **RDM controller**. |
+| **Art-Net** | ✅ | RDM opcodes `ArtTodRequest`/`ArtTodData`/`ArtTodControl` (Table-of-Devices) + `ArtRdm` (tunnel GET/SET). LuxDMX can be an **Art-Net→RDM gateway** for PC consoles. |
 | **sACN / E1.31** | ❌ | E1.31 is **one-way streaming only — no RDM.** RDM-over-IP is a separate standard, **RDMnet (E1.33)** (broker/LLRP, heavy) → **out of scope.** |
 
 Consequences for the design:
-- RDM lives on the **physical line**; LumiGate is its controller regardless of input protocol.
+- RDM lives on the **physical line**; LuxDMX is its controller regardless of input protocol.
 - RDM is **always** exposed through our **own web UI / REST / WebSocket** (discover, address, identify,
   sensors) — independent of Art-Net/sACN.
 - **Optionally** re-exposed over **Art-Net** (gateway role) so a desk/PC manages fixtures *through* us.
@@ -72,7 +72,7 @@ must be timed by firmware → the MCU must own the **DE/RE** (Driver-Enable / Re
 
 ## 2. Firmware feasibility — already supported
 
-`someweisguy/esp_dmx` (the lib LumiGate already uses, v4.x) supports **RDM controller + discovery**:
+`someweisguy/esp_dmx` (the lib LuxDMX already uses, v4.x) supports **RDM controller + discovery**:
 `rdm_discover_devices_simple()` and `rdm_discover_with_callback()`. It expects DE+/RE tied to one
 GPIO and a **120 Ω terminator** on the bus (required for RDM). 3.3 V transceivers wire directly;
 5 V ones need a level shifter.
@@ -290,7 +290,7 @@ optionally the cached metadata) in NVS, mirroring how channel labels work today.
       with the TOD UID list.
 - [ ] Handle `ArtRdm` (and `ArtRdmSub`): tunnel the GET/SET to the wire, return the response.
 - [ ] (Requires extending UDP handling — `rstephan/ArtnetWifi` has no RDM opcodes.) Lets QLC+/consoles
-      discover & manage fixtures **through** LumiGate.
+      discover & manage fixtures **through** LuxDMX.
 - [ ] **sACN note:** no equivalent — sACN mode = local-RDM-only via the web UI (no RDMnet/E1.33).
 
 ### Phase 5 — Polish

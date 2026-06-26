@@ -8,13 +8,14 @@ docs/playwright-report/
 
 # local editor/agent config (never publish)
 .claude/
+CLAUDE.md
 .vscode/
 .history/
-# stray SKiDL byproducts if lumigate.py is run from repo root
-/lumigate.erc
-/lumigate.log
-/lumigate*_sklib.py
-/lumigate*.kicad_prl
+# stray SKiDL byproducts if luxdmx.py is run from repo root
+/luxdmx.erc
+/luxdmx.log
+/luxdmx*_sklib.py
+/luxdmx*.kicad_prl
 
 # pioarduino custom_sdkconfig from-source core build artifacts (generated from the
 # custom_sdkconfig option in platformio.ini — that file is the source of truth)
@@ -28,6 +29,11 @@ docs/playwright-report/
 /src/idf_component.yml.orig
 
 # Local-only private working assets — kept OUT of the public repo.
-# (UI simulator / video pipeline + promo plan; backed up privately in tombueng/LumiGate-ops.)
+# (UI simulator / video pipeline + promo plan; backed up privately in tombueng/LuxDMX-ops.)
 /sim/
 PROMO_PLAN.local.md
+
+# Private deploy secrets for luxdmx.org Strato hosting (SSH key + credentials/URLs)
+/.secrets/
+*.bak
+__pycache__/

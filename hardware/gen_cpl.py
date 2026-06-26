@@ -25,8 +25,8 @@ matching the gerbers (also exported --use-drill-file-origin).
 import pcbnew, csv, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PCB = os.path.join(HERE, "lumigate.kicad_pcb")
-OUT = os.path.join(HERE, "lumigate_CPL.csv")
+PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
+OUT = os.path.join(HERE, "luxdmx_CPL.csv")
 
 # Per-footprint rotation correction (degrees added to CPL). Exact footprint-name
 # match. Add entries as verified on the JLCPCB preview. easyeda footprints

@@ -4,8 +4,8 @@ stock libs), assigns nets, drops them in a grid for the user to place."""
 import pcbnew, re, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PCB = os.path.join(HERE, "lumigate.kicad_pcb")
-NET = os.path.join(HERE, "lumigate.net")
+PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
+NET = os.path.join(HERE, "luxdmx.net")
 STOCK = r"C:\Program Files\KiCad\10.0\share\kicad\footprints"
 EZ = os.path.join(HERE, "easyeda")
 fm = pcbnew.FromMM; mm = pcbnew.ToMM

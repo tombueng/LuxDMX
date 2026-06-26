@@ -3,7 +3,7 @@
   2. add per-pin SH / D- / D+ pinout labels at J7 and J8 (vertical, to fit the 1mm pitch).
 KiCad 10. Idempotent for the J7/J8 pin labels."""
 import pcbnew
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 PINOUT = {"1": "SH", "2": "D-", "3": "D+"}

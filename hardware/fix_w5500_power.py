@@ -5,7 +5,7 @@ pin to the nearest reachable plane-stitched target (a +3V3/GND decoupling-cap pa
 several targets and straight/L/Z path shapes, picking the first that clears all other-net copper.
 KiCad 10 python."""
 import pcbnew, math
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 PINS = {"+3V3": (132.00, 146.00), "GND": (126.50, 149.00)}   # U2.4, U2.16
 

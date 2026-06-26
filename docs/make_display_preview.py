@@ -161,7 +161,7 @@ def draw_status(p):
 
     if H >= 96:                                # tall colour panel (128x128)
         p.set_text_size(2); p.set_text_color(accent)
-        p.set_cursor(0, 0);  p.print("LumiGate")
+        p.set_cursor(0, 0);  p.print("LuxDMX")
         p.set_text_size(1); p.set_text_color(GREY)
         p.set_cursor(0, 18); p.print("v"); p.print(VERSION)
         p.set_text_color(WHITE); p.set_cursor(0, 30); p.print(IP)
@@ -190,7 +190,7 @@ def draw_status(p):
     if rp > 20:
         rp = 20
     y = 0
-    p.set_text_color(accent); p.set_cursor(0, y); p.print("LumiGate")
+    p.set_text_color(accent); p.set_cursor(0, y); p.print("LuxDMX")
     p.set_text_color(GREY); p.set_cursor(W - len(VERSION) * 6, y); p.print(VERSION)
     # Dual-colour 128x64 OLEDs are yellow rows 0-15 + a ~2px gap + blue rows 16-63.
     # Keep the title alone in the yellow band and start the body at the seam, so no

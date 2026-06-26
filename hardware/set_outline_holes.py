@@ -5,7 +5,7 @@ Board = SX+2*INSET wide, SY+2*INSET tall, anchored to keep the right (XLR) + bot
 with the current outline. Holes at the 4 symmetric inset corners; clearance-checked against part bodies
 (the ESP32 U1 RF-keepout corner is allowed -- an NPTH hole there is the known waiver). KiCad 10 python."""
 import pcbnew
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 SX, SY, INSET = 90.0, 70.0, 4.5            # hole-to-hole spacing X/Y, uniform edge inset
 W, H = SX + 2*INSET, SY + 2*INSET          # 99 x 79

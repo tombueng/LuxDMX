@@ -3,7 +3,7 @@ manual tight packing (select any member -> whole group moves). Idempotent: clear
 first. Grouping is just metadata -- it does not affect the netlist/route. After you finish packing,
 re-run the pipeline (rebuild_iso -> escape -> autoroute -> cleanup_pads -> tighten_poe_void). KiCad 10."""
 import pcbnew
-PCB = r"C:\dev\DMX\hardware\lumigate.kicad_pcb"
+PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 b = pcbnew.LoadBoard(PCB)
 
 CLUSTERS = {

@@ -2,7 +2,7 @@
 (drill/place) ORIGIN.  Board-safe: kicad-cli is read-only, this does NOT rebuild the
 board (unlike build_v3.py).
 
-    py gen_gerbers.py            # -> lumigate_gerbers.zip
+    py gen_gerbers.py            # -> luxdmx_gerbers.zip
 
 WHY THIS EXISTS / THE TRAP:
 gerbers and the CPL (gen_cpl.py) MUST share the same coordinate origin, or JLCPCB
@@ -14,8 +14,8 @@ GUI plot in ABSOLUTE page coordinates is exactly the regression this script prev
 import os, glob, shutil, tempfile, zipfile, subprocess
 
 HERE   = os.path.dirname(os.path.abspath(__file__))
-PCB    = os.path.join(HERE, "lumigate.kicad_pcb")
-ZIP    = os.path.join(HERE, "lumigate_gerbers.zip")
+PCB    = os.path.join(HERE, "luxdmx.kicad_pcb")
+ZIP    = os.path.join(HERE, "luxdmx_gerbers.zip")
 LAYERS = "F.Cu,In1.Cu,In2.Cu,B.Cu,F.Mask,B.Mask,F.Paste,B.Paste,F.Silkscreen,B.Silkscreen,Edge.Cuts"
 
 CLI = os.environ.get("KICAD_CLI")
@@ -28,7 +28,7 @@ if not CLI or not os.path.exists(CLI):
     else:
         raise SystemExit("kicad-cli not found - set $KICAD_CLI")
 
-tmp = tempfile.mkdtemp(prefix="lumigate_gbr_")
+tmp = tempfile.mkdtemp(prefix="luxdmx_gbr_")
 try:
     subprocess.run([CLI, "pcb", "export", "gerbers", PCB, "-o", tmp + os.sep,
                     "--use-drill-file-origin", "--no-protel-ext", "--layers", LAYERS],

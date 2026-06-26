@@ -1,9 +1,9 @@
 // Source merging (issue #10): HTP / LTP / off and sACN priority.
 //
-// Runs against a live LumiGate. The shape + UI tests are read-only (safe any
+// Runs against a live LuxDMX. The shape + UI tests are read-only (safe any
 // time). The behavioural tests set a merge mode, reboot, drive two simultaneous
 // sources on output A's universe, assert the merged DMX, then restore the
-// original config — opt-in via LUMIGATE_WRITE=1.
+// original config — opt-in via LUXDMX_WRITE=1.
 import { test, expect } from '@playwright/test';
 import {
   deviceHost, UdpSender, streamFor, artDmxPacket, e131Packet, prepInput,
@@ -91,8 +91,8 @@ test.describe('Source merging (issue #10)', () => {
 
   // ── behaviour (opt-in: mutates + reboots the device) ──────────────────────
   test('HTP merges two sources per channel; sACN priority overrides', async ({ request }) => {
-    test.skip(process.env.LUMIGATE_WRITE !== '1',
-      'set LUMIGATE_WRITE=1 to run device-mutating tests (reboots the device twice)');
+    test.skip(process.env.LUXDMX_WRITE !== '1',
+      'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device twice)');
     test.setTimeout(120_000);   // two reboots
     const before = await info(request);
     const art = before.outputs[0].uni, sacn = art + 1;
@@ -148,8 +148,8 @@ test.describe('Source merging (issue #10)', () => {
   });
 
   test('HTP merge shows the merging indicator, not a conflict', async ({ page, request }) => {
-    test.skip(process.env.LUMIGATE_WRITE !== '1',
-      'set LUMIGATE_WRITE=1 to run device-mutating tests (reboots the device twice)');
+    test.skip(process.env.LUXDMX_WRITE !== '1',
+      'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device twice)');
     test.setTimeout(120_000);   // two reboots
     const before = await info(request);
     const art = before.outputs[0].uni, sacn = art + 1;
@@ -181,8 +181,8 @@ test.describe('Source merging (issue #10)', () => {
   });
 
   test('LTP merge mode persists across a reboot', async ({ request }) => {
-    test.skip(process.env.LUMIGATE_WRITE !== '1',
-      'set LUMIGATE_WRITE=1 to run device-mutating tests (reboots the device twice)');
+    test.skip(process.env.LUXDMX_WRITE !== '1',
+      'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device twice)');
     test.setTimeout(120_000);   // two reboots
     const before = await info(request);
     try {

@@ -1,13 +1,13 @@
-# LumiGate board catalog
+# LuxDMX board catalog
 
 Board descriptors for the visual pin picker in the device `/config` page (issue #12).
 
-This folder is published by GitHub Pages together with the rest of `web/`, so the
-config page fetches it from `https://tombueng.github.io/LumiGate/boards/`.
+This folder is deployed to luxdmx.org alongside the site, so the config page
+fetches it from `https://luxdmx.org/web/boards/`.
 
 ## How it is used
 
-The five **core boards** (`lumigate_v4`, `esp32s3-devkitc-1`, `esp32-devkitc`,
+The five **core boards** (`luxdmx_v4`, `esp32s3-devkitc-1`, `esp32-devkitc`,
 `esp32-devkit-v1`, `xiao-esp32s3`) are also baked into the firmware
 (`src/pages/config.html`) so the picker works fully offline on an isolated stage LAN.
 This catalog:
@@ -64,8 +64,8 @@ red = do-not-use (`flash`/`serial`/`reserved:*`), blue ring = currently assigned
 
 ## Regenerating
 
-Every descriptor is generated so it cannot drift from the hardware: LumiGate v4 from the
-PCB netlist (`hardware/lumigate.py`), the hand-tuned dev boards from published header
+Every descriptor is generated so it cannot drift from the hardware: LuxDMX v4 from the
+PCB netlist (`hardware/luxdmx.py`), the hand-tuned dev boards from published header
 pinouts, and the long tail auto-derived from the arduino-esp32 core
 `variants/<dir>/pins_arduino.h`:
 

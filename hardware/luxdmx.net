@@ -1,7 +1,7 @@
 (export 
   (version "D")
   (design
-    (source "lumigate.py")
+    (source "luxdmx.py")
     (date "06/23/2026 06:08 PM")
     (tool "SKiDL (2.2.3)")
     (sheet
@@ -13,7 +13,7 @@
         (company)
         (rev)
         (date)
-        (source "lumigate.py")
+        (source "luxdmx.py")
         (comment
           (number "1")
           (value ""))
@@ -57,7 +57,7 @@
         (field
           (name "SKiDL Tag") "9KayEULp8o")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -81,7 +81,7 @@
         (field
           (name "SKiDL Tag") "lbJyuDBtOz")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -105,7 +105,7 @@
         (field
           (name "SKiDL Tag") "f6GehuJcZa")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -129,7 +129,7 @@
         (field
           (name "SKiDL Tag") "SbEUBkLmDt")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -153,7 +153,7 @@
         (field
           (name "SKiDL Tag") "2C_2ANTsB3")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -177,7 +177,7 @@
         (field
           (name "SKiDL Tag") "DCTHp0so_V")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -201,7 +201,7 @@
         (field
           (name "SKiDL Tag") "tF1ETQQHTv")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -225,7 +225,7 @@
         (field
           (name "SKiDL Tag") "o79JLYRGnz")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -249,7 +249,7 @@
         (field
           (name "SKiDL Tag") "dN6doC9odW")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -273,7 +273,7 @@
         (field
           (name "SKiDL Tag") "62JpzZGLr3")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -297,7 +297,7 @@
         (field
           (name "SKiDL Tag") "BW7o68FtO6")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -321,7 +321,7 @@
         (field
           (name "SKiDL Tag") "ad6aDbV7Wm")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -345,7 +345,7 @@
         (field
           (name "SKiDL Tag") "0H1yOs9ygM")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -369,7 +369,7 @@
         (field
           (name "SKiDL Tag") "srSkfbOdIX")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -393,7 +393,7 @@
         (field
           (name "SKiDL Tag") "quoTeY3d_C")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -417,7 +417,7 @@
         (field
           (name "SKiDL Tag") "Ja1e4C9bXb")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -441,7 +441,7 @@
         (field
           (name "SKiDL Tag") "mhdg8tqOHC")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -465,7 +465,7 @@
         (field
           (name "SKiDL Tag") "fA9QsXxkuL")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -489,7 +489,7 @@
         (field
           (name "SKiDL Tag") "usohKlzsFE")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -513,7 +513,7 @@
         (field
           (name "SKiDL Tag") "YjofkBVnXm")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -537,7 +537,7 @@
         (field
           (name "SKiDL Tag") "GPROQkYNH5")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -561,7 +561,7 @@
         (field
           (name "SKiDL Tag") "_2oQ1fgAZX")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -585,7 +585,7 @@
         (field
           (name "SKiDL Tag") "QJntKFEl9p")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -609,7 +609,7 @@
         (field
           (name "SKiDL Tag") "cQwWLxln3x")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -633,7 +633,7 @@
         (field
           (name "SKiDL Tag") "wy3w03ddm8")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -657,7 +657,7 @@
         (field
           (name "SKiDL Tag") "NYBZosmK7T")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -681,7 +681,7 @@
         (field
           (name "SKiDL Tag") "B8QPrlwVLF")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -705,7 +705,7 @@
         (field
           (name "SKiDL Tag") "q_er_XRDOm")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -729,7 +729,7 @@
         (field
           (name "SKiDL Tag") "johlxvOZDE")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -753,7 +753,7 @@
         (field
           (name "SKiDL Tag") "AAVXAo0uq5")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "C"))
@@ -777,7 +777,7 @@
         (field
           (name "SKiDL Tag") "U81oWWiR77")
         (field
-          (name "SKiDL Line") "lumigate.py:342"))
+          (name "SKiDL Line") "luxdmx.py:342"))
       (libsource
         (lib "NO_LIB")
         (part "SM712"))
@@ -801,7 +801,7 @@
         (field
           (name "SKiDL Tag") "DYV4bKGKR9")
         (field
-          (name "SKiDL Line") "lumigate.py:262"))
+          (name "SKiDL Line") "luxdmx.py:262"))
       (libsource
         (lib "NO_LIB")
         (part "SMAJ60A"))
@@ -825,7 +825,7 @@
         (field
           (name "SKiDL Tag") "VkpqRq9dgz")
         (field
-          (name "SKiDL Line") "lumigate.py:284"))
+          (name "SKiDL Line") "luxdmx.py:284"))
       (libsource
         (lib "NO_LIB")
         (part "SMAJ5.0A"))
@@ -849,7 +849,7 @@
         (field
           (name "SKiDL Tag") "gzeTwRZCYQ")
         (field
-          (name "SKiDL Line") "lumigate.py:391"))
+          (name "SKiDL Line") "luxdmx.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -873,7 +873,7 @@
         (field
           (name "SKiDL Tag") "yyTectP0Zr")
         (field
-          (name "SKiDL Line") "lumigate.py:391"))
+          (name "SKiDL Line") "luxdmx.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -897,7 +897,7 @@
         (field
           (name "SKiDL Tag") "CRdf1zpuu8")
         (field
-          (name "SKiDL Line") "lumigate.py:391"))
+          (name "SKiDL Line") "luxdmx.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -921,7 +921,7 @@
         (field
           (name "SKiDL Tag") "QnLls1VkIT")
         (field
-          (name "SKiDL Line") "lumigate.py:391"))
+          (name "SKiDL Line") "luxdmx.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -945,7 +945,7 @@
         (field
           (name "SKiDL Tag") "Mt8cKLwlxu")
         (field
-          (name "SKiDL Line") "lumigate.py:391"))
+          (name "SKiDL Line") "luxdmx.py:391"))
       (libsource
         (lib "NO_LIB")
         (part "LED"))
@@ -969,7 +969,7 @@
         (field
           (name "SKiDL Tag") "vsttdL4PmM")
         (field
-          (name "SKiDL Line") "lumigate.py:378"))
+          (name "SKiDL Line") "luxdmx.py:378"))
       (libsource
         (lib "NO_LIB")
         (part "SM712"))
@@ -993,7 +993,7 @@
         (field
           (name "SKiDL Tag") "PysvLan9iL")
         (field
-          (name "SKiDL Line") "lumigate.py:240"))
+          (name "SKiDL Line") "luxdmx.py:240"))
       (libsource
         (lib "NO_LIB")
         (part "PPTC"))
@@ -1017,7 +1017,7 @@
         (field
           (name "SKiDL Tag") "FrSAyZ5i1a")
         (field
-          (name "SKiDL Line") "lumigate.py:287"))
+          (name "SKiDL Line") "luxdmx.py:287"))
       (libsource
         (lib "NO_LIB")
         (part "FerriteBead"))
@@ -1041,7 +1041,7 @@
         (field
           (name "SKiDL Tag") "MNtiXNdXx8")
         (field
-          (name "SKiDL Line") "lumigate.py:324"))
+          (name "SKiDL Line") "luxdmx.py:324"))
       (libsource
         (lib "NO_LIB")
         (part "FerriteBead"))
@@ -1065,7 +1065,7 @@
         (field
           (name "SKiDL Tag") "znPHcuGX8I")
         (field
-          (name "SKiDL Line") "lumigate.py:368"))
+          (name "SKiDL Line") "luxdmx.py:368"))
       (libsource
         (lib "NO_LIB")
         (part "FerriteBead"))
@@ -1089,7 +1089,7 @@
         (field
           (name "SKiDL Tag") "pQwkjom4gJ")
         (field
-          (name "SKiDL Line") "lumigate.py:351"))
+          (name "SKiDL Line") "luxdmx.py:351"))
       (libsource
         (lib "NO_LIB")
         (part "NC5FAH"))
@@ -1113,7 +1113,7 @@
         (field
           (name "SKiDL Tag") "rq1xxLnGFt")
         (field
-          (name "SKiDL Line") "lumigate.py:229"))
+          (name "SKiDL Line") "luxdmx.py:229"))
       (libsource
         (lib "NO_LIB")
         (part "USB_C"))
@@ -1137,7 +1137,7 @@
         (field
           (name "SKiDL Tag") "LrHA8F3BUa")
         (field
-          (name "SKiDL Line") "lumigate.py:184"))
+          (name "SKiDL Line") "luxdmx.py:184"))
       (libsource
         (lib "NO_LIB")
         (part "HY931147C"))
@@ -1161,7 +1161,7 @@
         (field
           (name "SKiDL Tag") "NMgAuod43M")
         (field
-          (name "SKiDL Line") "lumigate.py:410"))
+          (name "SKiDL Line") "luxdmx.py:410"))
       (libsource
         (lib "NO_LIB")
         (part "Conn_JSTSH9"))
@@ -1185,7 +1185,7 @@
         (field
           (name "SKiDL Tag") "xmWGSul9uv")
         (field
-          (name "SKiDL Line") "lumigate.py:379"))
+          (name "SKiDL Line") "luxdmx.py:379"))
       (libsource
         (lib "NO_LIB")
         (part "NC5FAH"))
@@ -1209,7 +1209,7 @@
         (field
           (name "SKiDL Tag") "IQ_8qM18gZ")
         (field
-          (name "SKiDL Line") "lumigate.py:429"))
+          (name "SKiDL Line") "luxdmx.py:429"))
       (libsource
         (lib "NO_LIB")
         (part "Conn_JSTSH9"))
@@ -1233,7 +1233,7 @@
         (field
           (name "SKiDL Tag") "qnbUm4I3Ch")
         (field
-          (name "SKiDL Line") "lumigate.py:445"))
+          (name "SKiDL Line") "luxdmx.py:445"))
       (libsource
         (lib "NO_LIB")
         (part "Conn_JSTSH3"))
@@ -1257,7 +1257,7 @@
         (field
           (name "SKiDL Tag") "WYKYk8kf07")
         (field
-          (name "SKiDL Line") "lumigate.py:447"))
+          (name "SKiDL Line") "luxdmx.py:447"))
       (libsource
         (lib "NO_LIB")
         (part "Conn_JSTSH3"))
@@ -1281,7 +1281,7 @@
         (field
           (name "SKiDL Tag") "SD17sleWps")
         (field
-          (name "SKiDL Line") "lumigate.py:297"))
+          (name "SKiDL Line") "luxdmx.py:297"))
       (libsource
         (lib "NO_LIB")
         (part "L"))
@@ -1305,7 +1305,7 @@
         (field
           (name "SKiDL Tag") "3G9hRhnsdC")
         (field
-          (name "SKiDL Line") "lumigate.py:338"))
+          (name "SKiDL Line") "luxdmx.py:338"))
       (libsource
         (lib "NO_LIB")
         (part "ACM2012-201-2P"))
@@ -1329,7 +1329,7 @@
         (field
           (name "SKiDL Tag") "GKU9GUb5F5")
         (field
-          (name "SKiDL Line") "lumigate.py:376"))
+          (name "SKiDL Line") "luxdmx.py:376"))
       (libsource
         (lib "NO_LIB")
         (part "ACM2012-201-2P"))
@@ -1353,7 +1353,7 @@
         (field
           (name "SKiDL Tag") "heNcRGavvG")
         (field
-          (name "SKiDL Line") "lumigate.py:461"))
+          (name "SKiDL Line") "luxdmx.py:461"))
       (libsource
         (lib "NO_LIB")
         (part "MountingHole"))
@@ -1377,7 +1377,7 @@
         (field
           (name "SKiDL Tag") "IrZUw1oZPR")
         (field
-          (name "SKiDL Line") "lumigate.py:461"))
+          (name "SKiDL Line") "luxdmx.py:461"))
       (libsource
         (lib "NO_LIB")
         (part "MountingHole"))
@@ -1401,7 +1401,7 @@
         (field
           (name "SKiDL Tag") "zK77v1XJyC")
         (field
-          (name "SKiDL Line") "lumigate.py:461"))
+          (name "SKiDL Line") "luxdmx.py:461"))
       (libsource
         (lib "NO_LIB")
         (part "MountingHole"))
@@ -1425,7 +1425,7 @@
         (field
           (name "SKiDL Tag") "Xx0gVy0Tt0")
         (field
-          (name "SKiDL Line") "lumigate.py:461"))
+          (name "SKiDL Line") "luxdmx.py:461"))
       (libsource
         (lib "NO_LIB")
         (part "MountingHole"))
@@ -1449,7 +1449,7 @@
         (field
           (name "SKiDL Tag") "rmArMiG1Vz")
         (field
-          (name "SKiDL Line") "lumigate.py:329"))
+          (name "SKiDL Line") "luxdmx.py:329"))
       (libsource
         (lib "NO_LIB")
         (part "B0505S-1W"))
@@ -1473,7 +1473,7 @@
         (field
           (name "SKiDL Tag") "vXnZMr4jvw")
         (field
-          (name "SKiDL Line") "lumigate.py:370"))
+          (name "SKiDL Line") "luxdmx.py:370"))
       (libsource
         (lib "NO_LIB")
         (part "B0505S-1W"))
@@ -1497,7 +1497,7 @@
         (field
           (name "SKiDL Tag") "YG_vqw7cM2")
         (field
-          (name "SKiDL Line") "lumigate.py:215"))
+          (name "SKiDL Line") "luxdmx.py:215"))
       (libsource
         (lib "NO_LIB")
         (part "MMBT3904"))
@@ -1521,7 +1521,7 @@
         (field
           (name "SKiDL Tag") "zqEW8QLONI")
         (field
-          (name "SKiDL Line") "lumigate.py:215"))
+          (name "SKiDL Line") "luxdmx.py:215"))
       (libsource
         (lib "NO_LIB")
         (part "MMBT3904"))
@@ -1545,7 +1545,7 @@
         (field
           (name "SKiDL Tag") "nXfKvw8mpv")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1569,7 +1569,7 @@
         (field
           (name "SKiDL Tag") "DpXFmY4gRZ")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1593,7 +1593,7 @@
         (field
           (name "SKiDL Tag") "XfBtU_AzWc")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1617,7 +1617,7 @@
         (field
           (name "SKiDL Tag") "WitMTsTYMX")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1641,7 +1641,7 @@
         (field
           (name "SKiDL Tag") "b4MWUeUoeh")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1665,7 +1665,7 @@
         (field
           (name "SKiDL Tag") "Gs0bY9Lc1A")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1689,7 +1689,7 @@
         (field
           (name "SKiDL Tag") "UHwUohKPtE")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1713,7 +1713,7 @@
         (field
           (name "SKiDL Tag") "eCpbTrNVSl")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1737,7 +1737,7 @@
         (field
           (name "SKiDL Tag") "DWl1wXgGAk")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1761,7 +1761,7 @@
         (field
           (name "SKiDL Tag") "3vuvgnLInE")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1785,7 +1785,7 @@
         (field
           (name "SKiDL Tag") "SQ3D6j2ijm")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1809,7 +1809,7 @@
         (field
           (name "SKiDL Tag") "E40YwLVz_Z")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1833,7 +1833,7 @@
         (field
           (name "SKiDL Tag") "ba3HDhm2Ur")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1857,7 +1857,7 @@
         (field
           (name "SKiDL Tag") "Byy09K62x9")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1881,7 +1881,7 @@
         (field
           (name "SKiDL Tag") "tmlaOF423v")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1905,7 +1905,7 @@
         (field
           (name "SKiDL Tag") "nHLmc3qPkz")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1929,7 +1929,7 @@
         (field
           (name "SKiDL Tag") "XR7tvPK4ZR")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1953,7 +1953,7 @@
         (field
           (name "SKiDL Tag") "rkzRE2NOux")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -1977,7 +1977,7 @@
         (field
           (name "SKiDL Tag") "ygp3ISAhda")
         (field
-          (name "SKiDL Line") "lumigate.py:37"))
+          (name "SKiDL Line") "luxdmx.py:37"))
       (libsource
         (lib "NO_LIB")
         (part "R"))
@@ -2001,7 +2001,7 @@
         (field
           (name "SKiDL Tag") "GSPCgaubor")
         (field
-          (name "SKiDL Line") "lumigate.py:118"))
+          (name "SKiDL Line") "luxdmx.py:118"))
       (libsource
         (lib "NO_LIB")
         (part "SW_PUSH"))
@@ -2025,7 +2025,7 @@
         (field
           (name "SKiDL Tag") "qsjfkiOToJ")
         (field
-          (name "SKiDL Line") "lumigate.py:119"))
+          (name "SKiDL Line") "luxdmx.py:119"))
       (libsource
         (lib "NO_LIB")
         (part "SW_PUSH"))
@@ -2049,7 +2049,7 @@
         (field
           (name "SKiDL Tag") "FYEIouT2Ho")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2073,7 +2073,7 @@
         (field
           (name "SKiDL Tag") "mgC875Jxb7")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2097,7 +2097,7 @@
         (field
           (name "SKiDL Tag") "hDrIp8R8iC")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2121,7 +2121,7 @@
         (field
           (name "SKiDL Tag") "QnNTcDECRC")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2145,7 +2145,7 @@
         (field
           (name "SKiDL Tag") "9O93_Hi_z9")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2169,7 +2169,7 @@
         (field
           (name "SKiDL Tag") "3lGMczRVm1")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2193,7 +2193,7 @@
         (field
           (name "SKiDL Tag") "w5cG4Gx3BX")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2217,7 +2217,7 @@
         (field
           (name "SKiDL Tag") "RtYKV_v69Z")
         (field
-          (name "SKiDL Line") "lumigate.py:469"))
+          (name "SKiDL Line") "luxdmx.py:469"))
       (libsource
         (lib "NO_LIB")
         (part "TestPoint"))
@@ -2241,7 +2241,7 @@
         (field
           (name "SKiDL Tag") "nXn14xgVzT")
         (field
-          (name "SKiDL Line") "lumigate.py:94"))
+          (name "SKiDL Line") "luxdmx.py:94"))
       (libsource
         (lib "NO_LIB")
         (part "ESP32-S3-WROOM-1-N8"))
@@ -2265,7 +2265,7 @@
         (field
           (name "SKiDL Tag") "nQdB2hmcjF")
         (field
-          (name "SKiDL Line") "lumigate.py:138"))
+          (name "SKiDL Line") "luxdmx.py:138"))
       (libsource
         (lib "NO_LIB")
         (part "W5500"))
@@ -2289,7 +2289,7 @@
         (field
           (name "SKiDL Tag") "Pabcy4sLch")
         (field
-          (name "SKiDL Line") "lumigate.py:206"))
+          (name "SKiDL Line") "luxdmx.py:206"))
       (libsource
         (lib "NO_LIB")
         (part "CH340C"))
@@ -2313,7 +2313,7 @@
         (field
           (name "SKiDL Tag") "hX9IAtKHZw")
         (field
-          (name "SKiDL Line") "lumigate.py:295"))
+          (name "SKiDL Line") "luxdmx.py:295"))
       (libsource
         (lib "NO_LIB")
         (part "SY8089"))
@@ -2337,7 +2337,7 @@
         (field
           (name "SKiDL Tag") "6VsJN5x7jG")
         (field
-          (name "SKiDL Line") "lumigate.py:313"))
+          (name "SKiDL Line") "luxdmx.py:313"))
       (libsource
         (lib "NO_LIB")
         (part "ISO3086DWR"))
@@ -2361,7 +2361,7 @@
         (field
           (name "SKiDL Tag") "KVhD1VsvdG")
         (field
-          (name "SKiDL Line") "lumigate.py:360"))
+          (name "SKiDL Line") "luxdmx.py:360"))
       (libsource
         (lib "NO_LIB")
         (part "ISO3086DWR"))
@@ -2385,7 +2385,7 @@
         (field
           (name "SKiDL Tag") "xxv5ec98hx")
         (field
-          (name "SKiDL Line") "lumigate.py:258"))
+          (name "SKiDL Line") "luxdmx.py:258"))
       (libsource
         (lib "NO_LIB")
         (part "DP9900M-5V"))
@@ -2409,7 +2409,7 @@
         (field
           (name "SKiDL Tag") "qrQ3BBTsBh")
         (field
-          (name "SKiDL Line") "lumigate.py:244"))
+          (name "SKiDL Line") "luxdmx.py:244"))
       (libsource
         (lib "NO_LIB")
         (part "USBLC6-2SC6"))
@@ -2433,7 +2433,7 @@
         (field
           (name "SKiDL Tag") "OOMCCe6bLS")
         (field
-          (name "SKiDL Line") "lumigate.py:275"))
+          (name "SKiDL Line") "luxdmx.py:275"))
       (libsource
         (lib "NO_LIB")
         (part "TPS2116"))
@@ -2457,7 +2457,7 @@
         (field
           (name "SKiDL Tag") "_JXvMroDdq")
         (field
-          (name "SKiDL Line") "lumigate.py:164"))
+          (name "SKiDL Line") "luxdmx.py:164"))
       (libsource
         (lib "NO_LIB")
         (part "Crystal"))

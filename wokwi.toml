@@ -11,6 +11,6 @@ elf = ".pio/build/wokwi/firmware.elf"
 # start code / 512 slots and verify the ~40 Hz failsafe refresh timing.
 [[net.forward]]
 # Forward the device web UI (port 80) to localhost:8180 so you can open the
-# LumiGate dashboard in a browser against the simulated board.
+# LuxDMX dashboard in a browser against the simulated board.
 from = "localhost:8180"
 to = "target:80"

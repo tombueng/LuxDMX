@@ -1,4 +1,4 @@
-// Network helpers for the LumiGate e2e suite: Art-Net + sACN (E1.31) packet
+// Network helpers for the LuxDMX e2e suite: Art-Net + sACN (E1.31) packet
 // builders, a UDP streamer, and a thin WebSocket client (Node's built-in global
 // WebSocket, available on Node 21+). All pure Node — no extra dependencies.
 import dgram from 'dgram';
@@ -11,8 +11,8 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Resolve the device to a bare IP (headless Chromium / dgram can't use *.local).
 export async function deviceHost() {
-  if (process.env.LUMIGATE_URL) return new URL(process.env.LUMIGATE_URL).hostname;
-  const host = process.env.LUMIGATE_HOST || 'dmx-gateway.local';
+  if (process.env.LUXDMX_URL) return new URL(process.env.LUXDMX_URL).hostname;
+  const host = process.env.LUXDMX_HOST || 'dmx-gateway.local';
   try {
     const { address } = await dns.lookup(host, { family: 4 });
     return address;
@@ -53,7 +53,7 @@ export function e131Packet(universe, data, seq = 0, opts = {}) {
   // Framing layer
   buf.writeUInt16BE(0x7000 | (638 - 38), 38);   // flags + framing PDU length
   buf.writeUInt32BE(0x00000002, 40);            // framing vector = VECTOR_E131_DATA_PACKET
-  buf.write('LumiGate e2e', 44, 'latin1');      // source name (64)
+  buf.write('LuxDMX e2e', 44, 'latin1');      // source name (64)
   buf[108] = priority & 0xff;                    // priority
   buf.writeUInt16BE(0, 109);                    // sync address
   buf[111] = seq & 0xff;                        // sequence number

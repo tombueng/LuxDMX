@@ -1,12 +1,12 @@
 <p align="center">
-  <a href="https://youtu.be/vYDyAZC2Ups"><img src="docs/mock.png" alt="LumiGate — open-source Art-Net / sACN to DMX512 gateway with a live diagnostic web UI" width="100%"></a>
+  <a href="https://youtu.be/vYDyAZC2Ups"><img src="docs/mock.png" alt="LuxDMX — open-source Art-Net / sACN to DMX512 gateway with a live diagnostic web UI" width="100%"></a>
 </p>
 
 <p align="center">
-  <img src="docs/logo.png" alt="LumiGate logo" width="120">
+  <img src="docs/logo.png" alt="LuxDMX logo" width="120">
 </p>
 
-<h1 align="center">LumiGate</h1>
+<h1 align="center">LuxDMX</h1>
 
 <p align="center">
   <b>Open-source Art-Net / sACN (E1.31) &rarr; DMX512 gateway for ESP32 / ESP32-S3 / Ethernet.</b>
@@ -20,14 +20,14 @@
 </p>
 
 <p align="center">
-  <a href="https://tombueng.github.io/LumiGate/"><img alt="Flash in browser" src="https://img.shields.io/badge/flash%20in-browser-2dd4bf"></a>
-  <a href="https://github.com/tombueng/LumiGate/actions/workflows/build.yml"><img alt="Build" src="https://github.com/tombueng/LumiGate/actions/workflows/build.yml/badge.svg"></a>
-  <a href="https://github.com/tombueng/LumiGate/releases"><img alt="Latest firmware" src="https://img.shields.io/github/v/tag/tombueng/LumiGate?filter=v*&sort=semver&label=firmware"></a>
+  <a href="https://tombueng.github.io/LuxDMX/"><img alt="Flash in browser" src="https://img.shields.io/badge/flash%20in-browser-2dd4bf"></a>
+  <a href="https://github.com/tombueng/LuxDMX/actions/workflows/build.yml"><img alt="Build" src="https://github.com/tombueng/LuxDMX/actions/workflows/build.yml/badge.svg"></a>
+  <a href="https://github.com/tombueng/LuxDMX/releases"><img alt="Latest firmware" src="https://img.shields.io/github/v/tag/tombueng/LuxDMX?filter=v*&sort=semver&label=firmware"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
 <p align="center">
-  <a href="https://tombueng.github.io/LumiGate/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
+  <a href="https://tombueng.github.io/LuxDMX/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
   <a href="https://youtu.be/vYDyAZC2Ups"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
   <a href="hardware/README.md"><b>🛠 Custom PCB</b></a> &nbsp;·&nbsp;
   <a href="#flashing-pre-built-firmware"><b>Install</b></a>
@@ -41,7 +41,7 @@
 
 A guided tour of every control — manual channel control, labels, sparkline history, identify, blackout, and all settings:
 
-[![LumiGate web UI walkthrough](docs/demo.gif)](https://youtu.be/vYDyAZC2Ups)
+[![LuxDMX web UI walkthrough](docs/demo.gif)](https://youtu.be/vYDyAZC2Ups)
 
 ▶ **[Watch the full walkthrough on YouTube](https://youtu.be/vYDyAZC2Ups)** &nbsp;·&nbsp; regenerate with [`docs/screenshot.mjs`](docs/screenshot.mjs)
 
@@ -71,7 +71,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Mesh-aware WiFi** | Scans all channels and joins the **strongest** AP (multi-AP/mesh friendly) |
 | **WiFi Config Portal** | First-boot AP + captive portal via WiFiManager |
 | **Selectable network mode** | Pick the interface (WiFi or wired Ethernet) and WiFi mode (client/STA or standalone AP) in the web UI, on boards that have both |
-| **Standalone AP mode** | LumiGate hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
+| **Standalone AP mode** | LuxDMX hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
 | **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, or reboot. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
 | **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click GitHub update |
@@ -90,14 +90,14 @@ A guided tour of every control — manual channel control, labels, sparkline his
 
 ## Hardware
 
-> ### 🛠 Custom PCB — LumiGate v4
+> ### 🛠 Custom PCB — LuxDMX v4
 >
 > Want the real thing instead of breadboard + modules? There's a complete **open-source 4-layer PCB**:
 > ESP32-S3 with **both WiFi and wired Ethernet** (W5500), **two galvanically-isolated DMX universes**
 > (two XLR-5 outputs), **802.3af PoE** or USB-C power + flashing, a 5-LED status panel, BOOT/RST buttons,
 > and an optional OLED/TFT display header. All palm-sized and fabricable at JLCPCB for a few dollars.
 >
-> [<img src="hardware/board3d-1.png" width="360" alt="LumiGate v4 custom PCB">](hardware/README.md)
+> [<img src="hardware/board3d-1.png" width="360" alt="LuxDMX v4 custom PCB">](hardware/README.md)
 >
 > **→ Full design, component rationale, BOM, gerbers & JLCPCB fab guide: [`hardware/`](hardware/README.md)**
 
@@ -182,7 +182,7 @@ GND→  DMX XLR pin 1  (Shield/Ground)  [optional but recommended]
 
 ### Wiring Diagram
 
-![LumiGate Wiring Diagram](docs/wiring.svg)
+![LuxDMX Wiring Diagram](docs/wiring.svg)
 
 **Connection table:**
 
@@ -258,7 +258,7 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 - **Do not connect DE/RE** — the Waveshare (C) handles direction automatically. Connecting them will break transmission.
 - **Keep TTL wires short** (< 20 cm). Long unshielded wires on the TTL side pick up noise; the RS485 side handles long distances natively.
-- **XLR gender:** Use a **female** XLR panel socket for the DMX output. DMX sources (transmitters) use female XLR; receivers use male XLR. LumiGate is a source.
+- **XLR gender:** Use a **female** XLR panel socket for the DMX output. DMX sources (transmitters) use female XLR; receivers use male XLR. LuxDMX is a source.
 
 ---
 
@@ -283,7 +283,7 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 > ### ⚡ Flash from your browser — no install, no command line
 >
-> Open **[the web flasher](https://tombueng.github.io/LumiGate/)** in desktop **Chrome or Edge**,
+> Open **[the web flasher](https://tombueng.github.io/LuxDMX/)** in desktop **Chrome or Edge**,
 > plug in your board over USB, pick your model, and click flash. That's it — no Python, no esptool,
 > no toolchain. It always installs the latest release.
 >
@@ -291,7 +291,7 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 No toolchain needed. GitHub CI builds the firmware on every push to master.
 
-**[Download latest release](https://github.com/tombueng/LumiGate/releases/tag/latest)** — includes `firmware.bin`, `bootloader.bin`, `partitions.bin`, `boot_app0.bin`.
+**[Download latest release](https://github.com/tombueng/LuxDMX/releases/tag/latest)** — includes `firmware.bin`, `bootloader.bin`, `partitions.bin`, `boot_app0.bin`.
 
 ### Boot mode (required for all methods)
 
@@ -309,14 +309,14 @@ You must manually enter download mode before flashing:
 Downloads and runs [`flash.ps1`](flash.ps1), which installs Python + esptool automatically:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass; irm https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 | iex
+Set-ExecutionPolicy -Scope Process Bypass; irm https://raw.githubusercontent.com/tombueng/LuxDMX/master/flash.ps1 | iex
 ```
 
 Or save and run it manually:
 
 ```powershell
 # Download
-Invoke-WebRequest https://raw.githubusercontent.com/tombueng/LumiGate/master/flash.ps1 -OutFile flash.ps1
+Invoke-WebRequest https://raw.githubusercontent.com/tombueng/LuxDMX/master/flash.ps1 -OutFile flash.ps1
 # Run
 Set-ExecutionPolicy -Scope Process Bypass
 .\flash.ps1
@@ -329,7 +329,7 @@ The script: installs Python 3 via `winget` if missing → installs `esptool` via
 ```bash
 pip install esptool
 
-REPO=tombueng/LumiGate
+REPO=tombueng/LuxDMX
 for f in firmware.bin bootloader.bin partitions.bin boot_app0.bin; do
   curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
     | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
@@ -351,7 +351,7 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
 ```bash
 pip install esptool
 
-REPO=tombueng/LumiGate
+REPO=tombueng/LuxDMX
 for f in firmware-esp32s3.bin bootloader-esp32s3.bin partitions-esp32s3.bin boot_app0.bin; do
   curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
     | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
@@ -373,7 +373,7 @@ esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 921600 \
 ```bash
 pip install esptool
 
-REPO=tombueng/LumiGate
+REPO=tombueng/LuxDMX
 for f in firmware-wt32eth01.bin bootloader-wt32eth01.bin partitions-wt32eth01.bin boot_app0.bin; do
   curl -sL "$(curl -s https://api.github.com/repos/$REPO/releases/tags/latest \
     | python3 -c "import sys,json; assets=json.load(sys.stdin)['assets']; \
@@ -400,7 +400,7 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
 ### Project Structure
 
 ```
-LumiGate/
+LuxDMX/
 ├── src/
 │   ├── main.cpp          ← firmware logic
 │   ├── pages/            ← edit web UI here (plain HTML)
@@ -473,9 +473,9 @@ On first boot (or after WiFi reset), a board in WiFi client mode opens a WiFi ac
 - **SSID:** `DMX-Gateway` (no password)
 - Connect with phone or PC → browser auto-opens portal (or go to `192.168.4.1`)
 - Select your network, enter password, set Art-Net Universe (default: `0`)
-- Click **Save** → LumiGate connects and reboots
+- Click **Save** → LuxDMX connects and reboots
 
-> **Mesh / multi-AP WiFi:** LumiGate scans all channels and joins the
+> **Mesh / multi-AP WiFi:** LuxDMX scans all channels and joins the
 > **strongest** AP for your SSID (and re-picks it on reconnect), so it won't
 > latch onto a distant node. The ESP32 is **2.4 GHz only** — make sure the AP
 > nearest the device broadcasts 2.4 GHz. Check `rssi` on the status page: a
@@ -486,12 +486,12 @@ On first boot (or after WiFi reset), a board in WiFi client mode opens a WiFi ac
 
 ### Network mode: WiFi, Ethernet, or standalone AP
 
-Choose how LumiGate connects in **`/config` → Network**. Changes apply after a reboot.
+Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a reboot.
 
 - **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 module** enabled under *Wired Ethernet (W5500)*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first turn on "Use a W5500 Ethernet module" (off by default) and set its pins, then enable "Use wired Ethernet".
 - **WiFi mode:**
   - **Client (STA)** — join your existing 2.4 GHz network (the default; set credentials via the config portal above).
-  - **Standalone AP** — LumiGate hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
+  - **Standalone AP** — LuxDMX hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
 - **Wired link-loss policy** (boards on wired Ethernet), for when *the wired Ethernet link is down*:
   - **Keep retrying the wired link** (default): never opens a hotspot, reconnects on its own when the cable is back. Best on a show.
   - **Standalone WiFi AP**: the device becomes its own network (needs an **AP password**; it refuses to open an *unsecured* AP).
@@ -501,7 +501,7 @@ Choose how LumiGate connects in **`/config` → Network**. Changes apply after a
 
 **Using AP mode with an iPad / console app** (Luminair, Photon, etc.): set WiFi mode to Standalone AP and reboot, join the `dmx-gateway` network, then point the app's Art-Net output at **`192.168.4.1`** (or broadcast `192.168.4.255`).
 
-> **AP-mode caveats:** the joined device has **no internet** while on LumiGate's AP; it is **2.4 GHz only** with a small client limit; and **Art-Net** (unicast/broadcast) is more reliable than **sACN** multicast over a SoftAP, so prefer Art-Net in this mode.
+> **AP-mode caveats:** the joined device has **no internet** while on LuxDMX's AP; it is **2.4 GHz only** with a small client limit; and **Art-Net** (unicast/broadcast) is more reliable than **sACN** multicast over a SoftAP, so prefer Art-Net in this mode.
 
 ### 2. Status Page
 
@@ -520,7 +520,7 @@ Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 bau
 
 ### 3. Changing WiFi / Config Reset
 
-To move LumiGate to a different WiFi network, clear its stored credentials — it will reopen the setup portal on next boot.
+To move LuxDMX to a different WiFi network, clear its stored credentials — it will reopen the setup portal on next boot.
 
 | Method | Steps |
 |---|---|
@@ -600,11 +600,11 @@ Channel labels are managed over REST (`GET /labels.json`, `POST /labels`).
 
 ## Visual pin configuration (board picker)
 
-LumiGate has a lot of GPIOs to set (status LED, 5-LED panel, OLED, two DMX outputs).
+LuxDMX has a lot of GPIOs to set (status LED, 5-LED panel, OLED, two DMX outputs).
 To make this idiot-proof, **Settings → Hardware board** offers:
 
 - **Templates** — pick your board and click **Apply template** to fill every LED /
-  display / DMX pin with the tested map in one step. Selecting the *LumiGate v4*
+  display / DMX pin with the tested map in one step. Selecting the *LuxDMX v4*
   board applies the exact pin map of the open-hardware PCB.
 - **Click pins on a board diagram** — the pick button next to each GPIO field opens an
   interactive board so you click the actual pin instead of guessing GPIO numbers. The
@@ -618,7 +618,7 @@ variants (which are **not** all the same pinout):
 
 | Board | Notes |
 |---|---|
-| LumiGate v4 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
+| LuxDMX v4 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
 | ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
 | ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
@@ -633,7 +633,7 @@ no network means you still get the built-ins plus manual entry. You can switch b
 a dropdown inside the pin-picker popup itself.
 
 All descriptors are generated from authoritative pinout data
-(`hardware/gen_board_descriptor.py`): `hardware/lumigate.py` for v3, published header
+(`hardware/gen_board_descriptor.py`): `hardware/luxdmx.py` for v3, published header
 pinouts for the hand-tuned dev boards, and the Arduino core `variants/<dir>/pins_arduino.h`
 for the rest, so the GPIO numbers and reserved/strapping/flash flags are accurate per
 variant (e.g. the PICO-based Feather V2 frees GPIO6-11 and reserves 16/17 instead). The
@@ -649,11 +649,11 @@ how to add a board.
 
 1. Open **Eingänge/Ausgänge** tab
 2. Click in the output area right of **Universe 1** → select **ArtNet** → interface = your PC's IP
-3. Configure: Output IP = LumiGate's IP, Art-Net Universe = `0`
+3. Configure: Output IP = LuxDMX's IP, Art-Net Universe = `0`
 4. Set transmission mode to **Full** (sends all 512 channels continuously at ~40 fps)
 5. Test with **Einfaches Mischpult** → move fader → grid lights up cyan
 
-> **Universe mapping:** QLC+ "Universe 1" = Art-Net Universe `0`. LumiGate defaults to Universe `0`.  
+> **Universe mapping:** QLC+ "Universe 1" = Art-Net Universe `0`. LuxDMX defaults to Universe `0`.  
 > **Tip:** if "Standard" mode shows ~0.4 fps and values don't update, restart QLC+ or switch to "Full" mode.
 
 ### Ready-made demo shows
@@ -671,7 +671,7 @@ The big show is generated by [`docs/make_show.py`](docs/make_show.py) — edit t
 
 ## Status LED
 
-LumiGate supports three LED types, configurable in the web UI:
+LuxDMX supports three LED types, configurable in the web UI:
 
 | State | WS2812 RGB | Plain GPIO |
 |---|---|---|
@@ -686,7 +686,7 @@ The "DMX active" green is held through brief input gaps (continuous 40 Hz
 output), so momentary multicast loss doesn't flicker the LED. The LED runs on
 its own task, so serving the web UI never freezes it.
 
-**5-LED status panel** (`ledType 3`, the LumiGate v4 board) — five discrete LEDs that show
+**5-LED status panel** (`ledType 3`, the LuxDMX v4 board) — five discrete LEDs that show
 independent states *simultaneously*, instead of one LED time-sharing colours:
 
 | LED | Meaning |
@@ -704,13 +704,13 @@ The v4 board uses **R=1 G=2 Y=6 B=7 W=15**.
 
 ## Display (OLED / colour OLED)
 
-LumiGate can drive an **optional status display** that shows the gateway's live state
+LuxDMX can drive an **optional status display** that shows the gateway's live state
 without a browser — IP, output universe(s), protocol, frame rate, source count and link / DMX
 activity — and **auto-switches to a full-screen alert** when something needs attention
 (two consoles fighting over the universe, identify, or manual override). It's **off by
 default**; enable and pin it under **Settings → Display**.
 
-![LumiGate display types](docs/display-preview.png)
+![LuxDMX display types](docs/display-preview.png)
 
 *Rendered from the firmware's own layout code with the real display font &nbsp;·&nbsp; regenerate
 with [`docs/make_display_preview.py`](docs/make_display_preview.py). **Top:** 0.96″ /
@@ -750,7 +750,7 @@ See [docs/display.md](docs/display.md) for the full design — per-board pin tab
 
 ## DMX Outputs
 
-LumiGate drives up to **2 independent DMX outputs** — each its own universe, UART port and
+LuxDMX drives up to **2 independent DMX outputs** — each its own universe, UART port and
 RS485 transceiver — configurable at runtime under **Settings → DMX Outputs** (no recompile).
 The 2-output ceiling is a hardware limit: the ESP32 / ESP32-S3 expose 3 UARTs and UART0 is the
 serial console, leaving UART1 + UART2. **Output B ships disabled**, so single-universe setups are
@@ -767,7 +767,7 @@ Per output:
 | RX pin | `16` (GPIO16) | ESP32 GPIO connected to the RS485 module's RO (data-out); needed for RDM |
 | RTS / DE pin | `−1` (disabled) | RS485 direction-control pin. −1 for auto-direction modules (Waveshare C). Required for RDM. |
 
-Setting **both outputs to the same universe** turns LumiGate into a 1-in / 2-out DMX splitter.
+Setting **both outputs to the same universe** turns LuxDMX into a 1-in / 2-out DMX splitter.
 **RDM** runs on the first enabled output with an RTS pin set (one output at a time). For
 multi-universe input, **Art-Net is recommended** (single UDP socket, no IGMP); sACN works too
 (one multicast group joined per universe).
@@ -784,7 +784,7 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
-| LumiGate v4 (ESP32-S3 + W5500) | `lumigate_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| LuxDMX v4 (ESP32-S3 + W5500) | `luxdmx_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external W5500 module** — the W5500
 driver is compiled into every build. In **`/config` &rarr; Wired Ethernet** turn on
@@ -856,7 +856,7 @@ packets over the network and assert the REST API, WebSocket and web UI react cor
 
 ```bash
 cd docs && npm install && npx playwright install chromium
-LUMIGATE_HOST=dmx-gateway.local npm test
+LUXDMX_HOST=dmx-gateway.local npm test
 ```
 
 ---

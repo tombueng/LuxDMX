@@ -4,20 +4,20 @@ import { execSync } from 'child_process';
 import dns from 'dns/promises';
 
 // ── Config ───────────────────────────────────────────────────────────────────
-// Resolve the device: LUMIGATE_URL > mDNS lookup of LUMIGATE_HOST > fallback IP.
+// Resolve the device: LUXDMX_URL > mDNS lookup of LUXDMX_HOST > fallback IP.
 // (Headless Chromium can't resolve *.local itself, so we resolve to an IP here.)
 const FALLBACK_IP = '192.168.178.197';
 const OUT         = 'C:/dev/DMX/docs';
 const VID_RAW     = OUT + '/video-raw';
-const RUN_OTA     = process.env.LUMIGATE_OTA === '1';   // off by default (reflashes device)
-const RUN_VIDEO   = process.env.LUMIGATE_NOVIDEO !== '1';
-const RUN_SHOTS   = process.env.LUMIGATE_NOSHOT !== '1';
+const RUN_OTA     = process.env.LUXDMX_OTA === '1';   // off by default (reflashes device)
+const RUN_VIDEO   = process.env.LUXDMX_NOVIDEO !== '1';
+const RUN_SHOTS   = process.env.LUXDMX_NOSHOT !== '1';
 const VID_W       = 1920;                                // Full-HD walkthrough recording
 const VID_H       = 1080;
 
 async function resolveBase() {
-  if (process.env.LUMIGATE_URL) return process.env.LUMIGATE_URL;
-  const host = process.env.LUMIGATE_HOST || 'dmx-gateway.local';
+  if (process.env.LUXDMX_URL) return process.env.LUXDMX_URL;
+  const host = process.env.LUXDMX_HOST || 'dmx-gateway.local';
   try {
     const { address } = await dns.lookup(host, { family: 4 });
     return 'http://' + address;
@@ -62,7 +62,7 @@ const CURSOR_JS = `(() => {
 })();`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Still screenshots (status + settings; OTA pair only when LUMIGATE_OTA=1)
+// 1. Still screenshots (status + settings; OTA pair only when LUXDMX_OTA=1)
 // ─────────────────────────────────────────────────────────────────────────────
 async function shoot(browser) {
   const page = await browser.newPage();
