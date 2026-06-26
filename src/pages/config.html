@@ -832,7 +832,8 @@ function loadVersions(){
         .sort(function(a,b){ return vNum(b.tag_name) - vNum(a.tag_name); });
       var tb = $('ver-rows');
       if (!rows.length){ tb.innerHTML = '<tr><td colspan="4" class="text-secondary text-center small py-2">No releases found</td></tr>'; return; }
-      tb.innerHTML = rows.map(function(rel, i){
+      var LIMIT = 5;   // show the newest 5; the rest go behind a "Show more" button
+      var html = rows.map(function(rel, i){
         var ver = rel.tag_name.replace(/^v/, '');
         var date = (rel.published_at||'').slice(0,10);
         var changes = extractChanges(rel.body);
@@ -846,18 +847,31 @@ function loadVersions(){
         var btn = isCurrent
           ? '<button class="btn btn-outline-secondary btn-sm" disabled>Installed</button>'
           : '<button class="btn btn-outline-primary btn-sm" onclick="installVersion(\'' + ver + '\')">Install</button>';
-        return '<tr>' +
+        var extra = i >= LIMIT ? ' class="ver-extra" style="display:none"' : '';
+        return '<tr' + extra + '>' +
           '<td class="text-nowrap">v' + ver + badge + '</td>' +
           '<td class="text-nowrap text-secondary">' + date + '</td>' +
           '<td class="small">' + chHtml + '</td>' +
           '<td class="text-end">' + btn + '</td>' +
           '</tr>';
       }).join('');
+      if (rows.length > LIMIT){
+        html += '<tr id="ver-more-row"><td colspan="4" class="text-center py-2">' +
+          '<button class="btn btn-outline-secondary btn-sm" onclick="showAllVersions()">' +
+          'Show ' + (rows.length - LIMIT) + ' older version' + (rows.length - LIMIT === 1 ? '' : 's') +
+          '</button></td></tr>';
+      }
+      tb.innerHTML = html;
     })
     .catch(function(){
       $('ver-rows').innerHTML =
         '<tr><td colspan="4" class="text-secondary text-center small py-2">Could not reach GitHub</td></tr>';
     });
+}
+function showAllVersions(){
+  var tb = $('ver-rows'); if (!tb) return;
+  tb.querySelectorAll('.ver-extra').forEach(function(r){ r.style.display = ''; });
+  var more = $('ver-more-row'); if (more) more.remove();
 }
 </script>
 
