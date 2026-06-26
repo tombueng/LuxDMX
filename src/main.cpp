@@ -25,8 +25,8 @@
 // per-board default VALUES live in templates/*.ini (embedded via extra_scripts.py),
 // not in -D macros. The structural enums (MERGE_*, NET_*, WIRED_FB_*, RMII_*) stay
 // defined below in main.cpp; config_enums.h mirrors them for the engine TU.
-#include "config/config_core.h"
-#include "config/config_serial.h"   // serial configuration console (Phase 2/3)
+#include <config_core.h>     // EmbeddedConfig library (lib/EmbeddedConfig)
+#include <config_serial.h>   // serial configuration console (Phase 2/3)
 // Wired-Ethernet capability (compile-time). WiFi is ALWAYS compiled in too; the
 // active interface — and, on the classic ESP32, which wired PHY — is chosen at
 // runtime (issue #14).

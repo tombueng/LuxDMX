@@ -55,7 +55,7 @@ def main():
         registry.append(f'    {{"{name}", {sym}}},')
 
     h = "// Auto-generated from templates/*.ini by tools/gen_config_templates.py — do not edit.\n"
-    h += '#include "../config/config_core.h"\n\n'
+    h += '#include <config_core.h>\n\n'
     h += "\n".join(blocks) + "\n"
     h += "const CfgTemplate CONFIG_TEMPLATES[] = {\n" + "\n".join(registry) + "\n};\n"
     h += "const size_t CONFIG_TEMPLATE_COUNT = sizeof(CONFIG_TEMPLATES) / sizeof(CONFIG_TEMPLATES[0]);\n"
