@@ -936,6 +936,7 @@ function buildBoards(){
   BOARDS = {};
   BOARDS['luxdmx_v4'] = finalizeDesc({ id:'luxdmx_v4', name:'LuxDMX v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
     cols:s3cols(true),
+    hardwired:[{gpio:1,label:'LED Red'},{gpio:2,label:'LED Green'},{gpio:6,label:'LED Yellow'},{gpio:7,label:'LED Blue'},{gpio:15,label:'LED White'},{gpio:17,label:'DMX TX'},{gpio:18,label:'DMX RX'},{gpio:8,label:'DMX DE/RE'},{gpio:12,label:'W5500 SCLK'},{gpio:11,label:'W5500 MOSI'},{gpio:13,label:'W5500 MISO'},{gpio:10,label:'W5500 CS'},{gpio:14,label:'W5500 INT'},{gpio:9,label:'W5500 RST'},{gpio:4,label:'Display SDA (J4)'},{gpio:5,label:'Display SCL (J4)'}],
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15, dispType:1, dispsda:4, dispscl:5,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8}] } });
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
