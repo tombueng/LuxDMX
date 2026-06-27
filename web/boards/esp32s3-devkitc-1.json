@@ -226,5 +226,310 @@
       "gpio": 48,
       "label": "onboard RGB LED"
     }
-  ]
+  ],
+  "phys": {
+    "usb": "bottom",
+    "pins": [
+      {
+        "pos": 1,
+        "side": "L",
+        "silk": "3V3",
+        "type": "power"
+      },
+      {
+        "pos": 2,
+        "side": "L",
+        "silk": "3V3",
+        "type": "power"
+      },
+      {
+        "pos": 3,
+        "side": "L",
+        "silk": "RST",
+        "type": "en"
+      },
+      {
+        "pos": 4,
+        "side": "L",
+        "silk": "IO4",
+        "type": "gpio",
+        "gpio": 4
+      },
+      {
+        "pos": 5,
+        "side": "L",
+        "silk": "IO5",
+        "type": "gpio",
+        "gpio": 5
+      },
+      {
+        "pos": 6,
+        "side": "L",
+        "silk": "IO6",
+        "type": "gpio",
+        "gpio": 6
+      },
+      {
+        "pos": 7,
+        "side": "L",
+        "silk": "IO7",
+        "type": "gpio",
+        "gpio": 7
+      },
+      {
+        "pos": 8,
+        "side": "L",
+        "silk": "IO15",
+        "type": "gpio",
+        "gpio": 15
+      },
+      {
+        "pos": 9,
+        "side": "L",
+        "silk": "IO16",
+        "type": "gpio",
+        "gpio": 16
+      },
+      {
+        "pos": 10,
+        "side": "L",
+        "silk": "IO17",
+        "type": "gpio",
+        "gpio": 17
+      },
+      {
+        "pos": 11,
+        "side": "L",
+        "silk": "IO18",
+        "type": "gpio",
+        "gpio": 18
+      },
+      {
+        "pos": 12,
+        "side": "L",
+        "silk": "IO8",
+        "type": "gpio",
+        "gpio": 8
+      },
+      {
+        "pos": 13,
+        "side": "L",
+        "silk": "IO3",
+        "type": "gpio",
+        "gpio": 3
+      },
+      {
+        "pos": 14,
+        "side": "L",
+        "silk": "IO46",
+        "type": "gpio",
+        "gpio": 46
+      },
+      {
+        "pos": 15,
+        "side": "L",
+        "silk": "IO9",
+        "type": "gpio",
+        "gpio": 9
+      },
+      {
+        "pos": 16,
+        "side": "L",
+        "silk": "IO10",
+        "type": "gpio",
+        "gpio": 10
+      },
+      {
+        "pos": 17,
+        "side": "L",
+        "silk": "IO11",
+        "type": "gpio",
+        "gpio": 11
+      },
+      {
+        "pos": 18,
+        "side": "L",
+        "silk": "IO12",
+        "type": "gpio",
+        "gpio": 12
+      },
+      {
+        "pos": 19,
+        "side": "L",
+        "silk": "IO13",
+        "type": "gpio",
+        "gpio": 13
+      },
+      {
+        "pos": 20,
+        "side": "L",
+        "silk": "IO14",
+        "type": "gpio",
+        "gpio": 14
+      },
+      {
+        "pos": 21,
+        "side": "L",
+        "silk": "5V",
+        "type": "power"
+      },
+      {
+        "pos": 22,
+        "side": "L",
+        "silk": "GND",
+        "type": "gnd"
+      },
+      {
+        "pos": 1,
+        "side": "R",
+        "silk": "GND",
+        "type": "gnd"
+      },
+      {
+        "pos": 2,
+        "side": "R",
+        "silk": "TX0",
+        "type": "gpio",
+        "gpio": 43
+      },
+      {
+        "pos": 3,
+        "side": "R",
+        "silk": "RX0",
+        "type": "gpio",
+        "gpio": 44
+      },
+      {
+        "pos": 4,
+        "side": "R",
+        "silk": "IO1",
+        "type": "gpio",
+        "gpio": 1
+      },
+      {
+        "pos": 5,
+        "side": "R",
+        "silk": "IO2",
+        "type": "gpio",
+        "gpio": 2
+      },
+      {
+        "pos": 6,
+        "side": "R",
+        "silk": "IO42",
+        "type": "gpio",
+        "gpio": 42
+      },
+      {
+        "pos": 7,
+        "side": "R",
+        "silk": "IO41",
+        "type": "gpio",
+        "gpio": 41
+      },
+      {
+        "pos": 8,
+        "side": "R",
+        "silk": "IO40",
+        "type": "gpio",
+        "gpio": 40
+      },
+      {
+        "pos": 9,
+        "side": "R",
+        "silk": "IO39",
+        "type": "gpio",
+        "gpio": 39
+      },
+      {
+        "pos": 10,
+        "side": "R",
+        "silk": "IO38",
+        "type": "gpio",
+        "gpio": 38
+      },
+      {
+        "pos": 11,
+        "side": "R",
+        "silk": "IO37",
+        "type": "gpio",
+        "gpio": 37
+      },
+      {
+        "pos": 12,
+        "side": "R",
+        "silk": "IO36",
+        "type": "gpio",
+        "gpio": 36
+      },
+      {
+        "pos": 13,
+        "side": "R",
+        "silk": "IO35",
+        "type": "gpio",
+        "gpio": 35
+      },
+      {
+        "pos": 14,
+        "side": "R",
+        "silk": "IO0",
+        "type": "gpio",
+        "gpio": 0
+      },
+      {
+        "pos": 15,
+        "side": "R",
+        "silk": "IO45",
+        "type": "gpio",
+        "gpio": 45
+      },
+      {
+        "pos": 16,
+        "side": "R",
+        "silk": "IO48",
+        "type": "gpio",
+        "gpio": 48
+      },
+      {
+        "pos": 17,
+        "side": "R",
+        "silk": "IO47",
+        "type": "gpio",
+        "gpio": 47
+      },
+      {
+        "pos": 18,
+        "side": "R",
+        "silk": "IO21",
+        "type": "gpio",
+        "gpio": 21
+      },
+      {
+        "pos": 19,
+        "side": "R",
+        "silk": "IO20",
+        "type": "gpio",
+        "gpio": 20
+      },
+      {
+        "pos": 20,
+        "side": "R",
+        "silk": "IO19",
+        "type": "gpio",
+        "gpio": 19
+      },
+      {
+        "pos": 21,
+        "side": "R",
+        "silk": "GND",
+        "type": "gnd"
+      },
+      {
+        "pos": 22,
+        "side": "R",
+        "silk": "GND",
+        "type": "gnd"
+      }
+    ]
+  }
 }
