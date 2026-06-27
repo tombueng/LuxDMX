@@ -2562,14 +2562,30 @@ static void waitEthLink() {
 // Bring up the W5500 wired Ethernet (runtime opt-in via cfg.useEthernet/g_useEth).
 // Registered as an lwIP netif, so the web/Art-Net/sACN/OTA stack runs over it
 // unchanged. WiFi stays the default; this only runs when the user enabled Ethernet.
-static void startEthSpi() {
-    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz\n",
-        cfg.ethCs, cfg.ethInt, cfg.ethRst, cfg.ethSck, cfg.ethMiso, cfg.ethMosi, cfg.ethFreqMhz);
+// The W5500 is software-driven (the S3 has no Ethernet MAC): its SPI interrupt + driver
+// task otherwise land on whatever core calls ETH.begin (setup() runs on core 1), where
+// they contend with the DMX/RDM TX-DONE ISR that performs the RDM turnaround. Run the
+// bring-up from a task pinned to core 0 so the W5500's SPI ISR sits on core 0, away from
+// DMX/RDM on core 1. (Investigation report 6.6: a blunt UART-interrupt priority bump
+// instead just starves the whole W5500 stack; core separation is the right lever.)
+static volatile bool s_ethUpDone;
+static void ethUpTask(void *arg) {
     ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
               ETH_W5500_SPI_HOST, cfg.ethSck, cfg.ethMiso, cfg.ethMosi,
               cfg.ethFreqMhz);
     applyEthStaticIp();
     waitEthLink();
+    s_ethUpDone = true;
+    vTaskDelete(NULL);
+}
+static void startEthSpi() {
+    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz (bring-up on core 0)\n",
+        cfg.ethCs, cfg.ethInt, cfg.ethRst, cfg.ethSck, cfg.ethMiso, cfg.ethMosi, cfg.ethFreqMhz);
+    s_ethUpDone = false;
+    xTaskCreatePinnedToCore(ethUpTask, "ethup", 8192, NULL, 5, NULL, 0);
+    uint32_t t0 = millis();
+    while (!s_ethUpDone && millis() - t0 < 30000) delay(20);
+    if (!s_ethUpDone) Serial.println("[ETH] core-0 bring-up still running after 30s");
 }
 #endif
 
