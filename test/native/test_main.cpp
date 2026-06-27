@@ -179,6 +179,8 @@ int main() {
     CHECK(hasS(execute("schema"), "\"options\":["),     "serial: schema enum options");
     CHECK(hasS(execute("schema"), "\"key\":\"o0_tx\""), "serial: schema expands per-output keys");
     CHECK(hasS(execute("schema"), "\"min\":-1"),        "serial: schema int range");
+    CHECK(hasS(execute("schema"), "\"value\":"),        "serial: schema includes current values");
+    CHECK(hasS(execute("schema"), "\"secret\":true"),   "serial: schema marks secrets");
     execute("load ledtype=2 o1_uni=5");
     CHECK(cfg.ledType == 2 && cfg.outputs[1].universe == 5, "serial: load batch applied");
     CHECK(hasS(execute("template esp32s3dev"), "OK"),   "serial: template apply ok");
