@@ -210,104 +210,25 @@ void save() {
     prefs.end();
 }
 
-// ---- JSON serialization ----------------------------------------------------
-// Appends to a String (no Print dependency) so the engine has no transport ties:
-// works identically on the device and in the native host test, and the serial
-// console can capture the dump straight into a String.
-static void emitStr(String& out, const String& v) {
-    out += "\"";
-    const char* c = v.c_str();
-    for (; *c; c++) {
-        if (*c == '"' || *c == '\\') { char b[3] = {'\\', *c, 0}; out += b; }
-        else { char b[2] = {*c, 0}; out += b; }
-    }
-    out += "\"";
-}
-static void emitField(String& out, void* a, CfgKind kind, uint16_t flags, bool mask) {
-    if (kind == CfgKind::Str) {
-        if (mask && (flags & CFG_SECRET)) out += "\"***\"";
-        else emitStr(out, *(String*)a);
-    } else if (kind == CfgKind::Bool) {
-        out += (*(bool*)a ? "true" : "false");
-    } else {
-        out += String(*(int*)a);
-    }
-}
-
-void toJson(String& out, bool maskSecrets) {
-    bool first = true;
-    for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++) {
-        const CfgField& f = CONFIG_FIELDS[j];
-        if (!first) out += ",";
-        first = false;
-        out += "\""; out += f.jsonKey; out += "\":";
-        emitField(out, rootAddr(f), f.kind, f.flags, maskSecrets);
-    }
-    out += ",\"outputs\":[";
-    for (int i = 0; i < MAX_OUTPUTS; i++) {
-        if (i) out += ",";
-        out += "{";
-        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
-            const CfgOutputField& f = OUTPUT_FIELDS[j];
-            if (j) out += ",";
-            out += "\""; out += f.jsonKey; out += "\":";
-            emitField(out, outAddr(i, f), f.kind, f.flags, maskSecrets);
-        }
-        out += "}";
-    }
-    out += "]";
-}
-
-// ---- schema descriptors (self-describing config for generic clients) -------
-static const char* kindName(CfgKind k) {
-    switch (k) { case CfgKind::Bool: return "bool"; case CfgKind::Str: return "str";
-                 case CfgKind::Enum: return "enum"; default: return "int"; }
-}
-static void emitMeta(String& out, bool& first, const char* key, const char* group, const char* label,
-                     CfgKind kind, int32_t mn, int32_t mx, uint16_t flags,
-                     const char* const* labels, uint8_t count, const String& value) {
-    if (!first) out += ",";
-    first = false;
-    out += "{\"key\":";   emitStr(out, key);
-    out += ",\"group\":"; emitStr(out, group);
-    out += ",\"label\":"; emitStr(out, label);
-    out += ",\"type\":\""; out += kindName(kind); out += "\"";
-    if (kind == CfgKind::Enum && labels && count) {
-        out += ",\"options\":[";
-        for (uint8_t k = 0; k < count; k++) { if (k) out += ","; emitStr(out, labels[k]); }
-        out += "]";
-    } else if (kind == CfgKind::Int) {
-        out += ",\"min\":"; out += String((int)mn);
-        out += ",\"max\":"; out += String((int)mx);
-    }
-    if (flags & CFG_SECRET) out += ",\"secret\":true";
-    // Current value, keyed by the same canonical key, so a client needs only this
-    // one command to both describe AND prefill the form. Secrets are masked.
-    out += ",\"value\":";
-    if (kind == CfgKind::Str) emitStr(out, value);   // value already "***" if secret
-    else                      out += value;          // bool true/false or number
-    out += "}";
-}
-
-void schemaJson(String& out) {
-    out += "{\"fields\":[";
-    bool first = true;
+// ---- key=value dump --------------------------------------------------------
+// One "key=value" per line over every field (per-output expanded to o<i>_<suffix>),
+// secrets masked. This is exactly the format setValue / a bare "key=value" line
+// accept, so reading `dump`, editing a few lines, and sending them back round-trips.
+void dump(String& out, bool maskSecrets) {
     for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++) {
         const CfgField& f = CONFIG_FIELDS[j];
         String v; getValue(f.key, v);
-        if (f.flags & CFG_SECRET) v = "***";
-        emitMeta(out, first, f.key, f.group, f.label, f.kind, f.min, f.max, f.flags, f.enumLabels, f.enumCount, v);
+        if (maskSecrets && (f.flags & CFG_SECRET)) v = "***";
+        out += f.key; out += "="; out += v; out += "\n";
     }
     for (int i = 0; i < MAX_OUTPUTS; i++)
         for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
             const CfgOutputField& f = OUTPUT_FIELDS[j];
-            String key   = String("o") + i + "_" + f.suffix;
-            String group = String("Output ") + i;
+            String key = String("o") + i + "_" + f.suffix;
             String v; getValue(key, v);
-            if (f.flags & CFG_SECRET) v = "***";
-            emitMeta(out, first, key.c_str(), group.c_str(), f.label, f.kind, f.min, f.max, f.flags, f.enumLabels, f.enumCount, v);
+            if (maskSecrets && (f.flags & CFG_SECRET)) v = "***";
+            out += key; out += "="; out += v; out += "\n";
         }
-    out += "]}";
 }
 
 } // namespace cfgcore

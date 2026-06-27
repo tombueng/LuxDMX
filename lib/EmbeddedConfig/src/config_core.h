@@ -23,19 +23,10 @@ void save();
 bool setValue(const String& key, const String& val, String& err);
 bool getValue(const String& key, String& out);   // false if the key is unknown
 
-// Append all schema fields to `out` as a JSON object body, "key":value pairs plus
-// an "outputs":[...] array. maskSecrets replaces CFG_SECRET values with "***"
-// (serial dumps pass true). No Print dependency, so the engine stays transport-free.
-void toJson(String& out, bool maskSecrets);
-
-// Append the schema descriptors + current values to `out` as JSON:
-//   {"fields":[{"key","group","label","type":"int|bool|str|enum",
-//               "min","max" | "options":[...], "secret":true?, "value":<cur>}, ...]}
-// Per-output fields are expanded to o<i>_<suffix> with group "Output <i>"; secret
-// values are masked. This makes the device self-describing: a client (serial TUI /
-// Web-Serial page) renders AND prefills a full config UI from this one command,
-// keyed by the canonical key (what set/get use), duplicating no field definitions.
-void schemaJson(String& out);
+// Append one "key=value" line per field to `out` (per-output expanded to
+// o<i>_<suffix>), secrets masked when maskSecrets. Same format setValue / a bare
+// "key=value" line accept, so dump -> edit a few lines -> send back round-trips.
+void dump(String& out, bool maskSecrets);
 
 // Apply a board template by name from the embedded registry (resolves extends=).
 bool applyTemplate(const String& name, String& err);

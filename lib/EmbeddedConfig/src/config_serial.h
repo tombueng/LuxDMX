@@ -3,25 +3,23 @@
 #include "config_core.h"
 
 // ---------------------------------------------------------------------------
-// Serial configuration console. One line grammar that serves both a human at a
-// terminal and a machine/AI client, all rendered from the same schema the web
-// form + NVS use (no field details duplicated here):
+// Minimal serial config interface, deliberately machine-first (the main user is a
+// script/agent driving a device on the bench; for full interactive setup, get the
+// board on the network and use its web UI). The whole grammar:
 //
-//   help                 list the commands
-//   list [group]         human-readable fields + values (optionally one section)
-//   get <id>             -> id=value          (machine)
-//   set <id> <value>     -> OK | ERR <reason> (validated + clamped via the schema)
-//   json                 full config dump (secrets masked) — paired with `load`
-//   load <k=v> [k=v ...] batch-apply key=value pairs (reuses the template engine)
-//   template <name>      apply a board preset in memory (then `save` to persist)
+//   dump                 print every setting as key=value (secrets masked)
+//   <key>=<value> ...    set one or more fields (PARTIAL: only listed keys change)
+//   get <key>            -> key=value
+//   set <key> <value>    -> OK | ERR <reason> (validated + clamped via the schema)
 //   save [reboot]        persist to NVS; reboot if asked
-//   reboot               restart the device
-//   factory              wipe config + restart
-//   wifi <ssid> [pass]   set WiFi STA credentials and (re)connect
+//   wifi <ssid> [pass]   set WiFi STA credentials and (re)connect (recovery)
+//   reboot | factory     restart / wipe + restart
+//   help
 //
-// The engine verbs (help/list/get/set/json/load/template) are pure and need no
-// device APIs; the device-side actions are injected as Hooks so this module
-// carries no WiFi / ESP / NVS-reboot dependency (keeps it library-clean).
+// `dump` and the bare "key=value" write round-trip: read dump, change a few lines,
+// send them back. The read/parse verbs are pure (unit-testable); the device-side
+// actions (save/reboot/factory/wifi) are injected as Hooks so this module carries
+// no WiFi / ESP / NVS-reboot dependency (keeps the library reusable).
 // ---------------------------------------------------------------------------
 namespace cfgserial {
 

@@ -1,8 +1,5 @@
 #include "config_serial.h"
-#include "config_types.h"
-#include "config_schema.h"
 #include <stdlib.h>
-#include <string.h>
 
 namespace cfgserial {
 
@@ -18,84 +15,41 @@ void begin(Stream& io, const Hooks& hooks) {
     g_announced = false;
 }
 
-static void prompt() { if (g_io) g_io->print("cfg> "); }
-
-// Printed once, the first time the console is polled (so it lands after the boot
-// log), telling a human how to drive it.
-static void announce() {
-    if (!g_io) return;
-    g_io->println();
-    g_io->println("== LuxDMX serial config console ==");
-    g_io->println("Type 'help' for commands.  e.g.  list  |  get o0_tx  |  set hostname studio  |  save");
-    prompt();
-}
-
-// ---- formatting helpers ----------------------------------------------------
 static void appendChar(String& s, char c) { char b[2] = {c, 0}; s += b; }
-
-// One "  key = value   (enum label)" line for the human `list`.
-static void appendFieldLine(String& out, const char* key, const String& val,
-                            const char* const* labels, uint8_t count, uint16_t flags) {
-    out += "  ";
-    out += key;
-    out += " = ";
-    if (flags & CFG_SECRET) out += val.length() ? "***" : "";
-    else                    out += val;
-    if (labels && count) {                       // annotate enums with the label
-        int v = atoi(val.c_str());
-        if (v >= 0 && v < (int)count) { out += "  ("; out += labels[v]; out += ")"; }
-    }
-    out += "\n";
-}
-
-static bool groupMatches(const char* group, const String& filter) {
-    if (filter.length() == 0) return true;
-    String g = group;  g.toLowerCase();
-    String f = filter; f.toLowerCase();
-    return strstr(g.c_str(), f.c_str()) != nullptr;   // case-insensitive substring
-}
-
-static String listText(const String& filter) {
-    String out;
-    const char* curGroup = nullptr;
-    for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++) {
-        const CfgField& f = CONFIG_FIELDS[j];
-        if (!groupMatches(f.group, filter)) continue;
-        if (curGroup != f.group) { out += "["; out += f.group; out += "]\n"; curGroup = f.group; }
-        String v; cfgcore::getValue(f.key, v);
-        appendFieldLine(out, f.key, v, f.enumLabels, f.enumCount, f.flags);
-    }
-    // Per-output fields grouped as their own sections.
-    for (int i = 0; i < MAX_OUTPUTS; i++) {
-        char grp[16]; snprintf(grp, sizeof(grp), "Output %d", i);
-        if (!groupMatches(grp, filter)) continue;
-        out += "["; out += grp; out += "]\n";
-        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
-            const CfgOutputField& f = OUTPUT_FIELDS[j];
-            String key = String("o") + i + "_" + f.suffix;
-            String v; cfgcore::getValue(key, v);
-            appendFieldLine(out, key.c_str(), v, f.enumLabels, f.enumCount, f.flags);
-        }
-    }
-    if (out.length() == 0) out = "ERR no matching group";
-    return out;
-}
 
 static String helpText() {
     return
-        "commands:\n"
-        "  help                 this list\n"
-        "  list [group]         show fields + values (optionally one section)\n"
-        "  get <id>             read one field  -> id=value\n"
-        "  set <id> <value>     write one field -> OK | ERR\n"
-        "  json                 full config dump (secrets masked)\n"
-        "  schema               field metadata as JSON (types/groups/ranges/options)\n"
-        "  load <k=v> [k=v ...] batch-apply key=value pairs\n"
-        "  template <name>      apply a board preset in memory (then save)\n"
+        "LuxDMX config:\n"
+        "  dump                 print every setting as key=value\n"
+        "  <key>=<value> ...    set one or more fields (partial; not all keys needed)\n"
+        "  get <key>            read one field -> key=value\n"
+        "  set <key> <value>    set one field -> OK | ERR\n"
         "  save [reboot]        persist to NVS; reboot if asked\n"
-        "  reboot               restart\n"
-        "  factory              wipe config + restart\n"
-        "  wifi <ssid> [pass]   set WiFi credentials and reconnect";
+        "  wifi <ssid> [pass]   set WiFi credentials and reconnect\n"
+        "  reboot | factory     restart / wipe + restart\n"
+        "  help";
+}
+
+// Apply a "key=value [key=value ...]" line (space- or comma-separated). Partial:
+// only the listed fields change; everything else is left as-is.
+static String applyKv(const String& line) {
+    int ok = 0, fail = 0; String firstErr;
+    int i = 0, n = line.length();
+    while (i < n) {
+        while (i < n && (line[i] == ' ' || line[i] == '\t' || line[i] == ',')) i++;
+        int start = i;
+        while (i < n && line[i] != ' ' && line[i] != '\t' && line[i] != ',') i++;
+        if (i <= start) continue;
+        String tok = line.substring(start, i);
+        int eq = tok.indexOf('=');
+        if (eq < 0) { fail++; if (!firstErr.length()) firstErr = String("bad token: ") + tok; continue; }
+        String k = tok.substring(0, eq), v = tok.substring(eq + 1);
+        String e;
+        if (cfgcore::setValue(k, v, e)) ok++;
+        else { fail++; if (!firstErr.length()) firstErr = e; }
+    }
+    if (fail) return String("ERR ") + firstErr + " (" + ok + " ok, " + fail + " failed)";
+    return String("OK ") + ok;
 }
 
 // ---- command dispatch ------------------------------------------------------
@@ -107,11 +61,15 @@ String execute(const String& line) {
     String verb = sp < 0 ? l : l.substring(0, sp);
     String rest = sp < 0 ? String("") : l.substring(sp + 1);
     rest.trim();
+
+    // A bare "key=value ..." line is the main write path (partial config update).
+    if (verb.indexOf('=') >= 0) return applyKv(l);
+
     verb.toLowerCase();
 
     if (verb == "help" || verb == "?") return helpText();
 
-    if (verb == "list") return listText(rest);
+    if (verb == "dump") { String s; cfgcore::dump(s, true); return s; }
 
     if (verb == "get") {
         String v;
@@ -121,59 +79,17 @@ String execute(const String& line) {
 
     if (verb == "set") {
         int s2 = rest.indexOf(' ');
-        if (s2 < 0) return "ERR usage: set <id> <value>";
-        String id = rest.substring(0, s2);
-        String val = rest.substring(s2 + 1); val.trim();
+        if (s2 < 0) return "ERR usage: set <key> <value>";
+        String k = rest.substring(0, s2);
+        String v = rest.substring(s2 + 1); v.trim();
         String e;
-        if (cfgcore::setValue(id, val, e)) return "OK";
-        return String("ERR ") + e;
-    }
-
-    if (verb == "json") {
-        String j = "{"; cfgcore::toJson(j, true); j += "}";
-        return j;
-    }
-
-    if (verb == "schema") {            // self-describing field metadata (for UIs)
-        String s; cfgcore::schemaJson(s);
-        return s;
-    }
-
-    if (verb == "load") {
-        if (rest.length() == 0) return "ERR usage: load <key=value> [key=value ...]";
-        // Turn the space/comma separated pairs into the engine's newline format.
-        String text;
-        for (size_t i = 0; i < rest.length(); i++) {
-            char c = rest[i];
-            appendChar(text, (c == ' ' || c == ',' || c == '\t') ? '\n' : c);
-        }
-        text += "\n";
-        String e;
-        if (cfgcore::applyTemplateText(text.c_str(), e)) return "OK";
-        return String("ERR ") + e;
-    }
-
-    if (verb == "template") {
-        if (rest.length() == 0) return "ERR usage: template <name>";
-        String e;
-        if (cfgcore::resetTo(rest, e)) return String("OK applied '") + rest + "' (not saved; use 'save')";
-        return String("ERR ") + e;
+        return cfgcore::setValue(k, v, e) ? String("OK") : (String("ERR ") + e);
     }
 
     if (verb == "save") {
         bool rb = (rest == "reboot");
         if (g_hooks.save) g_hooks.save(rb);
         return rb ? "OK saved, rebooting" : "OK saved";
-    }
-
-    if (verb == "reboot") {
-        if (g_hooks.reboot) g_hooks.reboot();
-        return "OK rebooting";
-    }
-
-    if (verb == "factory") {
-        if (g_hooks.factory) g_hooks.factory();
-        return "OK factory reset, rebooting";
     }
 
     if (verb == "wifi") {
@@ -186,13 +102,19 @@ String execute(const String& line) {
         return "ERR wifi not available";
     }
 
+    if (verb == "reboot")  { if (g_hooks.reboot)  g_hooks.reboot();  return "OK rebooting"; }
+    if (verb == "factory") { if (g_hooks.factory) g_hooks.factory(); return "OK factory reset, rebooting"; }
+
     return String("ERR unknown command: ") + verb + " (try 'help')";
 }
 
 // ---- non-blocking line reader ----------------------------------------------
 void poll() {
     if (!g_io) return;
-    if (!g_announced) { g_announced = true; announce(); }   // greet once, after the boot log
+    if (!g_announced) {   // one quiet line once, after the boot log
+        g_announced = true;
+        g_io->println("[cfg] serial config ready - type 'help' (or 'dump')");
+    }
     while (g_io->available() > 0) {
         int c = g_io->read();
         if (c < 0) break;
@@ -201,7 +123,6 @@ void poll() {
             String resp = execute(g_line);
             g_line = "";
             if (resp.length()) g_io->println(resp);
-            prompt();
         } else if (g_line.length() < 600) {
             appendChar(g_line, (char)c);
         }

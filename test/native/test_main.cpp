@@ -137,20 +137,19 @@ int main() {
     cfgcore::load();
     CHECK(cfg.outputs[0].txPin == 12,          "legacy: o0_tx wins over dmxtx");
 
-    // 5) JSON output + secret masking
+    // 5) key=value dump + secret masking
     nvsStore().clear();
     cfgcore::resetToTemplate();
     cfgcore::setValue("hostname", "box", err);
     cfgcore::setValue("otapw", "s3cret", err);
-    String j; cfgcore::toJson(j, false);
-    CHECK(hasS(j, "\"ledType\":3"),         "json: ledType");
-    CHECK(hasS(j, "\"hostname\":\"box\""),  "json: hostname");
-    CHECK(hasS(j, "\"outputs\":["),         "json: outputs array");
-    CHECK(hasS(j, "\"tx\":17"),             "json: nested output tx");
-    CHECK(hasS(j, "\"otapw\":\"s3cret\""),  "json: secret shown when unmasked");
-    String jm; cfgcore::toJson(jm, true);
-    CHECK(hasS(jm, "\"otapw\":\"***\""),    "json: secret masked");
-    CHECK(!hasS(jm, "s3cret"),              "json: secret not leaked when masked");
+    String d; cfgcore::dump(d, false);
+    CHECK(hasS(d, "ledtype=3"),     "dump: ledtype");
+    CHECK(hasS(d, "hostname=box"),  "dump: hostname");
+    CHECK(hasS(d, "o0_tx=17"),      "dump: per-output key");
+    CHECK(hasS(d, "otapw=s3cret"),  "dump: secret shown when unmasked");
+    String dm; cfgcore::dump(dm, true);
+    CHECK(hasS(dm, "otapw=***"),    "dump: secret masked");
+    CHECK(!hasS(dm, "s3cret"),      "dump: secret not leaked when masked");
 
     // 6) FULL per-board fresh-device byte-parity (every template vs old DEF_* defaults)
     checkBoard("esp32dev");
@@ -173,20 +172,14 @@ int main() {
     CHECK(execute("set o0_tx 999") == "OK",             "serial: set high still OK");
     CHECK(cfg.outputs[0].txPin == 48,                    "serial: set clamped to 48");
     CHECK(hasS(execute("set bogus 1"), "ERR"),          "serial: set unknown -> ERR");
-    CHECK(hasS(execute("json"), "\"ledType\":3"),       "serial: json dump");
-    CHECK(hasS(execute("json"), "\"otapw\":\"***\""),   "serial: json masks secret");
-    CHECK(hasS(execute("schema"), "\"key\":\"protocol\""), "serial: schema has fields");
-    CHECK(hasS(execute("schema"), "\"options\":["),     "serial: schema enum options");
-    CHECK(hasS(execute("schema"), "\"key\":\"o0_tx\""), "serial: schema expands per-output keys");
-    CHECK(hasS(execute("schema"), "\"min\":-1"),        "serial: schema int range");
-    CHECK(hasS(execute("schema"), "\"value\":"),        "serial: schema includes current values");
-    CHECK(hasS(execute("schema"), "\"secret\":true"),   "serial: schema marks secrets");
-    execute("load ledtype=2 o1_uni=5");
-    CHECK(cfg.ledType == 2 && cfg.outputs[1].universe == 5, "serial: load batch applied");
-    CHECK(hasS(execute("template esp32s3dev"), "OK"),   "serial: template apply ok");
-    CHECK(cfg.ledPin == 48 && cfg.ledType == 2,          "serial: template values applied");
-    CHECK(hasS(execute("template nope"), "ERR"),        "serial: template unknown -> ERR");
-    CHECK(hasS(execute("list Network"), "wifimode"),    "serial: list group filter");
+    CHECK(hasS(execute("dump"), "o0_tx="),              "serial: dump key=value");
+    CHECK(hasS(execute("dump"), "otapw=***"),           "serial: dump masks secret");
+    // bare "key=value" partial write (single, then multiple space/comma separated)
+    CHECK(hasS(execute("ledtype=2"), "OK"),             "serial: bare key=value");
+    CHECK(cfg.ledType == 2,                              "serial: bare kv applied");
+    CHECK(hasS(execute("o1_uni=5, o0_rx=7"), "OK"),     "serial: bare multi kv");
+    CHECK(cfg.outputs[1].universe == 5 && cfg.outputs[0].rxPin == 7, "serial: bare multi applied");
+    CHECK(hasS(execute("bogus=1"), "ERR"),              "serial: bare kv unknown -> ERR");
     CHECK(execute("help").length() > 0,                  "serial: help");
     execute("save");        CHECK(g_saveCalls == 1,      "serial: save hook");
     execute("save reboot"); CHECK(g_saveCalls == 2,      "serial: save reboot hook");
