@@ -28,6 +28,14 @@ bool getValue(const String& key, String& out);   // false if the key is unknown
 // (serial dumps pass true). No Print dependency, so the engine stays transport-free.
 void toJson(String& out, bool maskSecrets);
 
+// Append the schema DESCRIPTORS (not values) to `out` as JSON:
+//   {"fields":[{"key","group","label","type":"int|bool|str|enum",
+//               "min","max" | "options":[...], "secret":true?}, ...]}
+// Per-output fields are expanded to o<i>_<suffix> with group "Output <i>". This is
+// what makes the device self-describing: a client (serial TUI / Web-Serial page)
+// renders a full config UI generically from schema + toJson, duplicating nothing.
+void schemaJson(String& out);
+
 // Apply a board template by name from the embedded registry (resolves extends=).
 bool applyTemplate(const String& name, String& err);
 // Apply one template's raw "key=value" text (used by applyTemplate + tests).

@@ -89,6 +89,7 @@ static String helpText() {
         "  get <id>             read one field  -> id=value\n"
         "  set <id> <value>     write one field -> OK | ERR\n"
         "  json                 full config dump (secrets masked)\n"
+        "  schema               field metadata as JSON (types/groups/ranges/options)\n"
         "  load <k=v> [k=v ...] batch-apply key=value pairs\n"
         "  template <name>      apply a board preset in memory (then save)\n"
         "  save [reboot]        persist to NVS; reboot if asked\n"
@@ -131,6 +132,11 @@ String execute(const String& line) {
     if (verb == "json") {
         String j = "{"; cfgcore::toJson(j, true); j += "}";
         return j;
+    }
+
+    if (verb == "schema") {            // self-describing field metadata (for UIs)
+        String s; cfgcore::schemaJson(s);
+        return s;
     }
 
     if (verb == "load") {

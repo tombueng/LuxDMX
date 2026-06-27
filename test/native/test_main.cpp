@@ -175,6 +175,10 @@ int main() {
     CHECK(hasS(execute("set bogus 1"), "ERR"),          "serial: set unknown -> ERR");
     CHECK(hasS(execute("json"), "\"ledType\":3"),       "serial: json dump");
     CHECK(hasS(execute("json"), "\"otapw\":\"***\""),   "serial: json masks secret");
+    CHECK(hasS(execute("schema"), "\"key\":\"protocol\""), "serial: schema has fields");
+    CHECK(hasS(execute("schema"), "\"options\":["),     "serial: schema enum options");
+    CHECK(hasS(execute("schema"), "\"key\":\"o0_tx\""), "serial: schema expands per-output keys");
+    CHECK(hasS(execute("schema"), "\"min\":-1"),        "serial: schema int range");
     execute("load ledtype=2 o1_uni=5");
     CHECK(cfg.ledType == 2 && cfg.outputs[1].universe == 5, "serial: load batch applied");
     CHECK(hasS(execute("template esp32s3dev"), "OK"),   "serial: template apply ok");

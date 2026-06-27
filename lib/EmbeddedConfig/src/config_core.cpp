@@ -258,4 +258,47 @@ void toJson(String& out, bool maskSecrets) {
     out += "]";
 }
 
+// ---- schema descriptors (self-describing config for generic clients) -------
+static const char* kindName(CfgKind k) {
+    switch (k) { case CfgKind::Bool: return "bool"; case CfgKind::Str: return "str";
+                 case CfgKind::Enum: return "enum"; default: return "int"; }
+}
+static void emitMeta(String& out, bool& first, const char* key, const char* group, const char* label,
+                     CfgKind kind, int32_t mn, int32_t mx, uint16_t flags,
+                     const char* const* labels, uint8_t count) {
+    if (!first) out += ",";
+    first = false;
+    out += "{\"key\":";   emitStr(out, key);
+    out += ",\"group\":"; emitStr(out, group);
+    out += ",\"label\":"; emitStr(out, label);
+    out += ",\"type\":\""; out += kindName(kind); out += "\"";
+    if (kind == CfgKind::Enum && labels && count) {
+        out += ",\"options\":[";
+        for (uint8_t k = 0; k < count; k++) { if (k) out += ","; emitStr(out, labels[k]); }
+        out += "]";
+    } else if (kind == CfgKind::Int) {
+        out += ",\"min\":"; out += String((int)mn);
+        out += ",\"max\":"; out += String((int)mx);
+    }
+    if (flags & CFG_SECRET) out += ",\"secret\":true";
+    out += "}";
+}
+
+void schemaJson(String& out) {
+    out += "{\"fields\":[";
+    bool first = true;
+    for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++) {
+        const CfgField& f = CONFIG_FIELDS[j];
+        emitMeta(out, first, f.key, f.group, f.label, f.kind, f.min, f.max, f.flags, f.enumLabels, f.enumCount);
+    }
+    for (int i = 0; i < MAX_OUTPUTS; i++)
+        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
+            const CfgOutputField& f = OUTPUT_FIELDS[j];
+            String key   = String("o") + i + "_" + f.suffix;
+            String group = String("Output ") + i;
+            emitMeta(out, first, key.c_str(), group.c_str(), f.label, f.kind, f.min, f.max, f.flags, f.enumLabels, f.enumCount);
+        }
+    out += "]}";
+}
+
 } // namespace cfgcore
