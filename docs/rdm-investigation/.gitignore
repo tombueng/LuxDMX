@@ -1,0 +1,11 @@
+# Published: the report itself (REPORT.{md,pdf,html}), its figures, build inputs, README.
+# Everything below stays local-only (bench scripts with internal IPs, raw captures,
+# firmware binaries, the internal plan, the draft forum reply).
+PLAN.md
+FORUM_ANSWER.md
+README.local.md
+captures/
+tools/
+fix/
+scripts/
+*.bin

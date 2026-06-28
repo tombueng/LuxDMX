@@ -1,0 +1,26 @@
+% --- scientific-report styling (xelatex via pandoc) ---
+\usepackage{microtype}
+\usepackage{xcolor}
+\definecolor{accentcolor}{HTML}{0A6E3A}
+\definecolor{rulecolor}{HTML}{0A6E3A}
+
+% coloured, clean section headings (manual numbering is already in the heading text)
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries\color{accentcolor}}{}{0pt}{}
+\titlespacing*{\section}{0pt}{1.4ex plus 1ex minus .2ex}{0.8ex}
+\titleformat{\subsection}{\normalsize\bfseries\color{accentcolor!80!black}}{}{0pt}{}
+
+% running header / footer
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\itshape Reliable RDM on the ESP32-S3}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[R]{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% a touch tighter, nicer tables/abstract
+\usepackage{booktabs}
+\renewcommand{\arraystretch}{1.15}
+\usepackage{ragged2e}
