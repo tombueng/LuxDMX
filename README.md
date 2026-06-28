@@ -403,6 +403,8 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
 LuxDMX/
 ├── src/
 │   ├── main.cpp          ← firmware logic
+│   ├── config/
+│   │   └── config_schema.cpp  ← THE field table: one row per setting
 │   ├── pages/            ← edit web UI here (plain HTML)
 │   │   ├── index.html
 │   │   ├── config.html
@@ -412,10 +414,19 @@ LuxDMX/
 │   ├── assets/           ← images served by the ESP32
 │   │   └── logo.png      ← 96×96 px, replaces itself on rebuild
 │   └── generated/        ← auto-created at build time, gitignored
+├── include/              ← config_schema.h (Config struct) + config_enums.h
+├── lib/EmbeddedConfig/   ← reusable schema-driven config engine (NVS + serial console)
+├── templates/            ← per-board default VALUES (esp32dev.ini, luxdmx_v4.ini, ...)
 ├── docs/                 ← documentation assets (README images)
 ├── extra_scripts.py      ← PlatformIO pre-build hook
 └── platformio.ini
 ```
+
+Config is schema-driven: every persisted setting is described once as a row in
+`src/config/config_schema.cpp`, and that one table drives NVS load/save, the
+`/config` web form, and the serial console. Defaults live in `templates/*.ini`
+(picked per build with `-DDEFAULT_TEMPLATE=...`), not as `-D` macros. The engine
+itself is a standalone PlatformIO library under `lib/EmbeddedConfig/`.
 
 ### How the build pipeline works
 
@@ -425,6 +436,7 @@ Before every `pio run`, PlatformIO executes `extra_scripts.py`, which:
 2. Reads every `src/assets/*.png` file
 3. Converts them to C `PROGMEM` arrays / string literals and writes them to `src/generated/*.h`
 4. `main.cpp` `#include`s those headers — the HTML and images become part of the firmware binary
+5. Embeds the board default `templates/*.ini` into `src/generated/config_templates.cpp` (via `tools/gen_config_templates.py`), so a build's defaults come from a data file, not hand-edited macros
 
 **To change the web UI**, edit the HTML files in `src/pages/` and rebuild — no C++ changes needed.  
 **To replace the logo**, drop a new 96×96 PNG into `src/assets/logo.png` and rebuild.
@@ -528,6 +540,25 @@ To move LuxDMX to a different WiFi network, clear its stored credentials — it 
 | **Hardware** | Power off → hold **BOOT** → power on → keep holding for 3 seconds → release → device reboots into AP mode |
 
 After reset, connect to the `DMX-Gateway` access point (no password) and follow the [First Setup](#1-config-portal) steps to join the new network.
+
+### Serial configuration (USB)
+
+Mostly a recovery and scripting hatch. If a board can't get on the network, plug
+it in over USB, open a serial monitor at 115200 baud, and type `help`. It's a tiny
+key=value interface using the same field names as the web form:
+
+| Command | What it does |
+|---|---|
+| `dump` | print every setting as `key=value` (passwords masked) |
+| `key=value [key=value ...]` | set one or more fields (partial: only the keys you list change) |
+| `get <key>` / `set <key> <value>` | read / write a single field |
+| `save [reboot]` | persist to NVS, optionally reboot to apply |
+| `wifi <ssid> [pass]` | set WiFi credentials and reconnect (the usual "it's stuck offline" fix) |
+| `reboot` / `factory` | restart / wipe config and restart |
+
+`dump` and the bare `key=value` write round-trip: dump the config, change a couple
+of lines, paste them back, `save`. For everyday setup use the web UI; the serial
+path is there for headless tweaks and getting a stranded board back online.
 
 ---
 
