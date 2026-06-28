@@ -9,17 +9,24 @@
 <style>
 body { background:#0d1117; display:flex; align-items:center; justify-content:center; min-height:100vh; }
 .box { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:2.5rem; text-align:center; width:min(420px,92vw); }
-@keyframes spin { to { transform: rotate(360deg); } }
-.spinner { display:inline-block; width:2.5rem; height:2.5rem; border:3px solid #30363d; border-top-color:#58a6ff; border-radius:50%; animation:spin .8s linear infinite; margin-bottom:1.25rem; }
+/* Brand spinner: DMX-fader equaliser bars bouncing through the four brand colours. */
+@keyframes fade-bar { 0%,100% { transform:scaleY(.3); } 50% { transform:scaleY(1); } }
+.spinner { display:inline-flex; align-items:flex-end; gap:5px; height:2.5rem; margin-bottom:1.25rem; }
+.spinner i { width:8px; height:100%; border-radius:3px; transform-origin:bottom; animation:fade-bar 1s ease-in-out infinite; }
+.spinner i:nth-child(1){ background:#23e6f7; animation-delay:0s; }
+.spinner i:nth-child(2){ background:#45d85c; animation-delay:.12s; }
+.spinner i:nth-child(3){ background:#ffaa1c; animation-delay:.24s; }
+.spinner i:nth-child(4){ background:#f33abc; animation-delay:.36s; }
+.spinner i:nth-child(5){ background:#23e6f7; animation-delay:.48s; }
 </style>
 </head>
 <body>
 <div class="box">
-  <div class="spinner" id="spin"></div>
+  <div class="spinner" id="spin"><i></i><i></i><i></i><i></i><i></i></div>
   <div class="fw-bold fs-5 mb-2" id="title">Starting update&hellip;</div>
   <div class="text-secondary small" id="sub">Fetching the new firmware from LuxDMX.org.</div>
   <div id="barwrap" style="display:none;height:6px;background:#21262d;border-radius:3px;overflow:hidden;margin-top:1.4rem">
-    <div id="bar" style="height:100%;width:0%;background:#58a6ff;transition:width .3s linear"></div>
+    <div id="bar" style="height:100%;width:0%;background:linear-gradient(90deg,#23e6f7,#f33abc);transition:width .3s linear"></div>
   </div>
 </div>
 <script>

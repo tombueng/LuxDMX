@@ -13,7 +13,13 @@
   --gh-border:  #30363d;
   --gh-text:    #c9d1d9;
   --gh-muted:   #8b949e;
-  --gh-accent:  #58a6ff;
+  /* LuxDMX brand palette: cyan / magenta / amber / green */
+  --lux-cyan:    #23e6f7;
+  --lux-magenta: #f33abc;
+  --lux-amber:   #ffaa1c;
+  --lux-green:   #45d85c;
+  --lux-ink:     #06141a;   /* dark text for legibility on the bright fills */
+  --gh-accent:  var(--lux-cyan);
 }
 [data-bs-theme="dark"] {
   --bs-body-bg:            var(--gh-bg);
@@ -22,7 +28,26 @@
   --bs-card-border-color:  var(--gh-border);
   --bs-border-color:       var(--gh-border);
   --bs-secondary-color:    var(--gh-muted);
+  --bs-primary: #23e6f7; --bs-primary-rgb: 35,230,247;
+  --bs-success: #45d85c; --bs-success-rgb: 69,216,92;
+  --bs-warning: #ffaa1c; --bs-warning-rgb: 255,170,28;
+  --bs-danger:  #f33abc; --bs-danger-rgb:  243,58,188;
+  --bs-link-color: #23e6f7; --bs-link-color-rgb: 35,230,247; --bs-link-hover-color: #5cedfb;
 }
+/* Contextual buttons recoloured to the brand palette. The fills are bright, so the
+   label ink goes dark (var(--lux-ink)) for contrast instead of Bootstrap's white. */
+.btn-primary{--bs-btn-bg:#23e6f7;--bs-btn-border-color:#23e6f7;--bs-btn-color:#06141a;--bs-btn-hover-bg:#5cedfb;--bs-btn-hover-border-color:#5cedfb;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#15bccc;--bs-btn-active-border-color:#15bccc;--bs-btn-active-color:#06141a;--bs-btn-disabled-bg:#23e6f7;--bs-btn-disabled-border-color:#23e6f7;--bs-btn-disabled-color:#06141a;}
+.btn-success{--bs-btn-bg:#45d85c;--bs-btn-border-color:#45d85c;--bs-btn-color:#06141a;--bs-btn-hover-bg:#6ee27f;--bs-btn-hover-border-color:#6ee27f;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#2fb846;--bs-btn-active-border-color:#2fb846;--bs-btn-active-color:#06141a;}
+.btn-warning{--bs-btn-bg:#ffaa1c;--bs-btn-border-color:#ffaa1c;--bs-btn-color:#06141a;--bs-btn-hover-bg:#ffbe4d;--bs-btn-hover-border-color:#ffbe4d;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#e08e00;--bs-btn-active-border-color:#e08e00;--bs-btn-active-color:#06141a;}
+.btn-danger{--bs-btn-bg:#f33abc;--bs-btn-border-color:#f33abc;--bs-btn-color:#06141a;--bs-btn-hover-bg:#ff5bcd;--bs-btn-hover-border-color:#ff5bcd;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#d11d9c;--bs-btn-active-border-color:#d11d9c;--bs-btn-active-color:#06141a;}
+.btn-outline-primary{--bs-btn-color:#23e6f7;--bs-btn-border-color:#23e6f7;--bs-btn-hover-bg:#23e6f7;--bs-btn-hover-border-color:#23e6f7;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#23e6f7;--bs-btn-active-border-color:#23e6f7;--bs-btn-active-color:#06141a;}
+.btn-outline-success{--bs-btn-color:#45d85c;--bs-btn-border-color:#45d85c;--bs-btn-hover-bg:#45d85c;--bs-btn-hover-border-color:#45d85c;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#45d85c;--bs-btn-active-border-color:#45d85c;--bs-btn-active-color:#06141a;}
+.btn-outline-warning{--bs-btn-color:#ffaa1c;--bs-btn-border-color:#ffaa1c;--bs-btn-hover-bg:#ffaa1c;--bs-btn-hover-border-color:#ffaa1c;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#ffaa1c;--bs-btn-active-border-color:#ffaa1c;--bs-btn-active-color:#06141a;}
+.btn-outline-danger{--bs-btn-color:#f33abc;--bs-btn-border-color:#f33abc;--bs-btn-hover-bg:#f33abc;--bs-btn-hover-border-color:#f33abc;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#f33abc;--bs-btn-active-border-color:#f33abc;--bs-btn-active-color:#06141a;}
+.form-check-input:checked{background-color:#23e6f7;border-color:#23e6f7;}
+.form-control:focus,.form-select:focus{border-color:#23e6f7;box-shadow:0 0 0 .25rem rgba(35,230,247,.25);}
+.form-range::-webkit-slider-thumb{background:#23e6f7;}
+.form-range::-moz-range-thumb{background:#23e6f7;}
 body { background: var(--gh-bg); }
 
 .site-nav {
@@ -83,11 +108,11 @@ body { background: var(--gh-bg); }
 .ch .ch-v { font-size: 0.5rem; color: #fff; line-height: 1.1;
   text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
 .ch .ch-l {
-  font-size: 0.4rem; color: #cfe2ff; font-weight: 600; line-height: 1;
+  font-size: 0.4rem; color: #bfeff6; font-weight: 600; line-height: 1;
   max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
 }
-.ch.labeled { border-color: #2d4f7c; }
+.ch.labeled { border-color: #1f7d8a; }   /* dimmed cyan ring on named channels */
 
 /* Custom hover tooltip: a 2.5x-zoomed live clone of the hovered cell, shown instantly. */
 #cell-tip {
@@ -163,35 +188,35 @@ footer a:hover { color: var(--gh-text); }
 <div class="container-fluid p-3">
 
   <!-- Conflict warning -->
-  <div id="conflict-banner" style="display:none;background:#2d1200;border:1px solid #f85149"
+  <div id="conflict-banner" style="display:none;background:#2a0a20;border:1px solid #f33abc"
        class="align-items-center gap-2 mb-3 px-3 py-2 rounded">
-    <span style="color:#f85149">&#9888;</span>
-    <span class="small" style="color:#f85149">
+    <span style="color:#f33abc">&#9888;</span>
+    <span class="small" style="color:#f33abc">
       Universe conflict &mdash; two or more sources are clashing on a universe.
       Enable a merge mode (HTP/LTP) on that output, or leave only one source.
     </span>
   </div>
 
   <!-- Merging indicator (positive: multiple sources combined on purpose) -->
-  <div id="merge-banner" style="display:none;background:#0d2818;border:1px solid #3fb950"
+  <div id="merge-banner" style="display:none;background:#0c2417;border:1px solid #45d85c"
        class="align-items-center gap-2 mb-3 px-3 py-2 rounded">
-    <span style="color:#3fb950">&#10227;</span>
-    <span class="small" style="color:#3fb950">
+    <span style="color:#45d85c">&#10227;</span>
+    <span class="small" style="color:#45d85c">
       Merging multiple sources on a universe (HTP/LTP).
     </span>
   </div>
 
   <!-- Update banner -->
   <div id="update-banner" class="mb-3 px-3 py-2 rounded"
-       style="display:none;background:#2d2a00;border:1px solid #e3b341">
+       style="display:none;background:#2a2400;border:1px solid #ffaa1c">
     <div class="d-flex align-items-center justify-content-between">
-      <span style="color:#e3b341;font-size:.85rem">&#8635;&nbsp; Firmware update available: <strong id="update-ver"></strong></span>
+      <span style="color:#ffaa1c;font-size:.85rem">&#8635;&nbsp; Firmware update available: <strong id="update-ver"></strong></span>
       <div class="d-flex gap-2">
-        <button type="button" id="update-go" class="btn btn-sm fw-semibold" style="background:#e3b341;color:#000;font-size:.78rem">Update</button>
-        <button type="button" id="update-dismiss" class="btn btn-sm" style="border:1px solid #e3b341;color:#e3b341;font-size:.78rem">Dismiss</button>
+        <button type="button" id="update-go" class="btn btn-sm fw-semibold" style="background:#ffaa1c;color:#06141a;font-size:.78rem">Update</button>
+        <button type="button" id="update-dismiss" class="btn btn-sm" style="border:1px solid #ffaa1c;color:#ffaa1c;font-size:.78rem">Dismiss</button>
       </div>
     </div>
-    <pre id="update-notes" style="display:none;margin:.5rem 0 0;font-size:.72rem;color:#c9b458;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.25);border-radius:4px;padding:.4rem .6rem;max-height:160px;overflow-y:auto"></pre>
+    <pre id="update-notes" style="display:none;margin:.5rem 0 0;font-size:.72rem;color:#e7c46b;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.25);border-radius:4px;padding:.4rem .6rem;max-height:160px;overflow-y:auto"></pre>
     <!-- Hidden form: the Update button installs the newest release directly (no detour via /config) -->
     <form method="POST" action="/ota/github" id="ota-form" class="d-none">
       <input type="hidden" name="version" id="ota-version">
@@ -298,7 +323,7 @@ footer a:hover { color: var(--gh-text); }
     <svg id="spark-svg" viewBox="0 0 60 40" preserveAspectRatio="none"
          width="100%" height="36"
          style="display:block;border-radius:4px;background:#1c2128;margin-bottom:.5rem">
-      <polyline id="spark-line" points="" fill="none" stroke="#58a6ff" stroke-width="1.5"
+      <polyline id="spark-line" points="" fill="none" stroke="#23e6f7" stroke-width="1.5"
                 vector-effect="non-scaling-stroke"/>
     </svg>
     <input type="range" class="form-range mb-1" id="ch-slider" min="0" max="255"
@@ -478,10 +503,10 @@ loadLabels();
 
 function cellBg(v) {
   if (v === 0) return '';
-  const t = v / 255;
-  const r = Math.round(28  + t * (88  - 28));
-  const g = Math.round(33  + t * (166 - 33));
-  const b = Math.round(40  + t * (255 - 40));
+  const t = v / 255;                 // dark slate -> brand cyan as the level rises
+  const r = Math.round(28  + t * (35  - 28));
+  const g = Math.round(33  + t * (230 - 33));
+  const b = Math.round(40  + t * (247 - 40));
   return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
@@ -557,9 +582,9 @@ function connect() {
   sock = new WebSocket('ws://' + location.host + '/ws');
   sock.binaryType = 'arraybuffer';
   var badge = document.getElementById('ws-badge');
-  sock.onopen  = function() { badge.textContent = 'Live';    badge.style.background = '#238636';
+  sock.onopen  = function() { badge.textContent = 'Live';    badge.style.background = '#45d85c'; badge.style.color = '#06141a';
                               if (viewOut) sock.send(JSON.stringify({type:'viewout', out: viewOut})); };
-  sock.onclose = function() { badge.textContent = 'Offline'; badge.style.background = '#da3633'; setTimeout(connect, 2000); };
+  sock.onclose = function() { badge.textContent = 'Offline'; badge.style.background = '#f33abc'; badge.style.color = '#06141a'; setTimeout(connect, 2000); };
   sock.onmessage = function(e) {
     if (typeof e.data === 'string') {
       // Text frame: senders + log metadata (replaces HTTP polling)
@@ -598,12 +623,12 @@ function connect() {
     // rssi field is typed: <=0 WiFi STA dBm, >=10 wired link speed (Mbps), 1 = AP.
     var re = document.getElementById('rssi'), nl = document.getElementById('net-label');
     if (rssi >= 10) {                       // wired Ethernet
-      nl.textContent = 'LAN';  re.textContent = rssi + 'M';   re.style.color = '#3fb950';
+      nl.textContent = 'LAN';  re.textContent = rssi + 'M';   re.style.color = '#45d85c';
     } else if (rssi >= 1) {                 // standalone AP fallback
-      nl.textContent = 'AP';   re.textContent = 'active';     re.style.color = '#a371f7';
+      nl.textContent = 'AP';   re.textContent = 'active';     re.style.color = '#f33abc';
     } else {                                // WiFi STA, real signal strength
       nl.textContent = 'WiFi'; re.textContent = rssi + ' dBm';
-      re.style.color = rssi > -65 ? '#3fb950' : rssi > -80 ? '#e3b341' : '#f85149';
+      re.style.color = rssi > -65 ? '#45d85c' : rssi > -80 ? '#ffaa1c' : '#f33abc';
     }
     document.getElementById('heap').textContent   = (heap / 1024).toFixed(0) + ' KB';
     var h = Math.floor(upS / 3600), m = Math.floor((upS % 3600) / 60), s = upS % 60;

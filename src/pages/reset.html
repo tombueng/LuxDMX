@@ -7,11 +7,18 @@
 <link rel="icon" type="image/png" href="/favicon.png?v=__FWVER__">
 <link rel="stylesheet" href="/bootstrap.min.css?v=__FWVER__">
 <style>
-:root { --gh-bg:#0d1117; --gh-surface:#161b22; --gh-border:#30363d; --gh-text:#c9d1d9; --gh-muted:#8b949e; }
+:root { --gh-bg:#0d1117; --gh-surface:#161b22; --gh-border:#30363d; --gh-text:#c9d1d9; --gh-muted:#8b949e;
+  --lux-cyan:#23e6f7; --lux-magenta:#f33abc; --lux-amber:#ffaa1c; --lux-green:#45d85c; --lux-ink:#06141a; }
 [data-bs-theme="dark"] {
   --bs-body-bg: var(--gh-bg); --bs-body-color: var(--gh-text);
   --bs-card-bg: var(--gh-surface); --bs-card-border-color: var(--gh-border);
+  --bs-primary:#23e6f7; --bs-primary-rgb:35,230,247;
+  --bs-success:#45d85c; --bs-success-rgb:69,216,92;
+  --bs-warning:#ffaa1c; --bs-warning-rgb:255,170,28;
+  --bs-danger:#f33abc; --bs-danger-rgb:243,58,188;
 }
+.btn-primary{--bs-btn-bg:#23e6f7;--bs-btn-border-color:#23e6f7;--bs-btn-color:#06141a;--bs-btn-hover-bg:#5cedfb;--bs-btn-hover-border-color:#5cedfb;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#15bccc;--bs-btn-active-border-color:#15bccc;--bs-btn-active-color:#06141a;}
+.btn-danger{--bs-btn-bg:#f33abc;--bs-btn-border-color:#f33abc;--bs-btn-color:#06141a;--bs-btn-hover-bg:#ff5bcd;--bs-btn-hover-border-color:#ff5bcd;--bs-btn-hover-color:#06141a;--bs-btn-active-bg:#d11d9c;--bs-btn-active-border-color:#d11d9c;--bs-btn-active-color:#06141a;}
 body { background: var(--gh-bg); }
 .site-nav {
   background: var(--gh-surface); border-bottom: 1px solid var(--gh-border);
