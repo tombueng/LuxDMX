@@ -41,6 +41,23 @@
 		(45 "User.4" user)
 	)
 	(setup
+		(stackup
+			(layer "F.SilkS" (type "Top Silk Screen"))
+			(layer "F.Paste" (type "Top Solder Paste"))
+			(layer "F.Mask" (type "Top Solder Mask") (thickness 0.0152))
+			(layer "F.Cu" (type "copper") (thickness 0.035))
+			(layer "dielectric 1" (type "prepreg") (thickness 0.2104) (material "7628") (epsilon_r 4.05) (loss_tangent 0.0182))
+			(layer "In1.Cu" (type "copper") (thickness 0.0152))
+			(layer "dielectric 2" (type "core") (thickness 1.065) (material "FR4") (epsilon_r 4.6) (loss_tangent 0.02))
+			(layer "In2.Cu" (type "copper") (thickness 0.0152))
+			(layer "dielectric 3" (type "prepreg") (thickness 0.2104) (material "7628") (epsilon_r 4.05) (loss_tangent 0.0182))
+			(layer "B.Cu" (type "copper") (thickness 0.035))
+			(layer "B.Mask" (type "Bottom Solder Mask") (thickness 0.0152))
+			(layer "B.Paste" (type "Bottom Solder Paste"))
+			(layer "B.SilkS" (type "Bottom Silk Screen"))
+			(copper_finish "ENIG")
+			(dielectric_constraints no)
+		)
 		(pad_to_mask_clearance 0)
 		(allow_soldermask_bridges_in_footprints no)
 		(tenting
@@ -24660,7 +24677,7 @@
 	(via
 		(at 125.400714 148.960352)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "GND")
@@ -24741,7 +24758,7 @@
 	(via
 		(at 132.738245 144.316777)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "GND")
@@ -24813,7 +24830,7 @@
 	(via
 		(at 130.112884 155.995746)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "GND")
@@ -24894,7 +24911,7 @@
 	(via
 		(at 129.438725 144.301104)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "GND")
@@ -25092,7 +25109,7 @@
 	(via
 		(at 134.33494 147.281606)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "GND")
@@ -25191,7 +25208,7 @@
 	(via
 		(at 125.401898 150.564594)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "GND")
@@ -26260,7 +26277,7 @@
 	(via
 		(at 128.51441 144.900094)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "+3V3")
@@ -26341,7 +26358,7 @@
 	(via
 		(at 130.097833 144.703686)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "+3V3")
@@ -26458,7 +26475,7 @@
 	(via
 		(at 125.400714 151.539647)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "+3V3")
@@ -26467,7 +26484,7 @@
 	(via
 		(at 129.460352 155.599285)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "+3V3")
@@ -26476,7 +26493,7 @@
 	(via
 		(at 132.039647 144.900714)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "+3V3")
@@ -26494,7 +26511,7 @@
 	(via
 		(at 125.004253 149.612884)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "+3V3")
@@ -26503,7 +26520,7 @@
 	(via
 		(at 124.816777 148.261754)
 		(size 0.5)
-		(drill 0.25)
+		(drill 0.2)
 		(layers "F.Cu" "B.Cu")
 		(locked yes)
 		(net "+3V3")
@@ -30381,15 +30398,6 @@
 		(layer "F.Cu")
 		(net "CC2")
 		(uuid "ecef9273-2712-403b-a58f-687130b0837c")
-	)
-	(via
-		(at 149.273486 160.2498)
-		(size 0.5)
-		(drill 0.25)
-		(layers "F.Cu" "B.Cu")
-		(locked yes)
-		(net "CC2")
-		(uuid "2f961329-43e9-450b-98aa-d49c5898b334")
 	)
 	(segment
 		(start 108.78 117.75)
