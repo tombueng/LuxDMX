@@ -89,7 +89,7 @@ sub-step, never conclude from a single unvalidated run.**
 
 ## 2. Test setup (hardware-in-the-loop bench)
 
-![The hardware-in-the-loop bench: a LuxDMX controller (DUT) and an RDM-responder sim share one RS485 bus through MAX3485 transceivers; a custom 4-channel logic analyzer taps the four signals that matter — the controller's TX, EN and RX, and the sim's TX.](figures/bench_diagram)
+![The hardware-in-the-loop bench: a LuxDMX controller (DUT) and an RDM-responder sim share one RS485 bus through MAX3485 transceivers; a custom 4-channel logic analyzer taps the four signals that matter — the controller's TX, EN and RX, and the sim's TX.](figures/bench_diagram.png)
 
 ![The same bench in hardware. Three ESP32-S3 boards — DUT (the LuxDMX controller under test), SIM (the RDM responder) and LA (the four-channel logic analyzer) — with the two blue MAX3485 transceivers and the RS485 bus on the breadboard; the ribbon carries the four tapped signals to the analyzer.](figures/rig-setup.jpg){width=82%}
 
@@ -216,7 +216,7 @@ receives it at the same instant (**rx-latency 0 µs** — transceiver propagatio
 resolution). The decoded reply is 7×`0xFE` preamble + masked UID = a valid discovery response, and
 it is received by the controller.
 
-![Figure 1 — one full RDM discovery transaction on the wire. ctrlTX (the request) ends ~988 µs; the controller flips EN to receive ~12 µs later (orange); the responder replies at ~1614 µs and the controller receives it at the same instant (ctrlRX green = simTX red), decoded as 7×0xFE preamble + masked UID.](figures/hr05_timing)
+![Figure 1 — one full RDM discovery transaction on the wire. ctrlTX (the request) ends ~988 µs; the controller flips EN to receive ~12 µs later (orange); the responder replies at ~1614 µs and the controller receives it at the same instant (ctrlRX green = simTX red), decoded as 7×0xFE preamble + masked UID.](figures/hr05_timing.png)
 
 **Consequence (answers the headline question):** RDM E1.20 lets a responder reply no earlier than
 **176 µs** (RDM_TIMING_RESPONDER_MIN). The controller is already listening ~12–18 µs after its
@@ -253,7 +253,7 @@ hurt specifically by the AsyncTCP request-handling task competing with `loop()`,
 load per se** — which is exactly why the fix is "isolate the RDM service from the web task," not
 "turn WiFi off."
 
-![Figure 2 — controller TX→RX turnaround vs network load (N ≥ 25 per condition; WiFi present in all but the first group). WiFi-off and WiFi-on-idle are indistinguishable (~16 vs ~15 µs median), so the radio being on costs nothing; only active web traffic inflates the turnaround, and it scales with request *rate* — one browser ~31 µs, eight ~51 µs (worst case ~75 µs). Every bar, in every condition, stays below the 176 µs line (the earliest a compliant responder may legally reply), so no reply was ever missed.](figures/wifi_turnaround)
+![Figure 2 — controller TX→RX turnaround vs network load (N ≥ 25 per condition; WiFi present in all but the first group). WiFi-off and WiFi-on-idle are indistinguishable (~16 vs ~15 µs median), so the radio being on costs nothing; only active web traffic inflates the turnaround, and it scales with request *rate* — one browser ~31 µs, eight ~51 µs (worst case ~75 µs). Every bar, in every condition, stays below the 176 µs line (the earliest a compliant responder may legally reply), so no reply was ever missed.](figures/wifi_turnaround.png)
 
 **6.3 Capability matrix.**
 
@@ -308,7 +308,7 @@ condition §6.4 predicted should be *best*), the node's RDM discovery **failed a
 | WiFi | **15 / 15** |
 | Wired Ethernet (W5500 active) | **1 / 15** |
 
-![RDM discovery succeeds on every attempt over WiFi, but almost never with the W5500 wired interface active — same node, same bus, same responder; the only changed variable is the active Ethernet driver.](figures/eth_vs_wifi_rdm){width=62%}
+![RDM discovery succeeds on every attempt over WiFi, but almost never with the W5500 wired interface active — same node, same bus, same responder; the only changed variable is the active Ethernet driver.](figures/eth_vs_wifi_rdm.png){width=62%}
 
 On the wire the cause is visible. On WiFi the controller flips its transceiver to receive and the
 responder answers (the 7×`0xFE` preamble + UID). On Ethernet the **TX→RX turnaround does not happen**:
@@ -460,9 +460,9 @@ DMX/RDM *receiver*, and on the bench it took **10,157 frames off the RS485 wire 
 overrun errors** (WiFi off). So the chip receives DMX cleanly. The difficulty is specifically about
 protecting that ~5.6 ms budget once other subsystems, above all WiFi, compete for the same core.
 
-![ESP32-S3 + esp_dmx as a DMX receiver: 10,157 frames taken off the RS485 wire with zero framing or overrun errors (WiFi off). The receive path itself is sound.](figures/dmx_rx_reliability){width=80%}
+![ESP32-S3 + esp_dmx as a DMX receiver: 10,157 frames taken off the RS485 wire with zero framing or overrun errors (WiFi off). The receive path itself is sound.](figures/dmx_rx_reliability.png){width=80%}
 
-![The interrupt-latency budget that governs ESP32 DMX receive. A 128-byte UART RX FIFO buys about 5.6 ms of slack at the DMX byte rate; routine interrupt latency (even WiFi MAC bursts) sits far inside it, so frames are not lost. The only failure mode is a stall *longer* than the FIFO depth: a non-IRAM ISR frozen during a flash-cache blackout, a long noInterrupts() section, or CPU starvation. Keep the ISR in IRAM and the DMX work on a core away from WiFi.](figures/dmx_rx_budget){width=92%}
+![The interrupt-latency budget that governs ESP32 DMX receive. A 128-byte UART RX FIFO buys about 5.6 ms of slack at the DMX byte rate; routine interrupt latency (even WiFi MAC bursts) sits far inside it, so frames are not lost. The only failure mode is a stall *longer* than the FIFO depth: a non-IRAM ISR frozen during a flash-cache blackout, a long noInterrupts() section, or CPU starvation. Keep the ISR in IRAM and the DMX work on a core away from WiFi.](figures/dmx_rx_budget.png){width=92%}
 
 **And I ran it with WiFi active.** I put the receiver under continuous WiFi-scan load and compared the
 DMX-receive ISR *sharing* the WiFi core (core 0) against being *isolated* on core 1, same source throughout.
@@ -476,7 +476,7 @@ ESP32-S3 receives DMX cleanly *with WiFi running*. What still breaks it is a sta
 depth, a different failure (non-IRAM ISR during a flash write, a long noInterrupts(), CPU starvation), not
 routine WiFi interrupt latency.
 
-![With WiFi-scan load running throughout, the DMX-receive framing-error count stayed at ~0 whether the receive ISR shared the WiFi core (B) or was isolated on core 1 (C), the same as no-WiFi (A). The 128-byte FIFO + IRAM ISR absorb the WiFi-MAC interrupt latency. ~3,200 frames per condition.](figures/dmx_rx_wifi){width=80%}
+![With WiFi-scan load running throughout, the DMX-receive framing-error count stayed at ~0 whether the receive ISR shared the WiFi core (B) or was isolated on core 1 (C), the same as no-WiFi (A). The 128-byte FIFO + IRAM ISR absorb the WiFi-MAC interrupt latency. ~3,200 frames per condition.](figures/dmx_rx_wifi.png){width=80%}
 
 **And under real sustained traffic, not just scan load.** I joined the receiver to the bench WiFi as a
 station and had a host blast a continuous TCP stream at it (a raw sink on the device, drained as fast as it
@@ -501,7 +501,7 @@ That is the most likely root of "ESP32 DMX receive is unreliable" reports like y
 latency in itself (the FIFO soaks that up), but a driver or a code path that holds the receive ISR off
 longer than the FIFO can cover. esp_dmx is built to avoid it; a lot of simpler DMX libraries are not.
 
-![Receive failure modes, measured (~2,100 frames / 60 s each). Only blocking interrupts past the 5.6 ms FIFO budget corrupts receive (~13x baseline). Real flash writes during receive do not, because esp_dmx's IRAM ISR runs through the cache blackout; a driver without an IRAM ISR would corrupt here just like the blocked-ISR case.](figures/dmx_rx_failmodes){width=80%}
+![Receive failure modes, measured (~2,100 frames / 60 s each). Only blocking interrupts past the 5.6 ms FIFO budget corrupts receive (~13x baseline). Real flash writes during receive do not, because esp_dmx's IRAM ISR runs through the cache blackout; a driver without an IRAM ISR would corrupt here just like the blocked-ISR case.](figures/dmx_rx_failmodes.png){width=80%}
 
 I measured this exact effect from the controller side. The DMX/RDM transmit + turnaround runs in
 the Arduino `loop()` task, and the moment I put the device under WiFi/HTTP load a higher-priority
