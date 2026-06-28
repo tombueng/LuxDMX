@@ -34,8 +34,9 @@ the board was never left worse than the prior step; backups taken at each step.
   length-matched diff-pair routing needs the interactive GUI (the single-net auto-router can't do it) and a
   botched Ethernet re-route is the worst failure mode, so it is left for a supervised production spin.
   Functional for short 100BASE-TX as-is.
-- **Silk** — 62 cosmetic warnings (ref/label over a pad, near the edge, ref-on-ref in dense corners, the
-  informative back-silk tables). The fab auto-clips silk off pads and edges; accepted, not chased to zero.
+- **Silk** — `normalize_silk.py` re-placed 89 ref-des clear of pads/silk, dropping cosmetic warnings
+  **62 -> 46** (24 overlap / 16 edge / 6 over-copper). The rest are dense-area ref-on-ref, refs near the
+  edge (J*/MH* not moved) and the informative back-silk tables; fab auto-clips silk off pads/edges.
 
 ## How to re-run the validation
 ```
@@ -55,7 +56,7 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 | 1 | Routing complete (MACHINE-ENFORCED) | ✅ | `validate_connectivity.py` (kicad-cli DRC `unconnected_items`), wired into gen_gerbers.py + gen_cpl.py | **v4.01: 0 unrouted, machine-verified.** The gate ABORTS any fab export while a single net is unrouted; it caught **C17** (stranded INSIDE the DMX2 isolation void, planes cut away -> unconnectable). v4.01 (2026-06-28): C17 moved to the buck + via-in-pad; **bias R20-R23** placed + **re-routed by Freerouting on F.Cu only** (0 signal B.Cu, so the iso GND pour is not cut), and **122 GNDISO/GNDISO2 stitch vias** reconnect the F-pour fragments to the solid B-pour. **Isolation verified: 0 island-net copper leaves its island.** EN/IO0 preserved from HEAD (digital side locked, not re-routed). **0 DRC errors** after the 2026-06-29 hardening (the W5500 fan-out + USB-C CC2 fine-pitch near-misses resolved by the 0.15mm Default clearance). Fab package regenerated. |
 | 1b | 4-layer power stackup | ✅ | rebuild_iso (In1=GND, In2=+3V3 LT_POWER) | signals F/B only, planes solid; +3V3/GND pads stitched to planes |
 | 2 | DRC (electrical) | ✅ | kicad-cli pcb drc | **0 shorts, 0 clearance errors.** The 3 fine-pitch near-misses (W5500 0.5mm QFN + USB-C CC2, 0.16-0.174mm) resolved by setting Default clearance 0.2 -> 0.15mm; re-route to 0.2mm is geometrically impossible at 0.5mm pitch, 0.15mm still 68% over JLC's 0.0889mm min |
-| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | **62 cosmetic** silk warnings (31 overlap / 16 edge / 15 over-copper) after the v5 silk pass: ref/label over a pad, near the edge, ref-on-ref in dense corners, the informative back-silk tables. The fab auto-clips silk off pads/edges = no functional or fab impact. Accepted, not chased to zero; hand-tidy in the GUI if a clean silk render is wanted |
+| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | **46 cosmetic** silk warnings (24 overlap / 16 edge / 6 over-copper) after `normalize_silk.py` re-placed 89 ref-des clear of pads/silk (down from 62). The rest are dense-area ref-on-ref, refs near the edge (J*/MH* not moved) and the informative back-silk tables; fab auto-clips silk off pads/edges = no functional or fab impact. Accepted |
 | 4 | Net connectivity = intent | ✅ | board generated from `luxdmx.net` (SKiDL) | by construction; schematic reviewed pin-by-pin |
 | 5 | Decoupling/xtal/switcher placement (EMC) | ✅ | validate_placement.py + place_decoupling.py | caps snapped to IC pins, 2mm min gap, 0 overlaps (was 20-56mm) |
 | 5b | Board outline / mounting holes | ✅ | set_outline_holes.py | **99 x 79mm**; 4 corner M3 holes at **90 x 70mm spacing, uniform 4.5mm inset** (all 4 equal edge distance); 0 hole-vs-body collisions. Holes are **plated + tied to GND** (MountingHole_3.2mm_M3_Pad) so the 4 corners bond board GND to a metal chassis — see docs/ruggedization.md "Grounding & shielding". |
