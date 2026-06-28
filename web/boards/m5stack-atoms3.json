@@ -142,5 +142,24 @@
       "gpio": 35,
       "label": "NeoPixel"
     }
-  ]
+  ],
+  "phys": {
+    "usb": "bottom",
+    "pins": [
+      { "pos": 1, "side": "L", "silk": "GND", "type": "gnd" },
+      { "pos": 2, "side": "L", "silk": "5V", "type": "power" },
+      { "pos": 3, "side": "L", "silk": "G2", "type": "gpio", "gpio": 2 },
+      { "pos": 4, "side": "L", "silk": "G1", "type": "gpio", "gpio": 1 },
+      { "pos": 5, "side": "L", "silk": "G8", "type": "gpio", "gpio": 8 },
+      { "pos": 6, "side": "L", "silk": "G7", "type": "gpio", "gpio": 7 },
+      { "pos": 7, "side": "L", "silk": "G6", "type": "gpio", "gpio": 6 },
+      { "pos": 8, "side": "L", "silk": "G5", "type": "gpio", "gpio": 5 },
+      { "pos": 9, "side": "L", "silk": "3V3", "type": "power" },
+      { "pos": 1, "side": "R", "silk": "GND", "type": "gnd" },
+      { "pos": 2, "side": "R", "silk": "5V", "type": "power" },
+      { "pos": 3, "side": "R", "silk": "G38", "type": "gpio", "gpio": 38 },
+      { "pos": 4, "side": "R", "silk": "G39", "type": "gpio", "gpio": 39 },
+      { "pos": 5, "side": "R", "silk": "RST", "type": "en" }
+    ]
+  }
 }

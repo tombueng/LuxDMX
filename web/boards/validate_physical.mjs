@@ -1,25 +1,29 @@
 // Structural check for the curated physical headers (issue #17).
 //
 // For every board that ships a `phys` block it asserts the header is well-formed:
-//   - the expected total pin count for that board,
-//   - the power rails are present (3V3 + GND, plus EN/5V/VIN where applicable),
+//   - the power rails are present (3V3 + a GND), plus the exact rails we expect on
+//     the hand-checked boards,
 //   - every `gpio` referenced by a physical pin also exists in the board's `cols`
 //     GPIO list (so the diagram and the validator can never disagree),
 //   - no two pins share the same side+pos,
 //   - every silk label is a non-empty string,
-//   - only `type:"gpio"` pins carry a gpio; power/gnd/en/nc never do.
+//   - only `type:"gpio"` pins carry a gpio; power/gnd/en/nc never do,
+//   - the USB edge is set.
+//
+// Boards listed in EXPECT are checked strictly (exact pin count + named rails).
+// Any other board that has a `phys` block is auto-discovered and checked against
+// the generic rules, so curating a new board needs no edit here.
 //
 // Run:  node web/boards/validate_physical.mjs
-// Exits non-zero on the first board that fails, so it doubles as a CI gate.
+// Exits non-zero on any failure, so it doubles as a CI gate.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 
-// Boards we curated by hand, with the pin count we expect for each footprint.
-// rails = silk labels that must be present; enable = an enable/reset pin must exist
-// (its silk is "EN" on the classic boards but "RST" on the S3 DevKitC-1).
+// Hand-checked boards, with the pin count we expect for each footprint.
+// rails = silk labels that must be present.
 const EXPECT = {
   'esp32-devkitc':     { pins: 38, rails: ['3V3', 'GND', '5V'] },
   'nodemcu-32s':       { pins: 38, rails: ['3V3', 'GND', '5V'] },
@@ -38,22 +42,17 @@ function gpioSet(desc) {
   return set;
 }
 
-function checkBoard(id, expect) {
-  const file = path.join(DIR, id + '.json');
-  if (!fs.existsSync(file)) { fail(id, 'descriptor file missing'); return; }
-  const d = JSON.parse(fs.readFileSync(file, 'utf8'));
+function checkBoard(id, desc, expect) {
+  if (!desc.phys || !Array.isArray(desc.phys.pins)) { fail(id, 'no phys.pins array'); return; }
+  const pins = desc.phys.pins;
 
-  if (!d.phys || !Array.isArray(d.phys.pins)) { fail(id, 'no phys.pins array'); return; }
-  const pins = d.phys.pins;
+  // exact pin count only for the strictly-expected boards
+  if (expect && pins.length !== expect.pins) fail(id, `expected ${expect.pins} pins, got ${pins.length}`);
 
-  // total pin count
-  if (pins.length !== expect.pins) fail(id, `expected ${expect.pins} pins, got ${pins.length}`);
+  if (!['top', 'bottom', 'left', 'right'].includes(desc.phys.usb || ''))
+    fail(id, `phys.usb must be top/bottom/left/right, got ${JSON.stringify(desc.phys.usb)}`);
 
-  // usb edge present + sane
-  if (!['top', 'bottom', 'left', 'right'].includes(d.phys.usb || ''))
-    fail(id, `phys.usb must be top/bottom/left/right, got ${JSON.stringify(d.phys.usb)}`);
-
-  const cols = gpioSet(d);
+  const cols = gpioSet(desc);
   const seenPos = new Set();
   const silks = new Set();
 
@@ -77,25 +76,40 @@ function checkBoard(id, expect) {
     }
   }
 
-  // required power rails (by silk) + a ground + an enable/reset pin (by type)
-  for (const rail of expect.rails)
+  // named power rails: exact list on the strict boards, just 3V3 + GND everywhere else
+  const rails = expect ? expect.rails : ['3V3', 'GND'];
+  for (const rail of rails)
     if (!silks.has(rail)) fail(id, `missing power rail "${rail}"`);
   if (!pins.some((p) => p.type === 'gnd')) fail(id, 'missing a GND pin');
-  if (!pins.some((p) => p.type === 'en')) fail(id, 'missing an enable/reset (EN/RST) pin');
-
-  // at least one assignable GPIO, obviously
   if (!pins.some((p) => p.type === 'gpio')) fail(id, 'no assignable gpio pins');
+  // strict boards must also break out an enable/reset pin
+  if (expect && !pins.some((p) => p.type === 'en')) fail(id, 'missing an enable/reset (EN/RST) pin');
 }
 
 console.log('Validating curated physical headers...');
-for (const [id, expect] of Object.entries(EXPECT)) {
+
+// Every *.json with a phys block (index.json has none, so it's skipped naturally).
+const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.json') && f !== 'index.json');
+let checked = 0;
+for (const f of files.sort()) {
+  const id = f.replace(/\.json$/, '');
+  let desc;
+  try { desc = JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')); }
+  catch (e) { fail(id, `invalid JSON: ${e.message}`); continue; }
+  if (!desc.phys) continue;   // not curated yet
   const before = failures;
-  checkBoard(id, expect);
-  if (failures === before) console.log(`  ✓ ${id} (${expect.pins} pins)`);
+  checkBoard(id, desc, EXPECT[id]);
+  checked++;
+  const n = desc.phys.pins ? desc.phys.pins.length : '?';
+  if (failures === before) console.log(`  ✓ ${id} (${n} pins${EXPECT[id] ? '' : ', auto'})`);
 }
 
+// the four hand-checked boards must always be present and curated
+for (const id of Object.keys(EXPECT))
+  if (!fs.existsSync(path.join(DIR, id + '.json'))) fail(id, 'expected board descriptor is missing');
+
 if (failures) {
-  console.error(`\n${failures} problem(s) found.`);
+  console.error(`\n${failures} problem(s) found across ${checked} curated board(s).`);
   process.exit(1);
 }
-console.log('\nAll curated physical headers are well-formed.');
+console.log(`\nAll ${checked} curated physical header(s) are well-formed.`);

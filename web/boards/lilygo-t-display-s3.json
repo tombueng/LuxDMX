@@ -189,5 +189,34 @@
       }
     ]
   },
-  "_source": "auto from variants/lilygo_t_display_s3/pins_arduino.h"
+  "_source": "auto from variants/lilygo_t_display_s3/pins_arduino.h",
+  "phys": {
+    "usb": "bottom",
+    "pins": [
+      { "pos": 1, "side": "L", "silk": "5V", "type": "power" },
+      { "pos": 2, "side": "L", "silk": "GND", "type": "gnd" },
+      { "pos": 3, "side": "L", "silk": "NC", "type": "nc" },
+      { "pos": 4, "side": "L", "silk": "NC", "type": "nc" },
+      { "pos": 5, "side": "L", "silk": "IO13", "type": "gpio", "gpio": 13 },
+      { "pos": 6, "side": "L", "silk": "IO12", "type": "gpio", "gpio": 12 },
+      { "pos": 7, "side": "L", "silk": "IO11", "type": "gpio", "gpio": 11 },
+      { "pos": 8, "side": "L", "silk": "IO10", "type": "gpio", "gpio": 10 },
+      { "pos": 9, "side": "L", "silk": "IO3", "type": "gpio", "gpio": 3 },
+      { "pos": 10, "side": "L", "silk": "IO2", "type": "gpio", "gpio": 2 },
+      { "pos": 11, "side": "L", "silk": "IO1", "type": "gpio", "gpio": 1 },
+      { "pos": 12, "side": "L", "silk": "3V3", "type": "power" },
+      { "pos": 1, "side": "R", "silk": "3V3", "type": "power" },
+      { "pos": 2, "side": "R", "silk": "GND", "type": "gnd" },
+      { "pos": 3, "side": "R", "silk": "GND", "type": "gnd" },
+      { "pos": 4, "side": "R", "silk": "NC", "type": "nc" },
+      { "pos": 5, "side": "R", "silk": "IO16", "type": "gpio", "gpio": 16 },
+      { "pos": 6, "side": "R", "silk": "IO21", "type": "gpio", "gpio": 21 },
+      { "pos": 7, "side": "R", "silk": "IO17", "type": "gpio", "gpio": 17 },
+      { "pos": 8, "side": "R", "silk": "IO18", "type": "gpio", "gpio": 18 },
+      { "pos": 9, "side": "R", "silk": "IO44", "type": "gpio", "gpio": 44 },
+      { "pos": 10, "side": "R", "silk": "IO43", "type": "gpio", "gpio": 43 },
+      { "pos": 11, "side": "R", "silk": "GND", "type": "gnd" },
+      { "pos": 12, "side": "R", "silk": "GND", "type": "gnd" }
+    ]
+  }
 }
