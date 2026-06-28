@@ -74,7 +74,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Standalone AP mode** | LuxDMX hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
 | **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, or reboot. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
 | **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
-| **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click GitHub update |
+| **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
 | **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
 | **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v4 board) — codes network/idle/DMX/conflict/identify state |
@@ -453,7 +453,7 @@ pio run --target upload
 
 ### OTA Updates (after first flash)
 
-- **From browser:** open `http://dmx-gateway.local/config` → Firmware Update section → upload a `.bin` file or click "Update from GitHub"
+- **From browser:** open `http://dmx-gateway.local/config` → Firmware Update section → upload a `.bin` file or click "Update from LuxDMX.org". (The home page also has an **Update** button when a newer release is out, which installs the latest straight away.)
 
 | Downloading update | Back online |
 |---|---|
@@ -467,7 +467,7 @@ upload_flags    = --auth=dmxota
 ```
 
 > The **OTA Password** (Settings → Device) guards **only** this IDE / PlatformIO
-> `espota` path. The browser "Firmware Update" above (`.bin` upload + GitHub install)
+> `espota` path. The browser "Firmware Update" above (`.bin` upload + luxdmx.org install)
 > is **not** protected by it.
 
 ---
@@ -582,7 +582,8 @@ values are fetched as JSON.
 | `/version.json` | GET | Current firmware version + update-available flag |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
-| `/ota/github` | POST | Install a release from GitHub (`version=latest` or `1.0.N`) |
+| `/ota/github` | POST | Install a release (downloaded via luxdmx.org; `version=latest` or `1.0.N`) |
+| `/ota/status` | GET | Live progress of an in-flight install (`{phase,pct}`) — the update page polls it |
 
 ### WebSocket (`ws://<device>/ws`, port 80)
 
