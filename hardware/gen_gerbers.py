@@ -28,6 +28,11 @@ if not CLI or not os.path.exists(CLI):
     else:
         raise SystemExit("kicad-cli not found - set $KICAD_CLI")
 
+# HARD GATE (the C17 lesson): refuse to emit gerbers while ANY net is unrouted.
+# This makes "validated but shipped an unrouted cap" structurally impossible. See validate_connectivity.py.
+from validate_connectivity import check_connectivity
+check_connectivity(PCB, CLI)   # raises SystemExit on any unconnected net -> no gerbers get produced
+
 tmp = tempfile.mkdtemp(prefix="luxdmx_gbr_")
 try:
     subprocess.run([CLI, "pcb", "export", "gerbers", PCB, "-o", tmp + os.sep,

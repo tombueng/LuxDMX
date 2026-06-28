@@ -27,10 +27,10 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 
 | # | Item | Status | Method | Result / action |
 |---|------|--------|--------|-----------------|
-| 1 | Routing complete | ✅ | autoroute + DRC connectivity | **0 unrouted** (full pipeline: rebuild_iso → escape_connectors → autoroute_fr2 → cleanup_pads → tighten_poe_void, + route_one for stragglers). 2 W5500 fan-out clearances at 0.174mm = JLCPCB-4L ok |
+| 1 | Routing complete (MACHINE-ENFORCED) | ✅ | `validate_connectivity.py` (kicad-cli DRC `unconnected_items`), wired into gen_gerbers.py + gen_cpl.py | **v4.01: 0 unrouted, machine-verified.** The gate ABORTS any fab export while a single net is unrouted; it caught **C17** (stranded INSIDE the DMX2 isolation void, planes cut away -> unconnectable). v4.01 (2026-06-28): C17 moved to the buck + via-in-pad; **bias R20-R23** placed + **re-routed by Freerouting on F.Cu only** (0 signal B.Cu, so the iso GND pour is not cut), and **122 GNDISO/GNDISO2 stitch vias** reconnect the F-pour fragments to the solid B-pour. **Isolation verified: 0 island-net copper leaves its island.** EN/IO0 preserved from HEAD (digital side locked, not re-routed). 3 DRC errors = the known W5500 fan-out + USB-C CC2 near-misses (JLCPCB-4L ok). Fab package regenerated. |
 | 1b | 4-layer power stackup | ✅ | rebuild_iso (In1=GND, In2=+3V3 LT_POWER) | signals F/B only, planes solid; +3V3/GND pads stitched to planes |
 | 2 | DRC (electrical) | ⚠️ | kicad-cli pcb drc | 0 shorts; 2 W5500 pin4/16 trace near-misses + 3 DISP_DC-near-edge (local hand-fix); waivable CC2↔SBU1 |
-| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | 37 (6 over-copper / 15 overlap / 16 edge), cosmetic + mask-protected; silk-over-pad = 0, courtyard = 0 (re-verified post-reroute) |
+| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | 44 silk warnings (24 overlap / 14 edge / 6 over-copper) after the **E1.11 silk pass** (COM/D1-/D1+ pin labels + ISO port marks, 2026-06-27); cosmetic, silk-over-pad = 0, courtyard = 0, text-height = 0. Extra overlap vs the old 37 is the 3-char standard abbreviations on the 1mm-pitch J7/J8 breakout (inherent, legible 0.8mm kept) |
 | 4 | Net connectivity = intent | ✅ | board generated from `luxdmx.net` (SKiDL) | by construction; schematic reviewed pin-by-pin |
 | 5 | Decoupling/xtal/switcher placement (EMC) | ✅ | validate_placement.py + place_decoupling.py | caps snapped to IC pins, 2mm min gap, 0 overlaps (was 20-56mm) |
 | 5b | Board outline / mounting holes | ✅ | set_outline_holes.py | **99 x 79mm**; 4 corner M3 holes at **90 x 70mm spacing, uniform 4.5mm inset** (all 4 equal edge distance); 0 hole-vs-body collisions. Holes are **plated + tied to GND** (MountingHole_3.2mm_M3_Pad) so the 4 corners bond board GND to a metal chassis — see docs/ruggedization.md "Grounding & shielding". |
@@ -74,6 +74,14 @@ pass closed the remaining gaps and improved EMC. Full rationale + part numbers i
 - **F1 PPTC (1.5A/16V, 25mΩ)** — self-healing fuse on USB VBUS; the TPS2116 OR mux (U9) keeps the B0505S margin. (22/9)
 - **D11 SMAJ5.0A** — +5V transient/overvoltage clamp. (23)
 - **L2/L3 ACM2012-201-2P** — common-mode chokes on each DMX pair, cable side, after the TVS. (24)
+- **F2-F5 Bourns TBU-CA065-200-WH (200mA/650V high-speed protector, C913221)** — series TBU per DMX data
+  line for **DMX512-A Protected** (Annex C, the "fault-protected" approach). Chain: cable/XLR + breakout →
+  **TBU** → SM712 TVS → choke → transceiver; a sustained 30VAC/42VDC fault makes the TBU trigger in <1µs and
+  BLOCK (650V standoff) so the SM712 only sees the sub-µs transient. v5.00 replaced the v4.01 PTC (its ms
+  thermal trip let ~19A through the SM712 → would cook). SPICE-confirmed (spice/sim_tbu.py); 8.6Ω×2 series is
+  signal-OK (far receiver 7-10× threshold). 4.0mm cable-side creepage; board widened 20mm right to fit the
+  bigger TBU + keep all 4 corner MH on GND. **Annex-C survival bench-test still pending** before the silk
+  "Protected" mark. (see E1.11_COMPLIANCE.md)
 - **FB1/FB2/FB3 (600Ω@100MHz)** — pi-filter the isolated DMX DC-DC input (+5V) and outputs (VISO/VISO2). (25)
 - **Conformal coating** — assembly note for humidity/dust (no BOM part). (26)
 - **Grounding/shielding** — 4 mounting holes are plated + on GND to bond the digital ground to a

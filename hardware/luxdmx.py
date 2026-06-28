@@ -64,8 +64,11 @@ DMX2_TX = Net('DMX2_TX'); DMX2_RX = Net('DMX2_RX'); DMX2_EN = Net('DMX2_EN')
 DMX2_A = Net('DMX2_A'); DMX2_B = Net('DMX2_B')
 # --- ruggedization (harsh-environment hardening): cable-side DMX nets (after the CM chokes),
 #     fused/filtered power rails. See VALIDATION.md "Ruggedization" + docs/ruggedization.md ---
-DMX_AO = Net('DMX_AO'); DMX_BO = Net('DMX_BO')            # DMX1 after L2 common-mode choke (XLR/cable side)
+DMX_AO = Net('DMX_AO'); DMX_BO = Net('DMX_BO')            # DMX1 after L2 common-mode choke (SM712/choke node)
 DMX2_AO = Net('DMX2_AO'); DMX2_BO = Net('DMX2_BO')        # DMX2 after L3 common-mode choke
+# DMX512-A Protected (Annex C): cable/XLR side of the per-line series PTC. cable -> DMX_*X -> PTC -> DMX_*O (SM712)
+DMX_AX = Net('DMX_AX'); DMX_BX = Net('DMX_BX')            # DMX1 XLR/breakout side of F2/F3 PTC
+DMX2_AX = Net('DMX2_AX'); DMX2_BX = Net('DMX2_BX')        # DMX2 XLR/breakout side of F4/F5 PTC
 P5V_USBF = Net('+5V_USBF')                                # USB VBUS after F1 PTC resettable fuse
 P5V_DMX = Net('+5V_DMX')                                  # +5V after FB1 ferrite -> isolated DMX DC-DC inputs
 VISO_DRV = Net('VISO_DRV'); VISO2_DRV = Net('VISO2_DRV')  # DMX-driver supply after FB2/FB3 ferrite
@@ -332,6 +335,13 @@ Cb = C('C21', '10uF', 'Capacitor_SMD:C_1206_3216Metric'); Cb[1] += P5V_DMX; Cb[2
 
 # DMX termination (at the transceiver) + L2 common-mode choke + TVS clamp (at the cable) + XLR-5
 Rterm = R('R12', '120R', 'Resistor_SMD:R_0805_2012Metric'); Rterm[1] += DMX_A; Rterm[2] += DMX_B
+# Fail-safe BIAS (RDM idle): pull DMX_A up to the isolated 5V (VISO_DRV) and DMX_B down to GND2, on the
+# ISOLATED side. ~470R holds the idle differential >=~250mV even worst-case (both ends terminated -> 60R,
+# VISO=5V: 5*60/(60+2*470)=300mV), so the ISO3086 receiver reads a defined MARK when the bus is undriven
+# during the RDM turnaround (no bias = floating idle line = the 36% framing errors seen on the breadboard
+# rig). ~5mA/universe, the B0505S shrugs it off. Not an E1.11 requirement; an RDM-receive robustness add.
+Rb1a = R('R20', '470R'); Rb1a[1] += DMX_A; Rb1a[2] += VISO_DRV
+Rb1b = R('R21', '470R'); Rb1b[1] += DMX_B; Rb1b[2] += GND2
 CMC = mk('ACM2012-201-2P', 'L', 'Inductor_SMD:L_CommonModeChoke_Coilank_ACM2012',
          [(1, '1', PT.PASSIVE), (2, '2', PT.PASSIVE), (3, '3', PT.PASSIVE), (4, '4', PT.PASSIVE)],
          value='ACM2012-201-2P')
@@ -339,7 +349,21 @@ L2 = CMC(); L2.ref = 'L2'
 L2[1] += DMX_A; L2[4] += DMX_AO; L2[2] += DMX_B; L2[3] += DMX_BO   # windings A:1-4, B:2-3 (in=left 1/2, out=right 4/3)
 TVS = mk('SM712', 'D', 'Package_TO_SOT_SMD:SOT-23',
          [(1, 'IO1', PT.PASSIVE), (2, 'GND', PT.PASSIVE), (3, 'IO2', PT.PASSIVE)], value='SM712')
-D1 = TVS(); D1.ref = 'D1'; D1['IO1'] += DMX_AO; D1['GND'] += GND2; D1['IO2'] += DMX_BO   # clamp incoming surge at the cable
+D1 = TVS(); D1.ref = 'D1'; D1['IO1'] += DMX_AO; D1['GND'] += GND2; D1['IO2'] += DMX_BO   # clamp (transceiver side of the TBU)
+# DMX512-A Protected (Annex C): series TBU high-speed protector per data line, between the XLR/cable (DMX_*X)
+# and the SM712/choke node (DMX_*O). Bourns TBU-CA065-200-WH (C913221): bidirectional electronic current
+# limiter, 200mA hold / 650V standoff / 8.6R / <1us response. On a sustained 30VAC/42VDC fault the current
+# rises and the TBU TRIGGERS in <1us, going high-Z and BLOCKING the fault (holds off up to 650V); the SM712
+# then only sees the sub-us trigger transient (exactly its 8/20us job) -- no sustained current, nothing
+# overheats. Self-resets when the fault clears. This is why the TBU replaces the slow PTC: the 1.5R PTC let
+# ~19A through the SM712 for ms before its thermal trip; the TBU blocks before the SM712 can overheat (the
+# standard's named "fault-protected" approach). Pin 1/3 = the two terminals (bidirectional, interchangeable),
+# pin 2 = NU (not used, left unconnected). 8.6R x2 series is signal-OK: ~1.75V at the far receiver (8.7x the
+# 200mV threshold), RDM near-end reflection ~6.6%. I_op 200mA vs ~50mA DMX peak = 4x no-nuisance-trip margin.
+TBU = mk('TBU-CA065-200-WH', 'F', 'C913221:DIO-SMD_3P-L6.5-W4.0-BI',
+         [(1, 'IN/OUT', PT.PASSIVE), (2, 'NU', PT.NOCONNECT), (3, 'OUT/IN', PT.PASSIVE)], value='TBU 200mA 650V')
+F2 = TBU(); F2.ref = 'F2'; F2[1] += DMX_AX; F2[3] += DMX_AO   # DMX1 Data+ protect (pin2 NU unconnected)
+F3 = TBU(); F3.ref = 'F3'; F3[1] += DMX_BX; F3[3] += DMX_BO   # DMX1 Data- protect
 # 5-pin XLR (E1.11/DMX512-A): Neutrik NC5FAH (C368501) -- female, horizontal THT PCB mount.
 #   1=shield/common 2=Data1- 3=Data1+; 4/5 = optional 2nd data link, NC for one driver per port.
 #   G/6/7 = shell + mounting posts -> tied to the isolated DMX ground.
@@ -350,7 +374,7 @@ XLR = mk('NC5FAH', 'J', 'C368501:CONN-TH_NC5FAH',
          value='XLR-5 NC5FAH')
 J1 = XLR(); J1.ref = 'J1'
 J1['SHIELD'] += GND2; J1['SHELL'] += GND2; J1[6] += GND2; J1[7] += GND2
-J1['DATA-'] += DMX_BO; J1['DATA+'] += DMX_AO
+J1['DATA-'] += DMX_BX; J1['DATA+'] += DMX_AX   # cable side of the F2/F3 PTC (Protected)
 
 # ============================================================================
 # Isolated DMX universe 2:  U6 ISO3086DWR + PS2 B0505S iso-DCDC + J5 XLR-3 + protection
@@ -373,12 +397,18 @@ Cb2 = C('C26', '10uF', 'Capacitor_SMD:C_1206_3216Metric'); Cb2[1] += P5V_DMX; Cb
 
 # DMX2 termination + L3 common-mode choke + TVS clamp (at the cable) + XLR-5
 Rterm2 = R('R19', '120R', 'Resistor_SMD:R_0805_2012Metric'); Rterm2[1] += DMX2_A; Rterm2[2] += DMX2_B
+# Fail-safe BIAS for universe 2 (mirror of R20/R21, on the VISO2/GNDISO2 island)
+Rb2a = R('R22', '470R'); Rb2a[1] += DMX2_A; Rb2a[2] += VISO2_DRV
+Rb2b = R('R23', '470R'); Rb2b[1] += DMX2_B; Rb2b[2] += GNDI2
 L3 = CMC(); L3.ref = 'L3'
 L3[1] += DMX2_A; L3[4] += DMX2_AO; L3[2] += DMX2_B; L3[3] += DMX2_BO   # windings A:1-4, B:2-3
-D7 = TVS(); D7.ref = 'D7'; D7['IO1'] += DMX2_AO; D7['GND'] += GNDI2; D7['IO2'] += DMX2_BO
+D7 = TVS(); D7.ref = 'D7'; D7['IO1'] += DMX2_AO; D7['GND'] += GNDI2; D7['IO2'] += DMX2_BO   # clamp (transceiver side of the TBU)
+# DMX512-A Protected universe 2: series TBU F4/F5 (mirror of F2/F3), DMX2_*X -> TBU -> DMX2_*O
+F4 = TBU(); F4.ref = 'F4'; F4[1] += DMX2_AX; F4[3] += DMX2_AO   # DMX2 Data+ protect (pin2 NU unconnected)
+F5 = TBU(); F5.ref = 'F5'; F5[1] += DMX2_BX; F5[3] += DMX2_BO   # DMX2 Data- protect
 J5 = XLR(); J5.ref = 'J5'
 J5['SHIELD'] += GNDI2; J5['SHELL'] += GNDI2; J5[6] += GNDI2; J5[7] += GNDI2
-J5['DATA-'] += DMX2_BO; J5['DATA+'] += DMX2_AO
+J5['DATA-'] += DMX2_BX; J5['DATA+'] += DMX2_AX   # cable side of the F4/F5 PTC (Protected)
 
 # ============================================================================
 # Status LEDs (direct on S3 GPIOs): GPIO -> R -> LED anode, cathode -> GND
@@ -443,9 +473,9 @@ SH3 = mk('Conn_JSTSH3', 'J', 'Connector_JST:JST_SH_SM03B-SRSS-TB_1x03-1MP_P1.00m
          [(1, '1', PT.PASSIVE), (2, '2', PT.PASSIVE), (3, '3', PT.PASSIVE), ('MP', 'MP', PT.PASSIVE)],
          value='DMX SH3')
 J7 = SH3(); J7.ref = 'J7'; J7.value = 'DMX-OUT A'
-J7[1] += GND2;  J7[2] += DMX_BO;  J7[3] += DMX_AO;  J7['MP'] += GND2
+J7[1] += GND2;  J7[2] += DMX_BX;  J7[3] += DMX_AX;  J7['MP'] += GND2   # cable side of the PTC
 J8 = SH3(); J8.ref = 'J8'; J8.value = 'DMX-OUT B'
-J8[1] += GNDI2; J8[2] += DMX2_BO; J8[3] += DMX2_AO; J8['MP'] += GNDI2
+J8[1] += GNDI2; J8[2] += DMX2_BX; J8[3] += DMX2_AX; J8['MP'] += GNDI2   # cable side of the PTC
 
 # ============================================================================
 # Mounting holes — PLATED M3, tied to board GND. The 4 corners bond the DIGITAL ground

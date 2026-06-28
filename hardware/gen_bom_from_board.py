@@ -56,6 +56,9 @@ INFO = {
     "J5": ("Neutrik NC5FAH XLR-5 female horizontal PCB (E1.11 DMX out, universe 2)", "C368501"),
     "D7": ("SM712 TVS SOT-23 (universe 2)", "C404012"),
     "R19": ("120R 0805 (DMX-B termination)", "C17437"),
+    # fail-safe bias (RDM idle), 470R 0402 1% UNI-ROYAL 0402WGF4700TCE (JLCPCB Basic, in stock)
+    "R20": ("470R 0402 (DMX-A fail-safe bias)", "C25117"), "R21": ("470R 0402 (DMX-B fail-safe bias)", "C25117"),
+    "R22": ("470R 0402 (DMX2-A fail-safe bias)", "C25117"), "R23": ("470R 0402 (DMX2-B fail-safe bias)", "C25117"),
     "C23": ("100nF 0402", "C1525"), "C24": ("100nF 0402", "C1525"),
     "C25": ("10uF 1206", "C13585"), "C26": ("10uF 1206", "C13585"),
     # ---- PoE PD stage + 5V source OR-ing ----
@@ -69,6 +72,13 @@ INFO = {
     "C29": ("22uF 0805 (+5V rail bulk)", "C45783"),
     # ---- ruggedization: protection / EMC parts ----
     "F1": ("BSMD1206-150-16V 1.5A/16V resettable PPTC fuse (USB VBUS)", "C883133"),
+    # DMX512-A Protected (Annex C): series TBU high-speed protector per data line, TBU-CA065-200-WH
+    # 200mA/650V/8.6R bidirectional electronic current limiter (in stock C913221); the standard's named
+    # "fault-protected" approach -- blocks a sustained fault in <1us so the SM712 only sees the transient.
+    "F2": ("TBU-CA065-200-WH 200mA 650V high-speed protector (DMX Protected series)", "C913221"),
+    "F3": ("TBU-CA065-200-WH 200mA 650V high-speed protector (DMX Protected series)", "C913221"),
+    "F4": ("TBU-CA065-200-WH 200mA 650V high-speed protector (DMX Protected series)", "C913221"),
+    "F5": ("TBU-CA065-200-WH 200mA 650V high-speed protector (DMX Protected series)", "C913221"),
     "U8": ("USBLC6-2SC6 USB ESD/TVS array (SOT-23-6)", "C7519"),
     "D11": ("SMAJ5.0A TVS SMA (+5V transient clamp)", "C151932"),
     "L2": ("ACM2012-201-2P common-mode choke (DMX-A pair)", "C383338"),
@@ -104,6 +114,15 @@ for fp in b.GetFootprints():
     fpn = str(fp.GetFPID().GetLibItemName())
     key = lcsc if lcsc else f"\x00{comment}\x00{fpn}"
     groups[key].append((ref, comment, fpn, lcsc))
+
+# HARD GATE (the C17 lesson, for assembly): a placed part with NO BOM/LCSC entry would ship
+# UNPOPULATED. Refuse to write a BOM that silently drops placed parts.
+if not_in_bom:
+    import sys
+    print(f"!! ABORT: {len(not_in_bom)} placed part(s) have NO BOM/LCSC entry (would ship UNPOPULATED): "
+          f"{sorted(not_in_bom, key=k)}")
+    print("   Add each to INFO with an in-stock LCSC# (verify stock first), then re-run.")
+    sys.exit(1)
 
 rows = [["Comment", "Designator", "Footprint", "LCSC Part #"]]
 body = []

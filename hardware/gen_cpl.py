@@ -28,6 +28,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
 OUT = os.path.join(HERE, "luxdmx_CPL.csv")
 
+# HARD GATE (the C17 lesson): no assembly CPL for a board with unrouted nets. See validate_connectivity.py.
+import sys as _sys; _sys.path.insert(0, HERE)
+from validate_connectivity import check_connectivity
+check_connectivity(PCB)   # raises SystemExit on any unconnected net
+
 # Per-footprint rotation correction (degrees added to CPL). Exact footprint-name
 # match. Add entries as verified on the JLCPCB preview. easyeda footprints
 # (e.g. "SOT-23-5_L3.0-W1.7-...", "LQFP-48_L7.0-...") deliberately NOT listed.

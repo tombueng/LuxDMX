@@ -9,6 +9,7 @@ Idempotent (clears its own front+back silk first). Does NOT touch the LED legend
 outside the connector region). Run standalone after placement. KiCad 10 python.
 """
 import pcbnew
+from hw_version import HW_VERSION
 PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 FS, BS = pcbnew.F_SilkS, pcbnew.B_SilkS
@@ -106,7 +107,7 @@ table("DISPLAY  J4", J4, 132.0, 110.0)
 
 # ---- BACK: key-features grid (mirrored). 2 cols; file order DETAIL|FEATURE so back view reads
 #      FEATURE | DETAIL. Isolation values are datasheet-confirmed (see VALIDATION_REPORT.md). ----
-FEAT = [("INPUT", "Art-Net / sACN"), ("OUTPUTS", "2x isolated DMX512-A"),
+FEAT = [("INPUT", "Art-Net / sACN"), ("OUTPUTS", "2x DMX512-A Protected"),
         ("DMX ISO", "1kV galvanic (B0505S)"), ("ISO XCVR", "ISO3086 2.5kVrms"),
         ("PoE", "802.3af, 1500V iso"), ("POWER", "USB-C 5V or PoE (OR-ed)"),
         ("CORE", "ESP32-S3 + W5500 10/100"), ("GROUND", "M3 screws -> metal case"),
@@ -121,7 +122,7 @@ for i in range(fn + 1):
 for vx in (FX, FX + WDE, FX + FTW):
     line(vx, FY, vx, FY + fn*FRH, BS, 0.12)
 cDE, cFE = FX + WDE/2, FX + WDE + WFE/2
-text("LuxDMX v4 -- KEY FEATURES", FX + FTW/2, FY - 1.6, 1.5, BS, mirror=True)
+text("LuxDMX v%s -- KEY FEATURES" % HW_VERSION, FX + FTW/2, FY - 1.6, 1.5, BS, mirror=True)
 text("DETAIL", cDE, FY + FRH/2, 1.1, BS, mirror=True); text("FEATURE", cFE, FY + FRH/2, 1.1, BS, mirror=True)
 for r, (feat, det) in enumerate(FEAT):
     yc = FY + (r+1)*FRH + FRH/2

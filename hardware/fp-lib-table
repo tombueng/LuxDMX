@@ -10,4 +10,5 @@
   (lib (name "C78988")(type "KiCad")(uri "${KIPRJMOD}/easyeda/C78988.pretty")(options "")(descr ""))
   (lib (name "C84681")(type "KiCad")(uri "${KIPRJMOD}/easyeda/C84681.pretty")(options "")(descr ""))
   (lib (name "C91754")(type "KiCad")(uri "${KIPRJMOD}/easyeda/C91754.pretty")(options "")(descr ""))
+  (lib (name "C913221")(type "KiCad")(uri "${KIPRJMOD}/easyeda/C913221.pretty")(options "")(descr "Bourns TBU-CA065-200-WH high-speed protector"))
 )
