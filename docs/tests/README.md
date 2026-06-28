@@ -59,11 +59,16 @@ They always restore the original configuration afterwards.
 | `manual-blackout.spec.mjs` | Manual override + per-channel set + blackout (via the UI) |
 | `labels.spec.mjs` | Channel labels round-trip + grid rendering |
 | `multi-output.spec.mjs` | Issue #4: `outputs[2]` shape, migration, RDM binding, UI; splitter + pin-less-output regression (opt-in) |
+| `signal-loss.spec.mjs` | Per-output signal-loss policy: `/info` loss field + `/config` selector; after the 2.5 s source timeout HOLD keeps the frame, BLACKOUT zeros it, STOP holds (not zero), over Art-Net + sACN; persistence across reboot (opt-in) |
 
 ## Notes
 
 - sACN frames are sent **unicast** to the device's port 5568 (it binds
   `INADDR_ANY`), which avoids host multicast-routing quirks while still
   exercising the full E1.31 parse path.
+- The signal-loss **STOP** mode is checked at the buffer level (`/dmx.json` shows
+  the buffer is held, not zeroed, which proves it isn't BLACKOUT). Its defining
+  behaviour — the DMX line actually stops clocking — is only observable on the
+  wire, so it needs a logic analyzer on the TX pin and is out of e2e scope.
 - Tests run serially (`workers: 1`) since they share one physical device, and
   network specs reset manual override so they don't interfere with each other.
