@@ -142,4 +142,47 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('#rmii-pins')).toBeHidden();
     await expect(page.locator('#net-mode-row')).toBeHidden();
   });
+
+  test('home-page Update button installs the latest release directly (no detour via /config)', async ({ page }) => {
+    // Mock the version + release feed so the update banner appears regardless of
+    // what the device actually runs. The install is never confirmed (Cancel only),
+    // and POST /ota/github is blocked as a safety net so the device cannot reboot.
+    await page.route('**/version.json', route =>
+      route.fulfill({ contentType: 'application/json',
+        body: JSON.stringify({ current: '1.0.1', latest: '1.0.999', update: true }) }));
+    await page.route('https://luxdmx.org/firmware/releases', route =>
+      route.fulfill({ contentType: 'application/json',
+        body: JSON.stringify([{ tag_name: 'v1.0.999', published_at: '2026-01-01T00:00:00Z',
+          body: '- shiny new thing\n- another fix' }]) }));
+    let otaPosted = false;
+    await page.route('**/ota/github', route => { otaPosted = true; route.abort(); });
+
+    await page.goto('/');
+    await expect(page.locator('#update-banner')).toBeVisible();
+    await expect(page.locator('#update-ver')).toHaveText('1.0.999');
+
+    // The Update control is a button that opens the confirm popup in place — not a
+    // link that navigates away to the settings page.
+    const go = page.locator('#update-go');
+    await expect(go).toHaveJSProperty('tagName', 'BUTTON');
+    await go.click();
+
+    const modal = page.locator('#app-modal');
+    await expect(modal).toBeVisible();
+    await expect(page.locator('#app-modal-body')).toContainText('Install v1.0.999');
+    await expect(page.locator('#app-modal-ok')).toHaveText(/Update & reboot/);
+    // The hidden form posts a version-targeted OTA to the install endpoint.
+    await expect(page.locator('#ota-form')).toHaveAttribute('action', '/ota/github');
+
+    // Cancel must not install / reboot the device.
+    await page.locator('#app-modal-cancel').click();
+    await expect(modal).toBeHidden();
+    expect(otaPosted).toBeFalsy();
+  });
+
+  test('firmware-update UI is labelled LuxDMX.org, not GitHub', async ({ page }) => {
+    await page.goto('/config');
+    await expect(page.getByText('Update from LuxDMX.org')).toBeVisible();
+    expect(await page.content()).not.toContain('Update from GitHub');
+  });
 });

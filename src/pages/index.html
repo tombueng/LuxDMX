@@ -122,6 +122,11 @@ body { background: var(--gh-bg); }
 .form-range::-webkit-slider-thumb { background: var(--gh-accent); }
 .form-range::-webkit-slider-runnable-track { background: #30363d; }
 
+/* Generic confirm modal (firmware update, etc.) */
+.app-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1080; align-items:center; justify-content:center; padding:1rem; }
+.app-modal.show { display:flex; }
+.app-modal .card { width:min(440px,96vw); }
+
 #ws-badge { font-size: 0.72rem; }
 footer { border-color: var(--gh-border) !important; color: var(--gh-muted); font-size: 0.77rem; }
 footer a { color: var(--gh-muted); text-decoration: none; }
@@ -182,11 +187,15 @@ footer a:hover { color: var(--gh-text); }
     <div class="d-flex align-items-center justify-content-between">
       <span style="color:#e3b341;font-size:.85rem">&#8635;&nbsp; Firmware update available: <strong id="update-ver"></strong></span>
       <div class="d-flex gap-2">
-        <a href="/config" class="btn btn-sm fw-semibold" style="background:#e3b341;color:#000;font-size:.78rem">Update</a>
+        <button type="button" id="update-go" class="btn btn-sm fw-semibold" style="background:#e3b341;color:#000;font-size:.78rem">Update</button>
         <button type="button" id="update-dismiss" class="btn btn-sm" style="border:1px solid #e3b341;color:#e3b341;font-size:.78rem">Dismiss</button>
       </div>
     </div>
     <pre id="update-notes" style="display:none;margin:.5rem 0 0;font-size:.72rem;color:#c9b458;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.25);border-radius:4px;padding:.4rem .6rem;max-height:160px;overflow-y:auto"></pre>
+    <!-- Hidden form: the Update button installs the newest release directly (no detour via /config) -->
+    <form method="POST" action="/ota/github" id="ota-form" class="d-none">
+      <input type="hidden" name="version" id="ota-version">
+    </form>
   </div>
 
 
@@ -737,6 +746,31 @@ rdmRefresh();
 
 // Firmware update check
 function vNum(s) { var m = String(s).match(/(\d+)\.(\d+)\.(\d+)/); return m ? (+m[1]*1e6 + +m[2]*1e3 + +m[3]) : 0; }
+// Lightweight confirm popup (same look as the one on the settings page)
+function showModal(opts) {
+  opts = opts || {};
+  return new Promise(function(resolve) {
+    var ov = document.getElementById('app-modal');
+    document.getElementById('app-modal-title').textContent = opts.title || 'Confirm';
+    document.getElementById('app-modal-body').textContent  = opts.body  || '';
+    var ok = document.getElementById('app-modal-ok'), cancel = document.getElementById('app-modal-cancel');
+    ok.textContent = opts.okText || 'OK';
+    ok.className   = 'btn btn-sm ' + (opts.okClass || 'btn-primary');
+    cancel.style.display = (opts.cancel === false) ? 'none' : '';
+    ov.classList.add('show');
+    function close(val) {
+      ov.classList.remove('show');
+      ok.onclick = cancel.onclick = ov.onclick = null;
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    }
+    function onKey(ev) { if (ev.key === 'Escape') close(false); else if (ev.key === 'Enter') close(true); }
+    ok.onclick     = function() { close(true); };
+    cancel.onclick = function() { close(false); };
+    ov.onclick     = function(ev) { if (ev.target === ov) close(false); };
+    document.addEventListener('keydown', onKey);
+  });
+}
 function extractChanges(body) {
   if (!body) return [];
   var b = body, cut = b.search(/##?\s*Flash files/i);
@@ -745,7 +779,7 @@ function extractChanges(body) {
     .filter(function(l){ return /^[-•]/.test(l); })
     .map(function(l){ return l.replace(/^[-•]\s*/, ''); });
 }
-// Update check is driven entirely by the live GitHub release list so the banner
+// Update check is driven entirely by the live LuxDMX.org release list so the banner
 // always reflects the true newest version (the device only polls once at boot).
 fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
   var curNum = vNum(d.current);
@@ -766,6 +800,19 @@ fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
         try { localStorage.setItem('dismissedUpdate', newest); } catch (e) {}
         banner.style.display = 'none';
       };
+      // Update -> confirm popup -> install the newest release straight away
+      document.getElementById('update-go').onclick = function() {
+        var ver = newest.replace(/^v/, '');
+        showModal({
+          title: 'Update firmware',
+          body: 'Install v' + ver + '? The device will reboot and be offline for about a minute.',
+          okText: 'Update & reboot', okClass: 'btn-warning'
+        }).then(function(ok) {
+          if (!ok) return;
+          document.getElementById('ota-version').value = ver;
+          document.getElementById('ota-form').submit();
+        });
+      };
       // Aggregate changes across every release newer than the installed version
       var lines = [];
       rels.filter(function(rel){ return vNum(rel.tag_name) > curNum; }).forEach(function(rel) {
@@ -782,5 +829,19 @@ fetch('/version.json').then(function(r) { return r.json(); }).then(function(d) {
     }).catch(function() {});
 }).catch(function() {});
 </script>
+
+<!-- Confirm modal (firmware update) -->
+<div class="app-modal" id="app-modal">
+  <div class="card shadow">
+    <div class="card-header" id="app-modal-title">Confirm</div>
+    <div class="card-body">
+      <p class="mb-3" id="app-modal-body"></p>
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="app-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="app-modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

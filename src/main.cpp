@@ -438,6 +438,11 @@ static uint32_t lastDmxMs    = 0;
 static bool     pendingGithubOta = false;
 static String   otaTarget       = "latest";   // release tag to install
 static String   latestVersion   = "";
+// Live OTA progress, polled by the update page via /ota/status. Written from the
+// httpUpdate callbacks (loop task), read from the web handler (AsyncTCP task);
+// plain aligned bytes so the cross-task read is atomic.
+static volatile uint8_t otaProgPhase = 0;     // 0 idle, 1 downloading+writing, 2 finalizing, 3 error
+static volatile uint8_t otaProgPct   = 0;     // 0..100 over the streamed image
 static bool     updateAvailable = false;
 
 // Identify: temporarily force one channel to full on the wire to locate a fixture
@@ -1879,11 +1884,22 @@ static void doGithubOta() {
     String otaUrl = String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
+    // Drive /ota/status so the update page can show real progress. The ESP streams
+    // the HTTP body straight into flash (download and write happen together), so
+    // phase 1 covers both; phase 2 is the final verify/commit before the reboot.
+    otaProgPhase = 1; otaProgPct = 0;
+    httpUpdate.onProgress([](int cur, int total) {
+        otaProgPct = (total > 0) ? (uint8_t)((uint32_t)cur * 100 / total) : 0;
+    });
+    httpUpdate.onEnd([]()      { otaProgPhase = 2; otaProgPct = 100; });
+    httpUpdate.onError([](int) { otaProgPhase = 3; });
     WiFiClientSecure client;
     client.setInsecure();
     httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
     httpUpdate.rebootOnUpdate(true);
     httpUpdate.update(client, otaUrl);
+    // Only reaches here on failure (success reboots inside update()).
+    otaProgPhase = 3;
     Serial.printf("[OTA] Failed (%d): %s\n",
         httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
     dmxReady = true;
@@ -1903,8 +1919,20 @@ static void handleOtaGithub(AsyncWebServerRequest* req) {
         otaTarget = "v" + v;
     }
     Serial.printf("[OTA] Target requested: %s\n", otaTarget.c_str());
+    otaProgPhase = 0; otaProgPct = 0;   // reset for this run; loop() fills it in
     req->send_P(200, "text/html", OTA_PROGRESS_HTML);
     pendingGithubOta = true;
+}
+
+// Live OTA progress for the update page. Stays reachable during the install
+// because AsyncTCP runs on its own task while httpUpdate blocks loop().
+static void handleOtaStatus(AsyncWebServerRequest* req) {
+    char buf[48];
+    snprintf(buf, sizeof(buf), "{\"phase\":%u,\"pct\":%u}",
+             (unsigned)otaProgPhase, (unsigned)otaProgPct);
+    AsyncWebServerResponse* r = req->beginResponse(200, "application/json", buf);
+    r->addHeader("Cache-Control", "no-store");
+    req->send(r);
 }
 
 static void handleOtaUploadDone(AsyncWebServerRequest* req) {
@@ -2686,6 +2714,7 @@ void setup() {
     http.on("/reset",             HTTP_GET,  handleResetGet);
     http.on("/reset",             HTTP_POST, handleResetPost);
     http.on("/ota/github",        HTTP_POST, handleOtaGithub);
+    http.on("/ota/status",        HTTP_GET,  handleOtaStatus);
     http.on("/ota/upload",        HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     http.on("/version.json",      HTTP_GET,  handleVersionJson);
     http.on("/info.json",         HTTP_GET,  handleInfoJson);

@@ -16,31 +16,68 @@ body { background:#0d1117; display:flex; align-items:center; justify-content:cen
 <body>
 <div class="box">
   <div class="spinner" id="spin"></div>
-  <div class="fw-bold fs-5 mb-2" id="title">Downloading update&hellip;</div>
-  <div class="text-secondary small" id="sub">Connecting to GitHub and installing firmware.<br>The device will reboot automatically.</div>
+  <div class="fw-bold fs-5 mb-2" id="title">Starting update&hellip;</div>
+  <div class="text-secondary small" id="sub">Fetching the new firmware from LuxDMX.org.</div>
+  <div id="barwrap" style="display:none;height:6px;background:#21262d;border-radius:3px;overflow:hidden;margin-top:1.4rem">
+    <div id="bar" style="height:100%;width:0%;background:#58a6ff;transition:width .3s linear"></div>
+  </div>
 </div>
 <script>
-var phase = 0;
-var titles = ['Downloading update…', 'Installing firmware…', 'Rebooting…', 'Waiting for device…'];
-var subs   = [
-  'Connecting to GitHub and installing firmware.<br>The device will reboot automatically.',
-  'Writing new firmware to flash.',
-  'Applying update and restarting.',
-  'Trying to reconnect&hellip;'
-];
-function next() {
-  phase = Math.min(phase + 1, titles.length - 1);
-  document.getElementById('title').textContent = titles[phase];
-  document.getElementById('sub').innerHTML = subs[phase];
+// The version this page was built as, baked in at build time. This page is served
+// by the firmware running RIGHT NOW (the one being replaced), so FROM is the
+// pre-update version. The update is only really done once the device comes back
+// reporting a DIFFERENT version — that, not "the server answered", is the signal
+// to reload. The old firmware keeps answering HTTP while it downloads, so a plain
+// "first 200 wins" reload would bounce you onto the stale pre-update page.
+var FROM = "__FWVER__";
+var titleEl = document.getElementById('title');
+var subEl   = document.getElementById('sub');
+var barWrap = document.getElementById('barwrap');
+var barEl   = document.getElementById('bar');
+function show(title, sub, pct) {
+  titleEl.textContent = title;
+  subEl.innerHTML = sub;
+  if (pct == null) { barWrap.style.display = 'none'; }
+  else { barWrap.style.display = 'block'; barEl.style.width = Math.max(0, Math.min(100, pct)) + '%'; }
 }
-setTimeout(next, 8000);
-setTimeout(next, 20000);
-setTimeout(next, 30000);
-setTimeout(function poll() {
-  fetch('/').then(function(r) {
-    if (r.ok) { location.href = '/'; } else { setTimeout(poll, 2000); }
-  }).catch(function() { setTimeout(poll, 2000); });
-}, 32000);
+var lastPct = 0, wrote = false, start = Date.now();
+function again() {
+  if (Date.now() - start > 150000) { location.replace('/'); }   // safety net
+  else { setTimeout(tick, 1000); }
+}
+function tick() {
+  fetch('/version.json', { cache: 'no-store' })
+    .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+    .then(function(d){
+      if (d && d.current && d.current !== FROM) {        // device reports the NEW version -> done
+        show('Up to date', 'Reloading&hellip;', 100);
+        location.replace('/');
+        return;
+      }
+      // Still the old firmware: ask it what the install is actually doing.
+      // (Download and flash stream together on the ESP, so phase 1 is both; the
+      //  device stays reachable because AsyncTCP runs while the update blocks loop.)
+      return fetch('/ota/status', { cache: 'no-store' })
+        .then(function(r){ return r.json(); })
+        .then(function(s){
+          lastPct = s.pct || 0;
+          if (s.phase === 3)      show('Update failed', 'The device keeps its current firmware and will reboot.', null);
+          else if (s.phase === 2) { wrote = true; show('Flashing firmware&hellip;', 'Verifying and finishing the new image.', 100); }
+          else if (s.phase === 1) show('Downloading firmware&hellip;', 'Streaming from LuxDMX.org and writing to flash.', lastPct);
+          else                    show('Starting update&hellip;', 'Fetching the new firmware from LuxDMX.org.', null);
+          again();
+        })
+        .catch(function(){ again(); });   // status momentarily unavailable -> hold the last view
+    })
+    .catch(function(){
+      // Device unreachable -> it's rebooting. Only say so once the write finished;
+      // before that it's just busy flashing and not yet answering.
+      if (wrote || lastPct >= 99) show('Rebooting&hellip;', 'Waiting for the device to come back online.', 100);
+      else show('Downloading firmware&hellip;', 'Streaming from LuxDMX.org and writing to flash.', lastPct);
+      again();
+    });
+}
+setTimeout(tick, 1500);
 </script>
 </body>
 </html>
