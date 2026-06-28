@@ -8,16 +8,21 @@
 // Mutating + reboots the device, opt-in via LUXDMX_WRITE=1.
 import { test, expect, request as pwRequest } from '@playwright/test';
 
+// Return only after `pred` holds on TWO consecutive reads, so the device is
+// solidly back up (not mid-reboot) before the next test runs against it.
 async function waitForState(request, pred, ms = 45_000) {
   const t0 = Date.now();
   await new Promise((r) => setTimeout(r, 2_000));
+  let streak = 0, last = null;
   while (Date.now() - t0 < ms) {
     try {
       const r = await request.get('/info.json', { timeout: 4000 });
-      if (r.ok()) { const d = await r.json(); if (pred(d)) return d; }
-    } catch { /* mid-reboot */ }
+      if (r.ok()) { const d = await r.json(); if (pred(d)) { last = d; if (++streak >= 2) return d; } else streak = 0; }
+      else streak = 0;
+    } catch { streak = 0; }   // mid-reboot
     await new Promise((r) => setTimeout(r, 1500));
   }
+  if (last) return last;
   throw new Error('device did not reach expected state in time');
 }
 

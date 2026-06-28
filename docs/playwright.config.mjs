@@ -28,6 +28,10 @@ export default defineConfig({
   workers: 1,
   timeout: 30_000,
   expect: { timeout: 10_000 },
+  // The mutating tests reboot the device; a following test can briefly hit it
+  // mid-reboot (ECONNRESET / WS not-yet-up). Retry so a transient reboot-window
+  // blip re-runs after the device has recovered, rather than failing the suite.
+  retries: 2,
   reporter: [['list']],
   use: {
     baseURL,
