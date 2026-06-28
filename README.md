@@ -66,7 +66,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Manual DMX control** | Click any channel in browser, set value via slider |
 | **Blackout button** | Zero all channels instantly from browser |
 | **Art-Net / Manual toggle** | Switch between protocol passthrough and manual override |
-| **Failsafe output** | Continuous 40 Hz DMX refresh holds the last frame through brief input gaps |
+| **Signal-loss policy** | Per-output choice when the source stops: hold last frame (default), blackout, or stop sending. Continuous 40 Hz refresh bridges brief input gaps either way |
 | **Static IP or DHCP** | Configurable static IP/gateway/subnet/DNS, or automatic DHCP |
 | **Mesh-aware WiFi** | Scans all channels and joins the **strongest** AP (multi-AP/mesh friendly) |
 | **WiFi Config Portal** | First-boot AP + captive portal via WiFiManager |
@@ -571,7 +571,7 @@ values are fetched as JSON.
 | URL | Method | Function |
 |---|---|---|
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
-| `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP), static IP, hostname, OTA password, LED config, DMX pins (gzip) |
+| `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, `board`/`mcu` id, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
@@ -613,6 +613,16 @@ When more than one console targets the same universe, pick a per-output **merge 
 - **LTP** (latest takes precedence) — the most recently seen source drives the output.
 
 The **sACN priority** field is honoured first: a higher-priority source wins outright, and equal priority falls back to the mode above (Art-Net joins at the default priority of 100). A source that stops sending drops out of the mix after ~2.5 s. While an output is actively merging, the status page shows a green "merging" indicator instead of the conflict banner.
+
+### Signal-loss behaviour
+
+DMX512 is a continuously-refreshed stream, so LuxDMX keeps clocking the line at ~40 Hz even when the values never change. That's normal, and it's what fixtures expect (a receiver that stops seeing frames runs its own loss timeout). What should happen once **every** source for a universe has gone quiet (no Art-Net/sACN for ~2.5 s) is a per-output choice in `/config`:
+
+- **Hold last frame** (default): keep refreshing the last values, so a brief network drop or a lost multicast packet never disturbs the look.
+- **Blackout**: drive every channel to 0 (still transmitted at the normal rate), so the rig goes dark when the source disappears.
+- **Stop sending**: idle the line entirely, letting each fixture fall back to its own DMX-loss behaviour.
+
+Manual control and identify always keep transmitting, whatever the policy. A freshly booted node with no source yet follows the same rule, so an output set to **stop** stays dark until a source appears.
 
 A JSON **text** frame with the sender list + change log is pushed every 2 s
 (`{"meta":1,"senders":[…],"log":[…]}`) so the browser never has to poll.
@@ -834,6 +844,12 @@ KSZ8081, JL1101), the **PHY address**, the **MDC / MDIO / PHY-power** GPIOs and 
 that way needs no changes. The RMII **data lines are fixed by the EMAC** (TXD0 19, TXD1 22, TX_EN 21,
 RXD0 25, RXD1 26, RX_DV 27) and can't be moved; the pin-picker reserves those plus your configured
 management / clock / power pins, so a DMX or LED pin that lands on one is flagged.
+
+> **Not supported: ENC28J60.** The old blue ENC28J60 SPI modules don't work here. arduino-esp32's
+> `ETH` library has no driver for them (its SPI options are W5500 / W6100 / DM9051), so there's
+> nothing to call. They're also only 10 Mbit with an 8 KB buffer and no hardware TCP/IP stack, which
+> is the wrong end of the trade for Art-Net/sACN under full DMX load. Use a **W5500** instead: same
+> SPI bus, costs about the same, full hardware stack, and it's already built in.
 
 > **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
 > ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the

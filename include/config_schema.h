@@ -16,6 +16,7 @@ struct DmxOutput {
     int  rxPin;      // -1 = output only (no RDM)
     int  rtsPin;     // -1 = auto-direction module / no RDM
     int  mergeMode;  // how to combine multiple sources on this universe
+    int  lossMode;   // what to send when every source on this universe goes silent
 };
 
 struct Config {

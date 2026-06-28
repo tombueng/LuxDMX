@@ -74,10 +74,11 @@ static void checkBoard(const char* name) {
     // output 0
     EQ(cfg.outputs[0].enabled, true); EQ(cfg.outputs[0].universe, 0); EQ(cfg.outputs[0].port, 1);
     EQ(cfg.outputs[0].txPin, o0tx); EQ(cfg.outputs[0].rxPin, o0rx); EQ(cfg.outputs[0].rtsPin, o0rts);
-    EQ(cfg.outputs[0].mergeMode, 0);
+    EQ(cfg.outputs[0].mergeMode, 0); EQ(cfg.outputs[0].lossMode, 0);
     // output 1
     EQ(cfg.outputs[1].enabled, o1en); EQ(cfg.outputs[1].universe, 1); EQ(cfg.outputs[1].port, 2);
     EQ(cfg.outputs[1].txPin, o1tx); EQ(cfg.outputs[1].rxPin, o1rx); EQ(cfg.outputs[1].rtsPin, o1rts);
+    EQ(cfg.outputs[1].mergeMode, 0); EQ(cfg.outputs[1].lossMode, 0);
     #undef EQ
 }
 

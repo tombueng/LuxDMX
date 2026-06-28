@@ -52,6 +52,7 @@ function fullForm(info, flips = {}) {
     f[`o${i}_uni`] = String(o.uni); f[`o${i}_port`] = String(o.port);
     f[`o${i}_tx`] = String(o.tx); f[`o${i}_rx`] = String(o.rx);
     f[`o${i}_rts`] = String(o.rts); f[`o${i}_merge`] = String(o.merge);
+    f[`o${i}_loss`] = String(o.loss);
   });
   // apply overrides; a null value deletes the key (turns a checkbox off)
   for (const [k, v] of Object.entries(flips)) { if (v === null) delete f[k]; else f[k] = v; }
@@ -97,6 +98,7 @@ test('every web-form option round-trips through /config', async ({ request }) =>
     ['o0_rx',   '21', (d) => d.outputs[0].rx],
     ['o0_rts',  '22', (d) => d.outputs[0].rts],
     ['o0_merge', '2', (d) => d.outputs[0].merge],
+    ['o0_loss',  '1', (d) => d.outputs[0].loss],
     ['o1_en',  true,  (d) => d.outputs[1].en],   // flip the disabled output on
     ['o1_uni',   '4', (d) => d.outputs[1].uni],
     ['o1_port',  '1', (d) => d.outputs[1].port],
@@ -104,6 +106,7 @@ test('every web-form option round-trips through /config', async ({ request }) =>
     ['o1_rx',   '24', (d) => d.outputs[1].rx],
     ['o1_rts',  '25', (d) => d.outputs[1].rts],
     ['o1_merge', '1', (d) => d.outputs[1].merge],
+    ['o1_loss',  '2', (d) => d.outputs[1].loss],
   ];
 
   // /info.json only echoes the RMII pin fields on a chip with an internal EMAC

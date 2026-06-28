@@ -301,6 +301,14 @@ static constexpr uint32_t SOURCE_TIMEOUT_MS = 2500;
 // the highest active priority win; equal priority falls back to the merge mode.
 static constexpr uint8_t  DEFAULT_PRIORITY  = 100;
 
+// Per-output signal-loss policy (DmxOutput.lossMode): what an output does once
+// every source on its universe has been silent past SOURCE_TIMEOUT_MS. DMX512 is
+// a continuously-refreshed stream, so HOLD and ZERO keep transmitting at the
+// normal rate; only STOP actually idles the line.
+static constexpr int LOSS_HOLD = 0;   // keep refreshing the last frame (failsafe, default)
+static constexpr int LOSS_ZERO = 1;   // blackout: drive all channels to 0, keep transmitting
+static constexpr int LOSS_STOP = 2;   // stop transmitting, so fixtures run their own DMX-loss failsafe
+
 // Source state codes: WS frame byte 13 + LED/display. Keep in sync with the
 // matching values documented in src/pages/index.html.
 static constexpr uint8_t SRC_NORMAL   = 0;
@@ -416,6 +424,10 @@ static uint32_t outFrameCount[MAX_OUTPUTS]  = {0};
 static uint32_t outLastFrameMs[MAX_OUTPUTS] = {0};
 static uint32_t outLastDmxMs[MAX_OUTPUTS]   = {0};
 static float    outFps[MAX_OUTPUTS]         = {0.0f};
+// True while no live source feeds this output's universe. Drives the per-output
+// signal-loss policy (LOSS_*). Starts true: a freshly booted node has no source
+// yet, so a STOP-configured output stays dark until one appears.
+static bool     outSrcLost[MAX_OUTPUTS]     = {true, true};
 static float    jitterMs     = 0.0f;
 static uint32_t prevFrameMs  = 0;
 static uint32_t startMs      = 0;
@@ -705,10 +717,15 @@ static void sendDmx() {
     int  vo = viewOutput();
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!outReady[i]) continue;
-        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         // Identify override: force one channel to full on the wire only (on the
         // monitored output), without corrupting the stored value the UI sees.
         bool ov = ovActive && i == vo;
+        // STOP-on-loss: go dark on the wire so fixtures fall back to their own
+        // DMX-loss behaviour. Manual mode (the UI owns this output) and an active
+        // identify are explicit user intent and keep the line clocking.
+        if (cfg.outputs[i].lossMode == LOSS_STOP && outSrcLost[i]
+            && !ov && !(manualMode && i == vo)) continue;
+        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         uint8_t saved = 0;
         if (ov) { saved = dmxBuf[i][identifyCh]; dmxBuf[i][identifyCh] = 255; }
         dmx_write(port, dmxBuf[i], DMX_PACKET_SIZE);
@@ -1210,8 +1227,9 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient*, AwsEventType type,
 //   OFF — the most recently seen source wins the whole frame (legacy behaviour)
 //   HTP — per channel, the maximum across the contributing sources
 //   LTP — the most recently seen contributing source wins the whole frame
-// A source silent for SOURCE_TIMEOUT_MS drops out. With no live source the
-// buffer is left untouched, so the line holds its last frame as a failsafe.
+// A source silent for SOURCE_TIMEOUT_MS drops out. With no live source left, the
+// per-output signal-loss policy (lossMode) applies: HOLD keeps the last frame,
+// ZERO blacks it out, STOP idles the line (enforced in sendDmx()).
 // The monitored output is frozen while manual mode is on (the web UI owns it).
 static void mergeOutput(int outIdx) {
     if (manualMode && outIdx == viewOutput()) return;
@@ -1228,7 +1246,16 @@ static void mergeOutput(int outIdx) {
         contrib[nc++] = i;
         if (s.priority > topPrio) topPrio = s.priority;
     }
-    if (nc == 0) return;   // nothing live → hold the last frame as a failsafe
+    if (nc == 0) {
+        // Every source for this universe has gone silent: apply the per-output
+        // signal-loss policy. ZERO blacks the buffer out (still transmitted at the
+        // normal rate); HOLD leaves it as-is; STOP keeps the buffer but is enforced
+        // in sendDmx(), which simply stops clocking this port out.
+        outSrcLost[outIdx] = true;
+        if (out.lossMode == LOSS_ZERO) memset(&dmxBuf[outIdx][1], 0, 512);
+        return;
+    }
+    outSrcLost[outIdx] = false;   // a live source is feeding this output again
 
     if (out.mergeMode == MERGE_HTP && nc > 1) {
         // Per channel, the maximum across the top-priority sources. Each source
@@ -1535,6 +1562,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
         j += ",\"rx\":";   j += o.rxPin;
         j += ",\"rts\":";  j += o.rtsPin;
         j += ",\"merge\":"; j += o.mergeMode;
+        j += ",\"loss\":";  j += o.lossMode;
         j += "}";
     }
     j += "],";
@@ -2376,14 +2404,30 @@ static void waitEthLink() {
 // Bring up the W5500 wired Ethernet (runtime opt-in via cfg.useEthernet/g_useEth).
 // Registered as an lwIP netif, so the web/Art-Net/sACN/OTA stack runs over it
 // unchanged. WiFi stays the default; this only runs when the user enabled Ethernet.
-static void startEthSpi() {
-    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz\n",
-        cfg.ethCs, cfg.ethInt, cfg.ethRst, cfg.ethSck, cfg.ethMiso, cfg.ethMosi, cfg.ethFreqMhz);
+// The W5500 is software-driven (the S3 has no Ethernet MAC): its SPI interrupt + driver
+// task otherwise land on whatever core calls ETH.begin (setup() runs on core 1), where
+// they contend with the DMX/RDM TX-DONE ISR that performs the RDM turnaround. Run the
+// bring-up from a task pinned to core 0 so the W5500's SPI ISR sits on core 0, away from
+// DMX/RDM on core 1. (Investigation report 6.6: a blunt UART-interrupt priority bump
+// instead just starves the whole W5500 stack; core separation is the right lever.)
+static volatile bool s_ethUpDone;
+static void ethUpTask(void *arg) {
     ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
               ETH_W5500_SPI_HOST, cfg.ethSck, cfg.ethMiso, cfg.ethMosi,
               cfg.ethFreqMhz);
     applyEthStaticIp();
     waitEthLink();
+    s_ethUpDone = true;
+    vTaskDelete(NULL);
+}
+static void startEthSpi() {
+    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz (bring-up on core 0)\n",
+        cfg.ethCs, cfg.ethInt, cfg.ethRst, cfg.ethSck, cfg.ethMiso, cfg.ethMosi, cfg.ethFreqMhz);
+    s_ethUpDone = false;
+    xTaskCreatePinnedToCore(ethUpTask, "ethup", 8192, NULL, 5, NULL, 0);
+    uint32_t t0 = millis();
+    while (!s_ethUpDone && millis() - t0 < 30000) delay(20);
+    if (!s_ethUpDone) Serial.println("[ETH] core-0 bring-up still running after 30s");
 }
 #endif
 

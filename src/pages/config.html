@@ -440,6 +440,15 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
               </select>
               <div class="form-text">Combine two consoles on this universe. sACN priority is honoured when merging is on.</div>
             </div>
+            <div class="col-sm-6">
+              <label class="form-label text-secondary small mb-1">On signal loss</label>
+              <select class="form-select out-loss">
+                <option value="0">Hold last frame</option>
+                <option value="1">Blackout (send zeros)</option>
+                <option value="2">Stop sending</option>
+              </select>
+              <div class="form-text">What this output does when its Art-Net/sACN source stops (after ~2.5 s). Hold keeps the last look; blackout drives every channel to 0; stop idles the line so fixtures run their own DMX-loss failsafe.</div>
+            </div>
           </div>
           <div class="form-text mt-2 out-rdm-note">Set RTS/EN to a GPIO to enable RDM on this output; leave −1 to disable.</div>
         </div>
@@ -602,6 +611,7 @@ function wireCard(cont, tpl, i, o){
   var rx  = node.querySelector('.out-rx');
   var rts = node.querySelector('.out-rts');
   var merge = node.querySelector('.out-merge');
+  var loss = node.querySelector('.out-loss');
   en.name  = 'o'+i+'_en';   en.id = 'o'+i+'_en';   en.checked = !!o.en;
   uni.name = 'o'+i+'_uni';  uni.value  = (o.uni  != null ? o.uni  : i);
   port.name= 'o'+i+'_port'; port.value = (o.port != null ? o.port : i + 1);
@@ -609,6 +619,7 @@ function wireCard(cont, tpl, i, o){
   rx.name  = 'o'+i+'_rx';   rx.value   = (o.rx   != null ? o.rx   : -1);
   rts.name = 'o'+i+'_rts';  rts.value  = (o.rts  != null ? o.rts  : -1);
   merge.name = 'o'+i+'_merge'; merge.value = (o.merge != null ? o.merge : 0);
+  loss.name = 'o'+i+'_loss'; loss.value = (o.loss != null ? o.loss : 0);
   en.addEventListener('change', function(){ syncOutBody(node); });
   uni.addEventListener('input', function(){ updCardHint(node); });
   cont.appendChild(node);
@@ -832,7 +843,8 @@ function loadVersions(){
         .sort(function(a,b){ return vNum(b.tag_name) - vNum(a.tag_name); });
       var tb = $('ver-rows');
       if (!rows.length){ tb.innerHTML = '<tr><td colspan="4" class="text-secondary text-center small py-2">No releases found</td></tr>'; return; }
-      tb.innerHTML = rows.map(function(rel, i){
+      var LIMIT = 5;   // show the newest 5; the rest go behind a "Show more" button
+      var html = rows.map(function(rel, i){
         var ver = rel.tag_name.replace(/^v/, '');
         var date = (rel.published_at||'').slice(0,10);
         var changes = extractChanges(rel.body);
@@ -846,18 +858,31 @@ function loadVersions(){
         var btn = isCurrent
           ? '<button class="btn btn-outline-secondary btn-sm" disabled>Installed</button>'
           : '<button class="btn btn-outline-primary btn-sm" onclick="installVersion(\'' + ver + '\')">Install</button>';
-        return '<tr>' +
+        var extra = i >= LIMIT ? ' class="ver-extra" style="display:none"' : '';
+        return '<tr' + extra + '>' +
           '<td class="text-nowrap">v' + ver + badge + '</td>' +
           '<td class="text-nowrap text-secondary">' + date + '</td>' +
           '<td class="small">' + chHtml + '</td>' +
           '<td class="text-end">' + btn + '</td>' +
           '</tr>';
       }).join('');
+      if (rows.length > LIMIT){
+        html += '<tr id="ver-more-row"><td colspan="4" class="text-center py-2">' +
+          '<button class="btn btn-outline-secondary btn-sm" onclick="showAllVersions()">' +
+          'Show ' + (rows.length - LIMIT) + ' older version' + (rows.length - LIMIT === 1 ? '' : 's') +
+          '</button></td></tr>';
+      }
+      tb.innerHTML = html;
     })
     .catch(function(){
       $('ver-rows').innerHTML =
         '<tr><td colspan="4" class="text-secondary text-center small py-2">Could not reach GitHub</td></tr>';
     });
+}
+function showAllVersions(){
+  var tb = $('ver-rows'); if (!tb) return;
+  tb.querySelectorAll('.ver-extra').forEach(function(r){ r.style.display = ''; });
+  var more = $('ver-more-row'); if (more) more.remove();
 }
 </script>
 

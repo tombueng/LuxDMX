@@ -105,5 +105,6 @@ const CfgOutputField OUTPUT_FIELDS[] = {
     OINT ("rx",    "rx",    rxPin,     "dmxrx",   -1, 48,   "RX pin"),
     OINT ("rts",   "rts",   rtsPin,    "dmxrts",  -1, 48,   "RTS / DE-RE pin"),
     OINT ("merge", "merge", mergeMode, nullptr, MERGE_OFF, MERGE_LTP, "Merge mode"),
+    OINT ("loss",  "loss",  lossMode,  nullptr, LOSS_HOLD, LOSS_STOP, "Signal-loss policy"),
 };
 const size_t OUTPUT_FIELD_COUNT = ARRSZ(OUTPUT_FIELDS);
