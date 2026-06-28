@@ -77,13 +77,49 @@ greyed and inert (so you can wire VCC/GND/EN by the diagram but can't assign a s
 them). Every `gpio` listed in `phys` must also exist in `cols`. Boards **without** `phys`
 fall back to the original horizontal two-column diagram, so this is fully optional.
 
-Curated so far (validated by `validate_physical.mjs`): **ESP32 DevKitC (38-pin)**,
-**NodeMCU-32S (38-pin)**, **ESP32 DevKit v1 (DOIT, 30-pin)**, **ESP32-S3 DevKitC-1
-(44-pin)**. To check the curated data is well-formed:
+`phys` models a board as one row of pins down each side (`L`/`R`). Boards whose pins are on
+a 2xN dual-row header per side (e.g. the LOLIN S3 Mini) or on four separate edges (Arduino
+form-factor, e.g. the Metro ESP32-S3) don't fit that yet, so they stay on the fallback
+renderer until the model grows a multi-column option.
+
+Curated so far (validated by `validate_physical.mjs`): the four classics — ESP32 DevKitC
+(38), NodeMCU-32S (38), ESP32 DevKit v1 (30), ESP32-S3 DevKitC-1 (44) — plus, from vendor
+pinout diagrams: ESP32-S3 DevKitM-1, XIAO ESP32-S3, Adafruit Feather S3, Adafruit QT Py S3,
+Unexpected Maker ProS3, TinyS3, Heltec WiFi LoRa 32 V3, LilyGO T-Display-S3, M5Stack AtomS3.
+To check the curated data is well-formed:
 
 ```sh
 node web/boards/validate_physical.mjs
 ```
+
+The validator auto-discovers every `<id>.json` that has a `phys` block, so adding one needs
+no edit there.
+
+### Fixed wiring (`hardwired`) and headers — for boards with a fixed pinout
+
+A purpose-built board (the **LuxDMX v4**) wires nearly everything in copper, so the picker
+should not let you change those pins. Two optional fields drive that, keyed on the
+**detected** board (what `/info.json` reports), not the dropdown:
+
+```jsonc
+"hardwired": [                                  // pins/fields fixed by the board
+  { "field": "o0_tx", "gpio": 17, "label": "DMX A · TX → DI" },   // locks the o0_tx input to 17
+  { "field": "o0_port", "val": 1, "label": "DMX A · UART port" }, // a non-pin field (no gpio)
+  // ...
+],
+"headers": [                                    // physical connectors that ARE user-wirable
+  { "ref": "J4", "name": "Display header", "pins": [
+    { "pin": 1, "silk": "3V3" }, { "pin": 3, "silk": "SDA", "gpio": 4 } /* ... */ ] }
+]
+```
+
+For each `hardwired` entry the config page sets the matching form field (`field`) to its
+fixed value (`val`, or the `gpio` if no `val`), **disables** it, hides its pin-pick button,
+and drops in a hidden mirror so the value still POSTs. The `headers` are rendered as small
+pin tables so the user sees exactly which pins on the display/expansion connectors they can
+actually wire to. Boards without `hardwired`/`headers` behave exactly as before.
+
+`phys`, `hardwired` and `headers` are hand-curated; a regenerator must preserve them.
 
 ### Pin `flags`
 
