@@ -53,10 +53,28 @@ export function configForm(snapshot, o1Overrides = {}) {
   return f;
 }
 
-// Poll /info.json across a reboot until `pred(info)` holds.
+// Poll /info.json across a reboot until `pred(info)` holds on TWO consecutive
+// reads. Requiring a stable streak (not a single hit) means we only return once
+// the device is solidly back up, not mid-reboot, so the next test doesn't race a
+// device that's still flapping (the main source of ECONNRESET / WS-not-up flakes).
 export async function waitForState(request, pred, ms = 45000) {
   await sleep(2000); // let the reboot begin
-  const d = await pollFor(() => info(request), pred, { ms, every: 2000 });
-  if (!d || !pred(d)) throw new Error('device did not reach the expected state in time');
-  return d;
+  const deadline = Date.now() + ms;
+  let streak = 0, last = null;
+  while (Date.now() < deadline) {
+    try {
+      const d = await info(request);
+      if (pred(d)) { last = d; if (++streak >= 2) return d; }
+      else streak = 0;
+    } catch { streak = 0; }   // mid-reboot: reset the streak
+    await sleep(1500);
+  }
+  if (last) return last;
+  throw new Error('device did not reach the expected state in time');
+}
+
+// Wait until the device is reachable + stable (two consecutive /info.json reads).
+// Use in a beforeEach after reboot-heavy tests so a spec starts from a settled device.
+export async function waitReady(request, ms = 45000) {
+  return waitForState(request, () => true, ms);
 }

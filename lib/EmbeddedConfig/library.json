@@ -1,0 +1,10 @@
+{
+  "name": "EmbeddedConfig",
+  "version": "0.1.0",
+  "description": "Schema-driven, transport-agnostic configuration engine for ESP32. One field table drives NVS load/save (with board templates for defaults + legacy-key migration), a JSON dump, web-form apply, and a serial console (human + machine/AI grammar). The consumer project provides config_schema.h (the Config struct + field tables) and config_enums.h (structural constants).",
+  "keywords": "config, configuration, nvs, preferences, esp32, schema, serial, settings",
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "headers": ["config_core.h", "config_serial.h", "config_types.h"]
+}

@@ -6,8 +6,10 @@ Also writes src/generated/version.h from the LUXDMX_VERSION env var.
 """
 Import("env")
 import os
+import sys
 import gzip
 import pathlib
+import subprocess
 
 def escape_c(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"').replace("\r", "")
@@ -119,6 +121,15 @@ def patch_esp_dmx():
     else:
         print("  [patch] esp_dmx uart.c: already patched")
 
+def generate_config_templates(root: pathlib.Path, gen_dir: pathlib.Path):
+    """Embed templates/*.ini into src/generated/config_templates.cpp (the board
+    default values the config engine applies). Single source of truth = the .ini
+    files; see tools/gen_config_templates.py."""
+    script = root / "tools" / "gen_config_templates.py"
+    out    = gen_dir / "config_templates.cpp"
+    subprocess.run([sys.executable, str(script), str(root), str(out)], check=True)
+
+
 def generate_version(gen_dir: pathlib.Path) -> str:
     version = os.environ.get("LUXDMX_VERSION", "dev")
     (gen_dir / "version.h").write_text(
@@ -134,6 +145,7 @@ def generate():
     gen_dir.mkdir(exist_ok=True)
     print("LuxDMX: generating embedded assets...")
     patch_esp_dmx()
+    generate_config_templates(root, gen_dir)
     version = generate_version(gen_dir)
     for f in sorted((root / "src" / "pages").glob("*.html")):
         html_to_header(f, gen_dir, version)

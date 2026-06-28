@@ -37,3 +37,6 @@ PROMO_PLAN.local.md
 /.secrets/
 *.bak
 __pycache__/
+
+# native test build artifacts
+build/
