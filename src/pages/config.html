@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LuxDMX — Settings</title>
+<title>LuxDMX Settings</title>
 <link rel="icon" type="image/png" href="/favicon.png?v=__FWVER__">
 <link rel="stylesheet" href="/bootstrap.min.css?v=__FWVER__">
 <style>
@@ -194,7 +194,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <input class="form-control" type="text" name="dns" id="net-dns" value="" placeholder="192.168.1.1">
           </div>
         </div>
-        <div class="form-text mt-2">Applied after reboot. Wrong values can make the device unreachable &mdash; use the BOOT-button reset to recover.</div>
+        <div class="form-text mt-2">Applied after reboot. Wrong values can make the device unreachable. Use the BOOT-button reset to recover.</div>
       </div>
     </div>
 
@@ -393,7 +393,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       </div>
     </div>
 
-    <!-- DMX outputs — up to 2 independent universes -->
+    <!-- DMX outputs: up to 2 independent universes -->
     <div class="card mb-3">
       <div class="card-header">DMX Outputs</div>
       <div class="card-body">
@@ -427,7 +427,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
         <div class="card-body out-body">
           <div class="row g-3">
             <div class="col-sm-6">
-              <label class="form-label text-secondary small mb-1">Universe (0–15)</label>
+              <label class="form-label text-secondary small mb-1">Universe (0-15)</label>
               <input class="form-control out-uni" type="number" min="0" max="15" value="0">
               <div class="form-text out-uni-hint"></div>
             </div>
@@ -454,9 +454,9 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <div class="col-sm-6">
               <label class="form-label text-secondary small mb-1">Merge mode</label>
               <select class="form-select out-merge">
-                <option value="0">Off — last source wins</option>
-                <option value="1">HTP — highest takes precedence</option>
-                <option value="2">LTP — latest source wins</option>
+                <option value="0">Off (last source wins)</option>
+                <option value="1">HTP (highest takes precedence)</option>
+                <option value="2">LTP (latest source wins)</option>
               </select>
               <div class="form-text">Combine two consoles on this universe. sACN priority is honoured when merging is on.</div>
             </div>
@@ -508,13 +508,13 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       <div class="mb-3">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
           <span class="fw-semibold small">Update from LuxDMX.org</span>
-          <span class="text-secondary small">Installed: <strong id="cur-ver">v—</strong></span>
+          <span class="text-secondary small">Installed: <strong id="cur-ver">v?</strong></span>
         </div>
 
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="auto-update-sw">
           <label class="form-check-label small" for="auto-update-sw">
-            Auto-update &mdash; install new firmware automatically when available
+            Auto-update: install new firmware automatically when available
           </label>
         </div>
 
@@ -557,7 +557,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
     </div>
   </div>
 
-  <!-- WiFi Reset — danger zone -->
+  <!-- WiFi Reset: danger zone -->
   <div class="card border-danger mt-2">
     <div class="card-header" style="color:#f33abc;background:#1c0a16;border-color:#6e1a4f">Danger Zone</div>
     <div class="card-body">
@@ -584,8 +584,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <footer class="text-center py-3 mt-2 border-top">
   &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
-  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
-  &nbsp;&mdash;&nbsp; MIT License
+  &nbsp;&middot;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
+  &nbsp;&middot;&nbsp; MIT License
 </footer>
 
 <div id="save-bar">
@@ -793,7 +793,7 @@ function showModal(opts){
   });
 }
 
-// Guard: never submit an enabled output with no TX pin — it can't drive a line
+// Guard: never submit an enabled output with no TX pin, it can't drive a line
 // and the device refuses it anyway. Catch it here with a clear message.
 document.querySelector('form[action="/config"]').addEventListener('submit', function(e){
   var bad = [];
@@ -871,7 +871,7 @@ function loadVersions(){
         var chHtml = changes.length
           ? '<ul class="mb-0 ps-3">' + changes.slice(0,8).map(function(c){
               return '<li>' + c.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</li>'; }).join('') + '</ul>'
-          : '<span class="text-secondary">&mdash;</span>';
+          : '<span class="text-secondary">&middot;</span>';
         var isCurrent = (ver === CURRENT);
         var badge = (i === 0 ? ' <span class="badge bg-primary">latest</span>' : '')
                   + (isCurrent ? ' <span class="badge bg-success">installed</span>' : '');
@@ -914,7 +914,7 @@ var REMOTE_INDEX = {};
 var BUILTINS = ['luxdmx_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
-// Chip families — used when no full board descriptor is selected (Custom).
+// Chip families: used when no full board descriptor is selected (Custom).
 var FAMILIES = {
   esp32:   { flash:[6,7,8,9,10,11], serial:[1,3], inputOnly:[34,35,36,39], strapping:[0,2,5,12,15], usbjtag:[], max:39 },
   esp32s3: { flash:[26,27,28,29,30,31,32], serial:[43,44], inputOnly:[], strapping:[0,3,45,46], usbjtag:[19,20], max:48 }
@@ -963,14 +963,14 @@ function e32cols(){
   return [ E32L.map(function(g){ return P(g, e32silk(g), e32flags(g)); }),
            E32R.map(function(g){ return P(g, e32silk(g), e32flags(g)); }) ];
 }
-// ESP32 DevKit v1 (DOIT, 30-pin) — narrower; flash pins (6-11) NOT broken out.
+// ESP32 DevKit v1 (DOIT, 30-pin), narrower; flash pins (6-11) NOT broken out.
 var E32_30L = [36,39,34,35,32,33,25,26,27,14,12,13];
 var E32_30R = [23,22,1,3,21,19,18,5,17,16,4,0,2,15];
 function e32cols30(){
   return [ E32_30L.map(function(g){ return P(g, e32silk(g), e32flags(g)); }),
            E32_30R.map(function(g){ return P(g, e32silk(g), e32flags(g)); }) ];
 }
-// Seeed XIAO ESP32-S3 — tiny board, D0..D10 silk labels ([gpio, silk]).
+// Seeed XIAO ESP32-S3: tiny board, D0..D10 silk labels ([gpio, silk]).
 var XIAO_L = [[1,'D0'],[2,'D1'],[3,'D2'],[4,'D3'],[5,'D4'],[6,'D5'],[43,'D6/TX']];
 var XIAO_R = [[44,'D7/RX'],[7,'D8'],[8,'D9'],[9,'D10']];
 function xiaocols(){
@@ -1005,7 +1005,7 @@ function buildBoards(){
 // ---- Which board / family is in effect -------------------------------------
 function currentBoardDesc(){ var id = $('board-sel').value; return (id && id !== 'custom' && BOARDS[id]) ? BOARDS[id] : null; }
 function genericForMcu(){
-  // Explicit per-family fallback. IMPORTANT: never *guess* a family — the old code
+  // Explicit per-family fallback. IMPORTANT: never *guess* a family; the old code
   // returned the S3 board for anything that wasn't exactly 'esp32', so a device that
   // reported an empty/unknown mcu showed an ESP32-S3 board on a plain ESP32.
   if (INFO_MCU === 'esp32')   return BOARDS['esp32-devkitc']     || null;
@@ -1116,7 +1116,7 @@ function pinFlags(g){
     if (g > fam.max || g < 0) fl.push('range');
   }
   // Runtime overlay: while RMII is the selected wired PHY, its fixed GPIOs are
-  // reserved — so a DMX / LED / display pin landing on one is flagged as a conflict.
+  // reserved, so a DMX / LED / display pin landing on one is flagged as a conflict.
   if (rmiiActive() && rmiiReservedPins().indexOf(g) >= 0 && fl.indexOf('reserved:eth-rmii') < 0)
     fl.push('reserved:eth-rmii');
   return fl;
@@ -1243,7 +1243,7 @@ function renderBoard(){
   [[8,8],[BW-8,8],[8,BH-8],[BW-8,BH-8]].forEach(function(c){ s += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="3" fill="#0d1117" stroke="#1f8a63" stroke-width="0.6"/>'; });
   function drawRow(pins, padY, top){
     for (var i = 0; i < pins.length; i++){ var p = pins[i], x = xOf(i), fl = p.flags || [], u = assign[p.gpio], col = u ? '#23e6f7' : statusColor(padClass(fl));
-      var tip = 'GPIO' + p.gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (u ? ' — ' + u.map(roleLabel).join(', ') : '');
+      var tip = 'GPIO' + p.gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' · ' + fl.join(', ') : ' · free') + (u ? ' · ' + u.map(roleLabel).join(', ') : '');
       var lbl = 'G' + p.gpio + (p.silk && p.silk !== ('IO' + p.gpio) ? ' ' + p.silk : '');
       var ly = top ? (padY - PH - 2) : (padY + PH + 2), rot = top ? -90 : 90;
       s += '<g class="pad' + (u ? ' used' : '') + '" data-gpio="' + p.gpio + '"><title>' + esc(tip) + '</title>'
@@ -1296,10 +1296,10 @@ function printBoard(){
   var c = $('board-svg-wrap').innerHTML;
   if (!c){ return; }
   var w = window.open('', '_blank', 'width=900,height=700'); if (!w) return;
-  w.document.write('<!doctype html><html><head><title>' + esc(currentBoardName()) + ' — pin plan</title>'
+  w.document.write('<!doctype html><html><head><title>' + esc(currentBoardName()) + ' · pin plan</title>'
     + '<style>body{background:#0d1117;color:#c9d1d9;font-family:sans-serif;margin:0;padding:24px}'
     + 'h3{margin:0 0 14px;font-weight:600}svg{width:100%;max-width:780px;height:auto;display:block;margin:0 auto}</style></head>'
-    + '<body><h3>' + esc(currentBoardName()) + ' — pin assignment</h3>' + c + '</body></html>');
+    + '<body><h3>' + esc(currentBoardName()) + ' · pin assignment</h3>' + c + '</body></html>');
   w.document.close(); w.focus(); setTimeout(function(){ try { w.print(); } catch(e){} }, 450);
 }
 function renderCurrent(){ renderBoard(); }
@@ -1316,7 +1316,7 @@ function openPicker(role){
   var h = $('board-pick-hint');
   if (role){ h.classList.remove('d-none'); h.textContent = 'Click the pin to assign to ' + roleLabel(role) + '.'; }
   else { h.classList.add('d-none'); }
-  $('board-modal-title').textContent = role ? ('Pick pin: ' + roleLabel(role)) : (currentBoardName() + ' — pin map');
+  $('board-modal-title').textContent = role ? ('Pick pin: ' + roleLabel(role)) : (currentBoardName() + ' · pin map');
   syncModalBoardSel();
   renderCurrent();
   $('board-modal').classList.add('show');
@@ -1343,7 +1343,7 @@ function applyTemplate(){
   });
 }
 function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply').disabled = !(b && b.preset); updHardwired(); }
-// List the board's fixed on-board wiring (LED, NeoPixel, Ethernet, etc.) — changeable but
+// List the board's fixed on-board wiring (LED, NeoPixel, Ethernet, etc.), changeable but
 // usually best left alone; helps the user avoid clobbering a hard-wired pin.
 function updHardwired(){
   var el = $('board-hardwired'); if (!el) return;
@@ -1358,7 +1358,7 @@ function appendBoardOption(id, name){
   if (document.querySelector('#board-sel option[value="' + id + '"]')) return;
   var o = document.createElement('option'); o.value = id; o.textContent = name; $('board-sel').appendChild(o);
 }
-// Only offer boards that match the detected chip family — a classic-ESP32 pin map
+// Only offer boards that match the detected chip family; a classic-ESP32 pin map
 // can't run on an ESP32-S3 and vice-versa. Unknown mcu on either side => show it.
 function mcuMatch(m){ return !INFO_MCU || !m || m === INFO_MCU; }
 function fillBoardSelect(){

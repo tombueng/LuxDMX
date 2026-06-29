@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LuxDMX — Updating</title>
+<title>LuxDMX Updating</title>
 <link rel="icon" type="image/png" href="/favicon.png?v=__FWVER__">
 <link rel="stylesheet" href="/bootstrap.min.css?v=__FWVER__">
 <style>
@@ -23,7 +23,7 @@ body { background:#0d1117; display:flex; align-items:center; justify-content:cen
 <body>
 <div class="box">
   <div class="spinner" id="spin"><i></i><i></i><i></i><i></i><i></i></div>
-  <div class="fw-bold fs-5 mb-2" id="title">Starting update&hellip;</div>
+  <div class="fw-bold fs-5 mb-2" id="title">Starting update…</div>
   <div class="text-secondary small" id="sub">Fetching the new firmware from LuxDMX.org.</div>
   <div id="barwrap" style="display:none;height:6px;background:#21262d;border-radius:3px;overflow:hidden;margin-top:1.4rem">
     <div id="bar" style="height:100%;width:0%;background:linear-gradient(90deg,#23e6f7,#f33abc);transition:width .3s linear"></div>
@@ -33,7 +33,7 @@ body { background:#0d1117; display:flex; align-items:center; justify-content:cen
 // The version this page was built as, baked in at build time. This page is served
 // by the firmware running RIGHT NOW (the one being replaced), so FROM is the
 // pre-update version. The update is only really done once the device comes back
-// reporting a DIFFERENT version — that, not "the server answered", is the signal
+// reporting a DIFFERENT version. That, not "the server answered", is the signal
 // to reload. The old firmware keeps answering HTTP while it downloads, so a plain
 // "first 200 wins" reload would bounce you onto the stale pre-update page.
 var FROM = "__FWVER__";
@@ -57,7 +57,7 @@ function tick() {
     .then(function(r){ if (!r.ok) throw 0; return r.json(); })
     .then(function(d){
       if (d && d.current && d.current !== FROM) {        // device reports the NEW version -> done
-        show('Up to date', 'Reloading&hellip;', 100);
+        show('Up to date', 'Reloading…', 100);
         location.replace('/');
         return;
       }
@@ -69,9 +69,9 @@ function tick() {
         .then(function(s){
           lastPct = s.pct || 0;
           if (s.phase === 3)      show('Update failed', 'The device keeps its current firmware and will reboot.', null);
-          else if (s.phase === 2) { wrote = true; show('Flashing firmware&hellip;', 'Verifying and finishing the new image.', 100); }
-          else if (s.phase === 1) show('Downloading firmware&hellip;', 'Streaming from LuxDMX.org and writing to flash.', lastPct);
-          else                    show('Starting update&hellip;', 'Fetching the new firmware from LuxDMX.org.', null);
+          else if (s.phase === 2) { wrote = true; show('Flashing firmware…', 'Verifying and finishing the new image.', 100); }
+          else if (s.phase === 1) show('Downloading firmware…', 'Streaming from LuxDMX.org and writing to flash.', lastPct);
+          else                    show('Starting update…', 'Fetching the new firmware from LuxDMX.org.', null);
           again();
         })
         .catch(function(){ again(); });   // status momentarily unavailable -> hold the last view
@@ -79,8 +79,8 @@ function tick() {
     .catch(function(){
       // Device unreachable -> it's rebooting. Only say so once the write finished;
       // before that it's just busy flashing and not yet answering.
-      if (wrote || lastPct >= 99) show('Rebooting&hellip;', 'Waiting for the device to come back online.', 100);
-      else show('Downloading firmware&hellip;', 'Streaming from LuxDMX.org and writing to flash.', lastPct);
+      if (wrote || lastPct >= 99) show('Rebooting…', 'Waiting for the device to come back online.', 100);
+      else show('Downloading firmware…', 'Streaming from LuxDMX.org and writing to flash.', lastPct);
       again();
     });
 }
