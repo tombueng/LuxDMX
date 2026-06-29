@@ -43,3 +43,4 @@ tools/
 !normalize_silk.py
 !validate_connectivity.py
 !validate_geometry.py
+!validate_placement.py

@@ -42,7 +42,7 @@ the board was never left worse than the prior step; backups taken at each step.
 ```
 python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 "<KiCad>/bin/python" validate_geometry.py     # trace width / via current / DFM
-"<KiCad>/bin/python" validate_placement.py    # decoupling/switcher cap proximity (EMC)
+"<KiCad>/bin/python" validate_placement.py    # decoupling/ferrite/switcher proximity (EMC); also auto-run by gen_gerbers.py, exits non-zero on drift
 "<KiCad>/bin/kicad-cli" pcb drc --format json -o drc.json luxdmx.kicad_pcb   # DRC + connectivity
 # routing pipeline (after any placement change):
 "<KiCad>/bin/python" rebuild_iso.py && python escape_connectors.py && python autoroute_fr2.py \
@@ -58,7 +58,7 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 | 2 | DRC (electrical) | ✅ | kicad-cli pcb drc | **0 shorts, 0 clearance errors.** The 3 fine-pitch near-misses (W5500 0.5mm QFN + USB-C CC2, 0.16-0.174mm) resolved by setting Default clearance 0.2 -> 0.15mm; re-route to 0.2mm is geometrically impossible at 0.5mm pitch, 0.15mm still 68% over JLC's 0.0889mm min |
 | 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | **46 cosmetic** silk warnings (24 overlap / 16 edge / 6 over-copper) after `normalize_silk.py` re-placed 89 ref-des clear of pads/silk (down from 62). The rest are dense-area ref-on-ref, refs near the edge (J*/MH* not moved) and the informative back-silk tables; fab auto-clips silk off pads/edges = no functional or fab impact. Accepted |
 | 4 | Net connectivity = intent | ✅ | board generated from `luxdmx.net` (SKiDL) | by construction; schematic reviewed pin-by-pin |
-| 5 | Decoupling/xtal/switcher placement (EMC) | ✅ | validate_placement.py + place_decoupling.py | caps snapped to IC pins, 2mm min gap, 0 overlaps (was 20-56mm) |
+| 5 | Decoupling/xtal/switcher placement (EMC) | ✅ enforced | **validate_placement.py** (per-part pad-to-pad distance to the served IC pin, incl. crystal load caps + **FB1/2/3 supply ferrites**) **wired into gen_gerbers.py** (reports drift on every fab export, exits non-zero standalone) + place_decoupling.py to re-snap | each cap/ferrite has a per-part max distance to its IC pin; after any placement change, re-run place_decoupling.py to re-cluster + validate_placement.py to confirm. Connectivity stays the HARD gate; placement is a loud quality WARNING (never blocks fab on a fuzzy threshold) |
 | 5b | Board outline / mounting holes | ✅ | set_outline_holes.py | **99 x 79mm**; 4 corner M3 holes at **90 x 70mm spacing, uniform 4.5mm inset** (all 4 equal edge distance); 0 hole-vs-body collisions. Holes are **plated + tied to GND** (MountingHole_3.2mm_M3_Pad) so the 4 corners bond board GND to a metal chassis — see docs/ruggedization.md "Grounding & shielding". |
 | 6 | PoE module ↔ magjack distance | ⚠️ | geometry | VPOE runs ~50mm; functional, see PoE note |
 | 7 | Isolation surface creepage (DMX 4mm / PoE 2.5mm) | ✅ | DRC `.kicad_dru` | 0 isolation-clearance violations |
