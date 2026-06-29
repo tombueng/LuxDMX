@@ -102,7 +102,7 @@ body { background: var(--gh-bg); }
   transition: height .12s linear;
 }
 .ch .ch-n, .ch .ch-v, .ch .ch-l { position: relative; z-index: 1; }
-/* tiny hard 1px seam (0-blur) — cheap to paint, keeps text crisp over the gauge */
+/* tiny hard 1px seam (0-blur), cheap to paint, keeps text crisp over the gauge */
 .ch .ch-n { font-size: 0.74rem; font-weight: 700; color: #fff; line-height: 1.05;
   text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000; }
 .ch .ch-v { font-size: 0.5rem; color: #fff; line-height: 1.1;
@@ -173,11 +173,11 @@ footer a:hover { color: var(--gh-text); }
     </div>
   </a>
   <div class="nav-stats">
-    <div class="nav-stat"><span class="ns-label">FPS</span><span class="ns-val" id="fps">—</span></div>
-    <div class="nav-stat"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">—</span></div>
-    <div class="nav-stat"><span class="ns-label">Heap</span><span class="ns-val" id="heap">—</span></div>
-    <div class="nav-stat"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">—</span></div>
-    <div class="nav-stat"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">—</span></div>
+    <div class="nav-stat"><span class="ns-label">FPS</span><span class="ns-val" id="fps">&middot;</span></div>
+    <div class="nav-stat"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">&middot;</span></div>
+    <div class="nav-stat"><span class="ns-label">Heap</span><span class="ns-val" id="heap">&middot;</span></div>
+    <div class="nav-stat"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">&middot;</span></div>
+    <div class="nav-stat"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">&middot;</span></div>
   </div>
   <div class="nav-links">
     <a href="/" class="btn btn-primary btn-sm">Status</a>
@@ -192,7 +192,7 @@ footer a:hover { color: var(--gh-text); }
        class="align-items-center gap-2 mb-3 px-3 py-2 rounded">
     <span style="color:#f33abc">&#9888;</span>
     <span class="small" style="color:#f33abc">
-      Universe conflict &mdash; two or more sources are clashing on a universe.
+      Universe conflict: two or more sources are clashing on a universe.
       Enable a merge mode (HTP/LTP) on that output, or leave only one source.
     </span>
   </div>
@@ -244,7 +244,7 @@ footer a:hover { color: var(--gh-text); }
   <!-- DMX Grid -->
   <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
-      <span>DMX Channels 1–512</span>
+      <span>DMX Channels 1-512</span>
       <small class="text-secondary">click to edit</small>
     </div>
     <div class="card-body p-2">
@@ -272,7 +272,7 @@ footer a:hover { color: var(--gh-text); }
     </div>
   </div>
 
-  <!-- Fixtures (RDM) — hidden entirely unless an RTS/DE pin is configured -->
+  <!-- Fixtures (RDM): hidden entirely unless an RTS/DE pin is configured -->
   <div class="card mb-3" id="rdm-card" style="display:none">
     <div class="card-header d-flex align-items-center justify-content-between">
       <span>Fixtures (RDM)</span>
@@ -343,15 +343,15 @@ footer a:hover { color: var(--gh-text); }
 
 <footer class="text-center py-3 mt-1 border-top">
   &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
-  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
-  &nbsp;&mdash;&nbsp; MIT License
+  &nbsp;&middot;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
+  &nbsp;&middot;&nbsp; MIT License
 </footer>
 
 <script>
 const dmx = new Uint8Array(512);
 let activeCh = 0, sock;
 let labels = {};      // labels for the currently-viewed output: { "1": "Front L", ... }
-let allLabels = {};   // per-output: { "0": {"1":"Front L"}, "1": {...} } — each line has its own fixtures
+let allLabels = {};   // per-output: { "0": {"1":"Front L"}, "1": {...} }, each line has its own fixtures
 let devInfo = {};  // filled from /info.json
 
 // Outputs (enabled universes) and which one the monitor is currently viewing.
@@ -391,7 +391,7 @@ function buildOutSelector(){
   grp.innerHTML = outputs.map(function(o){
     return '<button type="button" class="btn btn-outline-secondary" data-out="' + o.idx +
            '">Output ' + String.fromCharCode(65 + o.idx) + ' · U' + o.uni +
-           ' · <span class="out-fps">–</span> fps</button>';
+           ' · <span class="out-fps">&middot;</span> fps</button>';
   }).join('');
   grp.querySelectorAll('button').forEach(function(b){
     b.addEventListener('click', function(){ setViewOut(+b.dataset.out); });
@@ -411,7 +411,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   updNavSub();
 }).catch(function(){});
 
-// Sparkline — 60 samples at 0.5 s = 30 s of history
+// Sparkline: 60 samples at 0.5 s = 30 s of history
 const SPARK_LEN = 60;
 const spark = new Uint8Array(SPARK_LEN);
 let sparkIdx = 0, sparkFull = false, sparkTimer = null;
@@ -494,7 +494,7 @@ function saveLabel() {
   allLabels[viewOut] = labels;
   applyLabels();
   document.getElementById('modal-title').textContent =
-    'Channel ' + activeCh + (labels[activeCh] ? ' — ' + labels[activeCh] : '');
+    'Channel ' + activeCh + (labels[activeCh] ? ': ' + labels[activeCh] : '');
   fetch('/labels', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                      body: JSON.stringify(allLabels) }).catch(function(){});
 }
@@ -530,7 +530,7 @@ function openModal(ch) {
   spark.fill(0); sparkIdx = 0; sparkFull = false;
   document.getElementById('spark-line').setAttribute('points', '');
   document.getElementById('modal-title').textContent =
-    'Channel ' + ch + (labels[ch] ? ' — ' + labels[ch] : '');
+    'Channel ' + ch + (labels[ch] ? ': ' + labels[ch] : '');
   document.getElementById('ch-label').value = labels[ch] || '';
   syncModal(dmx[ch - 1]);
   document.getElementById('modal').classList.add('show');
@@ -690,7 +690,7 @@ function updateLog(data) {
   }).join('');
 }
 
-// Senders + log now arrive over the WebSocket (see sock.onmessage) — no HTTP
+// Senders + log now arrive over the WebSocket (see sock.onmessage), no HTTP
 // polling, which previously exhausted the device's TCP sockets.
 
 // ── RDM fixtures ────────────────────────────────────────────────────────────
@@ -730,7 +730,7 @@ function rdmRender(d) {
     }).join(' · ');
     return '<tr>' +
       '<td class="ps-3" style="font-family:monospace">' + esc(f.uid) + '</td>' +
-      '<td><div>' + (f.model ? 'model ' + f.model : '&mdash;') +
+      '<td><div>' + (f.model ? 'model ' + f.model : '&middot;') +
         (f.persCount > 1 ? ' <span class="text-secondary">(pers ' + f.pers + '/' + f.persCount + ')</span>' : '') +
         '</div>' +
         (f.sw ? '<div class="text-secondary" style="font-size:.7rem">' + esc(f.sw) + '</div>' : '') +
