@@ -51,7 +51,7 @@ They always restore the original configuration afterwards.
 | Spec | Feature (network → web UI) |
 |---|---|
 | `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org" |
-| `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking |
+| `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking; tight back-to-back burst keeps tracking (socket-drain regression). The per-loop latency win itself needs a logic analyzer on the DMX wire and isn't asserted here. |
 | `sacn.spec.mjs` | sACN / E1.31 → DMX values, live grid, sender tracking |
 | `conflict.spec.mjs` | Two simultaneous senders → conflict banner |
 | `merge.spec.mjs` | Issue #10: per-output merge mode shape + UI; HTP per-channel max, sACN priority override, LTP persistence (opt-in) |

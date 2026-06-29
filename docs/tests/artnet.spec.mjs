@@ -43,6 +43,34 @@ test('status-page grid reflects Art-Net values live', async ({ page, request }) 
   } finally { sender.close(); }
 });
 
+test('Art-Net tracks a tight back-to-back burst (socket drain)', async ({ request }) => {
+  const { art } = await universes(request);
+  const sender = new UdpSender(host);
+  try {
+    // Fire a rapid burst with a ramping ch1 and no inter-frame gap, so several
+    // ArtDMX packets land in the device's UDP socket at once. The gateway drains
+    // its Art-Net socket every loop (mirrors readSacn), so it must keep tracking
+    // and settle on the final frame instead of stalling or dropping out.
+    // NOTE: this guards correctness of the drain loop. The actual per-loop
+    // latency win only shows under loop jitter and needs a logic analyzer on the
+    // DMX wire to measure (see README) — it isn't asserted here.
+    const marker = 123;
+    for (let v = 1; v <= 200; v++) {
+      const d = Buffer.alloc(512);
+      d[0] = v; d[1] = marker;
+      await sender.send(ART_PORT, artDmxPacket(art, d, v));
+    }
+    // Steady final frame to guarantee delivery regardless of UDP drops mid-burst.
+    const fin = Buffer.alloc(512);
+    fin[0] = 250; fin[1] = marker;
+    await streamFor(sender, ART_PORT, () => artDmxPacket(art, fin), { ms: 800, hz: 60 });
+    const d = await pollFor(() => dmx(request),
+      (x) => x.ch[0] === 250 && x.ch[1] === marker);
+    expect(d.ch[0]).toBe(250);
+    expect(d.ch[1]).toBe(marker);
+  } finally { sender.close(); }
+});
+
 test('Art-Net sender is tracked with FPS', async ({ request }) => {
   const { art } = await universes(request);
   const sender = new UdpSender(host);

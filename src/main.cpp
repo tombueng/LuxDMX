@@ -2783,7 +2783,14 @@ void loop() {
     // could not check for data" every loop (and wastes CPU) — seen with the W5500
     // link down (or before it comes up).
     if (netConnected()) {
-        if (cfg.protocol != 1) artnet.read();
+        // Drain all queued Art-Net packets this loop (bounded), so a transient
+        // socket backlog catches up to the newest frame instead of clearing one
+        // packet per loop. read() runs onArtDmx for each ART_DMX and returns 0
+        // once the socket is empty. Mirrors readSacn()'s drain — without it
+        // Art-Net visibly lags sACN whenever the loop hitches under WiFi jitter.
+        // The 64-packet cap keeps loop() responsive if a source ever floods us.
+        if (cfg.protocol != 1)
+            for (int n = 0; n < 64 && artnet.read(); ++n) { }
         if (cfg.protocol != 0) readSacn();
     }
     ArduinoOTA.handle();
