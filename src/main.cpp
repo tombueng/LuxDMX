@@ -1970,6 +1970,7 @@ static void wmSaveCallback() { wm_shouldSave = true; }
 
 static void startWiFiManager(bool forcePortal) {
     WiFiManager wm;
+    wm.setHostname(cfg.hostname.c_str());   // advertise via DHCP (option 12) so the router registers the name for non-mDNS clients
     wm.setSaveConfigCallback(wmSaveCallback);
     wm.setAPCallback([](WiFiManager*) { setLedColor(NEO_PURPLE, true); }); // portal open
     wm.setConnectTimeout(60);
@@ -2443,6 +2444,7 @@ static void ethUpTask(void *arg) {
     ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
               ETH_W5500_SPI_HOST, cfg.ethSck, cfg.ethMiso, cfg.ethMosi,
               cfg.ethFreqMhz);
+    ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link
     applyEthStaticIp();
     waitEthLink();
     s_ethUpDone = true;
@@ -2491,6 +2493,7 @@ static void startEthRmii() {
         RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
     ETH.begin(rmiiPhyType(phy), cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio,
               cfg.rmiiPwr, rmiiClkMode(cfg.rmiiClk));
+    ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link
     applyEthStaticIp();
     waitEthLink();
 }
@@ -2574,6 +2577,7 @@ static void startWiFiStation() {
         saveConfig();
     }
     WiFi.mode(WIFI_STA);
+    WiFi.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) so the router resolves the name
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
@@ -2629,6 +2633,7 @@ static bool cfgserialWifi(const String& ssid, const String& pass) {
     // reconnects (the recover-a-stuck-board path). WiFi stays out of the schema.
     WiFi.persistent(true);
     WiFi.mode(WIFI_STA);
+    WiFi.setHostname(cfg.hostname.c_str());
     WiFi.begin(ssid.c_str(), pass.c_str());
     return true;
 }
