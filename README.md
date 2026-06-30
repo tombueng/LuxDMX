@@ -651,7 +651,10 @@ To make this idiot-proof, **Settings → Hardware board** offers:
 - **Click pins on a board diagram** — the pick button next to each GPIO field opens an
   interactive board so you click the actual pin instead of guessing GPIO numbers. The
   diagram colour-codes pins (free / caution / do-not-use) and shows your current
-  assignments right on the board.
+  assignments right on the board. The common dev boards (DevKitC, NodeMCU-32S, DOIT v1,
+  S3 DevKitC-1) draw their **real physical header** — USB on the correct edge, every pin
+  in its true row with the board's own silk, and the 3V3 / 5V / GND / EN pins shown (greyed,
+  so you can wire VCC/GND by it) rather than only the GPIO pins.
 - **Live validation** — duplicate pins, strapping/flash/input-only pins and
   Ethernet-reserved pins are flagged in red/amber before you can save.
 

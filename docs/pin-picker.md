@@ -89,6 +89,31 @@ esp32   : flash 6-11, serial 1/3, input-only 34/35/36/39, strapping 0/2/5/12/15,
 esp32s3 : flash 26-32, serial 43/44, usb-jtag 19/20, strapping 0/3/45/46, max 48
 ```
 
+## Physical header diagram (issue #17)
+
+The plain descriptor (`cols`) only lists the GPIO/signal pins, so the old diagram had
+no 3V3 / 5V / VIN / GND / EN to wire VCC/GND by, the column order was approximate, and
+the labels were `Gxx`/`IOxx` rather than the board's silk. Boards that ship a curated
+`phys` block now render a faithful **physical header** instead:
+
+- every pin in its real row, the USB connector on the correct edge (board the right way up),
+- power / GND / EN pins shown but greyed and **non-assignable** (you can wire VCC/GND/EN
+  by it, but a signal can't be dropped on a rail),
+- each pin labelled with the board's own silk (`D21`, `3V3`, `GND`, ...) plus the GPIO
+  number where the silk hides it,
+- GPIO pins stay clickable / assignable with the same status colours and callouts as before.
+
+Boards without `phys` keep the original horizontal two-column diagram, so it degrades
+gracefully. The `phys` fields are documented in
+[web/boards/README.md](../web/boards/README.md#physical-header-phys--optional). Curated
+boards: ESP32 DevKitC (38-pin), NodeMCU-32S (38-pin), ESP32 DevKit v1 (DOIT, 30-pin),
+ESP32-S3 DevKitC-1 (44-pin). The four built-in offline boards carry the same data inline
+in `config.html`. Validate the curated data with:
+
+```sh
+node web/boards/validate_physical.mjs
+```
+
 ## Descriptor schema and adding boards
 
 See [web/boards/README.md](../web/boards/README.md) for the JSON schema, the `flags`
