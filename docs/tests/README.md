@@ -73,3 +73,11 @@ They always restore the original configuration afterwards.
   wire, so it needs a logic analyzer on the TX pin and is out of e2e scope.
 - Tests run serially (`workers: 1`) since they share one physical device, and
   network specs reset manual override so they don't interfere with each other.
+- **DHCP hostname (option 12)** can't be exercised by this suite: the device
+  advertising its hostname only has a visible effect on the *router's* DNS, which
+  needs a real DHCP server, so it's out of e2e scope. It was verified by HIL
+  against a Fritzbox: set a made-up hostname over the serial console, reboot, and
+  confirm the router resolves it (`<name>.fritz.box` → device IP) with no mDNS
+  involved. Checked on both WiFi STA and wired W5500 (each interface registers via
+  its own DHCP lease). The hostname field itself round-trips through `/config` +
+  `/info.json`, which `web-ui.spec.mjs` already covers.

@@ -75,7 +75,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, or reboot. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
 | **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
-| **mDNS** | Reachable as `dmx-gateway.local` (hostname configurable) |
+| **mDNS + DHCP hostname** | Reachable as `dmx-gateway.local` via mDNS, *and* the device sends its hostname over DHCP (option 12) so your router registers it by plain name. Clients without mDNS (e.g. Windows) can then reach it as `dmx-gateway` / `dmx-gateway.fritz.box`. Hostname configurable |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
 | **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v4 board) — codes network/idle/DMX/conflict/identify state |
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
@@ -517,7 +517,7 @@ Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a r
 
 ### 2. Status Page
 
-Open `http://dmx-gateway.local` (or the IP shown in serial monitor at 115200 baud):
+Open `http://dmx-gateway.local` (mDNS), or `http://dmx-gateway/` if your router resolves DHCP hostnames (handy on Windows, which has no mDNS), or the IP shown in serial monitor at 115200 baud:
 
 - Live stats: framerate, link (**WiFi** signal in dBm, **LAN** with link speed, or **AP**), uptime, free heap, jitter
 - Conflict warning when sources clash on a universe, or a "merging" indicator when HTP/LTP merging is enabled for that output
