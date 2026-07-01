@@ -7,14 +7,14 @@
 > holes, and wider power traces are in; a few datasheet/silk items remain open (see **Status**). Treat the
 > first build as a prototype and do a final review before ordering.
 
-# LuxDMX v4 — hardware
+# LuxDMX v5 — hardware
 
 A compact, open-source **Art-Net / sACN → galvanically-isolated DMX512 gateway**, built around
 an ESP32-S3 with **both** WiFi *and* wired Ethernet. Designed entirely as code (SKiDL netlist) and
 routed by a fully-scripted, placement-driven pipeline — so the board regenerates itself from your
 component placement, isolation barrier and all.
 
-![LuxDMX v4 — PCB layout](board-pcb-1.png)
+![LuxDMX v5 — PCB layout](board-pcb-1.png)
 
 <p align="center">
   <img src="board3d-1.png" width="49%" alt="3D render — front">
@@ -224,7 +224,7 @@ fee. A complete, assembled prototype lands well under typical hobby budgets.
 > **Design-complete and fully validated, but NOT yet fabricated or tested on real hardware.** Treat the
 > first build as a prototype and do a final review before ordering.
 
-The v4 board (two isolated DMX universes + PoE, **99 × 79 mm**, 4 corner plated M3 mounting holes) is
+The v5 board (two isolated DMX universes + PoE, **119 × 79 mm**, 4 corner plated M3 mounting holes) is
 **fully routed** (0 unrouted, 0 unconnected) and passes the scripted validation:
 
 - **DRC:** 3 clearance waivers only (2× W5500 0.5 mm-pitch escapes at 0.174 mm, USB-C CC2 at 0.160 mm),

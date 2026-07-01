@@ -77,27 +77,32 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
 | **mDNS + DHCP hostname** | Reachable as `dmx-gateway.local` via mDNS, *and* the device sends its hostname over DHCP (option 12) so your router registers it by plain name. Clients without mDNS (e.g. Windows) can then reach it as `dmx-gateway` / `dmx-gateway.fritz.box`. Hostname configurable |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
-| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v4 board) — codes network/idle/DMX/conflict/identify state |
+| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — codes network/idle/DMX/conflict/identify state |
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Ethernet support** | WT32-ETH01 (LAN8720) and the v4 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external W5500 module works too, and a **classic ESP32 can pick the W5500 (SPI) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
+| **Ethernet support** | WT32-ETH01 (LAN8720) and the v5 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external W5500 module works too, and a **classic ESP32 can pick the W5500 (SPI) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
 
 ## Hardware
 
-> ### 🛠 Custom PCB — LuxDMX v4
+> ### 🛠 Custom PCB — LuxDMX v5
 >
 > Want the real thing instead of breadboard + modules? There's a complete **open-source 4-layer PCB**:
 > ESP32-S3 with **both WiFi and wired Ethernet** (W5500), **two galvanically-isolated DMX universes**
 > (two XLR-5 outputs), **802.3af PoE** or USB-C power + flashing, a 5-LED status panel, BOOT/RST buttons,
 > and an optional OLED/TFT display header. All palm-sized and fabricable at JLCPCB for a few dollars.
 >
-> [<img src="hardware/board3d-1.png" width="360" alt="LuxDMX v4 custom PCB">](hardware/README.md)
+> **v5 is DMX512-A Protected** (ANSI E1.11 Annex C): each DMX output survives a sustained fault on the data
+> pins — someone plugging mains (30 VAC) or up to ±42 VDC into the XLR — without damage. A series Bourns TBU
+> high-speed protector blocks the fault in <1 µs and the board self-recovers when it's removed. Full
+> [E1.11 / DMX512-A compliance breakdown →](hardware/E1.11_COMPLIANCE.md)
+>
+> [<img src="hardware/board3d-1.png" width="360" alt="LuxDMX v5 custom PCB — DMX512-A Protected">](hardware/README.md)
 >
 > **→ Full design, component rationale, BOM, gerbers & JLCPCB fab guide: [`hardware/`](hardware/README.md)**
 
@@ -728,7 +733,7 @@ The "DMX active" green is held through brief input gaps (continuous 40 Hz
 output), so momentary multicast loss doesn't flicker the LED. The LED runs on
 its own task, so serving the web UI never freezes it.
 
-**5-LED status panel** (`ledType 3`, the LuxDMX v4 board) — five discrete LEDs that show
+**5-LED status panel** (`ledType 3`, the LuxDMX v5 board) — five discrete LEDs that show
 independent states *simultaneously*, instead of one LED time-sharing colours:
 
 | LED | Meaning |
@@ -740,7 +745,7 @@ independent states *simultaneously*, instead of one LED time-sharing colours:
 | **White** | identify active (blink) / booting |
 
 Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48` (built-in WS2812).
-The v4 board uses **R=1 G=2 Y=6 B=7 W=15**.
+The v5 board uses **R=1 G=2 Y=6 B=7 W=15**.
 
 ---
 

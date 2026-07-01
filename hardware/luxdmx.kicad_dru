@@ -8,11 +8,11 @@
 
 (rule "DMX1 isolation 4mm"
   (constraint clearance (min 4mm))
-  (condition "(A.Net == 'GNDISO' || A.Net == 'VISO' || A.Net == 'DMX_A' || A.Net == 'DMX_B' || A.Net == 'DMX_A_TERM') && (B.Net != 'GNDISO' && B.Net != 'VISO' && B.Net != 'DMX_A' && B.Net != 'DMX_B' && B.Net != 'DMX_A_TERM') && !(A.insideCourtyard('PS1') && B.insideCourtyard('PS1')) && !(A.insideCourtyard('U5') && B.insideCourtyard('U5'))"))
+  (condition "(A.Net == 'GNDISO' || A.Net == 'VISO' || A.Net == 'VISO_DRV' || A.Net == 'DMX_A' || A.Net == 'DMX_B' || A.Net == 'DMX_AO' || A.Net == 'DMX_BO' || A.Net == 'DMX_AX' || A.Net == 'DMX_BX' || A.Net == 'DMX_A_TERM') && (B.Net != 'GNDISO' && B.Net != 'VISO' && B.Net != 'VISO_DRV' && B.Net != 'DMX_A' && B.Net != 'DMX_B' && B.Net != 'DMX_AO' && B.Net != 'DMX_BO' && B.Net != 'DMX_AX' && B.Net != 'DMX_BX' && B.Net != 'DMX_A_TERM') && !(A.insideCourtyard('PS1') && B.insideCourtyard('PS1')) && !(A.insideCourtyard('U5') && B.insideCourtyard('U5'))"))
 
 (rule "DMX2 isolation 4mm"
   (constraint clearance (min 4mm))
-  (condition "(A.Net == 'GNDISO2' || A.Net == 'VISO2' || A.Net == 'DMX2_A' || A.Net == 'DMX2_B') && (B.Net != 'GNDISO2' && B.Net != 'VISO2' && B.Net != 'DMX2_A' && B.Net != 'DMX2_B') && !(A.insideCourtyard('PS2') && B.insideCourtyard('PS2')) && !(A.insideCourtyard('U6') && B.insideCourtyard('U6'))"))
+  (condition "(A.Net == 'GNDISO2' || A.Net == 'VISO2' || A.Net == 'VISO2_DRV' || A.Net == 'DMX2_A' || A.Net == 'DMX2_B' || A.Net == 'DMX2_AO' || A.Net == 'DMX2_BO' || A.Net == 'DMX2_AX' || A.Net == 'DMX2_BX') && (B.Net != 'GNDISO2' && B.Net != 'VISO2' && B.Net != 'VISO2_DRV' && B.Net != 'DMX2_A' && B.Net != 'DMX2_B' && B.Net != 'DMX2_AO' && B.Net != 'DMX2_BO' && B.Net != 'DMX2_AX' && B.Net != 'DMX2_BX') && !(A.insideCourtyard('PS2') && B.insideCourtyard('PS2')) && !(A.insideCourtyard('U6') && B.insideCourtyard('U6'))"))
 
 (rule "PoE isolation 2.5mm"
   (constraint clearance (min 2.5mm))

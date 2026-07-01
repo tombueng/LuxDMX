@@ -103,3 +103,5 @@ print("-"*100)
 from collections import Counter
 c=Counter(r[0] for r in rows)
 print(f"  {c[PASS]} PASS / {c[WARN]} WARN / {c[FAIL]} FAIL")
+import sys
+sys.exit(1 if c[FAIL] else 0)   # FAIL items block; WARN (SPICE-worth / margins) do not

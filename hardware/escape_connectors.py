@@ -36,7 +36,7 @@ def escape(ref,pn):
             vx,vy=x+dd*math.cos(ang+da),y+dd*math.sin(ang+da)
             if vok(vx,vy) and sok(x,y,vx,vy):
                 v=pcbnew.PCB_VIA(b); v.SetPosition(pcbnew.VECTOR2I(FM(vx),FM(vy))); v.SetViaType(pcbnew.VIATYPE_THROUGH)
-                v.SetDrill(FM(0.25)); v.SetWidth(FM(0.5)); v.SetNetCode(nc); v.SetLayerPair(pcbnew.F_Cu,pcbnew.B_Cu); v.SetLocked(True); b.Add(v)
+                v.SetDrill(FM(0.2)); v.SetWidth(FM(0.5)); v.SetNetCode(nc); v.SetLayerPair(pcbnew.F_Cu,pcbnew.B_Cu); v.SetLocked(True); b.Add(v)   # 0.5/0.2 = 0.15mm annular (>=JLC 0.13); 0.25 drill was 0.125 ring
                 placed.append((vx,vy,nc))
                 tr=pcbnew.PCB_TRACK(b); tr.SetStart(pcbnew.VECTOR2I(FM(x),FM(y))); tr.SetEnd(pcbnew.VECTOR2I(FM(vx),FM(vy)))
                 tr.SetWidth(FM(0.2)); tr.SetLayer(pcbnew.F_Cu if tgt['onF'] else pcbnew.B_Cu); tr.SetNetCode(nc); tr.SetLocked(True); b.Add(tr)

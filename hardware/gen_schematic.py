@@ -1048,11 +1048,12 @@ PAGE_H = page_bottom + 14.0
 # ---------------------------------------------------------------------------
 # assemble
 # ---------------------------------------------------------------------------
+from hw_version import HW_VERSION                          # board rev for the title block
 out = ['(kicad_sch', '\t(version 20250114)', '\t(generator "eeschema")',
        '\t(generator_version "9.0")', '\t(uuid "%s")' % uid('root'),
        '\t(paper "User" %s %s)' % (fnum(PAGE_W), fnum(PAGE_H)),
-       '\t(title_block (title "LuxDMX v4 - Art-Net/sACN -> isolated DMX gateway") '
-       '(rev "v4") (comment 1 "auto-generated from luxdmx.net by gen_schematic.py"))',
+       '\t(title_block (title "LuxDMX v%s - Art-Net/sACN -> isolated DMX gateway") '
+       '(rev "v%s") (comment 1 "auto-generated from luxdmx.net by gen_schematic.py"))' % (HW_VERSION, HW_VERSION),
        '\t(lib_symbols']
 for k in sorted(symbols):
     out.append('\t\t' + symbols[k].lib)

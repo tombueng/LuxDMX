@@ -13,6 +13,7 @@ from collections import defaultdict
 PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
 TM = pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
+_fail = False   # any power net under capacity, or any DFM minimum below JLCPCB -> exit 1 (usable as a gate)
 
 # expected worst-case current per power net (A)
 IEXP = {"+5V": 0.80, "+3V3": 0.40, "+5V_USB": 0.80, "+5V_POE": 0.40,
@@ -35,6 +36,7 @@ for n in IEXP:
     w = wmin[n] if wmin[n] < 9e9 else 0
     cap10 = ipc_amp(w) if w else 0; cap20 = ipc_amp(w, 20) if w else 0
     ok = cap10 >= IEXP[n]
+    if not ok: _fail = True
     print(f"{n:8} {w:9.3f} {cap10:7.2f}A {cap20:7.2f}A {IEXP[n]:6.2f}A {vias[n]:5}  {'OK' if ok else 'THIN -> widen'}")
 
 print("\n=== via current (0.3mm drill / 0.6mm pad through-via ~ 1-1.5A each @10C) ===")
@@ -57,3 +59,7 @@ print(f"  min track width : {mintrk:.3f} mm   {'OK' if mintrk>=0.0889 else 'TOO 
 print(f"  min drill       : {min(drills):.3f} mm   {'OK' if min(drills)>=0.15 else 'TOO SMALL'}")
 print(f"  min via annular : {min(annul):.3f} mm   {'OK' if min(annul)>=0.13 else 'TOO SMALL'}" if annul else "  (no vias)")
 print(f"  copper clearance: enforced by DRC (.kicad_dru); see DRC report for any <min")
+if mintrk < 0.0889 or (drills and min(drills) < 0.15) or (annul and min(annul) < 0.13):
+    _fail = True
+import sys
+sys.exit(1 if _fail else 0)

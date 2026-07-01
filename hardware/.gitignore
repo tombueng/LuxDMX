@@ -16,3 +16,39 @@ gerbers/
 
 # routing toolchain binaries (FR2 jar + portable JDK25) — large, downloadable
 tools/
+
+# one-off / operational scripts stay LOCAL, not in git. The committed board (luxdmx.kicad_pcb) is the
+# artifact; only the design source, the reproducible build pipeline + generators, the silk/feature steps,
+# and the validation gates are tracked. New scratch scripts are auto-ignored.
+*.py
+!luxdmx.py
+!hw_version.py
+!csv_to_xlsx.py
+!gen_bom_from_board.py
+!gen_gerbers.py
+!gen_cpl.py
+!gen_schematic.py
+!build_v3.py
+!sync_board.py
+!rebuild_iso.py
+!escape_connectors.py
+!autoroute_fr2.py
+!cleanup_pads.py
+!tighten_poe_void.py
+!add_mounting_holes.py
+!add_silk_branding.py
+!add_port_pinout_silk.py
+!add_silk_labels.py
+!fix_edge_dmx_silk.py
+!normalize_silk.py
+!validate_connectivity.py
+!validate_geometry.py
+!validate_placement.py
+!validate_electrical.py
+!validate_tbu_iso.py
+!validate_critical.py
+# 2026-07-01 reproducible routing pipeline (route_all.sh) + the impedance/partial-net steps
+!route_tbu.py
+!setup_netclasses.py
+!finish_partial.py
+!widen_eth.py

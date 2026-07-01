@@ -28,6 +28,20 @@ if not CLI or not os.path.exists(CLI):
     else:
         raise SystemExit("kicad-cli not found - set $KICAD_CLI")
 
+# HARD GATE (the C17 lesson): refuse to emit gerbers while ANY net is unrouted.
+# This makes "validated but shipped an unrouted cap" structurally impossible. See validate_connectivity.py.
+from validate_connectivity import check_connectivity
+check_connectivity(PCB, CLI)   # raises SystemExit on any unconnected net -> no gerbers get produced
+
+# EMC placement check on every board change: report any decoupling cap / supply ferrite that drifted away
+# from the IC pin it serves. Connectivity is the HARD fab blocker; placement is a quality WARNING so it never
+# blocks fab over a fuzzy distance threshold -- but it is loud on every gerber export. See validate_placement.py.
+from validate_placement import check_placement
+_pl = check_placement(PCB)
+if _pl:
+    print(f"[placement] WARNING: {len(_pl)} support part(s) farther from their pin than target (see above); "
+          "fix or re-run place_decoupling.py. (not blocking gerbers)")
+
 tmp = tempfile.mkdtemp(prefix="luxdmx_gbr_")
 try:
     subprocess.run([CLI, "pcb", "export", "gerbers", PCB, "-o", tmp + os.sep,

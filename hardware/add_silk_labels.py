@@ -13,8 +13,8 @@ b = pcbnew.LoadBoard(PCB)
 
 # ref -> (label, dx, dy, rot)  offset in mm from the footprint centre, toward open silk
 LABELS = {
-    "J1": ("DMX-OUT A", -10.5, 0.0, 90),   # XLR-5 universe 1, left of the connector (vertical)
-    "J5": ("DMX-OUT B", -10.5, 0.0, 90),   # XLR-5 universe 2
+    "J1": ("DMX-OUT A (ISO)", -10.5, 0.0, 90),   # XLR-5 universe 1; (ISO) = isolated port marking (E1.11 10.4)
+    "J5": ("DMX-OUT B (ISO)", -10.5, 0.0, 90),   # XLR-5 universe 2; (ISO) = isolated port marking (E1.11 10.4)
     "J3": ("ETHERNET 10/100", 1.0, -8.5, 0),  # RJ45 magjack, above
     "J2": ("USB-C", 0.0, -5.0, 0),         # USB-C inlet, above
     # J4 (display) + J6 (expansion) get per-pin pinout grids instead — see add_port_pinout_silk.py
