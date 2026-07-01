@@ -44,3 +44,11 @@ tools/
 !validate_connectivity.py
 !validate_geometry.py
 !validate_placement.py
+!validate_electrical.py
+!validate_tbu_iso.py
+!validate_critical.py
+# 2026-07-01 reproducible routing pipeline (route_all.sh) + the impedance/partial-net steps
+!route_tbu.py
+!setup_netclasses.py
+!finish_partial.py
+!widen_eth.py

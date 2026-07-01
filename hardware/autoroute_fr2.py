@@ -25,6 +25,11 @@ for t in list(b.GetTracks()):
     b.Remove(t); n += 1
 print("cleared", n, "unlocked tracks, kept", kept, "locked", flush=True)
 pcbnew.ExportSpecctraDSN(b, dsn)
+# NB tried + abandoned: injecting an (autoroute_settings ...) block with via_costs + per-layer preferred
+# directions (the only way to reach those, per the v2.2.4 source) makes Freerouting parse the board as
+# "2 unrouted nets" and route nothing on our KiCad-exported DSN. Setting router.scoring.via_costs /
+# optimizer in freerouting.json works but gives no win beyond run-to-run noise (the default postroute
+# optimizer already runs). So: plain export, let FR's defaults do their thing.
 # Run Freerouting with its GUI VISIBLE so the routing can be watched (user preference: never headless).
 # Analytics stays disabled so it doesn't block on the api.freerouting.app telemetry call. The window
 # opens, loads the DSN, autoroutes (-mp passes) while you watch, writes the .ses, and closes itself.

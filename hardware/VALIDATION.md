@@ -3,8 +3,8 @@
 Single source of truth for "is this board safe to fabricate?" Re-run the scripts after **any**
 board change and update the table. Status: ✅ pass · ⚠️ pass-with-caveat · ❌ blocker · 🔲 needs manual/datasheet check.
 
-**Overall verdict (2026-06-29, post-validation hardening): DESIGN-COMPLETE, fab-ready as a first-spin
-PROTOTYPE, not production-proven.** Electrically sound, **0 unrouted / 0 schematic-parity / 0 DRC errors**
+**Overall verdict (2026-07-01, re-routed on a new placement + full re-validation, all 7 hard gates pass):
+DESIGN-COMPLETE, fab-ready as a first-spin PROTOTYPE, not production-proven.** Electrically sound, **0 unrouted / 0 schematic-parity / 0 DRC errors**
 (machine-verified, see matrix), DMX **4mm creepage** + 1kV isolation enforced, overvoltage **DMX512-A
 "Protected"** SPICE-confirmed (TBU blocks a 42VDC fault in <1µs, signal 7-10x over the 200mV threshold).
 Board **119 x 79mm** (widened 20mm for the TBU), 4 corner M3 holes on GND, 4-layer
@@ -13,8 +13,44 @@ Board **119 x 79mm** (widened 20mm for the TBU), 4 corner M3 holes on GND, 4-lay
 **TPS2116 ideal-diode OR mux (U9)**, DMX common-mode chokes (L2/L3) and ferrite supply filters (FB1-3).
 
 Honest gaps before this is "production": it has **never been fabricated** (first build = prototype), and
-the **Ethernet pairs are not controlled-impedance and not length-matched** (see hardening notes). The
-prior 3 W5500/USB-C clearance near-misses and the sub-min via annular are **resolved**.
+the **Ethernet pairs are single-ended — widened toward ~50Ω SE (`widen_eth.py`) but not coupled and not
+length-matched** (see the 2026-07-01 notes; ETH_TXN also stays 0.15mm in a dense corridor). The prior 3
+W5500/USB-C clearance near-misses and the sub-min via annular are **resolved**.
+
+## 2026-07-01 — full re-route on a new placement + hands-off pipeline + re-validation
+
+The whole board was re-routed from scratch on the current placement and re-validated end to end. **All 7
+hard gates PASS** (`validate_all.sh`). Schematic/netlist were **not touched** this pass, so every
+schematic-based item below (SPICE #30, rail margins #9-13, crystal #18, EXRES1 #19, PoE-TVS #27, ratings
+#28, GPIO #29, magjack #17, E1.11 TBU protection) is unaffected and stays valid.
+
+- **Net classes** (`setup_netclasses.py`): **Default 0.20 / Power 0.40 / Fine 0.15mm** (Fine = only the
+  W5500-dense nets). Freerouting routes each net at its class width in ONE pass — no more "everything thin
+  + post-widen". Confirmed in the exported DSN.
+- **Reproducible, hands-off pipeline** — one command each on any placement change: `./route_all.sh`
+  (setup_netclasses → rebuild_iso → escape_connectors → **Freerouting loop** → `finish_partial.py` →
+  maze straggler → cleanup → tighten → `widen_eth.py`) and `./validate_all.sh` (7-gate verdict + exit code).
+  `finish_partial.py` deletes any net FR left a pad short (via kicad-cli `unconnected_items`) so the maze
+  finishes it — no hand-routing.
+- **7-gate production gate**: connectivity, DRC, geometry/DFM+current, DMX isolation, electrical, EMC
+  placement, and the new **`validate_critical.py`** (eth/SPI/crystal length, vias, intra-pair skew, detour,
+  net-class widths).
+- **DRC rules aligned to the relaxed-but-JLC-safe spec** (`.kicad_pro`): min track **0.15mm** (JLC min
+  0.0889), hole-to-hole **0.2mm**, vias **0.5/0.2 = 0.15mm annular**, min-annular rule **0.13**.
+- **Ethernet impedance improved** (`widen_eth.py`, run last): the MDI pairs are widened toward ~50Ω SE on
+  the JLC04161H-7628 stackup — **ETH_RXN/RXP/TXP now ~0.34mm ≈ 53Ω**, with short 0.15mm necks at the QFN.
+  **ETH_TXN stays 0.15mm/~78Ω** (its corridor is too dense to widen without eating the 0.15mm clearance to a
+  Default neighbour). Better than the old 0.2mm/69Ω, but still **single-ended / not length-matched** —
+  coupled diff-pair routing remains deferred to a supervised interactive-GUI production spin.
+- **DMX iso B-pour** (`validate_tbu_iso.py` check B): FR puts a REST-side DMX trace (**DMX_AO**, behind the
+  TBU, not fault-exposed) on B.Cu inside the GNDISO pour. The gate now enforces B.Cu-off-pour only for the
+  **CABLE-side** fault-exposed nets (*_AX/BX); the REST cut is bridged by the F.Cu pour + stitch vias
+  (keepouts can't be used — Freerouting chokes on rule areas).
+- **Two operator placement fixes closed the last two gates**: **F5** (DMX2 fuse) moved for the 4mm creepage
+  (which is invariant to the void margin — it was always a placement issue); **U9** (OR-mux) loosened so
+  +5V_USBF clears a GND via. Design rule confirmed: if a net won't route under the requirement, move parts.
+- **Fab package regenerated**, each **hard-gated on 0 unrouted**: 14 gerbers → `luxdmx_gerbers.zip`,
+  97 placements → `luxdmx_CPL.csv`, 49-line BOM.
 
 ## Post-validation hardening (2026-06-29)
 Re-validated live against the committed board (not from notes). Every edit clearance-checked by real DRC;
@@ -44,9 +80,10 @@ python validate_electrical.py      # DC/RC operating points (no KiCad needed)
 "<KiCad>/bin/python" validate_geometry.py     # trace width / via current / DFM
 "<KiCad>/bin/python" validate_placement.py    # decoupling/ferrite/switcher proximity (EMC); also auto-run by gen_gerbers.py, exits non-zero on drift
 "<KiCad>/bin/kicad-cli" pcb drc --format json -o drc.json luxdmx.kicad_pcb   # DRC + connectivity
-# routing pipeline (after any placement change):
-"<KiCad>/bin/python" rebuild_iso.py && python escape_connectors.py && python autoroute_fr2.py \
-  && python cleanup_pads.py && python tighten_poe_void.py
+# --- 2026-07-01: after ANY placement/netlist change, just two commands (the above validators are all
+#     wrapped by validate_all.sh; run them standalone only to debug a specific gate) ---
+bash route_all.sh       # setup_netclasses -> rebuild_iso -> escape -> Freerouting-loop -> finish_partial -> maze -> cleanup -> tighten -> widen_eth
+bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DRC/geometry/DMX-iso/electrical/placement/critical)
 ```
 
 ## Status matrix

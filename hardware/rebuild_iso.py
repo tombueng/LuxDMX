@@ -25,7 +25,7 @@ FM = pcbnew.FromMM; TM = pcbnew.ToMM
 # hugging only the actual routed VPOE copper afterwards. DMX islands are compact, so bbox is fine.
 DOMAINS = [
     ("DMX1", {"GNDISO", "VISO", "VISO_DRV", "DMX_A", "DMX_B", "DMX_AO", "DMX_BO", "DMX_AX", "DMX_BX", "DMX_A_TERM"}, "GNDISO", 4.0),
-    ("DMX2", {"GNDISO2", "VISO2", "VISO2_DRV", "DMX2_A", "DMX2_B", "DMX2_AO", "DMX2_BO", "DMX2_AX", "DMX2_BX"}, "GNDISO2", 4.0),
+    ("DMX2", {"GNDISO2", "VISO2", "VISO2_DRV", "DMX2_A", "DMX2_B", "DMX2_AO", "DMX2_BO", "DMX2_AX", "DMX2_BX"}, "GNDISO2", 4.5),
 ]
 
 b = pcbnew.LoadBoard(PCB)
