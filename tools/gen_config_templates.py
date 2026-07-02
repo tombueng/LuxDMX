@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate src/generated/config_templates.cpp from templates/*.ini.
+"""Generate src/generated/config_templates.gen.h from templates/*.ini.
 
 The board templates (templates/*.ini) are the SINGLE SOURCE OF TRUTH for each
 board's runtime default values. This embeds them as PROGMEM C strings into the
@@ -10,7 +10,7 @@ Comment ('#') and blank lines are dropped — the engine ignores them anyway, an
 stripping keeps the embedded blob small. Run by extra_scripts.py at build time
 and by test/native/run.bat before the host test compiles.
 
-Usage: gen_config_templates.py [<project_root>] [<out_cpp>]
+Usage: gen_config_templates.py [<project_root>] [<out_header>]
 """
 import sys
 import pathlib
@@ -34,7 +34,7 @@ def meaningful_lines(text: str):
 
 def main():
     root = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path(__file__).resolve().parent.parent
-    out = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else root / "src" / "generated" / "config_templates.cpp"
+    out = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else root / "src" / "generated" / "config_templates.gen.h"
     tdir = root / "templates"
 
     inis = sorted(tdir.glob("*.ini"), key=lambda p: (p.stem != "_base", p.stem))  # _base first
@@ -55,6 +55,7 @@ def main():
         registry.append(f'    {{"{name}", {sym}}},')
 
     h = "// Auto-generated from templates/*.ini by tools/gen_config_templates.py — do not edit.\n"
+    h += "#pragma once\n"
     h += '#include <config_core.h>\n\n'
     h += "\n".join(blocks) + "\n"
     h += "const CfgTemplate CONFIG_TEMPLATES[] = {\n" + "\n".join(registry) + "\n};\n"

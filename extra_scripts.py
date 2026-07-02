@@ -122,11 +122,19 @@ def patch_esp_dmx():
         print("  [patch] esp_dmx uart.c: already patched")
 
 def generate_config_templates(root: pathlib.Path, gen_dir: pathlib.Path):
-    """Embed templates/*.ini into src/generated/config_templates.cpp (the board
+    """Embed templates/*.ini into src/generated/config_templates.gen.h (the board
     default values the config engine applies). Single source of truth = the .ini
-    files; see tools/gen_config_templates.py."""
+    files; see tools/gen_config_templates.py. The header is pulled into the build by
+    the committed wrapper src/config_templates_gen.cpp. Emitting a *header* (not a
+    .cpp) is deliberate: PlatformIO globs src/ before this script runs, so a
+    generated source file is absent from a clean first build's glob and the link
+    fails with 'undefined reference to CONFIG_TEMPLATES'. Every other generated
+    asset here is already a header for the same reason."""
     script = root / "tools" / "gen_config_templates.py"
-    out    = gen_dir / "config_templates.cpp"
+    out    = gen_dir / "config_templates.gen.h"
+    # Drop the pre-split generated .cpp if an older build left one behind, so it
+    # can't be globbed alongside the wrapper and double-define CONFIG_TEMPLATES.
+    (gen_dir / "config_templates.cpp").unlink(missing_ok=True)
     subprocess.run([sys.executable, str(script), str(root), str(out)], check=True)
 
 
