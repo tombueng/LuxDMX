@@ -10,14 +10,17 @@ families, so C3/C6/S2/H2/P4 boards are out of scope.
 **Layout** = how the two pin columns are built: *header* = hand-tuned physical header
 order; *auto* = generated from `variants/<dir>/pins_arduino.h` (GPIO numbers / silk /
 flags are real, physical column placement is approximate).
+📐 = ships a **curated physical header** (`phys`): the full real header incl. power/GND/EN
+pins in their true positions with the board's own silk, drawn as a faithful upright diagram
+(issue #17). So far: ESP32 DevKitC, NodeMCU-32S, ESP32 DevKit v1, ESP32-S3 DevKitC-1.
 
 ## ESP32 (classic, Xtensa / WROOM-32 etc.)
 
 | Board | Variant | Layout |
 |---|---|---|
-| ESP32 DevKitC V4 (WROOM-32, 38-pin) | `esp32` | header |
-| DOIT ESP32 DevKit v1 (30-pin) | `doitESP32devkitV1` | header |
-| NodeMCU-32S | `nodemcu-32s` | header |
+| ESP32 DevKitC V4 (WROOM-32, 38-pin) | `esp32` | header 📐 |
+| DOIT ESP32 DevKit v1 (30-pin) | `doitESP32devkitV1` | header 📐 |
+| NodeMCU-32S | `nodemcu-32s` | header 📐 |
 | WEMOS LOLIN D32 | `d32` | header (30-pin) |
 | WEMOS LOLIN32 | `lolin32` | header (30-pin) |
 | WEMOS LOLIN32 Lite | `lolin32-lite` | header (30-pin) |
@@ -37,7 +40,7 @@ flags are real, physical column placement is approximate).
 | Board | Variant | Layout |
 |---|---|---|
 | LuxDMX v4 (S3 + W5500) | (PCB source) | header |
-| ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | header |
+| ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | header 📐 |
 | ESP32-S3 DevKitM-1 | `esp32s3` | header |
 | Seeed XIAO ESP32-S3 | `XIAO_ESP32S3` | header |
 | Adafruit Feather ESP32-S3 | `adafruit_feather_esp32s3` | header |

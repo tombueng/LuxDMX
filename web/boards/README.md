@@ -42,8 +42,47 @@ reached, the page degrades silently to the built-in boards plus manual GPIO entr
     "ledType": 2, "ledPin": 48,
     "dispType": 1, "dispsda": 8, "dispscl": 9,
     "outputs": [ { "en": true, "uni": 0, "port": 1, "tx": 17, "rx": 18, "rts": -1 } ]
+  },
+  "phys": {                         // OPTIONAL curated physical header (issue #17)
+    "usb": "bottom",                // which edge the USB connector is on: top|bottom|left|right
+    "pins": [                       // EVERY physical pin in its real row, both sides
+      { "pos": 1, "side": "L", "silk": "3V3", "type": "power" },
+      { "pos": 1, "side": "R", "silk": "GND", "type": "gnd" },
+      { "pos": 4, "side": "L", "silk": "IO4", "gpio": 4, "type": "gpio" }
+      // ...
+    ]
   }
 }
+```
+
+### Physical header (`phys`) — optional
+
+`cols` gives the GPIO/signal pins; it has no power rails and its column placement is
+approximate. `phys` adds the board's **real, full header** so the picker can draw a
+wire-by-it diagram: the USB connector on the correct edge, every pin (including the
+power rails) in its true position, and the board's own silk labels.
+
+| field | meaning |
+|---|---|
+| `usb` | edge the USB/programming connector sits on (`top`/`bottom`/`left`/`right`) so the board is drawn the right way up |
+| `pins[]` | one entry per physical pin |
+| `pins[].pos` | row index down one side, `1` = nearest the USB end |
+| `pins[].side` | `"L"` (left header) or `"R"` (right header), board viewed with USB toward you |
+| `pins[].silk` | the label printed on the board (`3V3`, `GND`, `EN`, `D21`, `IO4`, `VP`, ...) |
+| `pins[].gpio` | the GPIO number — only on `type:"gpio"` pins; omitted for everything else |
+| `pins[].type` | `power` \| `gnd` \| `en` \| `gpio` \| `nc` |
+
+Only `type:"gpio"` pins are clickable/assignable; `power`/`gnd`/`en`/`nc` pins are shown
+greyed and inert (so you can wire VCC/GND/EN by the diagram but can't assign a signal to
+them). Every `gpio` listed in `phys` must also exist in `cols`. Boards **without** `phys`
+fall back to the original horizontal two-column diagram, so this is fully optional.
+
+Curated so far (validated by `validate_physical.mjs`): **ESP32 DevKitC (38-pin)**,
+**NodeMCU-32S (38-pin)**, **ESP32 DevKit v1 (DOIT, 30-pin)**, **ESP32-S3 DevKitC-1
+(44-pin)**. To check the curated data is well-formed:
+
+```sh
+node web/boards/validate_physical.mjs
 ```
 
 ### Pin `flags`

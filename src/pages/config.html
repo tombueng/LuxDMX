@@ -63,7 +63,13 @@ footer a:hover { color:var(--gh-text); }
 .board-svg { max-width:100%; height:auto; font-family:ui-monospace,Menlo,Consolas,monospace; }
 .board-svg .pad { cursor:pointer; }
 .board-svg .pad:hover .pin-pad { stroke:#23e6f7; stroke-width:2.6; }
-.pin-dot { fill:#0d1117; }
+.board-svg .ppin { cursor:default; }
+.board-svg .ppin.power { pointer-events:none; }
+.board-svg .ppin.power text { font-style:italic; }
+.board-svg .board-body { pointer-events:none; }
+.pin-dot { fill:#0d1117; pointer-events:none; }
+/* the pad's hit target is its rect; the dot/label never steal the click */
+.board-svg .pad text, .board-svg .ppin text { pointer-events:none; }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#45d85c; } .lg-warn::before{ background:#ffaa1c; } .lg-bad::before{ background:#f33abc; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #23e6f7 inset; }
@@ -977,6 +983,40 @@ function xiaocols(){
   function m(p){ return P(p[0], p[1], s3flags(p[0], false)); }
   return [ XIAO_L.map(m), XIAO_R.map(m) ];
 }
+// ---- Curated physical headers (issue #17) ----------------------------------
+// Real header order for the offline core boards, so the diagram is wire-by-it:
+// every pin in its true row, power/GND/EN included (and non-assignable). Each
+// side is a list of [silk, gpioOrNull]; null = a power/GND/EN/NC pin. These
+// mirror web/boards/<id>.json exactly (kept here too so they work fully offline).
+function phType(silk, gpio){
+  var s = String(silk).toUpperCase();
+  if (s === '3V3' || s === '5V' || s === 'VIN' || s === 'VBUS' || s === 'VCC') return 'power';
+  if (s === 'GND' || s === 'G' || s === '0V') return 'gnd';
+  if (s === 'EN' || s === 'RST' || s === 'RESET') return 'en';
+  if (s === 'NC') return 'nc';
+  return gpio == null ? 'nc' : 'gpio';
+}
+function phSide(label, rows){
+  return rows.map(function(r, i){
+    var silk = r[0], gpio = (r.length > 1 ? r[1] : null), t = phType(silk, gpio);
+    var e = { pos:i + 1, side:label, silk:silk, type:t };
+    if (gpio != null && t === 'gpio') e.gpio = gpio;
+    return e;
+  });
+}
+function phys(usb, leftRows, rightRows){ return { usb:usb, pins: phSide('L', leftRows).concat(phSide('R', rightRows)) }; }
+// ESP32 DevKitC V4 (WROOM-32, 38-pin). Espressif J2 (left) + J3 (right). Flash silk D0..D3/CMD/CLK.
+function physDevKitC(){ return phys('bottom',
+  [['3V3'],['EN'],['VP',36],['VN',39],['IO34',34],['IO35',35],['IO32',32],['IO33',33],['IO25',25],['IO26',26],['IO27',27],['IO14',14],['IO12',12],['GND'],['IO13',13],['D2',9],['D3',10],['CMD',11],['5V']],
+  [['GND'],['IO23',23],['IO22',22],['TX0',1],['RX0',3],['IO21',21],['GND'],['IO19',19],['IO18',18],['IO5',5],['IO17',17],['IO16',16],['IO4',4],['IO0',0],['IO2',2],['IO15',15],['D1',8],['D0',7],['CLK',6]]); }
+// ESP32 DevKit v1 (DOIT, 30-pin). USB at the bottom; flash pins not broken out; Dxx silk.
+function physDoit(){ return phys('bottom',
+  [['EN'],['VP',36],['VN',39],['D34',34],['D35',35],['D32',32],['D33',33],['D25',25],['D26',26],['D27',27],['D14',14],['D12',12],['D13',13],['GND'],['VIN']],
+  [['3V3'],['D15',15],['D2',2],['D4',4],['RX2',16],['TX2',17],['D5',5],['D18',18],['D19',19],['D21',21],['RX0',3],['TX0',1],['D22',22],['D23',23],['GND']]); }
+// ESP32-S3-DevKitC-1 v1.1 (44-pin). Espressif J1 (left) + J3 (right); GND silk "G", reset "RST".
+function physS3DevKitC(){ return phys('bottom',
+  [['3V3'],['3V3'],['RST'],['IO4',4],['IO5',5],['IO6',6],['IO7',7],['IO15',15],['IO16',16],['IO17',17],['IO18',18],['IO8',8],['IO3',3],['IO46',46],['IO9',9],['IO10',10],['IO11',11],['IO12',12],['IO13',13],['IO14',14],['5V'],['GND']],
+  [['GND'],['TX0',43],['RX0',44],['IO1',1],['IO2',2],['IO42',42],['IO41',41],['IO40',40],['IO39',39],['IO38',38],['IO37',37],['IO36',36],['IO35',35],['IO0',0],['IO45',45],['IO48',48],['IO47',47],['IO21',21],['IO20',20],['IO19',19],['GND'],['GND']]); }
 function buildBoards(){
   BOARDS = {};
   BOARDS['luxdmx_v4'] = finalizeDesc({ id:'luxdmx_v4', name:'LuxDMX v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
@@ -985,15 +1025,15 @@ function buildBoards(){
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15, dispType:1, dispsda:4, dispscl:5,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8}] } });
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
-    cols:s3cols(false),
+    cols:s3cols(false), phys:physS3DevKitC(),
     preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:-1}] } });
   BOARDS['esp32-devkitc'] = finalizeDesc({ id:'esp32-devkitc', name:'ESP32 DevKitC (WROOM-32, 38-pin)', mcu:'esp32',
-    cols:e32cols(),
+    cols:e32cols(), phys:physDevKitC(),
     preset:{ ledType:1, ledPin:2, dispType:1, dispsda:21, dispscl:22,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:16, rts:-1}] } });
   BOARDS['esp32-devkit-v1'] = finalizeDesc({ id:'esp32-devkit-v1', name:'ESP32 DevKit v1 (DOIT, 30-pin)', mcu:'esp32',
-    cols:e32cols30(),
+    cols:e32cols30(), phys:physDoit(),
     preset:{ ledType:1, ledPin:2, dispType:1, dispsda:21, dispscl:22,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:16, rts:-1}] } });
   BOARDS['xiao-esp32s3'] = finalizeDesc({ id:'xiao-esp32s3', name:'Seeed XIAO ESP32-S3', mcu:'esp32s3',
@@ -1201,12 +1241,20 @@ function shortRole(role){
     dispsda:'SDA', dispscl:'SCL', dispcs:'CS', dispdc:'DC', disprst:'RST', dispsck:'SCK', dispmosi:'MOSI' };
   return map[role] || role;
 }
+// Dispatcher: boards that ship a curated physical header (`phys`) get the faithful
+// vertical layout (every pin in its real row, power/GND/EN shown but greyed); every
+// other board falls back to the original horizontal two-column diagram.
+function renderBoard(){
+  var b = diagramDesc(), wrap = $('board-svg-wrap');
+  if (!b){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
+  if (b.phys && b.phys.pins && b.phys.pins.length) return renderBoardPhysical(b, wrap);
+  return renderBoardCols(b, wrap);
+}
 // Horizontal board diagram: the two pin columns become the top and bottom rows
 // (pins along the horizon), silk + GPIO labels stand vertically just inside each
 // row, and assigned-function callouts stack outward above/below. Geometry is in
 // fixed board units at a fixed scale, so a pin is the SAME size on every board.
-function renderBoard(){
-  var b = diagramDesc(), wrap = $('board-svg-wrap');
+function renderBoardCols(b, wrap){
   if (!b || !b.cols){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
   var assign = {};
   activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
@@ -1264,6 +1312,76 @@ function renderBoard(){
   wrap.innerHTML = s;
   wrap.querySelectorAll('.pad').forEach(function(node){ node.addEventListener('click', function(){ onPinClick(+node.getAttribute('data-gpio')); }); });
 }
+// Power / GND / EN / NC pins are shown so you can wire VCC/GND/EN by the diagram,
+// but they are never an assignable signal target.
+function isPower(type){ return type === 'power' || type === 'gnd' || type === 'en' || type === 'nc'; }
+function powerColor(type){ return type === 'power' ? '#d98c1f' : type === 'gnd' ? '#7d8590' : type === 'en' ? '#a371f7' : '#545d68'; }
+// Faithful physical diagram from a board's curated `phys` header. The module is
+// drawn upright with its USB connector on the real edge; every pin sits in its
+// true row, labelled with the board's own silk (plus the GPIO number where it has
+// one). Power/GND/EN pins are greyed and inert; GPIO pins keep the exact same
+// status colours, callouts and click-to-assign behaviour as the column diagram.
+function renderBoardPhysical(b, wrap){
+  var assign = {};
+  activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
+  var pins = b.phys.pins, usb = b.phys.usb || 'bottom';
+  var L = pins.filter(function(p){ return p.side === 'L'; }).sort(function(a,c){ return a.pos - c.pos; });
+  var R = pins.filter(function(p){ return p.side === 'R'; }).sort(function(a,c){ return a.pos - c.pos; });
+  var n = Math.max(L.length, R.length, 1);
+  // Geometry (board units; scaled up once for the final SVG). Rows run top->bottom.
+  // The pads sit on the two outer header edges; the module body is drawn strictly
+  // BETWEEN the columns so it never overlaps (or intercepts clicks on) a pad.
+  var PITCH = 19, TM = 18, PAD = 13, PH = PAD / 2, LBL = 50, CALL = 92, GUT = 8, SFONT = 7.5, SCALE = 1.5;
+  var leftPadX = CALL + LBL, bodyX = leftPadX + PH + GUT, bodyW = 60;
+  var rightPadX = bodyX + bodyW + GUT + PH;
+  var BW = rightPadX + LBL + CALL;
+  var BH = TM + (n - 1) * PITCH + TM;
+  var bodyCx = bodyX + bodyW / 2;
+  var usbBottom = usb !== 'top';
+  var s = '<svg class="board-svg" width="' + Math.round(BW * SCALE) + '" viewBox="0 0 ' + BW + ' ' + (BH + 26) + '" preserveAspectRatio="xMidYMid meet">';
+  s += '<g transform="translate(0,4)">';
+  // module body + RF shield + USB connector are decorative only (no pointer events,
+  // so they can never steal a click from a pad even if anti-aliasing overlaps).
+  s += '<g class="board-body" pointer-events="none">';
+  s += '<rect x="' + bodyX + '" y="' + (TM - 12) + '" width="' + bodyW + '" height="' + (BH - 2 * TM + 24) + '" rx="6" fill="#2b3138" stroke="#11151a"/>';
+  var shieldY = usbBottom ? (TM - 8) : (BH - TM - 26);
+  s += '<rect x="' + (bodyX + 4) + '" y="' + shieldY + '" width="' + (bodyW - 8) + '" height="32" rx="3" fill="#3a4048" stroke="#11151a" opacity="0.7"/>';
+  var usbY = usbBottom ? (BH - 14) : (TM - 18), uw = 22;
+  s += '<rect x="' + (bodyCx - uw / 2) + '" y="' + usbY + '" width="' + uw + '" height="15" rx="2" fill="#aab2bd" stroke="#6b7480"/>';
+  s += '<text x="' + bodyCx + '" y="' + (BH / 2) + '" fill="#9aa6b0" font-size="8.5" font-weight="600" text-anchor="middle" transform="rotate(-90 ' + bodyCx + ' ' + (BH / 2) + ')">' + esc(b.name) + '</text>';
+  s += '</g>';
+  function rowY(i){ return TM + i * PITCH; }
+  function drawSide(list, padX, isLeft){
+    for (var i = 0; i < list.length; i++){
+      var p = list[i], y = rowY(i), gpio = (p.gpio != null) ? p.gpio : null;
+      var power = isPower(p.type), u = (gpio != null) ? assign[gpio] : null;
+      var col = power ? powerColor(p.type) : (u ? '#23e6f7' : statusColor(padClass(currentFlags(gpio))));
+      var fl = (gpio != null) ? currentFlags(gpio) : [];
+      var tip = power
+        ? p.silk + (p.type === 'power' ? ' — power rail (not assignable)' : p.type === 'gnd' ? ' — ground (not assignable)' : p.type === 'en' ? ' — enable / reset (not assignable)' : ' — not connected')
+        : ('GPIO' + gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (u ? ' — ' + u.map(roleLabel).join(', ') : ''));
+      // label text: silk, plus the GPIO number when the silk hides it
+      var lbl = p.silk + (gpio != null && p.silk !== ('IO' + gpio) && p.silk !== ('GPIO' + gpio) ? ' ·G' + gpio : '');
+      var lblX = isLeft ? (padX - PH - 4) : (padX + PH + 4), anchor = isLeft ? 'end' : 'start';
+      var cls = power ? 'ppin power' : 'pad';
+      s += '<g class="' + cls + '"' + (power ? '' : ' data-gpio="' + gpio + '"') + '><title>' + esc(tip) + '</title>'
+        + '<rect class="pin-pad" x="' + (padX - PH) + '" y="' + (y - PH) + '" width="' + PAD + '" height="' + PAD + '" rx="2" fill="' + col + '" fill-opacity="' + (power ? '0.30' : '0.22') + '" stroke="' + col + '" stroke-width="' + (u ? 2.4 : 1.3) + '"/>'
+        + '<circle class="pin-dot" cx="' + padX + '" cy="' + y + '" r="2.1"/>'
+        + '<text x="' + lblX + '" y="' + (y + 2.6) + '" text-anchor="' + anchor + '" font-size="' + SFONT + '" fill="' + (power ? '#8b949e' : '#c9d1d9') + '">' + esc(lbl) + '</text></g>';
+      if (u){
+        var cx = isLeft ? (padX - PH - LBL) : (padX + PH + LBL), ctext = u.map(calloutLabel).join(', ');
+        s += '<line x1="' + lblX + '" y1="' + y + '" x2="' + cx + '" y2="' + y + '" stroke="#23e6f7" stroke-width="0.6" stroke-dasharray="2 2"/>'
+          + '<text x="' + cx + '" y="' + (y + 2.6) + '" text-anchor="' + (isLeft ? 'end' : 'start') + '" font-size="8" font-weight="600" fill="#23e6f7">' + esc(ctext) + '</text>';
+      }
+    }
+  }
+  drawSide(L, leftPadX, true); drawSide(R, rightPadX, false);
+  s += '</g></svg>';
+  wrap.innerHTML = s;
+  wrap.querySelectorAll('.pad').forEach(function(node){ node.addEventListener('click', function(){ onPinClick(+node.getAttribute('data-gpio')); }); });
+}
+// Flags for a GPIO from the active board descriptor (same source the validator uses).
+function currentFlags(gpio){ if (gpio == null) return []; return pinFlags(gpio); }
 function onPinClick(gpio){
   if (PICK_TARGET){
     var el = byRole(PICK_TARGET);
