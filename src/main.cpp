@@ -1524,9 +1524,14 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // Compile-time board identity. Lets the /config pin-picker auto-select the right
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
-#if defined(USE_ETH_SPI)
+// BOARD_LUXDMX_V4 is set ONLY by [env:luxdmx_v4] — it means the real board, not just
+// "has a W5500". USE_ETH_SPI is too coarse to identify the board: esp32dev and esp32s3dev
+// set it too (so a DIY user can add a W5500 module), so keying the id on it made every
+// W5500 build claim to be a luxdmx_v4. That matters now the v4 descriptor locks its
+// hard-wired pins — a plain DevKitC must not report luxdmx_v4 and get its pins frozen.
+#if defined(BOARD_LUXDMX_V4)
 static const char BOARD_ID[] = "luxdmx_v4";
-#elif defined(USE_ETHERNET)
+#elif defined(USE_ETH_RMII) || defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
 static const char BOARD_ID[] = "esp32s3-devkitc-1";

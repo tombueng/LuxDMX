@@ -239,74 +239,60 @@
         "tx": 17,
         "rx": 18,
         "rts": 8
+      },
+      {
+        "en": true,
+        "uni": 1,
+        "port": 2,
+        "tx": 16,
+        "rx": 21,
+        "rts": 47
       }
     ]
   },
   "_source": "generated from hardware/luxdmx.py",
   "hardwired": [
-    {
-      "gpio": 1,
-      "label": "LED Red"
-    },
-    {
-      "gpio": 2,
-      "label": "LED Green"
-    },
-    {
-      "gpio": 6,
-      "label": "LED Yellow"
-    },
-    {
-      "gpio": 7,
-      "label": "LED Blue"
-    },
-    {
-      "gpio": 15,
-      "label": "LED White"
-    },
-    {
-      "gpio": 17,
-      "label": "DMX TX"
-    },
-    {
-      "gpio": 18,
-      "label": "DMX RX"
-    },
-    {
-      "gpio": 8,
-      "label": "DMX DE/RE"
-    },
-    {
-      "gpio": 12,
-      "label": "W5500 SCLK"
-    },
-    {
-      "gpio": 11,
-      "label": "W5500 MOSI"
-    },
-    {
-      "gpio": 13,
-      "label": "W5500 MISO"
-    },
-    {
-      "gpio": 10,
-      "label": "W5500 CS"
-    },
-    {
-      "gpio": 14,
-      "label": "W5500 INT"
-    },
-    {
-      "gpio": 9,
-      "label": "W5500 RST"
-    },
-    {
-      "gpio": 4,
-      "label": "Display SDA (J4)"
-    },
-    {
-      "gpio": 5,
-      "label": "Display SCL (J4)"
-    }
+    { "field": "o0_tx",   "gpio": 17, "label": "DMX A · TX → DI" },
+    { "field": "o0_rx",   "gpio": 18, "label": "DMX A · RX → RO" },
+    { "field": "o0_rts",  "gpio": 8,  "label": "DMX A · DE/RE → EN" },
+    { "field": "o0_port", "val": 1,   "label": "DMX A · UART port" },
+    { "field": "o1_tx",   "gpio": 16, "label": "DMX B · TX → DI" },
+    { "field": "o1_rx",   "gpio": 21, "label": "DMX B · RX → RO" },
+    { "field": "o1_rts",  "gpio": 47, "label": "DMX B · DE/RE → EN" },
+    { "field": "o1_port", "val": 2,   "label": "DMX B · UART port" },
+    { "field": "ethsck",  "gpio": 12, "label": "W5500 · SCLK" },
+    { "field": "ethmosi", "gpio": 11, "label": "W5500 · MOSI" },
+    { "field": "ethmiso", "gpio": 13, "label": "W5500 · MISO" },
+    { "field": "ethcs",   "gpio": 10, "label": "W5500 · CS" },
+    { "field": "ethint",  "gpio": 14, "label": "W5500 · INT" },
+    { "field": "ethrst",  "gpio": 9,  "label": "W5500 · RST" },
+    { "field": "ledtype", "val": 3,   "label": "5-LED status panel" },
+    { "field": "ledr",    "gpio": 1,  "label": "LED · Red" },
+    { "field": "ledg",    "gpio": 2,  "label": "LED · Green" },
+    { "field": "ledy",    "gpio": 6,  "label": "LED · Yellow" },
+    { "field": "ledb",    "gpio": 7,  "label": "LED · Blue" },
+    { "field": "ledw",    "gpio": 15, "label": "LED · White" },
+    { "field": "dispsda",  "gpio": 4,  "label": "Display J4 · SDA" },
+    { "field": "dispscl",  "gpio": 5,  "label": "Display J4 · SCL" },
+    { "field": "dispsck",  "gpio": 39, "label": "Display J4 · SCK" },
+    { "field": "dispmosi", "gpio": 40, "label": "Display J4 · MOSI" },
+    { "field": "dispcs",   "gpio": 41, "label": "Display J4 · CS" },
+    { "field": "dispdc",   "gpio": 42, "label": "Display J4 · DC" },
+    { "field": "disprst",  "gpio": 38, "label": "Display J4 · RST" }
+  ],
+  "headers": [
+    { "ref": "J4", "name": "Display header", "pins": [
+      { "pin": 1, "silk": "3V3" }, { "pin": 2, "silk": "GND" },
+      { "pin": 3, "silk": "SDA", "gpio": 4 }, { "pin": 4, "silk": "SCL", "gpio": 5 },
+      { "pin": 5, "silk": "SCK", "gpio": 39 }, { "pin": 6, "silk": "MOSI", "gpio": 40 },
+      { "pin": 7, "silk": "CS", "gpio": 41 }, { "pin": 8, "silk": "DC", "gpio": 42 },
+      { "pin": 9, "silk": "RST", "gpio": 38 }
+    ] },
+    { "ref": "J6", "name": "Expansion header", "pins": [
+      { "pin": 1, "silk": "5V" }, { "pin": 2, "silk": "3V3" }, { "pin": 3, "silk": "GND" },
+      { "pin": 4, "silk": "IO35", "gpio": 35 }, { "pin": 5, "silk": "IO36", "gpio": 36 },
+      { "pin": 6, "silk": "IO37", "gpio": 37 }, { "pin": 7, "silk": "IO48", "gpio": 48 },
+      { "pin": 8, "silk": "IO19", "gpio": 19 }, { "pin": 9, "silk": "IO20", "gpio": 20 }
+    ] }
   ]
 }

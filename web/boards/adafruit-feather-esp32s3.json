@@ -141,5 +141,38 @@
       "gpio": 13,
       "label": "red LED"
     }
-  ]
+  ],
+  "phys": {
+    "usb": "top",
+    "pins": [
+      { "pos": 1, "side": "L", "silk": "RST", "type": "en" },
+      { "pos": 2, "side": "L", "silk": "3V3", "type": "power" },
+      { "pos": 3, "side": "L", "silk": "3V3", "type": "power" },
+      { "pos": 4, "side": "L", "silk": "GND", "type": "gnd" },
+      { "pos": 5, "side": "L", "silk": "A0", "type": "gpio", "gpio": 18 },
+      { "pos": 6, "side": "L", "silk": "A1", "type": "gpio", "gpio": 17 },
+      { "pos": 7, "side": "L", "silk": "A2", "type": "gpio", "gpio": 16 },
+      { "pos": 8, "side": "L", "silk": "A3", "type": "gpio", "gpio": 15 },
+      { "pos": 9, "side": "L", "silk": "A4", "type": "gpio", "gpio": 14 },
+      { "pos": 10, "side": "L", "silk": "A5", "type": "gpio", "gpio": 8 },
+      { "pos": 11, "side": "L", "silk": "SCK", "type": "gpio", "gpio": 36 },
+      { "pos": 12, "side": "L", "silk": "MOSI", "type": "gpio", "gpio": 35 },
+      { "pos": 13, "side": "L", "silk": "MISO", "type": "gpio", "gpio": 37 },
+      { "pos": 14, "side": "L", "silk": "RX", "type": "gpio", "gpio": 38 },
+      { "pos": 15, "side": "L", "silk": "TX", "type": "gpio", "gpio": 39 },
+      { "pos": 16, "side": "L", "silk": "TXD0", "type": "nc" },
+      { "pos": 1, "side": "R", "silk": "VBAT", "type": "power" },
+      { "pos": 2, "side": "R", "silk": "EN", "type": "en" },
+      { "pos": 3, "side": "R", "silk": "VBUS", "type": "power" },
+      { "pos": 4, "side": "R", "silk": "D13", "type": "gpio", "gpio": 13 },
+      { "pos": 5, "side": "R", "silk": "D12", "type": "gpio", "gpio": 12 },
+      { "pos": 6, "side": "R", "silk": "D11", "type": "gpio", "gpio": 11 },
+      { "pos": 7, "side": "R", "silk": "D10", "type": "gpio", "gpio": 10 },
+      { "pos": 8, "side": "R", "silk": "D9", "type": "gpio", "gpio": 9 },
+      { "pos": 9, "side": "R", "silk": "D6", "type": "gpio", "gpio": 6 },
+      { "pos": 10, "side": "R", "silk": "D5", "type": "gpio", "gpio": 5 },
+      { "pos": 11, "side": "R", "silk": "SCL", "type": "gpio", "gpio": 4 },
+      { "pos": 12, "side": "R", "silk": "SDA", "type": "gpio", "gpio": 3 }
+    ]
+  }
 }
