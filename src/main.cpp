@@ -1490,7 +1490,10 @@ static void readSacnSocket(int outIdx) {
     // Drain all packets buffered since the last call (catches up after any gap)
     for (int guard = 0; guard < 16; guard++) {
         int pktLen = udp.parsePacket();
-        if (pktLen < SACN_MIN_LEN) return;
+        if (pktLen <= 0) return;                          // nothing pending
+        // A runt packet (stray multicast, IGMP artefact, port scan) must still be CONSUMED, else it
+        // lingers in the socket and every subsequent parsePacket() re-logs a NetworkUdp error -> flood.
+        if (pktLen < SACN_MIN_LEN) { udp.read(sacnBuf, sizeof(sacnBuf)); continue; }
         uint32_t senderIp = (uint32_t)udp.remoteIP();
         int n = udp.read(sacnBuf, sizeof(sacnBuf));
         if (n < SACN_MIN_LEN) continue;
@@ -1762,6 +1765,42 @@ static String rdmJsonEsc(const char* s) {
         else if ((uint8_t)c >= 0x20)  o += c;
     }
     return o;
+}
+
+// HTTP trigger for RDM ops -- a reliable, scriptable alternative to the WS control channel (the WS
+// path drops triggers under load; this never does). Used by the e2e tests and bench tooling.
+//   GET /rdm/discover
+//   GET /rdm/setaddr?uid=MMMM:DDDDDDDD&addr=N
+//   GET /rdm/identify?uid=MMMM:DDDDDDDD&on=1
+static void handleRdmTrigger(AsyncWebServerRequest* req) {
+    const String path = req->url();
+    if (path.endsWith("/discover")) {
+        rdmDiscoverReq = true;
+        req->send(200, "application/json", "{\"ok\":true,\"op\":\"discover\"}");
+        return;
+    }
+    if (req->hasParam("uid")) {
+        String us = req->getParam("uid")->value();
+        int colon = us.indexOf(':');
+        if (colon > 0) {
+            rdm_uid_t u;
+            u.man_id = (uint16_t)strtoul(us.substring(0, colon).c_str(), nullptr, 16);
+            u.dev_id = (uint32_t)strtoul(us.substring(colon + 1).c_str(), nullptr, 16);
+            if (path.endsWith("/setaddr") && req->hasParam("addr")) {
+                int a = req->getParam("addr")->value().toInt();
+                if (a >= 1 && a <= 512) {
+                    rdmSetUid = u; rdmReqAddr = (uint16_t)a; rdmSetAddrReq = true;
+                    req->send(200, "application/json", "{\"ok\":true,\"op\":\"setaddr\"}"); return;
+                }
+            } else if (path.endsWith("/identify")) {
+                rdmIdentUid = u;
+                rdmReqOn = req->hasParam("on") && req->getParam("on")->value().toInt() != 0;
+                rdmIdentifyReq = true;
+                req->send(200, "application/json", "{\"ok\":true,\"op\":\"identify\"}"); return;
+            }
+        }
+    }
+    req->send(400, "application/json", "{\"ok\":false}");
 }
 
 static void handleRdmJson(AsyncWebServerRequest* req) {
@@ -2863,6 +2902,9 @@ void setup() {
     http.on("/version.json",      HTTP_GET,  handleVersionJson);
     http.on("/info.json",         HTTP_GET,  handleInfoJson);
     http.on("/rdm.json",          HTTP_GET,  handleRdmJson);
+    http.on("/rdm/discover",      HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/setaddr",       HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/identify",      HTTP_GET,  handleRdmTrigger);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);

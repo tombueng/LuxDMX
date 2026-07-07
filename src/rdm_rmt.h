@@ -102,6 +102,8 @@ static int rdmBuild(uint8_t* buf, const rdm_uid_t& dest, uint8_t cc, uint16_t pi
 }
 
 // Transmit a pre-built raw packet over RMT, then flip DE to RX. Blocks until TX is on the wire.
+// On a DE-only transceiver (receiver always on) our own frame echoes back into the RX FIFO during
+// the drive; we let that echo tail drain and flush it so the following read sees only the reply.
 static void rdmTx(const uint8_t* pkt, int len) {
     RmtDmx* rd = g_rdmRmt;
     if (!rd || !rd->chan) return;
@@ -112,11 +114,8 @@ static void rdmTx(const uint8_t* pkt, int len) {
     rmt_transmit(rd->chan, rd->enc, rd->sym, rd->nsym * sizeof(rmt_symbol_word_t), &tc);
     rmt_tx_wait_all_done(rd->chan, 60);          // wait until the last bit has left
     rdmDe(0);                                    // turnaround: stop driving, enable the receiver
-    // If the transceiver keeps its receiver enabled during drive (single DE/EN pin, /RE tied
-    // active), our own frame echoes straight back into the RX FIFO. Let that echo tail finish
-    // arriving, then flush it, so the following read sees ONLY the responder's reply.
-    esp_rom_delay_us(90);
-    uart_flush_input(RDM_RMT_UART);
+    esp_rom_delay_us(90);                        // let our own echoed frame finish arriving
+    uart_flush_input(RDM_RMT_UART);              // discard it -> the read sees only the responder reply
 }
 
 // --- response parsing -----------------------------------------------------------------------
@@ -187,34 +186,44 @@ static inline rdm_uid_t uidUnpack(uint64_t v) { rdm_uid_t u; u.man_id = v >> 32;
 
 // Send DISC_UNIQUE_BRANCH(lower..upper) and read the (break-less, preamble+EUID) reply.
 // Returns 0 = nobody in range, 1 = exactly one (decoded into *found), 2 = collision (>1 in range).
+// A reply that arrives but doesn't decode cleanly is RE-READ: on a noisy bus a lone fixture's reply
+// can pick up a stray bit flip and look just like a multi-fixture collision. A stochastic error
+// clears on a re-read (-> clean single), while a genuine collision stays garbled every time
+// (-> split). True silence returns "empty" at once (no wasted retries on the many empty branches).
 static int rdmDiscBranch(uint64_t lower, uint64_t upper, rdm_uid_t* found) {
     uint8_t pd[12];
     putUid(&pd[0], uidUnpack(lower));
     putUid(&pd[6], uidUnpack(upper));
-    uint8_t pkt[64];
-    int len = rdmBuild(pkt, RDM_UID_BROADCAST_ALL, RDM_CC_DISC_COMMAND,
-                       RDM_PID_DISC_UNIQUE_BRANCH, pd, 12);
-    rdmTx(pkt, len);
-    uint8_t rx[48];
-    int n = uart_read_bytes(RDM_RMT_UART, rx, sizeof(rx), pdMS_TO_TICKS(RDM_DISC_TIMEOUT_MS));
-    rdmDe(1);
-    if (n <= 0) return 0;                         // silence -> empty branch
-    // Locate the 0xAA preamble separator (0..7 leading 0xFE preamble bytes precede it).
-    int sep = -1;
-    for (int i = 0; i < n; i++) { if (rx[i] == 0xAA) { sep = i; break; } if (rx[i] != 0xFE) break; }
-    if (sep < 0 || n - sep - 1 < 16) return 2;    // got noise but no clean EUID -> collision
-    uint8_t* e = rx + sep + 1;
-    uint8_t u[6];
-    for (int i = 0; i < 6; i++) u[i] = e[i * 2] & e[i * 2 + 1];   // 0xAA/0x55 de-interleave
-    // E1.20 discovery checksum = sum of the 12 masked EUID bytes. Since
-    // (uid|0xAA)+(uid|0x55) == uid+0xFF, that equals sum(uid) + 0xFF per byte -- NOT the bare
-    // UID sum. (Matches esp_dmx driver.c and any real fixture.)
-    uint16_t csum = 0; for (int i = 0; i < 6; i++) csum += (uint16_t)u[i] + 0xFF;
-    uint8_t ch[2] = { (uint8_t)(e[12] & e[13]), (uint8_t)(e[14] & e[15]) };
-    if (csum != (uint16_t)((ch[0] << 8) | ch[1])) return 2;      // bad checksum -> collision
-    found->man_id = (u[0] << 8) | u[1];
-    found->dev_id = ((uint32_t)u[2] << 24) | (u[3] << 16) | (u[4] << 8) | u[5];
-    return 1;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        uint8_t pkt[64];
+        int len = rdmBuild(pkt, RDM_UID_BROADCAST_ALL, RDM_CC_DISC_COMMAND,
+                           RDM_PID_DISC_UNIQUE_BRANCH, pd, 12);
+        rdmTx(pkt, len);
+        uint8_t rx[48];
+        int n = uart_read_bytes(RDM_RMT_UART, rx, sizeof(rx), pdMS_TO_TICKS(RDM_DISC_TIMEOUT_MS));
+        rdmDe(1);
+        if (n <= 0) return 0;                        // silence -> genuinely empty branch
+        // Locate the 0xAA preamble separator (0..7 leading 0xFE preamble bytes precede it).
+        int sep = -1;
+        for (int i = 0; i < n; i++) { if (rx[i] == 0xAA) { sep = i; break; } if (rx[i] != 0xFE) break; }
+        if (sep >= 0 && n - sep - 1 >= 16) {
+            uint8_t* e = rx + sep + 1;
+            uint8_t u[6];
+            for (int i = 0; i < 6; i++) u[i] = e[i * 2] & e[i * 2 + 1];   // 0xAA/0x55 de-interleave
+            // E1.20 discovery checksum = sum of the 12 masked EUID bytes == sum(uid)+0xFF per byte
+            // ((uid|0xAA)+(uid|0x55) == uid+0xFF). Matches esp_dmx and any real fixture.
+            uint16_t csum = 0; for (int i = 0; i < 6; i++) csum += (uint16_t)u[i] + 0xFF;
+            uint8_t ch[2] = { (uint8_t)(e[12] & e[13]), (uint8_t)(e[14] & e[15]) };
+            if (csum == (uint16_t)((ch[0] << 8) | ch[1])) {              // clean single -> done
+                found->man_id = (u[0] << 8) | u[1];
+                found->dev_id = ((uint32_t)u[2] << 24) | (u[3] << 16) | (u[4] << 8) | u[5];
+                return 1;
+            }
+        }
+        // bytes present but not a clean single: stray bit flip on a lone fixture, or a real
+        // collision. Re-read; if it stays dirty across attempts it is a genuine collision -> split.
+    }
+    return 2;
 }
 
 // Mute a single device (so it drops out of further DISC_UNIQUE_BRANCH sweeps). Returns true on ACK.
@@ -234,27 +243,35 @@ static void rdmUnMuteAll() {
     uart_flush_input(RDM_RMT_UART);
 }
 
-// Recursive binary search over a UID range; mutes + records each device found.
-static void rdmDiscRange(uint64_t lo, uint64_t hi, rdm_uid_t* out, int max, int* count) {
-    int guard = 0;
-    while (*count < max && guard++ < max + 4) {
-        rdm_uid_t f;
-        int r = rdmDiscBranch(lo, hi, &f);
-        if (r == 0) return;                       // branch empty
-        if (r == 1) {                             // exactly one visible
-            if (rdmMute(f)) {
-                bool dup = false;
-                for (int i = 0; i < *count; i++) if (uidPack(out[i]) == uidPack(f)) { dup = true; break; }
-                if (!dup) out[(*count)++] = f;
+// Iterative binary search over the UID range, mutes + records each device found. ITERATIVE on
+// purpose: a recursive split of the 48-bit UID space goes ~48 deep, which overflows the DMX task
+// stack and hard-resets the board (seen on the bench: corrupted backtrace / SW_CPU_RESET). An
+// explicit range stack keeps memory bounded, and a total-branch budget means even a garbled bus
+// (every branch reads as a collision) finishes instead of thrashing forever.
+static void rdmDiscRange(uint64_t lo0, uint64_t hi0, rdm_uid_t* out, int max, int* count) {
+    static uint64_t stkLo[64], stkHi[64];         // deferred right-halves (single-threaded -> static OK)
+    int sp = 0; stkLo[sp] = lo0; stkHi[sp] = hi0; sp++;
+    int budget = 8 * max + 128;                   // hard cap on total DISC branches
+    while (sp > 0 && *count < max && budget > 0) {
+        uint64_t lo = stkLo[--sp], hi = stkHi[sp];
+        int guard = 0;
+        while (*count < max && guard++ < max + 4 && budget-- > 0) {
+            rdm_uid_t f;
+            int r = rdmDiscBranch(lo, hi, &f);
+            if (r == 0) break;                    // branch empty -> next range
+            if (r == 1) {                         // exactly one visible -> mute + record, re-scan range
+                if (rdmMute(f)) {
+                    bool dup = false;
+                    for (int i = 0; i < *count; i++) if (uidPack(out[i]) == uidPack(f)) { dup = true; break; }
+                    if (!dup) out[(*count)++] = f;
+                }
+                continue;
             }
-            continue;                             // re-scan same range: another device may have been masked
+            if (lo >= hi) break;                  // collision at a single address -> give up on it
+            uint64_t mid = lo + (hi - lo) / 2;    // collision -> do the left half now, defer the right
+            if (sp < 63) { stkLo[sp] = mid + 1; stkHi[sp] = hi; sp++; }
+            hi = mid;
         }
-        // r == 2: collision -> split the range
-        if (lo >= hi) return;                     // single address can't be split further
-        uint64_t mid = lo + (hi - lo) / 2;
-        rdmDiscRange(lo, mid, out, max, count);
-        rdmDiscRange(mid + 1, hi, out, max, count);
-        return;
     }
 }
 
