@@ -20,7 +20,7 @@ Companion files: `VALIDATION_PLAN.md` (what we check), `VALIDATION.md` (status m
 ### Fixes applied this pass (value-only, no reroute)
 | Ref | Was | Now | Why |
 |---|---|---|---|
-| C12/C13 | 22pF | **33pF C0G** | Crystal is **CL=20pF** (part# 2520-25-**20**-...). 22pF presented only 15pF → W5500 25MHz ran fast, eating the ±50ppm Ethernet budget. 33pF‖33pF + ~4pF stray = 20.5pF ✓ (**was a real blocker**) |
+| C12/C13 | 33pF | **10pF C0G** | Crystal swapped to **C2981624, CL=9pF** (part# 2520-25-**9**-...) because the CL=20pF C2981622 kept going OOS at JLC. 10pF‖10pF + ~4pF stray = 9pF ✓ matches. C0G/NP0 required. |
 | R3 | 12k | **12.4k 1%** | W5500 EXRES1 datasheet value (was −3.2%, off-spec PHY bias) |
 | D10 | SMAJ58A | **SMAJ60A** | PoE TVS standoff was only 1V over the 57V max (leakage/self-heat risk). 60A: Vbr 66.7V, clamp 96.8V |
 
@@ -75,7 +75,7 @@ v1.0.2, WCH CH340, Suzhou-Liming 2520 crystal, TDK ACM2012, Fenghua CBM bead, Ne
   held ≥500µs (firmware), EXRES1 now 12.4k.
 
 ### Passives / crystal / connectors
-- **Crystal C2981622 = 25MHz, CL=20pF, ±10ppm/±10ppm** (well within W5500 ±50ppm) — load caps fixed to 33pF C0G.
+- **Crystal C2981624 = 25MHz, CL=9pF, ±10ppm** (well within W5500 ±50ppm) — load caps 10pF C0G. (Replaced C2981622 CL=20pF, which kept going OOS at JLC; 10pF‖10pF + ~4pF stray = 9pF.)
 - **ACM2012-201-2P CM choke:** 200Ω@100MHz, 350mA, 250mΩ, 50V. Differential impedance ~flat near DC → does
   NOT distort 250kbps DMX edges (L/R ≈ 0.08ns ≪ 4µs bit). Suitable. (Optional better-matched: WE-CNSW 90Ω.)
 - **Ferrite 600Ω@100MHz 0805 2A 100mΩ (C139168):** all 3 positions at 2.5–20% of rating, IR drop ≤40mV. OK.
@@ -192,7 +192,7 @@ but C27 and the buck inductor loop are worth tightening on a future placement pa
    (compile-time defaults are single-output). Hardware wiring is correct (§2).
 7. C27 (PoE bulk, 24mm) + C26 (B0505S#2 in-bulk at FB1, 30mm) + L1 (buck loop) placement could tighten on a
    future pass — functional now (SPICE-confirmed); the user's tight-pack tradeoff. 4.7µF TOCAP 0402→0603.
-8. BOM notes: force **≥10V** on the 22µF buck caps; **C0G/NP0** on the 33pF crystal caps; XLR shell off chassis.
+8. BOM notes: force **≥10V** on the 22µF buck caps; **C0G/NP0** on the 10pF crystal caps; XLR shell off chassis.
 
 The board is fab-ready as-is for PoE / clean-USB power; item 1 is the only thing to decide before ordering.
 
