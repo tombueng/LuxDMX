@@ -1,0 +1,12 @@
+# PlatformIO build output
+.pio/
+
+# VS Code Local History (this is a nested git repo — never track it)
+hardware/.history/
+
+# KiCad autosave / lock / backup churn
+*.lck
+*-backups/
+*-bak/
+_autosave-*
+fp-info-cache

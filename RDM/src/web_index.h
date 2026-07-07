@@ -1,0 +1,600 @@
+// Auto-generated from web/index.html by gen_web.py. Do not edit by hand.
+#pragma once
+static const char INDEX_HTML[] = R"RDMHTML(
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LuxDMX RDM Simulator</title>
+<style>
+/* Fully self-contained (no external CSS/JS/fonts) so it works offline when the
+   sim serves it from its own WiFi AP. The class names track Bootstrap 5 so the
+   markup reads like a normal Bootstrap page, but the rules are hand-rolled. */
+*{box-sizing:border-box}
+:root{
+  --gh-bg:#0d1117; --gh-surface:#161b22; --gh-elev:#1c2330; --gh-border:#30363d;
+  --gh-text:#e6edf3; --gh-muted:#8b949e;
+  --lux-cyan:#23e6f7; --lux-magenta:#f33abc; --lux-amber:#ffaa1c; --lux-green:#45d85c;
+  --lux-ink:#06141a;
+}
+body{background:var(--gh-bg);color:var(--gh-text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;margin:0}
+.container-fluid{width:100%}
+.row{display:flex;flex-wrap:wrap;margin:0 -.5rem}
+.row>[class*="col"]{padding:0 .5rem}
+.g-2>[class*="col"]{padding:.25rem}.g-3>[class*="col"]{padding:.5rem}
+.col-auto{flex:0 0 auto;width:auto}.col-6{flex:0 0 50%;max-width:50%}.col-12{flex:0 0 100%;max-width:100%}
+@media(min-width:576px){.col-sm-4{flex:0 0 33.33%;max-width:33.33%}.col-sm-3{flex:0 0 25%;max-width:25%}}
+@media(min-width:768px){.col-md-3{flex:0 0 25%;max-width:25%}.col-md-6{flex:0 0 50%;max-width:50%}.col-md-4{flex:0 0 33.33%;max-width:33.33%}}
+@media(min-width:992px){.col-lg-7{flex:0 0 58.33%;max-width:58.33%}.col-lg-5{flex:0 0 41.66%;max-width:41.66%}.col-lg-6{flex:0 0 50%;max-width:50%}.col-lg-8{flex:0 0 66.66%;max-width:66.66%}.col-lg-4{flex:0 0 33.33%;max-width:33.33%}}
+.d-flex{display:flex}.d-grid{display:grid}.d-grid>*{width:100%}.d-none{display:none}
+.flex-wrap{flex-wrap:wrap}.flex-column{flex-direction:column}
+.align-items-center{align-items:center}.align-items-end{align-items:flex-end}
+.justify-content-between{justify-content:space-between}.justify-content-end{justify-content:flex-end}
+.ms-auto{margin-left:auto}.me-2{margin-right:.5rem}.w-100{width:100%}
+.gap-1{gap:.25rem}.gap-2{gap:.5rem}.gap-3{gap:1rem}
+.p-2{padding:.5rem}.p-3{padding:1rem}.px-3{padding-left:1rem;padding-right:1rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}
+.mb-0{margin-bottom:0}.mb-1{margin-bottom:.25rem}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:1rem}
+.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:1rem}
+.small{font-size:.85rem}.fs-5{font-size:1.25rem}.text-center{text-align:center}.text-end{text-align:right}
+.text-secondary{color:var(--gh-muted)}
+.card{background:var(--gh-surface);border:1px solid var(--gh-border);border-radius:12px}
+.card-header{padding:.6rem 1rem;border-bottom:1px solid var(--gh-border);font-weight:600}
+.card-body{padding:1rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;font-weight:500;text-align:center;border:1px solid transparent;border-radius:8px;padding:.45rem .9rem;cursor:pointer;font-size:.95rem;background:var(--gh-elev);color:var(--gh-text);transition:filter .15s,background .15s;text-decoration:none;font-family:inherit}
+.btn:hover{filter:brightness(1.14)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:active{transform:translateY(1px)}
+.btn-sm{padding:.25rem .6rem;font-size:.85rem}
+.btn-primary{background:var(--lux-cyan);border-color:var(--lux-cyan);color:var(--lux-ink)}
+.btn-success{background:var(--lux-green);border-color:var(--lux-green);color:var(--lux-ink)}
+.btn-warning{background:var(--lux-amber);border-color:var(--lux-amber);color:var(--lux-ink)}
+.btn-danger{background:var(--lux-magenta);border-color:var(--lux-magenta);color:var(--lux-ink)}
+.btn-outline-primary{background:transparent;border-color:var(--lux-cyan);color:var(--lux-cyan)}
+.btn-outline-primary:hover{background:var(--lux-cyan);color:var(--lux-ink);filter:none}
+.btn-outline-secondary{background:transparent;border-color:var(--gh-border);color:var(--gh-muted)}
+.btn-outline-secondary:hover{background:var(--gh-elev);color:var(--gh-text);filter:none}
+/* segmented button tab bar — real <button>s, not links */
+.segbar{display:inline-flex;flex-wrap:wrap;gap:.3rem;background:var(--gh-surface);border:1px solid var(--gh-border);border-radius:12px;padding:.3rem}
+.segbar .seg{border:1px solid transparent;background:transparent;color:var(--gh-muted);border-radius:9px;padding:.45rem .95rem;font-weight:600;font-size:.9rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:.4rem;transition:.15s}
+.segbar .seg:hover{color:var(--gh-text);background:var(--gh-elev)}
+.segbar .seg.active{color:var(--lux-ink);background:var(--lux-cyan);border-color:var(--lux-cyan)}
+.segbar .seg .pip{background:rgba(0,0,0,.25);border-radius:999px;font-size:.7rem;padding:0 .4rem;min-width:1.2rem;text-align:center}
+.segbar .seg:not(.active) .pip{background:var(--gh-elev);color:var(--gh-muted)}
+/* small pill toggle (chart timescale) */
+.toggle{display:inline-flex;border:1px solid var(--gh-border);border-radius:8px;overflow:hidden}
+.toggle button{background:transparent;color:var(--gh-muted);border:none;padding:.2rem .6rem;font-size:.78rem;cursor:pointer;font-family:inherit}
+.toggle button.active{background:var(--lux-cyan);color:var(--lux-ink)}
+table{width:100%;border-collapse:collapse;color:var(--gh-text)}
+.table th,.table td{border-bottom:1px solid var(--gh-border);text-align:left;padding:.4rem .6rem}
+.table-sm th,.table-sm td{padding:.3rem .5rem}
+.table-hover tbody tr:hover{background:rgba(255,255,255,.03)}
+.form-label{display:block;margin-bottom:.2rem}
+.form-control,.form-select{background:#0d1117;border:1px solid var(--gh-border);color:var(--gh-text);border-radius:8px;padding:.4rem .6rem;width:100%;font-family:inherit}
+.form-control-sm,.form-select-sm{padding:.25rem .5rem;font-size:.85rem}
+.form-range{width:100%;accent-color:var(--lux-cyan)}
+.form-check{position:relative;padding-left:2.6rem;min-height:1.4rem;margin-bottom:.4rem}
+.form-check-input{position:absolute;left:0;top:0;width:2.1rem;height:1.15rem;appearance:none;-webkit-appearance:none;background:#30363d;border-radius:999px;cursor:pointer;transition:.2s;border:none}
+.form-check-input:checked{background:var(--lux-cyan)}
+.form-check-input::after{content:"";position:absolute;top:2px;left:2px;width:.85rem;height:.85rem;background:#fff;border-radius:50%;transition:.2s}
+.form-check-input:checked::after{left:calc(100% - .95rem)}
+.form-check-label{cursor:pointer}
+.badge{display:inline-block;padding:.2rem .5rem;border-radius:6px;font-size:.72rem}
+.text-bg-secondary{background:#30363d;color:#c9d1d9}
+.text-bg-cyan{background:rgba(35,230,247,.16);color:var(--lux-cyan);border:1px solid rgba(35,230,247,.4)}
+.navbar-lux{background:var(--gh-surface);border-bottom:1px solid var(--gh-border)}
+.brand{font-weight:700;letter-spacing:.5px}
+.brand .lx{color:var(--lux-cyan)} .brand .dmx{color:var(--lux-magenta)}
+.chip{background:#0d1117;border:1px solid var(--gh-border);border-radius:999px;padding:.15rem .6rem;font-size:.8rem;white-space:nowrap}
+.chip b{color:var(--lux-cyan)}
+.chip.warn b{color:var(--lux-amber)} .chip.bad b{color:var(--lux-magenta)} .chip.ok b{color:var(--lux-green)}
+.metric{background:var(--gh-surface);border:1px solid var(--gh-border);border-radius:12px;padding:.9rem 1rem;position:relative;overflow:hidden}
+.metric .v{font-size:1.9rem;font-weight:700;line-height:1}
+.metric .k{color:var(--gh-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.5px}
+.metric .spark{position:absolute;right:0;bottom:0;left:0;height:26px;opacity:.55}
+.metric .spark canvas{width:100%;height:26px;display:block}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.log{background:#080c10;border:1px solid var(--gh-border);border-radius:10px;height:340px;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;padding:.5rem}
+.log .l{white-space:pre;padding:1px 4px;border-radius:4px}
+.log .dub{color:#8b949e} .log .rep{color:var(--lux-cyan)} .log .mute{color:var(--lux-green)} .log .gs{color:var(--lux-amber)} .log .bad{color:var(--lux-magenta)}
+.tblwrap{max-height:60vh;overflow:auto}
+table.fx td,table.fx th{padding:.35rem .6rem;font-size:.87rem}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:.35rem}
+.dot.on{background:var(--lux-green);box-shadow:0 0 6px var(--lux-green)} .dot.off{background:#30363d}
+.dot.warn{background:var(--lux-amber);box-shadow:0 0 6px var(--lux-amber)}
+.dot.bad{background:var(--lux-magenta);box-shadow:0 0 6px var(--lux-magenta)}
+.bar{height:8px;border-radius:6px;background:#0d1117;overflow:hidden}
+.bar>span{display:block;height:100%;background:var(--lux-green);transition:width .3s}
+.bar.warn>span{background:var(--lux-amber)} .bar.bad>span{background:var(--lux-magenta)}
+.chartbox{position:relative;width:100%}
+.chartbox canvas{width:100%;display:block;border-radius:8px}
+.chartbox .cur{position:absolute;top:.4rem;right:.6rem;font-size:1.3rem;font-weight:700;font-family:ui-monospace,Consolas,monospace}
+.chartbox .lbl{position:absolute;top:.5rem;left:.6rem;font-size:.72rem;color:var(--gh-muted);text-transform:uppercase;letter-spacing:.5px}
+.legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.78rem;color:var(--gh-muted)}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:.3rem;vertical-align:middle}
+.offline-banner{display:none;background:rgba(255,170,28,.12);border:1px solid var(--lux-amber);color:var(--lux-amber);border-radius:8px;padding:.4rem .8rem;font-size:.85rem}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--lux-green);display:inline-block;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-lux px-3 py-2">
+  <div class="d-flex align-items-center gap-3 flex-wrap w-100">
+    <span class="brand fs-5"><span class="lx">Lux</span><span class="dmx">DMX</span> RDM Simulator</span>
+    <span class="badge text-bg-cyan" title="UI refresh rate"><span class="livedot me-2"></span>live 4&nbsp;Hz</span>
+    <div class="d-flex gap-2 flex-wrap ms-auto align-items-center">
+      <span class="chip" id="chip-bus"><span class="dot off" id="busdot"></span>bus <b id="c-bus">?</b></span>
+      <span class="chip">fixtures <b id="c-fix">0</b></span>
+      <span class="chip ok">found <b id="c-found">0</b></span>
+      <span class="chip">req/s <b id="c-reqs">0</b></span>
+      <span class="chip warn">corrupt <b id="c-corr">0%</b></span>
+      <span class="chip bad">S3 drops <b id="c-drop">0</b></span>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid p-3">
+  <div class="offline-banner mb-3" id="offline">Device not reachable — showing demo data. Connect to the simulator's WiFi and reload.</div>
+
+  <div class="segbar mb-3" id="tabs">
+    <button class="seg active" data-tab="dash">Dashboard</button>
+    <button class="seg" data-tab="fix">Fixtures <span class="pip" id="pip-fix">0</span></button>
+    <button class="seg" data-tab="mon">RDM Monitor</button>
+    <button class="seg" data-tab="ana">Analyzer <span class="pip" id="pip-ana">—</span></button>
+    <button class="seg" data-tab="stress">Stress / Fuzz</button>
+    <button class="seg" data-tab="set">Settings</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section data-panel="dash">
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="m-req">0</div><div class="k">RDM requests</div><div class="spark"><canvas data-spark="reqRate"></canvas></div></div></div>
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="m-resp">0</div><div class="k">responses sent</div><div class="spark"><canvas data-spark="respRate"></canvas></div></div></div>
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="m-found">0/0</div><div class="k">discovered</div></div></div>
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="m-corr">0%</div><div class="k">request corruption</div><div class="spark"><canvas data-spark="corrupt"></canvas></div></div></div>
+    </div>
+    <div class="row g-3 mb-3">
+      <div class="col-lg-6"><div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+        <span>RDM throughput</span>
+        <span class="legend"><span><i style="background:var(--lux-cyan)"></i>requests/s</span><span><i style="background:var(--lux-green)"></i>responses/s</span></span>
+      </div><div class="card-body"><div class="chartbox"><span class="lbl">req/s</span><canvas data-chart="throughput" height="150"></canvas></div></div></div></div>
+      <div class="col-lg-6"><div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+        <span>DMX line — framing errors / min (issue&nbsp;#64)</span>
+        <span class="legend"><span><i style="background:var(--lux-magenta)"></i>errors/min</span></span>
+      </div><div class="card-body"><div class="chartbox"><span class="cur" id="dash-fe-cur">0</span><span class="lbl">err/min</span><canvas data-chart="dashFraming" height="150"></canvas></div></div></div></div>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+          <span>Live RDM activity</span>
+          <button class="btn btn-sm btn-outline-secondary" onclick="clearLog()">clear</button>
+        </div><div class="card-body"><div class="log" id="log"></div></div></div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card mb-3"><div class="card-header">Bus health</div><div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2" title="Idle-bus RX noise. Should be ~0 on a clean bus. Wiggle wiring to minimise.">
+            <span>Idle bus noise <span class="text-secondary small">(wiggle test)</span></span>
+            <span id="hb-noise" class="fs-5 mono">—</span></div>
+          <div class="d-flex justify-content-between align-items-center mb-2" title="Analog A-B on the 485 lines via ADC (needs the 2:1 divider taps on A0/A1). Idle should be ~+300mV with low noise.">
+            <span>A-B line (analog)</span>
+            <span id="hb-mv" class="mono">—</span></div>
+          <div class="d-flex justify-content-between small mb-1"><span>Request integrity</span><span id="hb-int">—</span></div>
+          <div class="bar mb-3" id="hb-int-bar"><span style="width:100%"></span></div>
+          <div class="d-flex justify-content-between small mb-1"><span>S3 response catch</span><span id="hb-catch">—</span></div>
+          <div class="bar mb-3" id="hb-catch-bar"><span style="width:100%"></span></div>
+          <div class="small text-secondary" id="hb-note"></div>
+        </div></div>
+        <div class="card"><div class="card-header">Quick actions</div><div class="card-body d-grid gap-2">
+          <button class="btn btn-primary" onclick="trigger()">Trigger controller discovery</button>
+          <button class="btn btn-outline-primary" onclick="unmute()">Un-mute all fixtures</button>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FIXTURES -->
+  <section data-panel="fix" hidden>
+    <div class="card mb-3"><div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-auto"><label class="form-label small mb-0">Fixture count</label>
+          <input type="number" class="form-control form-control-sm" id="gen-count" value="64" min="1" max="200" style="width:110px"></div>
+        <div class="col-auto"><label class="form-label small mb-0">UID pattern</label>
+          <select class="form-select form-select-sm" id="gen-pat" style="width:150px">
+            <option value="spread">spread (realistic)</option>
+            <option value="cluster">clustered</option>
+            <option value="sequential">sequential</option>
+          </select></div>
+        <div class="col-auto"><button class="btn btn-sm btn-primary" onclick="generate()">Generate bus</button></div>
+        <div class="col-auto"><button class="btn btn-sm btn-outline-secondary" onclick="unmute()">Un-mute all</button></div>
+      </div>
+    </div></div>
+    <div class="card"><div class="card-body tblwrap">
+      <table class="table table-sm table-hover fx mb-0">
+        <thead><tr><th>#</th><th>UID</th><th>DMX addr</th><th>Footprint</th><th>Personality</th><th>Model</th><th>Muted</th><th>ID</th></tr></thead>
+        <tbody id="fx-body"></tbody>
+      </table>
+    </div></div>
+  </section>
+
+  <!-- RDM MONITOR -->
+  <section data-panel="mon" hidden>
+    <div class="row g-3">
+      <div class="col-lg-7"><div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+        <span>Transaction log (discovery tree, GET/SET)</span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="clearLog()">clear</button>
+      </div>
+        <div class="card-body"><div class="log" id="log2" style="height:60vh"></div></div></div></div>
+      <div class="col-lg-5"><div class="card"><div class="card-header">Devices the controller found</div>
+        <div class="card-body tblwrap"><table class="table table-sm fx mb-0"><thead><tr><th>UID</th><th>Addr</th><th>Model</th></tr></thead>
+        <tbody id="dev-body"><tr><td colspan="3" class="text-secondary">none yet</td></tr></tbody></table></div></div></div>
+    </div>
+  </section>
+
+  <!-- ANALYZER -->
+  <section data-panel="ana" hidden>
+    <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">
+      <span>DMX output analyzer — framing errors on the wire (Swisson-style, issue&nbsp;#64)</span>
+      <span><span class="dot" id="an-sigdot"></span> <span class="mono" id="an-sig">no signal</span></span>
+    </div><div class="card-body">
+      <div class="row g-3">
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-fe" style="font-size:2.2rem">0</div><div class="k">framing errors</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-ferate">0</div><div class="k">errors / min</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-refresh">0</div><div class="k">refresh Hz</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-slots">0</div><div class="k">slots / frame</div></div></div>
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-sc">—</div><div class="k">start code</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-break">0</div><div class="k">break+MAB ~µs</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-frames">0</div><div class="k">frames seen</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="an-window">0s</div><div class="k">measure window</div></div></div>
+      </div>
+
+      <div class="row g-3 mt-2">
+        <div class="col-lg-8"><div class="card" style="background:var(--gh-bg)"><div class="card-header d-flex justify-content-between align-items-center">
+          <span>Framing errors / min</span>
+          <span class="toggle" data-scope="framing"><button data-win="fast" class="active">60&nbsp;s</button><button data-win="slow">10&nbsp;min</button></span>
+        </div><div class="card-body"><div class="chartbox"><span class="cur" id="ana-fe-cur">0</span><canvas data-chart="framing" height="150"></canvas></div></div></div></div>
+        <div class="col-lg-4"><div class="card" style="background:var(--gh-bg)"><div class="card-header">Refresh Hz</div>
+          <div class="card-body"><div class="chartbox"><span class="cur" id="ana-hz-cur">0</span><canvas data-chart="refresh" height="150"></canvas></div>
+          <div class="small text-secondary mt-2">DMX512 spec: 1–44&nbsp;Hz. Steady line = good timing.</div></div></div></div>
+      </div>
+
+      <p class="text-secondary small mt-3 mb-2" id="an-note">Point a DMX output at this sim (A/B on the bus) and watch the framing-error count. On a clean bus a good gateway holds it at 0. Framing errors that climb with network load are the core-contention symptom from issue #64.</p>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" onclick="resetAnalyzer()">Reset window</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="clearCharts()">Clear graphs</button>
+      </div>
+    </div></div>
+    <div class="row g-3">
+      <div class="col-md-6"><div class="card"><div class="card-header">RDM-side integrity (this sim as a responder)</div><div class="card-body">
+        <div class="row g-3">
+          <div class="col-6"><div class="metric"><div class="v" id="a-bad">0</div><div class="k">bad-checksum frames</div></div></div>
+          <div class="col-6"><div class="metric"><div class="v" id="a-reask">0</div><div class="k">S3 dropped replies</div></div></div>
+          <div class="col-6"><div class="metric"><div class="v" id="a-stall">0</div><div class="k">RX FIFO overflow</div></div></div>
+          <div class="col-6"><div class="metric"><div class="v" id="a-turn">250</div><div class="k">turnaround µs</div></div></div>
+        </div>
+      </div></div></div>
+      <div class="col-md-6"><div class="card"><div class="card-header">E1.11 / E1.20 timing reference</div><div class="card-body small">
+        <table class="table table-sm mono mb-0"><tbody>
+          <tr><td>Break</td><td>≥ 88 µs (176 typical)</td></tr>
+          <tr><td>Mark-after-break</td><td>8–12 µs</td></tr>
+          <tr><td>Slot framing</td><td>1 start + 8 data + 2 stop @ 250 kbit</td></tr>
+          <tr><td>Responder turnaround</td><td>176–2000 µs (sim: <span id="a-turn2">250</span> µs)</td></tr>
+        </tbody></table>
+        <p class="text-secondary mt-2 mb-0">Break/MAB is timed from the inter-frame gap (approx). Per-edge scope view is on the roadmap.</p>
+      </div></div></div>
+    </div>
+  </section>
+
+  <!-- STRESS / FUZZ -->
+  <section data-panel="stress" hidden>
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="fz-req">0</div><div class="k">requests seen</div></div></div>
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="fz-drop-c">0</div><div class="k">S3 dropped replies</div></div></div>
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="fz-bad">0</div><div class="k">bad-checksum</div></div></div>
+      <div class="col-6 col-md-3"><div class="metric"><div class="v" id="fz-corr">0%</div><div class="k">controller error rate</div></div></div>
+    </div>
+    <div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+      <span>Timing fuzz &amp; fault injection</span>
+      <span class="badge text-bg-secondary" id="fz-state">idle</span></div>
+      <div class="card-body">
+      <p class="text-secondary">Make the virtual fixtures misbehave like real "fixtures from hell" to stress the controller. These toggles map straight to the responder's fuzz engine (serial: f/drop/late/mute/csum). The point: heavy RDM should still finish with zero lost frames and no retries.</p>
+      <div class="row g-3">
+        <div class="col-md-6"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fz-late"><label class="form-check-label" for="fz-late">Late turnaround (near the 2 ms limit)</label></div></div>
+        <div class="col-md-6"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fz-runt"><label class="form-check-label" for="fz-runt">Runt / short breaks</label></div></div>
+        <div class="col-md-6"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fz-drop"><label class="form-check-label" for="fz-drop">Randomly drop N% of responses</label></div></div>
+        <div class="col-md-6"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fz-csum"><label class="form-check-label" for="fz-csum">Occasional bad checksum</label></div></div>
+        <div class="col-md-6"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fz-mute"><label class="form-check-label" for="fz-mute">Flaky mute (ignore DISC_MUTE sometimes)</label></div></div>
+        <div class="col-md-6"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="fz-baud"><label class="form-check-label" for="fz-baud">Baud drift</label></div></div>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-warning" onclick="applyFuzz()">Apply fuzz profile</button>
+        <button class="btn btn-outline-secondary" onclick="clearFuzz()">Clear all</button>
+      </div>
+    </div></div>
+    <div class="card mt-3"><div class="card-header">Controller error rate under fuzz</div>
+      <div class="card-body"><div class="chartbox"><span class="cur" id="fz-corr-cur">0%</span><span class="lbl">corruption</span><canvas data-chart="fuzzCorr" height="130"></canvas></div></div></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section data-panel="set" hidden>
+    <div class="row g-3">
+      <div class="col-lg-6"><div class="card"><div class="card-header">Responder</div><div class="card-body">
+        <label class="form-label small">Turnaround delay (µs) — E1.20 window 176–2000</label>
+        <input type="range" class="form-range" id="s-turn" min="120" max="1000" step="10" value="250" oninput="document.getElementById('s-turnv').textContent=this.value">
+        <div class="d-flex justify-content-between small text-secondary"><span>120</span><span class="mono" id="s-turnv">250</span><span>1000</span></div>
+        <div class="form-check form-switch mt-3"><input class="form-check-input" type="checkbox" id="s-verbose"><label class="form-check-label" for="s-verbose">Verbose discovery trace</label></div>
+        <button class="btn btn-primary mt-3" onclick="saveSettings()">Save</button>
+      </div></div></div>
+      <div class="col-lg-6"><div class="card"><div class="card-header">Device</div><div class="card-body small mono">
+        <div>firmware: <span id="s-fw">—</span></div>
+        <div>uptime: <span id="s-up">—</span></div>
+        <div>free heap: <span id="s-heap">—</span></div>
+        <div>WiFi: <span id="s-wifi">—</span></div>
+        <div>IP: <span id="s-ip">—</span></div>
+        <div class="mt-2">UI poll: <span id="s-poll">250 ms</span> · uptime this page: <span id="s-page">0s</span></div>
+      </div></div></div>
+    </div>
+  </section>
+</div>
+
+<template id="fx-row"><tr>
+  <td class="mono idx"></td><td class="mono uid"></td><td class="addr"></td><td class="fp"></td>
+  <td class="pers"></td><td class="model"></td>
+  <td><span class="dot off mutedot"></span></td><td><span class="dot off iddot"></span></td>
+</tr></template>
+
+<script>
+"use strict";
+const $=(s)=>document.querySelector(s), $$=(s)=>document.querySelectorAll(s);
+let DEMO=false;
+const POLL_MS=250;                 // metrics/charts: 4 Hz
+const SLOW_EVERY=6;                // status+fixtures every 6 ticks (~1.5 s)
+const CSS=(n)=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---- API helpers (fall back to demo data if the device isn't reachable) ----
+async function api(path,opts){ const r=await fetch(path,Object.assign({cache:'no-store'},opts)); if(!r.ok) throw 0; return r.json(); }
+function demoStatus(){DEMO=true; return {fw:'sim-dev',up:'0d 00:12:03',heap:181000,wifi:'LuxDMX-RDM-Sim',ip:'192.168.42.1',
+  bus:{state:'idle'},fixtures:64,discovered:61,turnaround:250,verbose:false};}
+let demoT=0;
+function demoMetrics(){demoT++; const wobble=Math.abs(Math.sin(demoT/9));
+  return {rdmReq:326+demoT*7,resp:117+demoT*3,get:12,set:0,nack:0,reAsk:2,badCsum:14+((demoT/5)|0),rxStall:0,discovered:61,muted:61,
+  anSignal:true,anFrames:2840+demoT*40,anSlots:513,anStartCode:0,anRefresh:39.6+wobble*0.5,anBreakUs:184,
+  anFramingErr:(demoT%30<3)?2:0,anFramingPerMin:wobble*1.5,anRxSlots:1457320,anWindowMs:72000};}
+function demoFixtures(){const a=[];for(let i=0;i<10;i++){const h=((i+1)*2654435761)>>>0;
+  a.push({idx:i,uid:'4C58:'+h.toString(16).toUpperCase().padStart(8,'0'),address:1+(i*17)%500,footprint:1+(i%32),
+    persCur:1,persCount:1+(i%4),model:['LX Par 4','LX Wash 8','LX Spot 16','LX Mover 32'][i%4],muted:i<6,identify:i===2});}
+  return a;}
+
+// ---- tabs (real buttons) ----
+$$('#tabs .seg').forEach(b=>b.onclick=()=>{
+  $$('#tabs .seg').forEach(x=>x.classList.toggle('active',x===b));
+  $$('section[data-panel]').forEach(s=>s.hidden = s.dataset.panel!==b.dataset.tab);
+  requestAnimationFrame(drawAllCharts);   // canvases sized 0 while hidden — redraw on show
+});
+
+// ================= charts =================
+// Tiny self-contained time-series charts. Each series keeps two ring buffers:
+//   fast = last ~60s at the poll rate; slow = ~10min downsampled.
+// No external libs, so it is safe to serve from the device AP under a strict CSP.
+function Ring(n){return {buf:new Array(n).fill(null),n,i:0,len:0,
+  push(v){this.buf[this.i]=v;this.i=(this.i+1)%this.n;if(this.len<this.n)this.len++;},
+  toArr(){const o=[];for(let k=0;k<this.len;k++)o.push(this.buf[(this.i-this.len+k+this.n)%this.n]);return o;}};}
+const FAST_N=240, SLOW_N=240;      // 240*250ms=60s ; 240*2.5s=10min
+const series={};
+function serie(key){ if(!series[key]) series[key]={fast:Ring(FAST_N),slow:Ring(SLOW_N),slowAcc:0,slowCnt:0}; return series[key]; }
+let slowTick=0;
+function pushSeries(key,val){ const s=serie(key); s.fast.push(val);
+  s.slowAcc+=val; s.slowCnt++;
+  if(slowTick%10===0){ s.slow.push(s.slowCnt?s.slowAcc/s.slowCnt:val); s.slowAcc=0; s.slowCnt=0; } }
+
+const charts=[];   // {canvas,cfg}
+function registerChart(canvas,cfg){ if(canvas) charts.push({canvas,cfg}); }
+function drawChart(canvas,cfg){
+  const parent=canvas.parentElement; const cssW=parent.clientWidth||canvas.clientWidth;
+  if(!cssW) return;                                  // hidden tab
+  const cssH=cfg.h||150, dpr=Math.min(window.devicePixelRatio||1,2);
+  if(canvas.width!==Math.round(cssW*dpr)||canvas.height!==Math.round(cssH*dpr)){
+    canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+    canvas.style.height=cssH+'px'; }
+  const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  const win=cfg.win?cfg.win():'fast';
+  const datasets=cfg.series.map(sd=>({color:sd.color,fill:sd.fill,data:serie(sd.key)[win].toArr()}));
+  const pad={l:34,r:6,t:10,b:12}; const W=cssW-pad.l-pad.r, H=cssH-pad.t-pad.b;
+  let max=cfg.min||0; datasets.forEach(d=>d.data.forEach(v=>{if(v!=null&&v>max)max=v;}));
+  if(cfg.maxHint) max=Math.max(max,cfg.maxHint);
+  max=niceMax(max); const N=Math.max.apply(null,datasets.map(d=>d.data.length).concat([1]));
+  // grid + y labels
+  ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.fillStyle=CSS('--gh-muted'); ctx.font='10px ui-monospace,Consolas,monospace';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let g=0;g<=2;g++){ const yy=pad.t+H*g/2; const val=max*(1-g/2);
+    ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(pad.l+W,yy);ctx.stroke();
+    ctx.fillText(fmtY(val),pad.l-4,yy); }
+  // series
+  datasets.forEach(d=>{ if(d.data.length<2)return;
+    const xstep=W/(N-1); const y=(v)=>pad.t+H*(1-(v/max));
+    if(d.fill){ ctx.beginPath(); let started=false;
+      d.data.forEach((v,i)=>{ if(v==null)return; const x=pad.l+i*xstep;
+        if(!started){ctx.moveTo(x,pad.t+H);ctx.lineTo(x,y(v));started=true;}else ctx.lineTo(x,y(v)); });
+      ctx.lineTo(pad.l+(d.data.length-1)*xstep,pad.t+H); ctx.closePath();
+      ctx.fillStyle=hexA(d.color,.13); ctx.fill(); }
+    ctx.beginPath(); let started=false;
+    d.data.forEach((v,i)=>{ if(v==null)return; const x=pad.l+i*xstep;
+      if(!started){ctx.moveTo(x,y(v));started=true;}else ctx.lineTo(x,y(v)); });
+    ctx.strokeStyle=d.color; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.stroke();
+    // last point dot
+    const last=d.data[d.data.length-1];
+    if(last!=null){ const x=pad.l+(d.data.length-1)*xstep; ctx.fillStyle=d.color; ctx.beginPath(); ctx.arc(x,y(last),2.4,0,7); ctx.fill(); }
+  });
+}
+function niceMax(m){ if(m<=0)return 1; const p=Math.pow(10,Math.floor(Math.log10(m))); const n=m/p;
+  const step=n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+function fmtY(v){ if(v>=1000)return (v/1000).toFixed(v>=10000?0:1)+'k'; if(v>=10)return v.toFixed(0); if(v>=1)return v.toFixed(1); return v.toFixed(v>0?2:0); }
+function hexA(c,a){ // accept #rgb/#rrggbb, return rgba
+  c=c.trim(); if(c[0]==='#'){ let r,g,b; if(c.length===4){r=parseInt(c[1]+c[1],16);g=parseInt(c[2]+c[2],16);b=parseInt(c[3]+c[3],16);} else {r=parseInt(c.slice(1,3),16);g=parseInt(c.slice(3,5),16);b=parseInt(c.slice(5,7),16);} return 'rgba('+r+','+g+','+b+','+a+')';} return c; }
+function drawAllCharts(){ charts.forEach(c=>drawChart(c.canvas,c.cfg)); drawSparks(); }
+function drawSparks(){ $$('canvas[data-spark]').forEach(cv=>{
+  const parent=cv.parentElement.parentElement; const w=parent.clientWidth; if(!w)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2); cv.width=Math.round(w*dpr); cv.height=Math.round(26*dpr);
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,26);
+  const data=serie(cv.dataset.spark).fast.toArr(); if(data.length<2)return;
+  let max=0; data.forEach(v=>{if(v!=null&&v>max)max=v;}); max=max||1;
+  const col=cv.dataset.spark==='corrupt'?CSS('--lux-amber'):CSS('--lux-cyan');
+  const xs=w/(data.length-1); ctx.beginPath();
+  data.forEach((v,i)=>{const x=i*xs,y=24-22*((v||0)/max); i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.stroke(); }); }
+
+// scope toggles
+const chartWin={framing:'fast'};
+$$('.toggle[data-scope]').forEach(t=>{ const scope=t.dataset.scope;
+  t.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    t.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));
+    chartWin[scope]=b.dataset.win; drawAllCharts(); }); });
+
+// register the charts
+registerChart($('canvas[data-chart="throughput"]'),{series:[
+  {key:'reqRate',color:CSS('--lux-cyan'),fill:true},{key:'respRate',color:CSS('--lux-green')}]});
+registerChart($('canvas[data-chart="dashFraming"]'),{min:0,maxHint:2,series:[{key:'framingMin',color:CSS('--lux-magenta'),fill:true}]});
+registerChart($('canvas[data-chart="framing"]'),{min:0,maxHint:2,win:()=>chartWin.framing,series:[{key:'framingMin',color:CSS('--lux-magenta'),fill:true}]});
+registerChart($('canvas[data-chart="refresh"]'),{min:0,maxHint:44,series:[{key:'refresh',color:CSS('--lux-cyan')}]});
+registerChart($('canvas[data-chart="fuzzCorr"]'),{min:0,maxHint:5,series:[{key:'corrupt',color:CSS('--lux-amber'),fill:true}]});
+function clearCharts(){ Object.keys(series).forEach(k=>delete series[k]); drawAllCharts(); }
+
+// ---- log ----
+const LOGMAX=400; let logLines=[];
+function logAdd(cls,txt){ logLines.push({cls,txt}); if(logLines.length>LOGMAX) logLines.shift(); renderLog(); }
+function renderLog(){ const html=logLines.map(l=>'<div class="l '+l.cls+'">'+l.txt+'</div>').join('');
+  ['#log','#log2'].forEach(id=>{const el=$(id); if(el){const atBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-30; el.innerHTML=html; if(atBottom) el.scrollTop=el.scrollHeight;}});}
+function clearLog(){logLines=[];renderLog();}
+
+// ---- render ----
+function pct(n,d){ return d>0?Math.round(100*n/d):0; }
+function setBar(id,val,warnAt,badAt){const b=$(id);b.className='bar'+(val<=badAt?' bad':val<=warnAt?' warn':'');b.querySelector('span').style.width=val+'%';}
+
+let prevReq=0, prevResp=0, lastT=performance.now();
+let prevRxB=null, lastRxT=performance.now();
+function renderStatus(s){
+  $('#c-bus').textContent=s.bus.state; $('#busdot').className='dot '+(s.bus.state==='idle'?'off':'on');
+  $('#c-fix').textContent=s.fixtures; $('#pip-fix').textContent=s.fixtures;
+  $('#a-turn').textContent=s.turnaround; $('#a-turn2').textContent=s.turnaround;
+  $('#s-fw').textContent=s.fw; $('#s-up').textContent=s.up; $('#s-heap').textContent=(s.heap/1024|0)+' KB';
+  $('#s-wifi').textContent=s.wifi; $('#s-ip').textContent=s.ip;
+  if($('#s-turn') && document.activeElement!==$('#s-turn')){ $('#s-turn').value=s.turnaround; $('#s-turnv').textContent=s.turnaround; }
+  $('#offline').style.display = DEMO ? 'block':'none';
+}
+function renderMetrics(s,m){
+  const now=performance.now(); const dt=(now-lastT)/1000||1;
+  const rps=Math.max(0,(m.rdmReq-prevReq)/dt), sps=Math.max(0,(m.resp-prevResp)/dt);
+  prevReq=m.rdmReq; prevResp=m.resp; lastT=now;
+  pushSeries('reqRate',rps); pushSeries('respRate',sps);
+  const corr=pct(m.badCsum,m.rdmReq); pushSeries('corrupt',corr);
+  pushSeries('framingMin',+(m.anFramingPerMin||0));
+  pushSeries('refresh',+(m.anRefresh||0));
+  slowTick++;
+
+  // header chips
+  $('#c-found').textContent=m.discovered; $('#c-corr').textContent=corr+'%'; $('#c-drop').textContent=m.reAsk;
+  $('#c-reqs').textContent=Math.round(rps);
+  // dashboard metrics
+  $('#m-req').textContent=m.rdmReq; $('#m-resp').textContent=m.resp;
+  $('#m-found').textContent=m.discovered+'/'+s.fixtures; $('#m-corr').textContent=corr+'%';
+  $('#dash-fe-cur').textContent=(m.anFramingPerMin||0).toFixed(1);
+  $('#dash-fe-cur').style.color=(m.anFramingErr>0)?CSS('--lux-magenta'):CSS('--lux-green');
+  // idle-bus noise (wiggle test)
+  if(m.rxBytes!=null){ const nn=performance.now();
+    if(prevRxB!=null){ const rate=Math.max(0,Math.round((m.rxBytes-prevRxB)/((nn-lastRxT)/1000)));
+      const el=$('#hb-noise'); el.textContent=rate+' B/s';
+      el.style.color = rate<50?CSS('--lux-green') : rate<2000?CSS('--lux-amber'):CSS('--lux-magenta'); }
+    prevRxB=m.rxBytes; lastRxT=nn; }
+  if(m.vdiff!=null){ const el=$('#hb-mv'); el.textContent=m.vdiff+' mV idle, '+m.vpp+' mVpp';
+    el.style.color = (m.vdiff>250 && m.vpp<120)?CSS('--lux-green') : (m.vdiff>200)?CSS('--lux-amber'):CSS('--lux-magenta'); }
+  const integ=100-corr; const catch_=100-pct(m.reAsk,Math.max(1,m.resp));
+  $('#hb-int').textContent=integ+'%'; setBar('#hb-int-bar',integ,90,70);
+  $('#hb-catch').textContent=catch_+'%'; setBar('#hb-catch-bar',catch_,98,90);
+  $('#hb-note').textContent = corr>10
+    ? 'High request corruption at the half-duplex turnaround — suspect missing fail-safe bias on the bus.'
+    : 'Bus looking healthy.';
+  // rdm integrity panel
+  $('#a-bad').textContent=m.badCsum; $('#a-stall').textContent=m.rxStall; $('#a-reask').textContent=m.reAsk;
+  // stress panel
+  $('#fz-req').textContent=m.rdmReq; $('#fz-drop-c').textContent=m.reAsk; $('#fz-bad').textContent=m.badCsum;
+  $('#fz-corr').textContent=corr+'%'; $('#fz-corr-cur').textContent=corr+'%';
+  // analyzer tab
+  if(m.anFramingErr!=null){
+    const sig=m.anSignal; $('#an-sig').textContent=sig?'DMX signal OK':'no signal';
+    $('#an-sigdot').className='dot '+(sig?'on':'off');
+    $('#pip-ana').textContent=sig?(m.anRefresh||0).toFixed(0)+'Hz':'—';
+    const fe=m.anFramingErr; const feEl=$('#an-fe'); feEl.textContent=fe;
+    feEl.style.color = fe===0?CSS('--lux-green'):CSS('--lux-magenta');
+    $('#an-ferate').textContent=(m.anFramingPerMin||0).toFixed(1);
+    $('#an-refresh').textContent=(m.anRefresh||0).toFixed(1);
+    $('#an-slots').textContent=m.anSlots;
+    $('#an-sc').textContent='0x'+(m.anStartCode||0).toString(16).toUpperCase().padStart(2,'0');
+    $('#an-break').textContent=m.anBreakUs;
+    $('#an-frames').textContent=m.anFrames;
+    $('#an-window').textContent=Math.round((m.anWindowMs||0)/1000)+'s';
+    $('#ana-fe-cur').textContent=(m.anFramingPerMin||0).toFixed(1);
+    $('#ana-fe-cur').style.color=fe===0?CSS('--lux-green'):CSS('--lux-magenta');
+    $('#ana-hz-cur').textContent=(m.anRefresh||0).toFixed(1);
+    $('#an-note').textContent = !sig ? 'No DMX detected on the bus. Connect a DMX output (A/B) and make sure the sim shares ground with it.'
+      : fe===0 ? 'Clean: 0 framing errors this window. This is what a well-isolated gateway (core-separated) should hold.'
+      : 'Framing errors present ('+fe+'). If they climb when you load the network (Art-Net flood / wired Ethernet), that is the core-contention fault from issue #64.';
+  }
+}
+function renderFixtures(list){ const tb=$('#fx-body'); tb.innerHTML='';
+  list.forEach(f=>{ const r=$('#fx-row').content.cloneNode(true);
+    r.querySelector('.idx').textContent=f.idx; r.querySelector('.uid').textContent=f.uid;
+    r.querySelector('.addr').textContent=f.address; r.querySelector('.fp').textContent=f.footprint+' ch';
+    r.querySelector('.pers').textContent=f.persCur+'/'+f.persCount; r.querySelector('.model').textContent=f.model;
+    r.querySelector('.mutedot').className='dot '+(f.muted?'on':'off');
+    r.querySelector('.iddot').className='dot '+(f.identify?'on':'off'); tb.appendChild(r); });
+}
+
+// ---- actions ----
+async function trigger(){ logAdd('rep','» triggering controller discovery'); try{await api('/api/discover',{method:'POST'});}catch(e){logAdd('bad','(demo) no device');} }
+async function unmute(){ try{await api('/api/unmute',{method:'POST'});logAdd('mute','» un-muted all fixtures');}catch(e){logAdd('bad','(demo) no device');} }
+async function resetAnalyzer(){ try{await api('/api/analyzer/reset',{method:'POST'});logAdd('rep','» analyzer window reset');}catch(e){logAdd('bad','(demo) no device');} }
+async function generate(){ const count=+$('#gen-count').value, pattern=$('#gen-pat').value;
+  try{await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fixtures:count,pattern})});logAdd('rep','» generated '+count+' fixtures ('+pattern+')');}catch(e){logAdd('bad','(demo) no device');} }
+async function saveSettings(){ const turnaround=+$('#s-turn').value, verbose=$('#s-verbose').checked;
+  try{await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turnaround,verbose})});logAdd('rep','» settings saved');}catch(e){logAdd('bad','(demo) no device');} }
+function fuzzBody(){ return {drop:$('#fz-drop').checked?30:0, late:$('#fz-late').checked, badcsum:$('#fz-csum').checked, mute:$('#fz-mute').checked, runt:$('#fz-runt').checked, baud:$('#fz-baud').checked}; }
+async function applyFuzz(){ const body=fuzzBody();
+  const on=Object.values(body).some(v=>v&&v!==0);
+  $('#fz-state').textContent=on?'active':'idle'; $('#fz-state').className='badge '+(on?'text-bg-cyan':'text-bg-secondary');
+  try{await api('/api/fuzz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    logAdd('bad','» fuzz applied '+JSON.stringify(body));}catch(e){logAdd('bad','(demo) no device');}
+}
+function clearFuzz(){ ['fz-drop','fz-late','fz-csum','fz-mute','fz-runt','fz-baud'].forEach(id=>$('#'+id).checked=false); applyFuzz(); }
+
+// ---- log feed from device (or synthetic in demo) ----
+async function pollLog(){ try{ const ls=await api('/api/log'); ls.forEach(e=>logAdd(e.cls||'dub',e.txt)); }catch(e){} }
+
+// ---- main loop ----
+let tick=0; const pageT0=performance.now();
+let cacheS=null, cacheFx=null;
+async function pollFast(){
+  let s=cacheS,m;
+  try{
+    const need = (tick%SLOW_EVERY===0) || !cacheS;
+    const reqs=[api('/api/metrics')];
+    if(need){ reqs.push(api('/api/status')); reqs.push(api('/api/fixtures')); }
+    const res=await Promise.all(reqs); DEMO=false;
+    m=res[0]; if(need){ cacheS=s=res[1]; cacheFx=res[2]; }
+  }catch(e){ DEMO=true; s=cacheS=demoStatus(); m=demoMetrics(); if(!cacheFx)cacheFx=demoFixtures(); }
+  if(!s){ s=demoStatus(); }
+  if(tick%SLOW_EVERY===0){ renderStatus(s); renderFixtures(cacheFx);
+    const db=$('#dev-body');
+    if(m.devices&&m.devices.length){ db.innerHTML=m.devices.map(d=>'<tr><td class="mono">'+d.uid+'</td><td>'+(d.address||'—')+'</td><td>'+(d.model||'—')+'</td></tr>').join(''); } }
+  renderMetrics(s,m);
+  drawAllCharts();
+  $('#s-page').textContent=Math.round((performance.now()-pageT0)/1000)+'s';
+  tick++;
+}
+window.addEventListener('resize',()=>requestAnimationFrame(drawAllCharts));
+pollFast(); setInterval(pollFast,POLL_MS); setInterval(pollLog,750);
+</script>
+</body>
+</html>
+
+)RDMHTML";
