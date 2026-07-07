@@ -105,6 +105,11 @@
 #include <Update.h>
 #include <ArtnetWifi.h>
 #include <esp_dmx.h>
+#ifdef DMX_RMT
+#include "dmx_rmt.h"
+static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64 hard-zero path)
+#include "rdm_rmt.h"                    // RDM controller on RMT-TX + UART-RX (no esp_dmx, no interrupt leak)
+#endif
 #include <rdm/controller.h>             // RDM controller: discovery + GET/SET
 #include <rdm/controller/include/utils.h>  // rdm_send_request() for sensor PIDs
 #include <rdm/include/uid.h>            // rdm_uid_is_eq() and friends
@@ -424,6 +429,11 @@ static uint32_t outFrameCount[MAX_OUTPUTS]  = {0};
 static uint32_t outLastFrameMs[MAX_OUTPUTS] = {0};
 static uint32_t outLastDmxMs[MAX_OUTPUTS]   = {0};
 static float    outFps[MAX_OUTPUTS]         = {0.0f};
+// Real DMX OUTPUT (transmit) rate per output, counted in sendDmx (the DMX task) and rolled up
+// once a second. This is what "outfps" should report -- the rate we actually clock onto the
+// wire (a steady ~40 Hz), independent of the input frame rate.
+static volatile uint32_t txFrames[MAX_OUTPUTS] = {0};
+static float    outTxFps[MAX_OUTPUTS]       = {0.0f};
 // True while no live source feeds this output's universe. Drives the per-output
 // signal-loss policy (LOSS_*). Starts true: a freshly booted node has no source
 // yet, so a STOP-configured output stays dark until one appears.
@@ -716,10 +726,21 @@ static int viewOutput() {
     return 0;
 }
 
+// Clock every enabled output out for one DMX frame. The two DMX UARTs are independent
+// hardware, so we fire ALL of them first (dmx_write + dmx_send) and only THEN wait for
+// them to finish -- both frames transmit CONCURRENTLY. With two outputs that is ~one
+// frame time (~23 ms) instead of ~46 ms, so each output holds ~40 Hz instead of dropping
+// to ~20 Hz (issue #64). Runs from the dedicated high-priority dmxTxTask (see below), the
+// sole owner of the DMX ports, so its break/MAB timing is never preempted by loop().
 static void sendDmx() {
     if (!dmxReady) return;
     bool ovActive = identifyCh && millis() < identifyUntil;
     int  vo = viewOutput();
+    dmx_port_t sentPort[MAX_OUTPUTS]; int nSent = 0;
+#ifdef DMX_RMT
+    int rmtSent[MAX_OUTPUTS]; int nRmt = 0;
+#endif
+    // Phase 1: write + kick off every output that should clock this frame.
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!outReady[i]) continue;
         // Identify override: force one channel to full on the wire only (on the
@@ -730,13 +751,66 @@ static void sendDmx() {
         // identify are explicit user intent and keep the line clocking.
         if (cfg.outputs[i].lossMode == LOSS_STOP && outSrcLost[i]
             && !ov && !(manualMode && i == vo)) continue;
-        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         uint8_t saved = 0;
         if (ov) { saved = dmxBuf[i][identifyCh]; dmxBuf[i][identifyCh] = 255; }
+#ifdef DMX_RMT
+        {   // RMT-driven output -> kick (async), streams out in hardware. The RDM output stays on
+            // RMT too: RDM requests go out via RMT and responses come back on a RX-only UART, so
+            // there is never a switch and DMX output on this pin is uninterrupted between RDM ops.
+            rmtDmxKick(&g_rmt[i], dmxBuf[i], DMX_PACKET_SIZE);
+            if (ov) dmxBuf[i][identifyCh] = saved;
+            rmtSent[nRmt++] = i;
+            txFrames[i]++;                 // count real transmitted frames for the output-fps stat
+            continue;
+        }
+#endif
+        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         dmx_write(port, dmxBuf[i], DMX_PACKET_SIZE);
         dmx_send(port);
-        dmx_wait_sent(port, DMX_TIMEOUT_TICK);
         if (ov) dmxBuf[i][identifyCh] = saved;
+        sentPort[nSent++] = port;
+        txFrames[i]++;                         // count real transmitted frames for the output-fps stat
+    }
+    // Phase 2: wait for the concurrent transmissions to complete.
+    for (int k = 0; k < nSent; k++) dmx_wait_sent(sentPort[k], DMX_TIMEOUT_TICK);
+#ifdef DMX_RMT
+    for (int k = 0; k < nRmt; k++) rmtDmxWait(&g_rmt[rmtSent[k]]);
+#endif
+}
+
+// Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
+// strict 25 ms cadence (vTaskDelayUntil, 40 Hz) at high priority pinned to core 1, so a
+// burst of Art-Net/sACN packet processing in loop() (also core 1) can NEVER delay or jitter
+// the DMX break/frame timing. Combined with the EMAC bring-up moved to core 0 (ethRmiiUpTask),
+// nothing on core 1 -- neither tasks nor the wired-Ethernet ISR -- can disturb the transmit.
+// This task is the SOLE owner of the DMX ports: it also services RDM (a no-op unless a
+// direction-enable pin is configured), so loop() never touches the bus.
+static TaskHandle_t g_dmxTask = nullptr;
+static void rdmService();   // fwd decl (defined below, next to the RDM controller)
+static void netRxTask(void*);   // fwd decl (defined below, next to loop() -- runs on core 0)
+
+// (No RMT<->esp_dmx switch: in the DMX_RMT build the RDM output stays on RMT permanently. RDM
+// requests are sent via RMT and responses read on a RX-only UART -- see rdm_rmt.h. Nothing is
+// ever installed/deleted at runtime, so the esp_dmx interrupt-leak path is gone entirely.)
+
+static void dmxTxTask(void*) {
+    const TickType_t period = pdMS_TO_TICKS(25);        // 40 Hz
+    TickType_t next = xTaskGetTickCount();
+    uint32_t fpsWin = millis();
+    for (;;) {
+        vTaskDelayUntil(&next, period);                 // precise period, immune to loop() load
+        if (identifyCh && millis() >= identifyUntil) identifyCh = 0;
+        rdmService();                                   // queued RDM request (bus owner); no-op otherwise
+        sendDmx();                                      // clock outputs out, concurrently
+        // Roll up the real transmitted-frame rate once a second (for the "outfps" stat).
+        const uint32_t now = millis();
+        if (now - fpsWin >= 1000) {
+            for (int i = 0; i < MAX_OUTPUTS; i++) {
+                outTxFps[i] = txFrames[i] * 1000.0f / (float)(now - fpsWin);
+                txFrames[i] = 0;
+            }
+            fpsWin = now;
+        }
     }
 }
 
@@ -841,13 +915,41 @@ static bool rdmParseUid(const String& msg, rdm_uid_t& out) {
     return true;
 }
 
+// ---- RDM transport adapter -------------------------------------------------------------
+// The DMX_RMT build talks RDM over RMT-TX + a RX-only UART (rdm_rmt.h); other builds use the
+// esp_dmx controller. Both back ends present this same small op-set to the app layer below, so
+// dropping esp_dmx later is just deleting the #else half.
+#ifdef DMX_RMT
+static int  rdmOpDiscover(rdm_uid_t* u, int max)                                      { return rdmRmtDiscover(u, max); }
+static bool rdmOpDeviceInfo(const rdm_uid_t& uid, rdm_device_info_t* i, rdm_ack_t* a) { return rdmRmtGetDeviceInfo(uid, i, a); }
+static bool rdmOpSwLabel(const rdm_uid_t& uid, char* b, size_t n, rdm_ack_t* a)       { return rdmRmtGetSwLabel(uid, b, n, a); }
+static bool rdmOpSensorDef(const rdm_uid_t& uid, uint8_t s, rdm_sensor_definition_t* d, rdm_ack_t* a) { return rdmRmtGetSensorDef(uid, s, d, a); }
+static bool rdmOpSensorVal(const rdm_uid_t& uid, uint8_t s, rdm_sensor_value_t* v, rdm_ack_t* a)      { return rdmRmtGetSensorValue(uid, s, v, a); }
+static bool rdmOpSetAddr(const rdm_uid_t& uid, uint16_t addr, rdm_ack_t* a)           { return rdmRmtSetStartAddr(uid, addr, a); }
+static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)             { return rdmRmtSetIdentify(uid, on, a); }
+#else
+static dmx_port_t rdmPort() { return (dmx_port_t)cfg.outputs[rdmOut].port; }
+static int  rdmOpDiscover(rdm_uid_t* u, int max)                                      { return rdm_discover_devices_simple(rdmPort(), u, max); }
+static bool rdmOpDeviceInfo(const rdm_uid_t& uid, rdm_device_info_t* i, rdm_ack_t* a) { return rdm_send_get_device_info(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, i, a); }
+static bool rdmOpSwLabel(const rdm_uid_t& uid, char* b, size_t n, rdm_ack_t* a)       { return rdm_send_get_software_version_label(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, b, n, a); }
+static bool rdmOpSensorDef(const rdm_uid_t& uid, uint8_t s, rdm_sensor_definition_t* d, rdm_ack_t* a) {
+    rdm_request_t req = { (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND, RDM_PID_SENSOR_DEFINITION, "b$", &s, 1 };
+    return rdm_send_request(rdmPort(), &req, "bbbbwwwwba$", d, sizeof(*d), a);
+}
+static bool rdmOpSensorVal(const rdm_uid_t& uid, uint8_t s, rdm_sensor_value_t* v, rdm_ack_t* a) {
+    rdm_request_t req = { (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND, RDM_PID_SENSOR_VALUE, "b$", &s, 1 };
+    return rdm_send_request(rdmPort(), &req, "bwwww$", v, sizeof(*v), a);
+}
+static bool rdmOpSetAddr(const rdm_uid_t& uid, uint16_t addr, rdm_ack_t* a)           { return rdm_send_set_dmx_start_address(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, addr, a); }
+static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)             { return rdm_send_set_identify_device(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, on ? 1 : 0, a); }
+#endif
+
 // Full discovery sweep + per-device GET device-info & software-version label.
 // Blocks the bus for the duration (~hundreds of ms) — DMX output pauses briefly.
 static void rdmDoDiscover() {
-    dmx_port_t port = (dmx_port_t)cfg.outputs[rdmOut].port;
     rdmBusy = true;
     rdm_uid_t uids[RDM_MAX_DEVICES];
-    int n = rdm_discover_devices_simple(port, uids, RDM_MAX_DEVICES);
+    int n = rdmOpDiscover(uids, RDM_MAX_DEVICES);
     if (n > RDM_MAX_DEVICES) n = RDM_MAX_DEVICES;
     rdmCount = 0;
     for (int i = 0; i < n; i++) {
@@ -855,8 +957,7 @@ static void rdmDoDiscover() {
         d.uid = uids[i];
         rdm_ack_t ack;
         rdm_device_info_t info;
-        if (rdm_send_get_device_info(port, &uids[i], RDM_SUB_DEVICE_ROOT, &info, &ack)
-            && ack.type == RDM_RESPONSE_TYPE_ACK) {
+        if (rdmOpDeviceInfo(uids[i], &info, &ack) && ack.type == RDM_RESPONSE_TYPE_ACK) {
             d.startAddr        = info.dmx_start_address;
             d.footprint        = info.footprint;
             d.modelId          = info.model_id;
@@ -866,8 +967,7 @@ static void rdmDoDiscover() {
             d.sensorCount      = info.sensor_count > RDM_MAX_SENSORS
                                      ? RDM_MAX_SENSORS : info.sensor_count;
         }
-        rdm_send_get_software_version_label(port, &uids[i], RDM_SUB_DEVICE_ROOT,
-                                            d.swLabel, sizeof(d.swLabel), &ack);
+        rdmOpSwLabel(uids[i], d.swLabel, sizeof(d.swLabel), &ack);
 
         // Sensors (E1.20): per sensor read its definition (name/unit) then value.
         // Sensors are numbered 0..count-1; definition and value are independent —
@@ -878,20 +978,14 @@ static void rdmDoDiscover() {
             uint8_t   sn = s;
 
             rdm_sensor_definition_t def = {};
-            rdm_request_t dreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
-                                   RDM_PID_SENSOR_DEFINITION, "b$", &sn, 1 };
-            if (rdm_send_request(port, &dreq, "bbbbwwwwba$", &def, sizeof(def), &sack)
-                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+            if (rdmOpSensorDef(uids[i], sn, &def, &sack) && sack.type == RDM_RESPONSE_TYPE_ACK) {
                 strlcpy(sen.name, def.description[0] ? def.description : rdmTypeStr(def.type),
                         sizeof(sen.name));
                 strlcpy(sen.unit, rdmUnitStr(def.unit), sizeof(sen.unit));
             }
 
             rdm_sensor_value_t val = {};
-            rdm_request_t vreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
-                                   RDM_PID_SENSOR_VALUE, "b$", &sn, 1 };
-            if (rdm_send_request(port, &vreq, "bwwww$", &val, sizeof(val), &sack)
-                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+            if (rdmOpSensorVal(uids[i], sn, &val, &sack) && sack.type == RDM_RESPONSE_TYPE_ACK) {
                 sen.value = val.present_value;
                 sen.valid = true;
                 if (!sen.name[0]) strlcpy(sen.name, "Sensor", sizeof(sen.name));
@@ -905,16 +999,16 @@ static void rdmDoDiscover() {
     Serial.printf("[RDM] discovery: %d device(s)\n", rdmCount);
 }
 
-// Called once per loop() iteration; does work only when a request is queued.
+// Called once per DMX cycle from the DMX task (the sole bus owner); does work only when a
+// request is queued. On the DMX_RMT build this runs the whole RDM transaction over RMT-TX +
+// UART-RX inline -- no peripheral switch, the RDM output never leaves RMT.
 static void rdmService() {
     if (!rdmAvailable()) return;
-    dmx_port_t port = (dmx_port_t)cfg.outputs[rdmOut].port;
     rdm_ack_t ack;
 
     if (rdmSetAddrReq) {
         rdmSetAddrReq = false;
-        if (rdm_send_set_dmx_start_address(port, &rdmSetUid, RDM_SUB_DEVICE_ROOT,
-                                           rdmReqAddr, &ack)) {
+        if (rdmOpSetAddr(rdmSetUid, rdmReqAddr, &ack)) {
             RdmDevice* d = rdmFind(rdmSetUid);
             if (d) d->startAddr = rdmReqAddr;
             Serial.printf("[RDM] set " UIDSTR " addr=%u\n", UID2STR(rdmSetUid), rdmReqAddr);
@@ -922,8 +1016,7 @@ static void rdmService() {
     }
     if (rdmIdentifyReq) {
         rdmIdentifyReq = false;
-        if (rdm_send_set_identify_device(port, &rdmIdentUid, RDM_SUB_DEVICE_ROOT,
-                                         rdmReqOn ? 1 : 0, &ack)) {
+        if (rdmOpSetIdentify(rdmIdentUid, rdmReqOn, &ack)) {
             RdmDevice* d = rdmFind(rdmIdentUid);
             if (d) d->identifying = rdmReqOn;
         }
@@ -1097,8 +1190,10 @@ static void maybeLog(int outIdx, const uint8_t* cur, uint16_t len, uint32_t ip, 
 // Per-output frame rate: the live value, or 0 once that output's input has
 // stalled (>1.5 s), so a dead universe reads 0.0 instead of a stale rate. Used by
 // the WS push, dmx.json and the status display.
+// The rate we actually clock onto the DMX wire (steady ~40 Hz while an output is ready),
+// counted from the transmit side -- not the input frame rate. 0 when the output isn't running.
 static float outFpsLive(int i) {
-    return (millis() - outLastDmxMs[i] < 1500) ? outFps[i] : 0.0f;
+    return (i >= 0 && i < MAX_OUTPUTS && outReady[i]) ? outTxFps[i] : 0.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -2096,6 +2191,26 @@ static void initDmx() {
             continue;
         }
 
+#ifdef DMX_RMT
+        // Every output starts on the RMT peripheral -- hardware-sequenced frames, immune to
+        // core-0 network-DMA contention (issue #64 hard-zero). An RDM-capable output (has a DE
+        // pin, rtsPin >= 0) is switched RMT->esp_dmx on demand ONLY for an RDM transaction and
+        // back to RMT afterwards (see the DMX task), so it gets both immune DMX and RDM.
+        {
+            if (rmtDmxInit(&g_rmt[i], cfg.outputs[i].txPin)) {
+                outReady[i] = true; dmxReady = true;
+                if (firstEnabled) { monitorOut = i; firstEnabled = false; }
+                if (rdmOut < 0 && cfg.outputs[i].rtsPin >= 0) {                 // RDM-capable output
+                    rdmOut = i;
+                    // RDM runs on this same RMT channel for TX + a RX-only UART for responses.
+                    rdmRmtInit(&g_rmt[i], cfg.outputs[i].rtsPin, cfg.outputs[i].rxPin);
+                }
+                Serial.printf("[DMX] out%d ready (RMT%s): uni=%d tx=%d\n",
+                    i, cfg.outputs[i].rtsPin >= 0 ? "+RDM" : "", cfg.outputs[i].universe, cfg.outputs[i].txPin);
+            } else Serial.printf("[DMX] out%d RMT init FAILED\n", i);
+            continue;
+        }
+#endif
         dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         dmx_config_t config = DMX_CONFIG_DEFAULT;
         dmx_driver_install(port, &config, nullptr, 0);
@@ -2492,15 +2607,34 @@ static eth_clock_mode_t rmiiClkMode(int idx) {
 // Bring up RMII Ethernet via the ESP32 internal EMAC. The PHY family, SMI address,
 // MDC/MDIO/PHY-power pins and REF_CLK mode are runtime config (cfg.rmii*); the RMII
 // data lines are fixed by the EMAC. Defaults reproduce the LAN8720/WT32-ETH01 wiring.
-static void startEthRmii() {
+//
+// The internal EMAC's RX interrupt is allocated on whichever core calls ETH.begin(), so
+// we bring it up from a task pinned to core 0 -- exactly like the W5500 path (ethUpTask)
+// -- to keep the EMAC interrupt off core 1, where the DMX transmit (sendDmx/dmx_send in
+// loop()) runs. Brought up inline in setup() the EMAC ISR lands on core 1, and a busy
+// wired link (Art-Net flood) then preempts the DMX break/frame timing enough to put
+// framing errors on the output (issue #64). Measured on the bench: idle 0 framing
+// errors, ~4.4/min under a heavy flood with the inline (core-1) bring-up.
+static volatile bool s_ethRmiiUpDone;
+static void ethRmiiUpTask(void *arg) {
     int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
-    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d\n",
-        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
     ETH.begin(rmiiPhyType(phy), cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio,
               cfg.rmiiPwr, rmiiClkMode(cfg.rmiiClk));
     ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link
     applyEthStaticIp();
     waitEthLink();
+    s_ethRmiiUpDone = true;
+    vTaskDelete(NULL);
+}
+static void startEthRmii() {
+    int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
+    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d (bring-up on core 0)\n",
+        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
+    s_ethRmiiUpDone = false;
+    xTaskCreatePinnedToCore(ethRmiiUpTask, "ethrmii", 8192, NULL, 5, NULL, 0);
+    uint32_t t0 = millis();
+    while (!s_ethRmiiUpDone && millis() - t0 < 30000) delay(20);
+    if (!s_ethRmiiUpDone) Serial.println("[ETH] RMII core-0 bring-up still running after 30s");
 }
 #endif
 
@@ -2743,6 +2877,14 @@ void setup() {
     xTaskCreate(ledTask, "led", 2048, nullptr, 1, nullptr);
     if (dispReady) xTaskCreate(displayTask, "disp", 4096, nullptr, 1, nullptr);
     xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr);
+    // issue #64 core separation: DMX transmit on core 1, Art-Net/sACN receive on core 0.
+    // dmxTxTask: high priority (19, above loop()=1), pinned core 1, strict 40 Hz cadence,
+    //   sole owner of the DMX ports; self-gates on dmxReady so it is safe to start early.
+    // netRxTask: moderate priority (5, below lwIP/WiFi so it can't starve them), pinned
+    //   core 0, drains the UDP sockets and re-merges idle sources. With receive on core 0
+    //   nothing on core 1 can disturb esp_dmx's break/MAB timer ISR -> rock-solid frames.
+    xTaskCreatePinnedToCore(dmxTxTask, "dmxtx", 4096, nullptr, 19, &g_dmxTask, 1);
+    xTaskCreatePinnedToCore(netRxTask, "netrx", 8192, nullptr, 5,  nullptr,   0);
     Serial.println("[BOOT] ready.");
 }
 
@@ -2781,58 +2923,59 @@ static void simArtnetTick() {
 #endif
 
 // ---------------------------------------------------------------------------
-// loop()
+// Network receive task -- runs on CORE 0, the network core. This is the other half
+// of the issue #64 fix: it takes Art-Net / sACN receive (artnet.read / readSacn) and
+// source-timeout re-merge OFF core 1, so the DMX transmit on core 1 (dmxTxTask) runs
+// with NOTHING else competing for the core. esp_dmx sequences its break/MAB with a
+// hardware-timer ISR on core 1; any lwIP/packet work on core 1 (as loop() used to do)
+// can delay that ISR and corrupt a frame while the DMX task is between frames. Moving
+// receive to core 0 removes that entirely: core 1 = DMX only. Receive writes dmxBuf,
+// the DMX task reads it -- a plain byte array, so a rare torn frame is harmless (the
+// next frame 25 ms later is consistent) and no lock is needed (a lock would risk
+// priority-inverting the high-priority DMX task).
+static void netRxTask(void*) {
+    for (;;) {
+        if (netConnected()) {
+            // Drain all queued Art-Net packets (bounded) so a socket backlog catches up
+            // to the newest frame. read() runs onArtDmx per ART_DMX, returns 0 when empty.
+            if (cfg.protocol != 1)
+                for (int n = 0; n < 64 && artnet.read(); ++n) { }
+            if (cfg.protocol != 0) readSacn();
+        }
+        ArduinoOTA.handle();
+
+        uint32_t now = millis();
+        // Re-merge outputs whose input has gone quiet so a stopped source drops out of
+        // the mix even without a new frame (issue #10 source timeout).
+        static uint32_t lastMergeMs = 0;
+        if (now - lastMergeMs >= 100) {
+            for (int i = 0; i < MAX_OUTPUTS; i++)
+                if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
+            g_srcStatus = sourceStatus();
+            lastMergeMs = now;
+        }
+        vTaskDelay(1);   // yield ~1 ms; the 64-packet drain + lwIP buffering keep up easily
+    }
+}
+
+// ---------------------------------------------------------------------------
+// loop()  (core 1) -- DMX (dmxTxTask) and receive (netRxTask) run in their own tasks now;
+// loop() only does the non-time-critical housekeeping (serial console, WS pushes).
 // ---------------------------------------------------------------------------
 void loop() {
     cfgserial::poll();   // serial config console (non-blocking line reader)
 
-    // AsyncWebServer + AsyncWebSocket run in their own task, so loop() never
-    // blocks on the network — only Art-Net/sACN input and DMX output here.
-    // Only poll the UDP sockets while a link is actually up: on arduino-esp32 v3,
-    // calling parsePacket() with no network spams "[E][NetworkUdp.cpp] parsePacket():
-    // could not check for data" every loop (and wastes CPU) — seen with the W5500
-    // link down (or before it comes up).
-    if (netConnected()) {
-        // Drain all queued Art-Net packets this loop (bounded), so a transient
-        // socket backlog catches up to the newest frame instead of clearing one
-        // packet per loop. read() runs onArtDmx for each ART_DMX and returns 0
-        // once the socket is empty. Mirrors readSacn()'s drain — without it
-        // Art-Net visibly lags sACN whenever the loop hitches under WiFi jitter.
-        // The 64-packet cap keeps loop() responsive if a source ever floods us.
-        if (cfg.protocol != 1)
-            for (int n = 0; n < 64 && artnet.read(); ++n) { }
-        if (cfg.protocol != 0) readSacn();
-    }
-    ArduinoOTA.handle();
 #ifdef SIM_ARTNET
     simArtnetTick();
 #endif
 
     uint32_t now = millis();
 
-    // Re-merge outputs whose input has gone quiet, so a source that stops sending
-    // drops out of the mix even without a new frame to trigger routeFrame()
-    // (issue #10 source timeout). Outputs still actively receiving are already
-    // merged per-frame in routeFrame(), so skip them here to avoid redundant work.
-    static uint32_t lastMergeMs = 0;
-    if (now - lastMergeMs >= 100) {
-        for (int i = 0; i < MAX_OUTPUTS; i++)
-            if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
-        g_srcStatus = sourceStatus();   // also refresh cached state when input is idle
-        lastMergeMs = now;
-    }
-
-    // Continuous DMX output at ~40 Hz: holds the last frame as a failsafe so
-    // brief input gaps (lost multicast on a weak link) never interrupt the
-    // lights. sendDmx() applies any identify override and manual changes too.
-    static uint32_t lastDmxTx = 0;
-    if (identifyCh && now >= identifyUntil) identifyCh = 0;
-    if (now - lastDmxTx >= 25) { sendDmx(); lastDmxTx = now; }
-
-    // RDM discovery / GET-SET on the bus (no-op unless a request is queued and
-    // the direction-enable pin is configured). A full discovery briefly pauses
-    // DMX output while it sweeps the line.
-    rdmService();
+    // Art-Net/sACN receive + source-timeout re-merge -> netRxTask (core 0).
+    // DMX output + RDM bus service -> dmxTxTask (core 1, high priority).
+    // Keeping both off this loop is the issue #64 fix: core 1 does only DMX, so no
+    // packet processing can delay/jitter the break/frame timing. loop() just does the
+    // non-time-critical housekeeping below.
 
     if (now - lastWsPush >= 100) {
         wsPush();
