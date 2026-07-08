@@ -120,7 +120,7 @@ table.fx td,table.fx th{padding:.35rem .6rem;font-size:.87rem}
 <nav class="navbar navbar-lux px-3 py-2">
   <div class="d-flex align-items-center gap-3 flex-wrap w-100">
     <span class="brand fs-5"><span class="lx">Lux</span><span class="dmx">DMX</span> RDM Simulator</span>
-    <span class="badge text-bg-cyan" title="UI refresh rate"><span class="livedot me-2"></span>live 4&nbsp;Hz</span>
+    <span class="badge text-bg-cyan" title="UI refresh rate"><span class="livedot me-2"></span>live 10&nbsp;Hz</span>
     <div class="d-flex gap-2 flex-wrap ms-auto align-items-center">
       <span class="chip" id="chip-bus"><span class="dot off" id="busdot"></span>bus <b id="c-bus">?</b></span>
       <span class="chip">fixtures <b id="c-fix">0</b></span>
@@ -347,7 +347,7 @@ table.fx td,table.fx th{padding:.35rem .6rem;font-size:.87rem}
         <div>free heap: <span id="s-heap">—</span></div>
         <div>WiFi: <span id="s-wifi">—</span></div>
         <div>IP: <span id="s-ip">—</span></div>
-        <div class="mt-2">UI poll: <span id="s-poll">250 ms</span> · uptime this page: <span id="s-page">0s</span></div>
+        <div class="mt-2">UI poll: <span id="s-poll">100 ms</span> · uptime this page: <span id="s-page">0s</span></div>
       </div></div></div>
     </div>
   </section>
@@ -363,8 +363,8 @@ table.fx td,table.fx th{padding:.35rem .6rem;font-size:.87rem}
 "use strict";
 const $=(s)=>document.querySelector(s), $$=(s)=>document.querySelectorAll(s);
 let DEMO=false;
-const POLL_MS=250;                 // metrics/charts: 4 Hz
-const SLOW_EVERY=6;                // status+fixtures every 6 ticks (~1.5 s)
+const POLL_MS=100;                 // metrics/charts: 10 Hz (smooth counter)
+const SLOW_EVERY=15;               // status+fixtures every 15 ticks (~1.5 s)
 const CSS=(n)=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 // ---- API helpers (fall back to demo data if the device isn't reachable) ----
@@ -395,13 +395,13 @@ $$('#tabs .seg').forEach(b=>b.onclick=()=>{
 function Ring(n){return {buf:new Array(n).fill(null),n,i:0,len:0,
   push(v){this.buf[this.i]=v;this.i=(this.i+1)%this.n;if(this.len<this.n)this.len++;},
   toArr(){const o=[];for(let k=0;k<this.len;k++)o.push(this.buf[(this.i-this.len+k+this.n)%this.n]);return o;}};}
-const FAST_N=240, SLOW_N=240;      // 240*250ms=60s ; 240*2.5s=10min
+const FAST_N=600, SLOW_N=240;      // 600*100ms=60s ; 240*2.5s=10min
 const series={};
 function serie(key){ if(!series[key]) series[key]={fast:Ring(FAST_N),slow:Ring(SLOW_N),slowAcc:0,slowCnt:0}; return series[key]; }
 let slowTick=0;
 function pushSeries(key,val){ const s=serie(key); s.fast.push(val);
   s.slowAcc+=val; s.slowCnt++;
-  if(slowTick%10===0){ s.slow.push(s.slowCnt?s.slowAcc/s.slowCnt:val); s.slowAcc=0; s.slowCnt=0; } }
+  if(slowTick%25===0){ s.slow.push(s.slowCnt?s.slowAcc/s.slowCnt:val); s.slowAcc=0; s.slowCnt=0; } }
 
 const charts=[];   // {canvas,cfg}
 function registerChart(canvas,cfg){ if(canvas) charts.push({canvas,cfg}); }

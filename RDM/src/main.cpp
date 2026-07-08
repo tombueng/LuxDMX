@@ -137,7 +137,7 @@ static volatile uint32_t g_anSlots = 0;       // slot count of the last complete
 static volatile uint32_t g_anFramingErr = 0;  // total framing errors (stop bit low on a data slot)
 static volatile uint32_t g_anRxSlots = 0;     // total data slots inspected (denominator for the rate)
 static uint32_t g_anSlotCount = 0;            // clean data slots since the last break (frame builder)
-static uint32_t g_anExpectFrame = 0;          // learned frame length, capped (see serviceAnalyzer)
+static uint32_t g_anExpectFrame = 0;          // frame-length reference, clamped to 513 (see serviceAnalyzer)
 static volatile uint8_t  g_anStartCode = 0;   // slot-0 of the last frame (0x00 = DMX, 0xCC = RDM)
 static volatile uint32_t g_anBreakUs = 0;     // approx inter-frame gap (break+MAB+MBB), microseconds
 static volatile float    g_anRefreshHz = 0;   // refresh rate from slot-0 -> slot-0 spacing
@@ -403,12 +403,13 @@ static void anDmaStart() {
 // error. expectFrame learns the true frame length (a gateway sends a fixed 513). Refresh is a frame
 // count over a wall-clock window (per-byte timestamps are gone with DMA, but frame-rate over 500 ms is
 // exactly what a DMX tester reports and is immune to how bursty loop1 is).
-// A DMX frame is at most 1 start code + 512 channels = 513 slots. The learned frame length is capped
-// just above that so a long break-less stretch (e.g. while DMX pauses during an RDM discovery) can
-// never poison it into a huge value. AN_HARD_RESYNC is a self-heal: if we somehow run this many slots
-// with no recognised break, force a boundary and re-learn, so the analyzer can never get stuck.
-static const uint32_t AN_MAX_FRAME   = 520;
+// Break detection is structural: a run of >=2 low slots is a DMX break (frame boundary), a lone low
+// slot is a framing error. No learned/adaptive frame length (an earlier version learned one and it got
+// poisoned under load, merging frames 2:1 -> 20 Hz + endless errors). AN_HARD_RESYNC is a last-ditch
+// self-heal: if this many data slots pass with no break at all, force a boundary so nothing can stick.
 static const uint32_t AN_HARD_RESYNC = 1100;
+static const uint32_t AN_DMX_FRAME   = 513;   // 1 start code + 512 channels: the reference clamp
+static const uint32_t AN_TOL         = 3;     // slop so a break is still caught if the length jitters
 static void serviceAnalyzer() {
   static uint32_t lastRefMs = 0, lastRefFrames = 0;
   if (g_anDma < 0) return;
@@ -420,24 +421,27 @@ static void serviceAnalyzer() {
     const uint8_t data    = (w >> 23) & 0xFF;
     const bool    stopLow = ((w >> 31) & 1) == 0;
     if (!stopLow) {                                 // clean data slot (stop bit high = framed OK)
-      if (g_anSlotCount == 0) g_anStartCode = data; // first slot after a break = the start code
+      if (g_anSlotCount == 0) g_anStartCode = data; // first slot of the frame = the start code
       g_anSlotCount++; g_anRxSlots++;
-      if (g_anSlotCount > AN_HARD_RESYNC) {         // no break for way too long -> force a resync
+      if (g_anSlotCount > AN_HARD_RESYNC) {         // no break for far too long -> force a boundary
         g_anSlots = g_anSlotCount; g_anFrames++; g_anSlotCount = 0; g_anExpectFrame = 0;
       }
       continue;
     }
+    // A break and a framing error are BOTH a single low slot -- this PIO only samples a byte on a
+    // start edge, so a continuous-low break yields one low word, not a run. Tell them apart by
+    // position: a break sits at the frame end (~513 slots). The frame-length reference is CLAMPED to
+    // the DMX max (513) so a missed break, which merges two frames, can never raise it and run away
+    // (that was the 20 Hz / endless-error bug) -- it re-syncs on the very next real break.
+    g_anRxSlots++;
     const bool atFrameEnd = (g_anExpectFrame == 0) ? (g_anSlotCount >= 16)
-                                                   : (g_anSlotCount + 4 >= g_anExpectFrame);
-    if (atFrameEnd) {                               // real break -> frame boundary
-      if (g_anSlotCount > g_anExpectFrame && g_anSlotCount <= AN_MAX_FRAME) g_anExpectFrame = g_anSlotCount;
+                                                   : (g_anSlotCount + AN_TOL >= g_anExpectFrame);
+    if (atFrameEnd) {                               // break -> frame boundary
+      g_anExpectFrame = (g_anSlotCount < AN_DMX_FRAME) ? g_anSlotCount : AN_DMX_FRAME;
       g_anSlots = g_anSlotCount; g_anFrames++; g_anSlotCount = 0;
-    } else {                                        // stop-low mid-frame -> framing error, but only
-      // count it on an actual DMX frame (start code 0x00). During an RDM discovery the bus carries
-      // requests/replies (start code 0xCC, break-less preambles) that a DMX-tuned analyzer would
-      // otherwise flag as errors -- that is not the issue #64 signal, so ignore it.
-      if (g_anExpectFrame > 256 && g_anStartCode == 0x00) g_anFramingErr++;
-      g_anSlotCount++; g_anRxSlots++;
+    } else {                                        // low bit before the frame end = framing error
+      if (g_anStartCode == 0x00) g_anFramingErr++;  // ...but only on a DMX frame (ignore RDM traffic)
+      g_anSlotCount++;
     }
   }
   const uint32_t nowMs = millis();
@@ -445,7 +449,7 @@ static void serviceAnalyzer() {
     if (lastRefMs && g_anFrames >= lastRefFrames)
       g_anRefreshHz = (g_anFrames - lastRefFrames) * 1000.0f / (float)(nowMs - lastRefMs);
     if (g_anRefreshHz > 1.0f) {                     // display-only break estimate: period - active
-      const float active = g_anExpectFrame * 44.0f; // ~44 us per 8N2 slot
+      const float active = g_anSlots * 44.0f;       // ~44 us per 8N2 slot
       const float period = 1000000.0f / g_anRefreshHz;
       g_anBreakUs = (period > active) ? (uint32_t)(period - active) : 0;
     }
@@ -896,8 +900,15 @@ static void handleAnReset()  { anReset(); g_web.send(200,"application/json","{\"
 static void handleDiag() {
   if (g_web.hasArg("rc")) g_rcDisable = g_web.arg("rc").toInt() != 0;
   if (g_web.hasArg("ml")) g_mlDisable = g_web.arg("ml").toInt() != 0;
+  // Raw pin probe: is the transceiver RO (GP0) actually toggling with the live bus, or stuck at a
+  // constant level?  gp0_hi = highs out of gp0_n fast samples. A DMX line shows a MIX (mostly high
+  // with data lows); all-high or all-low = the RP is not seeing the bus. de = the DE/EN pin level.
+  int hi = 0; const int N = 4000;
+  for (int i = 0; i < N; i++) if (gpio_get(RS485_RX)) hi++;
+  const int de = gpio_get(RS485_DE);
   g_web.send(200,"application/json",
-    String("{\"rcDisable\":") + (g_rcDisable?"true":"false") + ",\"mlDisable\":" + (g_mlDisable?"true":"false") + "}");
+    String("{\"rcDisable\":") + (g_rcDisable?"true":"false") + ",\"mlDisable\":" + (g_mlDisable?"true":"false")
+    + ",\"gp0_hi\":" + hi + ",\"gp0_n\":" + N + ",\"de\":" + de + "}");
 }
 static void handleDiscover() { g_web.send(200,"application/json","{\"ok\":true,\"note\":\"the controller triggers its own discovery\"}"); }
 static void handleLog() {
