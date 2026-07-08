@@ -283,6 +283,22 @@ table.fx td,table.fx th{padding:.35rem .6rem;font-size:.87rem}
         <p class="text-secondary mt-2 mb-0">Break/MAB is timed from the inter-frame gap (approx). Per-edge scope view is on the roadmap.</p>
       </div></div></div>
     </div>
+
+    <div class="card mt-3"><div class="card-header d-flex justify-content-between align-items-center">
+      <span>Reply capture &mdash; what the controller actually received (tap WT32 IO4 &rarr; RP GP13)</span>
+      <span><span class="dot" id="rc-dot"></span> <span class="mono" id="rc-state">no tap</span></span>
+    </div><div class="card-body">
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-replies">0</div><div class="k">replies captured</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-fe">0</div><div class="k">framing errors</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-mm">0</div><div class="k">byte mismatch (last)</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-oe">0</div><div class="k">overrun</div></div></div>
+      </div>
+      <div class="small text-secondary mb-1">Last reply, byte for byte. <b>sent</b> is what the responder drove; <b>recv</b> is what the controller's UART saw after the whole analog path. Differing bytes are highlighted.</div>
+      <div class="mono small" style="line-height:1.7"><span class="text-secondary">sent</span> <span id="rc-sent">&mdash;</span></div>
+      <div class="mono small" style="line-height:1.7"><span class="text-secondary">recv</span> <span id="rc-recv">&mdash;</span></div>
+      <p class="text-secondary small mt-2 mb-0" id="rc-note">Wire the controller's RDM-reply RX pin (WT32 IO4) to RP GP13 and share ground. Then the sim can say whether a garbled reply was mangled on the wire or misread by the controller firmware.</p>
+    </div></div>
   </section>
 
   <!-- STRESS / FUZZ -->
@@ -540,6 +556,34 @@ function renderMetrics(s,m){
       : fe===0 ? 'Clean: 0 framing errors this window. This is what a well-isolated gateway (core-separated) should hold.'
       : 'Framing errors present ('+fe+'). If they climb when you load the network (Art-Net flood / wired Ethernet), that is the core-contention fault from issue #64.';
   }
+  // reply-side capture (what the controller received vs what we sent)
+  if(m.rcBytes!=null){
+    const tapped=m.rcBytes>0;
+    $('#rc-replies').textContent=m.rcReplies||0;
+    $('#rc-fe').textContent=m.rcFramingErr||0; $('#rc-fe').style.color=(m.rcFramingErr>0)?CSS('--lux-magenta'):CSS('--lux-green');
+    $('#rc-mm').textContent=m.rcMismatch||0; $('#rc-mm').style.color=(m.rcMismatch>0)?CSS('--lux-magenta'):CSS('--lux-green');
+    $('#rc-oe').textContent=m.rcOverrun||0;
+    const clean=tapped && (m.rcFramingErr||0)===0 && (m.rcMismatch||0)===0 && (m.rcReplies||0)>0;
+    $('#rc-dot').className='dot '+(!tapped?'off':clean?'on':'bad');
+    $('#rc-state').textContent=!tapped?'no tap':clean?'clean':'errors';
+    const d=diffHex(m.txReplyHex||'', m.rcReplyHex||'');
+    $('#rc-sent').innerHTML=d.sent; $('#rc-recv').innerHTML=d.recv;
+    $('#rc-note').textContent = !tapped
+      ? 'No bytes on GP13 yet. Wire the controller reply-RX (WT32 IO4) to RP GP13 + common ground, then run a discovery.'
+      : (m.rcReplies||0)===0 ? 'Line is up but no complete reply burst captured yet. Trigger a discovery or GET.'
+      : clean ? 'Reply arrives byte-perfect at the controller. So any discovery misses are the controller firmware read, not the wire.'
+      : 'Reply corrupted on the wire ('+(m.rcFramingErr||0)+' framing err, '+(m.rcMismatch||0)+' bytes differ from sent). Signal integrity on the reply leg, not the firmware.';
+  }
+}
+// Split two hex strings into bytes, align on their trailing bytes (the controller can miss a leading
+// preamble/turnaround byte), and highlight bytes that differ within the aligned window.
+function diffHex(sent, recv){
+  const S=sent.match(/../g)||[], R=recv.match(/../g)||[];
+  const n=Math.min(S.length,R.length), so=S.length-n, ro=R.length-n;
+  const MG='<span style="color:var(--lux-magenta)">', E='</span>';
+  const sHtml=S.map((b,i)=>{ const j=i-so; return (j>=0&&j<n&&b!==R[ro+j])?MG+b+E:b; }).join(' ');
+  const rHtml=R.map((b,i)=>{ const j=i-ro; return (j>=0&&j<n&&b!==S[so+j])?MG+b+E:b; }).join(' ');
+  return { sent:S.length?sHtml:'—', recv:R.length?rHtml:'—' };
 }
 function renderFixtures(list){ const tb=$('#fx-body'); tb.innerHTML='';
   list.forEach(f=>{ const r=$('#fx-row').content.cloneNode(true);

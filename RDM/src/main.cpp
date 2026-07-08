@@ -162,6 +162,40 @@ static volatile float    g_gtRefreshHz = 0;
 static volatile uint32_t g_gtResetMs = 0;
 static bool g_gtReady = false;
 
+// --- Reply-side capture -----------------------------------------------------------------------
+// The responder's own RO goes dark while it drives (single combined DE+RE), so the on-board analyzer
+// can't see the RDM reply it transmits. To catch reply corruption we tap what the CONTROLLER actually
+// receives: wire the WT32 controller's RDM-reply RX pin (IO4, logic level after its transceiver) to
+// GP13 (uart0 RX). The RP then holds "what I sent" next to "what the controller got" and diffs them,
+// which pins any bit error on the analog path (RP DI -> xcvr -> bus -> WT32 xcvr -> IO4) versus the
+// controller's own firmware read. RDM replies are break-less, so a reply burst is split on an idle gap.
+static const uint8_t RC_RX_PIN = 13;          // GP13 = uart0 RX <- WT32 IO4 (controller reply RX)
+#define RC_UART uart0
+static volatile uint32_t g_rcBytes = 0;       // bytes the controller reply line delivered
+static volatile uint32_t g_rcFramingErr = 0;  // FE on a reply byte = on-wire corruption (break-less)
+static volatile uint32_t g_rcOverrun = 0;     // OE = capture fell behind
+static volatile uint32_t g_rcReplies = 0;     // complete reply bursts captured
+static volatile uint32_t g_rcMismatch = 0;    // last reply: bytes that differ from what we sent
+static uint8_t  g_txReply[64]; static volatile int g_txReplyLen = 0;   // last reply the responder sent
+static uint8_t  g_rcCur[64];   static volatile int g_rcCurLen = 0;     // reply being assembled
+static uint8_t  g_rcLast[64];  static volatile int g_rcLastLen = 0;    // last complete captured reply
+static volatile uint32_t g_rcLastByteUs = 0;
+static volatile uint32_t g_rcResetMs = 0;
+static bool g_rcReady = false;
+
+// Snapshot the bytes we are about to drive so serviceRcUart() can diff them against the capture.
+static inline void snapTxReply(const uint8_t* b, int n) {
+  int m = n > (int)sizeof(g_txReply) ? (int)sizeof(g_txReply) : n;
+  for (int i = 0; i < m; i++) g_txReply[i] = b[i];
+  g_txReplyLen = m;
+}
+static String hexBuf(const uint8_t* b, int n) {
+  static const char H[] = "0123456789ABCDEF";
+  String s; s.reserve(n * 2);
+  for (int i = 0; i < n; i++) { s += H[b[i] >> 4]; s += H[b[i] & 0xF]; }
+  return s;
+}
+
 static void gtUartInit() {
   uart_init(GT_UART, 250000);
   uart_set_format(GT_UART, 8, 2, UART_PARITY_NONE);   // DMX slot framing = 8 data + 2 stop, no parity
@@ -187,6 +221,53 @@ static void serviceGtUart() {
     } else if (dr & (1u << 8)) {                        // FE without BE = a genuine framing error
       g_gtFramingErr++;
     }
+  }
+}
+
+static void rcUartInit() {
+  uart_init(RC_UART, 250000);
+  uart_set_format(RC_UART, 8, 2, UART_PARITY_NONE);   // same slot framing as DMX/RDM: 8 data + 2 stop
+  uart_set_fifo_enabled(RC_UART, true);
+  gpio_set_function(RC_RX_PIN, GPIO_FUNC_UART);
+  gpio_pull_up(RC_RX_PIN);      // idle-high when no tap is wired (a driven WT32 IO4 overrides this),
+                                // so the "no tap" state reads clean instead of flagging float glitches
+  busy_wait_us(200);            // let the pull-up settle, then drop the transition glitch the FIFO
+  uart_hw_t* h = uart_get_hw(RC_UART);            // latched while the pad switched to UART mode
+  while (!(h->fr & UART_UARTFR_RXFE_BITS)) (void)h->dr;
+  g_rcReady = true;
+}
+// Finish the reply burst currently in g_rcCur: publish it and diff it against what we drove. The diff
+// aligns on the trailing bytes (EUID+checksum for a DISC reply, the message tail for a GET/SET reply)
+// since the controller may miss a leading preamble/turnaround byte or two.
+static void rcFinalize() {
+  if (g_rcCurLen == 0) return;
+  for (int i = 0; i < g_rcCurLen; i++) g_rcLast[i] = g_rcCur[i];
+  g_rcLastLen = g_rcCurLen;
+  const int n = g_rcLastLen < g_txReplyLen ? g_rcLastLen : g_txReplyLen;
+  const int off = g_txReplyLen - n, roff = g_rcLastLen - n;
+  uint32_t diff = (g_rcLastLen > g_txReplyLen) ? (g_rcLastLen - g_txReplyLen)
+                                               : (g_txReplyLen - g_rcLastLen);
+  for (int i = 0; i < n; i++) if (g_rcLast[roff + i] != g_txReply[off + i]) diff++;
+  g_rcMismatch = diff;
+  g_rcReplies++;
+  g_rcCurLen = 0;
+}
+// Drain the capture UART. A quiet gap on the line ends a reply burst (replies carry no break).
+static void serviceRcUart() {
+  if (!g_rcReady) return;
+  uart_hw_t* h = uart_get_hw(RC_UART);
+  if (g_rcCurLen > 0 && (h->fr & UART_UARTFR_RXFE_BITS) && (time_us_32() - g_rcLastByteUs) > 200)
+    rcFinalize();                                       // line went idle -> the burst is complete
+  while (!(h->fr & UART_UARTFR_RXFE_BITS)) {
+    const uint32_t dr = h->dr;
+    g_rcBytes++;
+    if (dr & (1u << 11)) g_rcOverrun++;                 // OE
+    if (dr & (1u << 8))  g_rcFramingErr++;              // FE (break-less reply -> FE means corruption)
+    const uint8_t byte = dr & 0xFF;
+    const uint32_t t = time_us_32();
+    if (g_rcCurLen > 0 && (t - g_rcLastByteUs) > 200) rcFinalize();   // gap -> previous burst ended
+    if (g_rcCurLen < (int)sizeof(g_rcCur)) g_rcCur[g_rcCurLen++] = byte;
+    g_rcLastByteUs = t;
   }
 }
 // Per-discovery tracking (a discovery starts on a broadcast DISC_UN_MUTE).
@@ -362,6 +443,7 @@ static void sendDiscResponse(const Fixture* fx) {
   for (int j = 0; j < 6; j++) { r[k++] = fx->uid[j] | 0xAA; r[k++] = fx->uid[j] | 0x55; cs += (uint16_t)fx->uid[j] + 0xFF; }
   r[k++] = (cs>>8)|0xAA; r[k++] = (cs>>8)|0x55; r[k++] = (cs&0xFF)|0xAA; r[k++] = (cs&0xFF)|0x55;
   if (g_fuzzBadCsum && chance(20)) r[23] ^= 0xFF;      // fault injection: corrupt the checksum
+  snapTxReply(r, 24);
   deTx(); busy_wait_us(replyDelay()); txBytes(r, 24); deRx();
   pio_sm_clear_fifos(g_pio, RX_SM);   // clearing works; SM disable/restart (rxReset) intermittently kills RX
 }
@@ -379,6 +461,7 @@ static void sendRdmResponse(const uint8_t* ctrlUid, const Fixture* fx, uint8_t t
   for (int i=0;i<pdl;i++) p[24+i]=pd[i];
   uint16_t cs=0; const int ml=24+pdl; for (int i=0;i<ml;i++) cs+=p[i];
   p[ml]=cs>>8; p[ml+1]=cs&0xFF;
+  snapTxReply(p, ml+2);
   deTx(); busy_wait_us(replyDelay()); sendBreak(); txBytes(p, ml+2); deRx();
   pio_sm_clear_fifos(g_pio, RX_SM);
 }
@@ -554,6 +637,7 @@ static void setupPio() {
   anDmaStart();          // stream analyzer slots into a RAM ring buffer so capture never stalls
 
   gtUartInit();          // ground-truth hardware-UART framing detector on GP5 (uart1)
+  rcUartInit();          // reply-side capture: what the controller receives, on GP13 (uart0)
   g_pioReady = true;
 }
 
@@ -588,6 +672,7 @@ void loop1() {
   }
   serviceAnalyzer();          // fold DMX slot framing / timing into the analyzer counters
   serviceGtUart();            // ground-truth: hardware-UART framing flags (authoritative)
+  serviceRcUart();            // reply-side capture: bytes the controller actually received
   g_lastActivityMs = millis();
 }
 
@@ -601,6 +686,7 @@ static void anReset() {
   g_anFrames = g_anSlots = g_anFramingErr = g_anRxSlots = 0;
   g_anRefreshHz = 0; g_anBreakUs = 0; g_anStartCode = 0; g_anResetMs = millis();
   g_gtFrames = g_gtFramingErr = g_gtOverrun = g_gtBytes = 0; g_gtRefreshHz = 0; g_gtResetMs = millis();
+  g_rcBytes = g_rcFramingErr = g_rcOverrun = g_rcReplies = g_rcMismatch = 0; g_rcLastLen = 0; g_rcResetMs = millis();
 }
 static void printGt() {
   const uint32_t el = millis() - g_gtResetMs; const float mins = el / 60000.0f;
@@ -620,10 +706,17 @@ static void printAnalyzer() {
     (double)g_anRefreshHz, (unsigned long)g_anBreakUs,
     (unsigned long)g_anFramingErr, (double)perMin, (unsigned long)g_anRxSlots);
 }
+static void printRc() {
+  Serial.printf("[reply-capture] replies=%lu framingErr=%lu overrun=%lu mismatch(last)=%lu bytes=%lu\n"
+                "  sent: %s\n  recv: %s\n",
+    (unsigned long)g_rcReplies, (unsigned long)g_rcFramingErr, (unsigned long)g_rcOverrun,
+    (unsigned long)g_rcMismatch, (unsigned long)g_rcBytes,
+    hexBuf(g_txReply, g_txReplyLen).c_str(), hexBuf(g_rcLast, g_rcLastLen).c_str());
+}
 static void handleCommand(char* line) {
   switch (line[0]) {
     case 'a': { if (line[1]=='r' || line[1]=='0') { anReset(); Serial.println("[analyzer] counters reset"); }
-                printAnalyzer(); printGt(); break; }
+                printAnalyzer(); printGt(); printRc(); break; }
     case 'u': { if (line[1]=='r') { anReset(); Serial.println("[ground-truth] reset"); } printGt(); break; }
     case 't': { long v = atol(line+1); if (v>=100 && v<=3000) g_turnaround=v; printStatus(); break; }
     case 'f': { long v = atol(line+1); if (v>=1 && v<=MAXFIX) { genFixtures(v); } printStatus(); break; }
@@ -706,6 +799,11 @@ static void handleMetrics() {
   j += "\"gtFrames\":" + String((unsigned long)g_gtFrames) + ",\"gtFramingErr\":" + String((unsigned long)g_gtFramingErr) + ",";
   j += "\"gtFramingPerMin\":" + String(gtRate, 1) + ",\"gtOverrun\":" + String((unsigned long)g_gtOverrun) + ",";
   j += "\"gtRefresh\":" + String(g_gtRefreshHz, 1) + ",\"gtBytes\":" + String((unsigned long)g_gtBytes) + ",";
+  // Reply-side capture: what the controller received vs what we drove
+  j += "\"rcBytes\":" + String((unsigned long)g_rcBytes) + ",\"rcFramingErr\":" + String((unsigned long)g_rcFramingErr) + ",";
+  j += "\"rcOverrun\":" + String((unsigned long)g_rcOverrun) + ",\"rcReplies\":" + String((unsigned long)g_rcReplies) + ",";
+  j += "\"rcMismatch\":" + String((unsigned long)g_rcMismatch) + ",";
+  j += "\"txReplyHex\":\"" + hexBuf(g_txReply, g_txReplyLen) + "\",\"rcReplyHex\":\"" + hexBuf(g_rcLast, g_rcLastLen) + "\",";
   j += "\"discovered\":" + String(mutedCount()) + ",\"muted\":" + String(mutedCount()) + "}";
   g_web.send(200, "application/json", j);
 }
