@@ -1986,18 +1986,32 @@ static int parseBuild(const String& v) {
 }
 
 static bool httpsGet(const char* url, String& out, size_t maxLen) {
-    WiFiClientSecure client;
-    client.setInsecure();
-    HTTPClient h;
-    h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    if (!h.begin(client, url)) return false;
-    bool ok = false;
-    if (h.GET() == 200) {
-        String s = h.getString();
-        s.trim();
-        if (s.length() > 0 && s.length() <= maxLen) { out = s; ok = true; }
+    // A TLS client allocates a big (~40 KB) contiguous block for the mbedTLS buffers. Under a
+    // packet flood the heap fragments; attempting the handshake then throws std::bad_alloc, and
+    // an uncaught throw abort()s the board. Worse, this runs 8 s after every boot, so during a
+    // flood it turns into a reboot loop. Skip when a big block isn't available, and catch as a
+    // hard backstop so a version check can never reboot the gateway.
+    if (ESP.getMaxAllocHeap() < 50000) {
+        Serial.printf("[VER] skipped: largest free block %u too small for TLS\n", ESP.getMaxAllocHeap());
+        return false;
     }
-    h.end();
+    bool ok = false;
+    try {
+        WiFiClientSecure client;
+        client.setInsecure();
+        HTTPClient h;
+        h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        if (!h.begin(client, url)) return false;
+        if (h.GET() == 200) {
+            String s = h.getString();
+            s.trim();
+            if (s.length() > 0 && s.length() <= maxLen) { out = s; ok = true; }
+        }
+        h.end();
+    } catch (...) {
+        Serial.println("[VER] check threw under memory pressure, skipped");
+        return false;
+    }
     return ok;
 }
 
@@ -2039,6 +2053,13 @@ static void doGithubOta() {
     // luxdmx.org/firmware/ota/<target>/<file> 301-redirects to the matching GitHub
     // release asset (releases/download/<target>/<file>) -- target is "latest" or a
     // "vX.Y.Z" tag, so per-version OTA / downgrade still works through the redirect.
+    // TLS + the OTA download need a big contiguous block; if the heap is fragmented (e.g. a flood
+    // is in progress) defer rather than throw bad_alloc and abort. No restart here, so this can't
+    // become a reboot loop while an auto-update keeps retrying under load.
+    if (ESP.getMaxAllocHeap() < 50000) {
+        Serial.printf("[OTA] deferred: largest free block %u too small\n", ESP.getMaxAllocHeap());
+        otaProgPhase = 3; dmxReady = true; return;
+    }
     String otaUrl = String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
@@ -2051,11 +2072,15 @@ static void doGithubOta() {
     });
     httpUpdate.onEnd([]()      { otaProgPhase = 2; otaProgPct = 100; });
     httpUpdate.onError([](int) { otaProgPhase = 3; });
-    WiFiClientSecure client;
-    client.setInsecure();
-    httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    httpUpdate.rebootOnUpdate(true);
-    httpUpdate.update(client, otaUrl);
+    try {
+        WiFiClientSecure client;
+        client.setInsecure();
+        httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        httpUpdate.rebootOnUpdate(true);
+        httpUpdate.update(client, otaUrl);
+    } catch (...) {
+        Serial.println("[OTA] update threw under memory pressure");
+    }
     // Only reaches here on failure (success reboots inside update()).
     otaProgPhase = 3;
     Serial.printf("[OTA] Failed (%d): %s\n",
