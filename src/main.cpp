@@ -1207,7 +1207,10 @@ static float outFpsLive(int i) {
 // ---------------------------------------------------------------------------
 static void wsPush() {
     if (ws.count() == 0) return;
-    if (ESP.getFreeHeap() < 40000) return;   // never push under heap pressure
+    // Skip under heap pressure. getFreeHeap() alone is not enough: the async WS send copies
+    // the frame into a make_shared<vector> that needs ONE CONTIGUOUS block, so a fragmented
+    // heap (heavy under a packet flood) can throw bad_alloc even with lots of total free.
+    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 12000) return;
     uint16_t fpsI  = (uint16_t)(fps * 10.0f);
     // rssi field carries the active link: <=0 WiFi STA dBm, >=10 wired Ethernet
     // link speed in Mbps, 1 standalone AP. Lets the navbar show WiFi/LAN/AP live.
@@ -1237,7 +1240,11 @@ static void wsPush() {
     }
     // Only push if the async TCP queues have room, so a slow client never
     // backs up memory or blocks.
-    if (ws.availableForWriteAll()) ws.binaryAll(wsBuf, WS_FRAME_LEN);
+    // Belt-and-suspenders: a failed async allocation inside the WS stack throws std::bad_alloc;
+    // catching it degrades a push to a no-op instead of letting the uncaught throw abort() the CPU.
+    if (ws.availableForWriteAll()) {
+        try { ws.binaryAll(wsBuf, WS_FRAME_LEN); } catch (...) {}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1604,13 +1611,19 @@ static void handleLogJson(AsyncWebServerRequest* req)     { req->send(200, "appl
 // browser doesn't have to poll two HTTP endpoints every 2 s.
 static void wsPushMeta() {
     if (ws.count() == 0 || !ws.availableForWriteAll()) return;
-    if (ESP.getFreeHeap() < 40000) return;   // never push under heap pressure
-    String m = "{\"meta\":1,\"senders\":";
-    m += sendersJson();
-    m += ",\"log\":";
-    m += logJson();
-    m += "}";
-    ws.textAll(m);
+    // The meta JSON is several KB and the WS send needs a contiguous block for it, so guard on
+    // the LARGEST free block, not just total free: under a flood the heap fragments and total
+    // free (~100 KB) stays high while the biggest block shrinks, which is how ws.textAll() threw
+    // bad_alloc and abort()ed the board. try/catch is the hard backstop against that reboot.
+    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 24000) return;
+    try {
+        String m = "{\"meta\":1,\"senders\":";
+        m += sendersJson();
+        m += ",\"log\":";
+        m += logJson();
+        m += "}";
+        ws.textAll(m);
+    } catch (...) {}
 }
 
 // Static pages are served straight from PROGMEM (zero heap). Dynamic values
@@ -3138,4 +3151,9 @@ void loop() {
             fps, netRSSI(), (int)WiFi.status(), ws.count(), (unsigned)httpReqCount,
             (unsigned)wsConnCount, (unsigned)wsDiscCount);
     }
+
+    // Yield one tick so IDLE1 runs (feeds its task watchdog) and core 1 keeps genuine idle
+    // slack. loop() is only housekeeping, so 1 ms latency here is irrelevant; without it
+    // loopTask (prio 1) can monopolise core 1 under load and trip the IDLE1 watchdog.
+    delay(1);
 }
