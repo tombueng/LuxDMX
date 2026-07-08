@@ -1511,7 +1511,12 @@ static void readSacnSocket(int outIdx) {
         if (frameVec != 0x00000002u) continue;
         uint16_t universe = ((uint16_t)sacnBuf[SACN_UNIVERSE_OFF] << 8)
                            | sacnBuf[SACN_UNIVERSE_OFF + 1];
-        if ((int)universe != cfg.outputs[outIdx].universe + 1) continue;
+        // Do NOT reject by this socket's output universe. All the per-output sACN sockets share
+        // port 5568 (SO_REUSEADDR), and lwIP hands a UNICAST sACN packet to just one of them --
+        // often not the socket whose multicast group matches. Rejecting here dropped unicast sACN
+        // whenever >1 output was enabled (uni-1 landing on the uni-2 socket, etc.). Route by the
+        // packet's own universe instead: routeFrame() maps universe -> the matching output(s), and
+        // ignores a universe no output listens to. Multicast still works (each group -> its joiner).
         if (sacnBuf[SACN_STARTCODE_OFF] != 0x00) continue;
         uint8_t priority = sacnBuf[SACN_PRIORITY_OFF];
         routeFrame((int)universe - 1, sacnBuf + SACN_DATA_OFF, 512, senderIp, 1, priority);
