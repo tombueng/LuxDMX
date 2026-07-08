@@ -19,6 +19,7 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
+#include <esp_task_wdt.h>  // reconfigure the task WDT to not reboot the gateway under a network flood
 // Schema-driven config engine (src/config/). config_schema.h defines the Config +
 // DmxOutput structs + MAX_OUTPUTS (moved here out of main.cpp); config_core.h is
 // the transport-agnostic load/save/setValue/toJson engine the handlers drive. The
@@ -2927,6 +2928,26 @@ void setup() {
     //   nothing on core 1 can disturb esp_dmx's break/MAB timer ISR -> rock-solid frames.
     xTaskCreatePinnedToCore(dmxTxTask, "dmxtx", 4096, nullptr, 19, &g_dmxTask, 1);
     xTaskCreatePinnedToCore(netRxTask, "netrx", 8192, nullptr, 5,  nullptr,   0);
+
+    // Survive a network flood without resetting. Under heavy inbound traffic (e.g. an Art-Net
+    // storm on the wired link) the lwIP task pegs core 0, so core 0's idle task can't feed the
+    // task watchdog and the default handler PANICS -> SW_CPU_RESET. On the HIL bench a sustained
+    // ~6k+ pkt/s Art-Net flood crash-looped the WT32 every ~15 s (task_wdt: IDLE0, CPU 0: tiT).
+    // That is not a hang -- core 0 is just busy -- and a gateway must keep clocking DMX through it
+    // (DMX lives on core 1 and is unaffected). So reconfigure the task WDT to LOG a warning on
+    // starvation instead of rebooting. The idle tasks stay subscribed (arduino-esp32's idle hook
+    // keeps feeding them, so no "esp_task_wdt_reset: task not found" spam that disableCore0WDT()
+    // caused), the timeout is widened, and a real hang is still reported on the console + backtrace
+    // -- we just don't self-reset a busy-but-alive gateway mid-show. (This is what the analyzer saw
+    // as the DMX "freeze": the controller was rebooting, not the wire.)
+    {
+        esp_task_wdt_config_t twdt = {
+            .timeout_ms     = 10000,
+            .idle_core_mask  = (1u << portNUM_PROCESSORS) - 1,   // keep both idle tasks watched (no hook spam)
+            .trigger_panic  = false,                            // log-and-continue, don't reboot under load
+        };
+        esp_task_wdt_reconfigure(&twdt);
+    }
     Serial.println("[BOOT] ready.");
 }
 
