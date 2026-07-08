@@ -286,10 +286,10 @@ table.fx td,table.fx th{padding:.35rem .6rem;font-size:.87rem}
       <span><span class="dot" id="rc-dot"></span> <span class="mono" id="rc-state">no tap</span></span>
     </div><div class="card-body">
       <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-replies">0</div><div class="k">replies captured</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-replies">0</div><div class="k">replies checked</div></div></div>
+        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-bad">0</div><div class="k">corrupted replies</div></div></div>
         <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-fe">0</div><div class="k">framing errors</div></div></div>
         <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-mm">0</div><div class="k">byte mismatch (last)</div></div></div>
-        <div class="col-6 col-md-3"><div class="metric"><div class="v" id="rc-oe">0</div><div class="k">overrun</div></div></div>
       </div>
       <div class="small text-secondary mb-1">Last reply, byte for byte. <b>sent</b> is what the responder drove; <b>recv</b> is what the controller's UART saw after the whole analog path. Differing bytes are highlighted.</div>
       <div class="mono small" style="line-height:1.7"><span class="text-secondary">sent</span> <span id="rc-sent">&mdash;</span></div>
@@ -555,21 +555,22 @@ function renderMetrics(s,m){
   }
   // reply-side capture (what the controller received vs what we sent)
   if(m.rcBytes!=null){
-    const tapped=m.rcBytes>0;
-    $('#rc-replies').textContent=m.rcReplies||0;
+    const tapped=m.rcBytes>0, checked=m.rcReplies||0, bad=m.rcBadReplies||0;
+    $('#rc-replies').textContent=checked;
+    $('#rc-bad').textContent=bad; $('#rc-bad').style.color=(bad>0)?CSS('--lux-magenta'):CSS('--lux-green');
     $('#rc-fe').textContent=m.rcFramingErr||0; $('#rc-fe').style.color=(m.rcFramingErr>0)?CSS('--lux-magenta'):CSS('--lux-green');
     $('#rc-mm').textContent=m.rcMismatch||0; $('#rc-mm').style.color=(m.rcMismatch>0)?CSS('--lux-magenta'):CSS('--lux-green');
-    $('#rc-oe').textContent=m.rcOverrun||0;
-    const clean=tapped && (m.rcFramingErr||0)===0 && (m.rcMismatch||0)===0 && (m.rcReplies||0)>0;
-    $('#rc-dot').className='dot '+(!tapped?'off':clean?'on':'bad');
-    $('#rc-state').textContent=!tapped?'no tap':clean?'clean':'errors';
+    const clean=tapped && checked>0 && bad===0;
+    $('#rc-dot').className='dot '+(!tapped?'off':checked===0?'off':clean?'on':'bad');
+    $('#rc-state').textContent=!tapped?'no tap':checked===0?'idle':clean?'clean':'errors';
     const d=diffHex(m.txReplyHex||'', m.rcReplyHex||'');
     $('#rc-sent').innerHTML=d.sent; $('#rc-recv').innerHTML=d.recv;
+    const pct=checked>0?Math.round(100*bad/checked):0;
     $('#rc-note').textContent = !tapped
       ? 'No bytes on GP13 yet. Wire the controller reply-RX (WT32 IO4) to RP GP13 + common ground, then run a discovery.'
-      : (m.rcReplies||0)===0 ? 'Line is up but no complete reply burst captured yet. Trigger a discovery or GET.'
-      : clean ? 'Reply arrives byte-perfect at the controller. So any discovery misses are the controller firmware read, not the wire.'
-      : 'Reply corrupted on the wire ('+(m.rcFramingErr||0)+' framing err, '+(m.rcMismatch||0)+' bytes differ from sent). Signal integrity on the reply leg, not the firmware.';
+      : checked===0 ? 'Line is up but no reply captured yet. Trigger a discovery or GET on the controller.'
+      : clean ? 'Every reply reached the controller byte-perfect ('+checked+' checked). So any discovery misses are the controller firmware read, not the wire.'
+      : bad+' of '+checked+' replies corrupted ('+pct+'%) on the wire. The reply leg has a signal-integrity problem, not the firmware. Highlighted bytes show where it flipped.';
   }
 }
 // Split two hex strings into bytes, align on their trailing bytes (the controller can miss a leading

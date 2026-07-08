@@ -136,6 +136,8 @@ static volatile uint32_t g_anFrames = 0;      // valid DMX frames seen (break ->
 static volatile uint32_t g_anSlots = 0;       // slot count of the last complete frame (513 incl. start)
 static volatile uint32_t g_anFramingErr = 0;  // total framing errors (stop bit low on a data slot)
 static volatile uint32_t g_anRxSlots = 0;     // total data slots inspected (denominator for the rate)
+static uint32_t g_anSlotCount = 0;            // clean data slots since the last break (frame builder)
+static uint32_t g_anExpectFrame = 0;          // learned frame length, capped (see serviceAnalyzer)
 static volatile uint8_t  g_anStartCode = 0;   // slot-0 of the last frame (0x00 = DMX, 0xCC = RDM)
 static volatile uint32_t g_anBreakUs = 0;     // approx inter-frame gap (break+MAB+MBB), microseconds
 static volatile float    g_anRefreshHz = 0;   // refresh rate from slot-0 -> slot-0 spacing
@@ -174,20 +176,31 @@ static const uint8_t RC_RX_PIN = 13;          // GP13 = uart0 RX <- WT32 IO4 (co
 static volatile uint32_t g_rcBytes = 0;       // bytes the controller reply line delivered
 static volatile uint32_t g_rcFramingErr = 0;  // FE on a reply byte = on-wire corruption (break-less)
 static volatile uint32_t g_rcOverrun = 0;     // OE = capture fell behind
-static volatile uint32_t g_rcReplies = 0;     // complete reply bursts captured
+static volatile uint32_t g_rcReplies = 0;     // reply bursts located + checked
+static volatile uint32_t g_rcBadReplies = 0;  // of those, how many were corrupted (mismatch or framing err)
 static volatile uint32_t g_rcMismatch = 0;    // last reply: bytes that differ from what we sent
 static uint8_t  g_txReply[64]; static volatile int g_txReplyLen = 0;   // last reply the responder sent
-static uint8_t  g_rcCur[64];   static volatile int g_rcCurLen = 0;     // reply being assembled
-static uint8_t  g_rcLast[64];  static volatile int g_rcLastLen = 0;    // last complete captured reply
-static volatile uint32_t g_rcLastByteUs = 0;
+static uint8_t  g_rcWin[96];   static volatile int g_rcWinLen = 0;     // raw bytes seen in a reply window
+static uint8_t  g_rcLast[64];  static volatile int g_rcLastLen = 0;    // the reply as the controller saw it
+static volatile uint32_t g_rcFeAtArm = 0;     // framing-error count when a reply window opened
+static volatile uint32_t g_rcCalls = 0;       // DIAG: times rcAfterReply ran (== replies we drove)
+static volatile int      g_rcWinLast = 0;     // DIAG: bytes the last reply-window drain saw
+static volatile bool     g_rcDisable = false; // DIAG: when set, skip all reply-capture (isolate analyzer)
+static volatile bool     g_mlDisable = false; // DIAG: when set, skip the analog A-B sampler in loop()
 static volatile uint32_t g_rcResetMs = 0;
 static bool g_rcReady = false;
 
-// Snapshot the bytes we are about to drive so serviceRcUart() can diff them against the capture.
+// Snapshot the bytes we are about to drive AND arm the capture. The controller's reply-RX line also
+// carries the forward DMX, so we only trust bytes that land in the short window right after we send
+// (and then align on the reply signature). Without this the capture just grabs the next DMX frame.
 static inline void snapTxReply(const uint8_t* b, int n) {
   int m = n > (int)sizeof(g_txReply) ? (int)sizeof(g_txReply) : n;
   for (int i = 0; i < m; i++) g_txReply[i] = b[i];
   g_txReplyLen = m;
+  // Flush any stale forward-DMX out of the capture FIFO so the drain after the send sees only the
+  // reply (the bus is idle through the turnaround, so nothing else lands in between).
+  if (g_rcReady) { uart_hw_t* h = uart_get_hw(RC_UART); while (!(h->fr & UART_UARTFR_RXFE_BITS)) (void)h->dr; }
+  g_rcWinLen = 0; g_rcFeAtArm = g_rcFramingErr;
 }
 static String hexBuf(const uint8_t* b, int n) {
   static const char H[] = "0123456789ABCDEF";
@@ -236,39 +249,58 @@ static void rcUartInit() {
   while (!(h->fr & UART_UARTFR_RXFE_BITS)) (void)h->dr;
   g_rcReady = true;
 }
-// Finish the reply burst currently in g_rcCur: publish it and diff it against what we drove. The diff
-// aligns on the trailing bytes (EUID+checksum for a DISC reply, the message tail for a GET/SET reply)
-// since the controller may miss a leading preamble/turnaround byte or two.
-static void rcFinalize() {
-  if (g_rcCurLen == 0) return;
-  for (int i = 0; i < g_rcCurLen; i++) g_rcLast[i] = g_rcCur[i];
-  g_rcLastLen = g_rcCurLen;
-  const int n = g_rcLastLen < g_txReplyLen ? g_rcLastLen : g_txReplyLen;
-  const int off = g_txReplyLen - n, roff = g_rcLastLen - n;
-  uint32_t diff = (g_rcLastLen > g_txReplyLen) ? (g_rcLastLen - g_txReplyLen)
-                                               : (g_txReplyLen - g_rcLastLen);
-  for (int i = 0; i < n; i++) if (g_rcLast[roff + i] != g_txReply[off + i]) diff++;
-  g_rcMismatch = diff;
-  g_rcReplies++;
-  g_rcCurLen = 0;
+// Pull the actual reply out of the captured window and diff it against what we drove. The window can
+// also hold trailing forward-DMX bytes, so align on the reply signature: the 0xAA delimiter for a
+// DISC reply, else the start code + sub-start-code (0xCC 0x01) for a GET/SET reply.
+static void rcExtractReply() {
+  if (g_txReplyLen == 0 || g_rcWinLen == 0) return;
+  const bool disc = (g_txReply[0] == RDM_PREAMBLE);        // 0xFE preamble -> DISC reply
+  int start = -1, soff = 0;
+  if (disc) {
+    for (int i = 0; i < g_txReplyLen; i++) if (g_txReply[i] == RDM_DELIM) { soff = i; break; }  // sent delimiter
+    for (int i = 0; i < g_rcWinLen;   i++) if (g_rcWin[i]   == RDM_DELIM) { start = i; break; }  // recv delimiter
+  } else {
+    for (int i = 0; i + 1 < g_rcWinLen; i++) if (g_rcWin[i] == g_txReply[0] && g_rcWin[i+1] == g_txReply[1]) { start = i; break; }
+  }
+  if (start < 0) { g_rcBadReplies++; return; }             // reply signature not found (lost/mangled)
+  int n = 0; uint32_t diff = 0;
+  for (; start + n < g_rcWinLen && soff + n < g_txReplyLen && n < (int)sizeof(g_rcLast); n++) {
+    g_rcLast[n] = g_rcWin[start + n];
+    if (g_rcLast[n] != g_txReply[soff + n]) diff++;
+  }
+  const int expect = g_txReplyLen - soff;
+  if (n < expect) diff += (expect - n);                    // truncated (overflow) counts as mismatch
+  g_rcLastLen = n; g_rcMismatch = diff; g_rcReplies++;
+  const bool feInWindow = (g_rcFramingErr != g_rcFeAtArm);
+  if (diff > 0 || feInWindow) g_rcBadReplies++;
 }
-// Drain the capture UART. A quiet gap on the line ends a reply burst (replies carry no break).
+// Between transactions, just drain the FIFO so forward DMX can't overflow it. rcBytes is a
+// bus-activity reference; the reply itself is grabbed synchronously by rcAfterReply().
 static void serviceRcUart() {
   if (!g_rcReady) return;
   uart_hw_t* h = uart_get_hw(RC_UART);
-  if (g_rcCurLen > 0 && (h->fr & UART_UARTFR_RXFE_BITS) && (time_us_32() - g_rcLastByteUs) > 200)
-    rcFinalize();                                       // line went idle -> the burst is complete
-  while (!(h->fr & UART_UARTFR_RXFE_BITS)) {
+  while (!(h->fr & UART_UARTFR_RXFE_BITS)) { (void)h->dr; g_rcBytes++; }
+}
+// Called right after we release DE: the reply has just been clocked into the controller and echoed
+// onto its reply-RX line (which we tap). snapTxReply() flushed the FIFO before the send, and the bus
+// is idle during the turnaround, so what's here now is exactly the reply. Drain it, then extract.
+static void rcAfterReply() {
+  if (!g_rcReady) return;
+  g_rcCalls++;
+  g_rcWinLen = 0;
+  busy_wait_us(120);                                       // let the controller clock in the last byte
+  uart_hw_t* h = uart_get_hw(RC_UART);                     // the reply (if any) is already in the FIFO;
+  while (!(h->fr & UART_UARTFR_RXFE_BITS)) {               // a single drain keeps core 1 responsive
     const uint32_t dr = h->dr;
     g_rcBytes++;
-    if (dr & (1u << 11)) g_rcOverrun++;                 // OE
-    if (dr & (1u << 8))  g_rcFramingErr++;              // FE (break-less reply -> FE means corruption)
-    const uint8_t byte = dr & 0xFF;
-    const uint32_t t = time_us_32();
-    if (g_rcCurLen > 0 && (t - g_rcLastByteUs) > 200) rcFinalize();   // gap -> previous burst ended
-    if (g_rcCurLen < (int)sizeof(g_rcCur)) g_rcCur[g_rcCurLen++] = byte;
-    g_rcLastByteUs = t;
+    if (dr & (1u << 11)) g_rcOverrun++;                            // OE
+    if ((dr & (1u << 8)) && !(dr & (1u << 10))) g_rcFramingErr++;  // FE without BE = corruption
+    if (g_rcWinLen < (int)sizeof(g_rcWin)) g_rcWin[g_rcWinLen++] = dr & 0xFF;
   }
+  g_rcWinLast = g_rcWinLen;
+  { int m = g_rcWinLen < (int)sizeof(g_rcLast) ? g_rcWinLen : (int)sizeof(g_rcLast);  // DIAG: raw capture
+    for (int i = 0; i < m; i++) g_rcLast[i] = g_rcWin[i]; g_rcLastLen = m; }
+  rcExtractReply();
 }
 // Per-discovery tracking (a discovery starts on a broadcast DISC_UN_MUTE).
 static volatile bool     g_discActive = false;
@@ -287,9 +319,19 @@ static int prefixBits(const uint8_t* lo, const uint8_t* hi) {
 // --- Activity LED ------------------------------------------------------------
 static inline bool busActive() { return (millis() - g_lastActivityMs) < 250; }
 static void serviceLed() {
-  const uint32_t period = busActive() ? 60 : 700;
-  static uint32_t last = 0; static bool on = false; const uint32_t now = millis();
-  if (now - last >= period) { last = now; on = !on; digitalWrite(LED_BUILTIN, on); }
+  // Error indicator, not a heartbeat: dark when healthy, blinks only while errors are actively
+  // arriving (framing errors on the wire, a corrupt request, or a mangled reply). Nothing to watch
+  // when everything is fine, which is the normal state, so the LED stays off.
+  static uint32_t lastErr = 0, lastErrMs = 0, lastToggle = 0; static bool on = false, cur = false;
+  const uint32_t now = millis();
+  const uint32_t errs = g_gtFramingErr + g_rxBadCsum + g_rcBadReplies;
+  if (errs != lastErr) { lastErr = errs; lastErrMs = now; }
+  bool want = false;
+  if (now - lastErrMs < 1500) {                        // an error in the last 1.5 s -> blink fast
+    if (now - lastToggle >= 80) { on = !on; lastToggle = now; }
+    want = on;
+  }
+  if (want != cur) { digitalWrite(LED_BUILTIN, want); cur = want; }
 }
 // Wiring-check LED: reflects idle-bus RX noise so you can wiggle the board and watch it clean up.
 // SOLID ON = clean (no stray edges). BLINKING = noise, faster blink = more noise. Idle the bus
@@ -361,8 +403,13 @@ static void anDmaStart() {
 // error. expectFrame learns the true frame length (a gateway sends a fixed 513). Refresh is a frame
 // count over a wall-clock window (per-byte timestamps are gone with DMA, but frame-rate over 500 ms is
 // exactly what a DMX tester reports and is immune to how bursty loop1 is).
+// A DMX frame is at most 1 start code + 512 channels = 513 slots. The learned frame length is capped
+// just above that so a long break-less stretch (e.g. while DMX pauses during an RDM discovery) can
+// never poison it into a huge value. AN_HARD_RESYNC is a self-heal: if we somehow run this many slots
+// with no recognised break, force a boundary and re-learn, so the analyzer can never get stuck.
+static const uint32_t AN_MAX_FRAME   = 520;
+static const uint32_t AN_HARD_RESYNC = 1100;
 static void serviceAnalyzer() {
-  static uint32_t slotCount = 0, expectFrame = 0;
   static uint32_t lastRefMs = 0, lastRefFrames = 0;
   if (g_anDma < 0) return;
   const uint32_t head = (uint32_t)((dma_hw->ch[g_anDma].write_addr - (uintptr_t)g_anRing) >> 2)
@@ -373,17 +420,24 @@ static void serviceAnalyzer() {
     const uint8_t data    = (w >> 23) & 0xFF;
     const bool    stopLow = ((w >> 31) & 1) == 0;
     if (!stopLow) {                                 // clean data slot (stop bit high = framed OK)
-      if (slotCount == 0) g_anStartCode = data;     // first slot after a break = the start code
-      slotCount++; g_anRxSlots++;
+      if (g_anSlotCount == 0) g_anStartCode = data; // first slot after a break = the start code
+      g_anSlotCount++; g_anRxSlots++;
+      if (g_anSlotCount > AN_HARD_RESYNC) {         // no break for way too long -> force a resync
+        g_anSlots = g_anSlotCount; g_anFrames++; g_anSlotCount = 0; g_anExpectFrame = 0;
+      }
       continue;
     }
-    const bool atFrameEnd = (expectFrame == 0) ? (slotCount >= 16) : (slotCount + 4 >= expectFrame);
+    const bool atFrameEnd = (g_anExpectFrame == 0) ? (g_anSlotCount >= 16)
+                                                   : (g_anSlotCount + 4 >= g_anExpectFrame);
     if (atFrameEnd) {                               // real break -> frame boundary
-      if (slotCount > expectFrame) expectFrame = slotCount;
-      g_anSlots = slotCount; g_anFrames++; slotCount = 0;
-    } else {                                        // stop-low mid-frame -> genuine framing error
-      if (expectFrame > 256) g_anFramingErr++;
-      slotCount++; g_anRxSlots++;
+      if (g_anSlotCount > g_anExpectFrame && g_anSlotCount <= AN_MAX_FRAME) g_anExpectFrame = g_anSlotCount;
+      g_anSlots = g_anSlotCount; g_anFrames++; g_anSlotCount = 0;
+    } else {                                        // stop-low mid-frame -> framing error, but only
+      // count it on an actual DMX frame (start code 0x00). During an RDM discovery the bus carries
+      // requests/replies (start code 0xCC, break-less preambles) that a DMX-tuned analyzer would
+      // otherwise flag as errors -- that is not the issue #64 signal, so ignore it.
+      if (g_anExpectFrame > 256 && g_anStartCode == 0x00) g_anFramingErr++;
+      g_anSlotCount++; g_anRxSlots++;
     }
   }
   const uint32_t nowMs = millis();
@@ -391,7 +445,7 @@ static void serviceAnalyzer() {
     if (lastRefMs && g_anFrames >= lastRefFrames)
       g_anRefreshHz = (g_anFrames - lastRefFrames) * 1000.0f / (float)(nowMs - lastRefMs);
     if (g_anRefreshHz > 1.0f) {                     // display-only break estimate: period - active
-      const float active = expectFrame * 44.0f;     // ~44 us per 8N2 slot
+      const float active = g_anExpectFrame * 44.0f; // ~44 us per 8N2 slot
       const float period = 1000000.0f / g_anRefreshHz;
       g_anBreakUs = (period > active) ? (uint32_t)(period - active) : 0;
     }
@@ -445,6 +499,7 @@ static void sendDiscResponse(const Fixture* fx) {
   if (g_fuzzBadCsum && chance(20)) r[23] ^= 0xFF;      // fault injection: corrupt the checksum
   snapTxReply(r, 24);
   deTx(); busy_wait_us(replyDelay()); txBytes(r, 24); deRx();
+  if (!g_rcDisable) rcAfterReply();                     // capture what the controller received
   pio_sm_clear_fifos(g_pio, RX_SM);   // clearing works; SM disable/restart (rxReset) intermittently kills RX
 }
 
@@ -463,6 +518,7 @@ static void sendRdmResponse(const uint8_t* ctrlUid, const Fixture* fx, uint8_t t
   p[ml]=cs>>8; p[ml+1]=cs&0xFF;
   snapTxReply(p, ml+2);
   deTx(); busy_wait_us(replyDelay()); sendBreak(); txBytes(p, ml+2); deRx();
+  if (!g_rcDisable) rcAfterReply();                     // capture what the controller received
   pio_sm_clear_fifos(g_pio, RX_SM);
 }
 static void sendNack(const uint8_t* ctrlUid, const Fixture* fx, uint8_t tn, uint8_t cc, uint16_t pid, uint16_t reason) {
@@ -672,7 +728,7 @@ void loop1() {
   }
   serviceAnalyzer();          // fold DMX slot framing / timing into the analyzer counters
   serviceGtUart();            // ground-truth: hardware-UART framing flags (authoritative)
-  serviceRcUart();            // reply-side capture: bytes the controller actually received
+  if (!g_rcDisable) serviceRcUart();   // reply-side capture (ISOLATION: disable to test analyzer starve)
   g_lastActivityMs = millis();
 }
 
@@ -684,9 +740,11 @@ static void printStatus() {
 // Zero the analyzer + ground-truth counters and stamp the window start (like clearing a DMX tester).
 static void anReset() {
   g_anFrames = g_anSlots = g_anFramingErr = g_anRxSlots = 0;
+  g_anSlotCount = 0; g_anExpectFrame = 0;       // clear the frame-builder state so reset truly re-syncs
   g_anRefreshHz = 0; g_anBreakUs = 0; g_anStartCode = 0; g_anResetMs = millis();
   g_gtFrames = g_gtFramingErr = g_gtOverrun = g_gtBytes = 0; g_gtRefreshHz = 0; g_gtResetMs = millis();
-  g_rcBytes = g_rcFramingErr = g_rcOverrun = g_rcReplies = g_rcMismatch = 0; g_rcLastLen = 0; g_rcResetMs = millis();
+  g_rcBytes = g_rcFramingErr = g_rcOverrun = g_rcReplies = g_rcBadReplies = g_rcMismatch = 0;
+  g_rcLastLen = 0; g_rcResetMs = millis();
 }
 static void printGt() {
   const uint32_t el = millis() - g_gtResetMs; const float mins = el / 60000.0f;
@@ -707,10 +765,10 @@ static void printAnalyzer() {
     (unsigned long)g_anFramingErr, (double)perMin, (unsigned long)g_anRxSlots);
 }
 static void printRc() {
-  Serial.printf("[reply-capture] replies=%lu framingErr=%lu overrun=%lu mismatch(last)=%lu bytes=%lu\n"
+  Serial.printf("[reply-capture] replies=%lu bad=%lu framingErr=%lu overrun=%lu mismatch(last)=%lu\n"
                 "  sent: %s\n  recv: %s\n",
-    (unsigned long)g_rcReplies, (unsigned long)g_rcFramingErr, (unsigned long)g_rcOverrun,
-    (unsigned long)g_rcMismatch, (unsigned long)g_rcBytes,
+    (unsigned long)g_rcReplies, (unsigned long)g_rcBadReplies, (unsigned long)g_rcFramingErr,
+    (unsigned long)g_rcOverrun, (unsigned long)g_rcMismatch,
     hexBuf(g_txReply, g_txReplyLen).c_str(), hexBuf(g_rcLast, g_rcLastLen).c_str());
 }
 static void handleCommand(char* line) {
@@ -802,7 +860,8 @@ static void handleMetrics() {
   // Reply-side capture: what the controller received vs what we drove
   j += "\"rcBytes\":" + String((unsigned long)g_rcBytes) + ",\"rcFramingErr\":" + String((unsigned long)g_rcFramingErr) + ",";
   j += "\"rcOverrun\":" + String((unsigned long)g_rcOverrun) + ",\"rcReplies\":" + String((unsigned long)g_rcReplies) + ",";
-  j += "\"rcMismatch\":" + String((unsigned long)g_rcMismatch) + ",";
+  j += "\"rcBadReplies\":" + String((unsigned long)g_rcBadReplies) + ",\"rcMismatch\":" + String((unsigned long)g_rcMismatch) + ",";
+  j += "\"rcCalls\":" + String((unsigned long)g_rcCalls) + ",\"rcWinLast\":" + String((long)g_rcWinLast) + ",";
   j += "\"txReplyHex\":\"" + hexBuf(g_txReply, g_txReplyLen) + "\",\"rcReplyHex\":\"" + hexBuf(g_rcLast, g_rcLastLen) + "\",";
   j += "\"discovered\":" + String(mutedCount()) + ",\"muted\":" + String(mutedCount()) + "}";
   g_web.send(200, "application/json", j);
@@ -832,6 +891,14 @@ static void handleConfig() {
 }
 static void handleUnmute()   { for (int i=0;i<g_fixCount;i++) g_fix[i].muted=false; g_web.send(200,"application/json","{\"ok\":true}"); }
 static void handleAnReset()  { anReset(); g_web.send(200,"application/json","{\"ok\":true}"); }
+// DIAG: toggle reply-capture / analog sampler at runtime to isolate what starves the analyzer.
+//   /api/diag?rc=0|1&ml=0|1   (1 = DISABLE that subsystem). Returns current flag state.
+static void handleDiag() {
+  if (g_web.hasArg("rc")) g_rcDisable = g_web.arg("rc").toInt() != 0;
+  if (g_web.hasArg("ml")) g_mlDisable = g_web.arg("ml").toInt() != 0;
+  g_web.send(200,"application/json",
+    String("{\"rcDisable\":") + (g_rcDisable?"true":"false") + ",\"mlDisable\":" + (g_mlDisable?"true":"false") + "}");
+}
 static void handleDiscover() { g_web.send(200,"application/json","{\"ok\":true,\"note\":\"the controller triggers its own discovery\"}"); }
 static void handleLog() {
   String j = "["; const uint16_t head = g_evHead; int start = (int)head - 40; if (start < 0) start = 0;
@@ -862,6 +929,7 @@ static void setupWeb() {
   g_web.on("/api/discover", HTTP_POST, handleDiscover);
   g_web.on("/api/fuzz", HTTP_POST, handleFuzz);
   g_web.on("/api/analyzer/reset", HTTP_POST, handleAnReset);
+  g_web.on("/api/diag", handleDiag);
   g_web.on("/api/log", handleLog);
   g_web.begin();
 }
@@ -893,11 +961,15 @@ void loop() {
   if (g_diagMode) serviceDiagLed(); else serviceLed();
   g_web.handleClient();
 
+  // Keep the A-B analog reading fresh for the dashboard in every mode (it used to update only in
+  // diag mode, so the "A-B line" tile sat at 0 the rest of the time).
+  static uint32_t mlLast = 0;
+  if (!g_mlDisable && millis() - mlLast >= 400) { mlLast = millis(); measureLines(); }
+
   // Wiring-check readout on serial too (numbers, for when you have the console open).
   if (g_diagMode) {
     static uint32_t dl = 0, db = 0;
     if (millis() - dl >= 500) { const uint32_t n = g_rxBytes - db; db = g_rxBytes; dl = millis();
-      measureLines();
       Serial.printf("[diag] noise=%lu bytes/500ms  A-B idle=%d mV  noise=%d mVpp  %s\n",
         (unsigned long)n, g_vdiff, g_vpp, (n <= 5) ? "CLEAN <<<" : "noisy"); }
   }
