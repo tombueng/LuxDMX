@@ -90,17 +90,27 @@ static bool rmtDmxInit(RmtDmx* rd, int gpio) {
     txc.trans_queue_depth = 4;
     txc.flags.invert_out  = false;
 #if defined(SOC_RMT_SUPPORT_DMA) && SOC_RMT_SUPPORT_DMA
-    // S2/S3 and newer: use RMT-DMA so the whole frame streams from RAM with NO refill ISR at all
-    // -- fully autonomous. A big mem window keeps the DMA fed.
+    // The S3 (and S2/C-series) has exactly ONE DMA-capable RMT TX channel -- the IDF driver comment
+    // is blunt about it: "Only the last channel has the DMA capability". So the FIRST output claims
+    // DMA (whole frame streams from RAM, zero refill ISR, fully autonomous); any FURTHER output can't
+    // get a second DMA channel ("no free tx channels") and falls back to the non-DMA refill-ISR path.
+    // That is fine here: this build separates cores (DMX on core 1, network on core 0), so the refill
+    // ISR on core 1 isn't exposed to the issue-#64 network-DMA contention that made DMA necessary in
+    // the first place. Without this fallback, out1 failed to init on the S3 and the 2nd universe was dead.
     txc.flags.with_dma    = true;
     txc.mem_block_symbols = 1024;
+    if (rmt_new_tx_channel(&txc, &rd->chan) != ESP_OK) {
+        txc.flags.with_dma    = false;
+        txc.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL * 2;   // 2 blocks -> half the refill rate
+        if (rmt_new_tx_channel(&txc, &rd->chan) != ESP_OK) return false;
+    }
 #else
     // Classic ESP32: no RMT-DMA -> one channel memory block; the driver's ISR refills it. One
     // whole channel's worth (SOC_RMT_MEM_WORDS_PER_CHANNEL) minimises how often that refill runs.
     txc.flags.with_dma    = false;
     txc.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
-#endif
     if (rmt_new_tx_channel(&txc, &rd->chan) != ESP_OK) return false;
+#endif
     rmt_copy_encoder_config_t cec = {};
     if (rmt_new_copy_encoder(&cec, &rd->enc) != ESP_OK) return false;
     if (rmt_enable(rd->chan) != ESP_OK) return false;
