@@ -1545,6 +1545,23 @@ static bool argStr(AsyncWebServerRequest* req, const char* n, String& out) {
     return false;
 }
 
+// Sending a dynamically-built JSON body allocates a response buffer of ~body.length(); under heap
+// pressure that operator new throws std::bad_alloc, and an uncaught throw inside the AsyncTCP task
+// aborts the board. That rebooted the gateway when the web UI polled /rdm.json (which grows with the
+// number of discovered fixtures) or /dmx.json while the heap was low under load. Guard on the largest
+// free block, and catch as a hard backstop, so a status poll degrades to a 503 instead of a reboot.
+static void sendJsonSafe(AsyncWebServerRequest* req, const String& body) {
+    if ((int)ESP.getMaxAllocHeap() < (int)body.length() + 12000) {
+        try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {}
+        return;
+    }
+    try {
+        req->send(200, "application/json", body);
+    } catch (...) {
+        try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {}
+    }
+}
+
 static void handleVersionJson(AsyncWebServerRequest* req) {
     String j = "{\"current\":\"";
     j += FIRMWARE_VERSION;
@@ -1553,7 +1570,7 @@ static void handleVersionJson(AsyncWebServerRequest* req) {
     j += "\",\"update\":";
     j += updateAvailable ? "true" : "false";
     j += "}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
 static String sendersJson() {
@@ -1604,8 +1621,8 @@ static String logJson() {
     return j;
 }
 
-static void handleSendersJson(AsyncWebServerRequest* req) { req->send(200, "application/json", sendersJson()); }
-static void handleLogJson(AsyncWebServerRequest* req)     { req->send(200, "application/json", logJson()); }
+static void handleSendersJson(AsyncWebServerRequest* req) { sendJsonSafe(req, sendersJson()); }
+static void handleLogJson(AsyncWebServerRequest* req)     { sendJsonSafe(req, logJson()); }
 
 // Push senders + log over the WebSocket (one persistent connection) so the
 // browser doesn't have to poll two HTTP endpoints every 2 s.
@@ -1746,7 +1763,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"board\":\"";    j += BOARD_ID;               j += "\",";
     j += "\"mcu\":\"";      j += MCU_ID;                 j += "\"";
     j += "}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
 static void handleDmxJson(AsyncWebServerRequest* req) {
@@ -1772,7 +1789,7 @@ static void handleDmxJson(AsyncWebServerRequest* req) {
         if (i < 512) j += ',';
     }
     j += "]}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
 // Escape a fixture-supplied string for safe inclusion in JSON.
@@ -1857,7 +1874,7 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
         j += "]}";
     }
     j += "]}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
 static void handleConfigGet(AsyncWebServerRequest* req) {
@@ -1912,7 +1929,7 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
 // Channel labels — browser owns the JSON object, device just persists it
 // ---------------------------------------------------------------------------
 static void handleLabelsGet(AsyncWebServerRequest* req) {
-    req->send(200, "application/json", g_labels);
+    sendJsonSafe(req, g_labels);
 }
 
 // Body handler for POST /labels (raw JSON). Accumulates chunks then persists.
