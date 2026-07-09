@@ -116,7 +116,7 @@
       (tstamps "57fd5205-470e-5a95-88f5-2a3d42b07527"))
     (comp
       (ref "C12")
-      (value "33pF C0G")
+      (value "10pF C0G")
       (description "")
       (footprint "Capacitor_SMD:C_0402_1005Metric")
       (fields
@@ -140,7 +140,7 @@
       (tstamps "ff7ae3c1-c885-5f66-99d0-e323d163004b"))
     (comp
       (ref "C13")
-      (value "33pF C0G")
+      (value "10pF C0G")
       (description "")
       (footprint "Capacitor_SMD:C_0402_1005Metric")
       (fields

@@ -166,10 +166,12 @@ XT = mk('Crystal', 'Y', 'Crystal:Crystal_SMD_2520-4Pin_2.5x2.0mm',
         value='25MHz')
 Y1 = XT(); Y1.ref = 'Y1'
 Y1[1] += XI; Y1[3] += XO; Y1[2] += GND; Y1[4] += GND
-# crystal load caps: the C2981622 is CL=20pF (part# 2520-25-20-...). CL=(C1*C2)/(C1+C2)+Cstray;
-# 33pF || 33pF + ~4pF stray = 20.5pF (was 22pF -> only 15pF presented, ran the W5500 clock fast). C0G/NP0.
-Cx1 = C('C12', '33pF C0G'); Cx1[1] += XI; Cx1[2] += GND
-Cx2 = C('C13', '33pF C0G'); Cx2[1] += XO; Cx2[2] += GND
+# crystal C2981624 is CL=9pF (2520-25-9; the CL=20pF C2981622 kept going OOS at JLC; C2981624 is in stock).
+# CL=(C1*C2)/(C1+C2)+Cstray; 10pF || 10pF + ~4pF stray = 9pF, matching the 9pF crystal. C0G/NP0 required.
+# NOTE: a mainstream 3225 package (C9006, JLC Basic 247k) would be the durable "always-available" fix, but the
+# 2520->3225 footprint swap needs a supervised re-route of the packed W5500 crystal corner (deferred).
+Cx1 = C('C12', '10pF C0G'); Cx1[1] += XI; Cx1[2] += GND
+Cx2 = C('C13', '10pF C0G'); Cx2[1] += XO; Cx2[2] += GND
 # MagJack HY931147C (C91754) — THT 10/100 PoE magjack: integrated magnetics + an INTEGRATED
 # PoE rectifier (Mode A+B bridge -> V+ pin9 / V- pin10) + 2 LEDs. Replaces the non-PoE
 # HR961160C: the internal bridge does the rectification, so no external BR1/BR2 are needed.

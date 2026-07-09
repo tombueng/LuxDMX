@@ -109,7 +109,7 @@ bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DR
 | 15 | Via current / annular | ✅ | validate_geometry.py | via current fine; **escape-via annular fixed 0.125 -> 0.150mm** (14 vias re-drilled 0.25->0.20, pad unchanged); **0 sub-min** |
 | 16 | DFM vs JLCPCB 4-layer | ✅ | validate_geometry.py | min trace 0.2mm, drill 0.2mm OK |
 | 17 | Magjack HY931147C pinout | ✅ | datasheet | verified vs HanRun REV.A/1 (2026-06-22): TD=5/6, RD=1/2, RCT=3/TCT=4, V+=9/V-=10, LED-Y=11/12 (A/K), LED-G=13/14 (A/K); straight MDI correct (no auto-MDIX) |
-| 18 | W5500 crystal CL vs caps | ✅ | datasheet (2520-25-**20**) | **FIXED**: crystal is CL=20pF; caps 22pF→**33pF C0G** (presented 15pF→20.5pF). Was running the 25MHz fast. |
+| 18 | W5500 crystal CL vs caps | ✅ | datasheet (2520-25-**9**) | **FIXED**: crystal **C2981624 CL=9pF**; caps **10pF C0G** (presented 9.0pF). Swapped from the OOS-prone CL=20pF C2981622 + 33pF caps. |
 | 19 | W5500 EXRES1 | ✅ | datasheet | **FIXED**: R3 12k→**12.4k 1%** (on-spec PHY bias) |
 | 27 | PoE TVS margin | ✅ | datasheet | **FIXED**: D10 SMAJ58A→**SMAJ60A** (58V standoff was only 1V over 57V max) |
 | 28 | Every part rating/value/datasheet | ✅/⚠️ | 4-agent datasheet pass | see **VALIDATION_REPORT.md**: all active parts + crystal + connectors read from official datasheets; ratings/values recomputed. 3 fixes applied, open items listed. |

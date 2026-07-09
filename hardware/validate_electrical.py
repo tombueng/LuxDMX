@@ -75,13 +75,13 @@ chk("USB-C CC pulldowns (R8/R9=5.1k)", PASS,
     "Rd=5.1k each = correct UFP/sink advertisement (default USB current); CC1+CC2 both populated (cable-orientation independent)")
 
 # ---------------------------------------------------------------- crystal load
-C1=C2=33.0
+C1=C2=10.0
 Cstray=4.0
 CL=(C1*C2)/(C1+C2)+Cstray
-CL_XTAL=20.0   # C2981622 is 2520-25-20 -> CL=20pF (datasheet-confirmed)
-chk("W5500 25MHz crystal load (C12/C13=33pF C0G)", PASS if abs(CL-CL_XTAL)<=2 else WARN,
-    f"presented CL={CL:.1f}pF (33||33 + {Cstray}pF stray) vs crystal CL={CL_XTAL:.0f}pF -> within +-1pF. "
-    f"Require C0G/NP0 dielectric. (Was 22pF -> 15pF presented, ran 25MHz fast.)")
+CL_XTAL=9.0   # C2981624 is 2520-25-9 -> CL=9pF (replaced the OOS-prone CL=20pF C2981622)
+chk("W5500 25MHz crystal load (C12/C13=10pF C0G)", PASS if abs(CL-CL_XTAL)<=2 else WARN,
+    f"presented CL={CL:.1f}pF (10||10 + {Cstray}pF stray) vs crystal CL={CL_XTAL:.0f}pF -> within +-1pF. "
+    f"Require C0G/NP0 dielectric. (Swapped 20pF xtal + 33pF caps -> 9pF xtal + 10pF caps; C2981622 kept going OOS.)")
 
 # ---------------------------------------------------------------- W5500 EXRES1
 chk("W5500 EXRES1 (R3=12.4k 1%)", PASS,

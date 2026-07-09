@@ -2134,7 +2134,7 @@
 				)
 			)
 		)
-		(property "Value" "33pF C0G"
+		(property "Value" "10pF C0G"
 			(at 0 1.16 0)
 			(layer "F.Fab")
 			(uuid "1d49e9b6-ad14-436a-9c31-9d721cf16e35")
@@ -17309,7 +17309,7 @@
 				)
 			)
 		)
-		(property "Value" "33pF C0G"
+		(property "Value" "10pF C0G"
 			(at 2 4.66 0)
 			(layer "F.Fab")
 			(uuid "479c2e77-ddef-4bdc-898c-db752adabbd9")
