@@ -11,7 +11,8 @@
 //              (controller subdivides on any reply -> full binary search of all fixtures)
 //            - DISC_MUTE / DISC_UN_MUTE  -> mute state + mute ACK
 //            - GET / SET  -> DEVICE_INFO, SW_VERSION, MODEL_DESC, MANUFACTURER_LABEL,
-//              SUPPORTED_PARAMETERS, DMX_START_ADDRESS, IDENTIFY_DEVICE  (+ NACK others)
+//              SUPPORTED_PARAMETERS, DMX_START_ADDRESS, IDENTIFY_DEVICE,
+//              SENSOR_DEFINITION + SENSOR_VALUE (1 simulated temperature sensor)  (+ NACK others)
 //   core 0 : activity LED, USB console + command parser, per-discovery drop report.
 //
 // Wiring (confirmed): GP0=RO(RX), GP1=DI(TX), GP2=DE+RE (low=receive).
@@ -68,7 +69,8 @@ static const uint16_t PID_SUPPORTED_PARAMETERS = 0x0050, PID_DEVICE_INFO = 0x006
 static const uint16_t PID_DEVICE_MODEL_DESCRIPTION = 0x0080, PID_MANUFACTURER_LABEL = 0x0081;
 static const uint16_t PID_SOFTWARE_VERSION_LABEL = 0x00C0, PID_DMX_START_ADDRESS = 0x00F0;
 static const uint16_t PID_IDENTIFY_DEVICE = 0x1000;
-static const uint16_t NR_UNKNOWN_PID = 0x0000;
+static const uint16_t PID_SENSOR_DEFINITION = 0x0200, PID_SENSOR_VALUE = 0x0201;
+static const uint16_t NR_UNKNOWN_PID = 0x0000, NR_DATA_OUT_OF_RANGE = 0x0001;
 
 // --- Virtual fixtures --------------------------------------------------------
 static const int MAXFIX = 200;
@@ -549,7 +551,7 @@ static void handleGetSet(const uint8_t* f, uint8_t cc, uint16_t pid, Fixture* fx
         d[k++]=fx->persCur; d[k++]=fx->persCount;                  // personality current/count
         d[k++]=fx->address>>8; d[k++]=fx->address;                 // DMX start address
         d[k++]=0x00; d[k++]=0x00;                                  // sub-device count
-        d[k++]=0x00;                                              // sensor count
+        d[k++]=0x01;                                              // sensor count (1 simulated temp sensor)
         sendRdmResponse(ctrl, fx, tn, RESP_ACK, respCc, pid, d, 19); return;
       }
       case PID_SOFTWARE_VERSION_LABEL: {
@@ -574,9 +576,41 @@ static void handleGetSet(const uint8_t* f, uint8_t cc, uint16_t pid, Fixture* fx
       }
       case PID_SUPPORTED_PARAMETERS: {
         const uint16_t pids[] = { PID_DEVICE_MODEL_DESCRIPTION, PID_MANUFACTURER_LABEL,
-                                  PID_DMX_START_ADDRESS, PID_IDENTIFY_DEVICE };
+                                  PID_DMX_START_ADDRESS, PID_IDENTIFY_DEVICE,
+                                  PID_SENSOR_DEFINITION, PID_SENSOR_VALUE };
         uint8_t d[32]; int k=0;
         for (unsigned i=0;i<sizeof(pids)/sizeof(pids[0]);i++){ d[k++]=pids[i]>>8; d[k++]=pids[i]; }
+        sendRdmResponse(ctrl, fx, tn, RESP_ACK, respCc, pid, d, k); return;
+      }
+      case PID_SENSOR_DEFINITION: {
+        // GET PD = 1 byte sensor number. We expose exactly one sensor (#0), a temperature probe.
+        const uint8_t sensor = f[24];
+        if (sensor != 0) { sendNack(ctrl, fx, tn, respCc, pid, NR_DATA_OUT_OF_RANGE); return; }
+        const char* s = "Temperature"; uint8_t d[32]; int k=0;
+        d[k++]=0x00;                 // sensor number
+        d[k++]=0x00;                 // type: TEMPERATURE
+        d[k++]=0x01;                 // unit: CENTIGRADE
+        d[k++]=0x00;                 // prefix: NONE
+        d[k++]=0xFF; d[k++]=0x38;    // range min = -200 (=-20.0 C)
+        d[k++]=0x01; d[k++]=0xF4;    // range max =  500 (= 50.0 C)
+        d[k++]=0x00; d[k++]=0x64;    // normal min = 100 (= 10.0 C)
+        d[k++]=0x01; d[k++]=0x2C;    // normal max = 300 (= 30.0 C)
+        d[k++]=0x00;                 // recorded/lowest-highest support: none
+        int n=0; while (s[n] && k<32){ d[k++]=s[n]; n++; }
+        sendRdmResponse(ctrl, fx, tn, RESP_ACK, respCc, pid, d, k); return;
+      }
+      case PID_SENSOR_VALUE: {
+        const uint8_t sensor = f[24];
+        if (sensor != 0) { sendNack(ctrl, fx, tn, respCc, pid, NR_DATA_OUT_OF_RANGE); return; }
+        // Simulate a live value that drifts each second (and differs per fixture) so a poller
+        // can see it move: 20.0 C .. 34.9 C. Value is tenths of a degree, signed.
+        int16_t v = (int16_t)(200 + ((millis()/1000 + fx->address) % 150));
+        uint8_t d[9]; int k=0;
+        d[k++]=0x00;                       // sensor number
+        d[k++]=v>>8; d[k++]=(uint8_t)v;    // present value
+        d[k++]=0x00; d[k++]=0x64;          // lowest detected  = 10.0 C
+        d[k++]=0x01; d[k++]=0x90;          // highest detected = 40.0 C
+        d[k++]=v>>8; d[k++]=(uint8_t)v;    // recorded value
         sendRdmResponse(ctrl, fx, tn, RESP_ACK, respCc, pid, d, k); return;
       }
       default: sendNack(ctrl, fx, tn, respCc, pid, NR_UNKNOWN_PID); return;
