@@ -1766,30 +1766,67 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     sendJsonSafe(req, j);
 }
 
+// /dmx.json is ~2.3 KB (the 512-channel array dominates). Building it as one String and letting
+// AsyncWebServer copy that into a single contiguous send buffer needs a big contiguous block -- which
+// fails on a fragmented heap (the ESP32-S3 allocator keeps lots of total free but a small largest
+// block, esp-idf #13588) and used to abort the board. So stream it instead: only the small header is
+// a String; the channel array is generated on demand straight into AsyncWebServer's own ~1.4 KB
+// segment buffer. No large contiguous allocation is ever needed, so the endpoint stays up even when
+// the heap is badly fragmented (and never has to fall back to a 503).
 static void handleDmxJson(AsyncWebServerRequest* req) {
-    String j;
-    j.reserve(2300);
+    struct DmxJson {
+        String head;                     // everything up to and including `"ch":[`  (~150 bytes)
+        int    out    = 0;
+        size_t headOff = 0;
+        int    ch     = 1;               // 1..512
+        char   cur[8]; size_t curLen = 0, curOff = 0;
+        int    phase  = 0;               // 0 head, 1 channels, 2 footer, 3 done
+        size_t footOff = 0;
+    };
+    std::shared_ptr<DmxJson> s;
+    try { s = std::make_shared<DmxJson>(); } catch (...) {}
+    if (!s) { try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {} return; }
+    s->out = viewOutput();
     char buf[32];
     snprintf(buf, sizeof(buf), "%.1f", fps);
-    j  = "{\"fps\":";    j += buf;
-    j += ",\"outfps\":[";
+    s->head  = "{\"fps\":"; s->head += buf; s->head += ",\"outfps\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         snprintf(buf, sizeof(buf), "%.1f", outFpsLive(i));
-        if (i) j += ',';
-        j += buf;
+        if (i) s->head += ',';
+        s->head += buf;
     }
-    j += "]";
-    j += ",\"rssi\":";   j += netRSSI();
-    j += ",\"up\":\"";   j += uptimeStr();
-    j += "\",\"heap\":"; j += ESP.getFreeHeap();
-    j += ",\"manual\":"; j += manualMode ? "true" : "false";
-    j += ",\"ch\":[";
-    for (int i = 1; i <= 512; i++) {
-        j += dmxBuf[viewOutput()][i];
-        if (i < 512) j += ',';
-    }
-    j += "]}";
-    sendJsonSafe(req, j);
+    s->head += "],\"rssi\":";  s->head += netRSSI();
+    s->head += ",\"up\":\"";   s->head += uptimeStr();
+    s->head += "\",\"heap\":"; s->head += ESP.getFreeHeap();
+    s->head += ",\"manual\":"; s->head += manualMode ? "true" : "false";
+    s->head += ",\"ch\":[";
+    req->sendChunked("application/json", [s](uint8_t* b, size_t maxLen, size_t) -> size_t {
+        size_t n = 0;
+        if (s->phase == 0) {                         // stream the small header
+            while (s->headOff < s->head.length() && n < maxLen) b[n++] = (uint8_t)s->head[s->headOff++];
+            if (s->headOff < s->head.length()) return n;
+            s->phase = 1;
+        }
+        if (s->phase == 1) {                         // stream the 512 channel values
+            while (n < maxLen) {
+                if (s->curOff >= s->curLen) {        // load the next channel token
+                    if (s->ch > 512) { s->phase = 2; break; }
+                    s->curLen = snprintf(s->cur, sizeof(s->cur), s->ch < 512 ? "%d," : "%d",
+                                         dmxBuf[s->out][s->ch]);
+                    s->curOff = 0; s->ch++;
+                }
+                while (s->curOff < s->curLen && n < maxLen) b[n++] = (uint8_t)s->cur[s->curOff++];
+            }
+            if (s->phase == 1) return n;             // buffer full mid-array; resume next call
+        }
+        if (s->phase == 2) {                         // closing "]}"
+            static const char foot[] = "]}";
+            while (s->footOff < 2 && n < maxLen) b[n++] = (uint8_t)foot[s->footOff++];
+            if (s->footOff < 2) return n;
+            s->phase = 3;
+        }
+        return n;                                    // phase 3: next call returns 0 -> complete
+    });
 }
 
 // Escape a fixture-supplied string for safe inclusion in JSON.
