@@ -845,8 +845,10 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 driver is compiled into every build. In **`/config` &rarr; Wired Ethernet** turn on
 **Use a W5500 Ethernet module** (off by default), set its pins, then enable **Use wired Ethernet**.
 Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25) and
-are fully configurable (with the on-board pin-picker); lower the SPI clock there if a long-wired
-module isn't detected. No special build is needed.
+are fully configurable (with the on-board pin-picker). The **SPI clock** is set by **W5500 SPI MHz**
+(`ethfreq`, default **20**, range 1 to 80); 20 MHz is fine on a real board, but drop it to ~8 MHz if the
+module is on long flying leads and isn't detected (the bring-up can otherwise hang). No special build
+is needed.
 
 On a **classic ESP32** the card also shows a **Wired PHY** selector: pick the **W5500 (SPI module)**
 or the **ESP32 built-in MAC + RMII PHY** (the WT32-ETH01 style). The S3 has no internal MAC, so it
