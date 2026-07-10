@@ -79,6 +79,8 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
 | **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — codes network/idle/DMX/conflict/identify state |
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
+| **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
+| **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
@@ -585,7 +587,7 @@ values are fetched as JSON.
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
 | `/labels.json` | GET | Channel labels object |
 | `/labels` | POST | Store the full labels object (JSON body) |
-| `/rdm.json` | GET | RDM controller state + discovered fixtures (TOD) |
+| `/rdm.json` | GET | RDM controller state + discovered fixtures (TOD), incl. the Art-Net RDM node state (`artnetRdm`, `artPort`, `discovering`) + request counters |
 | `/rdm/discover` | GET | Trigger an RDM discovery sweep on the bus (`{ok,op}`) |
 | `/rdm/setaddr` | GET | Set a fixture's DMX start address — `?uid=MMMM:DDDDDDDD&addr=1..512` |
 | `/rdm/identify` | GET | Toggle a fixture's identify — `?uid=MMMM:DDDDDDDD&on=0/1` |
@@ -903,6 +905,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Protocol | `Both (Art-Net + sACN)` | Web `/config` |
 | Static IP / gateway / subnet / DNS | DHCP | Web `/config` (Network) |
 | Auto-update | off | Web `/config` (Firmware) |
+| RDM over Art-Net (`artrdm`) | on | Web `/config` (RDM) |
 | Channel labels | — | Status page (channel modal) |
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password (IDE `espota` only) | `dmxota` | Web `/config` |

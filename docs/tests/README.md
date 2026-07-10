@@ -62,6 +62,7 @@ They always restore the original configuration afterwards.
 | `ota-update.spec.mjs` | `/ota/status` shape; home-page Update button → install popup → progress dialog shows the real phase/percent and only reloads onto the live page once the device reports the new version (full flash→update→restore cycle is opt-in) |
 | `signal-loss.spec.mjs` | Per-output signal-loss policy: `/info` loss field + `/config` selector; after the 2.5 s source timeout HOLD keeps the frame, BLACKOUT zeros it, STOP holds (not zero), over Art-Net + sACN; persistence across reboot (opt-in) |
 | `rdm-trigger.spec.mjs` | Issue #64 RMT DMX + esp_dmx-free RDM: `/rdm.json` controller shape; the HTTP RDM trigger endpoints (`/rdm/discover`, `/rdm/setaddr`, `/rdm/identify`) — param validation returns 400, valid calls queue a bus action and return `{ok,op}` (opt-in). The RMT framing win and on-wire discovery/GET/SET are validated on the RP2350 rig, not here (see note). |
+| `artnet-rdm.spec.mjs` | RDM over Art-Net (E1.20 over Art-Net 4): `/rdm.json` node fields (`artnetRdm`/`artPort`/`discovering` + request counters); drives the device as an Art-Net RDM controller — ArtPoll → ArtPollReply, ArtTodRequest → ArtTodData (TOD matches `/rdm.json`), and (opt-in) ArtRdm GET DEVICE_INFO + SET DMX_START_ADDRESS with read-back, AtcFlush re-discovery, and a check that a mid-stream flush doesn't collapse the transmit rate (`outfps`). The full DMX-stays-40fps-under-RDM proof is on the RP2350 analyzer (see `../rdm.md`). |
 
 ## Notes
 

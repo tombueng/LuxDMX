@@ -16,6 +16,77 @@ Art-Net / sACN → DMX output.
 > is the original plan and the hardware/transceiver background — still accurate except that the
 > firmware path is now RMT, not esp_dmx.
 
+> **RDM over Art-Net (implemented).** LuxDMX is now an Art-Net 4 RDM *output gateway*: a console
+> (DMX-Workshop, MagicQ, grandMA3, OLA, or the bundled `docs/tests/artnet_rdm_ctrl.py`) does RDM
+> to the fixtures on the physical wire over the network. See the **RDM over Art-Net** section below.
+
+---
+
+## RDM over Art-Net
+
+Art-Net carries RDM natively (sACN/E1.31 does not, network-native RDM there is the much heavier
+E1.33 "RDMnet", not implemented). The node side is four opcodes:
+
+| Packet | OpCode | Direction | What it does |
+|---|---|---|---|
+| `ArtPoll` / `ArtPollReply` | 0x2000 / 0x2100 | console to/from node | discovery; the reply advertises our output ports and that RDM is enabled |
+| `ArtTodRequest` to `ArtTodData` | 0x8000 to 0x8100 | console to node | return our **Table of Devices** (the UIDs we discovered on the wire) |
+| `ArtTodControl` (AtcFlush) | 0x8200 | console to node | flush the TOD and run a fresh discovery |
+| `ArtRdm` | 0x8300 | console to/from node | relay one GET/SET to a fixture and hand back the reply |
+
+**Discovery is proxied, GET/SET are pass-through.** The gateway runs E1.20 discovery on its own
+DMX wire and keeps a TOD; the console never touches the wire, it reads the TOD and sends GET/SET
+that the gateway relays. Discovery runs at power-on and on `AtcFlush`, and updated `ArtTodData` is
+pushed to any console that asked once the TOD changes.
+
+### Keeping DMX smooth while RDM runs (the real problem)
+
+RDM shares the half-duplex wire with DMX, so naive RDM starves the output. Measured on the bench
+(ESP32-S3 + W5500 + real 485 bus, 32-fixture responder): a full **blocking** discovery grabbed the
+bus for ~2.3 s and the DMX output on the wire **dropped from 40 fps to ~4-6 fps** the whole time.
+
+The fix is a scheduler, not just faster discovery. The Art-Net socket and all packet I/O run on the
+network core (`netRxTask`, core 0), which **queues** bus work to the DMX task (core 1, the sole bus
+owner). That task drains **at most one RDM transaction per DMX frame**, in the idle gap after the
+frame is clocked out. Discovery is a **resumable state machine** (one DISC branch or one GET per
+frame), so a full sweep spreads over a few seconds in the gaps instead of one long freeze. On-demand
+`ArtRdm` GET/SET take priority over background discovery.
+
+Result on the same rig, with a steady 40 fps Art-Net source running: through a full re-discovery
+*plus* a 1000-request `ArtRdm` GET flood, DMX holds **~26-40 fps with zero framing errors** and the
+board never reboots, versus the 4-6 fps freeze before. (DMX itself is clocked from the RMT
+peripheral, `dmx_rmt.h`, so it is hardware-timed and never corrupts even while RDM shares the task.)
+
+### Config + status
+
+- **`RDM over Art-Net`** toggle (config key `artrdm`, JSON `artnetRdm`), **default on**, and only
+  active on an RDM-capable output (one with a DE/RE pin). Turn it off and the node ignores every RDM
+  opcode; plain Art-Net/sACN DMX is untouched.
+- `/rdm.json` gains `artnetRdm`, `artPort` (the RDM output's Art-Net port-address), `discovering`,
+  and the `artTodReqs` / `artRdmReqs` / `artFlushes` / `artPolls` counters alongside the device TOD.
+- Only built into the `DMX_RMT` (esp_dmx-free) firmware path, which is every hardware env.
+
+### Interop notes
+
+- `ArtRdm` is unicast per Art-Net 4. `ArtPoll` is received on both the subnet-directed broadcast and
+  the limited broadcast (255.255.255.255): the node opens its 6454 socket with `SO_BROADCAST`, so
+  tools that poll on 255.255.255.255 (DMX-Workshop, OLA) still find it.
+- A non-RDM-aware DMX splitter between the gateway and the fixtures will silently kill RDM (it won't
+  pass the line turnaround). That is out of our control but a common support question.
+- Art-Net's OEM code in `ArtPollReply` is currently 0 (unregistered). Apply for a free OEM code from
+  Artistic Licence before any commercial release; RDM interop does not depend on it.
+
+### Testing it
+
+- `docs/tests/artnet_rdm_ctrl.py <gateway-ip> --pa 0 selftest` drives the whole thing as a controller
+  (ArtPoll, TOD, GET/SET, sensors) and prints pass/fail.
+- `docs/tests/artnet-rdm.spec.mjs` is the Playwright e2e (read-only paths by default; the wire GET/SET
+  + flush + DMX-not-disturbed checks gate behind `LUXDMX_WRITE=1`).
+- `docs/qlcplus-rdm-test.qxw` is a ready QLC+ workspace (Art-Net output to the gateway, dimmers at the
+  sim's fixture addresses) for driving the gateway from a real console while RDM runs.
+- The DMX-stays-40fps-under-RDM numbers above come from the RP2350 analyzer's ground-truth UART
+  (`anRefresh` / `gtFramingErr`), the same rig as the issue-#64 framing work.
+
 > **TL;DR** — RDM needs a transceiver whose **DE/RE (direction) pin is controlled by a GPIO**,
 > plus galvanic isolation and a 120 Ω terminator. The current **Waveshare TTL→RS485 (C)** is
 > *auto-direction* and **cannot do RDM**. **Note:** Amazon.de/eBay.de don't sell RDM-capable *isolated*

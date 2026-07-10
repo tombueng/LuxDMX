@@ -1717,6 +1717,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ledB\":";       j += cfg.ledB;               j += ",";
     j += "\"ledW\":";       j += cfg.ledW;               j += ",";
     j += "\"rdmOut\":";     j += rdmOut;                 j += ",";
+    j += "\"artnetRdm\":";  j += cfg.artnetRdm ? "true" : "false"; j += ",";
     j += "\"outputs\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         const DmxOutput& o = cfg.outputs[i];
