@@ -1,11 +1,11 @@
-> [!WARNING]
-> **Not yet fabricated or tested.** This board (the `v4-hardware` branch) is design-complete and passes
-> the full scripted validation (DRC, isolation, SPICE, Ethernet skew; see **VALIDATION.md**), but no
-> physical board has been built or bench-tested yet. The proven, supported path is the firmware on a plain
-> ESP32 + an isolated RS-485 module (see the main README). A ruggedization pass (USB ESD, PTC fuse, +5V
-> TVS, a TPS2116 ideal-diode OR mux, DMX common-mode chokes, ferrite supply filters), plated GND mounting
-> holes, and wider power traces are in; a few datasheet/silk items remain open (see **Status**). Treat the
-> first build as a prototype and do a final review before ordering.
+> [!NOTE]
+> **First spin is being fabricated.** This v5 board is on `master`, design-complete, and passes the full
+> scripted validation (DRC, isolation, SPICE, Ethernet skew; see **VALIDATION.md**). The first physical
+> boards have been ordered but not yet bench-tested, so treat this spin as a prototype: the firmware on a
+> plain ESP32 + an isolated RS-485 module is still the longest-proven path (see the main README). The
+> ruggedization pass (USB ESD, PTC fuse, +5V TVS, a TPS2116 ideal-diode OR mux, DMX common-mode chokes,
+> ferrite supply filters), plated GND mounting holes, wider power traces, and the DMX512-A "Protected"
+> series-TBU front end are all in.
 
 # LuxDMX v5 — hardware
 
@@ -54,7 +54,7 @@ dollars to fabricate at JLCPCB.
 - **U1 — ESP32-S3-WROOM-1-N8** *(LCSC C2913198)* — the MCU + 2.4 GHz WiFi radio. Runs the Art-Net/sACN
   receiver, the web UI, OTA updates, and the DMX engine. The PCB antenna hangs over the left board edge
   (no copper underneath it — intentional, for radiation efficiency).
-- **U2 — WIZnet W5500** *(C32843)* + **Y1 — 25 MHz crystal** + **J3 — HY931147C PoE RJ45 MagJack** *(C91754)* —
+- **U2 — WIZnet W5500** *(C32843)* + **Y1 — 25 MHz crystal** *(C2981624, 2520, CL 9 pF; load caps C12/C13 = 10 pF C0G)* + **J3 — HY931147C PoE RJ45 MagJack** *(C91754)* —
   a complete 10/100 wired-Ethernet subsystem on SPI. The magjack integrates the isolation magnetics,
   the link/activity LEDs, **and an internal PoE rectifier** (Mode A + Mode B → a single rectified DC pair
   on pins 9/10 — see *Power*). (Ethernet is isolated by the magjack's transformers; the W5500's
@@ -71,7 +71,12 @@ Each universe is a self-contained galvanic island; the two share no copper with 
   ground with anything else.
 - **D1 / D7 — SM712 TVS** *(C404012)* + **R12 / R19 — 120 Ω termination** — per-universe surge protection
   clamped to that universe's isolated ground, and the standard RS-485 line termination.
-- **J1 / J5 — XLR-5** *(C309326)* — the two DMX output connectors (Neutrik NC5FAH), each living entirely on its isolated domain.
+- **F2–F5 — Bourns TBU-CA065-200-WH** *(C913221)* — a series **high-speed protector** on each DMX data line:
+  the DMX512-A **"Protected"** (E1.11 Annex C) front end. It blocks a sustained fault (someone plugging mains,
+  or up to ±42 V, into the XLR) in under a microsecond and self-recovers, so the SM712 only ever sees the
+  sub-microsecond transient. Full breakdown in [`E1.11_COMPLIANCE.md`](E1.11_COMPLIANCE.md).
+- **R20–R23 — 470 Ω fail-safe bias** — hold each idle DMX pair in the RS-485 fail-safe state (needed for RDM).
+- **J1 / J5 — XLR-5** *(C368501)* — the two DMX output connectors (Neutrik NC5FAH), each living entirely on its isolated domain.
 - Nets: universe 1 = `VISO`/`GNDISO`/`DMX_A`/`DMX_B`; universe 2 = `VISO2`/`GNDISO2`/`DMX2_A`/`DMX2_B`.
 
 ### Power — USB-C **or** PoE (diode-OR'd)
@@ -88,7 +93,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
   divider is **R10 = 45.3 kΩ / R11 = 10 kΩ → 3.318 V** (SPICE-verified). Powers everything on the logic side.
 
 ### Programming & USB
-- **U3 — CH340C** *(C84681)* + **J2 — USB-C** *(C165948)* — USB-to-UART for flashing, plus the power inlet.
+- **U3 — CH340C** *(C7464026)* + **J2 — USB-C** *(C165948)* — USB-to-UART for flashing, plus the power inlet.
 - **Q1/Q2 — MMBT3904** *(C20526)* — the classic **2-transistor auto-reset** circuit: the CH340's DTR/RTS
   toggle EN and IO0 so `esptool` can drop the chip into the bootloader automatically — no button-dance.
 
@@ -121,7 +126,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
 
 ## The 4-layer board & the isolation barrier
 
-**Stack-up:** 4-layer, JLCPCB's standard **JLC04161H-3313** (1.6 mm). The two inner layers are
+**Stack-up:** 4-layer, JLCPCB **JLC04161H-7628** (1.6 mm; L1–L2 prepreg 0.2104 mm, Er 4.05 — the dielectric the Ethernet pairs are impedance-tuned to). The two inner layers are
 **ground-filled signal layers** — not classic "power planes". That's deliberate: as signal layers the
 autorouter will happily route ground (and fine-pitch escapes) to the inner copper, while the fill still
 gives every trace a solid 0.21 mm-away reference. The result: clean ~100 Ω Ethernet pairs and good EMI.
@@ -166,7 +171,7 @@ get done once. Move a part, re-run — done.
 > **Adding the dual-universe + PoE parts to an existing board:** [`sync_board.py`](sync_board.py) is the
 > incremental path — it keeps every already-placed footprint where it is, refreshes pad nets (e.g. J2's VBUS
 > moving onto `+5V_USB`), swaps J3 to the PoE magjack, and drops the brand-new parts (U6/PS2/J5/D7, U7/D10,
-> D8/D9, the new caps) in a grid on the right of the enlarged outline for you to place. Then run the normal
+> the new caps) in a grid on the right of the enlarged outline for you to place. Then run the normal
 > 2→5 pipeline. `build_v3.py` remains the full from-scratch grid build if you'd rather re-place everything.
 
 ---
@@ -178,15 +183,16 @@ Everything you upload is already generated in this folder.
 ### 1 — Bare PCB
 1. Go to [jlcpcb.com](https://jlcpcb.com) → **Add gerber file** → upload **`luxdmx_gerbers.zip`**.
 2. It auto-detects **4 layers**. Set: **Layers = 4**, Thickness **1.6 mm**, Impedance control =
-   **JLC04161H-3313** stackup (the one this board is designed for). Surface finish your choice (ENIG
+   **JLC04161H-7628** stackup (the one the board's Ethernet impedance is designed for). Surface finish your choice (ENIG
    recommended for the fine-pitch parts).
 
 ### 2 — Assembly (SMT)
 3. Enable **PCB Assembly**, then upload:
    - **BOM** → `luxdmx_BOM_jlcpcb.csv`
    - **CPL / pick-and-place** → `luxdmx_CPL.csv`
-4. In the BOM matching step, confirm each LCSC part (they're pre-filled). **J4** (the optional display
-   header) has no LCSC assigned — either pick a JST SH 9-pin part there or mark it **Do Not Populate**.
+4. In the BOM matching step, confirm each LCSC part (they're all pre-filled, every line in JLC stock). The
+   optional display / expansion headers **J4 / J6** (JST SH 9-pin, C160408) are in the BOM — mark them **Do
+   Not Populate** if you don't want the on-board panel.
 5. **Review the placement preview** — the CPL is rotation/position-corrected by `gen_cpl.py`, so parts
    should sit correctly. The ESP32-S3's antenna intentionally overhangs the left edge.
 
@@ -221,8 +227,8 @@ fee. A complete, assembled prototype lands well under typical hobby budgets.
 
 ## Status
 
-> **Design-complete and fully validated, but NOT yet fabricated or tested on real hardware.** Treat the
-> first build as a prototype and do a final review before ordering.
+> **Design-complete, fully validated, and the first spin is being fabricated.** Not yet bench-tested on
+> real hardware, so treat this first spin as a prototype.
 
 The v5 board (two isolated DMX universes + PoE, **119 × 79 mm**, 4 corner plated M3 mounting holes) is
 **fully routed** (0 unrouted, 0 unconnected) and passes the scripted validation:
