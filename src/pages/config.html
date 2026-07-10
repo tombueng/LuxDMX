@@ -159,7 +159,14 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="0">Client (join an existing network, STA)</option>
             <option value="1">Standalone access point (AP)</option>
           </select>
-          <div class="form-text">Client joins your router (set the password via the BOOT-button portal). Access point makes the device its own WiFi network for quick standalone tests, no router needed.</div>
+          <div class="form-text">Client joins your router. Access point makes the device its own WiFi network for quick standalone tests, no router needed.</div>
+        </div>
+        <div id="sta-creds-row" class="mb-3">
+          <label class="form-label text-secondary small mb-1">WiFi network (SSID)</label>
+          <input class="form-control mb-2" type="text" name="wifissid" id="wifi-ssid" value="" placeholder="MyNetwork">
+          <label class="form-label text-secondary small mb-1">WiFi password</label>
+          <input class="form-control" type="text" name="wifipsk" id="wifi-psk" value="" placeholder="(leave blank to keep the current one)">
+          <div class="form-text">The router network to join in client mode. Leave the password blank to keep the one already stored. To set this up without the web UI (first run), join the <b>LuxDMX-setup</b> access point and follow the page that pops up.</div>
         </div>
         <div id="ap-pw-row" class="mb-3" style="display:none">
           <label class="form-label text-secondary small mb-1">AP password</label>
@@ -702,6 +709,7 @@ function updNetMode(){
   var ap  = !eth && $('wifi-mode').value === '1';
   var fbAp = eth && $('fb-mode').value === '1';   // the standalone-AP fallback uses the AP password too
   $('wifi-mode-row').style.display = eth ? 'none' : '';
+  $('sta-creds-row').style.display = (!eth && !ap) ? '' : 'none';   // SSID/password only in client mode
   $('ap-pw-row').style.display     = (ap || fbAp) ? '' : 'none';
   $('ap-fb-row').style.display     = eth ? '' : 'none';
   $('static-row').style.display    = ap  ? 'none' : '';
@@ -729,6 +737,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('artrdm-sw').checked = d.artnetRdm !== undefined ? !!d.artnetRdm : true;
   $('useeth-sw').checked = !!d.useEthernet;
   $('wifi-mode').value = d.wifiMode !== undefined ? d.wifiMode : 0;
+  $('wifi-ssid').value = d.wifiSsid || '';
   $('ap-pw').value = d.apPassword || '';
   $('fb-mode').value = String(d.linkLossMode !== undefined ? d.linkLossMode : (d.apFallback ? 1 : 0));
   $('static-sw').checked = !!d.staticIp;

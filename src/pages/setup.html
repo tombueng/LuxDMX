@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LuxDMX — Setup</title>
+<link rel="icon" type="image/png" href="/favicon.png?v=__FWVER__">
+<link rel="stylesheet" href="/bootstrap.min.css?v=__FWVER__">
+<style>
+:root { --gh-bg:#0d1117; --gh-surface:#161b22; --gh-border:#30363d; --gh-text:#c9d1d9; --gh-muted:#8b949e; }
+[data-bs-theme="dark"] {
+  --bs-body-bg: var(--gh-bg); --bs-body-color: var(--gh-text);
+  --bs-card-bg: var(--gh-surface); --bs-card-border-color: var(--gh-border);
+}
+body { background: var(--gh-bg); }
+.site-nav {
+  background: var(--gh-surface); border-bottom: 1px solid var(--gh-border);
+  padding: 0.6rem 1rem; display: flex; align-items: center; gap: 1rem;
+}
+.brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+.brand img { height: 48px; }
+.brand-text { font-size: 1.2rem; font-weight: 700; color: #fff; }
+.card { background: var(--gh-surface); border-color: var(--gh-border); }
+.choice {
+  width: 100%; text-align: left; border: 1px solid var(--gh-border); background: var(--gh-surface);
+  border-radius: 10px; padding: 1.1rem 1.25rem; color: var(--gh-text); cursor: pointer;
+  display: flex; gap: 1rem; align-items: center; transition: border-color .15s, background .15s;
+}
+.choice:hover { border-color: #539bf5; background: #1b2230; }
+.choice .ic { font-size: 1.8rem; line-height: 1; }
+.choice .t { font-weight: 600; }
+.choice .d { color: var(--gh-muted); font-size: 0.85rem; }
+.net-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--gh-border); border-radius: 8px; }
+.net-item {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  padding: .55rem .8rem; cursor: pointer; border-bottom: 1px solid var(--gh-border);
+}
+.net-item:last-child { border-bottom: none; }
+.net-item:hover { background: #1b2230; }
+.net-item.sel { background: #1f6feb33; }
+.net-name { font-weight: 500; word-break: break-all; }
+.net-meta { color: var(--gh-muted); font-size: .8rem; white-space: nowrap; }
+footer { border-color: var(--gh-border) !important; color: var(--gh-muted); font-size: 0.77rem; }
+footer a { color: var(--gh-muted); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <span class="brand">
+    <img src="/logo.png?v=__FWVER__" alt="LuxDMX">
+    <span class="brand-text">LuxDMX</span>
+  </span>
+</nav>
+
+<div class="container py-4" style="max-width:480px">
+
+  <!-- Step 1: pick a path -->
+  <div id="step-landing">
+    <h5 class="fw-bold mb-1">Welcome</h5>
+    <p class="text-secondary small mb-4">First, get this gateway onto a network. Pick how you want to run it.</p>
+    <div class="d-grid gap-3">
+      <button type="button" class="choice" id="go-sta">
+        <span class="ic">&#128246;</span>
+        <span>
+          <span class="t d-block">Join my WiFi</span>
+          <span class="d">Connect to your router so consoles and apps on the same network can reach it.</span>
+        </span>
+      </button>
+      <button type="button" class="choice" id="go-ap">
+        <span class="ic">&#128225;</span>
+        <span>
+          <span class="t d-block">Use as access point</span>
+          <span class="d">The gateway becomes its own WiFi network. No router needed, good for a quick standalone rig.</span>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 2a: join WiFi -->
+  <div id="step-sta" style="display:none">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3">Join my WiFi</h6>
+        <form id="form-sta" method="POST" action="/setup">
+          <input type="hidden" name="mode" value="sta">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label text-secondary small mb-0">Nearby networks</label>
+            <button type="button" id="rescan" class="btn btn-outline-secondary btn-sm py-0">Rescan</button>
+          </div>
+          <div class="net-list mb-2" id="net-list">
+            <div class="text-secondary small p-3" id="net-status">Scanning&hellip;</div>
+          </div>
+          <label class="form-label text-secondary small mb-1">Network name (SSID)</label>
+          <input class="form-control mb-2" type="text" name="ssid" id="sta-ssid" placeholder="MyNetwork" required>
+          <label class="form-label text-secondary small mb-1">Password</label>
+          <input class="form-control mb-3" type="text" name="pw" id="sta-pw" placeholder="(leave blank for an open network)">
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary back-btn">Back</button>
+            <button type="submit" class="btn btn-primary flex-grow-1">Join &amp; reboot</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2b: access point -->
+  <div id="step-ap" style="display:none">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3">Use as access point</h6>
+        <form id="form-ap" method="POST" action="/setup">
+          <input type="hidden" name="mode" value="ap">
+          <p class="text-secondary small">The gateway will broadcast its own WiFi network (named after the device hostname). Join that network to control it.</p>
+          <label class="form-label text-secondary small mb-1">AP password (optional)</label>
+          <input class="form-control mb-1" type="text" name="appw" id="ap-pw" placeholder="(leave blank for an open network)">
+          <div class="form-text mb-3">8 or more characters enables WPA2. Leave it blank for an open network.</div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary back-btn">Back</button>
+            <button type="submit" class="btn btn-primary flex-grow-1">Create AP &amp; reboot</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="text-center py-3 border-top">
+  &copy; 2026 <a href="https://github.com/tombueng">tombueng</a>
+  &nbsp;&mdash;&nbsp; <a href="https://github.com/tombueng/LuxDMX">LuxDMX</a>
+</footer>
+
+<script>
+function $(id){ return document.getElementById(id); }
+function show(which){
+  $('step-landing').style.display = which === 'landing' ? '' : 'none';
+  $('step-sta').style.display     = which === 'sta'     ? '' : 'none';
+  $('step-ap').style.display      = which === 'ap'      ? '' : 'none';
+}
+$('go-sta').addEventListener('click', function(){ show('sta'); scan(); });
+$('go-ap').addEventListener('click', function(){ show('ap'); });
+var backs = document.getElementsByClassName('back-btn');
+for (var i = 0; i < backs.length; i++) backs[i].addEventListener('click', function(){ show('landing'); });
+
+// signal-strength label from RSSI (dBm)
+function bars(rssi){
+  if (rssi >= -55) return 'strong';
+  if (rssi >= -70) return 'ok';
+  return 'weak';
+}
+function scan(){
+  var list = $('net-list');
+  $('net-status') && ($('net-status').textContent = 'Scanning…');
+  fetch('/setup/scan').then(function(r){ return r.json(); }).then(function(d){
+    var nets = (d && d.nets) || [];
+    list.innerHTML = '';
+    if (!nets.length){
+      list.innerHTML = '<div class="text-secondary small p-3">No networks found. Enter the name below, or rescan.</div>';
+      return;
+    }
+    nets.forEach(function(n){
+      var row = document.createElement('div');
+      row.className = 'net-item';
+      var lock = n.lock ? ' 🔒' : '';
+      row.innerHTML = '<span class="net-name"></span><span class="net-meta">' + bars(n.rssi) + lock + '</span>';
+      row.querySelector('.net-name').textContent = n.ssid;
+      row.addEventListener('click', function(){
+        var sel = list.getElementsByClassName('sel');
+        for (var k = 0; k < sel.length; k++) sel[k].classList.remove('sel');
+        row.classList.add('sel');
+        $('sta-ssid').value = n.ssid;
+        if (!n.lock) $('sta-pw').value = '';
+        $('sta-pw').focus();
+      });
+      list.appendChild(row);
+    });
+  }).catch(function(){
+    list.innerHTML = '<div class="text-secondary small p-3">Scan failed. Enter the network name below.</div>';
+  });
+}
+$('rescan').addEventListener('click', scan);
+</script>
+</body>
+</html>

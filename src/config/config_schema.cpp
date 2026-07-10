@@ -79,6 +79,13 @@ const CfgField CONFIG_FIELDS[] = {
     // --- Network / WiFi -----------------------------------------------------
     BFIELD("useeth",   "useEthernet",  useEthernet,  "Use wired Ethernet", "Network", CFG_NONE),
     EFIELD("wifimode", "wifiMode",     wifiMode,     "WiFi mode",          "Network", ENUM_WIFIMODE),
+    // STA credentials: we own these now (the old WiFiManager kept them in the ESP32 WiFi NVS).
+    // wifissid: a blank web field clears it -> the device drops into the setup portal next boot.
+    // wifipsk: CFG_KEEPNE so saving other settings with the (never-echoed) password field left
+    // blank doesn't wipe it; CFG_SECRET masks it in serial dumps. /info.json only ever emits the
+    // SSID, never the password.
+    SFIELD("wifissid", "wifiSsid",     wifiSsid,     "WiFi SSID",          "Network", CFG_NONE),
+    SFIELD("wifipsk",  "wifiPsk",      wifiPsk,      "WiFi password",      "Network", CFG_SECRET | CFG_KEEPNE),
     EFIELD("fbmode",   "linkLossMode", linkLossMode, "Link-loss policy",   "Network", ENUM_FBMODE),
     SFIELD("appw",     "apPassword",   apPassword,   "AP password",        "Network", CFG_SECRET),
     BFIELD("staticip", "staticIp",     staticIp,     "Static IP",          "Network", CFG_NONE),

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LuxDMX — Setup done</title>
+<link rel="icon" type="image/png" href="/favicon.png?v=__FWVER__">
+<link rel="stylesheet" href="/bootstrap.min.css?v=__FWVER__">
+<style>
+[data-bs-theme="dark"]{--bs-success:#45d85c;--bs-success-rgb:69,216,92;}
+body { background: #0d1117; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.box { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 2.25rem 2rem; text-align: center; width: min(400px, 92vw); color: #c9d1d9; }
+.box a.go { display: inline-block; margin-top: .25rem; font-size: 1.1rem; font-weight: 600; word-break: break-all; }
+.hint { color: #8b949e; font-size: .8rem; margin-top: 1rem; }
+.progress { background: #0d1117; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div style="font-size:2.5rem;margin-bottom:.5rem">&#10003;</div>
+  <div class="fw-bold fs-5 mb-2 text-success">{{TITLE}}</div>
+  <div class="text-secondary small mb-3">{{MSG}}</div>
+  <a class="go" href="{{URL}}">{{URLLABEL}}</a>
+  <div class="progress mt-3" role="progressbar" aria-label="Waiting for the device" style="height:6px">
+    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width:100%"></div>
+  </div>
+  <div class="hint" id="status">Waiting for the device to come back online&hellip; this page jumps there on its own once it does.</div>
+  <div class="hint">{{HINT}}</div>
+</div>
+<script>
+// The device is rebooting onto its new network, so we can't fetch it (CORS + we're still on
+// the old setup AP that's going away). Probe reachability with an <img> instead — that loads
+// cross-origin fine — and navigate the moment the favicon comes back on the new network.
+var url = "{{URL}}";
+var tries = 0;
+function probe(){
+  var i = new Image();
+  i.onload = function(){ document.getElementById('status').textContent = 'Found it — opening…'; location.href = url; };
+  i.src = url + "/favicon.png?_=" + Date.now();
+  if (++tries === 8) document.getElementById('status').textContent =
+    'Still waiting… make sure this device is on the same network, then tap the link above.';
+}
+setInterval(probe, 2500);
+setTimeout(probe, 1500);
+</script>
+</body>
+</html>
