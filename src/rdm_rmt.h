@@ -345,3 +345,41 @@ static bool rdmRmtSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* ack) {
                         resp, sizeof(resp), &rpdl, ack)) return false;
     return ack->type == RDM_RESPONSE_TYPE_ACK;
 }
+
+// --- ArtRdm raw pass-through ----------------------------------------------------------------
+// Relay an RDM request exactly as an Art-Net controller supplied it. ArtRdm carries the full RDM
+// message WITHOUT the 0xCC start code (the controller already computed the checksum over the whole
+// message including that start code, per E1.20). We prepend 0xCC, put it on the wire, read the raw
+// reply, strip its 0xCC and hand the reply straight back so it can be wrapped into an ArtRdm reply.
+// Returns the reply length (>=0, without start code) or -1 (no/invalid reply, e.g. a broadcast).
+//   reqNoSC/reqLen : the ArtRdm RDM packet (SUB_START_CODE .. checksum) = RDM message minus SC.
+//   respNoSC/max   : buffer for the reply, also minus SC.
+static int rdmRmtRawRelay(const uint8_t* reqNoSC, int reqLen, uint8_t* respNoSC, int respMax) {
+    RmtDmx* rd = g_rdmRmt;
+    if (!rd || !rd->chan || reqLen < RDM_HDR_LEN - 1 || reqLen > 260) return -1;
+    static uint8_t pkt[264];
+    pkt[0] = RDM_SC;
+    memcpy(pkt + 1, reqNoSC, reqLen);            // controller's checksum already covers the SC
+    // Destination UID is msg[3..8] -> reqNoSC[2..7]. A broadcast/vendorcast dest gets no reply.
+    uint16_t destMan = ((uint16_t)reqNoSC[2] << 8) | reqNoSC[3];
+    bool bcast = (destMan == 0xFFFF);
+    rdmTx(pkt, reqLen + 1);
+    if (bcast) return 0;                          // relayed, nothing to read back
+    uint8_t rx[96];
+    int n = uart_read_bytes(RDM_RMT_UART, rx, sizeof(rx), pdMS_TO_TICKS(RDM_RESP_TIMEOUT_MS));
+    rdmDe(1);                                     // done listening -> drive (DMX resumes next frame)
+    if (n < 26) return -1;
+    int s = -1;
+    for (int i = 0; i < n - 1; i++) { if (rx[i] == RDM_SC && rx[i + 1] == RDM_SC_SUB) { s = i; break; } }
+    if (s < 0) return -1;
+    uint8_t* m = rx + s;
+    int avail = n - s;
+    int msgLen = m[2];
+    if (msgLen + 2 > avail || msgLen < RDM_HDR_LEN) return -1;
+    uint16_t ck = 0; for (int i = 0; i < msgLen; i++) ck += m[i];
+    if (ck != (uint16_t)((m[msgLen] << 8) | m[msgLen + 1])) return -1;
+    int outLen = msgLen + 2 - 1;                  // full reply minus the start code
+    if (outLen > respMax) outLen = respMax;
+    memcpy(respNoSC, m + 1, outLen);              // SUB_START_CODE .. checksum
+    return outLen;
+}
