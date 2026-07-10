@@ -83,7 +83,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Ethernet support** | WT32-ETH01 (LAN8720) and the v5 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external W5500 module works too, and a **classic ESP32 can pick the W5500 (SPI) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
+| **Ethernet support** | WT32-ETH01 (LAN8720) and the v5 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
@@ -505,7 +505,7 @@ On first boot (or after WiFi reset), a board in WiFi client mode opens a WiFi ac
 
 Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a reboot.
 
-- **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 module** enabled under *Wired Ethernet (W5500)*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first turn on "Use a W5500 Ethernet module" (off by default) and set its pins, then enable "Use wired Ethernet".
+- **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 / DM9051 SPI module** picked under *Wired Ethernet*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first pick the SPI chip (W5500 or DM9051) under *Wired Ethernet* and set its pins, then enable "Use wired Ethernet".
 - **WiFi mode:**
   - **Client (STA)** — join your existing 2.4 GHz network (the default; set credentials via the config portal above).
   - **Standalone AP** — LuxDMX hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
@@ -836,16 +836,20 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
 | LuxDMX v4 (ESP32-S3 + W5500) | `luxdmx_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 
-**Any ESP32 / ESP32-S3 build can add wired Ethernet with an external W5500 module** — the W5500
-driver is compiled into every build. In **`/config` &rarr; Wired Ethernet** turn on
-**Use a W5500 Ethernet module** (off by default), set its pins, then enable **Use wired Ethernet**.
-Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25) and
-are fully configurable (with the on-board pin-picker); lower the SPI clock there if a long-wired
-module isn't detected. No special build is needed.
+**Any ESP32 / ESP32-S3 build can add wired Ethernet with an external SPI module** — the W5500 and
+DM9051 drivers are compiled into every build. In **`/config` &rarr; Wired Ethernet** pick the chip
+(**W5500** or **DM9051**), set its pins, then enable **Use wired Ethernet**. The two share the same
+SPI wiring, so one pin card serves both. Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 /
+MOSI=23 / MISO=19 / INT=4 / RST=25) and are fully configurable (with the on-board pin-picker); lower
+the SPI clock there if a long-wired module isn't detected. No special build is needed.
 
-On a **classic ESP32** the card also shows a **Wired PHY** selector: pick the **W5500 (SPI module)**
-or the **ESP32 built-in MAC + RMII PHY** (the WT32-ETH01 style). The S3 has no internal MAC, so it
-stays W5500-only and the selector is hidden.
+The **DM9051** is a W5500 alternative (sometimes easier to source). It's wired in and selectable, but
+nobody's had one on the bench yet, so it's **untested on real hardware** so far. The W5500 path is
+unchanged.
+
+On a **classic ESP32** the card also lists the **ESP32 built-in MAC + RMII PHY** options (the
+WT32-ETH01 style) alongside the SPI modules. The S3 has no internal MAC, so it only offers the SPI
+modules (W5500 / DM9051).
 
 When **RMII** is selected you can set the **PHY family** (LAN8720/LAN8742, IP101, RTL8201, DP83848,
 KSZ8081, JL1101), the **PHY address**, the **MDC / MDIO / PHY-power** GPIOs and the **REF_CLK mode**

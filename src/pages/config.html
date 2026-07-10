@@ -222,18 +222,20 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
         <label class="form-label text-secondary small mb-1">Wired Ethernet PHY</label>
         <select class="form-select" id="wired-sel"><option value="none">None (WiFi only)</option></select>
         <div class="form-text">
-          Pick the wired hardware, or <b>None</b> to run on WiFi. <b>W5500</b> is an external SPI
-          module (any ESP32 / ESP32-S3). The <b>RMII</b> PHYs use the classic ESP32's built-in MAC
-          (an S3 has none, so it only offers W5500). Choosing a PHY reveals its pins and the
-          <i>Use wired Ethernet</i> switch in the Network card above.
+          Pick the wired hardware, or <b>None</b> to run on WiFi. <b>W5500</b> and <b>DM9051</b> are
+          external SPI modules (any ESP32 / ESP32-S3) that share the same pins below; DM9051 is a
+          W5500 alternative and is untested on hardware so far. The <b>RMII</b> PHYs use the classic
+          ESP32's built-in MAC (an S3 has none, so it only offers the SPI modules). Choosing a PHY
+          reveals its pins and the <i>Use wired Ethernet</i> switch in the Network card above.
         </div>
         <!-- Hidden, JS-driven fields the firmware reads (kept so the NVS keys / OTA stay the same) -->
         <input type="checkbox" name="ethon" id="ethon-sw" value="1" hidden>
         <select name="wiredphy" id="wired-phy" hidden><option value="0"></option><option value="1"></option></select>
+        <select name="ethspiphy" id="eth-spi-phy" hidden><option value="0"></option><option value="1"></option></select>
         <select name="rmiiphy" id="rmii-phy" hidden><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option><option value="5"></option></select>
 
         <div id="w5500-pins" class="mt-3" style="display:none">
-          <div class="form-text mb-2">GPIO pins for the W5500 module. Defaults are the classic-ESP32 VSPI pins.</div>
+          <div class="form-text mb-2">GPIO pins for the W5500 / DM9051 SPI module. Defaults are the classic-ESP32 VSPI pins.</div>
           <div class="row g-2">
             <div class="col"><label class="form-label text-secondary small mb-1">CS</label>
               <input class="form-control" type="number" name="ethcs" id="eth-cs" min="-1" max="48" value="5"></div>
@@ -673,7 +675,8 @@ var RMII_PHY_LABELS = ['LAN8720 / LAN8742', 'IP101', 'RTL8201', 'DP83848', 'KSZ8
 function buildWiredSelect(){
   var sel = $('wired-sel'); if (!sel) return;
   var html = '<option value="none">None (WiFi only)</option>';
-  if (ETH_SPI)  html += '<option value="w5500">W5500 (SPI module)</option>';
+  if (ETH_SPI)  html += '<option value="w5500">W5500 (SPI module)</option>'
+                      + '<option value="dm9051">DM9051 (SPI module)</option>';
   if (ETH_RMII) for (var i = 0; i < RMII_PHY_LABELS.length; i++)
     html += '<option value="rmii' + i + '">' + RMII_PHY_LABELS[i] + ' (RMII)</option>';
   sel.innerHTML = html;
@@ -684,11 +687,13 @@ function currentPhy(){ return wiredSel().indexOf('rmii') === 0 ? 1 : 0; }
 // Drive the card + the hidden firmware fields from the one selector. None = no wired
 // (forces WiFi); W5500 or an RMII PHY shows its pins + the "Use wired Ethernet" switch.
 function updWired(){
-  var v = wiredSel(), rmii = v.indexOf('rmii') === 0, w5500 = v === 'w5500', none = v === 'none';
-  $('ethon-sw').checked = w5500;                 // ethW5500 = W5500 selected
+  var v = wiredSel(), rmii = v.indexOf('rmii') === 0, dm9051 = v === 'dm9051',
+      spi = v === 'w5500' || dm9051, none = v === 'none';
+  $('ethon-sw').checked = spi;                   // SPI module (W5500 or DM9051) selected
   $('wired-phy').value  = rmii ? '1' : '0';      // wiredPhy 0=SPI, 1=RMII
+  $('eth-spi-phy').value = dm9051 ? '1' : '0';   // ethSpiPhy 0=W5500, 1=DM9051
   if (rmii) $('rmii-phy').value = v.slice(4);    // rmiiPhy index from "rmiiN"
-  $('w5500-pins').style.display = w5500 ? '' : 'none';
+  $('w5500-pins').style.display = spi ? '' : 'none';
   $('rmii-pins').style.display  = rmii  ? '' : 'none';
   $('net-mode-row').style.display = none ? 'none' : '';   // "Use wired Ethernet" only once a PHY is picked
   if (none) $('useeth-sw').checked = false;               // None forces WiFi
@@ -769,7 +774,8 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   // One Wired-Ethernet selector: build its options, then pick the current PHY from the
   // saved state (RMII -> rmiiN; else W5500 if the module is enabled; else None).
   buildWiredSelect();
-  $('wired-sel').value = (d.wiredPhy === 1) ? ('rmii' + (d.rmiiPhy || 0)) : (d.ethW5500 ? 'w5500' : 'none');
+  $('wired-sel').value = (d.wiredPhy === 1) ? ('rmii' + (d.rmiiPhy || 0))
+                       : (d.ethW5500 ? (d.ethSpiPhy === 1 ? 'dm9051' : 'w5500') : 'none');
   if (ETH_SPI || ETH_RMII)  $('w5500-card').style.display = '';    // build has a wired PHY -> show the card
   updWired();                                                      // map selection -> hidden fields + visibility
   $('dev-host').value = d.hostname || '';

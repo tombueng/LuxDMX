@@ -53,6 +53,12 @@
 // every other build defaults to W5500 — exactly the old compile-time split.
 #define WIRED_PHY_SPI  0   // W5500 over SPI (external module)
 #define WIRED_PHY_RMII 1   // LAN8720 over RMII (ESP32 internal EMAC)
+// Which SPI Ethernet chip the WIRED_PHY_SPI path drives (cfg.ethSpiPhy). Both are external
+// modules on the SAME CS/INT/RST/SCK/MISO/MOSI wiring and use the same ETH.begin() SPI
+// signature; only the PHY enum differs. DM9051 is a W5500 alternative (issue #36), UNTESTED
+// on real hardware so far. Default W5500, so an OTA changes nothing for existing devices.
+#define ETH_SPI_PHY_W5500  0   // Wiznet W5500
+#define ETH_SPI_PHY_DM9051 1   // Davicom DM9051
 #ifndef DEF_WIRED_PHY
 #if defined(USE_ETH_RMII)
 #define DEF_WIRED_PHY WIRED_PHY_RMII
@@ -2446,7 +2452,18 @@ static void waitEthLink() {
 // instead just starves the whole W5500 stack; core separation is the right lever.)
 static volatile bool s_ethUpDone;
 static void ethUpTask(void *arg) {
-    ETH.begin(ETH_PHY_W5500, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
+    // W5500 and DM9051 share the same SPI wiring + ETH.begin() signature; only the PHY enum
+    // changes. DM9051 is gated behind its IDF SPI-Ethernet driver (CONFIG_ETH_SPI_ETHERNET_
+    // DM9051, the same macro that gates the enum in ETH.h): if the framework wasn't built
+    // with it we fall back to W5500 so the build can never break (issue #36).
+    eth_phy_type_t phy = ETH_PHY_W5500;
+#if defined(CONFIG_ETH_SPI_ETHERNET_DM9051)
+    if (cfg.ethSpiPhy == ETH_SPI_PHY_DM9051) phy = ETH_PHY_DM9051;
+#else
+    if (cfg.ethSpiPhy == ETH_SPI_PHY_DM9051)
+        Serial.println("[ETH] DM9051 not in this build, using W5500");
+#endif
+    ETH.begin(phy, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
               ETH_W5500_SPI_HOST, cfg.ethSck, cfg.ethMiso, cfg.ethMosi,
               cfg.ethFreqMhz);
     ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link
@@ -2456,7 +2473,8 @@ static void ethUpTask(void *arg) {
     vTaskDelete(NULL);
 }
 static void startEthSpi() {
-    Serial.printf("[ETH] W5500 SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz (bring-up on core 0)\n",
+    Serial.printf("[ETH] %s SPI cs=%d irq=%d rst=%d sck=%d miso=%d mosi=%d freq=%dMHz (bring-up on core 0)\n",
+        cfg.ethSpiPhy == ETH_SPI_PHY_DM9051 ? "DM9051" : "W5500",
         cfg.ethCs, cfg.ethInt, cfg.ethRst, cfg.ethSck, cfg.ethMiso, cfg.ethMosi, cfg.ethFreqMhz);
     s_ethUpDone = false;
     xTaskCreatePinnedToCore(ethUpTask, "ethup", 8192, NULL, 5, NULL, 0);
