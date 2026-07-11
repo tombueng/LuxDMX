@@ -83,9 +83,21 @@ peripheral, `dmx_rmt.h`, so it is hardware-timed and never corrupts even while R
 - `docs/tests/artnet-rdm.spec.mjs` is the Playwright e2e (read-only paths by default; the wire GET/SET
   + flush + DMX-not-disturbed checks gate behind `LUXDMX_WRITE=1`).
 - `docs/qlcplus-rdm-test.qxw` is a ready QLC+ workspace (Art-Net output to the gateway, dimmers at the
-  sim's fixture addresses) for driving the gateway from a real console while RDM runs.
+  sim's fixture addresses) for driving the gateway from a real console while RDM runs. QLC+ itself has
+  no RDM, so it only exercises the DMX side (useful for "RDM doesn't disturb DMX").
+- **Independent validation with OLA** (the reference open RDM stack). `ola_rdm_discover -u 0`,
+  `ola_rdm_get --universe 0 --uid <uid> DEVICE_INFO`, `... DMX_START_ADDRESS`, `ola_rdm_set ... 50`,
+  `... SENSOR_VALUE 0` all round-trip against the gateway (patch OLA's Art-Net output port to universe
+  0 first). This was run and confirmed on the bench: OLA discovers all fixtures and reads/writes them
+  cleanly, so a completely separate implementation drives the node end to end.
 - The DMX-stays-40fps-under-RDM numbers above come from the RP2350 analyzer's ground-truth UART
   (`anRefresh` / `gtFramingErr`), the same rig as the issue-#64 framing work.
+
+**PC tools that can drive Art-Net RDM:** DMX-Workshop (Artistic Licence, the simplest), OLA, MagicQ,
+grandMA3. Note: **QLC+ has no RDM at all** (DMX only), and **grandMA3 onPC cannot output Art-Net
+without MA hardware** unlocking parameters. OLA has no native Windows build; under WSL2 its Art-Net
+replies (fixed UDP port 6454) don't survive the default NAT, so either use WSL "mirrored" networking
+or a small host-side Art-Net relay that bridges the WSL subnet to the LAN.
 
 > **TL;DR** — RDM needs a transceiver whose **DE/RE (direction) pin is controlled by a GPIO**,
 > plus galvanic isolation and a 120 Ω terminator. The current **Waveshare TTL→RS485 (C)** is
