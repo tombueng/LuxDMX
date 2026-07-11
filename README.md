@@ -683,7 +683,7 @@ no network means you still get the built-ins plus manual entry. You can switch b
 a dropdown inside the pin-picker popup itself.
 
 All descriptors are generated from authoritative pinout data
-(`hardware/gen_board_descriptor.py`): `hardware/luxdmx.py` for v3, published header
+(`hardware/gen_board_descriptor.py`): `hardware/luxdmx.py` for our own board, published header
 pinouts for the hand-tuned dev boards, and the Arduino core `variants/<dir>/pins_arduino.h`
 for the rest, so the GPIO numbers and reserved/strapping/flash flags are accurate per
 variant (e.g. the PICO-based Feather V2 frees GPIO6-11 and reserves 16/17 instead). The
