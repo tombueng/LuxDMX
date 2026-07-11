@@ -7,7 +7,7 @@ import dns from 'dns/promises';
 // Resolve the device: LUXDMX_URL > mDNS lookup of LUXDMX_HOST > fallback IP.
 // (Headless Chromium can't resolve *.local itself, so we resolve to an IP here.)
 const FALLBACK_IP = '192.168.178.197';
-const OUT         = 'C:/dev/DMX/docs';
+const OUT         = process.env.LUXDMX_OUT || 'C:/dev/DMX/docs';
 const VID_RAW     = OUT + '/video-raw';
 const RUN_OTA     = process.env.LUXDMX_OTA === '1';   // off by default (reflashes device)
 const RUN_VIDEO   = process.env.LUXDMX_NOVIDEO !== '1';
@@ -139,6 +139,40 @@ async function shoot(browser) {
       } catch { /* still rebooting */ }
     }
   }
+  await page.close();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1b. First-run setup portal (issue #45). The /setup page is served on any boot,
+//     so we can shoot it against the running device. Phone-width, since that's how
+//     you actually meet it (joining the LuxDMX-setup AP from a phone). The nearby-
+//     networks list is stubbed with friendly names so real SSIDs never land in the
+//     docs, and nothing here writes to the device.
+// ─────────────────────────────────────────────────────────────────────────────
+async function shootSetup(browser) {
+  const page = await browser.newPage();
+  await page.route('**/setup/scan', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ nets: [
+      { ssid: 'GreenRoom',     rssi: -48, lock: true  },
+      { ssid: 'BackstageWiFi', rssi: -63, lock: true  },
+      { ssid: 'FOH-Guest',     rssi: -71, lock: false },
+    ] }),
+  }));
+  // Phone-ish width; heights are tuned per step so the shot crops to the content
+  // (the page's min-height:100vh would otherwise pad a tall viewport with dead space).
+  await page.setViewportSize({ width: 460, height: 470 });
+  await page.goto(BASE + '/setup', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: OUT + '/screenshot-setup.png', fullPage: true });
+  console.log('setup landing done');
+
+  // Step into "Join my WiFi" so the scan list + fields are visible too
+  await page.setViewportSize({ width: 460, height: 600 });
+  await page.click('#go-sta');
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: OUT + '/screenshot-setup-join.png', fullPage: true });
+  console.log('setup join done');
   await page.close();
 }
 
@@ -380,10 +414,15 @@ async function recordDemo(browser) {
 // ─────────────────────────────────────────────────────────────────────────────
 const browser = await chromium.launch();
 try {
-  if (RUN_SHOTS) await shoot(browser);
-  if (RUN_VIDEO) {
-    if (existsSync(VID_RAW)) rmSync(VID_RAW, { recursive: true, force: true });
-    await recordDemo(browser);
+  // LUXDMX_ONLY=setup regenerates just the setup-portal shots (no device mutation, no video).
+  if (process.env.LUXDMX_ONLY === 'setup') {
+    await shootSetup(browser);
+  } else {
+    if (RUN_SHOTS) { await shoot(browser); await shootSetup(browser); }
+    if (RUN_VIDEO) {
+      if (existsSync(VID_RAW)) rmSync(VID_RAW, { recursive: true, force: true });
+      await recordDemo(browser);
+    }
   }
 } finally {
   await browser.close();

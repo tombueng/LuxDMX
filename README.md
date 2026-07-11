@@ -487,6 +487,9 @@ Out of the box, connect an Ethernet cable and power on — DHCP assigns an IP au
 
 ### 1. Setup portal (first run)
 
+| ![Setup portal — pick a path](docs/screenshot-setup.png) | ![Setup portal — join WiFi](docs/screenshot-setup-join.png) |
+|---|---|
+
 On first boot (or after a WiFi reset, or with the BOOT button held at power-up), LuxDMX
 opens its own setup access point and a captive portal:
 
