@@ -110,7 +110,7 @@ E1.33 "RDMnet", not implemented). The node side is four opcodes:
 
 **Discovery is proxied, GET/SET are pass-through.** The gateway runs E1.20 discovery on its own
 DMX wire and keeps a TOD; the console never touches the wire, it reads the TOD and sends GET/SET
-that the gateway relays. Discovery runs at power-on and on `AtcFlush`, and updated `ArtTodData` is
+that the gateway relays. Discovery runs on demand (a manual Discover or an `AtcFlush`), and updated `ArtTodData` is
 pushed to any console that asked once the TOD changes.
 
 ### Keeping DMX smooth while RDM runs (the real problem)

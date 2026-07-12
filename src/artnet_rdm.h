@@ -625,6 +625,6 @@ static void artRdmInit() {
     }
     Serial.printf("[ART-RDM] Art-Net RDM node up on :%d (port-address 0x%04X, RDM %s)\n",
                   ARTNET_PORT, artRdmPortAddr(), g_artRdmEnabled ? "on" : "off");
-    // Power-on discovery so the TOD is populated before the first console asks.
-    if (g_artRdmEnabled && rdmAvailable()) artStartDiscovery();
+    // No power-on scan: RDM discovers only on demand (a manual Discover, or a console's
+    // ArtTodControl/AtcFlush), so boot never dips the DMX output. The TOD starts empty.
 }
