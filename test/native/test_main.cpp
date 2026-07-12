@@ -68,6 +68,7 @@ static void checkBoard(const char* name) {
     EQ(cfg.ethCs, ethCs); EQ(cfg.ethSck, ethSck); EQ(cfg.ethMosi, ethMosi);
     EQ(cfg.ethMiso, ethMiso); EQ(cfg.ethInt, ethInt); EQ(cfg.ethRst, ethRst); EQ(cfg.ethFreqMhz, 20);
     EQ(cfg.ethW5500, false); EQ(cfg.wiredPhy, wiredPhy); EQ(cfg.useEthernet, useEth);
+    EQ(cfg.ethSpiPhy, 0);   // SPI Ethernet chip defaults to W5500 on every board (issue #36)
     EQ(cfg.rmiiPhy, 0); EQ(cfg.rmiiAddr, 1); EQ(cfg.rmiiMdc, 23); EQ(cfg.rmiiMdio, 18); EQ(cfg.rmiiPwr, 16); EQ(cfg.rmiiClk, 0);
     EQ(cfg.wifiMode, 0); EQ(cfg.linkLossMode, 0); EQ(cfg.staticIp, false); EQ(cfg.autoUpdate, false);
     EQ(cfg.subnet, "255.255.255.0");

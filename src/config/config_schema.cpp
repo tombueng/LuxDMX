@@ -16,6 +16,7 @@ static const char* const ENUM_PROTOCOL[] = {"Art-Net", "sACN", "Art-Net + sACN"}
 static const char* const ENUM_LEDTYPE[]  = {"off", "plain GPIO", "WS2812 RGB", "5-LED panel"};
 static const char* const ENUM_DISPTYPE[] = {"off", "SSD1306 128x64", "SSD1306 128x32", "SH1106", "SSD1351 colour"};
 static const char* const ENUM_WIREDPHY[] = {"W5500 (SPI)", "LAN8720 (RMII)"};
+static const char* const ENUM_ETHSPIPHY[] = {"W5500", "DM9051"};
 static const char* const ENUM_WIFIMODE[] = {"STA (client)", "AP (standalone)"};
 static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "reboot"};
 
@@ -64,6 +65,7 @@ const CfgField CONFIG_FIELDS[] = {
     IFIELD("ethint",  "ethInt",   ethInt,     -1, 48, "W5500 INT",  "Ethernet (W5500)"),
     IFIELD("ethrst",  "ethRst",   ethRst,     -1, 48, "W5500 RST",  "Ethernet (W5500)"),
     IFIELD("ethfreq", "ethFreq",  ethFreqMhz,  1, 80, "W5500 SPI MHz", "Ethernet (W5500)"),
+    EFIELD("ethspiphy", "ethSpiPhy", ethSpiPhy, "SPI Ethernet chip", "Ethernet (W5500)", ENUM_ETHSPIPHY),
 
     // --- Wired Ethernet: PHY select + LAN8720 (RMII) -----------------------
     EFIELD("wiredphy", "wiredPhy", wiredPhy,                       "Wired PHY",       "Ethernet (RMII)", ENUM_WIREDPHY),

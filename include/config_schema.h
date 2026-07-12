@@ -31,6 +31,7 @@ struct Config {
     int       dispSda, dispScl, dispRot, dispCs, dispDc, dispRst, dispSck, dispMosi;
     int       ethCs, ethSck, ethMosi, ethMiso, ethInt, ethRst, ethFreqMhz;
     bool      ethW5500;
+    int       ethSpiPhy;   // SPI Ethernet chip: 0=W5500, 1=DM9051 (used when wiredPhy = SPI)
     int       wiredPhy;
     int       rmiiPhy, rmiiAddr, rmiiMdc, rmiiMdio, rmiiPwr, rmiiClk;
     bool      useEthernet;

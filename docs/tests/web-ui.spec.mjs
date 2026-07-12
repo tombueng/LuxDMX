@@ -103,6 +103,7 @@ test.describe('Web UI + REST', () => {
     expect(typeof d.ethSpi).toBe('boolean');    // whether the W5500 driver is compiled in
     expect(typeof d.ethRmii).toBe('boolean');   // whether the internal-MAC RMII PHY is compiled in
     expect(typeof d.wiredPhy).toBe('number');   // 0 = W5500, 1 = LAN8720 RMII
+    expect(typeof d.ethSpiPhy).toBe('number');  // SPI chip: 0 = W5500, 1 = DM9051 (issue #36)
     expect(typeof d.linkLossMode).toBe('number'); // WIRED_FB_* link-loss policy
     if (d.ethSpi) {
       for (const k of ['ethCs', 'ethSck', 'ethMosi', 'ethMiso', 'ethInt', 'ethRst', 'ethFreq']) {
@@ -142,6 +143,13 @@ test.describe('Web UI + REST', () => {
       await sel.selectOption('w5500');
       await expect(page.locator('#w5500-pins')).toBeVisible();
       await expect(page.locator('#rmii-pins')).toBeHidden();
+      // DM9051 is the W5500 alternative: same SPI pin card, ethSpiPhy = 1 (issue #36)
+      await expect(sel.locator('option[value="dm9051"]')).toHaveCount(1);
+      await sel.selectOption('dm9051');
+      await expect(page.locator('#w5500-pins')).toBeVisible();
+      await expect(page.locator('#eth-spi-phy')).toHaveValue('1');
+      await sel.selectOption('w5500');
+      await expect(page.locator('#eth-spi-phy')).toHaveValue('0');
     }
     if (d.ethRmii) {
       await expect(sel.locator('option[value^="rmii"]')).toHaveCount(6);   // all six RMII PHYs
