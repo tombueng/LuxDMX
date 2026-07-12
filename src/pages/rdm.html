@@ -13,25 +13,7 @@
 html { background:#0d1117; }
 body { background:#0d1117; animation:lxfade .16s ease-out; }
 @keyframes lxfade { from { opacity:0 } to { opacity:1 } }
-/* Smooth tab switching: the browser renders the new page fully, then does a quick crossfade;
-   the top bar is a named element so it stays put instead of flickering. Progressive
-   enhancement — browsers without view transitions just navigate normally. */
-@view-transition { navigation: auto; }
-.site-nav { view-transition-name: site-nav; }
-::view-transition-group(site-nav) { animation-duration:.18s; }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration:.18s; }
-
-.site-nav { display:flex; align-items:center; gap:1rem; padding:.6rem 1rem; background:#161b22;
-            border-bottom:1px solid var(--gh-border); flex-wrap:wrap; }
-.site-nav .brand { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
-.site-nav .brand img { height:64px; border-radius:14px; }
-.site-nav .brand-text .name { font-size:1.4rem; font-weight:700; color:#fff; line-height:1; }
-.site-nav .brand-text .sub  { font-size:.68rem; color:var(--gh-muted); margin-top:2px; }
-.nav-stats { margin-left:auto; display:flex; gap:1.15rem; align-items:center; flex-wrap:wrap; }
-.nav-stat  { display:flex; flex-direction:column; line-height:1.05; }
-.nav-stat .ns-label { font-size:.55rem; text-transform:uppercase; letter-spacing:.07em; color:var(--gh-muted); }
-.nav-stat .ns-val   { font-size:.95rem; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; min-width:2.4em; }
-.site-nav .nav-links { display:flex; gap:.4rem; }
+/* the navbar (markup + its CSS + behaviour) is the shared src/pages/_nav.html fragment */
 .card-header { background:#1c2128; border-color:var(--gh-border); font-size:.85rem; }
 .mono { font-family:monospace; }
 .pill { font-size:.68rem; padding:.12em .5em; border-radius:10px; background:#21262d; color:var(--gh-muted); }
@@ -64,6 +46,7 @@ body { background:#0d1117; animation:lxfade .16s ease-out; }
 .fxrow:hover > td { background:#1c2128; }
 .fxrow .fx-name { font-weight:600; }
 .fxrow .fx-uid { font-family:monospace; font-size:.72rem; color:var(--gh-muted); }
+.uni-badge { font-size:.68rem; padding:.08em .45em; border-radius:6px; background:rgba(88,166,255,.18); color:#79c0ff; font-weight:600; }
 .fxrow .caret { display:inline-block; width:.85em; transition:transform .15s; color:var(--gh-muted); }
 .fxrow.open .caret { transform:rotate(90deg); }
 .fxedit { display:none; }
@@ -89,27 +72,7 @@ body { background:#0d1117; animation:lxfade .16s ease-out; }
 </style>
 </head>
 <body>
-<nav class="site-nav">
-  <a class="brand" href="/">
-    <img src="/logo.png?v=__FWVER__" alt="LuxDMX">
-    <div class="brand-text">
-      <div class="name">LuxDMX</div>
-      <div class="sub" id="nav-sub">&nbsp;</div>
-    </div>
-  </a>
-  <div class="nav-stats">
-    <div class="nav-stat"><span class="ns-label">FPS</span><span class="ns-val" id="fps">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label">Heap</span><span class="ns-val" id="heap">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">&middot;</span></div>
-  </div>
-  <div class="nav-links">
-    <a href="/" class="btn btn-outline-secondary btn-sm">Status</a>
-    <a href="/rdm" class="btn btn-primary btn-sm">RDM</a>
-    <a href="/config" class="btn btn-outline-secondary btn-sm">Settings</a>
-  </div>
-</nav>
+<!--NAVBAR-->
 
 <div class="container-fluid p-3">
   <div class="card mb-3">
@@ -121,7 +84,7 @@ body { background:#0d1117; animation:lxfade .16s ease-out; }
           <label class="form-check-label small" for="live-sw">Live sensors</label>
         </div>
         <span class="pill" id="art-port">&nbsp;</span>
-        <button class="btn btn-primary btn-sm" id="disc-btn" onclick="rdmDiscover()">Discover</button>
+        <span id="disc-ctl" class="d-flex gap-1"></span>
       </div>
     </div>
     <div class="card-body">
@@ -137,8 +100,9 @@ body { background:#0d1117; animation:lxfade .16s ease-out; }
   <div class="lx-modal-box card">
     <div class="card-header">Run RDM discovery?</div>
     <div class="card-body">
-      <p class="small text-secondary mb-3">Discovery shares the DMX wire to scan for fixtures, so the
-        output frame rate can dip for a few seconds while it runs. Best not to do this on a live show cue.</p>
+      <p class="small text-secondary mb-3"><span id="disc-modal-txt" class="text-info"></span>
+        Discovery shares the DMX wire to scan for fixtures, so the output frame rate can dip for a
+        few seconds while it runs. Best not to do this on a live show cue.</p>
       <div class="d-flex justify-content-end gap-2">
         <button class="btn btn-outline-secondary btn-sm" onclick="hideDiscModal()">Cancel</button>
         <button class="btn btn-primary btn-sm" onclick="startDiscovery()">Run discovery</button>
@@ -154,46 +118,14 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){retur
 function fid(uid){ return uid.replace(/[^0-9A-Fa-f]/g,''); }
 function send(o){ if(sock&&sock.readyState===1) sock.send(JSON.stringify(o)); }
 
-// ── shared nav strip, cached so a tab switch paints it instantly (no flicker) ──
-var NAVIDS=['fps','rssi','net-label','heap','uptime','jitter','nav-sub'];
-function saveNav(){ try{ var o={}; NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=[e.innerHTML,e.style.color||'']; }); sessionStorage.setItem('luxnav',JSON.stringify(o)); }catch(_){} }
-function paintNav(){ try{ var o=JSON.parse(sessionStorage.getItem('luxnav')||'{}'); NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e&&o[id]){ e.innerHTML=o[id][0]; if(o[id][1]) e.style.color=o[id][1]; } }); }catch(_){} }
-paintNav();
-
+// The /ws status frame drives the shared navbar; this socket is also the page's control channel.
 function connect(){
   sock=new WebSocket('ws://'+location.host+'/ws');
   sock.binaryType='arraybuffer';
   sock.onclose=function(){ setTimeout(connect,2000); };
-  sock.onmessage=function(e){ if(e.data instanceof ArrayBuffer) navStats(e.data); };   // controls out, nav frame in
+  sock.onmessage=function(e){ if(window.LuxNav) LuxNav.stats(e.data); };
 }
 connect();
-
-// The device broadcasts one binary status frame to every /ws client:
-// fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2) dmx(512) perOutputFps(2 each)
-function navStats(buf){
-  if(buf.byteLength<16) return;
-  var v=new DataView(buf);
-  var nOut=Math.max(0,(buf.byteLength-528)>>1), per=[];
-  for(var oi=0;oi<nOut;oi++) per.push((v.getUint16(528+2*oi)/10).toFixed(1));
-  // show every output's rate — the aggregate field is 0 when outputs are driven individually
-  document.getElementById('fps').textContent = per.length ? per.join(' · ') : (v.getUint16(0)/10).toFixed(1);
-  var rssi=v.getInt16(2), heap=v.getUint32(4), upS=v.getUint32(8);
-  var re=document.getElementById('rssi'), nl=document.getElementById('net-label');
-  if(rssi>=10){ nl.textContent='LAN'; re.textContent=rssi+'M'; re.style.color='#45d85c'; }         // wired
-  else if(rssi>=1){ nl.textContent='AP'; re.textContent='active'; re.style.color='#f33abc'; }        // AP fallback
-  else { nl.textContent='WiFi'; re.textContent=rssi+' dBm'; re.style.color=rssi>-65?'#45d85c':rssi>-80?'#ffaa1c':'#f33abc'; }
-  document.getElementById('heap').textContent=(heap/1024).toFixed(0)+' KB';
-  var h=Math.floor(upS/3600), m=Math.floor((upS%3600)/60), s=upS%60;
-  document.getElementById('uptime').textContent=(h?h+'h ':'')+(m?m+'m ':'')+s+'s';
-  document.getElementById('jitter').textContent=(v.getUint16(14)/10).toFixed(1)+' ms';
-  saveNav();
-}
-// Nav subtitle (hostname · IP · version), same as the Status page.
-fetch('/info.json').then(function(r){return r.json();}).then(function(d){
-  document.getElementById('nav-sub').innerHTML=
-    (d.hostname||'')+'.local &nbsp;&middot;&nbsp; '+(d.ip||'')+' &nbsp;&middot;&nbsp; v'+(d.version||'');
-  saveNav();
-}).catch(function(){});
 
 // ── E1.20 labels ────────────────────────────────────────────────────────────
 var CAT={0:'',0x0100:'Fixture',0x0101:'Fixture Fixed',0x0102:'Fixture Moving Yoke',0x0103:'Fixture Moving Mirror',
@@ -329,6 +261,7 @@ function fxRow(f){
   var row='<tr class="fxrow'+op+'" id="fxr_'+i+'" onclick="toggleFx(\''+f.uid+'\')">'+
     '<td><span class="caret">&#9656;</span> <span class="fx-name">'+esc(name)+'</span></td>'+
     '<td class="fx-uid">'+esc(f.uid)+'</td>'+
+    '<td><span class="uni-badge">U'+f.uni+'</span></td>'+
     '<td>'+f.addr+'</td>'+
     '<td>'+f.footprint+'</td>'+
     '<td>'+persCell(f)+'</td>'+
@@ -340,7 +273,7 @@ function fxRow(f){
       'onclick="event.stopPropagation();rdmIdentify(\''+f.uid+'\','+(f.identify?'false':'true')+')">ID</button></td>'+
   '</tr>';
   var extra=(esc(f.sw)?('Software: '+esc(f.sw)+' &nbsp;&middot;&nbsp; '):'')+'Sub-devices: '+f.subs;
-  var edit='<tr class="fxedit'+op+'" id="fxe_'+i+'"><td colspan="10">'+
+  var edit='<tr class="fxedit'+op+'" id="fxe_'+i+'"><td colspan="11">'+
     '<div class="d-flex flex-wrap align-items-end gap-3 py-1">'+
       '<div><label class="form-label small mb-1 text-secondary">DMX start address</label><div class="input-group input-group-sm" style="width:170px">'+
         '<input type="number" min="1" max="512" value="'+f.addr+'" id="addr_'+i+'" class="form-control">'+
@@ -353,12 +286,13 @@ function fxRow(f){
     '</div></td></tr>';
   return row+edit;
 }
-var FXCOLS=[['name','Fixture'],['uid','UID'],['addr','Addr'],['foot','Foot'],['pers','Personality'],
+var FXCOLS=[['name','Fixture'],['uid','UID'],['uni','Uni'],['addr','Addr'],['foot','Foot'],['pers','Personality'],
             ['mfg','Manufacturer'],['model','Model'],['cat','Category']];
 function sortVal(f,col){
   switch(col){
     case 'name':  return (f.label||f.modelName||('Model '+f.model)).toLowerCase();
     case 'uid':   return f.uid;
+    case 'uni':   return f.uni;
     case 'addr':  return f.addr;
     case 'foot':  return f.footprint;
     case 'pers':  return f.pers;
@@ -431,16 +365,16 @@ function scanHtml(d){
 function render(d){
   lastD=d;
   document.getElementById('art-port').textContent = (d.artPort!=null) ? ('Art-Net RDM: uni '+d.artPort+(d.artnetRdm?'':' (off)')) : '';
-  var st=document.getElementById('rdm-status'), list=document.getElementById('fx-list'), dash=document.getElementById('sensor-dash'), btn=document.getElementById('disc-btn');
-  if(!d.available){ st.textContent='No RDM-capable output configured (an output needs a DE/RE pin).'; list.innerHTML=''; dash.innerHTML=''; lastSig=''; btn.disabled=true; return; }
-  // Disable Discover only while a scan is actually running, and never keep it grey for more than
-  // 30 s (a stuck/failed scan must still be re-triggerable).
+  var st=document.getElementById('rdm-status'), list=document.getElementById('fx-list'), dash=document.getElementById('sensor-dash');
+  if(!d.available){ st.textContent='No RDM-capable output configured (an output needs a DE/RE pin).'; list.innerHTML=''; dash.innerHTML=''; lastSig=''; document.getElementById('disc-ctl').innerHTML=''; return; }
+  // Buttons stay live except while a scan is actually running, and never grey for >30 s (a stuck
+  // scan must still be re-triggerable).
   var busyNow = !!(d.busy||d.discovering);
   if(busyNow){ if(!busySince) busySince=Date.now(); } else busySince=0;
-  btn.disabled = busyNow && (Date.now()-busySince < 30000);
+  renderDiscCtl(d, busyNow && (Date.now()-busySince < 30000));
   var has=d.devices&&d.devices.length;
   if(d.busy||d.discovering){ st.innerHTML=scanHtml(d); }
-  else if(!has){ st.textContent = d.scanned ? 'No RDM fixtures found on the line.' : 'Click Discover to scan the line.'; }
+  else if(!has){ st.textContent = d.scanned ? 'No RDM fixtures found.' : 'Discover to scan for fixtures.'; }
   else { st.textContent = d.devices.length+' fixture'+(d.devices.length>1?'s':''); }
   if(!has){ list.innerHTML=''; dash.innerHTML=''; lastSig=''; }
   else {
@@ -471,10 +405,31 @@ function tick(){ fetch('/rdm.json').then(function(r){return r.json();}).then(ren
 function refresh(){ clearTimeout(timer); tick(); }
 function reschedule(){ schedule(); }
 
-function rdmDiscover(){ document.getElementById('disc-modal').classList.add('show'); }
+// One Discover per RDM universe (each transceiver line), plus a "Scan all". Falls back to a single
+// button when there is only one RDM line.
+var pendingDiscLine=-1;
+function discUni(line){ var rl=(lastD&&lastD.rdmLines)||[]; for(var i=0;i<rl.length;i++) if(rl[i].line===line) return rl[i].uni; return line; }
+function renderDiscCtl(d, dis){
+  var dc=document.getElementById('disc-ctl'); if(!dc) return;
+  var rl=d.rdmLines||[], D=dis?' disabled':'';
+  var busyLine=(d.discovering)?d.discLine:-99;
+  var h='';
+  if(rl.length>1){
+    rl.forEach(function(l){ var on=d.discovering&&(d.discLine===l.line);
+      h+='<button class="btn btn-outline-primary btn-sm"'+D+' onclick="rdmDiscover('+l.line+')">'+(on?'Scanning U'+l.uni+'…':'Scan U'+l.uni)+'</button>'; });
+    h+='<button class="btn btn-primary btn-sm"'+D+' onclick="rdmDiscover(-1)">Scan all</button>';
+  } else {
+    h='<button class="btn btn-primary btn-sm"'+D+' onclick="rdmDiscover(-1)">'+(d.discovering?'Scanning…':'Discover')+'</button>';
+  }
+  dc.innerHTML=h;
+}
+function rdmDiscover(line){ pendingDiscLine=(line==null?-1:line);
+  var t=document.getElementById('disc-modal-txt');
+  if(t) t.textContent = pendingDiscLine<0 ? 'This scans every RDM universe.' : 'This scans universe '+discUni(pendingDiscLine)+'.';
+  document.getElementById('disc-modal').classList.add('show'); }
 function hideDiscModal(){ document.getElementById('disc-modal').classList.remove('show'); }
-function startDiscovery(){ hideDiscModal(); send({type:'rdm_discover'}); document.getElementById('disc-btn').disabled=true; busySince=Date.now();
-  document.getElementById('rdm-status').textContent='Scanning the line…'; setTimeout(refresh,800); }
+function startDiscovery(){ hideDiscModal(); send({type:'rdm_discover',line:pendingDiscLine}); busySince=Date.now();
+  document.getElementById('rdm-status').textContent='Scanning…'; setTimeout(refresh,800); }
 function rdmSetAddr(uid){ var el=document.getElementById('addr_'+fid(uid)); var a=parseInt(el.value,10);
   if(a>=1&&a<=512){ send({type:'rdm_setaddr',uid:uid,addr:a}); setTimeout(refresh,900);} }
 function rdmSetLabel(uid){ var el=document.getElementById('lbl_'+fid(uid)); send({type:'rdm_setlabel',uid:uid,label:el.value}); setTimeout(refresh,900); }

@@ -24,39 +24,64 @@
 #include <rdm/controller.h>      // rdm_ack_t (struct only — we never call the esp_dmx controller)
 
 // --- config ---------------------------------------------------------------------------------
-#ifndef RDM_RMT_UART
-#define RDM_RMT_UART   UART_NUM_2       // a spare UART (no esp_dmx in the RMT build) used RX-only
+// Each RDM-capable output ("line") is a transceiver: its own RMT TX channel, DE/RE pin and an
+// RX-only UART. The RMT DMX build leaves UART1/UART2 free, so up to two lines are supported and
+// RDM can run on both universes (one at a time; the engine selects the active line per transaction).
+#ifndef RDM_MAX_LINES
+#define RDM_MAX_LINES 2
 #endif
 #define RDM_SC             0xCC         // RDM start code
 #define RDM_SC_SUB         0x01         // RDM sub-start code (SC_SUB_MESSAGE)
 #define RDM_HDR_LEN        24           // fixed header bytes SC..PDL (message length = 24 + PDL)
 #define RDM_RESP_TIMEOUT_MS 9           // responder must reply within this window of the request end
 #define RDM_DISC_TIMEOUT_MS 3           // discovery reply window
+static const uart_port_t RDM_LINE_UART[RDM_MAX_LINES] = { UART_NUM_2, UART_NUM_1 };  // RX-only, one per line
 
 // --- module state ---------------------------------------------------------------------------
 static rdm_uid_t g_rdmCtrl = {0x4C58, 0};   // controller UID: man_id 'LX' (<=0x7fff), dev_id from MAC
-static RmtDmx*   g_rdmRmt  = nullptr;        // the RDM output's RMT channel (shared for request TX)
-static int       g_rdmDe   = -1;             // DE/RE direction pin (HIGH=TX, LOW=RX)
-static int       g_rdmRx   = -1;             // UART RX pin (transceiver RO)
+
+struct RdmLine { RmtDmx* rmt; int de; int rx; uart_port_t uart; bool up; };
+static RdmLine   g_rdmLines[RDM_MAX_LINES] = {};
+static int       g_rdmLineN = 0;
+
+// The active line — every transaction below drives these; rdmRmtSelect() points them at a line.
+static RmtDmx*     g_rdmRmt  = nullptr;      // active RMT channel (shared for request TX)
+static int         g_rdmDe   = -1;           // active DE/RE direction pin (HIGH=TX, LOW=RX)
+static int         g_rdmRx   = -1;           // active UART RX pin (transceiver RO)
+static uart_port_t g_rdmUart = UART_NUM_2;   // active RX UART
 static uint8_t   g_rdmTN   = 0;              // RDM transaction number (rolls)
-static bool      g_rdmUartUp = false;
+static volatile uint32_t g_rdmSent = 0;      // RDM frames transmitted on the bus (for the web UI)
+static volatile uint32_t g_rdmRecv = 0;      // checksum-valid RDM responses received
 
 static inline void rdmDe(int level) { gpio_set_level((gpio_num_t)g_rdmDe, level); }
 
-// Set up the RX-only UART + DE pin. Call once at boot for the RDM output. rmt is that output's
-// already-initialised RMT channel; it is reused to transmit RDM requests.
-static bool rdmRmtInit(RmtDmx* rmt, int dePin, int rxPin) {
-    g_rdmRmt = rmt; g_rdmDe = dePin; g_rdmRx = rxPin;
-    // Controller UID device-id from the base MAC (stable per board).
-    uint8_t mac[6] = {0};
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    g_rdmCtrl.dev_id = ((uint32_t)mac[2] << 24) | (mac[3] << 16) | (mac[4] << 8) | mac[5];
+static int rdmRmtLineCount() { return g_rdmLineN; }
+// Point the transaction engine at a line (its RMT channel + DE pin + RX UART). Cheap; call it before
+// running discovery / a transaction on that line. RDM is serialised on the DMX task, so switching
+// the active line between ops is safe.
+static void rdmRmtSelect(int line) {
+    if (line < 0 || line >= g_rdmLineN) return;
+    RdmLine& L = g_rdmLines[line];
+    g_rdmRmt = L.rmt; g_rdmDe = L.de; g_rdmRx = L.rx; g_rdmUart = L.uart;
+}
 
+// Register an RDM line (RX-only UART + DE pin; rmt is that output's already-initialised RMT channel,
+// reused to transmit RDM requests). Call once per RDM-capable output at boot. Returns the line index
+// or -1 if full. The first line registered becomes the active one.
+static int rdmRmtInit(RmtDmx* rmt, int dePin, int rxPin) {
+    if (g_rdmLineN >= RDM_MAX_LINES) return -1;
+    int idx = g_rdmLineN;
+    uart_port_t uart = RDM_LINE_UART[idx];
+    if (idx == 0) {   // controller UID device-id from the base MAC (stable per board), once
+        uint8_t mac[6] = {0};
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        g_rdmCtrl.dev_id = ((uint32_t)mac[2] << 24) | (mac[3] << 16) | (mac[4] << 8) | mac[5];
+    }
     gpio_config_t io = {};
     io.pin_bit_mask = 1ULL << dePin;
     io.mode = GPIO_MODE_OUTPUT;
     gpio_config(&io);
-    rdmDe(1);   // idle in TX/drive so DMX (on RMT) keeps driving the line
+    gpio_set_level((gpio_num_t)dePin, 1);   // idle in TX/drive so DMX (on RMT) keeps driving the line
 
     uart_config_t uc = {};
     uc.baud_rate = 250000;
@@ -65,13 +90,17 @@ static bool rdmRmtInit(RmtDmx* rmt, int dePin, int rxPin) {
     uc.stop_bits = UART_STOP_BITS_2;          // DMX/RDM is 8N2
     uc.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
     uc.source_clk = UART_SCLK_DEFAULT;
-    if (uart_driver_install(RDM_RMT_UART, 512, 0, 0, nullptr, 0) != ESP_OK) return false;
-    uart_param_config(RDM_RMT_UART, &uc);
+    if (uart_driver_install(uart, 512, 0, 0, nullptr, 0) != ESP_OK) return -1;
+    uart_param_config(uart, &uc);
     // RX only — TX/RTS/CTS left unconnected so the UART never drives the bus.
-    uart_set_pin(RDM_RMT_UART, UART_PIN_NO_CHANGE, rxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(uart, UART_PIN_NO_CHANGE, rxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     gpio_set_pull_mode((gpio_num_t)rxPin, GPIO_PULLUP_ONLY);   // keep RO idle-high if it ever tri-states
-    g_rdmUartUp = true;
-    return true;
+
+    g_rdmLines[idx].rmt = rmt; g_rdmLines[idx].de = dePin; g_rdmLines[idx].rx = rxPin;
+    g_rdmLines[idx].uart = uart; g_rdmLines[idx].up = true;
+    g_rdmLineN++;
+    if (idx == 0) rdmRmtSelect(0);   // default active line
+    return idx;
 }
 
 // --- request framing ------------------------------------------------------------------------
@@ -107,7 +136,8 @@ static int rdmBuild(uint8_t* buf, const rdm_uid_t& dest, uint8_t cc, uint16_t pi
 static void rdmTx(const uint8_t* pkt, int len) {
     RmtDmx* rd = g_rdmRmt;
     if (!rd || !rd->chan) return;
-    uart_flush_input(RDM_RMT_UART);              // drop anything stale before we listen
+    g_rdmSent++;
+    uart_flush_input(g_rdmUart);              // drop anything stale before we listen
     rdmDe(1);                                    // drive
     rmtDmxEncode(rd, pkt, len);                  // break + MAB + packet bytes
     rmt_transmit_config_t tc = {}; tc.loop_count = 0; tc.flags.eot_level = 1;
@@ -115,7 +145,7 @@ static void rdmTx(const uint8_t* pkt, int len) {
     rmt_tx_wait_all_done(rd->chan, 60);          // wait until the last bit has left
     rdmDe(0);                                    // turnaround: stop driving, enable the receiver
     esp_rom_delay_us(90);                        // let our own echoed frame finish arriving
-    uart_flush_input(RDM_RMT_UART);              // discard it -> the read sees only the responder reply
+    uart_flush_input(g_rdmUart);              // discard it -> the read sees only the responder reply
 }
 
 // --- response parsing -----------------------------------------------------------------------
@@ -124,7 +154,7 @@ static void rdmTx(const uint8_t* pkt, int len) {
 static bool rdmReadResp(const rdm_uid_t& expectFrom, uint8_t* pd, int pdMax, int* pdl,
                         rdm_ack_t* ack) {
     uint8_t rx[96];
-    int n = uart_read_bytes(RDM_RMT_UART, rx, sizeof(rx), pdMS_TO_TICKS(RDM_RESP_TIMEOUT_MS));
+    int n = uart_read_bytes(g_rdmUart, rx, sizeof(rx), pdMS_TO_TICKS(RDM_RESP_TIMEOUT_MS));
     rdmDe(1);                                    // done listening -> back to drive (DMX resumes)
     // Find the start code. A leading break shows up as a 0x00 (framing error) byte; skip to 0xCC.
     const char* fail = nullptr;
@@ -161,6 +191,7 @@ static bool rdmReadResp(const rdm_uid_t& expectFrom, uint8_t* pd, int pdMax, int
     if (rpdl < 0) rpdl = 0;
     for (int i = 0; i < rpdl; i++) pd[i] = m[24 + i];
     *pdl = rpdl;
+    g_rdmRecv++;
     return true;
 }
 
@@ -200,7 +231,7 @@ static int rdmDiscBranch(uint64_t lower, uint64_t upper, rdm_uid_t* found) {
                            RDM_PID_DISC_UNIQUE_BRANCH, pd, 12);
         rdmTx(pkt, len);
         uint8_t rx[48];
-        int n = uart_read_bytes(RDM_RMT_UART, rx, sizeof(rx), pdMS_TO_TICKS(RDM_DISC_TIMEOUT_MS));
+        int n = uart_read_bytes(g_rdmUart, rx, sizeof(rx), pdMS_TO_TICKS(RDM_DISC_TIMEOUT_MS));
         rdmDe(1);
         if (n <= 0) return 0;                        // silence -> genuinely empty branch
         // Locate the 0xAA preamble separator (0..7 leading 0xFE preamble bytes precede it).
@@ -240,7 +271,7 @@ static void rdmUnMuteAll() {
                        RDM_PID_DISC_UN_MUTE, nullptr, 0);
     rdmTx(pkt, len);
     vTaskDelay(pdMS_TO_TICKS(1));                 // let the broadcast settle
-    uart_flush_input(RDM_RMT_UART);
+    uart_flush_input(g_rdmUart);
 }
 
 // Iterative binary search over the UID range, mutes + records each device found. ITERATIVE on
@@ -406,7 +437,7 @@ static int rdmRmtRawRelay(const uint8_t* reqNoSC, int reqLen, uint8_t* respNoSC,
     rdmTx(pkt, reqLen + 1);
     if (bcast) return 0;                          // relayed, nothing to read back
     uint8_t rx[96];
-    int n = uart_read_bytes(RDM_RMT_UART, rx, sizeof(rx), pdMS_TO_TICKS(RDM_RESP_TIMEOUT_MS));
+    int n = uart_read_bytes(g_rdmUart, rx, sizeof(rx), pdMS_TO_TICKS(RDM_RESP_TIMEOUT_MS));
     rdmDe(1);                                     // done listening -> drive (DMX resumes next frame)
     if (n < 26) return -1;
     int s = -1;

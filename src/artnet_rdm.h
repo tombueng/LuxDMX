@@ -94,6 +94,7 @@ static volatile uint8_t g_discStage = 0, g_discFound = 0, g_discCur = 0, g_discS
 // ===========================================================================
 //  Packet builders
 // ===========================================================================
+static int rdmLineForUniverse(uint16_t uni);   // fwd decl (defined with the discovery machine)
 static inline void wrU16LE(uint8_t* p, uint16_t v) { p[0] = v & 0xff; p[1] = v >> 8; }
 
 // ArtPollReply (239 bytes): announce the node + its output ports + RDM capability.
@@ -124,8 +125,8 @@ static int buildArtPollReply(uint8_t* b) {
         b[174 + np] = 0x80;                    // PortTypes: output, DMX512
         b[182 + np] = 0x80;                    // GoodOutput: data is being transmitted
         b[190 + np] = cfg.outputs[i].universe & 0x0f;   // SwOut: low nibble of the port-address
-        // GoodOutputB bit7: 1 = RDM disabled. Clear it for the RDM output when RDM is on.
-        bool rdmOn = g_artRdmEnabled && (i == rdmOut) && rdmAvailable();
+        // GoodOutputB bit7: 1 = RDM disabled. Clear it for every RDM-capable output (has a line).
+        bool rdmOn = g_artRdmEnabled && rdmLineForOut[i] >= 0 && outReady[i];
         b[213 + np] = rdmOn ? 0x00 : 0x80;
         np++;
     }
@@ -248,7 +249,7 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
         if (!g_artRdmEnabled || n < 25) return;
         uint8_t net = p[21];
         uint16_t pa = ((uint16_t)(net & 0x7f) << 8) | p[23];
-        if (pa != artRdmPortAddr()) return;            // only the RDM output carries devices
+        if (rdmLineForUniverse(pa) < 0) return;        // must be one of our RDM universes
         int rdmLen = n - 24;
         if (rdmLen < 1 || rdmLen > 257) return;
         ArtRdmReq r = {}; r.kind = ARTREQ_RDM; r.ip = ip; r.portAddr = pa;
@@ -303,9 +304,16 @@ static int      g_adTabN = 0;
 static int      g_adEi = 0;       // which found device
 static int      g_adSub = 0;      // 0=info 1=sw 2=sensordef 3=sensorval
 static int      g_adSensor = 0;
+static int      g_adLine = 0;     // RDM line (transceiver output) currently being discovered
+static bool     g_adAll  = false; // true = sweep every line in sequence (one Discover, both universes)
 
-static void artStartDiscovery() {
-    if (g_adPhase != AD_IDLE) return;
+// line < 0 discovers every RDM line in sequence; line >= 0 discovers just that one.
+static void artStartDiscovery(int line = -1) {
+    if (g_adPhase != AD_IDLE || rdmRmtLineCount() == 0) return;
+    g_adAll  = (line < 0);
+    g_adLine = g_adAll ? 0 : line;
+    if (g_adLine >= rdmRmtLineCount()) return;
+    rdmRmtSelect(g_adLine);
     g_adPhase = AD_START;
     g_artDiscovering = true;
     rdmBusy = true;
@@ -323,16 +331,32 @@ static bool artTodChanged() {
     return false;
 }
 
+// The RDM engine line that reaches a given Art-Net universe/port-address, or -1.
+static int rdmLineForUniverse(uint16_t uni) {
+    for (int L = 0; L < MAX_OUTPUTS; L++) {
+        int o = rdmOutForLine[L];
+        if (o >= 0 && (uint16_t)cfg.outputs[o].universe == uni) return L;
+    }
+    return -1;
+}
+
+// Push each RDM universe's own Table of Devices to every subscriber (one ArtTodData per port).
 static void artPushTodToSubs() {
     static uint8_t pkt[28 + RDM_MAX_DEVICES * 6];
     rdm_uid_t uids[RDM_MAX_DEVICES];
-    for (int i = 0; i < rdmCount; i++) uids[i] = rdmDevices[i].uid;
-    uint16_t pa = artRdmPortAddr();
-    for (int s = 0; s < ART_MAX_SUBS; s++) {
-        if (!g_artSubs[s]) continue;
-        int len = buildArtTodData(pkt, pa, uids, rdmCount);
-        ArtRdmResp r; r.ip = g_artSubs[s]; r.len = len; memcpy(r.data, pkt, len);
-        if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
+    for (int L = 0; L < MAX_OUTPUTS; L++) {
+        int o = rdmOutForLine[L];
+        if (o < 0) continue;
+        uint16_t pa = (uint16_t)cfg.outputs[o].universe;
+        int nu = 0;
+        for (int i = 0; i < rdmCount; i++)
+            if (rdmDevices[i].universe == pa) uids[nu++] = rdmDevices[i].uid;
+        int len = buildArtTodData(pkt, pa, uids, nu);
+        for (int s = 0; s < ART_MAX_SUBS; s++) {
+            if (!g_artSubs[s]) continue;
+            ArtRdmResp r; r.ip = g_artSubs[s]; r.len = len; memcpy(r.data, pkt, len);
+            if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
+        }
     }
 }
 
@@ -347,6 +371,7 @@ static bool artDiscStep() {
     g_discSub   = (uint8_t)g_adSub;
     switch (g_adPhase) {
     case AD_START:
+        rdmRmtSelect(g_adLine);      // drive discovery on this line's transceiver + RX UART
         rdmUnMuteAll();
         g_adSp = 0; g_adStkLo[0] = 0; g_adStkHi[0] = uidPack(RDM_UID_MAX); g_adSp = 1;
         g_adRange = false; g_adFoundN = 0;
@@ -442,17 +467,31 @@ static bool artDiscStep() {
         }
     }
     case AD_PUBLISH: {
-        bool changed = artTodChanged();
-        for (int i = 0; i < g_adTabN; i++) rdmDevices[i] = g_adTab[i];
-        rdmCount = g_adTabN;
+        int outIdx = rdmOutForLine[g_adLine];
+        uint16_t uni = (outIdx >= 0) ? cfg.outputs[outIdx].universe : 0;
+        // Replace only THIS line's fixtures in the shared table; keep the other lines' fixtures.
+        int keep = 0;
+        for (int i = 0; i < rdmCount; i++)
+            if (rdmDevices[i].universe != uni) rdmDevices[keep++] = rdmDevices[i];
+        rdmCount = keep;
+        for (int i = 0; i < g_adTabN && rdmCount < RDM_MAX_DEVICES; i++) {
+            g_adTab[i].universe = uni;
+            g_adTab[i].rdmLine  = (uint8_t)g_adLine;
+            rdmDevices[rdmCount++] = g_adTab[i];
+        }
         rdmApplySavedPoll();     // restore each fixture's per-sensor poll switches
         rdmScanned = true;
+        Serial.printf("[RDM] discovery line %d (uni %d): %d device(s)\n", g_adLine, uni, g_adTabN);
+        if (g_adAll && g_adLine + 1 < rdmRmtLineCount()) {   // sweep the next line too
+            g_adLine++;
+            rdmRmtSelect(g_adLine);
+            g_adPhase = AD_START;
+            return true;
+        }
         rdmBusy = false;
         g_artDiscovering = false;
         g_adPhase = AD_IDLE;
-        Serial.printf("[RDM] incremental discovery: %d device(s)%s\n",
-                      rdmCount, changed ? " (TOD changed)" : "");
-        if (changed) artPushTodToSubs();
+        artPushTodToSubs();
         return false;
     }
     default:
@@ -475,6 +514,7 @@ static void artSensorPollStep() {
         if (d.sensorCount == 0 || g_pollSen >= d.sensorCount) { g_pollDev++; g_pollSen = 0; continue; }
         RdmSensor& s = d.sensors[g_pollSen];
         if (!s.poll || (uint32_t)(now - s.pollMs) < SENSOR_POLL_MS) { g_pollSen++; continue; }
+        rdmRmtSelect(d.rdmLine);   // reach this fixture on its own line/universe
         rdm_ack_t ack; int16_t p, lo, hi, rec;
         if (rdmRmtGetSensorFull(d.uid, g_pollSen, &p, &lo, &hi, &rec, &ack)) {
             s.value = p; s.lowest = lo; s.highest = hi; s.recorded = rec; s.valid = true;
@@ -494,19 +534,22 @@ static void artRdmService() {
     g_artRdmEnabled = cfg.artnetRdm;
     rdm_ack_t ack;
 
-    // RDM-tab controls: set personality / device label (one op, user-initiated).
+    // RDM-tab controls: set personality / device label (one op, user-initiated). Select the target
+    // fixture's line first so the request goes out on its universe.
     if (rdmSetPersReq) {
         rdmSetPersReq = false;
+        RdmDevice* d = rdmFind(rdmPersUid); if (d) rdmRmtSelect(d->rdmLine);
         if (rdmRmtSetPersonality(rdmPersUid, rdmReqPers, &ack)) {
-            RdmDevice* d = rdmFind(rdmPersUid); if (d) d->personality = rdmReqPers;
+            if (d) d->personality = rdmReqPers;
             Serial.printf("[RDM] set personality=%u\n", rdmReqPers);
         }
         return;
     }
     if (rdmSetLabelReq) {
         rdmSetLabelReq = false;
+        RdmDevice* d = rdmFind(rdmLabelUid); if (d) rdmRmtSelect(d->rdmLine);
         if (rdmRmtSetString(rdmLabelUid, RDM_PID_DEVICE_LABEL, rdmReqLabel, &ack)) {
-            RdmDevice* d = rdmFind(rdmLabelUid); if (d) strlcpy(d->deviceLabel, rdmReqLabel, sizeof(d->deviceLabel));
+            if (d) strlcpy(d->deviceLabel, rdmReqLabel, sizeof(d->deviceLabel));
         }
         return;
     }
@@ -514,8 +557,10 @@ static void artRdmService() {
     // A queued Art-Net request (highest priority: a console is waiting on it).
     ArtRdmReq req;
     if (g_artReqQ && xQueueReceive(g_artReqQ, &req, 0) == pdTRUE) {
+        int reqLine = rdmLineForUniverse(req.portAddr);   // which universe/line this request targets
         if (req.kind == ARTREQ_RDM) {
             g_artRdmReqs++;
+            if (reqLine >= 0) rdmRmtSelect(reqLine);       // relay on the target universe's line
             uint8_t respNoSC[257];
             int rl = rdmRmtRawRelay(req.rdm, req.rdmLen, respNoSC, sizeof(respNoSC));
             if (rl > 0) {
@@ -529,20 +574,23 @@ static void artRdmService() {
             artAddSub(req.ip);
             static uint8_t pkt[28 + RDM_MAX_DEVICES * 6];
             rdm_uid_t uids[RDM_MAX_DEVICES];
-            for (int i = 0; i < rdmCount; i++) uids[i] = rdmDevices[i].uid;
-            int len = buildArtTodData(pkt, req.portAddr, uids, rdmCount);
+            int nu = 0;                                    // only the fixtures on this universe
+            for (int i = 0; i < rdmCount; i++)
+                if ((uint16_t)rdmDevices[i].universe == req.portAddr) uids[nu++] = rdmDevices[i].uid;
+            int len = buildArtTodData(pkt, req.portAddr, uids, nu);
             ArtRdmResp r; r.ip = req.ip; r.len = len; memcpy(r.data, pkt, len);
             if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
         } else if (req.kind == ARTREQ_FLUSH) {
             g_artFlushes++;
             artAddSub(req.ip);
-            artStartDiscovery();     // fresh discovery; ArtTodData pushed when it completes
+            artStartDiscovery(reqLine);   // fresh discovery of just this universe; TOD pushed on completion
         }
         return;                      // one op this frame
     }
 
-    // A web-triggered discovery (existing rdmDiscoverReq flag) also runs incrementally now.
-    if (rdmDiscoverReq) { rdmDiscoverReq = false; artStartDiscovery(); }
+    // A web-triggered discovery (rdmDiscoverReq) runs incrementally; rdmDiscReqLine picks the line
+    // (-1 = sweep every universe).
+    if (rdmDiscoverReq) { rdmDiscoverReq = false; artStartDiscovery(rdmDiscReqLine); }
 
     // One discovery step, if a discovery is in progress.
     if (g_adPhase != AD_IDLE) { artDiscStep(); return; }

@@ -346,7 +346,7 @@ struct LogEntry {
     uint32_t ms;
     uint32_t ip;
     uint8_t  proto;
-    uint8_t  uni;     // Art-Net universe this frame targeted
+    uint16_t uni;     // Art-Net/sACN universe this frame targeted (0-32767)
     uint8_t  topN;    // valid entries in top[]
     uint16_t total;   // total channels changed
     struct { uint16_t ch; uint8_t val; } top[LOG_TOP];
@@ -422,10 +422,18 @@ static Adafruit_NeoPixel neoPixel(1, 0, NEO_GRB + NEO_KHZ800);
 static uint8_t  dmxBuf[MAX_OUTPUTS][DMX_PACKET_SIZE] = {{0}};
 static bool     outReady[MAX_OUTPUTS] = {false};   // per-output DMX driver installed
 static int      monitorOut   = 0;                  // output shown/controlled by the web UI
-static int      rdmOut       = -1;                 // output RDM runs on, -1 = none
+static int      rdmOut       = -1;                 // primary RDM output (first RDM line), -1 = none
+static int      rdmLineForOut[MAX_OUTPUTS];        // output index -> RDM engine line, -1 if not RDM-capable
+static int      rdmOutForLine[MAX_OUTPUTS];        // RDM engine line -> the output index it reaches
 static uint32_t lastFrameMs  = 0;
 static uint32_t frameCount   = 0;
 static float    fps          = 0.0f;
+// Incoming Art-Net/sACN frame rate per output-universe (for the navbar's "In FPS"). Counted in
+// updateSender() (once per packet, so a multi-universe source is attributed right) and closed to a
+// rate each second in wsPush() so a stopped universe decays to 0.
+static uint32_t inFrameCnt[MAX_OUTPUTS] = {0};
+static uint32_t inWinMs[MAX_OUTPUTS]    = {0};
+static float    inFpsOut[MAX_OUTPUTS]   = {0.0f};
 // Per-output frame rate (one universe each). The aggregate `fps` above stays the
 // sum of all inputs for the WS/web UI; these drive the per-universe display.
 static uint32_t outFrameCount[MAX_OUTPUTS]  = {0};
@@ -468,7 +476,10 @@ static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
 // WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1)
 // (srcStatus: 0=normal 1=conflict 2=merging)
 // jitter(2) dmx(512) + per-output fps(2 x MAX_OUTPUTS) = 528 + 2*MAX_OUTPUTS
-static constexpr int WS_FRAME_LEN = 528 + 2 * MAX_OUTPUTS;
+// 528 header+dmx, then per-output OUTPUT fps (2*N) and per-output INPUT fps (2*N), then a fixed
+// 10-byte tail (fixtures + RDM tx + RDM rx). Every tab's navbar reads its stats off this one frame.
+static constexpr int WS_NAV_TAIL  = 10;
+static constexpr int WS_FRAME_LEN = 528 + 4 * MAX_OUTPUTS + WS_NAV_TAIL;
 static uint8_t wsBuf[WS_FRAME_LEN];
 
 // sACN receive buffer
@@ -842,6 +853,8 @@ struct RdmSensor {
 };
 struct RdmDevice {
     rdm_uid_t uid;
+    uint16_t  universe;          // DMX universe (output) this fixture lives on
+    uint8_t   rdmLine;           // RDM engine line index (which transceiver output) to reach it on
     uint16_t  startAddr;
     uint16_t  footprint;
     uint16_t  modelId;
@@ -867,6 +880,7 @@ static uint32_t  rdmLastScanMs = 0;
 
 // Single-slot request mailboxes: set by the async WS task, consumed in loop().
 static volatile bool rdmDiscoverReq = false;
+static volatile int  rdmDiscReqLine = -1;          // discovery target: -1 = every line, >=0 = one line
 static volatile bool rdmSetAddrReq  = false;
 static volatile bool rdmIdentifyReq = false;
 static rdm_uid_t     rdmSetUid      = {0, 0};
@@ -1103,22 +1117,29 @@ static void rdmDoDiscover() {
 // Called once per DMX cycle from the DMX task (the sole bus owner); does work only when a
 // request is queued. On the DMX_RMT build this runs the whole RDM transaction over RMT-TX +
 // UART-RX inline -- no peripheral switch, the RDM output never leaves RMT.
+// Point the RDM engine at a fixture's line before a per-device transaction (no-op on the esp_dmx
+// build, which has a single RDM port).
+static inline void rdmSelectLine(const RdmDevice* d) {
+#ifdef DMX_RMT
+    if (d) rdmRmtSelect(d->rdmLine);
+#endif
+}
 static void rdmService() {
     if (!rdmAvailable()) return;
     rdm_ack_t ack;
 
     if (rdmSetAddrReq) {
         rdmSetAddrReq = false;
+        RdmDevice* d = rdmFind(rdmSetUid); rdmSelectLine(d);
         if (rdmOpSetAddr(rdmSetUid, rdmReqAddr, &ack)) {
-            RdmDevice* d = rdmFind(rdmSetUid);
             if (d) d->startAddr = rdmReqAddr;
             Serial.printf("[RDM] set " UIDSTR " addr=%u\n", UID2STR(rdmSetUid), rdmReqAddr);
         }
     }
     if (rdmIdentifyReq) {
         rdmIdentifyReq = false;
+        RdmDevice* d = rdmFind(rdmIdentUid); rdmSelectLine(d);
         if (rdmOpSetIdentify(rdmIdentUid, rdmReqOn, &ack)) {
-            RdmDevice* d = rdmFind(rdmIdentUid);
             if (d) d->identifying = rdmReqOn;
         }
     }
@@ -1185,6 +1206,9 @@ static void updateSender(uint32_t ip, uint8_t proto, int16_t universe,
     s.dataLen  = length < 512 ? length : 512;
     memcpy(s.data, data, s.dataLen);   // merge reads only [0, dataLen), so a short
                                        // frame contributes only the channels it sends
+    // Count this frame against every output listening on its universe (for per-output input fps).
+    for (int o = 0; o < MAX_OUTPUTS; o++)
+        if (cfg.outputs[o].enabled && cfg.outputs[o].universe == universe) inFrameCnt[o]++;
     s.winCnt++;
     if (now - s.winMs >= 1000) {
         s.fps   = (float)s.winCnt * 1000.0f / (float)(now - s.winMs);
@@ -1274,7 +1298,7 @@ static void maybeLog(int outIdx, const uint8_t* cur, uint16_t len, uint32_t ip, 
     e.ms    = now;
     e.ip    = ip;
     e.proto = proto;
-    e.uni   = (uint8_t)cfg.outputs[outIdx].universe;
+    e.uni   = (uint16_t)cfg.outputs[outIdx].universe;
     e.total = 0;
     e.topN  = 0;
     for (int i = 0; i < lim; i++) {
@@ -1345,6 +1369,28 @@ static void wsPush() {
         uint16_t f = (uint16_t)(outFpsLive(i) * 10.0f);
         wsBuf[528 + 2 * i] = f >> 8;  wsBuf[528 + 2 * i + 1] = f & 0xFF;
     }
+    // Per-output INPUT fps: close each output's 1 s input-frame window (so a universe that stops
+    // being sent decays to 0), then write it. Counted per output-universe in updateSender().
+    uint32_t nowMs = millis();
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        if (nowMs - inWinMs[i] >= 1000) {
+            inFpsOut[i] = (float)inFrameCnt[i] * 1000.0f / (float)(nowMs - inWinMs[i]);
+            inFrameCnt[i] = 0; inWinMs[i] = nowMs;
+        }
+        uint16_t inI = (uint16_t)(inFpsOut[i] * 10.0f < 65535.0f ? inFpsOut[i] * 10.0f : 65535.0f);
+        wsBuf[528 + 2 * MAX_OUTPUTS + 2 * i]     = inI >> 8;
+        wsBuf[528 + 2 * MAX_OUTPUTS + 2 * i + 1] = inI & 0xFF;
+    }
+    // Fixed tail: fixtures(2) rdmTx(4) rdmRx(4)
+    int t = 528 + 4 * MAX_OUTPUTS;
+    uint16_t nf = (uint16_t)rdmCount;
+    uint32_t rtx = 0, rrx = 0;
+#ifdef DMX_RMT
+    rtx = g_rdmSent; rrx = g_rdmRecv;
+#endif
+    wsBuf[t]   = nf >> 8;   wsBuf[t+1] = nf & 0xFF;
+    wsBuf[t+2] = rtx >> 24; wsBuf[t+3] = (rtx>>16)&0xFF; wsBuf[t+4] = (rtx>>8)&0xFF; wsBuf[t+5] = rtx & 0xFF;
+    wsBuf[t+6] = rrx >> 24; wsBuf[t+7] = (rrx>>16)&0xFF; wsBuf[t+8] = (rrx>>8)&0xFF; wsBuf[t+9] = rrx & 0xFF;
     // Only push if the async TCP queues have room, so a slow client never
     // backs up memory or blocks.
     // Belt-and-suspenders: a failed async allocation inside the WS stack throws std::bad_alloc;
@@ -1396,7 +1442,12 @@ static void handleWsText(const char* payload, size_t len) {
         return;
     }
     // RDM control — only set request flags here; loop() owns the bus and runs them.
-    if (msg.indexOf("\"rdm_discover\"") >= 0) { rdmDiscoverReq = true; return; }
+    if (msg.indexOf("\"rdm_discover\"") >= 0) {   // optional "line":N (else -1 = every universe)
+        int k = msg.indexOf("\"line\":");
+        rdmDiscReqLine = (k >= 0) ? msg.substring(k + 7).toInt() : -1;
+        rdmDiscoverReq = true;
+        return;
+    }
     if (msg.indexOf("\"rdm_setaddr\"") >= 0) {
         rdm_uid_t u;
         int k = msg.indexOf("\"addr\":");
@@ -2004,6 +2055,7 @@ static String rdmJsonEsc(const char* s) {
 static void handleRdmTrigger(AsyncWebServerRequest* req) {
     const String path = req->url();
     if (path.endsWith("/discover")) {
+        rdmDiscReqLine = req->hasParam("line") ? req->getParam("line")->value().toInt() : -1;
         rdmDiscoverReq = true;
         req->send(200, "application/json", "{\"ok\":true,\"op\":\"discover\"}");
         return;
@@ -2041,6 +2093,7 @@ static String rdmDeviceJson(const RdmDevice& d) {
     char uid[20];
     snprintf(uid, sizeof(uid), "%04X:%08lX", d.uid.man_id, (unsigned long)d.uid.dev_id);
     j += "{\"uid\":\"";     j += uid;          j += "\"";
+    j += ",\"uni\":";       j += d.universe;
     j += ",\"addr\":";      j += d.startAddr;
     j += ",\"footprint\":"; j += d.footprint;
     j += ",\"model\":";     j += d.modelId;
@@ -2099,6 +2152,21 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
     s->head += ",\"artFlushes\":"; s->head += (uint32_t)g_artFlushes;
     s->head += ",\"artPolls\":";   s->head += (uint32_t)g_artPolls;
     s->head += ",\"sensorPoll\":"; s->head += g_pollAny ? "true" : "false";   // any sensor switch enabled
+    s->head += ",\"rdmTx\":"; s->head += (uint32_t)g_rdmSent;   // RDM frames sent on the bus
+    s->head += ",\"rdmRx\":"; s->head += (uint32_t)g_rdmRecv;   // valid RDM responses received
+    s->head += ",\"discLine\":"; s->head += g_adLine;          // line currently being discovered
+    s->head += ",\"rdmLines\":[";                              // the RDM-capable universes (per line)
+    {
+        bool firstL = true;
+        for (int L = 0; L < MAX_OUTPUTS; L++) {
+            int o = rdmOutForLine[L];
+            if (o < 0) continue;
+            if (!firstL) s->head += ",";
+            firstL = false;
+            s->head += "{\"line\":"; s->head += L; s->head += ",\"uni\":"; s->head += cfg.outputs[o].universe; s->head += "}";
+        }
+    }
+    s->head += "]";
 #endif
     s->head += ",\"devices\":[";
     req->sendChunked("application/json", [s](uint8_t* b, size_t maxLen, size_t) -> size_t {
@@ -2444,7 +2512,7 @@ static void startWiFiManager(bool forcePortal) {
         Serial.printf("[WiFi] static IP %s\n", cfg.ip.c_str());
     }
     snprintf(wm_universeStr, sizeof(wm_universeStr), "%d", cfg.outputs[0].universe);
-    WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-15)", wm_universeStr, 3);
+    WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-32767)", wm_universeStr, 6);
     wm.addParameter(&param_universe);
     // Run the captive portal NON-blocking so the serial config console stays alive
     // while it's up: a fresh / stuck board (no WiFi yet) can then be recovered over
@@ -2467,7 +2535,7 @@ static void startWiFiManager(bool forcePortal) {
     }
     if (!connected) ESP.restart();
     if (wm_shouldSave) {
-        cfg.outputs[0].universe = constrain(atoi(param_universe.getValue()), 0, 15);
+        cfg.outputs[0].universe = constrain(atoi(param_universe.getValue()), 0, 32767);
         saveConfig();
         // The captive-portal ran its own web server on port 80; it may not
         // release the socket cleanly, which would stop our AsyncWebServer from
@@ -2528,6 +2596,7 @@ static void connectStrongestAP() {
 static void initDmx() {
     dmxReady = false;
     rdmOut   = -1;
+    for (int i = 0; i < MAX_OUTPUTS; i++) { rdmLineForOut[i] = -1; rdmOutForLine[i] = -1; }
     monitorOut = 0;
     bool firstEnabled = true;
     for (int i = 0; i < MAX_OUTPUTS; i++) {
@@ -2561,10 +2630,15 @@ static void initDmx() {
             if (rmtDmxInit(&g_rmt[i], cfg.outputs[i].txPin)) {
                 outReady[i] = true; dmxReady = true;
                 if (firstEnabled) { monitorOut = i; firstEnabled = false; }
-                if (rdmOut < 0 && cfg.outputs[i].rtsPin >= 0) {                 // RDM-capable output
-                    rdmOut = i;
-                    // RDM runs on this same RMT channel for TX + a RX-only UART for responses.
-                    rdmRmtInit(&g_rmt[i], cfg.outputs[i].rtsPin, cfg.outputs[i].rxPin);
+                if (cfg.outputs[i].rtsPin >= 0) {                 // RDM-capable output (has a transceiver)
+                    // RDM reuses this output's RMT channel for TX + a RX-only UART for responses.
+                    // Every such output becomes its own RDM line so RDM can run on both universes.
+                    int line = rdmRmtInit(&g_rmt[i], cfg.outputs[i].rtsPin, cfg.outputs[i].rxPin);
+                    if (line >= 0) {
+                        rdmLineForOut[i] = line;
+                        rdmOutForLine[line] = i;
+                        if (rdmOut < 0) rdmOut = i;              // primary (first line) for legacy paths
+                    }
                 }
                 Serial.printf("[DMX] out%d ready (RMT%s): uni=%d tx=%d\n",
                     i, cfg.outputs[i].rtsPin >= 0 ? "+RDM" : "", cfg.outputs[i].universe, cfg.outputs[i].txPin);

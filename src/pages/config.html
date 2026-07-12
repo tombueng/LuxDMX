@@ -36,15 +36,7 @@
 html { background: var(--gh-bg); }   /* dark from first paint: no white flash on tab switch */
 body { background: var(--gh-bg); animation:lxfade .16s ease-out; }
 @keyframes lxfade { from { opacity:0 } to { opacity:1 } }
-/* Smooth tab switching (progressive enhancement): quick crossfade, nav stays put. */
-@view-transition { navigation: auto; }
-::view-transition-group(site-nav) { animation-duration:.18s; }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration:.18s; }
-.site-nav { background:var(--gh-surface); border-bottom:1px solid var(--gh-border); padding:.6rem 1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; view-transition-name:site-nav; }
-.brand { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
-.brand img { height:48px; }
-.brand-text { font-size:1.2rem; font-weight:700; color:#fff; }
-.nav-links { margin-left:auto; display:flex; gap:.4rem; }
+/* the navbar (markup + its CSS + behaviour) is the shared src/pages/_nav.html fragment */
 .card { background:var(--gh-surface); border-color:var(--gh-border); }
 .card-header { background:#1c2128; border-color:var(--gh-border); font-weight:600; }
 .form-control,.form-select { background:var(--gh-bg); border-color:var(--gh-border); color:var(--gh-text); }
@@ -99,17 +91,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 </head>
 <body>
 
-<nav class="site-nav">
-  <a class="brand" href="/">
-    <img src="/logo.png?v=__FWVER__" alt="LuxDMX">
-    <span class="brand-text">LuxDMX</span>
-  </a>
-  <div class="nav-links">
-    <a href="/" class="btn btn-outline-secondary btn-sm">Status</a>
-    <a href="/rdm" class="btn btn-outline-secondary btn-sm">RDM</a>
-    <a href="/config" class="btn btn-primary btn-sm">Settings</a>
-  </div>
-</nav>
+<!--NAVBAR-->
 
 <div class="container py-4" style="max-width:960px">
 
@@ -455,8 +437,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
         <div class="card-body out-body">
           <div class="row g-3">
             <div class="col-sm-6">
-              <label class="form-label text-secondary small mb-1">Universe (0-15)</label>
-              <input class="form-control out-uni" type="number" min="0" max="15" value="0">
+              <label class="form-label text-secondary small mb-1">Universe (0-32767)</label>
+              <input class="form-control out-uni" type="number" min="0" max="32767" value="0">
               <div class="form-text out-uni-hint"></div>
             </div>
             <div class="col-sm-6">
@@ -1704,5 +1686,12 @@ function initBoards(){
   </div>
 </div>
 
+<script>
+// This page has no socket of its own, so open a lightweight one just to feed the shared navbar.
+(function(){ var s; function c(){ try{ s=new WebSocket('ws://'+location.host+'/ws'); s.binaryType='arraybuffer';
+  s.onclose=function(){ setTimeout(c,2000); };
+  s.onmessage=function(e){ if(window.LuxNav) LuxNav.stats(e.data); }; }catch(_){ setTimeout(c,2000); } }
+  c(); })();
+</script>
 </body>
 </html>

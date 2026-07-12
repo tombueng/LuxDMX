@@ -98,8 +98,9 @@ test.describe('Art-Net RDM — GET/SET pass-through (LUXDMX_WRITE=1)', () => {
     // discovery is incremental (a few seconds); wait for it to run and finish
     await sleep(1000);
     const busy = await rdmState(request);
-    // it either flagged discovering, or already finished fast; then it settles
-    await expect.poll(async () => (await rdmState(request)).discovering, { timeout: 15000 }).toBe(false);
+    // it either flagged discovering, or already finished fast; then it settles (a full-universe
+    // rediscovery of a large responder set can take a while)
+    await expect.poll(async () => (await rdmState(request)).discovering, { timeout: 40000 }).toBe(false);
     const j1 = await rdmState(request);
     expect(j1.artFlushes).toBeGreaterThan(j0.artFlushes);
     expect(j1.scanned).toBeTruthy();

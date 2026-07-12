@@ -58,10 +58,31 @@ sensor values"*. It tracks the state machine through its phases (searching the t
 each fixture's info/software/labels/sensors, then publishing), so a long sweep on a big rig shows
 real progress rather than an indeterminate spinner.
 
-The top bar is the same live strip as the Status page (FPS per output, link, heap, uptime, jitter,
-and the hostname/IP/version subtitle). It's cached across page loads and the pages opt into
-cross-document view transitions, so switching tabs is a quick crossfade with the bar held steady
-instead of a flicker.
+All three tabs (Status, RDM, Settings) share **one** navbar: it's a single fragment
+(`src/pages/_nav.html`) that `extra_scripts.py` injects into every page at build time, so there is
+one definition of the bar, its CSS and its behaviour. It shows FPS per output, link, heap, uptime,
+jitter, the number of discovered fixtures, the RDM frames sent / responses received on the wire
+(counters in `rdm_rmt.h`), and the hostname/IP/version subtitle. All of that rides on the one binary
+`/ws` status frame (the RDM figures are a fixed trailer appended to it), which every page already
+receives, so the bar is live and identical everywhere, a page just calls `LuxNav.stats(frame)`.
+Every stat has a fixed-width column so a changing value never reflows the bar, the values are cached
+across page loads, and the pages opt into cross-document view transitions, so switching tabs is a
+quick crossfade with the bar held steady instead of a flicker.
+
+RDM runs on **every** output that has a DE/RE (direction) pin, i.e. a real RS485 transceiver that can
+receive. Each such output is its own RDM "line" with its own RMT TX, DE pin and RX UART, so RDM can
+discover and talk to fixtures on both universes. The engine is serialised on the DMX task and selects
+the active line per transaction (`rdmRmtSelect`), so it drives one line at a time without ever
+stalling either output's DMX. Each discovered fixture is tagged with its universe (the **Uni** column
+in the table), and the RDM tab has a **Discover** button per universe (plus "Scan all"); discovering
+one universe re-reads only that line and leaves the other universes' fixtures in place. On the wire
+this needs one spare RX UART per line (`UART_NUM_2`, then `UART_NUM_1`), which the RMT DMX build
+leaves free. `/rdm.json` carries `rdmLines` (the RDM-capable universes), a `uni` on every fixture, and
+`discLine` (the line a sweep is on). Over **Art-Net** it's multi-port too: the node advertises RDM on
+every RDM universe (`ArtPollReply` GoodOutputB per port), and `ArtTodRequest`/`ArtTodControl`/`ArtRdm`
+are routed by port-address to the right line, so `ArtTodData` for a universe carries only that
+universe's fixtures and a relayed GET/SET goes out on the matching line. An external console
+(DMX-Workshop, MagicQ, grandMA3, OLA) can therefore do RDM on both universes.
 
 All of this is backed by `/rdm.json`, which grew the per-fixture fields (`mfg`, `modelName`, `label`,
 `cat`, `swVer`, and per-sensor `lo`/`hi`/`rec`/`type`/`poll`), a top-level `sensorPoll` flag, and the
@@ -467,3 +488,7 @@ optionally the cached metadata) in NVS, mirroring how channel labels work today.
 - Conceptinetics 2.5 kV Isolated DMX/RDM shield: <https://www.tindie.com/products/Conceptinetics/25kv-isolated-dmx-512-shield-for-arduino-r2/>
 - Mornsun TD301D485H (auto-direction): <https://www.mornsun-power.com/html/products-detail/TD301D485H.html>
 - M5Stack DMX Unit / Isolated RS485 Unit (auto, Grove TX/RX only): <https://docs.m5stack.com/en/unit/Unit-DMX> · <https://docs.m5stack.com/en/unit/iso485>
+
+---
+
+Art-Net™ Designed by and Copyright Artistic Licence Engineering Ltd.

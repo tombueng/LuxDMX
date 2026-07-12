@@ -31,6 +31,8 @@ test.describe('RDM tab — page + shape (always)', () => {
     expect(html).toContain('@view-transition');  // smooth cross-page navigation
     expect(html).toContain('rdm_sensorsel');     // per-sensor + per-fixture poll switches
     expect(html).not.toContain('max-width:1000px'); // full display width, like the Status card
+    expect(html).toContain('uni-badge');         // per-fixture universe column
+    expect(html).toContain('renderDiscCtl');     // per-universe Discover buttons
     // same live nav strip as the Status page (fps/rssi/heap/uptime/jitter)
     for (const id of ['nav-stats', 'id="fps"', 'id="rssi"', 'id="heap"', 'id="uptime"', 'id="jitter"'])
       expect(html, id).toContain(id);
@@ -41,6 +43,10 @@ test.describe('RDM tab — page + shape (always)', () => {
     expect(typeof j.sensorPoll).toBe('boolean');
     // live discovery-progress fields (drive the "scanning the line" bar)
     for (const k of ['discStage', 'discFound', 'discCur', 'discSub']) expect(typeof j[k], k).toBe('number');
+    // multi-line RDM: the RDM-capable universes + a per-fixture universe
+    expect(Array.isArray(j.rdmLines)).toBe(true);
+    for (const l of j.rdmLines) { expect(typeof l.line).toBe('number'); expect(typeof l.uni).toBe('number'); }
+    for (const f of j.devices) expect(typeof f.uni, 'uni').toBe('number');
     for (const f of j.devices) {
       for (const k of ['mfg', 'modelName', 'label']) expect(typeof f[k], k).toBe('string');
       for (const k of ['cat', 'swVer']) expect(typeof f[k], k).toBe('number');
@@ -74,18 +80,35 @@ test.describe('RDM tab — controls + live sensors (LUXDMX_WRITE=1)', () => {
   });
 
   test('discovery reports live progress (stage + found count advance)', async ({ request }) => {
+    // Wait for any in-flight sweep to settle, then scan a fresh one and watch the progress fields.
+    // (A multi-universe sweep visits an empty line last, so watching a leftover scan can see 0 found.)
+    await expect.poll(async () => (await rdm(request)).discovering, { timeout: 45000 }).toBe(false);
     await request.get('/rdm/discover');
-    // catch the scan in flight and record how far the progress fields get
     let maxStage = 0, sawFound = 0;
     const t0 = Date.now();
-    while (Date.now() - t0 < 25000) {
+    while (Date.now() - t0 < 40000) {
       const j = await rdm(request);
       if (j.discStage > maxStage) maxStage = j.discStage;
       if (j.discFound > sawFound) sawFound = j.discFound;
-      if (!j.discovering && maxStage > 0) break;
+      if (!j.discovering && maxStage > 0 && sawFound > 0) break;
     }
     expect(maxStage).toBeGreaterThanOrEqual(1);   // reached at least the search phase
     expect(sawFound).toBeGreaterThan(0);          // found at least one fixture during the scan
+  });
+
+  test('per-universe discovery leaves the other universes untouched', async ({ request }) => {
+    await expect.poll(async () => (await rdm(request)).discovering, { timeout: 45000 }).toBe(false);
+    const j = await rdm(request);
+    test.skip((j.rdmLines || []).length < 2, 'needs two RDM universes');
+    const uni0 = j.rdmLines[0].uni;
+    const before = j.devices.filter((d) => d.uni === uni0).length;
+    test.skip(!before, 'no fixtures on the first universe');
+    // rescan a different line; the first universe's fixtures must survive the merge
+    const other = j.rdmLines[j.rdmLines.length - 1].line;
+    await request.get('/rdm/discover?line=' + other);
+    await expect.poll(async () => (await rdm(request)).discovering, { timeout: 25000 }).toBe(false);
+    const after = (await rdm(request)).devices.filter((d) => d.uni === uni0).length;
+    expect(after).toBe(before);
   });
 
   test('SET device label round-trips', async ({ request }) => {
