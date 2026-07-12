@@ -420,7 +420,7 @@ LuxDMX/
 │   │   ├── reset.html
 │   │   └── reset_done.html
 │   ├── assets/           ← images served by the ESP32
-│   │   └── logo.png      ← 96×96 px, replaces itself on rebuild
+│   │   └── logo.webp     ← 256×256 WebP (~5 KB), embedded into the firmware on build
 │   └── generated/        ← auto-created at build time, gitignored
 ├── include/              ← config_schema.h (Config struct) + config_enums.h
 ├── lib/EmbeddedConfig/   ← reusable schema-driven config engine (NVS + serial console)
@@ -441,13 +441,13 @@ itself is a standalone PlatformIO library under `lib/EmbeddedConfig/`.
 Before every `pio run`, PlatformIO executes `extra_scripts.py`, which:
 
 1. Reads every `src/pages/*.html` file
-2. Reads every `src/assets/*.png` file
+2. Reads every image/CSS in `src/assets/` (`*.png`, `*.webp`, `*.svg`, `*.css`)
 3. Converts them to C `PROGMEM` arrays / string literals and writes them to `src/generated/*.h`
 4. `main.cpp` `#include`s those headers — the HTML and images become part of the firmware binary
 5. Embeds the board default `templates/*.ini` into `src/generated/config_templates.cpp` (via `tools/gen_config_templates.py`), so a build's defaults come from a data file, not hand-edited macros
 
 **To change the web UI**, edit the HTML files in `src/pages/` and rebuild — no C++ changes needed.  
-**To replace the logo**, drop a new 96×96 PNG into `src/assets/logo.png` and rebuild.
+**To replace the logo**, drop a new `src/assets/logo.webp` (or re-run `artwork/derive-logos.sh`) and rebuild. WebP keeps the embedded logo around 5 KB instead of ~117 KB for the equivalent PNG, and it is served straight from flash so it costs no heap.
 
 Dynamic values (IP address, universe number, etc.) use `{{PLACEHOLDER}}` tokens in the HTML; `main.cpp` substitutes them at request time with `String::replace()`.
 

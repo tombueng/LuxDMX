@@ -125,7 +125,7 @@ static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64
 #include "generated/reset_done_html.h"
 #include "generated/ota_progress_html.h"
 #include "generated/ota_done_html.h"
-#include "generated/logo_png.h"
+#include "generated/logo_webp.h"
 #include "generated/favicon_png.h"
 #include "generated/bootstrap_min_css.h"
 
@@ -2348,7 +2348,7 @@ static void handleResetPost(AsyncWebServerRequest* req) {
 }
 
 static void handleLogo(AsyncWebServerRequest* req) {
-    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/png", LOGO_PNG, LOGO_PNG_LEN);
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/webp", LOGO_WEBP, LOGO_WEBP_LEN);
     r->addHeader("Cache-Control", "max-age=86400");
     req->send(r);
 }
@@ -3330,7 +3330,7 @@ void setup() {
 #endif
     if (cfg.protocol != 0) startSacn();
 
-    http.on("/logo.png",          HTTP_GET,  handleLogo);
+    http.on("/logo.webp",         HTTP_GET,  handleLogo);
     http.on("/favicon.png",       HTTP_GET,  handleFavicon);
     http.on("/favicon.ico",       HTTP_GET,  handleFavicon);
     http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
