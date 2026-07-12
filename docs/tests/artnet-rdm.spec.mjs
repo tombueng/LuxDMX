@@ -14,7 +14,8 @@
 // the device's self-reported transmit rate (/dmx.json outfps) as a coarse proxy.
 import { test, expect } from '@playwright/test';
 import { deviceHost, sleep, artDmxPacket, UdpSender, ART_PORT } from './lib/net.mjs';
-import { ArtRdmClient, parseUidStr, CC_GET, PID_DEVICE_INFO } from './lib/artrdm.mjs';
+import { ArtRdmClient, parseUidStr, CC_GET, PID_DEVICE_INFO,
+         AC_MERGE_HTP0, AC_MERGE_LTP0, AC_CANCEL_MERGE, AC_BQP0 } from './lib/artrdm.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 
@@ -32,6 +33,9 @@ test.describe('Art-Net RDM — REST shape (always)', () => {
     expect(typeof j.discovering).toBe('boolean');   // an incremental discovery is running
     for (const k of ['artTodReqs', 'artRdmReqs', 'artFlushes', 'artPolls'])
       expect(typeof j[k], k).toBe('number');
+    expect(typeof j.bqPolicy, 'BackgroundQueuePolicy exposed').toBe('number');
+    expect(Array.isArray(j.outputs), 'per-output merge exposed for the RDM tab').toBe(true);
+    for (const o of j.outputs) { expect(typeof o.uni).toBe('number'); expect(typeof o.merge).toBe('number'); }
   });
 });
 
@@ -46,6 +50,14 @@ test.describe('Art-Net RDM — node (read-only wire, always)', () => {
     expect(reply.ip).toBe(host);                    // the reply carries our IP
     expect(reply.numPorts).toBeGreaterThanOrEqual(1);
     expect(reply.portTypes[0] & 0x80, 'port 0 is a DMX output').toBe(0x80);
+  });
+
+  test('ArtPollReply advertises RDM-capable + BackgroundQueue support + the queue policy', async () => {
+    const reply = await c.poll();
+    expect(reply, 'no ArtPollReply received').toBeTruthy();
+    expect(reply.status1 & 0x02, 'Status1 bit1: node is RDM capable').toBe(0x02);
+    expect(reply.status3 & 0x02, 'Status3 bit1: BackgroundQueue supported').toBe(0x02);
+    expect(typeof reply.bqPolicy, 'BackgroundQueuePolicy byte present in reply').toBe('number');
   });
 
   test('ArtTodRequest -> ArtTodData returns the TOD matching /rdm.json', async ({ request }) => {
@@ -124,5 +136,39 @@ test.describe('Art-Net RDM — GET/SET pass-through (LUXDMX_WRITE=1)', () => {
     // the device keeps transmitting all the way through -- never freezes to a crawl
     expect(Math.min(...base), 'baseline outfps').toBeGreaterThan(20);
     expect(lowest, 'outfps must not collapse during discovery').toBeGreaterThan(20);
+  });
+});
+
+// ArtAddress remote port config: a console (DMX-Workshop's "Configure Port" dialog) sets the port's
+// merge mode and the node's BackgroundQueuePolicy over the network. These mutate persisted config, so
+// they are opt-in and restore what they change.
+test.describe('Art-Net RDM ArtAddress remote config (LUXDMX_WRITE=1)', () => {
+  test.skip(!WRITE, 'mutates node config: set LUXDMX_WRITE=1 to run');
+  let host, c;
+  test.beforeAll(async () => { host = await deviceHost(); c = new ArtRdmClient(host); await c.ready; });
+  test.afterAll(async () => { await c?.close(); });
+
+  const out0Merge = async (request) => (await json(await request.get('/info.json'))).outputs[0].merge;
+
+  test('ArtAddress sets the port merge mode (HTP / LTP / cancel), applied live + read back', async ({ request }) => {
+    const before = await out0Merge(request);
+    await c.address(1, AC_MERGE_HTP0);
+    await expect.poll(() => out0Merge(request), { timeout: 5000 }).toBe(1);   // MERGE_HTP
+    expect((await c.poll()).goodOutput[0] & 0x02, 'GoodOutput bit1 clear = HTP').toBe(0);
+    await c.address(1, AC_MERGE_LTP0);
+    await expect.poll(() => out0Merge(request), { timeout: 5000 }).toBe(2);   // MERGE_LTP
+    expect((await c.poll()).goodOutput[0] & 0x02, 'GoodOutput bit1 set = LTP').toBe(0x02);  // the read-back a console shows
+    await c.address(1, AC_CANCEL_MERGE);
+    await expect.poll(() => out0Merge(request), { timeout: 5000 }).toBe(0);   // MERGE_OFF
+    await c.address(1, before === 1 ? AC_MERGE_HTP0 : before === 2 ? AC_MERGE_LTP0 : AC_CANCEL_MERGE);  // restore
+  });
+
+  test('ArtAddress sets the BackgroundQueuePolicy, reflected in /rdm.json + ArtPollReply', async ({ request }) => {
+    const before = (await rdmState(request)).bqPolicy;
+    await c.address(1, AC_BQP0 + 2);                                          // policy 2 = WARNING
+    await expect.poll(async () => (await rdmState(request)).bqPolicy, { timeout: 5000 }).toBe(2);
+    const reply = await c.poll();
+    expect(reply.bqPolicy, 'policy advertised back in ArtPollReply byte 228').toBe(2);
+    await c.address(1, AC_BQP0 + (before ?? 4));                              // restore (default 4 = off)
   });
 });

@@ -36,11 +36,28 @@ static constexpr uint16_t ARTNET_OP_TODREQUEST = 0x8000;
 static constexpr uint16_t ARTNET_OP_TODDATA    = 0x8100;
 static constexpr uint16_t ARTNET_OP_TODCONTROL = 0x8200;
 static constexpr uint16_t ARTNET_OP_RDM        = 0x8300;
+static constexpr uint16_t ARTNET_OP_ADDRESS    = 0x6000;
 static constexpr int      ARTNET_PORT          = 6454;
 static const uint8_t      ARTNET_ID[8]         = {'A','r','t','-','N','e','t',0};
 
 // AtcFlush command in ArtTodControl
 static constexpr uint8_t  ATC_FLUSH = 0x01;
+
+// ArtAddress Command byte (field 13). Art-Net 4 selects the target port by BindIndex, so consoles
+// send the "...0" variant; the per-port 1/2/3 variants are deprecated -> we match on the high nibble.
+static constexpr uint8_t  AC_CANCEL_MERGE = 0x01;  // drop the merge, next source wins
+static constexpr uint8_t  AC_MERGE_LTP0   = 0x10;  // 0x10..0x13 = set merge LTP
+static constexpr uint8_t  AC_MERGE_HTP0   = 0x50;  // 0x50..0x53 = set merge HTP
+static constexpr uint8_t  AC_CLEAR_OP0    = 0x90;  // 0x90..0x93 = zero the output buffer
+static constexpr uint8_t  AC_BQP0         = 0xe0;  // 0xe0..0xef = set BackgroundQueuePolicy 0..15
+
+// BackgroundQueuePolicy (node-wide): the severity at which the gateway harvests RDM STATUS_MESSAGES
+// from fixtures in the background. 4 = disabled (default); 0..3 = collect NONE/ADVISORY/WARNING/ERROR.
+// Persisted in NVS under key "bqpolicy". Settable via ArtAddress AcBqp* or the web RDM tab.
+static uint8_t         g_bqPolicy    = 4;
+static volatile bool   g_bqDirty     = false;   // policy changed -> loop() persists it
+static volatile bool   g_artCfgDirty = false;   // ArtAddress changed cfg.outputs -> loop() saveConfig()
+static constexpr uint32_t BQ_POLL_MS = 5000;    // re-check each device's status at most this often
 
 // ---- module config (captured at init) -------------------------------------
 static int      g_artSock       = -1;     // 6454 UDP, owned by core 0 (netRxTask): RX + all TX
@@ -97,8 +114,11 @@ static volatile uint8_t g_discStage = 0, g_discFound = 0, g_discCur = 0, g_discS
 static int rdmLineForUniverse(uint16_t uni);   // fwd decl (defined with the discovery machine)
 static inline void wrU16LE(uint8_t* p, uint16_t v) { p[0] = v & 0xff; p[1] = v >> 8; }
 
-// ArtPollReply (239 bytes): announce the node + its output ports + RDM capability.
-static int buildArtPollReply(uint8_t* b) {
+// ArtPollReply (239 bytes) for ONE output port. Art-Net wants a separate reply per port, each with
+// its own Net/Sub-Net switches and a unique BindIndex, because a single reply carries only one
+// Net/Sub-Net and so can't describe ports on different sub-nets. The universe is the full 15-bit
+// port-address: Net(7) << 8 | Sub-Net(4) << 4 | Universe(4), not just the low nibble.
+static int buildArtPollReply(uint8_t* b, int outIdx, int bindIndex) {
     g_nodeIp = (uint32_t)netLocalIP();          // refresh (DHCP may have assigned it after init)
     memset(b, 0, 239);
     memcpy(b, ARTNET_ID, 8);
@@ -107,37 +127,57 @@ static int buildArtPollReply(uint8_t* b) {
     b[12] = (g_nodeIp >> 16) & 0xff; b[13] = (g_nodeIp >> 24) & 0xff;
     wrU16LE(b + 14, ARTNET_PORT);              // Port (LE) = 0x1936
     b[16] = 0; b[17] = 1;                      // VersInfo H/L
-    b[18] = 0;                                 // NetSwitch (universe 0..15 -> net 0)
-    b[19] = 0;                                 // SubSwitch (sub-net 0)
+    uint16_t uni = (uint16_t)cfg.outputs[outIdx].universe;
+    b[18] = (uni >> 8) & 0x7f;                 // NetSwitch (bits 8..14 of the port-address)
+    b[19] = (uni >> 4) & 0x0f;                 // SubSwitch (bits 4..7 = sub-net)
     b[20] = 0; b[21] = 0;                      // Oem (unregistered)
-    b[23] = 0xd0;                              // Status1: indicators normal, PortAddr from fp/sw
+    bool rdmNode = g_artRdmEnabled && rdmRmtLineCount() > 0;
+    b[23] = 0xd0 | (rdmNode ? 0x02 : 0x00);    // Status1: indicators normal + bit1 = RDM capable
     b[24] = 0x58; b[25] = 0x4C;               // EstaMan (lo,hi) = 0x4C58 'LX'
     strlcpy((char*)(b + 26), "LuxDMX", 18);    // ShortName
     strlcpy((char*)(b + 44), "LuxDMX Art-Net / sACN DMX gateway", 64);  // LongName
-    // NodeReport
-    strlcpy((char*)(b + 108), "#0001 [0] OK", 64);
-
-    // Ports: expose each enabled output as a DMX512 output port. RDM is advertised on
-    // the RDM-capable output (rdmOut) via GoodOutputB bit 7 clear (= RDM enabled).
-    int np = 0;
-    for (int i = 0; i < MAX_OUTPUTS && np < 4; i++) {
-        if (!cfg.outputs[i].enabled) continue;
-        b[174 + np] = 0x80;                    // PortTypes: output, DMX512
-        b[182 + np] = 0x80;                    // GoodOutput: data is being transmitted
-        b[190 + np] = cfg.outputs[i].universe & 0x0f;   // SwOut: low nibble of the port-address
-        // GoodOutputB bit7: 1 = RDM disabled. Clear it for every RDM-capable output (has a line).
-        bool rdmOn = g_artRdmEnabled && rdmLineForOut[i] >= 0 && outReady[i];
-        b[213 + np] = rdmOn ? 0x00 : 0x80;
-        np++;
-    }
-    b[173] = np;                               // NumPortsLo
+    strlcpy((char*)(b + 108), "#0001 [0] OK", 64);   // NodeReport
+    // one output port
+    b[173] = 1;                                // NumPortsLo = 1
+    b[174] = 0x80;                             // PortTypes: output, DMX512
+    // GoodOutput: bit7 = data is being transmitted, bit1 = merge mode is LTP (clear = HTP). A console
+    // reads bit1 to show the current merge mode -- without it, flipping HTP/LTP in the console looks
+    // like it does nothing because the read-back always says HTP.
+    b[182] = 0x80 | (cfg.outputs[outIdx].mergeMode == MERGE_LTP ? 0x02 : 0x00);
+    b[190] = uni & 0x0f;                       // SwOut: universe nibble (bits 0..3)
+    // GoodOutputB (Art-Net 4) reports this port's RDM state to the controller:
+    //   bit7 set = RDM disabled          bit6 set = continuous output style
+    //   bit5 set = discovery NOT running  bit4 set = background discovery disabled
+    // We must report bit5 honestly: hard-coding it clear tells the controller we are *permanently*
+    // mid-discovery, and a controller (e.g. DMX-Workshop) won't settle a device to "active" while it
+    // believes the gateway's TOD is still being built. Set bit5 whenever discovery is idle so the
+    // TOD reads as final. bit4 stays clear (background discovery is enabled/available).
+    bool rdmOn = rdmNode && rdmLineForOut[outIdx] >= 0 && outReady[outIdx];
+    uint8_t gob = 0x00;
+    if (!rdmOn)                gob |= 0x80;    // RDM disabled on this port
+    if (!g_artDiscovering)     gob |= 0x20;    // discovery is not currently running -> TOD is final
+    b[213] = gob;
     b[200] = 0x00;                             // Style = StNode
     memcpy(b + 201, g_nodeMac, 6);             // MAC
     b[207] = b[10]; b[208] = b[11]; b[209] = b[12]; b[210] = b[13];   // BindIp = our IP
-    b[211] = 1;                                // BindIndex
+    b[211] = (uint8_t)bindIndex;               // BindIndex (1-based, unique per port)
     b[212] = 0x0e;                             // Status2: web-config + 15-bit + DHCP capable
-    b[217] = 0x00;                             // Status3
+    b[217] = 0x02;                             // Status3 bit1: BackgroundQueue supported
+    b[228] = g_bqPolicy;                       // BackgroundQueuePolicy (0..3 = collect severity, 4 = off)
     return 239;
+}
+
+// 1-based BindIndex of the enabled output that carries this universe -- must match the BindIndex the
+// same port was given in ArtPollReply, since the controller ties a TOD to a port via
+//   Physical Port = (BindIndex-1) * NumPortsLo + Port   (Art-Net 4, ArtTodData).
+static uint8_t artBindIndexForUniverse(uint16_t uni) {
+    int bind = 0;
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        if (!cfg.outputs[i].enabled) continue;
+        bind++;
+        if ((uint16_t)cfg.outputs[i].universe == uni) return (uint8_t)bind;
+    }
+    return 1;
 }
 
 // ArtTodData for one port-address, carrying the current TOD (our discovered UIDs).
@@ -148,8 +188,8 @@ static int buildArtTodData(uint8_t* b, uint16_t portAddr, const rdm_uid_t* uids,
     wrU16LE(b + 8, ARTNET_OP_TODDATA);
     b[10] = 0; b[11] = 14;                      // ProtVer H/L
     b[12] = 1;                                  // RdmVer = 1 (E1.20)
-    b[13] = 1;                                  // Port
-    b[20] = 1;                                  // BindIndex
+    b[13] = 1;                                  // Port (physical port index within this bind = 1)
+    b[20] = artBindIndexForUniverse(portAddr);  // BindIndex must match this port's ArtPollReply
     b[21] = (portAddr >> 8) & 0x7f;             // Net
     b[22] = 0x00;                               // CommandResponse: ArTodFull (TOD is complete)
     b[23] = portAddr & 0xff;                    // Address (Sub-Net + Universe)
@@ -204,6 +244,35 @@ static void artEnqueueReq(const ArtRdmReq& r) {
     if (g_artReqQ) xQueueSend(g_artReqQ, &r, 0);
 }
 
+// Output index reached by a 1-based BindIndex (inverse of the BindIndex we assign in ArtPollReply:
+// the Nth enabled output gets BindIndex N). -1 if out of range.
+static int artOutForBindIndex(uint8_t bind) {
+    int b = 0;
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        if (!cfg.outputs[i].enabled) continue;
+        if (++b == (int)bind) return i;
+    }
+    return -1;
+}
+
+// Unicast one ArtPollReply per enabled output (each with its own BindIndex + universe) back to `ip`.
+// Used to answer both ArtPoll and ArtAddress (the spec requires ArtAddress to be confirmed with an
+// ArtPollReply, which is also how a console reads back the change it just made).
+static void artSendPollReplies(uint32_t ip) {
+    static uint8_t reply[239];
+    int bind = 1;
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        if (!cfg.outputs[i].enabled) continue;
+        int len = buildArtPollReply(reply, i, bind++);
+        artSendTo(ip, reply, len);
+    }
+    if (bind == 1) {   // no enabled output: still answer so the console sees the node
+        int len = buildArtPollReply(reply, 0, 1);
+        reply[173] = 0;   // NumPorts = 0
+        artSendTo(ip, reply, len);
+    }
+}
+
 // Handle one Art-Net packet (already validated as "Art-Net"). Runs on core 0.
 static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
     uint16_t op = p[8] | (p[9] << 8);
@@ -219,9 +288,36 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
     }
     case ARTNET_OP_POLL: {
         g_artPolls++;
-        static uint8_t reply[239];
-        int len = buildArtPollReply(reply);
-        artSendTo(ip, reply, len);
+        artSendPollReplies(ip);   // one reply per enabled output (own BindIndex + universe)
+        return;
+    }
+    case ARTNET_OP_ADDRESS: {
+        // Remote port configuration (DMX-Workshop's "Configure Port" dialog). Command @ byte 106,
+        // BindIndex @ byte 13 selects the port. We honour merge mode + background queue policy +
+        // output-clear here; universe/port-name programming is intentionally not handled yet.
+        if (n < 107) return;
+        uint8_t bindIndex = p[13];
+        uint8_t cmd       = p[106];
+        int out = artOutForBindIndex(bindIndex ? bindIndex : 1);
+        uint8_t hi = cmd & 0xf0;
+        if (cmd >= AC_BQP0) {                                  // 0xe0..0xef: background queue policy 0..15
+            g_bqPolicy = cmd - AC_BQP0;
+            g_bqDirty  = true;
+            Serial.printf("[ART-ADDR] BackgroundQueuePolicy = %u\n", g_bqPolicy);
+        } else if (hi == AC_MERGE_LTP0 || hi == AC_MERGE_HTP0 || cmd == AC_CANCEL_MERGE) {
+            if (out >= 0) {
+                if (hi == AC_MERGE_HTP0)      cfg.outputs[out].mergeMode = MERGE_HTP;
+                else if (hi == AC_MERGE_LTP0) cfg.outputs[out].mergeMode = MERGE_LTP;
+                else /* AcCancelMerge */      cfg.outputs[out].mergeMode = MERGE_OFF;
+                g_artCfgDirty = true;                          // loop() persists via saveConfig()
+                Serial.printf("[ART-ADDR] out%d mergeMode = %d (bind %u)\n",
+                              out, cfg.outputs[out].mergeMode, bindIndex);
+            }
+        }
+        // (AcClearOp / universe / port-name programming intentionally not handled yet.)
+        // Every ArtAddress must be answered with an ArtPollReply (spec) -- also how the console reads
+        // back the applied value and repaints its dialog.
+        artSendPollReplies(ip);
         return;
     }
     case ARTNET_OP_TODREQUEST: {
@@ -246,12 +342,17 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
         return;
     }
     case ARTNET_OP_RDM: {
-        if (!g_artRdmEnabled || n < 25) return;
+        if (!g_artRdmEnabled || n < 26) return;
         uint8_t net = p[21];
         uint16_t pa = ((uint16_t)(net & 0x7f) << 8) | p[23];
         if (rdmLineForUniverse(pa) < 0) return;        // must be one of our RDM universes
-        int rdmLen = n - 24;
-        if (rdmLen < 1 || rdmLen > 257) return;
+        // The ArtRdm RdmPacket field is commonly zero-padded to a fixed size -- DMX-Workshop sends
+        // a 280-byte field (n=304) for a 26-byte GET. Derive the true length from the RDM message's
+        // own Message Length byte (p[25], counts SC..last PD) rather than the packet size, so the
+        // trailing padding is ignored. Using n-24 overflowed the 257 cap and dropped every request.
+        int msgLen = p[25];                            // RDM Message Length (SC .. last param-data slot)
+        int rdmLen = msgLen + 1;                        // RdmPacket = msgLen (incl SC) + 2 checksum - SC
+        if (msgLen < RDM_HDR_LEN || rdmLen > 257 || 24 + rdmLen > n) return;
         ArtRdmReq r = {}; r.kind = ARTREQ_RDM; r.ip = ip; r.portAddr = pa;
         r.rdmLen = rdmLen; memcpy(r.rdm, p + 24, rdmLen);
         artEnqueueReq(r);
@@ -338,6 +439,18 @@ static int rdmLineForUniverse(uint16_t uni) {
         if (o >= 0 && (uint16_t)cfg.outputs[o].universe == uni) return L;
     }
     return -1;
+}
+
+// Enqueue an ArtTodData carrying one universe's current TOD straight back to a single requester.
+static void artSendCurrentTod(uint32_t ip, uint16_t pa) {
+    static uint8_t pkt[28 + RDM_MAX_DEVICES * 6];
+    rdm_uid_t uids[RDM_MAX_DEVICES];
+    int nu = 0;                                    // only the fixtures on this universe
+    for (int i = 0; i < rdmCount; i++)
+        if ((uint16_t)rdmDevices[i].universe == pa) uids[nu++] = rdmDevices[i].uid;
+    int len = buildArtTodData(pkt, pa, uids, nu);
+    ArtRdmResp r; r.ip = ip; r.len = len; memcpy(r.data, pkt, len);
+    if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
 }
 
 // Push each RDM universe's own Table of Devices to every subscriber (one ArtTodData per port).
@@ -526,6 +639,29 @@ static void artSensorPollStep() {
     // nothing due this frame -> no bus op, DMX keeps its full frame rate
 }
 
+// Art-Net BackgroundQueuePolicy harvester. While a policy is set (0..3), read one device's
+// STATUS_MESSAGE per idle frame (round-robin), filtered by the policy's severity. Lowest priority
+// and one bus op, so DMX is untouched. A single paced timer (not a per-device array, to save DRAM on
+// the classic ESP32) spreads a full sweep over ~BQ_POLL_MS. The highest-severity message per device
+// is cached on the RdmDevice for /rdm.json + the web UI.
+static int      g_bqDev  = 0;
+static uint32_t g_bqNext = 0;
+static void artBqStep() {
+    static const uint8_t POLICY_STATUS[4] = { 0x00, 0x02, 0x03, 0x04 };  // NONE/ADVISORY/WARNING/ERROR
+    if (g_bqPolicy >= 4 || rdmCount == 0) return;
+    uint32_t now = millis();
+    uint32_t gap = BQ_POLL_MS / (uint32_t)rdmCount; if (gap < 20) gap = 20;   // one device per this gap
+    if ((uint32_t)(now - g_bqNext) < gap) return;
+    g_bqNext = now;
+    if (g_bqDev >= rdmCount) g_bqDev = 0;
+    RdmDevice& d = rdmDevices[g_bqDev++];
+    rdmRmtSelect(d.rdmLine);
+    rdm_ack_t ack; uint8_t t; uint16_t id; int16_t d1, d2; int cnt;
+    if (rdmRmtGetStatus(d.uid, POLICY_STATUS[g_bqPolicy], &t, &id, &d1, &d2, &cnt, &ack)) {
+        d.statusType = t; d.statusMsgId = id; d.statusCount = cnt;   // data values parsed, not stored
+    }
+}
+
 // Called once per DMX frame from rdmService (core 1). Does at most ONE bus op: a user control
 // (set personality/label) or a queued ArtRdm relay/TOD takes priority, otherwise one discovery
 // step, otherwise (when live polling is on) one sensor read. Never blocks the frame.
@@ -554,38 +690,46 @@ static void artRdmService() {
         return;
     }
 
-    // A queued Art-Net request (highest priority: a console is waiting on it).
-    ArtRdmReq req;
-    if (g_artReqQ && xQueueReceive(g_artReqQ, &req, 0) == pdTRUE) {
-        int reqLine = rdmLineForUniverse(req.portAddr);   // which universe/line this request targets
-        if (req.kind == ARTREQ_RDM) {
-            g_artRdmReqs++;
-            if (reqLine >= 0) rdmRmtSelect(reqLine);       // relay on the target universe's line
-            uint8_t respNoSC[257];
-            int rl = rdmRmtRawRelay(req.rdm, req.rdmLen, respNoSC, sizeof(respNoSC));
-            if (rl > 0) {
-                static uint8_t pkt[600];
-                int len = buildArtRdm(pkt, req.portAddr, respNoSC, rl);
-                ArtRdmResp r; r.ip = req.ip; r.len = len; memcpy(r.data, pkt, len);
-                if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
+    // Queued Art-Net requests -- a controller is blocked waiting on each reply. Drain several per
+    // frame under a time budget: at one op per DMX frame the relay tops out near 40/s, and a
+    // controller polling a full universe issues requests faster than that, so its per-request
+    // timeout trips and it reports the devices as lost. The budget bounds the time borrowed from the
+    // DMX frame (a relay op is ~9 ms of UART wait, the frame is 25 ms) so DMX keeps ticking while
+    // the backlog clears.
+    if (g_artReqQ) {
+        uint32_t t0 = micros();
+        ArtRdmReq req;
+        int served = 0;
+        while (xQueueReceive(g_artReqQ, &req, 0) == pdTRUE) {
+            int reqLine = rdmLineForUniverse(req.portAddr);   // which universe/line this request targets
+            if (req.kind == ARTREQ_RDM) {
+                g_artRdmReqs++;
+                if (reqLine >= 0) rdmRmtSelect(reqLine);       // relay on the target universe's line
+                uint8_t respNoSC[257];
+                int rl = rdmRmtRawRelay(req.rdm, req.rdmLen, respNoSC, sizeof(respNoSC));
+                if (rl > 0) {
+                    static uint8_t pkt[600];
+                    int len = buildArtRdm(pkt, req.portAddr, respNoSC, rl);
+                    ArtRdmResp r; r.ip = req.ip; r.len = len; memcpy(r.data, pkt, len);
+                    if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
+                }
+            } else if (req.kind == ARTREQ_TOD) {
+                g_artTodReqs++;
+                artAddSub(req.ip);
+                artSendCurrentTod(req.ip, req.portAddr);
+            } else if (req.kind == ARTREQ_FLUSH) {
+                g_artFlushes++;
+                artAddSub(req.ip);
+                // Answer the flush at once with the TOD we already hold: ArtTodControl expects an
+                // ArtTodData back promptly, but our re-discovery is deliberately incremental (one bus
+                // op per DMX frame) so DMX never stalls. Reply now, refresh in the background, and
+                // push the updated TOD to all subscribers when it completes.
+                artSendCurrentTod(req.ip, req.portAddr);
+                artStartDiscovery(reqLine);
             }
-        } else if (req.kind == ARTREQ_TOD) {
-            g_artTodReqs++;
-            artAddSub(req.ip);
-            static uint8_t pkt[28 + RDM_MAX_DEVICES * 6];
-            rdm_uid_t uids[RDM_MAX_DEVICES];
-            int nu = 0;                                    // only the fixtures on this universe
-            for (int i = 0; i < rdmCount; i++)
-                if ((uint16_t)rdmDevices[i].universe == req.portAddr) uids[nu++] = rdmDevices[i].uid;
-            int len = buildArtTodData(pkt, req.portAddr, uids, nu);
-            ArtRdmResp r; r.ip = req.ip; r.len = len; memcpy(r.data, pkt, len);
-            if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
-        } else if (req.kind == ARTREQ_FLUSH) {
-            g_artFlushes++;
-            artAddSub(req.ip);
-            artStartDiscovery(reqLine);   // fresh discovery of just this universe; TOD pushed on completion
+            if (++served >= 8 || (uint32_t)(micros() - t0) > 18000) break;
         }
-        return;                      // one op this frame
+        if (served) return;
     }
 
     // A web-triggered discovery (rdmDiscoverReq) runs incrementally; rdmDiscReqLine picks the line
@@ -595,8 +739,12 @@ static void artRdmService() {
     // One discovery step, if a discovery is in progress.
     if (g_adPhase != AD_IDLE) { artDiscStep(); return; }
 
-    // Idle: live sensor polling (lowest priority) — runs while any sensor switch is enabled.
-    if (g_pollAny) artSensorPollStep();
+    // Idle background work (lowest priority, one bus op/frame): live sensor polling and the Art-Net
+    // BackgroundQueue status harvest, alternated so both progress when both are enabled.
+    bool bqOn = (g_bqPolicy < 4) && rdmCount > 0;
+    if (g_pollAny && bqOn) { static bool t = false; t = !t; if (t) artBqStep(); else artSensorPollStep(); }
+    else if (bqOn)         artBqStep();
+    else if (g_pollAny)    artSensorPollStep();
 }
 
 // ---- setup + config -------------------------------------------------------
@@ -604,8 +752,14 @@ static void artRdmInit() {
     esp_read_mac(g_nodeMac, ESP_MAC_WIFI_STA);
     g_nodeIp = (uint32_t)netLocalIP();
     g_artRdmEnabled = cfg.artnetRdm;
-    if (!g_artReqQ)  g_artReqQ  = xQueueCreate(8, sizeof(ArtRdmReq));
-    if (!g_artRespQ) g_artRespQ = xQueueCreate(6, sizeof(ArtRdmResp));
+    prefs.begin(PREF_NS, true);
+    g_bqPolicy = prefs.getUChar("bqpolicy", 4);   // restore BackgroundQueuePolicy (4 = disabled)
+    prefs.end();
+    // Deep enough to hold a whole-universe burst: a console that fires a GET at every device it just
+    // discovered (64/universe) must not have requests silently dropped while the bus drains them one
+    // per DMX frame. Dropped requests show up in the console as devices that "lost contact".
+    if (!g_artReqQ)  g_artReqQ  = xQueueCreate(48, sizeof(ArtRdmReq));
+    if (!g_artRespQ) g_artRespQ = xQueueCreate(12, sizeof(ArtRdmResp));
     // Raw UDP socket on 0.0.0.0:6454 with SO_BROADCAST so a limited-broadcast ArtPoll
     // (255.255.255.255, used by DMX-Workshop/OLA) is received, not just subnet-directed.
     // Non-blocking: netRxTask polls it. Single-owner (core 0), so no locking needed.

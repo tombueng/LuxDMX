@@ -148,13 +148,39 @@ static void rdmTx(const uint8_t* pkt, int len) {
     uart_flush_input(g_rdmUart);              // discard it -> the read sees only the responder reply
 }
 
+// Read one break-framed RDM response off the UART, returning the instant the whole frame
+// (SC .. checksum) has arrived instead of always blocking the full timeout. A responder must reply
+// within ~2 ms (E1.20 RESPONDER_PACKET_SPACING), so once the frame is in there is nothing to wait
+// for; this collapses the old fixed ~9 ms UART wait to the real turnaround time. It lets the gateway
+// service a busy controller several times faster without taking any extra time from the DMX frame
+// (this is only about how long we listen on the wire, not the DMX output timing). Returns the byte
+// count captured; the caller still locates the SC and validates length + checksum.
+static int rdmReadFrame(uint8_t* rx, int rxMax) {
+    uint32_t t0 = micros();
+    int n = 0, sc = -1, need = -1;
+    while ((uint32_t)(micros() - t0) < (uint32_t)RDM_RESP_TIMEOUT_MS * 1000u) {
+        int r = uart_read_bytes(g_rdmUart, rx + n, rxMax - n, pdMS_TO_TICKS(1));
+        if (r > 0) {
+            n += r;
+            if (sc < 0)                                   // find the SC + SUB_START_CODE
+                for (int i = 0; i + 1 < n; i++)
+                    if (rx[i] == RDM_SC && rx[i + 1] == RDM_SC_SUB) { sc = i; break; }
+            if (sc >= 0 && need < 0 && n - sc >= 3)
+                need = rx[sc + 2] + 2;                    // message length byte + 16-bit checksum
+            if (need > 0 && n - sc >= need) break;        // whole frame captured -> return now
+        }
+        if (n >= rxMax) break;
+    }
+    return n;
+}
+
 // --- response parsing -----------------------------------------------------------------------
 // Read a normal (break-framed) RDM response off the UART, validate it, and hand back the
 // parameter data. Returns true if a checksum-valid response addressed to us was received.
 static bool rdmReadResp(const rdm_uid_t& expectFrom, uint8_t* pd, int pdMax, int* pdl,
                         rdm_ack_t* ack) {
     uint8_t rx[96];
-    int n = uart_read_bytes(g_rdmUart, rx, sizeof(rx), pdMS_TO_TICKS(RDM_RESP_TIMEOUT_MS));
+    int n = rdmReadFrame(rx, sizeof(rx));        // returns as soon as the whole reply has landed
     rdmDe(1);                                    // done listening -> back to drive (DMX resumes)
     // Find the start code. A leading break shows up as a 0x00 (framing error) byte; skip to 0xCC.
     const char* fail = nullptr;
@@ -417,6 +443,35 @@ static bool rdmRmtGetSensorFull(const rdm_uid_t& uid, uint8_t sensorNum,
     return true;
 }
 
+// GET STATUS_MESSAGE (0x0030) with a status-type filter (RDM_STATUS_ADVISORY/WARNING/ERROR, or
+// RDM_STATUS_NONE for "all"). The response is a list of 9-byte records
+// {sub-device(2), type(1), messageId(2), data1(2), data2(2)}. We hand back the highest-severity
+// record plus the total count -- enough for the Art-Net BackgroundQueue health view. ACK only.
+static bool rdmRmtGetStatus(const rdm_uid_t& uid, uint8_t statusType,
+                            uint8_t* outType, uint16_t* outId, int16_t* outD1, int16_t* outD2,
+                            int* outCount, rdm_ack_t* ack) {
+    uint8_t pd[80]; int pdl = 0;
+    *outType = 0; *outId = 0; *outD1 = 0; *outD2 = 0; *outCount = 0;
+    if (!rdmTransaction(uid, RDM_CC_GET_COMMAND, RDM_PID_STATUS_MESSAGE, &statusType, 1,
+                        pd, sizeof(pd), &pdl, ack)) return false;
+    if (ack->type != RDM_RESPONSE_TYPE_ACK) return false;
+    int nmsg = pdl / 9;
+    *outCount = nmsg;
+    int best = -1; uint8_t bestType = 0;
+    for (int i = 0; i < nmsg; i++) {
+        uint8_t t = pd[i * 9 + 2];
+        if (best < 0 || t > bestType) { bestType = t; best = i; }
+    }
+    if (best >= 0) {
+        const uint8_t* m = pd + best * 9;
+        *outType = m[2];
+        *outId   = (uint16_t)((m[3] << 8) | m[4]);
+        *outD1   = (int16_t)((m[5] << 8) | m[6]);
+        *outD2   = (int16_t)((m[7] << 8) | m[8]);
+    }
+    return true;
+}
+
 // --- ArtRdm raw pass-through ----------------------------------------------------------------
 // Relay an RDM request exactly as an Art-Net controller supplied it. ArtRdm carries the full RDM
 // message WITHOUT the 0xCC start code (the controller already computed the checksum over the whole
@@ -434,23 +489,31 @@ static int rdmRmtRawRelay(const uint8_t* reqNoSC, int reqLen, uint8_t* respNoSC,
     // Destination UID is msg[3..8] -> reqNoSC[2..7]. A broadcast/vendorcast dest gets no reply.
     uint16_t destMan = ((uint16_t)reqNoSC[2] << 8) | reqNoSC[3];
     bool bcast = (destMan == 0xFFFF);
-    rdmTx(pkt, reqLen + 1);
-    if (bcast) return 0;                          // relayed, nothing to read back
-    uint8_t rx[96];
-    int n = uart_read_bytes(g_rdmUart, rx, sizeof(rx), pdMS_TO_TICKS(RDM_RESP_TIMEOUT_MS));
-    rdmDe(1);                                     // done listening -> drive (DMX resumes next frame)
-    if (n < 26) return -1;
-    int s = -1;
-    for (int i = 0; i < n - 1; i++) { if (rx[i] == RDM_SC && rx[i + 1] == RDM_SC_SUB) { s = i; break; } }
-    if (s < 0) return -1;
-    uint8_t* m = rx + s;
-    int avail = n - s;
-    int msgLen = m[2];
-    if (msgLen + 2 > avail || msgLen < RDM_HDR_LEN) return -1;
-    uint16_t ck = 0; for (int i = 0; i < msgLen; i++) ck += m[i];
-    if (ck != (uint16_t)((m[msgLen] << 8) | m[msgLen + 1])) return -1;
-    int outLen = msgLen + 2 - 1;                  // full reply minus the start code
-    if (outLen > respMax) outLen = respMax;
-    memcpy(respNoSC, m + 1, outLen);              // SUB_START_CODE .. checksum
-    return outLen;
+    // Re-issue on a lost/late reply, exactly like rdmTransaction() does for our own GET/SETs.
+    // Resending the controller's identical bytes (same TN) is what a real controller does on a
+    // timeout; E1.20 GET/SET are idempotent so a duplicate is harmless. Without this, one dropped
+    // turnaround (~19% on a busy bus) shows up in the console as a device that "lost contact".
+    for (int attempt = 0; attempt < (bcast ? 1 : 3); attempt++) {
+        rdmTx(pkt, reqLen + 1);
+        if (bcast) return 0;                          // relayed, nothing to read back
+        uint8_t rx[96];
+        int n = rdmReadFrame(rx, sizeof(rx));         // returns as soon as the whole reply has landed
+        rdmDe(1);                                     // done listening -> drive (DMX resumes next frame)
+        if (n < 26) { esp_rom_delay_us(1000); continue; }
+        int s = -1;
+        for (int i = 0; i < n - 1; i++) { if (rx[i] == RDM_SC && rx[i + 1] == RDM_SC_SUB) { s = i; break; } }
+        if (s < 0) { esp_rom_delay_us(1000); continue; }
+        uint8_t* m = rx + s;
+        int avail = n - s;
+        int msgLen = m[2];
+        if (msgLen + 2 > avail || msgLen < RDM_HDR_LEN) { esp_rom_delay_us(1000); continue; }
+        uint16_t ck = 0; for (int i = 0; i < msgLen; i++) ck += m[i];
+        if (ck != (uint16_t)((m[msgLen] << 8) | m[msgLen + 1])) { esp_rom_delay_us(1000); continue; }
+        g_rdmRecv++;                                  // a valid relayed reply (WS "RDM rx" counts it too)
+        int outLen = msgLen + 2 - 1;                  // full reply minus the start code
+        if (outLen > respMax) outLen = respMax;
+        memcpy(respNoSC, m + 1, outLen);              // SUB_START_CODE .. checksum
+        return outLen;
+    }
+    return -1;
 }

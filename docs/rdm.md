@@ -137,8 +137,33 @@ peripheral, `dmx_rmt.h`, so it is hardware-timed and never corrupts even while R
   active on an RDM-capable output (one with a DE/RE pin). Turn it off and the node ignores every RDM
   opcode; plain Art-Net/sACN DMX is untouched.
 - `/rdm.json` gains `artnetRdm`, `artPort` (the RDM output's Art-Net port-address), `discovering`,
-  and the `artTodReqs` / `artRdmReqs` / `artFlushes` / `artPolls` counters alongside the device TOD.
+  `bqPolicy` (the BackgroundQueuePolicy), `outputs[]` (per-output `{i, uni, merge}` for the RDM tab's
+  merge control), and the `artTodReqs` / `artRdmReqs` / `artFlushes` / `artPolls` counters alongside
+  the device TOD. The RDM tab shows a **Merge** selector per universe (off/HTP/LTP) that both sets the
+  mode (`GET /rdm/merge?out=<i>&mode=<0/1/2>`) and reflects changes made from a console over Art-Net.
 - Only built into the `DMX_RMT` (esp_dmx-free) firmware path, which is every hardware env.
+
+### Remote configuration over Art-Net (`ArtAddress`)
+
+A console's port-config dialog (e.g. DMX-Workshop's *Configure Port*) reaches the node with an
+`ArtAddress` (OpCode `0x6000`); the node applies the change and confirms with an `ArtPollReply`.
+Art-Net 4 addresses the target port by the `BindIndex` field, so the deprecated per-port command
+variants (`…1/2/3`) are treated the same as `…0`. Handled commands:
+
+- **Merge mode**: `AcMergeHtp0` (0x50) → HTP, `AcMergeLtp0` (0x10) → LTP, `AcCancelMerge` (0x01) →
+  off. Maps straight onto that output's `mergeMode`, applied **live** (merge reads it per frame, no
+  reboot) and persisted to NVS so it survives a power cycle (the spec requires Ltp/Htp to be
+  retained). Merge only does anything when two sources hit the same universe.
+- **BackgroundQueuePolicy**: `AcBqp0`…`AcBqp15` (0xe0…0xef). This is a node-wide knob telling the
+  gateway to harvest RDM status from the fixtures in the background: `0` collect all, `1` advisory+,
+  `2` warning+, `3` error only, `4` off (default). The node advertises support in `ArtPollReply`
+  (`Status3` bit 1) and echoes the current value in byte 228. While a policy is set the gateway polls
+  one fixture's `STATUS_MESSAGE` per idle DMX frame (throttled, lowest priority, so DMX is untouched)
+  and caches the highest-severity result per device, surfaced in `/rdm.json` (`stType` / `stId` /
+  `stCount`) and as a badge on the RDM tab. Also settable locally: the **Health poll** selector on the
+  RDM tab, or `GET /rdm/bqp?p=N`.
+- Universe / port-name programming from `ArtAddress` is **not** handled yet (changing a universe would
+  desync the boot-time RDM line mapping); set those on the device's own web config instead.
 
 ### Interop notes
 
@@ -155,7 +180,9 @@ peripheral, `dmx_rmt.h`, so it is hardware-timed and never corrupts even while R
 - `docs/tests/artnet_rdm_ctrl.py <gateway-ip> --pa 0 selftest` drives the whole thing as a controller
   (ArtPoll, TOD, GET/SET, sensors) and prints pass/fail.
 - `docs/tests/artnet-rdm.spec.mjs` is the Playwright e2e (read-only paths by default; the wire GET/SET
-  + flush + DMX-not-disturbed checks gate behind `LUXDMX_WRITE=1`).
+  + flush + DMX-not-disturbed checks and the `ArtAddress` merge / BackgroundQueuePolicy config checks
+  gate behind `LUXDMX_WRITE=1`). The read-only pass also asserts `ArtPollReply` advertises RDM-capable
+  + BackgroundQueue support.
 - `docs/qlcplus-rdm-test.qxw` is a ready QLC+ workspace (Art-Net output to the gateway, dimmers at the
   sim's fixture addresses) for driving the gateway from a real console while RDM runs. QLC+ itself has
   no RDM, so it only exercises the DMX side (useful for "RDM doesn't disturb DMX").

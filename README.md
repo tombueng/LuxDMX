@@ -591,6 +591,8 @@ values are fetched as JSON.
 | `/rdm/discover` | GET | Trigger an RDM discovery sweep on the bus (`{ok,op}`) |
 | `/rdm/setaddr` | GET | Set a fixture's DMX start address — `?uid=MMMM:DDDDDDDD&addr=1..512` |
 | `/rdm/identify` | GET | Toggle a fixture's identify — `?uid=MMMM:DDDDDDDD&on=0/1` |
+| `/rdm/bqp` | GET | Set the Art-Net BackgroundQueuePolicy (background RDM status harvest), `?p=1..3` severity, `4` off |
+| `/rdm/merge` | GET | Set an output's merge mode, `?out=<index>&mode=0/1/2` (off/HTP/LTP), applied live + persisted |
 | `/version.json` | GET | Current firmware version + update-available flag |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
@@ -619,7 +621,9 @@ rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` along
 
 ### Source merging (HTP / LTP)
 
-When more than one console targets the same universe, pick a per-output **merge mode** in `/config`:
+When more than one console targets the same universe, pick a per-output **merge mode** in `/config`
+(or remotely from a console over Art-Net, where an `ArtAddress` `AcMergeHtp`/`AcMergeLtp`/`AcCancelMerge`
+is applied live and persisted):
 
 - **Off** — last frame wins; a clash raises the conflict warning.
 - **HTP** (highest takes precedence) — each channel is the maximum across the active sources.

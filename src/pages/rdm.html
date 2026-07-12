@@ -83,11 +83,21 @@ body { background:#0d1117; animation:lxfade .16s ease-out; }
           <input class="form-check-input" type="checkbox" id="live-sw" onclick="aggClick(event,'master')">
           <label class="form-check-label small" for="live-sw">Live sensors</label>
         </div>
+        <div class="d-flex align-items-center gap-1" title="Art-Net BackgroundQueuePolicy: harvest RDM status messages from fixtures in the background at this severity. Also settable from a console (DMX-Workshop).">
+          <label class="form-label small mb-0 text-secondary" for="bqp-sel">Health poll</label>
+          <select class="form-select form-select-sm py-0" style="width:auto" id="bqp-sel" onchange="setBqp(this.value)">
+            <option value="4">Off</option>
+            <option value="1">Advisory</option>
+            <option value="2">Warning</option>
+            <option value="3">Error</option>
+          </select>
+        </div>
         <span class="pill" id="art-port">&nbsp;</span>
         <span id="disc-ctl" class="d-flex gap-1"></span>
       </div>
     </div>
     <div class="card-body">
+      <div id="merge-ctl" class="d-flex flex-wrap align-items-center gap-2 mb-2 small"></div>
       <div id="rdm-status" class="text-secondary small mb-2">Loading…</div>
       <div id="sensor-dash"></div>
       <div id="fx-list"></div>
@@ -256,10 +266,17 @@ function setFixtureAll(d){
     el.indeterminate = ss.some(Boolean) && !ss.every(Boolean);
   });
 }
+// RDM status badge from the Art-Net BackgroundQueue harvest (only shown when a device reports one).
+function healthBadge(f){
+  if(!f.stCount) return '';
+  var lbl=({2:'Advisory',3:'Warning',4:'Error'})[f.stType]||('Status '+f.stType);
+  var cls=f.stType>=4?'bg-danger':(f.stType>=3?'bg-warning text-dark':'bg-info text-dark');
+  return ' <span class="badge '+cls+'" title="RDM status id '+f.stId+' ('+f.stCount+' queued)">'+lbl+'</span>';
+}
 function fxRow(f){
   var name=f.label||f.modelName||('Model '+f.model), op=open[f.uid]?' open':'', i=fid(f.uid);
   var row='<tr class="fxrow'+op+'" id="fxr_'+i+'" onclick="toggleFx(\''+f.uid+'\')">'+
-    '<td><span class="caret">&#9656;</span> <span class="fx-name">'+esc(name)+'</span></td>'+
+    '<td><span class="caret">&#9656;</span> <span class="fx-name">'+esc(name)+'</span>'+healthBadge(f)+'</td>'+
     '<td class="fx-uid">'+esc(f.uid)+'</td>'+
     '<td><span class="uni-badge">U'+f.uni+'</span></td>'+
     '<td>'+f.addr+'</td>'+
@@ -365,6 +382,9 @@ function scanHtml(d){
 function render(d){
   lastD=d;
   document.getElementById('art-port').textContent = (d.artPort!=null) ? ('Art-Net RDM: uni '+d.artPort+(d.artnetRdm?'':' (off)')) : '';
+  var bq=document.getElementById('bqp-sel');   // keep the Health poll selector in sync (a console can change it)
+  if(bq && d.bqPolicy!=null && document.activeElement!==bq) bq.value=(d.bqPolicy>=1&&d.bqPolicy<=3)?d.bqPolicy:4;
+  renderMergeCtl(d);   // per-output merge mode (also reflects changes made from a console over Art-Net)
   var st=document.getElementById('rdm-status'), list=document.getElementById('fx-list'), dash=document.getElementById('sensor-dash');
   if(!d.available){ st.textContent='No RDM-capable output configured (an output needs a DE/RE pin).'; list.innerHTML=''; dash.innerHTML=''; lastSig=''; document.getElementById('disc-ctl').innerHTML=''; return; }
   // Buttons stay live except while a scan is actually running, and never grey for >30 s (a stuck
@@ -435,6 +455,25 @@ function rdmSetAddr(uid){ var el=document.getElementById('addr_'+fid(uid)); var 
 function rdmSetLabel(uid){ var el=document.getElementById('lbl_'+fid(uid)); send({type:'rdm_setlabel',uid:uid,label:el.value}); setTimeout(refresh,900); }
 function rdmSetPers(uid,p){ send({type:'rdm_setpers',uid:uid,pers:parseInt(p,10)}); setTimeout(refresh,900); }
 function rdmIdentify(uid,on){ send({type:'rdm_identify',uid:uid,on:on}); setTimeout(refresh,600); }
+function setBqp(v){ fetch('/rdm/bqp?p='+encodeURIComponent(v)).then(function(){setTimeout(refresh,300);}).catch(function(){}); }
+function setMerge(out,mode){ fetch('/rdm/merge?out='+out+'&mode='+mode).then(function(){setTimeout(refresh,300);}).catch(function(){}); }
+// Per-output merge selectors. Rebuilt only when the set of outputs changes; values are updated in
+// place each poll so a change made from a console (over Art-Net) shows up here without a rebuild.
+var mergeSig='';
+function renderMergeCtl(d){
+  var el=document.getElementById('merge-ctl'); if(!el) return;
+  var outs=d.outputs||[];
+  var s=outs.map(function(o){return o.i+':'+o.uni;}).join(',');
+  if(s!==mergeSig){
+    mergeSig=s;
+    el.innerHTML = outs.length ? ('<span class="text-secondary">Merge</span>'+outs.map(function(o){
+      return '<span class="d-inline-flex align-items-center gap-1"><span class="uni-badge">U'+o.uni+'</span>'+
+        '<select class="form-select form-select-sm py-0" style="width:auto" id="merge_'+o.i+'" onchange="setMerge('+o.i+',this.value)">'+
+        '<option value="0">Off</option><option value="1">HTP</option><option value="2">LTP</option></select></span>';
+    }).join(' ')) : '';
+  }
+  outs.forEach(function(o){ var sel=document.getElementById('merge_'+o.i); if(sel && document.activeElement!==sel) sel.value=o.merge; });
+}
 function rdmSensSel(uid,idx,on){ send({type:'rdm_sensorsel',uid:uid,sensor:idx,on:on}); reschedule(); setTimeout(refresh,600); }
 
 // The "all" (per-fixture) and "Live sensors" (master) switches are select-off / restore controls,

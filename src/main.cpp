@@ -870,6 +870,12 @@ struct RdmDevice {
     char      deviceLabel[33];   // DEVICE_LABEL (user-assignable)
     uint8_t   sensorCount;
     RdmSensor sensors[RDM_MAX_SENSORS];
+    // Art-Net BackgroundQueue harvest: last STATUS_MESSAGE seen for this device (0 type = healthy).
+    // The message data values are parsed but not stored: the UI shows only type/id/count, and this
+    // struct is arrayed x64 twice, so each byte here costs ~128 B of DRAM (tight on the classic ESP32).
+    uint8_t   statusType;        // RDM_STATUS_* of the highest-severity queued message (0 = none)
+    uint16_t  statusMsgId;       // STATUS_MESSAGE_ID of that message
+    uint8_t   statusCount;       // number of messages in the last harvest
 };
 static constexpr int RDM_MAX_DEVICES = 64;
 static RdmDevice rdmDevices[RDM_MAX_DEVICES];
@@ -2060,6 +2066,24 @@ static void handleRdmTrigger(AsyncWebServerRequest* req) {
         req->send(200, "application/json", "{\"ok\":true,\"op\":\"discover\"}");
         return;
     }
+    if (path.endsWith("/bqp")) {   // Art-Net BackgroundQueuePolicy (0..3 severity, 4 = off)
+        int p = req->hasParam("p") ? req->getParam("p")->value().toInt() : 4;
+        if (p < 0) p = 0; if (p > 15) p = 15;
+        g_bqPolicy = (uint8_t)p; g_bqDirty = true;
+        req->send(200, "application/json", "{\"ok\":true,\"op\":\"bqp\"}");
+        return;
+    }
+    if (path.endsWith("/merge")) {   // set an output's merge mode (off/HTP/LTP), live + persisted
+        int out  = req->hasParam("out")  ? req->getParam("out")->value().toInt()  : -1;
+        int mode = req->hasParam("mode") ? req->getParam("mode")->value().toInt() : -1;
+        if (out >= 0 && out < MAX_OUTPUTS && mode >= MERGE_OFF && mode <= MERGE_LTP) {
+            cfg.outputs[out].mergeMode = mode; g_artCfgDirty = true;   // loop() persists via saveConfig
+            req->send(200, "application/json", "{\"ok\":true,\"op\":\"merge\"}");
+            return;
+        }
+        req->send(400, "application/json", "{\"ok\":false}");
+        return;
+    }
     if (req->hasParam("uid")) {
         String us = req->getParam("uid")->value();
         int colon = us.indexOf(':');
@@ -2123,7 +2147,12 @@ static String rdmDeviceJson(const RdmDevice& d) {
         j += ",\"poll\":";    j += sn.poll ? "true" : "false";
         j += ",\"unit\":\"";  j += rdmJsonEsc(sn.unit); j += "\"}";
     }
-    j += "]}";
+    j += "]";
+    // Art-Net BackgroundQueue harvest: last status message severity/id/count (0 = healthy).
+    j += ",\"stType\":";  j += d.statusType;
+    j += ",\"stId\":";    j += d.statusMsgId;
+    j += ",\"stCount\":"; j += d.statusCount;
+    j += "}";
     return j;
 }
 
@@ -2152,6 +2181,7 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
     s->head += ",\"artFlushes\":"; s->head += (uint32_t)g_artFlushes;
     s->head += ",\"artPolls\":";   s->head += (uint32_t)g_artPolls;
     s->head += ",\"sensorPoll\":"; s->head += g_pollAny ? "true" : "false";   // any sensor switch enabled
+    s->head += ",\"bqPolicy\":"; s->head += (int)g_bqPolicy;   // Art-Net BackgroundQueuePolicy (4 = off)
     s->head += ",\"rdmTx\":"; s->head += (uint32_t)g_rdmSent;   // RDM frames sent on the bus
     s->head += ",\"rdmRx\":"; s->head += (uint32_t)g_rdmRecv;   // valid RDM responses received
     s->head += ",\"discLine\":"; s->head += g_adLine;          // line currently being discovered
@@ -2164,6 +2194,19 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
             if (!firstL) s->head += ",";
             firstL = false;
             s->head += "{\"line\":"; s->head += L; s->head += ",\"uni\":"; s->head += cfg.outputs[o].universe; s->head += "}";
+        }
+    }
+    s->head += "]";
+    s->head += ",\"outputs\":[";                               // per-output merge mode (for the RDM tab)
+    {
+        bool firstO = true;
+        for (int i = 0; i < MAX_OUTPUTS; i++) {
+            if (!cfg.outputs[i].enabled) continue;
+            if (!firstO) s->head += ",";
+            firstO = false;
+            s->head += "{\"i\":"; s->head += i;
+            s->head += ",\"uni\":"; s->head += cfg.outputs[i].universe;
+            s->head += ",\"merge\":"; s->head += cfg.outputs[i].mergeMode; s->head += "}";
         }
     }
     s->head += "]";
@@ -3308,6 +3351,8 @@ void setup() {
     http.on("/rdm/discover",      HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/setaddr",       HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/identify",      HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/bqp",           HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/merge",         HTTP_GET,  handleRdmTrigger);
     // The page route matches "/rdm" and prefix "/rdm/…", so register it AFTER the /rdm/* handlers
     // (first match wins) or it would swallow /rdm/discover etc.
     http.on("/rdm",               HTTP_GET,  handleRdmPage);
@@ -3442,6 +3487,11 @@ void loop() {
     cfgserial::poll();   // serial config console (non-blocking line reader)
 
     if (rdmPollDirty) { rdmPollDirty = false; rdmSavePoll(); }   // persist sensor switch changes
+    if (g_artCfgDirty) { g_artCfgDirty = false; saveConfig(); }  // ArtAddress changed a merge mode
+    if (g_bqDirty) {                                             // ArtAddress changed the queue policy
+        g_bqDirty = false;
+        prefs.begin(PREF_NS, false); prefs.putUChar("bqpolicy", g_bqPolicy); prefs.end();
+    }
 
 #ifdef SIM_ARTNET
     simArtnetTick();
