@@ -7,7 +7,9 @@ import dgram from 'dgram';
 export const ART_PORT = 6454;
 const ID = 'Art-Net\0';
 export const OP_POLL = 0x2000, OP_POLLREPLY = 0x2100, OP_TODREQUEST = 0x8000,
-             OP_TODDATA = 0x8100, OP_TODCONTROL = 0x8200, OP_RDM = 0x8300;
+             OP_TODDATA = 0x8100, OP_TODCONTROL = 0x8200, OP_RDM = 0x8300, OP_ADDRESS = 0x6000;
+// ArtAddress Command bytes (Art-Net 4 selects the port by BindIndex, so the "...0" variants are used).
+export const AC_CANCEL_MERGE = 0x01, AC_MERGE_LTP0 = 0x10, AC_MERGE_HTP0 = 0x50, AC_BQP0 = 0xe0;
 export const CC_GET = 0x20, CC_SET = 0x30;
 export const PID_DEVICE_INFO = 0x0060, PID_SW_LABEL = 0x00c0,
              PID_DMX_START_ADDRESS = 0x00f0, PID_IDENTIFY = 0x1000, PID_SENSOR_VALUE = 0x0201;
@@ -68,12 +70,19 @@ export function parseTodData(p) {
 }
 function uidFrom2(b, o) { return [b.readUInt16BE(o), b.readUInt32BE(o + 2)]; }
 export function parseArtRdm(p) { return p.length < 25 ? null : parseRdm(Buffer.concat([Buffer.from([0xcc]), p.slice(24)])); }
+// ArtAddress: remote port config (merge mode, BackgroundQueuePolicy, ...). Command @106, BindIndex @13.
+export function buildArtAddress(bindIndex, cmd) {
+  const b = artHead(OP_ADDRESS, 97);   // 8 (ID) + 2 (op) + 97 = 107 bytes
+  b[10] = 0; b[11] = 14; b[13] = bindIndex; b[106] = cmd; return b;
+}
 export function parsePollReply(p) {
   if (p.length < 200 || p.toString('latin1', 0, 8) !== ID) return null;
   return { ip: `${p[10]}.${p[11]}.${p[12]}.${p[13]}`,
            short: p.toString('latin1', 26, 44).replace(/\0.*$/, ''),
            numPorts: p.readUInt16BE(172),
-           portTypes: [...p.slice(174, 178)], swOut: [...p.slice(190, 194)] };
+           portTypes: [...p.slice(174, 178)], swOut: [...p.slice(190, 194)],
+           status1: p[23], goodOutput: [...p.slice(182, 186)], goodOutputB: p.length > 213 ? p[213] : 0,
+           status3: p.length > 217 ? p[217] : 0, bqPolicy: p.length > 228 ? p[228] : null };
 }
 
 // ---- transport ----
@@ -102,6 +111,11 @@ export class ArtRdmClient {
   async poll(ms = 2000) { await this._send(buildArtPoll()); const m = await this._recv(OP_POLLREPLY, ms); return m && parsePollReply(m); }
   async todRequest(pa, ms = 3000) { await this._send(buildTodRequest(pa)); const m = await this._recv(OP_TODDATA, ms); return m && parseTodData(m); }
   async todFlush(pa) { await this._send(buildTodControl(pa, true)); }
+  // ArtAddress remote port config (merge mode, BackgroundQueuePolicy, ...). Answered by ArtPollReply.
+  async address(bindIndex, cmd, ms = 2000) {
+    await this._send(buildArtAddress(bindIndex, cmd));
+    const m = await this._recv(OP_POLLREPLY, ms); return m && parsePollReply(m);
+  }
   async rdm(pa, dest, cc, pid, pd = Buffer.alloc(0), retries = 2, ms = 2500) {
     for (let a = 0; a <= retries; a++) {
       this.tn = (this.tn % 255) + 1;

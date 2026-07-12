@@ -48,26 +48,11 @@
 .form-control:focus,.form-select:focus{border-color:#23e6f7;box-shadow:0 0 0 .25rem rgba(35,230,247,.25);}
 .form-range::-webkit-slider-thumb{background:#23e6f7;}
 .form-range::-moz-range-thumb{background:#23e6f7;}
-body { background: var(--gh-bg); }
+html { background: var(--gh-bg); }   /* dark from first paint: no white flash on tab switch */
+body { background: var(--gh-bg); animation:lxfade .16s ease-out; }
+@keyframes lxfade { from { opacity:0 } to { opacity:1 } }
 
-.site-nav {
-  background: var(--gh-surface);
-  border-bottom: none;
-  padding: 0.6rem 1rem;
-  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-}
-.site-nav .brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
-.site-nav .brand img { height: 64px; border-radius: 14px; }
-.site-nav .brand-text .name { font-size: 1.4rem; font-weight: 700; color: #fff; line-height: 1; }
-.site-nav .brand-text .sub  { font-size: 0.68rem; color: var(--gh-muted); margin-top: 2px; }
-.site-nav .nav-links { display: flex; gap: 0.4rem; }
-
-/* Compact live stats in the navbar (replaces the old stat cards) */
-.nav-stats { margin-left: auto; display: flex; gap: 1.15rem; align-items: center; flex-wrap: wrap; }
-.nav-stat  { display: flex; flex-direction: column; line-height: 1.05; }
-.nav-stat .ns-label { font-size: 0.55rem; text-transform: uppercase; letter-spacing: .07em; color: var(--gh-muted); }
-.nav-stat .ns-val   { font-size: 0.95rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
-
+/* the navbar (markup + its CSS + behaviour) is the shared src/pages/_nav.html fragment */
 .card { background: var(--gh-surface); border-color: var(--gh-border); }
 .card-header { background: #1c2128; border-color: var(--gh-border); font-size: 0.85rem; }
 
@@ -164,26 +149,7 @@ footer a:hover { color: var(--gh-text); }
 </head>
 <body>
 
-<nav class="site-nav">
-  <a class="brand" href="/">
-    <img src="/logo.png?v=__FWVER__" alt="LuxDMX">
-    <div class="brand-text">
-      <div class="name">LuxDMX</div>
-      <div class="sub" id="nav-sub">&nbsp;</div>
-    </div>
-  </a>
-  <div class="nav-stats">
-    <div class="nav-stat"><span class="ns-label">FPS</span><span class="ns-val" id="fps">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label">Heap</span><span class="ns-val" id="heap">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">&middot;</span></div>
-    <div class="nav-stat"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">&middot;</span></div>
-  </div>
-  <div class="nav-links">
-    <a href="/" class="btn btn-primary btn-sm">Status</a>
-    <a href="/config" class="btn btn-outline-secondary btn-sm">Settings</a>
-  </div>
-</nav>
+<!--NAVBAR-->
 
 <div class="container-fluid p-3">
 
@@ -272,29 +238,7 @@ footer a:hover { color: var(--gh-text); }
     </div>
   </div>
 
-  <!-- Fixtures (RDM): hidden entirely unless an RTS/DE pin is configured -->
-  <div class="card mb-3" id="rdm-card" style="display:none">
-    <div class="card-header d-flex align-items-center justify-content-between">
-      <span>Fixtures (RDM)</span>
-      <button class="btn btn-primary btn-sm py-0" id="rdm-discover" onclick="rdmDiscover()">Discover</button>
-    </div>
-    <div class="card-body p-0">
-      <div id="rdm-status" class="text-secondary small px-3 py-2">Loading…</div>
-      <table class="table table-sm mb-0 snd-tbl" id="rdm-table"
-             style="--bs-table-bg:transparent;display:none">
-        <thead>
-          <tr>
-            <th class="ps-3">UID</th>
-            <th>Model / Software</th>
-            <th>Footprint</th>
-            <th>Start addr</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="rdm-body"></tbody>
-      </table>
-    </div>
-  </div>
+  <!-- RDM fixtures live on their own tab now (/rdm) -->
 
   <!-- Change Log -->
   <div class="card mb-3">
@@ -354,20 +298,13 @@ let labels = {};      // labels for the currently-viewed output: { "1": "Front L
 let allLabels = {};   // per-output: { "0": {"1":"Front L"}, "1": {...} }, each line has its own fixtures
 let devInfo = {};  // filled from /info.json
 
+// the navbar strip (incl. its value cache) is the shared _nav.html fragment; this page only
+// feeds it the /ws frame via LuxNav.stats(...) below.
+
 // Outputs (enabled universes) and which one the monitor is currently viewing.
 let outputs = [];     // [{idx, uni}] enabled outputs, from /info.json
 let viewOut = 0;      // device-side output index being streamed
 
-function outUniverse(idx){
-  for (var i = 0; i < outputs.length; i++) if (outputs[i].idx === idx) return outputs[i].uni;
-  return idx;
-}
-function updNavSub(){
-  document.getElementById('nav-sub').innerHTML =
-    (devInfo.hostname || '') + '.local &nbsp;&middot;&nbsp; ' + (devInfo.ip || '') +
-    ' &nbsp;&middot;&nbsp; Universe ' + outUniverse(viewOut) +
-    ' &nbsp;&middot;&nbsp; v' + (devInfo.version || '');
-}
 // Tell the device which output's DMX buffer to stream + control, then relabel.
 function setViewOut(idx){
   viewOut = idx;
@@ -375,7 +312,6 @@ function setViewOut(idx){
   labels = allLabels[viewOut] || {};   // each output has its own fixture names
   applyLabels();
   markActiveOut();
-  updNavSub();
 }
 function markActiveOut(){
   document.querySelectorAll('#out-sel button').forEach(function(b){
@@ -408,7 +344,6 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   for (var i = 0; i < outs.length; i++) if (outs[i].en) outputs.push({idx:i, uni:outs[i].uni});
   if (outputs.length) viewOut = outputs[0].idx;
   buildOutSelector();
-  updNavSub();
 }).catch(function(){});
 
 // Sparkline: 60 samples at 0.5 s = 30 s of history
@@ -595,45 +530,19 @@ function connect() {
       return;
     }
     if (!(e.data instanceof ArrayBuffer)) return;
-    // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
-    //        rssi doubles as the link indicator: <=0 WiFi STA dBm | >=10 wired
-    //        link speed (Mbps) | 1 standalone AP
-    //        srcStatus: 0=normal 1=conflict 2=merging
-    //        dmx(512) + per-output fps(2 each)
+    if (window.LuxNav) LuxNav.stats(e.data);   // the shared navbar reads its stats off this frame
+    // frame: 16-byte header, dmx(512), per-output fps(2 x MAX_OUTPUTS), 10-byte RDM trailer
     var v = new DataView(e.data);
-    var fps         = (v.getUint16(0) / 10).toFixed(1);   // aggregate (fallback)
-    var rssi        = v.getInt16(2);
-    var heap        = v.getUint32(4);
-    var upS         = v.getUint32(8);
-    // byte 12 = active sender count (shown via the senders table, not here)
-    var srcStatus   = v.getUint8(13);   // 0 = normal, 1 = conflict, 2 = merging
-    var jitter      = (v.getUint16(14) / 10).toFixed(1);
+    var srcStatus = v.getUint8(13);   // 0 = normal, 1 = conflict, 2 = merging (drives the banners)
 
-    // Per-output frame rates appended after the 512-byte DMX block.
-    var perOut = [], nOut = Math.max(0, (v.byteLength - 528) >> 1);
+    // Output frame rates label each output-selector button. The frame carries two per-output arrays
+    // (output fps, then input fps) before the fixed 10-byte tail; we only need the output fps here.
+    var perOut = [], nOut = Math.max(0, (v.byteLength - 528 - 10) >> 2);
     for (var oi = 0; oi < nOut; oi++) perOut[oi] = v.getUint16(528 + 2 * oi) / 10;
-    // Main FPS stat reflects the viewed output; each selector button shows its own.
     document.querySelectorAll('#out-sel button').forEach(function(btn){
       var sp = btn.querySelector('.out-fps'), idx = +btn.dataset.out;
       if (sp && perOut[idx] != null) sp.textContent = perOut[idx].toFixed(1);
     });
-
-    document.getElementById('fps').textContent =
-      perOut[viewOut] != null ? perOut[viewOut].toFixed(1) : fps;
-    // rssi field is typed: <=0 WiFi STA dBm, >=10 wired link speed (Mbps), 1 = AP.
-    var re = document.getElementById('rssi'), nl = document.getElementById('net-label');
-    if (rssi >= 10) {                       // wired Ethernet
-      nl.textContent = 'LAN';  re.textContent = rssi + 'M';   re.style.color = '#45d85c';
-    } else if (rssi >= 1) {                 // standalone AP fallback
-      nl.textContent = 'AP';   re.textContent = 'active';     re.style.color = '#f33abc';
-    } else {                                // WiFi STA, real signal strength
-      nl.textContent = 'WiFi'; re.textContent = rssi + ' dBm';
-      re.style.color = rssi > -65 ? '#45d85c' : rssi > -80 ? '#ffaa1c' : '#f33abc';
-    }
-    document.getElementById('heap').textContent   = (heap / 1024).toFixed(0) + ' KB';
-    var h = Math.floor(upS / 3600), m = Math.floor((upS % 3600) / 60), s = upS % 60;
-    document.getElementById('uptime').textContent = (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + s + 's';
-    document.getElementById('jitter').textContent = jitter + ' ms';
 
     var cb = document.getElementById('conflict-banner');
     var mb = document.getElementById('merge-banner');
@@ -693,81 +602,7 @@ function updateLog(data) {
 // Senders + log now arrive over the WebSocket (see sock.onmessage), no HTTP
 // polling, which previously exhausted the device's TCP sockets.
 
-// ── RDM fixtures ────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
-    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
-  });
-}
-function rdmId(uid) { return 'rdma_' + uid.replace(/[^0-9A-Fa-f]/g, ''); }
-
-function rdmRender(d) {
-  // Hide the whole section unless RDM is enabled (an RTS/DE pin is configured).
-  var card = document.getElementById('rdm-card');
-  if (!d.available) { card.style.display = 'none'; return; }
-  card.style.display = '';
-
-  var st = document.getElementById('rdm-status');
-  var tbl = document.getElementById('rdm-table');
-  var btn = document.getElementById('rdm-discover');
-  var has = d.devices && d.devices.length;
-  btn.disabled = d.busy;
-
-  if (d.busy) {
-    st.textContent = 'Scanning the line…';
-    setTimeout(rdmRefresh, 1000);
-  } else if (!has) {
-    st.textContent = d.scanned ? 'No RDM fixtures found.' : 'Click Discover to scan the line.';
-  }
-  st.style.display = has ? 'none' : '';
-  tbl.style.display = has ? '' : 'none';
-  if (!has) return;
-
-  document.getElementById('rdm-body').innerHTML = d.devices.map(function(f) {
-    var idCls = f.identify ? 'btn-warning' : 'btn-outline-warning';
-    var sens = (f.sensors || []).map(function(s) {
-      return esc(s.name) + ' ' + s.value + (s.unit ? ' ' + esc(s.unit) : '');
-    }).join(' · ');
-    return '<tr>' +
-      '<td class="ps-3" style="font-family:monospace">' + esc(f.uid) + '</td>' +
-      '<td><div>' + (f.model ? 'model ' + f.model : '&middot;') +
-        (f.persCount > 1 ? ' <span class="text-secondary">(pers ' + f.pers + '/' + f.persCount + ')</span>' : '') +
-        '</div>' +
-        (f.sw ? '<div class="text-secondary" style="font-size:.7rem">' + esc(f.sw) + '</div>' : '') +
-        (sens ? '<div class="text-secondary" style="font-size:.7rem">' + sens + '</div>' : '') +
-        '</td>' +
-      '<td>' + f.footprint + '</td>' +
-      '<td><input type="number" min="1" max="512" value="' + f.addr + '" id="' + rdmId(f.uid) +
-        '" class="form-control form-control-sm d-inline-block" style="width:72px"></td>' +
-      '<td class="text-end pe-3 text-nowrap">' +
-        '<button class="btn btn-outline-primary btn-sm me-1" onclick="rdmSetAddr(\'' + f.uid + '\')">Set</button>' +
-        '<button class="btn ' + idCls + ' btn-sm" onclick="rdmIdentify(\'' + f.uid + '\',' + (f.identify ? 'false' : 'true') + ')">ID</button>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-}
-function rdmRefresh() {
-  fetch('/rdm.json').then(function(r){ return r.json(); }).then(rdmRender).catch(function(){});
-}
-function rdmDiscover() {
-  send({type: 'rdm_discover'});
-  var btn = document.getElementById('rdm-discover');
-  btn.disabled = true;
-  document.getElementById('rdm-status').style.display = '';
-  document.getElementById('rdm-status').textContent = 'Scanning the line…';
-  setTimeout(rdmRefresh, 1200);
-}
-function rdmSetAddr(uid) {
-  var el = document.getElementById(rdmId(uid));
-  if (!el) return;
-  var a = parseInt(el.value, 10);
-  if (a >= 1 && a <= 512) { send({type: 'rdm_setaddr', uid: uid, addr: a}); setTimeout(rdmRefresh, 800); }
-}
-function rdmIdentify(uid, on) {
-  send({type: 'rdm_identify', uid: uid, on: on});
-  setTimeout(rdmRefresh, 600);
-}
-rdmRefresh();
+// RDM fixtures moved to their own tab (/rdm).
 
 // Firmware update check
 function vNum(s) { var m = String(s).match(/(\d+)\.(\d+)\.(\d+)/); return m ? (+m[1]*1e6 + +m[2]*1e3 + +m[3]) : 0; }
