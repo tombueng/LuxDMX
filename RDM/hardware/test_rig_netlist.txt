@@ -1,0 +1,22 @@
+DMX/RDM test-rig - net list (ref.pad per net)
+============================================================
++3V3_S3      ( 3)  J_485B_L.2  J_S3A.1  J_S3A.2
++3V3_SIM     ( 4)  J_PICOB.5  J_485A_L.2  Rb1.2  J_MEAS.3
++5V          ( 4)  J_PICOB.2  J_S3A.21  J_W5500.2  J_MEAS.5
+BUS_A        ( 7)  J_485A_R.3  J_485B_R.3  Rb1.1  Rd1.1  J_MEAS.1  J_LA.1  J_TERM.1
+BUS_B        ( 7)  J_485A_R.4  J_485B_R.4  Rb2.1  Rd3.1  J_MEAS.2  J_LA.3  J_TERM.2
+ETH_CS       ( 2)  J_S3A.16  J_W5500.7
+ETH_INT      ( 2)  J_S3A.20  J_W5500.8
+ETH_MISO     ( 2)  J_S3A.19  J_W5500.3
+ETH_MOSI     ( 2)  J_S3A.17  J_W5500.5
+ETH_RST      ( 2)  J_S3A.15  J_W5500.6
+ETH_SCLK     ( 2)  J_S3A.18  J_W5500.9
+GND          (30)  J_PICOA.3  J_PICOA.8  J_PICOA.13  J_PICOA.18  J_PICOB.3  J_PICOB.8  J_PICOB.13  J_PICOB.18  J_485A_L.5  J_485A_R.2  J_485B_R.2  J_485B_L.5  J_S3A.22  J_S3B.1  J_S3B.21  J_S3B.22  J_W5500.4  Rb2.2  Rd2.2  Rd4.2  J_MEAS.4  J_LA.2  J_LA.4  J_LA.6  J_LA.8  J_LA.10  J_LA.12  J_LA.14  J_LA.16  J_TERM.3
+S3_DMX_EN    ( 3)  J_485B_L.1  J_S3A.12  J_LA.15
+S3_DMX_RX    ( 3)  J_485B_L.3  J_S3A.11  J_LA.13
+S3_DMX_TX    ( 3)  J_485B_L.4  J_S3A.10  J_LA.11
+SIM_A0       ( 3)  J_PICOB.10  Rd3.2  Rd4.1
+SIM_A1       ( 3)  J_PICOB.9  Rd1.2  Rd2.1
+SIM_EN       ( 3)  J_PICOA.4  J_485A_L.1  J_LA.9
+SIM_RX       ( 4)  J_PICOA.1  J_485A_L.3  J_MEAS.7  J_LA.7
+SIM_TX       ( 4)  J_PICOA.2  J_485A_L.4  J_MEAS.6  J_LA.5

@@ -19,6 +19,7 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
+#include <esp_task_wdt.h>  // reconfigure the task WDT to not reboot the gateway under a network flood
 // Schema-driven config engine (src/config/). config_schema.h defines the Config +
 // DmxOutput structs + MAX_OUTPUTS (moved here out of main.cpp); config_core.h is
 // the transport-agnostic load/save/setValue/toJson engine the handlers drive. The
@@ -111,6 +112,11 @@
 #include <Update.h>
 #include <ArtnetWifi.h>
 #include <esp_dmx.h>
+#ifdef DMX_RMT
+#include "dmx_rmt.h"
+static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64 hard-zero path)
+#include "rdm_rmt.h"                    // RDM controller on RMT-TX + UART-RX (no esp_dmx, no interrupt leak)
+#endif
 #include <rdm/controller.h>             // RDM controller: discovery + GET/SET
 #include <rdm/controller/include/utils.h>  // rdm_send_request() for sensor PIDs
 #include <rdm/include/uid.h>            // rdm_uid_is_eq() and friends
@@ -119,12 +125,13 @@
 #include "generated/version.h"
 #include "generated/index_html.h"
 #include "generated/config_html.h"
+#include "generated/rdm_html.h"
 #include "generated/config_saved_html.h"
 #include "generated/reset_html.h"
 #include "generated/reset_done_html.h"
 #include "generated/ota_progress_html.h"
 #include "generated/ota_done_html.h"
-#include "generated/logo_png.h"
+#include "generated/logo_webp.h"
 #include "generated/favicon_png.h"
 #include "generated/bootstrap_min_css.h"
 
@@ -345,7 +352,7 @@ struct LogEntry {
     uint32_t ms;
     uint32_t ip;
     uint8_t  proto;
-    uint8_t  uni;     // Art-Net universe this frame targeted
+    uint16_t uni;     // Art-Net/sACN universe this frame targeted (0-32767)
     uint8_t  topN;    // valid entries in top[]
     uint16_t total;   // total channels changed
     struct { uint16_t ch; uint8_t val; } top[LOG_TOP];
@@ -408,6 +415,7 @@ static bool parseIp(const String& s, IPAddress& out) {
 // Global objects
 // ---------------------------------------------------------------------------
 Preferences       prefs;
+static void rdmLoadPoll();   // fwd decl (defined with the RDM sensor-poll persistence, below)
 AsyncWebServer    http(80);
 AsyncWebSocket    ws("/ws");
 ArtnetWifi        artnet;
@@ -420,16 +428,29 @@ static Adafruit_NeoPixel neoPixel(1, 0, NEO_GRB + NEO_KHZ800);
 static uint8_t  dmxBuf[MAX_OUTPUTS][DMX_PACKET_SIZE] = {{0}};
 static bool     outReady[MAX_OUTPUTS] = {false};   // per-output DMX driver installed
 static int      monitorOut   = 0;                  // output shown/controlled by the web UI
-static int      rdmOut       = -1;                 // output RDM runs on, -1 = none
+static int      rdmOut       = -1;                 // primary RDM output (first RDM line), -1 = none
+static int      rdmLineForOut[MAX_OUTPUTS];        // output index -> RDM engine line, -1 if not RDM-capable
+static int      rdmOutForLine[MAX_OUTPUTS];        // RDM engine line -> the output index it reaches
 static uint32_t lastFrameMs  = 0;
 static uint32_t frameCount   = 0;
 static float    fps          = 0.0f;
+// Incoming Art-Net/sACN frame rate per output-universe (for the navbar's "In FPS"). Counted in
+// updateSender() (once per packet, so a multi-universe source is attributed right) and closed to a
+// rate each second in wsPush() so a stopped universe decays to 0.
+static uint32_t inFrameCnt[MAX_OUTPUTS] = {0};
+static uint32_t inWinMs[MAX_OUTPUTS]    = {0};
+static float    inFpsOut[MAX_OUTPUTS]   = {0.0f};
 // Per-output frame rate (one universe each). The aggregate `fps` above stays the
 // sum of all inputs for the WS/web UI; these drive the per-universe display.
 static uint32_t outFrameCount[MAX_OUTPUTS]  = {0};
 static uint32_t outLastFrameMs[MAX_OUTPUTS] = {0};
 static uint32_t outLastDmxMs[MAX_OUTPUTS]   = {0};
 static float    outFps[MAX_OUTPUTS]         = {0.0f};
+// Real DMX OUTPUT (transmit) rate per output, counted in sendDmx (the DMX task) and rolled up
+// once a second. This is what "outfps" should report -- the rate we actually clock onto the
+// wire (a steady ~40 Hz), independent of the input frame rate.
+static volatile uint32_t txFrames[MAX_OUTPUTS] = {0};
+static float    outTxFps[MAX_OUTPUTS]       = {0.0f};
 // True while no live source feeds this output's universe. Drives the per-output
 // signal-loss policy (LOSS_*). Starts true: a freshly booted node has no source
 // yet, so a STOP-configured output stays dark until one appears.
@@ -461,7 +482,10 @@ static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
 // WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1)
 // (srcStatus: 0=normal 1=conflict 2=merging)
 // jitter(2) dmx(512) + per-output fps(2 x MAX_OUTPUTS) = 528 + 2*MAX_OUTPUTS
-static constexpr int WS_FRAME_LEN = 528 + 2 * MAX_OUTPUTS;
+// 528 header+dmx, then per-output OUTPUT fps (2*N) and per-output INPUT fps (2*N), then a fixed
+// 10-byte tail (fixtures + RDM tx + RDM rx). Every tab's navbar reads its stats off this one frame.
+static constexpr int WS_NAV_TAIL  = 10;
+static constexpr int WS_FRAME_LEN = 528 + 4 * MAX_OUTPUTS + WS_NAV_TAIL;
 static uint8_t wsBuf[WS_FRAME_LEN];
 
 // sACN receive buffer
@@ -505,6 +529,7 @@ static void loadConfig() {
     prefs.begin(PREF_NS, true);
     if (prefs.isKey("labels")) g_labels = prefs.getString("labels", "{}");   // isKey: avoid the NOT_FOUND log on a fresh device
     prefs.end();
+    rdmLoadPoll();   // restore which sensors are enabled for live polling + graphing
     sanitizeOutputs();
 }
 
@@ -722,10 +747,21 @@ static int viewOutput() {
     return 0;
 }
 
+// Clock every enabled output out for one DMX frame. The two DMX UARTs are independent
+// hardware, so we fire ALL of them first (dmx_write + dmx_send) and only THEN wait for
+// them to finish -- both frames transmit CONCURRENTLY. With two outputs that is ~one
+// frame time (~23 ms) instead of ~46 ms, so each output holds ~40 Hz instead of dropping
+// to ~20 Hz (issue #64). Runs from the dedicated high-priority dmxTxTask (see below), the
+// sole owner of the DMX ports, so its break/MAB timing is never preempted by loop().
 static void sendDmx() {
     if (!dmxReady) return;
     bool ovActive = identifyCh && millis() < identifyUntil;
     int  vo = viewOutput();
+    dmx_port_t sentPort[MAX_OUTPUTS]; int nSent = 0;
+#ifdef DMX_RMT
+    int rmtSent[MAX_OUTPUTS]; int nRmt = 0;
+#endif
+    // Phase 1: write + kick off every output that should clock this frame.
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!outReady[i]) continue;
         // Identify override: force one channel to full on the wire only (on the
@@ -736,13 +772,68 @@ static void sendDmx() {
         // identify are explicit user intent and keep the line clocking.
         if (cfg.outputs[i].lossMode == LOSS_STOP && outSrcLost[i]
             && !ov && !(manualMode && i == vo)) continue;
-        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         uint8_t saved = 0;
         if (ov) { saved = dmxBuf[i][identifyCh]; dmxBuf[i][identifyCh] = 255; }
+#ifdef DMX_RMT
+        {   // RMT-driven output -> kick (async), streams out in hardware. The RDM output stays on
+            // RMT too: RDM requests go out via RMT and responses come back on a RX-only UART, so
+            // there is never a switch and DMX output on this pin is uninterrupted between RDM ops.
+            rmtDmxKick(&g_rmt[i], dmxBuf[i], DMX_PACKET_SIZE);
+            if (ov) dmxBuf[i][identifyCh] = saved;
+            rmtSent[nRmt++] = i;
+            txFrames[i]++;                 // count real transmitted frames for the output-fps stat
+            continue;
+        }
+#endif
+        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         dmx_write(port, dmxBuf[i], DMX_PACKET_SIZE);
         dmx_send(port);
-        dmx_wait_sent(port, DMX_TIMEOUT_TICK);
         if (ov) dmxBuf[i][identifyCh] = saved;
+        sentPort[nSent++] = port;
+        txFrames[i]++;                         // count real transmitted frames for the output-fps stat
+    }
+    // Phase 2: wait for the concurrent transmissions to complete.
+    for (int k = 0; k < nSent; k++) dmx_wait_sent(sentPort[k], DMX_TIMEOUT_TICK);
+#ifdef DMX_RMT
+    for (int k = 0; k < nRmt; k++) rmtDmxWait(&g_rmt[rmtSent[k]]);
+#endif
+}
+
+// Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
+// strict 25 ms cadence (vTaskDelayUntil, 40 Hz) at high priority pinned to core 1, so a
+// burst of Art-Net/sACN packet processing in loop() (also core 1) can NEVER delay or jitter
+// the DMX break/frame timing. Combined with the EMAC bring-up moved to core 0 (ethRmiiUpTask),
+// nothing on core 1 -- neither tasks nor the wired-Ethernet ISR -- can disturb the transmit.
+// This task is the SOLE owner of the DMX ports: it also services RDM (a no-op unless a
+// direction-enable pin is configured), so loop() never touches the bus.
+static TaskHandle_t g_dmxTask = nullptr;
+static void rdmService();   // fwd decl (defined below, next to the RDM controller)
+static void netRxTask(void*);   // fwd decl (defined below, next to loop() -- runs on core 0)
+static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
+                       uint32_t senderIp, uint8_t proto, uint8_t priority);   // fwd decl for artnet_rdm.h
+
+// (No RMT<->esp_dmx switch: in the DMX_RMT build the RDM output stays on RMT permanently. RDM
+// requests are sent via RMT and responses read on a RX-only UART -- see rdm_rmt.h. Nothing is
+// ever installed/deleted at runtime, so the esp_dmx interrupt-leak path is gone entirely.)
+
+static void dmxTxTask(void*) {
+    const TickType_t period = pdMS_TO_TICKS(25);        // 40 Hz
+    TickType_t next = xTaskGetTickCount();
+    uint32_t fpsWin = millis();
+    for (;;) {
+        vTaskDelayUntil(&next, period);                 // precise period, immune to loop() load
+        if (identifyCh && millis() >= identifyUntil) identifyCh = 0;
+        rdmService();                                   // queued RDM request (bus owner); no-op otherwise
+        sendDmx();                                      // clock outputs out, concurrently
+        // Roll up the real transmitted-frame rate once a second (for the "outfps" stat).
+        const uint32_t now = millis();
+        if (now - fpsWin >= 1000) {
+            for (int i = 0; i < MAX_OUTPUTS; i++) {
+                outTxFps[i] = txFrames[i] * 1000.0f / (float)(now - fpsWin);
+                txFrames[i] = 0;
+            }
+            fpsWin = now;
+        }
     }
 }
 
@@ -758,22 +849,41 @@ struct RdmSensor {
     char    name[20];   // SENSOR_DEFINITION description, or a type label
     char    unit[8];    // SI unit string derived from the definition
     int16_t value;      // SENSOR_VALUE present value
+    int16_t lowest;     // lowest detected (min)
+    int16_t highest;    // highest detected (max)
+    int16_t recorded;   // recorded value
+    uint8_t type;       // RDM sensor type enum (SENSOR_DEFINITION)
     bool    valid;      // a value was read
+    bool    poll;       // include this sensor in live polling + the graph (per-UID, persisted)
+    uint32_t pollMs;    // millis() of the last live read (rate-limits polling to ~1 Hz/sensor)
 };
 struct RdmDevice {
     rdm_uid_t uid;
+    uint16_t  universe;          // DMX universe (output) this fixture lives on
+    uint8_t   rdmLine;           // RDM engine line index (which transceiver output) to reach it on
     uint16_t  startAddr;
     uint16_t  footprint;
     uint16_t  modelId;
+    uint16_t  productCategory;   // DEVICE_INFO product category
+    uint32_t  swVersionId;       // DEVICE_INFO software version id (numeric)
     uint16_t  subDeviceCount;
     uint8_t   personality;
     uint8_t   personalityCount;
     bool      identifying;
-    char      swLabel[33];
+    char      swLabel[33];       // SOFTWARE_VERSION_LABEL
+    char      mfgLabel[33];      // MANUFACTURER_LABEL
+    char      modelDesc[33];     // DEVICE_MODEL_DESCRIPTION
+    char      deviceLabel[33];   // DEVICE_LABEL (user-assignable)
     uint8_t   sensorCount;
     RdmSensor sensors[RDM_MAX_SENSORS];
+    // Art-Net BackgroundQueue harvest: last STATUS_MESSAGE seen for this device (0 type = healthy).
+    // The message data values are parsed but not stored: the UI shows only type/id/count, and this
+    // struct is arrayed x64 twice, so each byte here costs ~128 B of DRAM (tight on the classic ESP32).
+    uint8_t   statusType;        // RDM_STATUS_* of the highest-severity queued message (0 = none)
+    uint16_t  statusMsgId;       // STATUS_MESSAGE_ID of that message
+    uint8_t   statusCount;       // number of messages in the last harvest
 };
-static constexpr int RDM_MAX_DEVICES = 32;
+static constexpr int RDM_MAX_DEVICES = 64;
 static RdmDevice rdmDevices[RDM_MAX_DEVICES];
 static int       rdmCount      = 0;
 static bool      rdmScanned    = false;       // a discovery has completed at least once
@@ -782,12 +892,20 @@ static uint32_t  rdmLastScanMs = 0;
 
 // Single-slot request mailboxes: set by the async WS task, consumed in loop().
 static volatile bool rdmDiscoverReq = false;
+static volatile int  rdmDiscReqLine = -1;          // discovery target: -1 = every line, >=0 = one line
 static volatile bool rdmSetAddrReq  = false;
 static volatile bool rdmIdentifyReq = false;
 static rdm_uid_t     rdmSetUid      = {0, 0};
 static rdm_uid_t     rdmIdentUid    = {0, 0};
 static volatile uint16_t rdmReqAddr = 1;
 static volatile bool rdmReqOn       = false;
+// Extended controls (RDM tab): set personality, set device label, toggle live sensor polling.
+static volatile bool rdmSetPersReq  = false;
+static rdm_uid_t     rdmPersUid     = {0, 0};
+static volatile uint8_t rdmReqPers  = 1;
+static volatile bool rdmSetLabelReq = false;
+static rdm_uid_t     rdmLabelUid    = {0, 0};
+static char          rdmReqLabel[33] = {0};
 
 // RDM only works when the DMX driver is up AND a direction-enable pin is set.
 static bool rdmAvailable() { return dmxReady && rdmOut >= 0 && outReady[rdmOut]; }
@@ -847,13 +965,116 @@ static bool rdmParseUid(const String& msg, rdm_uid_t& out) {
     return true;
 }
 
+// ── per-sensor live-poll selection, persisted in NVS (the RDM tab switches) ──
+// Each (device UID, sensor) can be enabled individually for background polling + graphing.
+// The enabled set is stored as "UID:mask" entries so it survives reboots and re-discovery.
+struct RdmPollSave { uint64_t uid; uint8_t mask; };
+static RdmPollSave   g_savedPoll[RDM_MAX_DEVICES];
+static int           g_savedPollN = 0;
+static volatile bool g_pollAny    = false;   // any sensor enabled -> the round-robin runs
+static volatile bool rdmPollDirty = false;   // a switch changed -> loop() persists
+
+static inline uint64_t uidPack64(const rdm_uid_t& u) { return ((uint64_t)u.man_id << 32) | u.dev_id; }
+
+static void rdmRecalcPollAny() {
+    for (int i = 0; i < rdmCount; i++)
+        for (int s = 0; s < rdmDevices[i].sensorCount; s++)
+            if (rdmDevices[i].sensors[s].poll) { g_pollAny = true; return; }
+    g_pollAny = false;
+}
+static void rdmLoadPoll() {
+    prefs.begin(PREF_NS, true);
+    String s = prefs.isKey("rdmpoll") ? prefs.getString("rdmpoll", "") : "";
+    prefs.end();
+    g_savedPollN = 0;
+    for (int i = 0; i < (int)s.length() && g_savedPollN < RDM_MAX_DEVICES; ) {
+        int c = s.indexOf(',', i); if (c < 0) c = s.length();
+        int col = s.indexOf(':', i);
+        if (col > i && col < c) {
+            g_savedPoll[g_savedPollN].uid  = strtoull(s.substring(i, col).c_str(), nullptr, 16);
+            g_savedPoll[g_savedPollN].mask = (uint8_t)strtoul(s.substring(col + 1, c).c_str(), nullptr, 16);
+            g_savedPollN++;
+        }
+        i = c + 1;
+    }
+}
+// Restore each discovered device's sensor.poll from the saved mask (run after a discovery).
+static void rdmApplySavedPoll() {
+    for (int i = 0; i < rdmCount; i++) {
+        uint8_t mask = 0;
+        uint64_t u = uidPack64(rdmDevices[i].uid);
+        for (int k = 0; k < g_savedPollN; k++) if (g_savedPoll[k].uid == u) { mask = g_savedPoll[k].mask; break; }
+        for (int s = 0; s < RDM_MAX_SENSORS; s++) rdmDevices[i].sensors[s].poll = (mask >> s) & 1;
+    }
+    rdmRecalcPollAny();
+}
+// Rebuild the saved map from the live flags and persist it (called from loop() on dirty).
+static void rdmSavePoll() {
+    g_savedPollN = 0;
+    String out;
+    for (int i = 0; i < rdmCount; i++) {
+        uint8_t mask = 0;
+        for (int s = 0; s < rdmDevices[i].sensorCount && s < 8; s++)
+            if (rdmDevices[i].sensors[s].poll) mask |= (1 << s);
+        if (!mask) continue;
+        if (g_savedPollN < RDM_MAX_DEVICES) {
+            g_savedPoll[g_savedPollN].uid  = uidPack64(rdmDevices[i].uid);
+            g_savedPoll[g_savedPollN].mask = mask; g_savedPollN++;
+        }
+        char buf[24];
+        snprintf(buf, sizeof(buf), "%012llX:%X", (unsigned long long)uidPack64(rdmDevices[i].uid), mask);
+        if (out.length()) out += ",";
+        out += buf;
+    }
+    prefs.begin(PREF_NS, false);
+    prefs.putString("rdmpoll", out);
+    prefs.end();
+}
+
+#ifdef DMX_RMT
+// Art-Net 4 RDM bridge (ArtPoll/ArtTod*/ArtRdm). Uses rdm_rmt.h's raw relay + discovery
+// primitives and the RdmDevice table / rdmDevices[] declared above. See docs/rdm.md.
+#include "artnet_rdm.h"
+#endif
+
+// ---- RDM transport adapter -------------------------------------------------------------
+// The DMX_RMT build talks RDM over RMT-TX + a RX-only UART (rdm_rmt.h); other builds use the
+// esp_dmx controller. Both back ends present this same small op-set to the app layer below, so
+// dropping esp_dmx later is just deleting the #else half.
+#ifdef DMX_RMT
+static int  rdmOpDiscover(rdm_uid_t* u, int max)                                      { return rdmRmtDiscover(u, max); }
+static bool rdmOpDeviceInfo(const rdm_uid_t& uid, rdm_device_info_t* i, rdm_ack_t* a) { return rdmRmtGetDeviceInfo(uid, i, a); }
+static bool rdmOpSwLabel(const rdm_uid_t& uid, char* b, size_t n, rdm_ack_t* a)       { return rdmRmtGetSwLabel(uid, b, n, a); }
+static bool rdmOpSensorDef(const rdm_uid_t& uid, uint8_t s, rdm_sensor_definition_t* d, rdm_ack_t* a) { return rdmRmtGetSensorDef(uid, s, d, a); }
+static bool rdmOpSensorVal(const rdm_uid_t& uid, uint8_t s, rdm_sensor_value_t* v, rdm_ack_t* a)      { return rdmRmtGetSensorValue(uid, s, v, a); }
+static bool rdmOpSetAddr(const rdm_uid_t& uid, uint16_t addr, rdm_ack_t* a)           { return rdmRmtSetStartAddr(uid, addr, a); }
+static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)             { return rdmRmtSetIdentify(uid, on, a); }
+#else
+static dmx_port_t rdmPort() { return (dmx_port_t)cfg.outputs[rdmOut].port; }
+static int  rdmOpDiscover(rdm_uid_t* u, int max)                                      { return rdm_discover_devices_simple(rdmPort(), u, max); }
+static bool rdmOpDeviceInfo(const rdm_uid_t& uid, rdm_device_info_t* i, rdm_ack_t* a) { return rdm_send_get_device_info(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, i, a); }
+static bool rdmOpSwLabel(const rdm_uid_t& uid, char* b, size_t n, rdm_ack_t* a)       { return rdm_send_get_software_version_label(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, b, n, a); }
+static bool rdmOpSensorDef(const rdm_uid_t& uid, uint8_t s, rdm_sensor_definition_t* d, rdm_ack_t* a) {
+    rdm_request_t req = { (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND, RDM_PID_SENSOR_DEFINITION, "b$", &s, 1 };
+    return rdm_send_request(rdmPort(), &req, "bbbbwwwwba$", d, sizeof(*d), a);
+}
+static bool rdmOpSensorVal(const rdm_uid_t& uid, uint8_t s, rdm_sensor_value_t* v, rdm_ack_t* a) {
+    rdm_request_t req = { (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND, RDM_PID_SENSOR_VALUE, "b$", &s, 1 };
+    return rdm_send_request(rdmPort(), &req, "bwwww$", v, sizeof(*v), a);
+}
+static bool rdmOpSetAddr(const rdm_uid_t& uid, uint16_t addr, rdm_ack_t* a)           { return rdm_send_set_dmx_start_address(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, addr, a); }
+static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)             { return rdm_send_set_identify_device(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, on ? 1 : 0, a); }
+#endif
+
 // Full discovery sweep + per-device GET device-info & software-version label.
 // Blocks the bus for the duration (~hundreds of ms) — DMX output pauses briefly.
+// (DMX_RMT builds run discovery incrementally instead — see artnet_rdm.h — so this
+// blocking sweep is only compiled for the esp_dmx back end.)
+#ifndef DMX_RMT
 static void rdmDoDiscover() {
-    dmx_port_t port = (dmx_port_t)cfg.outputs[rdmOut].port;
     rdmBusy = true;
     rdm_uid_t uids[RDM_MAX_DEVICES];
-    int n = rdm_discover_devices_simple(port, uids, RDM_MAX_DEVICES);
+    int n = rdmOpDiscover(uids, RDM_MAX_DEVICES);
     if (n > RDM_MAX_DEVICES) n = RDM_MAX_DEVICES;
     rdmCount = 0;
     for (int i = 0; i < n; i++) {
@@ -861,8 +1082,7 @@ static void rdmDoDiscover() {
         d.uid = uids[i];
         rdm_ack_t ack;
         rdm_device_info_t info;
-        if (rdm_send_get_device_info(port, &uids[i], RDM_SUB_DEVICE_ROOT, &info, &ack)
-            && ack.type == RDM_RESPONSE_TYPE_ACK) {
+        if (rdmOpDeviceInfo(uids[i], &info, &ack) && ack.type == RDM_RESPONSE_TYPE_ACK) {
             d.startAddr        = info.dmx_start_address;
             d.footprint        = info.footprint;
             d.modelId          = info.model_id;
@@ -872,8 +1092,7 @@ static void rdmDoDiscover() {
             d.sensorCount      = info.sensor_count > RDM_MAX_SENSORS
                                      ? RDM_MAX_SENSORS : info.sensor_count;
         }
-        rdm_send_get_software_version_label(port, &uids[i], RDM_SUB_DEVICE_ROOT,
-                                            d.swLabel, sizeof(d.swLabel), &ack);
+        rdmOpSwLabel(uids[i], d.swLabel, sizeof(d.swLabel), &ack);
 
         // Sensors (E1.20): per sensor read its definition (name/unit) then value.
         // Sensors are numbered 0..count-1; definition and value are independent —
@@ -884,20 +1103,14 @@ static void rdmDoDiscover() {
             uint8_t   sn = s;
 
             rdm_sensor_definition_t def = {};
-            rdm_request_t dreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
-                                   RDM_PID_SENSOR_DEFINITION, "b$", &sn, 1 };
-            if (rdm_send_request(port, &dreq, "bbbbwwwwba$", &def, sizeof(def), &sack)
-                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+            if (rdmOpSensorDef(uids[i], sn, &def, &sack) && sack.type == RDM_RESPONSE_TYPE_ACK) {
                 strlcpy(sen.name, def.description[0] ? def.description : rdmTypeStr(def.type),
                         sizeof(sen.name));
                 strlcpy(sen.unit, rdmUnitStr(def.unit), sizeof(sen.unit));
             }
 
             rdm_sensor_value_t val = {};
-            rdm_request_t vreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
-                                   RDM_PID_SENSOR_VALUE, "b$", &sn, 1 };
-            if (rdm_send_request(port, &vreq, "bwwww$", &val, sizeof(val), &sack)
-                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+            if (rdmOpSensorVal(uids[i], sn, &val, &sack) && sack.type == RDM_RESPONSE_TYPE_ACK) {
                 sen.value = val.present_value;
                 sen.valid = true;
                 if (!sen.name[0]) strlcpy(sen.name, "Sensor", sizeof(sen.name));
@@ -905,39 +1118,54 @@ static void rdmDoDiscover() {
         }
         rdmDevices[rdmCount++] = d;
     }
+    rdmApplySavedPoll();     // restore each fixture's per-sensor poll switches
     rdmScanned    = true;
     rdmLastScanMs = millis();
     rdmBusy       = false;
     Serial.printf("[RDM] discovery: %d device(s)\n", rdmCount);
 }
+#endif  // !DMX_RMT
 
-// Called once per loop() iteration; does work only when a request is queued.
+// Called once per DMX cycle from the DMX task (the sole bus owner); does work only when a
+// request is queued. On the DMX_RMT build this runs the whole RDM transaction over RMT-TX +
+// UART-RX inline -- no peripheral switch, the RDM output never leaves RMT.
+// Point the RDM engine at a fixture's line before a per-device transaction (no-op on the esp_dmx
+// build, which has a single RDM port).
+static inline void rdmSelectLine(const RdmDevice* d) {
+#ifdef DMX_RMT
+    if (d) rdmRmtSelect(d->rdmLine);
+#endif
+}
 static void rdmService() {
     if (!rdmAvailable()) return;
-    dmx_port_t port = (dmx_port_t)cfg.outputs[rdmOut].port;
     rdm_ack_t ack;
 
     if (rdmSetAddrReq) {
         rdmSetAddrReq = false;
-        if (rdm_send_set_dmx_start_address(port, &rdmSetUid, RDM_SUB_DEVICE_ROOT,
-                                           rdmReqAddr, &ack)) {
-            RdmDevice* d = rdmFind(rdmSetUid);
+        RdmDevice* d = rdmFind(rdmSetUid); rdmSelectLine(d);
+        if (rdmOpSetAddr(rdmSetUid, rdmReqAddr, &ack)) {
             if (d) d->startAddr = rdmReqAddr;
             Serial.printf("[RDM] set " UIDSTR " addr=%u\n", UID2STR(rdmSetUid), rdmReqAddr);
         }
     }
     if (rdmIdentifyReq) {
         rdmIdentifyReq = false;
-        if (rdm_send_set_identify_device(port, &rdmIdentUid, RDM_SUB_DEVICE_ROOT,
-                                         rdmReqOn ? 1 : 0, &ack)) {
-            RdmDevice* d = rdmFind(rdmIdentUid);
+        RdmDevice* d = rdmFind(rdmIdentUid); rdmSelectLine(d);
+        if (rdmOpSetIdentify(rdmIdentUid, rdmReqOn, &ack)) {
             if (d) d->identifying = rdmReqOn;
         }
     }
+#ifdef DMX_RMT
+    // Art-Net RDM relay + INCREMENTAL discovery: one bus transaction per DMX frame so RDM
+    // (background discovery, ArtTodRequest, ArtRdm GET/SET) never stalls the 40 Hz output.
+    // Also consumes rdmDiscoverReq, so the web "Discover" button runs incrementally too.
+    artRdmService();
+#else
     if (rdmDiscoverReq) {
         rdmDiscoverReq = false;
-        rdmDoDiscover();
+        rdmDoDiscover();   // blocking sweep (esp_dmx build; pauses DMX for the duration)
     }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -990,6 +1218,9 @@ static void updateSender(uint32_t ip, uint8_t proto, int16_t universe,
     s.dataLen  = length < 512 ? length : 512;
     memcpy(s.data, data, s.dataLen);   // merge reads only [0, dataLen), so a short
                                        // frame contributes only the channels it sends
+    // Count this frame against every output listening on its universe (for per-output input fps).
+    for (int o = 0; o < MAX_OUTPUTS; o++)
+        if (cfg.outputs[o].enabled && cfg.outputs[o].universe == universe) inFrameCnt[o]++;
     s.winCnt++;
     if (now - s.winMs >= 1000) {
         s.fps   = (float)s.winCnt * 1000.0f / (float)(now - s.winMs);
@@ -1079,7 +1310,7 @@ static void maybeLog(int outIdx, const uint8_t* cur, uint16_t len, uint32_t ip, 
     e.ms    = now;
     e.ip    = ip;
     e.proto = proto;
-    e.uni   = (uint8_t)cfg.outputs[outIdx].universe;
+    e.uni   = (uint16_t)cfg.outputs[outIdx].universe;
     e.total = 0;
     e.topN  = 0;
     for (int i = 0; i < lim; i++) {
@@ -1103,8 +1334,10 @@ static void maybeLog(int outIdx, const uint8_t* cur, uint16_t len, uint32_t ip, 
 // Per-output frame rate: the live value, or 0 once that output's input has
 // stalled (>1.5 s), so a dead universe reads 0.0 instead of a stale rate. Used by
 // the WS push, dmx.json and the status display.
+// The rate we actually clock onto the DMX wire (steady ~40 Hz while an output is ready),
+// counted from the transmit side -- not the input frame rate. 0 when the output isn't running.
 static float outFpsLive(int i) {
-    return (millis() - outLastDmxMs[i] < 1500) ? outFps[i] : 0.0f;
+    return (i >= 0 && i < MAX_OUTPUTS && outReady[i]) ? outTxFps[i] : 0.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -1117,7 +1350,10 @@ static float outFpsLive(int i) {
 // ---------------------------------------------------------------------------
 static void wsPush() {
     if (ws.count() == 0) return;
-    if (ESP.getFreeHeap() < 40000) return;   // never push under heap pressure
+    // Skip under heap pressure. getFreeHeap() alone is not enough: the async WS send copies
+    // the frame into a make_shared<vector> that needs ONE CONTIGUOUS block, so a fragmented
+    // heap (heavy under a packet flood) can throw bad_alloc even with lots of total free.
+    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 12000) return;
     uint16_t fpsI  = (uint16_t)(fps * 10.0f);
     // rssi field carries the active link: <=0 WiFi STA dBm, >=10 wired Ethernet
     // link speed in Mbps, 1 standalone AP. Lets the navbar show WiFi/LAN/AP live.
@@ -1145,9 +1381,35 @@ static void wsPush() {
         uint16_t f = (uint16_t)(outFpsLive(i) * 10.0f);
         wsBuf[528 + 2 * i] = f >> 8;  wsBuf[528 + 2 * i + 1] = f & 0xFF;
     }
+    // Per-output INPUT fps: close each output's 1 s input-frame window (so a universe that stops
+    // being sent decays to 0), then write it. Counted per output-universe in updateSender().
+    uint32_t nowMs = millis();
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        if (nowMs - inWinMs[i] >= 1000) {
+            inFpsOut[i] = (float)inFrameCnt[i] * 1000.0f / (float)(nowMs - inWinMs[i]);
+            inFrameCnt[i] = 0; inWinMs[i] = nowMs;
+        }
+        uint16_t inI = (uint16_t)(inFpsOut[i] * 10.0f < 65535.0f ? inFpsOut[i] * 10.0f : 65535.0f);
+        wsBuf[528 + 2 * MAX_OUTPUTS + 2 * i]     = inI >> 8;
+        wsBuf[528 + 2 * MAX_OUTPUTS + 2 * i + 1] = inI & 0xFF;
+    }
+    // Fixed tail: fixtures(2) rdmTx(4) rdmRx(4)
+    int t = 528 + 4 * MAX_OUTPUTS;
+    uint16_t nf = (uint16_t)rdmCount;
+    uint32_t rtx = 0, rrx = 0;
+#ifdef DMX_RMT
+    rtx = g_rdmSent; rrx = g_rdmRecv;
+#endif
+    wsBuf[t]   = nf >> 8;   wsBuf[t+1] = nf & 0xFF;
+    wsBuf[t+2] = rtx >> 24; wsBuf[t+3] = (rtx>>16)&0xFF; wsBuf[t+4] = (rtx>>8)&0xFF; wsBuf[t+5] = rtx & 0xFF;
+    wsBuf[t+6] = rrx >> 24; wsBuf[t+7] = (rrx>>16)&0xFF; wsBuf[t+8] = (rrx>>8)&0xFF; wsBuf[t+9] = rrx & 0xFF;
     // Only push if the async TCP queues have room, so a slow client never
     // backs up memory or blocks.
-    if (ws.availableForWriteAll()) ws.binaryAll(wsBuf, WS_FRAME_LEN);
+    // Belt-and-suspenders: a failed async allocation inside the WS stack throws std::bad_alloc;
+    // catching it degrades a push to a no-op instead of letting the uncaught throw abort() the CPU.
+    if (ws.availableForWriteAll()) {
+        try { ws.binaryAll(wsBuf, WS_FRAME_LEN); } catch (...) {}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1192,7 +1454,12 @@ static void handleWsText(const char* payload, size_t len) {
         return;
     }
     // RDM control — only set request flags here; loop() owns the bus and runs them.
-    if (msg.indexOf("\"rdm_discover\"") >= 0) { rdmDiscoverReq = true; return; }
+    if (msg.indexOf("\"rdm_discover\"") >= 0) {   // optional "line":N (else -1 = every universe)
+        int k = msg.indexOf("\"line\":");
+        rdmDiscReqLine = (k >= 0) ? msg.substring(k + 7).toInt() : -1;
+        rdmDiscoverReq = true;
+        return;
+    }
     if (msg.indexOf("\"rdm_setaddr\"") >= 0) {
         rdm_uid_t u;
         int k = msg.indexOf("\"addr\":");
@@ -1208,6 +1475,51 @@ static void handleWsText(const char* payload, size_t len) {
             rdmIdentUid = u;
             rdmReqOn    = (msg.indexOf("\"on\":true") >= 0);
             rdmIdentifyReq = true;
+        }
+        return;
+    }
+    if (msg.indexOf("\"rdm_setpers\"") >= 0) {
+        rdm_uid_t u;
+        int k = msg.indexOf("\"pers\":");
+        if (rdmParseUid(msg, u) && k >= 0) {
+            int p = msg.substring(k + 7).toInt();
+            if (p >= 1 && p <= 255) { rdmPersUid = u; rdmReqPers = (uint8_t)p; rdmSetPersReq = true; }
+        }
+        return;
+    }
+    if (msg.indexOf("\"rdm_setlabel\"") >= 0) {
+        rdm_uid_t u;
+        int k = msg.indexOf("\"label\":\"");
+        if (rdmParseUid(msg, u) && k >= 0) {
+            int s = k + 9, e = msg.indexOf('"', s);
+            if (e > s) {
+                strlcpy(rdmReqLabel, msg.substring(s, e).c_str(), sizeof(rdmReqLabel));
+                rdmLabelUid = u; rdmSetLabelReq = true;
+            }
+        }
+        return;
+    }
+    if (msg.indexOf("\"rdm_sensorpoll\"") >= 0) {   // master switch: enable/disable every sensor
+        bool on = (msg.indexOf("\"on\":true") >= 0);
+        for (int i = 0; i < rdmCount; i++)
+            for (int s = 0; s < rdmDevices[i].sensorCount; s++) rdmDevices[i].sensors[s].poll = on;
+        rdmRecalcPollAny();
+        rdmPollDirty = true;
+        return;
+    }
+    if (msg.indexOf("\"rdm_sensorsel\"") >= 0) {    // a sensor switch (poll + graph); sensor=-1 -> whole fixture
+        rdm_uid_t u;
+        int k = msg.indexOf("\"sensor\":");
+        if (rdmParseUid(msg, u) && k >= 0) {
+            int sn = msg.substring(k + 9).toInt();
+            bool on = (msg.indexOf("\"on\":true") >= 0);
+            RdmDevice* d = rdmFind(u);
+            if (d) {
+                if (sn < 0) { for (int s = 0; s < d->sensorCount; s++) d->sensors[s].poll = on; }  // all of this fixture
+                else if (sn < d->sensorCount) d->sensors[sn].poll = on;
+                rdmRecalcPollAny();
+                rdmPollDirty = true;
+            }
         }
         return;
     }
@@ -1354,12 +1666,15 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
 }
 
 // ---------------------------------------------------------------------------
-// Art-Net callback
+// Art-Net callback (esp_dmx builds; the DMX_RMT build parses Art-Net itself in
+// artnet_rdm.h so it can also handle the RDM opcodes on the same 6454 socket).
 // ---------------------------------------------------------------------------
+#ifndef DMX_RMT
 static void onArtDmx(uint16_t universe, uint16_t length, uint8_t, uint8_t* data) {
     // Art-Net carries no per-packet priority, so it joins the merge at the default.
     routeFrame((int)universe, data, length, (uint32_t)artnet.getSenderIp(), 0, DEFAULT_PRIORITY);
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // sACN / E1.31
@@ -1401,7 +1716,10 @@ static void readSacnSocket(int outIdx) {
     // Drain all packets buffered since the last call (catches up after any gap)
     for (int guard = 0; guard < 16; guard++) {
         int pktLen = udp.parsePacket();
-        if (pktLen < SACN_MIN_LEN) return;
+        if (pktLen <= 0) return;                          // nothing pending
+        // A runt packet (stray multicast, IGMP artefact, port scan) must still be CONSUMED, else it
+        // lingers in the socket and every subsequent parsePacket() re-logs a NetworkUdp error -> flood.
+        if (pktLen < SACN_MIN_LEN) { udp.read(sacnBuf, sizeof(sacnBuf)); continue; }
         uint32_t senderIp = (uint32_t)udp.remoteIP();
         int n = udp.read(sacnBuf, sizeof(sacnBuf));
         if (n < SACN_MIN_LEN) continue;
@@ -1418,7 +1736,12 @@ static void readSacnSocket(int outIdx) {
         if (frameVec != 0x00000002u) continue;
         uint16_t universe = ((uint16_t)sacnBuf[SACN_UNIVERSE_OFF] << 8)
                            | sacnBuf[SACN_UNIVERSE_OFF + 1];
-        if ((int)universe != cfg.outputs[outIdx].universe + 1) continue;
+        // Do NOT reject by this socket's output universe. All the per-output sACN sockets share
+        // port 5568 (SO_REUSEADDR), and lwIP hands a UNICAST sACN packet to just one of them --
+        // often not the socket whose multicast group matches. Rejecting here dropped unicast sACN
+        // whenever >1 output was enabled (uni-1 landing on the uni-2 socket, etc.). Route by the
+        // packet's own universe instead: routeFrame() maps universe -> the matching output(s), and
+        // ignores a universe no output listens to. Multicast still works (each group -> its joiner).
         if (sacnBuf[SACN_STARTCODE_OFF] != 0x00) continue;
         uint8_t priority = sacnBuf[SACN_PRIORITY_OFF];
         routeFrame((int)universe - 1, sacnBuf + SACN_DATA_OFF, 512, senderIp, 1, priority);
@@ -1440,6 +1763,23 @@ static bool argStr(AsyncWebServerRequest* req, const char* n, String& out) {
     return false;
 }
 
+// Sending a dynamically-built JSON body allocates a response buffer of ~body.length(); under heap
+// pressure that operator new throws std::bad_alloc, and an uncaught throw inside the AsyncTCP task
+// aborts the board. That rebooted the gateway when the web UI polled /rdm.json (which grows with the
+// number of discovered fixtures) or /dmx.json while the heap was low under load. Guard on the largest
+// free block, and catch as a hard backstop, so a status poll degrades to a 503 instead of a reboot.
+static void sendJsonSafe(AsyncWebServerRequest* req, const String& body) {
+    if ((int)ESP.getMaxAllocHeap() < (int)body.length() + 12000) {
+        try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {}
+        return;
+    }
+    try {
+        req->send(200, "application/json", body);
+    } catch (...) {
+        try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {}
+    }
+}
+
 static void handleVersionJson(AsyncWebServerRequest* req) {
     String j = "{\"current\":\"";
     j += FIRMWARE_VERSION;
@@ -1448,7 +1788,7 @@ static void handleVersionJson(AsyncWebServerRequest* req) {
     j += "\",\"update\":";
     j += updateAvailable ? "true" : "false";
     j += "}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
 static String sendersJson() {
@@ -1499,20 +1839,26 @@ static String logJson() {
     return j;
 }
 
-static void handleSendersJson(AsyncWebServerRequest* req) { req->send(200, "application/json", sendersJson()); }
-static void handleLogJson(AsyncWebServerRequest* req)     { req->send(200, "application/json", logJson()); }
+static void handleSendersJson(AsyncWebServerRequest* req) { sendJsonSafe(req, sendersJson()); }
+static void handleLogJson(AsyncWebServerRequest* req)     { sendJsonSafe(req, logJson()); }
 
 // Push senders + log over the WebSocket (one persistent connection) so the
 // browser doesn't have to poll two HTTP endpoints every 2 s.
 static void wsPushMeta() {
     if (ws.count() == 0 || !ws.availableForWriteAll()) return;
-    if (ESP.getFreeHeap() < 40000) return;   // never push under heap pressure
-    String m = "{\"meta\":1,\"senders\":";
-    m += sendersJson();
-    m += ",\"log\":";
-    m += logJson();
-    m += "}";
-    ws.textAll(m);
+    // The meta JSON is several KB and the WS send needs a contiguous block for it, so guard on
+    // the LARGEST free block, not just total free: under a flood the heap fragments and total
+    // free (~100 KB) stays high while the biggest block shrinks, which is how ws.textAll() threw
+    // bad_alloc and abort()ed the board. try/catch is the hard backstop against that reboot.
+    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 24000) return;
+    try {
+        String m = "{\"meta\":1,\"senders\":";
+        m += sendersJson();
+        m += ",\"log\":";
+        m += logJson();
+        m += "}";
+        ws.textAll(m);
+    } catch (...) {}
 }
 
 // Static pages are served straight from PROGMEM (zero heap). Dynamic values
@@ -1567,6 +1913,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ledB\":";       j += cfg.ledB;               j += ",";
     j += "\"ledW\":";       j += cfg.ledW;               j += ",";
     j += "\"rdmOut\":";     j += rdmOut;                 j += ",";
+    j += "\"artnetRdm\":";  j += cfg.artnetRdm ? "true" : "false"; j += ",";
     j += "\"outputs\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         const DmxOutput& o = cfg.outputs[i];
@@ -1635,33 +1982,70 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"board\":\"";    j += BOARD_ID;               j += "\",";
     j += "\"mcu\":\"";      j += MCU_ID;                 j += "\"";
     j += "}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
+// /dmx.json is ~2.3 KB (the 512-channel array dominates). Building it as one String and letting
+// AsyncWebServer copy that into a single contiguous send buffer needs a big contiguous block -- which
+// fails on a fragmented heap (the ESP32-S3 allocator keeps lots of total free but a small largest
+// block, esp-idf #13588) and used to abort the board. So stream it instead: only the small header is
+// a String; the channel array is generated on demand straight into AsyncWebServer's own ~1.4 KB
+// segment buffer. No large contiguous allocation is ever needed, so the endpoint stays up even when
+// the heap is badly fragmented (and never has to fall back to a 503).
 static void handleDmxJson(AsyncWebServerRequest* req) {
-    String j;
-    j.reserve(2300);
+    struct DmxJson {
+        String head;                     // everything up to and including `"ch":[`  (~150 bytes)
+        int    out    = 0;
+        size_t headOff = 0;
+        int    ch     = 1;               // 1..512
+        char   cur[8]; size_t curLen = 0, curOff = 0;
+        int    phase  = 0;               // 0 head, 1 channels, 2 footer, 3 done
+        size_t footOff = 0;
+    };
+    std::shared_ptr<DmxJson> s;
+    try { s = std::make_shared<DmxJson>(); } catch (...) {}
+    if (!s) { try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {} return; }
+    s->out = viewOutput();
     char buf[32];
     snprintf(buf, sizeof(buf), "%.1f", fps);
-    j  = "{\"fps\":";    j += buf;
-    j += ",\"outfps\":[";
+    s->head  = "{\"fps\":"; s->head += buf; s->head += ",\"outfps\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         snprintf(buf, sizeof(buf), "%.1f", outFpsLive(i));
-        if (i) j += ',';
-        j += buf;
+        if (i) s->head += ',';
+        s->head += buf;
     }
-    j += "]";
-    j += ",\"rssi\":";   j += netRSSI();
-    j += ",\"up\":\"";   j += uptimeStr();
-    j += "\",\"heap\":"; j += ESP.getFreeHeap();
-    j += ",\"manual\":"; j += manualMode ? "true" : "false";
-    j += ",\"ch\":[";
-    for (int i = 1; i <= 512; i++) {
-        j += dmxBuf[viewOutput()][i];
-        if (i < 512) j += ',';
-    }
-    j += "]}";
-    req->send(200, "application/json", j);
+    s->head += "],\"rssi\":";  s->head += netRSSI();
+    s->head += ",\"up\":\"";   s->head += uptimeStr();
+    s->head += "\",\"heap\":"; s->head += ESP.getFreeHeap();
+    s->head += ",\"manual\":"; s->head += manualMode ? "true" : "false";
+    s->head += ",\"ch\":[";
+    req->sendChunked("application/json", [s](uint8_t* b, size_t maxLen, size_t) -> size_t {
+        size_t n = 0;
+        if (s->phase == 0) {                         // stream the small header
+            while (s->headOff < s->head.length() && n < maxLen) b[n++] = (uint8_t)s->head[s->headOff++];
+            if (s->headOff < s->head.length()) return n;
+            s->phase = 1;
+        }
+        if (s->phase == 1) {                         // stream the 512 channel values
+            while (n < maxLen) {
+                if (s->curOff >= s->curLen) {        // load the next channel token
+                    if (s->ch > 512) { s->phase = 2; break; }
+                    s->curLen = snprintf(s->cur, sizeof(s->cur), s->ch < 512 ? "%d," : "%d",
+                                         dmxBuf[s->out][s->ch]);
+                    s->curOff = 0; s->ch++;
+                }
+                while (s->curOff < s->curLen && n < maxLen) b[n++] = (uint8_t)s->cur[s->curOff++];
+            }
+            if (s->phase == 1) return n;             // buffer full mid-array; resume next call
+        }
+        if (s->phase == 2) {                         // closing "]}"
+            static const char foot[] = "]}";
+            while (s->footOff < 2 && n < maxLen) b[n++] = (uint8_t)foot[s->footOff++];
+            if (s->footOff < 2) return n;
+            s->phase = 3;
+        }
+        return n;                                    // phase 3: next call returns 0 -> complete
+    });
 }
 
 // Escape a fixture-supplied string for safe inclusion in JSON.
@@ -1675,48 +2059,206 @@ static String rdmJsonEsc(const char* s) {
     return o;
 }
 
-static void handleRdmJson(AsyncWebServerRequest* req) {
-    String j;
-    j.reserve(96 + rdmCount * 280);
-    j  = "{\"available\":"; j += rdmAvailable() ? "true" : "false";
-    j += ",\"busy\":";      j += rdmBusy ? "true" : "false";
-    j += ",\"scanned\":";   j += rdmScanned ? "true" : "false";
-    j += ",\"devices\":[";
-    for (int i = 0; i < rdmCount; i++) {
-        const RdmDevice& d = rdmDevices[i];
-        char uid[20];
-        snprintf(uid, sizeof(uid), "%04X:%08lX", d.uid.man_id, (unsigned long)d.uid.dev_id);
-        if (i) j += ',';
-        j += "{\"uid\":\"";     j += uid;          j += "\"";
-        j += ",\"addr\":";      j += d.startAddr;
-        j += ",\"footprint\":"; j += d.footprint;
-        j += ",\"model\":";     j += d.modelId;
-        j += ",\"pers\":";      j += d.personality;
-        j += ",\"persCount\":"; j += d.personalityCount;
-        j += ",\"subs\":";      j += d.subDeviceCount;
-        j += ",\"identify\":";  j += d.identifying ? "true" : "false";
-        j += ",\"sw\":\"";      j += rdmJsonEsc(d.swLabel); j += "\"";
-        j += ",\"sensors\":[";
-        bool firstSen = true;
-        for (int s = 0; s < d.sensorCount; s++) {
-            const RdmSensor& sn = d.sensors[s];
-            if (!sn.valid) continue;
-            if (!firstSen) j += ',';
-            firstSen = false;
-            j += "{\"name\":\"";  j += rdmJsonEsc(sn.name);
-            j += "\",\"value\":"; j += sn.value;
-            j += ",\"unit\":\"";  j += rdmJsonEsc(sn.unit); j += "\"}";
-        }
-        j += "]}";
+// HTTP trigger for RDM ops -- a reliable, scriptable alternative to the WS control channel (the WS
+// path drops triggers under load; this never does). Used by the e2e tests and bench tooling.
+//   GET /rdm/discover
+//   GET /rdm/setaddr?uid=MMMM:DDDDDDDD&addr=N
+//   GET /rdm/identify?uid=MMMM:DDDDDDDD&on=1
+static void handleRdmTrigger(AsyncWebServerRequest* req) {
+    const String path = req->url();
+    if (path.endsWith("/discover")) {
+        rdmDiscReqLine = req->hasParam("line") ? req->getParam("line")->value().toInt() : -1;
+        rdmDiscoverReq = true;
+        req->send(200, "application/json", "{\"ok\":true,\"op\":\"discover\"}");
+        return;
     }
-    j += "]}";
-    req->send(200, "application/json", j);
+    if (path.endsWith("/bqp")) {   // Art-Net BackgroundQueuePolicy (0..3 severity, 4 = off)
+        int p = req->hasParam("p") ? req->getParam("p")->value().toInt() : 4;
+        if (p < 0) p = 0; if (p > 15) p = 15;
+        g_bqPolicy = (uint8_t)p; g_bqDirty = true;
+        req->send(200, "application/json", "{\"ok\":true,\"op\":\"bqp\"}");
+        return;
+    }
+    if (path.endsWith("/merge")) {   // set an output's merge mode (off/HTP/LTP), live + persisted
+        int out  = req->hasParam("out")  ? req->getParam("out")->value().toInt()  : -1;
+        int mode = req->hasParam("mode") ? req->getParam("mode")->value().toInt() : -1;
+        if (out >= 0 && out < MAX_OUTPUTS && mode >= MERGE_OFF && mode <= MERGE_LTP) {
+            cfg.outputs[out].mergeMode = mode; g_artCfgDirty = true;   // loop() persists via saveConfig
+            req->send(200, "application/json", "{\"ok\":true,\"op\":\"merge\"}");
+            return;
+        }
+        req->send(400, "application/json", "{\"ok\":false}");
+        return;
+    }
+    if (req->hasParam("uid")) {
+        String us = req->getParam("uid")->value();
+        int colon = us.indexOf(':');
+        if (colon > 0) {
+            rdm_uid_t u;
+            u.man_id = (uint16_t)strtoul(us.substring(0, colon).c_str(), nullptr, 16);
+            u.dev_id = (uint32_t)strtoul(us.substring(colon + 1).c_str(), nullptr, 16);
+            if (path.endsWith("/setaddr") && req->hasParam("addr")) {
+                int a = req->getParam("addr")->value().toInt();
+                if (a >= 1 && a <= 512) {
+                    rdmSetUid = u; rdmReqAddr = (uint16_t)a; rdmSetAddrReq = true;
+                    req->send(200, "application/json", "{\"ok\":true,\"op\":\"setaddr\"}"); return;
+                }
+            } else if (path.endsWith("/identify")) {
+                rdmIdentUid = u;
+                rdmReqOn = req->hasParam("on") && req->getParam("on")->value().toInt() != 0;
+                rdmIdentifyReq = true;
+                req->send(200, "application/json", "{\"ok\":true,\"op\":\"identify\"}"); return;
+            }
+        }
+    }
+    req->send(400, "application/json", "{\"ok\":false}");
+}
+
+// One RDM device as a JSON object (~420 bytes). Built on demand so /rdm.json can be *streamed*
+// device-by-device: at 64 fixtures the whole document is ~27 KB, which sendJsonSafe() refuses to
+// send in one piece on the fragmented S3 heap (largest contiguous block < 39 KB). Streaming never
+// needs more than one device's worth of contiguous heap.
+static String rdmDeviceJson(const RdmDevice& d) {
+    String j; j.reserve(440);
+    char uid[20];
+    snprintf(uid, sizeof(uid), "%04X:%08lX", d.uid.man_id, (unsigned long)d.uid.dev_id);
+    j += "{\"uid\":\"";     j += uid;          j += "\"";
+    j += ",\"uni\":";       j += d.universe;
+    j += ",\"addr\":";      j += d.startAddr;
+    j += ",\"footprint\":"; j += d.footprint;
+    j += ",\"model\":";     j += d.modelId;
+    j += ",\"pers\":";      j += d.personality;
+    j += ",\"persCount\":"; j += d.personalityCount;
+    j += ",\"subs\":";      j += d.subDeviceCount;
+    j += ",\"identify\":";  j += d.identifying ? "true" : "false";
+    j += ",\"sw\":\"";      j += rdmJsonEsc(d.swLabel); j += "\"";
+    j += ",\"mfg\":\"";     j += rdmJsonEsc(d.mfgLabel); j += "\"";
+    j += ",\"modelName\":\""; j += rdmJsonEsc(d.modelDesc); j += "\"";
+    j += ",\"label\":\"";   j += rdmJsonEsc(d.deviceLabel); j += "\"";
+    j += ",\"cat\":";       j += d.productCategory;
+    j += ",\"swVer\":";     j += (uint32_t)d.swVersionId;
+    j += ",\"sensors\":[";
+    bool firstSen = true;
+    for (int s = 0; s < d.sensorCount; s++) {
+        const RdmSensor& sn = d.sensors[s];
+        if (!sn.valid) continue;
+        if (!firstSen) j += ',';
+        firstSen = false;
+        j += "{\"name\":\"";  j += rdmJsonEsc(sn.name);
+        j += "\",\"value\":"; j += sn.value;
+        j += ",\"lo\":";      j += sn.lowest;
+        j += ",\"hi\":";      j += sn.highest;
+        j += ",\"rec\":";     j += sn.recorded;
+        j += ",\"type\":";    j += sn.type;
+        j += ",\"poll\":";    j += sn.poll ? "true" : "false";
+        j += ",\"unit\":\"";  j += rdmJsonEsc(sn.unit); j += "\"}";
+    }
+    j += "]";
+    // Art-Net BackgroundQueue harvest: last status message severity/id/count (0 = healthy).
+    j += ",\"stType\":";  j += d.statusType;
+    j += ",\"stId\":";    j += d.statusMsgId;
+    j += ",\"stCount\":"; j += d.statusCount;
+    j += "}";
+    return j;
+}
+
+static void handleRdmJson(AsyncWebServerRequest* req) {
+    struct RdmGen {
+        String head; size_t headOff = 0;      // header up to and including `"devices":[`
+        int    dev = 0;                       // next device index
+        String cur; size_t curOff = 0, curLen = 0;  // current device (with its leading comma)
+        int    phase = 0;                     // 0 head, 1 devices, 2 footer, 3 done
+        size_t footOff = 0;
+    };
+    auto s = std::make_shared<RdmGen>();
+    s->head  = "{\"available\":"; s->head += rdmAvailable() ? "true" : "false";
+    s->head += ",\"busy\":";      s->head += rdmBusy ? "true" : "false";
+    s->head += ",\"scanned\":";   s->head += rdmScanned ? "true" : "false";
+#ifdef DMX_RMT
+    s->head += ",\"artnetRdm\":"; s->head += g_artRdmEnabled ? "true" : "false";
+    s->head += ",\"artPort\":";   s->head += artRdmPortAddr();
+    s->head += ",\"discovering\":"; s->head += g_artDiscovering ? "true" : "false";
+    s->head += ",\"discStage\":"; s->head += (int)g_discStage;   // 0 idle 1 search 2 enrich 3 publish
+    s->head += ",\"discFound\":"; s->head += (int)g_discFound;   // devices seen so far
+    s->head += ",\"discCur\":";   s->head += (int)g_discCur;     // enrich: current device (0-based)
+    s->head += ",\"discSub\":";   s->head += (int)g_discSub;     // enrich: PID sub-step 0..7
+    s->head += ",\"artTodReqs\":"; s->head += (uint32_t)g_artTodReqs;
+    s->head += ",\"artRdmReqs\":"; s->head += (uint32_t)g_artRdmReqs;
+    s->head += ",\"artFlushes\":"; s->head += (uint32_t)g_artFlushes;
+    s->head += ",\"artPolls\":";   s->head += (uint32_t)g_artPolls;
+    s->head += ",\"sensorPoll\":"; s->head += g_pollAny ? "true" : "false";   // any sensor switch enabled
+    s->head += ",\"bqPolicy\":"; s->head += (int)g_bqPolicy;   // Art-Net BackgroundQueuePolicy (4 = off)
+    s->head += ",\"rdmTx\":"; s->head += (uint32_t)g_rdmSent;   // RDM frames sent on the bus
+    s->head += ",\"rdmRx\":"; s->head += (uint32_t)g_rdmRecv;   // valid RDM responses received
+    s->head += ",\"discLine\":"; s->head += g_adLine;          // line currently being discovered
+    s->head += ",\"rdmLines\":[";                              // the RDM-capable universes (per line)
+    {
+        bool firstL = true;
+        for (int L = 0; L < MAX_OUTPUTS; L++) {
+            int o = rdmOutForLine[L];
+            if (o < 0) continue;
+            if (!firstL) s->head += ",";
+            firstL = false;
+            s->head += "{\"line\":"; s->head += L; s->head += ",\"uni\":"; s->head += cfg.outputs[o].universe; s->head += "}";
+        }
+    }
+    s->head += "]";
+    s->head += ",\"outputs\":[";                               // per-output merge mode (for the RDM tab)
+    {
+        bool firstO = true;
+        for (int i = 0; i < MAX_OUTPUTS; i++) {
+            if (!cfg.outputs[i].enabled) continue;
+            if (!firstO) s->head += ",";
+            firstO = false;
+            s->head += "{\"i\":"; s->head += i;
+            s->head += ",\"uni\":"; s->head += cfg.outputs[i].universe;
+            s->head += ",\"merge\":"; s->head += cfg.outputs[i].mergeMode; s->head += "}";
+        }
+    }
+    s->head += "]";
+#endif
+    s->head += ",\"devices\":[";
+    req->sendChunked("application/json", [s](uint8_t* b, size_t maxLen, size_t) -> size_t {
+        size_t n = 0;
+        if (s->phase == 0) {                         // small header
+            while (s->headOff < s->head.length() && n < maxLen) b[n++] = (uint8_t)s->head[s->headOff++];
+            if (s->headOff < s->head.length()) return n;
+            s->phase = 1;
+        }
+        if (s->phase == 1) {                         // one device object at a time
+            while (n < maxLen) {
+                if (s->curOff >= s->curLen) {         // load the next device
+                    if (s->dev >= rdmCount) { s->phase = 2; break; }
+                    s->cur  = s->dev ? "," : "";
+                    s->cur += rdmDeviceJson(rdmDevices[s->dev]);
+                    s->curLen = s->cur.length(); s->curOff = 0; s->dev++;
+                }
+                while (s->curOff < s->curLen && n < maxLen) b[n++] = (uint8_t)s->cur[s->curOff++];
+            }
+            if (s->phase == 1) return n;              // buffer full mid-array; resume next call
+        }
+        if (s->phase == 2) {                         // closing "]}"
+            static const char foot[] = "]}";
+            while (s->footOff < 2 && n < maxLen) b[n++] = (uint8_t)foot[s->footOff++];
+            if (s->footOff < 2) return n;
+            s->phase = 3;
+        }
+        return n;                                    // phase 3: next call returns 0 -> complete
+    });
 }
 
 static void handleConfigGet(AsyncWebServerRequest* req) {
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", CONFIG_HTML, CONFIG_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
     r->addHeader("Cache-Control", "no-cache");   // revalidate after OTA (assets stay versioned)
+    req->send(r);
+}
+
+// The dedicated RDM tab (fixture list + per-fixture detail, live sensors, controls).
+static void handleRdmPage(AsyncWebServerRequest* req) {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", RDM_HTML, RDM_HTML_LEN);
+    r->addHeader("Content-Encoding", "gzip");
+    r->addHeader("Cache-Control", "no-cache");
     req->send(r);
 }
 
@@ -1765,7 +2307,7 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
 // Channel labels — browser owns the JSON object, device just persists it
 // ---------------------------------------------------------------------------
 static void handleLabelsGet(AsyncWebServerRequest* req) {
-    req->send(200, "application/json", g_labels);
+    sendJsonSafe(req, g_labels);
 }
 
 // Body handler for POST /labels (raw JSON). Accumulates chunks then persists.
@@ -1812,7 +2354,7 @@ static void handleResetPost(AsyncWebServerRequest* req) {
 }
 
 static void handleLogo(AsyncWebServerRequest* req) {
-    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/png", LOGO_PNG, LOGO_PNG_LEN);
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "image/webp", LOGO_WEBP, LOGO_WEBP_LEN);
     r->addHeader("Cache-Control", "max-age=86400");
     req->send(r);
 }
@@ -1839,18 +2381,32 @@ static int parseBuild(const String& v) {
 }
 
 static bool httpsGet(const char* url, String& out, size_t maxLen) {
-    WiFiClientSecure client;
-    client.setInsecure();
-    HTTPClient h;
-    h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    if (!h.begin(client, url)) return false;
-    bool ok = false;
-    if (h.GET() == 200) {
-        String s = h.getString();
-        s.trim();
-        if (s.length() > 0 && s.length() <= maxLen) { out = s; ok = true; }
+    // A TLS client allocates a big (~40 KB) contiguous block for the mbedTLS buffers. Under a
+    // packet flood the heap fragments; attempting the handshake then throws std::bad_alloc, and
+    // an uncaught throw abort()s the board. Worse, this runs 8 s after every boot, so during a
+    // flood it turns into a reboot loop. Skip when a big block isn't available, and catch as a
+    // hard backstop so a version check can never reboot the gateway.
+    if (ESP.getMaxAllocHeap() < 50000) {
+        Serial.printf("[VER] skipped: largest free block %u too small for TLS\n", ESP.getMaxAllocHeap());
+        return false;
     }
-    h.end();
+    bool ok = false;
+    try {
+        WiFiClientSecure client;
+        client.setInsecure();
+        HTTPClient h;
+        h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        if (!h.begin(client, url)) return false;
+        if (h.GET() == 200) {
+            String s = h.getString();
+            s.trim();
+            if (s.length() > 0 && s.length() <= maxLen) { out = s; ok = true; }
+        }
+        h.end();
+    } catch (...) {
+        Serial.println("[VER] check threw under memory pressure, skipped");
+        return false;
+    }
     return ok;
 }
 
@@ -1892,6 +2448,13 @@ static void doGithubOta() {
     // luxdmx.org/firmware/ota/<target>/<file> 301-redirects to the matching GitHub
     // release asset (releases/download/<target>/<file>) -- target is "latest" or a
     // "vX.Y.Z" tag, so per-version OTA / downgrade still works through the redirect.
+    // TLS + the OTA download need a big contiguous block; if the heap is fragmented (e.g. a flood
+    // is in progress) defer rather than throw bad_alloc and abort. No restart here, so this can't
+    // become a reboot loop while an auto-update keeps retrying under load.
+    if (ESP.getMaxAllocHeap() < 50000) {
+        Serial.printf("[OTA] deferred: largest free block %u too small\n", ESP.getMaxAllocHeap());
+        otaProgPhase = 3; dmxReady = true; return;
+    }
     String otaUrl = String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
@@ -1904,11 +2467,15 @@ static void doGithubOta() {
     });
     httpUpdate.onEnd([]()      { otaProgPhase = 2; otaProgPct = 100; });
     httpUpdate.onError([](int) { otaProgPhase = 3; });
-    WiFiClientSecure client;
-    client.setInsecure();
-    httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    httpUpdate.rebootOnUpdate(true);
-    httpUpdate.update(client, otaUrl);
+    try {
+        WiFiClientSecure client;
+        client.setInsecure();
+        httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        httpUpdate.rebootOnUpdate(true);
+        httpUpdate.update(client, otaUrl);
+    } catch (...) {
+        Serial.println("[OTA] update threw under memory pressure");
+    }
     // Only reaches here on failure (success reboots inside update()).
     otaProgPhase = 3;
     Serial.printf("[OTA] Failed (%d): %s\n",
@@ -1994,7 +2561,7 @@ static void startWiFiManager(bool forcePortal) {
         Serial.printf("[WiFi] static IP %s\n", cfg.ip.c_str());
     }
     snprintf(wm_universeStr, sizeof(wm_universeStr), "%d", cfg.outputs[0].universe);
-    WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-15)", wm_universeStr, 3);
+    WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-32767)", wm_universeStr, 6);
     wm.addParameter(&param_universe);
     // Run the captive portal NON-blocking so the serial config console stays alive
     // while it's up: a fresh / stuck board (no WiFi yet) can then be recovered over
@@ -2017,7 +2584,7 @@ static void startWiFiManager(bool forcePortal) {
     }
     if (!connected) ESP.restart();
     if (wm_shouldSave) {
-        cfg.outputs[0].universe = constrain(atoi(param_universe.getValue()), 0, 15);
+        cfg.outputs[0].universe = constrain(atoi(param_universe.getValue()), 0, 32767);
         saveConfig();
         // The captive-portal ran its own web server on port 80; it may not
         // release the socket cleanly, which would stop our AsyncWebServer from
@@ -2078,6 +2645,7 @@ static void connectStrongestAP() {
 static void initDmx() {
     dmxReady = false;
     rdmOut   = -1;
+    for (int i = 0; i < MAX_OUTPUTS; i++) { rdmLineForOut[i] = -1; rdmOutForLine[i] = -1; }
     monitorOut = 0;
     bool firstEnabled = true;
     for (int i = 0; i < MAX_OUTPUTS; i++) {
@@ -2102,6 +2670,31 @@ static void initDmx() {
             continue;
         }
 
+#ifdef DMX_RMT
+        // Every output starts on the RMT peripheral -- hardware-sequenced frames, immune to
+        // core-0 network-DMA contention (issue #64 hard-zero). An RDM-capable output (has a DE
+        // pin, rtsPin >= 0) is switched RMT->esp_dmx on demand ONLY for an RDM transaction and
+        // back to RMT afterwards (see the DMX task), so it gets both immune DMX and RDM.
+        {
+            if (rmtDmxInit(&g_rmt[i], cfg.outputs[i].txPin)) {
+                outReady[i] = true; dmxReady = true;
+                if (firstEnabled) { monitorOut = i; firstEnabled = false; }
+                if (cfg.outputs[i].rtsPin >= 0) {                 // RDM-capable output (has a transceiver)
+                    // RDM reuses this output's RMT channel for TX + a RX-only UART for responses.
+                    // Every such output becomes its own RDM line so RDM can run on both universes.
+                    int line = rdmRmtInit(&g_rmt[i], cfg.outputs[i].rtsPin, cfg.outputs[i].rxPin);
+                    if (line >= 0) {
+                        rdmLineForOut[i] = line;
+                        rdmOutForLine[line] = i;
+                        if (rdmOut < 0) rdmOut = i;              // primary (first line) for legacy paths
+                    }
+                }
+                Serial.printf("[DMX] out%d ready (RMT%s): uni=%d tx=%d\n",
+                    i, cfg.outputs[i].rtsPin >= 0 ? "+RDM" : "", cfg.outputs[i].universe, cfg.outputs[i].txPin);
+            } else Serial.printf("[DMX] out%d RMT init FAILED\n", i);
+            continue;
+        }
+#endif
         dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         dmx_config_t config = DMX_CONFIG_DEFAULT;
         dmx_driver_install(port, &config, nullptr, 0);
@@ -2510,15 +3103,34 @@ static eth_clock_mode_t rmiiClkMode(int idx) {
 // Bring up RMII Ethernet via the ESP32 internal EMAC. The PHY family, SMI address,
 // MDC/MDIO/PHY-power pins and REF_CLK mode are runtime config (cfg.rmii*); the RMII
 // data lines are fixed by the EMAC. Defaults reproduce the LAN8720/WT32-ETH01 wiring.
-static void startEthRmii() {
+//
+// The internal EMAC's RX interrupt is allocated on whichever core calls ETH.begin(), so
+// we bring it up from a task pinned to core 0 -- exactly like the W5500 path (ethUpTask)
+// -- to keep the EMAC interrupt off core 1, where the DMX transmit (sendDmx/dmx_send in
+// loop()) runs. Brought up inline in setup() the EMAC ISR lands on core 1, and a busy
+// wired link (Art-Net flood) then preempts the DMX break/frame timing enough to put
+// framing errors on the output (issue #64). Measured on the bench: idle 0 framing
+// errors, ~4.4/min under a heavy flood with the inline (core-1) bring-up.
+static volatile bool s_ethRmiiUpDone;
+static void ethRmiiUpTask(void *arg) {
     int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
-    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d\n",
-        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
     ETH.begin(rmiiPhyType(phy), cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio,
               cfg.rmiiPwr, rmiiClkMode(cfg.rmiiClk));
     ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link
     applyEthStaticIp();
     waitEthLink();
+    s_ethRmiiUpDone = true;
+    vTaskDelete(NULL);
+}
+static void startEthRmii() {
+    int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
+    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d (bring-up on core 0)\n",
+        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
+    s_ethRmiiUpDone = false;
+    xTaskCreatePinnedToCore(ethRmiiUpTask, "ethrmii", 8192, NULL, 5, NULL, 0);
+    uint32_t t0 = millis();
+    while (!s_ethRmiiUpDone && millis() - t0 < 30000) delay(20);
+    if (!s_ethRmiiUpDone) Serial.println("[ETH] RMII core-0 bring-up still running after 30s");
 }
 #endif
 
@@ -2722,14 +3334,21 @@ void setup() {
     initOTA();
 
     if (cfg.protocol != 1) {
+#ifndef DMX_RMT
         artnet.setArtDmxCallback(onArtDmx);
         artnet.begin();
+#endif
         Serial.printf("[ArtNet] out0 universe %d%s\n", cfg.outputs[0].universe,
             cfg.outputs[1].enabled ? " (+out1)" : "");
     }
+#ifdef DMX_RMT
+    // The Art-Net RDM bridge owns the 6454 socket (Art-Net DMX + ArtPoll/ArtTod*/ArtRdm)
+    // and does incremental, bus-friendly RDM discovery. Replaces artnet.begin() here.
+    artRdmInit();
+#endif
     if (cfg.protocol != 0) startSacn();
 
-    http.on("/logo.png",          HTTP_GET,  handleLogo);
+    http.on("/logo.webp",         HTTP_GET,  handleLogo);
     http.on("/favicon.png",       HTTP_GET,  handleFavicon);
     http.on("/favicon.ico",       HTTP_GET,  handleFavicon);
     http.on("/bootstrap.min.css", HTTP_GET,  handleBootstrapCss);
@@ -2747,6 +3366,14 @@ void setup() {
     http.on("/version.json",      HTTP_GET,  handleVersionJson);
     http.on("/info.json",         HTTP_GET,  handleInfoJson);
     http.on("/rdm.json",          HTTP_GET,  handleRdmJson);
+    http.on("/rdm/discover",      HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/setaddr",       HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/identify",      HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/bqp",           HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/merge",         HTTP_GET,  handleRdmTrigger);
+    // The page route matches "/rdm" and prefix "/rdm/…", so register it AFTER the /rdm/* handlers
+    // (first match wins) or it would swallow /rdm/discover etc.
+    http.on("/rdm",               HTTP_GET,  handleRdmPage);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
@@ -2761,6 +3388,34 @@ void setup() {
     xTaskCreate(ledTask, "led", 2048, nullptr, 1, nullptr);
     if (dispReady) xTaskCreate(displayTask, "disp", 4096, nullptr, 1, nullptr);
     xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr);
+    // issue #64 core separation: DMX transmit on core 1, Art-Net/sACN receive on core 0.
+    // dmxTxTask: high priority (19, above loop()=1), pinned core 1, strict 40 Hz cadence,
+    //   sole owner of the DMX ports; self-gates on dmxReady so it is safe to start early.
+    // netRxTask: moderate priority (5, below lwIP/WiFi so it can't starve them), pinned
+    //   core 0, drains the UDP sockets and re-merges idle sources. With receive on core 0
+    //   nothing on core 1 can disturb esp_dmx's break/MAB timer ISR -> rock-solid frames.
+    xTaskCreatePinnedToCore(dmxTxTask, "dmxtx", 4096, nullptr, 19, &g_dmxTask, 1);
+    xTaskCreatePinnedToCore(netRxTask, "netrx", 8192, nullptr, 5,  nullptr,   0);
+
+    // Survive a network flood without resetting. Under heavy inbound traffic (e.g. an Art-Net
+    // storm on the wired link) the lwIP task pegs core 0, so core 0's idle task can't feed the
+    // task watchdog and the default handler PANICS -> SW_CPU_RESET. On the HIL bench a sustained
+    // ~6k+ pkt/s Art-Net flood crash-looped the WT32 every ~15 s (task_wdt: IDLE0, CPU 0: tiT).
+    // That is not a hang -- core 0 is just busy -- and a gateway must keep clocking DMX through it
+    // (DMX lives on core 1 and is unaffected). So reconfigure the task WDT to LOG a warning on
+    // starvation instead of rebooting. The idle tasks stay subscribed (arduino-esp32's idle hook
+    // keeps feeding them, so no "esp_task_wdt_reset: task not found" spam that disableCore0WDT()
+    // caused), the timeout is widened, and a real hang is still reported on the console + backtrace
+    // -- we just don't self-reset a busy-but-alive gateway mid-show. (This is what the analyzer saw
+    // as the DMX "freeze": the controller was rebooting, not the wire.)
+    {
+        esp_task_wdt_config_t twdt = {
+            .timeout_ms     = 10000,
+            .idle_core_mask  = (1u << portNUM_PROCESSORS) - 1,   // keep both idle tasks watched (no hook spam)
+            .trigger_panic  = false,                            // log-and-continue, don't reboot under load
+        };
+        esp_task_wdt_reconfigure(&twdt);
+    }
     Serial.println("[BOOT] ready.");
 }
 
@@ -2799,58 +3454,74 @@ static void simArtnetTick() {
 #endif
 
 // ---------------------------------------------------------------------------
-// loop()
+// Network receive task -- runs on CORE 0, the network core. This is the other half
+// of the issue #64 fix: it takes Art-Net / sACN receive (artnet.read / readSacn) and
+// source-timeout re-merge OFF core 1, so the DMX transmit on core 1 (dmxTxTask) runs
+// with NOTHING else competing for the core. esp_dmx sequences its break/MAB with a
+// hardware-timer ISR on core 1; any lwIP/packet work on core 1 (as loop() used to do)
+// can delay that ISR and corrupt a frame while the DMX task is between frames. Moving
+// receive to core 0 removes that entirely: core 1 = DMX only. Receive writes dmxBuf,
+// the DMX task reads it -- a plain byte array, so a rare torn frame is harmless (the
+// next frame 25 ms later is consistent) and no lock is needed (a lock would risk
+// priority-inverting the high-priority DMX task).
+static void netRxTask(void*) {
+    for (;;) {
+        if (netConnected()) {
+#ifdef DMX_RMT
+            // Art-Net on our own 6454 socket: ArtDmx -> routeFrame, and the RDM opcodes
+            // (ArtPoll/ArtTodRequest/ArtTodControl/ArtRdm) queued to the DMX task. Then flush
+            // any ArtTodData / ArtRdm replies the DMX task produced. Bounded per call.
+            artRdmPollRx();
+            artRdmDrainResponses();
+#else
+            // Drain all queued Art-Net packets (bounded) so a socket backlog catches up
+            // to the newest frame. read() runs onArtDmx per ART_DMX, returns 0 when empty.
+            if (cfg.protocol != 1)
+                for (int n = 0; n < 64 && artnet.read(); ++n) { }
+#endif
+            if (cfg.protocol != 0) readSacn();
+        }
+        ArduinoOTA.handle();
+
+        uint32_t now = millis();
+        // Re-merge outputs whose input has gone quiet so a stopped source drops out of
+        // the mix even without a new frame (issue #10 source timeout).
+        static uint32_t lastMergeMs = 0;
+        if (now - lastMergeMs >= 100) {
+            for (int i = 0; i < MAX_OUTPUTS; i++)
+                if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
+            g_srcStatus = sourceStatus();
+            lastMergeMs = now;
+        }
+        vTaskDelay(1);   // yield ~1 ms; the 64-packet drain + lwIP buffering keep up easily
+    }
+}
+
+// ---------------------------------------------------------------------------
+// loop()  (core 1) -- DMX (dmxTxTask) and receive (netRxTask) run in their own tasks now;
+// loop() only does the non-time-critical housekeeping (serial console, WS pushes).
 // ---------------------------------------------------------------------------
 void loop() {
     cfgserial::poll();   // serial config console (non-blocking line reader)
 
-    // AsyncWebServer + AsyncWebSocket run in their own task, so loop() never
-    // blocks on the network — only Art-Net/sACN input and DMX output here.
-    // Only poll the UDP sockets while a link is actually up: on arduino-esp32 v3,
-    // calling parsePacket() with no network spams "[E][NetworkUdp.cpp] parsePacket():
-    // could not check for data" every loop (and wastes CPU) — seen with the W5500
-    // link down (or before it comes up).
-    if (netConnected()) {
-        // Drain all queued Art-Net packets this loop (bounded), so a transient
-        // socket backlog catches up to the newest frame instead of clearing one
-        // packet per loop. read() runs onArtDmx for each ART_DMX and returns 0
-        // once the socket is empty. Mirrors readSacn()'s drain — without it
-        // Art-Net visibly lags sACN whenever the loop hitches under WiFi jitter.
-        // The 64-packet cap keeps loop() responsive if a source ever floods us.
-        if (cfg.protocol != 1)
-            for (int n = 0; n < 64 && artnet.read(); ++n) { }
-        if (cfg.protocol != 0) readSacn();
+    if (rdmPollDirty) { rdmPollDirty = false; rdmSavePoll(); }   // persist sensor switch changes
+    if (g_artCfgDirty) { g_artCfgDirty = false; saveConfig(); }  // ArtAddress changed a merge mode
+    if (g_bqDirty) {                                             // ArtAddress changed the queue policy
+        g_bqDirty = false;
+        prefs.begin(PREF_NS, false); prefs.putUChar("bqpolicy", g_bqPolicy); prefs.end();
     }
-    ArduinoOTA.handle();
+
 #ifdef SIM_ARTNET
     simArtnetTick();
 #endif
 
     uint32_t now = millis();
 
-    // Re-merge outputs whose input has gone quiet, so a source that stops sending
-    // drops out of the mix even without a new frame to trigger routeFrame()
-    // (issue #10 source timeout). Outputs still actively receiving are already
-    // merged per-frame in routeFrame(), so skip them here to avoid redundant work.
-    static uint32_t lastMergeMs = 0;
-    if (now - lastMergeMs >= 100) {
-        for (int i = 0; i < MAX_OUTPUTS; i++)
-            if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
-        g_srcStatus = sourceStatus();   // also refresh cached state when input is idle
-        lastMergeMs = now;
-    }
-
-    // Continuous DMX output at ~40 Hz: holds the last frame as a failsafe so
-    // brief input gaps (lost multicast on a weak link) never interrupt the
-    // lights. sendDmx() applies any identify override and manual changes too.
-    static uint32_t lastDmxTx = 0;
-    if (identifyCh && now >= identifyUntil) identifyCh = 0;
-    if (now - lastDmxTx >= 25) { sendDmx(); lastDmxTx = now; }
-
-    // RDM discovery / GET-SET on the bus (no-op unless a request is queued and
-    // the direction-enable pin is configured). A full discovery briefly pauses
-    // DMX output while it sweeps the line.
-    rdmService();
+    // Art-Net/sACN receive + source-timeout re-merge -> netRxTask (core 0).
+    // DMX output + RDM bus service -> dmxTxTask (core 1, high priority).
+    // Keeping both off this loop is the issue #64 fix: core 1 does only DMX, so no
+    // packet processing can delay/jitter the break/frame timing. loop() just does the
+    // non-time-critical housekeeping below.
 
     if (now - lastWsPush >= 100) {
         wsPush();
@@ -2945,4 +3616,9 @@ void loop() {
             fps, netRSSI(), (int)WiFi.status(), ws.count(), (unsigned)httpReqCount,
             (unsigned)wsConnCount, (unsigned)wsDiscCount);
     }
+
+    // Yield one tick so IDLE1 runs (feeds its task watchdog) and core 1 keeps genuine idle
+    // slack. loop() is only housekeeping, so 1 ms latency here is irrelevant; without it
+    // loopTask (prio 1) can monopolise core 1 under load and trip the IDLE1 watchdog.
+    delay(1);
 }

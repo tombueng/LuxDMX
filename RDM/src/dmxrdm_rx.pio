@@ -1,0 +1,16 @@
+; dmxrdm_rx.pio - DMX/RDM byte receiver at 250 kBaud (8N).
+; PIO clock is run at 8x baud (2 MHz), so 1 bit = 8 PIO cycles. Autopush at 8 bits.
+;
+; Key detail vs a naive UART RX: we WAIT for the line to be high (idle / stop bit / MAB)
+; BEFORE waiting for the start-bit falling edge. That way a sustained low (a DMX/RDM
+; break) makes the SM stall instead of spraying 0x00 bytes, and the firmware sees a
+; clean gap in byte arrivals = a frame boundary. Frame framing + break/turnaround
+; detection is done in firmware from those gaps (see main.cpp, core 1).
+
+.program dmxrdm_rx
+    wait 1 pin 0              ; ensure line is idle/high first (so a break just stalls us)
+    wait 0 pin 0              ; wait for the start bit (falling edge)
+    set x, 7        [10]      ; 8 data bits; delay to the middle of the first one
+bitloop:
+    in pins, 1                ; sample one data bit (LSB first)
+    jmp x-- bitloop [6]       ; 8 PIO cycles per bit; autopush emits the byte after 8

@@ -86,6 +86,18 @@ test.describe('Web UI + REST', () => {
     expect(Array.isArray(d.devices)).toBeTruthy();
   });
 
+  test('/logo.webp serves a small WebP image (replaces the old ~117 KB PNG)', async ({ request }) => {
+    const res = await request.get('/logo.webp');
+    expect(res.ok()).toBeTruthy();
+    expect(res.headers()['content-type']).toBe('image/webp');
+    const body = await res.body();
+    expect(body.slice(0, 4).toString('latin1')).toBe('RIFF');   // WebP container magic
+    expect(body.slice(8, 12).toString('latin1')).toBe('WEBP');
+    expect(body.length).toBeLessThan(20000);                    // was ~117 KB as a PNG
+    // the old PNG endpoint is gone
+    expect((await request.get('/logo.png')).status()).toBe(404);
+  });
+
   test('/info.json advertises the W5500 SPI Ethernet config fields', async ({ request }) => {
     const d = await (await request.get('/info.json')).json();
     expect(typeof d.ethSpi).toBe('boolean');    // whether the W5500 driver is compiled in

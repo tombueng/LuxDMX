@@ -79,6 +79,8 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
 | **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — codes network/idle/DMX/conflict/identify state |
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
+| **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
+| **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
@@ -271,7 +273,8 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 | Library | Purpose |
 |---|---|
-| `someweisguy/esp_dmx ^4.1` | DMX512 transmit via UART |
+| built-in RMT (`dmx_rmt.h`) | DMX512 transmit — frames clocked out of the RMT peripheral so they survive the RMII-Ethernet DMA contention (issue #64). Paired with `rdm_rmt.h` for an esp_dmx-free RDM controller (RMT-TX + UART-RX, DE as GPIO). |
+| `someweisguy/esp_dmx ^4.1` | Fallback DMX/RDM path for the Wokwi sim build (the hardware envs use the RMT path via `-DDMX_RMT`) |
 | `rstephan/ArtnetWifi ^1.5` | Art-Net UDP receiver (port 6454) |
 | `tzapu/WiFiManager ^2.0` | WiFi config portal |
 | `ESP32Async/ESPAsyncWebServer` | Non-blocking HTTP server + WebSocket (port 80) |
@@ -417,7 +420,7 @@ LuxDMX/
 │   │   ├── reset.html
 │   │   └── reset_done.html
 │   ├── assets/           ← images served by the ESP32
-│   │   └── logo.png      ← 96×96 px, replaces itself on rebuild
+│   │   └── logo.webp     ← 256×256 WebP (~5 KB), embedded into the firmware on build
 │   └── generated/        ← auto-created at build time, gitignored
 ├── include/              ← config_schema.h (Config struct) + config_enums.h
 ├── lib/EmbeddedConfig/   ← reusable schema-driven config engine (NVS + serial console)
@@ -438,13 +441,13 @@ itself is a standalone PlatformIO library under `lib/EmbeddedConfig/`.
 Before every `pio run`, PlatformIO executes `extra_scripts.py`, which:
 
 1. Reads every `src/pages/*.html` file
-2. Reads every `src/assets/*.png` file
+2. Reads every image/CSS in `src/assets/` (`*.png`, `*.webp`, `*.svg`, `*.css`)
 3. Converts them to C `PROGMEM` arrays / string literals and writes them to `src/generated/*.h`
 4. `main.cpp` `#include`s those headers — the HTML and images become part of the firmware binary
 5. Embeds the board default `templates/*.ini` into `src/generated/config_templates.cpp` (via `tools/gen_config_templates.py`), so a build's defaults come from a data file, not hand-edited macros
 
 **To change the web UI**, edit the HTML files in `src/pages/` and rebuild — no C++ changes needed.  
-**To replace the logo**, drop a new 96×96 PNG into `src/assets/logo.png` and rebuild.
+**To replace the logo**, drop a new `src/assets/logo.webp` (or re-run `artwork/derive-logos.sh`) and rebuild. WebP keeps the embedded logo around 5 KB instead of ~117 KB for the equivalent PNG, and it is served straight from flash so it costs no heap.
 
 Dynamic values (IP address, universe number, etc.) use `{{PLACEHOLDER}}` tokens in the HTML; `main.cpp` substitutes them at request time with `String::replace()`.
 
@@ -584,6 +587,12 @@ values are fetched as JSON.
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
 | `/labels.json` | GET | Channel labels object |
 | `/labels` | POST | Store the full labels object (JSON body) |
+| `/rdm.json` | GET | RDM controller state + discovered fixtures (TOD), incl. the Art-Net RDM node state (`artnetRdm`, `artPort`, `discovering`) + request counters |
+| `/rdm/discover` | GET | Trigger an RDM discovery sweep on the bus (`{ok,op}`) |
+| `/rdm/setaddr` | GET | Set a fixture's DMX start address — `?uid=MMMM:DDDDDDDD&addr=1..512` |
+| `/rdm/identify` | GET | Toggle a fixture's identify — `?uid=MMMM:DDDDDDDD&on=0/1` |
+| `/rdm/bqp` | GET | Set the Art-Net BackgroundQueuePolicy (background RDM status harvest), `?p=1..3` severity, `4` off |
+| `/rdm/merge` | GET | Set an output's merge mode, `?out=<index>&mode=0/1/2` (off/HTP/LTP), applied live + persisted |
 | `/version.json` | GET | Current firmware version + update-available flag |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
@@ -612,7 +621,9 @@ rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` along
 
 ### Source merging (HTP / LTP)
 
-When more than one console targets the same universe, pick a per-output **merge mode** in `/config`:
+When more than one console targets the same universe, pick a per-output **merge mode** in `/config`
+(or remotely from a console over Art-Net, where an `ArtAddress` `AcMergeHtp`/`AcMergeLtp`/`AcCancelMerge`
+is applied live and persisted):
 
 - **Off** — last frame wins; a clash raises the conflict warning.
 - **HTP** (highest takes precedence) — each channel is the maximum across the active sources.
@@ -836,12 +847,14 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
 | LuxDMX v4 (ESP32-S3 + W5500) | `luxdmx_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 
-**Any ESP32 / ESP32-S3 build can add wired Ethernet with an external SPI module** — the W5500 and
+**Any ESP32 / ESP32-S3 build can add wired Ethernet with an external SPI module**: the W5500 and
 DM9051 drivers are compiled into every build. In **`/config` &rarr; Wired Ethernet** pick the chip
 (**W5500** or **DM9051**), set its pins, then enable **Use wired Ethernet**. The two share the same
 SPI wiring, so one pin card serves both. Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 /
-MOSI=23 / MISO=19 / INT=4 / RST=25) and are fully configurable (with the on-board pin-picker); lower
-the SPI clock there if a long-wired module isn't detected. No special build is needed.
+MOSI=23 / MISO=19 / INT=4 / RST=25) and are fully configurable (with the on-board pin-picker). The
+**SPI clock** is set by **W5500 SPI MHz** (`ethfreq`, default **20**, range 1 to 80); 20 MHz is fine
+on a real board, but drop it to ~8 MHz if the module is on long flying leads and is not detected (the
+bring-up can otherwise hang). No special build is needed.
 
 The **DM9051** is a W5500 alternative (sometimes easier to source). It's wired in and selectable, but
 nobody's had one on the bench yet, so it's **untested on real hardware** so far. The W5500 path is
@@ -869,6 +882,9 @@ management / clock / power pins, so a DMX or LED pin that lands on one is flagge
 > preprocessor reads as 0, so it was compiled out (null peripheral pointer). That, plus an ESP-IDF 5.x
 > fix (the removed `uart_periph_signal[].module` field) needed once the firmware moved to
 > **arduino-esp32 v3**, is applied by a build-time patch in [`extra_scripts.py`](extra_scripts.py).
+> The hardware builds now clock DMX out of the **RMT** peripheral (`dmx_rmt.h`, `-DDMX_RMT`) instead
+> of the UART, which sidesteps this esp_dmx UART2 issue entirely; the patch only matters for the
+> Wokwi sim build that still uses esp_dmx.
 
 **ESP32-S3 — safe GPIOs for a 2nd output:** free choices are **5, 6, 7, 8, 15, 18, 21**. Avoid
 **26–37** (SPI flash / octal PSRAM — *will* crash), **19/20** (USB), **43/44** (serial console),
@@ -897,6 +913,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Protocol | `Both (Art-Net + sACN)` | Web `/config` |
 | Static IP / gateway / subnet / DNS | DHCP | Web `/config` (Network) |
 | Auto-update | off | Web `/config` (Firmware) |
+| RDM over Art-Net (`artrdm`) | on | Web `/config` (RDM) |
 | Channel labels | — | Status page (channel modal) |
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password (IDE `espota` only) | `dmxota` | Web `/config` |

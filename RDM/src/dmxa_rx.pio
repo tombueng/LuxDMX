@@ -1,0 +1,22 @@
+; dmxa_rx.pio - DMX line ANALYZER receiver: 8 data bits + the stop bit.
+;
+; This is the byte receiver (dmxrdm_rx) with ONE extra sample: after the 8 data
+; bits we also sample the stop bit, and autopush 9 bits instead of 8. A DMX/UART
+; framing error = the stop bit is NOT high (mark) when it should be, so bit 8 of
+; each pushed word tells the firmware whether that slot framed cleanly. This is
+; how a DMX tester (Swisson XMT-120 etc.) counts "framing errors".
+;
+; Runs on its OWN state machine (pio1) so it never disturbs the RDM responder RX
+; on pio0. Both watch the same GP0 line; this one only measures, never replies.
+; Autopush threshold = 9. Shift right (LSB first): after 9 ins the word holds
+;   stop bit -> bit 31,  data b7..b0 -> bits 30..23.
+; So firmware reads:  data = (w >> 23) & 0xFF ;  stopHigh = (w >> 31) & 1.
+
+.program dmxa_rx
+    wait 1 pin 0              ; line idle/high first (a break just stalls us here)
+    wait 0 pin 0              ; start bit (falling edge)
+    set x, 7        [10]      ; 8 data bits; delay to the middle of the first one
+abit:
+    in pins, 1                ; sample one data bit (LSB first)
+    jmp x-- abit    [6]       ; 8 PIO cycles per bit
+    in pins, 1                ; sample the STOP bit (9th push) -> framing-error flag

@@ -17,14 +17,17 @@ def escape_c(s: str) -> str:
 # Large static pages are gzip-compressed (served with Content-Encoding: gzip)
 # to slash per-connection heap/airtime. They must contain no {{placeholders}}
 # (dynamic values are fetched client-side from /info.json).
-GZIP_PAGES = {"index", "config"}
+GZIP_PAGES = {"index", "config", "rdm"}
 
-def html_to_header(path: pathlib.Path, out_dir: pathlib.Path, version: str):
+def html_to_header(path: pathlib.Path, out_dir: pathlib.Path, version: str, nav_html: str = ""):
     var = path.stem.upper().replace("-", "_").replace(".", "_") + "_HTML"
     out = out_dir / (path.stem + "_html.h")
     # Cache-bust static asset URLs (?v=__FWVER__) with the build's firmware version so a
     # new firmware always serves fresh css/logo/favicon while still caching them hard.
     content = path.read_text(encoding="utf-8").replace("__FWVER__", version)
+    # Inject the one shared navbar fragment (src/pages/_nav.html) at its marker, so every
+    # page carries the identical bar without maintaining three copies.
+    content = content.replace("<!--NAVBAR-->", nav_html)
     if path.stem in GZIP_PAGES:
         gz  = gzip.compress(content.encode("utf-8"), compresslevel=9)
         rows = ["  " + ", ".join(f"0x{b:02x}" for b in gz[i:i+16]) + ","
@@ -155,12 +158,19 @@ def generate():
     patch_esp_dmx()
     generate_config_templates(root, gen_dir)
     version = generate_version(gen_dir)
+    # The shared navbar fragment (name starts with "_") is injected into every page, not served.
+    nav_file = root / "src" / "pages" / "_nav.html"
+    nav_html = nav_file.read_text(encoding="utf-8").replace("__FWVER__", version) if nav_file.exists() else ""
     for f in sorted((root / "src" / "pages").glob("*.html")):
-        html_to_header(f, gen_dir, version)
+        if f.stem.startswith("_"):
+            continue
+        html_to_header(f, gen_dir, version, nav_html)
     for f in sorted((root / "src" / "assets").glob("*.png")):
         binary_to_header(f, gen_dir, "PNG")
     for f in sorted((root / "src" / "assets").glob("*.svg")):
         binary_to_header(f, gen_dir, "SVG")
+    for f in sorted((root / "src" / "assets").glob("*.webp")):
+        binary_to_header(f, gen_dir, "WEBP")
     for f in sorted((root / "src" / "assets").glob("*.css")):
         # Gzip-compress CSS before embedding — reduces 232 KB bootstrap to ~40 KB
         raw = f.read_bytes()

@@ -42,6 +42,7 @@ struct Config {
     bool      staticIp;
     String    ip, gateway, subnet, dns;
     bool      autoUpdate;
+    bool      artnetRdm;      // respond to RDM-over-Art-Net (ArtTodRequest / ArtRdm)
 };
 
 extern Config cfg;
