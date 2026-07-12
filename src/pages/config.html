@@ -146,6 +146,11 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
           </select>
         </div>
         <div class="form-text">The input protocol applies to the whole device. The universe is set per DMX output below.</div>
+        <div class="form-check form-switch mt-3">
+          <input class="form-check-input" type="checkbox" name="artrdm" id="artrdm-sw" value="1">
+          <label class="form-check-label small" for="artrdm-sw">RDM over Art-Net</label>
+        </div>
+        <div class="form-text">Let a console do RDM to the fixtures over Art-Net (ArtPoll / ArtTodRequest / ArtRdm). Only active on an RDM-capable output (one with a DE/RE pin). Discovery is spread across DMX frames so it never stalls the output.</div>
       </div>
     </div>
 
@@ -727,6 +732,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   CURRENT = d.version || '';
   $('cur-ver').textContent = 'v' + CURRENT;
   $('proto-sel').value = d.protocol;
+  $('artrdm-sw').checked = d.artnetRdm !== undefined ? !!d.artnetRdm : true;
   $('useeth-sw').checked = !!d.useEthernet;
   $('wifi-mode').value = d.wifiMode !== undefined ? d.wifiMode : 0;
   $('ap-pw').value = d.apPassword || '';

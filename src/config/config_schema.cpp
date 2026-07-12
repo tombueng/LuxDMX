@@ -85,6 +85,9 @@ const CfgField CONFIG_FIELDS[] = {
     SFIELD("subnet",   "subnet",       subnet,       "Subnet mask",        "Network", CFG_NONE),
     SFIELD("dns",      "dns",          dns,          "DNS server",         "Network", CFG_NONE),
 
+    // --- RDM ----------------------------------------------------------------
+    BFIELD("artrdm", "artnetRdm", artnetRdm, "RDM over Art-Net", "RDM", CFG_NONE),
+
     // --- Updates (own route, not the /config form) -------------------------
     BFIELD("autoupd", "autoUpdate", autoUpdate, "Auto-update firmware", "Updates", CFG_NOWEB),
 };

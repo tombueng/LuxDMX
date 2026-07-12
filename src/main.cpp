@@ -789,6 +789,8 @@ static void sendDmx() {
 static TaskHandle_t g_dmxTask = nullptr;
 static void rdmService();   // fwd decl (defined below, next to the RDM controller)
 static void netRxTask(void*);   // fwd decl (defined below, next to loop() -- runs on core 0)
+static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
+                       uint32_t senderIp, uint8_t proto, uint8_t priority);   // fwd decl for artnet_rdm.h
 
 // (No RMT<->esp_dmx switch: in the DMX_RMT build the RDM output stays on RMT permanently. RDM
 // requests are sent via RMT and responses read on a RX-only UART -- see rdm_rmt.h. Nothing is
@@ -916,6 +918,12 @@ static bool rdmParseUid(const String& msg, rdm_uid_t& out) {
     return true;
 }
 
+#ifdef DMX_RMT
+// Art-Net 4 RDM bridge (ArtPoll/ArtTod*/ArtRdm). Uses rdm_rmt.h's raw relay + discovery
+// primitives and the RdmDevice table / rdmDevices[] declared above. See docs/rdm.md.
+#include "artnet_rdm.h"
+#endif
+
 // ---- RDM transport adapter -------------------------------------------------------------
 // The DMX_RMT build talks RDM over RMT-TX + a RX-only UART (rdm_rmt.h); other builds use the
 // esp_dmx controller. Both back ends present this same small op-set to the app layer below, so
@@ -947,6 +955,9 @@ static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)       
 
 // Full discovery sweep + per-device GET device-info & software-version label.
 // Blocks the bus for the duration (~hundreds of ms) — DMX output pauses briefly.
+// (DMX_RMT builds run discovery incrementally instead — see artnet_rdm.h — so this
+// blocking sweep is only compiled for the esp_dmx back end.)
+#ifndef DMX_RMT
 static void rdmDoDiscover() {
     rdmBusy = true;
     rdm_uid_t uids[RDM_MAX_DEVICES];
@@ -999,6 +1010,7 @@ static void rdmDoDiscover() {
     rdmBusy       = false;
     Serial.printf("[RDM] discovery: %d device(s)\n", rdmCount);
 }
+#endif  // !DMX_RMT
 
 // Called once per DMX cycle from the DMX task (the sole bus owner); does work only when a
 // request is queued. On the DMX_RMT build this runs the whole RDM transaction over RMT-TX +
@@ -1022,10 +1034,17 @@ static void rdmService() {
             if (d) d->identifying = rdmReqOn;
         }
     }
+#ifdef DMX_RMT
+    // Art-Net RDM relay + INCREMENTAL discovery: one bus transaction per DMX frame so RDM
+    // (background discovery, ArtTodRequest, ArtRdm GET/SET) never stalls the 40 Hz output.
+    // Also consumes rdmDiscoverReq, so the web "Discover" button runs incrementally too.
+    artRdmService();
+#else
     if (rdmDiscoverReq) {
         rdmDiscoverReq = false;
-        rdmDoDiscover();
+        rdmDoDiscover();   // blocking sweep (esp_dmx build; pauses DMX for the duration)
     }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -1451,12 +1470,15 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
 }
 
 // ---------------------------------------------------------------------------
-// Art-Net callback
+// Art-Net callback (esp_dmx builds; the DMX_RMT build parses Art-Net itself in
+// artnet_rdm.h so it can also handle the RDM opcodes on the same 6454 socket).
 // ---------------------------------------------------------------------------
+#ifndef DMX_RMT
 static void onArtDmx(uint16_t universe, uint16_t length, uint8_t, uint8_t* data) {
     // Art-Net carries no per-packet priority, so it joins the merge at the default.
     routeFrame((int)universe, data, length, (uint32_t)artnet.getSenderIp(), 0, DEFAULT_PRIORITY);
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // sACN / E1.31
@@ -1695,6 +1717,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ledB\":";       j += cfg.ledB;               j += ",";
     j += "\"ledW\":";       j += cfg.ledW;               j += ",";
     j += "\"rdmOut\":";     j += rdmOut;                 j += ",";
+    j += "\"artnetRdm\":";  j += cfg.artnetRdm ? "true" : "false"; j += ",";
     j += "\"outputs\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         const DmxOutput& o = cfg.outputs[i];
@@ -1882,6 +1905,15 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
     j  = "{\"available\":"; j += rdmAvailable() ? "true" : "false";
     j += ",\"busy\":";      j += rdmBusy ? "true" : "false";
     j += ",\"scanned\":";   j += rdmScanned ? "true" : "false";
+#ifdef DMX_RMT
+    j += ",\"artnetRdm\":"; j += g_artRdmEnabled ? "true" : "false";
+    j += ",\"artPort\":";   j += artRdmPortAddr();
+    j += ",\"discovering\":"; j += g_artDiscovering ? "true" : "false";
+    j += ",\"artTodReqs\":"; j += (uint32_t)g_artTodReqs;
+    j += ",\"artRdmReqs\":"; j += (uint32_t)g_artRdmReqs;
+    j += ",\"artFlushes\":"; j += (uint32_t)g_artFlushes;
+    j += ",\"artPolls\":";   j += (uint32_t)g_artPolls;
+#endif
     j += ",\"devices\":[";
     for (int i = 0; i < rdmCount; i++) {
         const RdmDevice& d = rdmDevices[i];
@@ -2975,11 +3007,18 @@ void setup() {
     initOTA();
 
     if (cfg.protocol != 1) {
+#ifndef DMX_RMT
         artnet.setArtDmxCallback(onArtDmx);
         artnet.begin();
+#endif
         Serial.printf("[ArtNet] out0 universe %d%s\n", cfg.outputs[0].universe,
             cfg.outputs[1].enabled ? " (+out1)" : "");
     }
+#ifdef DMX_RMT
+    // The Art-Net RDM bridge owns the 6454 socket (Art-Net DMX + ArtPoll/ArtTod*/ArtRdm)
+    // and does incremental, bus-friendly RDM discovery. Replaces artnet.begin() here.
+    artRdmInit();
+#endif
     if (cfg.protocol != 0) startSacn();
 
     http.on("/logo.png",          HTTP_GET,  handleLogo);
@@ -3096,10 +3135,18 @@ static void simArtnetTick() {
 static void netRxTask(void*) {
     for (;;) {
         if (netConnected()) {
+#ifdef DMX_RMT
+            // Art-Net on our own 6454 socket: ArtDmx -> routeFrame, and the RDM opcodes
+            // (ArtPoll/ArtTodRequest/ArtTodControl/ArtRdm) queued to the DMX task. Then flush
+            // any ArtTodData / ArtRdm replies the DMX task produced. Bounded per call.
+            artRdmPollRx();
+            artRdmDrainResponses();
+#else
             // Drain all queued Art-Net packets (bounded) so a socket backlog catches up
             // to the newest frame. read() runs onArtDmx per ART_DMX, returns 0 when empty.
             if (cfg.protocol != 1)
                 for (int n = 0; n < 64 && artnet.read(); ++n) { }
+#endif
             if (cfg.protocol != 0) readSacn();
         }
         ArduinoOTA.handle();
