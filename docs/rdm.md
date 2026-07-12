@@ -3,6 +3,19 @@
 Add **RDM** to LuxDMX: auto-discovery + bidirectional comms, on top of the existing
 Art-Net / sACN → DMX output.
 
+> **Status (implemented).** RDM is built. The controller no longer rides on esp_dmx — it's a
+> self-contained **RMT-TX + UART-RX** engine (`src/rdm_rmt.h`) that shares the DMX output's RMT
+> channel: it transmits DISC/GET/SET requests through RMT, flips the transceiver's DE/RE (a plain
+> GPIO) to receive, and reads the reply on a dedicated RX-only UART. No peripheral install/teardown
+> per transaction, so nothing leaks or stalls the DMX clock. Discovery is an **iterative** binary
+> search (an explicit range stack, not recursion — a 48-deep recursion overflowed the DMX task
+> stack and reset the board) and re-reads a garbled branch before calling it a collision, so a stray
+> bit flip on a lone fixture doesn't split forever. Trigger it over HTTP (`/rdm/discover`,
+> `/rdm/setaddr`, `/rdm/identify`) or the web UI. Validated on the RP2350 responder rig: discovery +
+> GET DEVICE_INFO / SW_VERSION_LABEL + SET address / identify all round-trip. This design doc below
+> is the original plan and the hardware/transceiver background — still accurate except that the
+> firmware path is now RMT, not esp_dmx.
+
 > **TL;DR** — RDM needs a transceiver whose **DE/RE (direction) pin is controlled by a GPIO**,
 > plus galvanic isolation and a 120 Ω terminator. The current **Waveshare TTL→RS485 (C)** is
 > *auto-direction* and **cannot do RDM**. **Note:** Amazon.de/eBay.de don't sell RDM-capable *isolated*

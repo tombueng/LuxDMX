@@ -271,7 +271,8 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 | Library | Purpose |
 |---|---|
-| `someweisguy/esp_dmx ^4.1` | DMX512 transmit via UART |
+| built-in RMT (`dmx_rmt.h`) | DMX512 transmit — frames clocked out of the RMT peripheral so they survive the RMII-Ethernet DMA contention (issue #64). Paired with `rdm_rmt.h` for an esp_dmx-free RDM controller (RMT-TX + UART-RX, DE as GPIO). |
+| `someweisguy/esp_dmx ^4.1` | Fallback DMX/RDM path for the Wokwi sim build (the hardware envs use the RMT path via `-DDMX_RMT`) |
 | `rstephan/ArtnetWifi ^1.5` | Art-Net UDP receiver (port 6454) |
 | `tzapu/WiFiManager ^2.0` | WiFi config portal |
 | `ESP32Async/ESPAsyncWebServer` | Non-blocking HTTP server + WebSocket (port 80) |
@@ -584,6 +585,10 @@ values are fetched as JSON.
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
 | `/labels.json` | GET | Channel labels object |
 | `/labels` | POST | Store the full labels object (JSON body) |
+| `/rdm.json` | GET | RDM controller state + discovered fixtures (TOD) |
+| `/rdm/discover` | GET | Trigger an RDM discovery sweep on the bus (`{ok,op}`) |
+| `/rdm/setaddr` | GET | Set a fixture's DMX start address — `?uid=MMMM:DDDDDDDD&addr=1..512` |
+| `/rdm/identify` | GET | Toggle a fixture's identify — `?uid=MMMM:DDDDDDDD&on=0/1` |
 | `/version.json` | GET | Current firmware version + update-available flag |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
@@ -840,8 +845,10 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 driver is compiled into every build. In **`/config` &rarr; Wired Ethernet** turn on
 **Use a W5500 Ethernet module** (off by default), set its pins, then enable **Use wired Ethernet**.
 Pins default to the classic-ESP32 VSPI set (CS=5 / SCK=18 / MOSI=23 / MISO=19 / INT=4 / RST=25) and
-are fully configurable (with the on-board pin-picker); lower the SPI clock there if a long-wired
-module isn't detected. No special build is needed.
+are fully configurable (with the on-board pin-picker). The **SPI clock** is set by **W5500 SPI MHz**
+(`ethfreq`, default **20**, range 1 to 80); 20 MHz is fine on a real board, but drop it to ~8 MHz if the
+module is on long flying leads and isn't detected (the bring-up can otherwise hang). No special build
+is needed.
 
 On a **classic ESP32** the card also shows a **Wired PHY** selector: pick the **W5500 (SPI module)**
 or the **ESP32 built-in MAC + RMII PHY** (the WT32-ETH01 style). The S3 has no internal MAC, so it
@@ -865,6 +872,9 @@ management / clock / power pins, so a DMX or LED pin that lands on one is flagge
 > preprocessor reads as 0, so it was compiled out (null peripheral pointer). That, plus an ESP-IDF 5.x
 > fix (the removed `uart_periph_signal[].module` field) needed once the firmware moved to
 > **arduino-esp32 v3**, is applied by a build-time patch in [`extra_scripts.py`](extra_scripts.py).
+> The hardware builds now clock DMX out of the **RMT** peripheral (`dmx_rmt.h`, `-DDMX_RMT`) instead
+> of the UART, which sidesteps this esp_dmx UART2 issue entirely; the patch only matters for the
+> Wokwi sim build that still uses esp_dmx.
 
 **ESP32-S3 — safe GPIOs for a 2nd output:** free choices are **5, 6, 7, 8, 15, 18, 21**. Avoid
 **26–37** (SPI flash / octal PSRAM — *will* crash), **19/20** (USB), **43/44** (serial console),

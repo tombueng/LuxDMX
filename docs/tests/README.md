@@ -61,6 +61,7 @@ They always restore the original configuration afterwards.
 | `multi-output.spec.mjs` | Issue #4: `outputs[2]` shape, migration, RDM binding, UI; splitter + pin-less-output regression (opt-in) |
 | `ota-update.spec.mjs` | `/ota/status` shape; home-page Update button → install popup → progress dialog shows the real phase/percent and only reloads onto the live page once the device reports the new version (full flash→update→restore cycle is opt-in) |
 | `signal-loss.spec.mjs` | Per-output signal-loss policy: `/info` loss field + `/config` selector; after the 2.5 s source timeout HOLD keeps the frame, BLACKOUT zeros it, STOP holds (not zero), over Art-Net + sACN; persistence across reboot (opt-in) |
+| `rdm-trigger.spec.mjs` | Issue #64 RMT DMX + esp_dmx-free RDM: `/rdm.json` controller shape; the HTTP RDM trigger endpoints (`/rdm/discover`, `/rdm/setaddr`, `/rdm/identify`) — param validation returns 400, valid calls queue a bus action and return `{ok,op}` (opt-in). The RMT framing win and on-wire discovery/GET/SET are validated on the RP2350 rig, not here (see note). |
 
 ## Notes
 
@@ -73,6 +74,18 @@ They always restore the original configuration afterwards.
   wire, so it needs a logic analyzer on the TX pin and is out of e2e scope.
 - Tests run serially (`workers: 1`) since they share one physical device, and
   network specs reset manual override so they don't interfere with each other.
+- **RMT DMX + RDM on the wire (issue #64)** can't be exercised by Playwright: the
+  whole point — DMX clocked out of the RMT peripheral so frames survive the RMII
+  Ethernet DMA contention (0 framing errors under load), and E1.20 discovery /
+  GET / SET timing inside the ~2 ms turnaround — is only observable on the bus.
+  It's validated on the RP2350 rig (a PIO framing analyzer cross-checked against a
+  hardware-UART ground truth, plus a 64-fixture RDM responder with a fuzz engine):
+  clean 40.0 Hz / 0 framing errors on both taps, discovery + GET/SET round-trips,
+  and **sensor polling** (GET SENSOR_DEFINITION / SENSOR_VALUE, where the
+  responder exposes a drifting temperature sensor and the controller reads it
+  back into `/rdm.json` `sensors[]`). Cross-checked on both the WT32-ETH01 (internal RMII)
+  and the ESP32-S3 + W5500 wiring (see `docs/rig-wiring-*.md`).
+  `rdm-trigger.spec.mjs` covers the REST surface that *is* web-observable.
 - **DHCP hostname (option 12)** can't be exercised by this suite: the device
   advertising its hostname only has a visible effect on the *router's* DNS, which
   needs a real DHCP server, so it's out of e2e scope. It was verified by HIL

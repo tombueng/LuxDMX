@@ -19,6 +19,7 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
+#include <esp_task_wdt.h>  // reconfigure the task WDT to not reboot the gateway under a network flood
 // Schema-driven config engine (src/config/). config_schema.h defines the Config +
 // DmxOutput structs + MAX_OUTPUTS (moved here out of main.cpp); config_core.h is
 // the transport-agnostic load/save/setValue/toJson engine the handlers drive. The
@@ -105,6 +106,11 @@
 #include <Update.h>
 #include <ArtnetWifi.h>
 #include <esp_dmx.h>
+#ifdef DMX_RMT
+#include "dmx_rmt.h"
+static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64 hard-zero path)
+#include "rdm_rmt.h"                    // RDM controller on RMT-TX + UART-RX (no esp_dmx, no interrupt leak)
+#endif
 #include <rdm/controller.h>             // RDM controller: discovery + GET/SET
 #include <rdm/controller/include/utils.h>  // rdm_send_request() for sensor PIDs
 #include <rdm/include/uid.h>            // rdm_uid_is_eq() and friends
@@ -424,6 +430,11 @@ static uint32_t outFrameCount[MAX_OUTPUTS]  = {0};
 static uint32_t outLastFrameMs[MAX_OUTPUTS] = {0};
 static uint32_t outLastDmxMs[MAX_OUTPUTS]   = {0};
 static float    outFps[MAX_OUTPUTS]         = {0.0f};
+// Real DMX OUTPUT (transmit) rate per output, counted in sendDmx (the DMX task) and rolled up
+// once a second. This is what "outfps" should report -- the rate we actually clock onto the
+// wire (a steady ~40 Hz), independent of the input frame rate.
+static volatile uint32_t txFrames[MAX_OUTPUTS] = {0};
+static float    outTxFps[MAX_OUTPUTS]       = {0.0f};
 // True while no live source feeds this output's universe. Drives the per-output
 // signal-loss policy (LOSS_*). Starts true: a freshly booted node has no source
 // yet, so a STOP-configured output stays dark until one appears.
@@ -716,10 +727,21 @@ static int viewOutput() {
     return 0;
 }
 
+// Clock every enabled output out for one DMX frame. The two DMX UARTs are independent
+// hardware, so we fire ALL of them first (dmx_write + dmx_send) and only THEN wait for
+// them to finish -- both frames transmit CONCURRENTLY. With two outputs that is ~one
+// frame time (~23 ms) instead of ~46 ms, so each output holds ~40 Hz instead of dropping
+// to ~20 Hz (issue #64). Runs from the dedicated high-priority dmxTxTask (see below), the
+// sole owner of the DMX ports, so its break/MAB timing is never preempted by loop().
 static void sendDmx() {
     if (!dmxReady) return;
     bool ovActive = identifyCh && millis() < identifyUntil;
     int  vo = viewOutput();
+    dmx_port_t sentPort[MAX_OUTPUTS]; int nSent = 0;
+#ifdef DMX_RMT
+    int rmtSent[MAX_OUTPUTS]; int nRmt = 0;
+#endif
+    // Phase 1: write + kick off every output that should clock this frame.
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!outReady[i]) continue;
         // Identify override: force one channel to full on the wire only (on the
@@ -730,13 +752,66 @@ static void sendDmx() {
         // identify are explicit user intent and keep the line clocking.
         if (cfg.outputs[i].lossMode == LOSS_STOP && outSrcLost[i]
             && !ov && !(manualMode && i == vo)) continue;
-        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         uint8_t saved = 0;
         if (ov) { saved = dmxBuf[i][identifyCh]; dmxBuf[i][identifyCh] = 255; }
+#ifdef DMX_RMT
+        {   // RMT-driven output -> kick (async), streams out in hardware. The RDM output stays on
+            // RMT too: RDM requests go out via RMT and responses come back on a RX-only UART, so
+            // there is never a switch and DMX output on this pin is uninterrupted between RDM ops.
+            rmtDmxKick(&g_rmt[i], dmxBuf[i], DMX_PACKET_SIZE);
+            if (ov) dmxBuf[i][identifyCh] = saved;
+            rmtSent[nRmt++] = i;
+            txFrames[i]++;                 // count real transmitted frames for the output-fps stat
+            continue;
+        }
+#endif
+        dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         dmx_write(port, dmxBuf[i], DMX_PACKET_SIZE);
         dmx_send(port);
-        dmx_wait_sent(port, DMX_TIMEOUT_TICK);
         if (ov) dmxBuf[i][identifyCh] = saved;
+        sentPort[nSent++] = port;
+        txFrames[i]++;                         // count real transmitted frames for the output-fps stat
+    }
+    // Phase 2: wait for the concurrent transmissions to complete.
+    for (int k = 0; k < nSent; k++) dmx_wait_sent(sentPort[k], DMX_TIMEOUT_TICK);
+#ifdef DMX_RMT
+    for (int k = 0; k < nRmt; k++) rmtDmxWait(&g_rmt[rmtSent[k]]);
+#endif
+}
+
+// Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
+// strict 25 ms cadence (vTaskDelayUntil, 40 Hz) at high priority pinned to core 1, so a
+// burst of Art-Net/sACN packet processing in loop() (also core 1) can NEVER delay or jitter
+// the DMX break/frame timing. Combined with the EMAC bring-up moved to core 0 (ethRmiiUpTask),
+// nothing on core 1 -- neither tasks nor the wired-Ethernet ISR -- can disturb the transmit.
+// This task is the SOLE owner of the DMX ports: it also services RDM (a no-op unless a
+// direction-enable pin is configured), so loop() never touches the bus.
+static TaskHandle_t g_dmxTask = nullptr;
+static void rdmService();   // fwd decl (defined below, next to the RDM controller)
+static void netRxTask(void*);   // fwd decl (defined below, next to loop() -- runs on core 0)
+
+// (No RMT<->esp_dmx switch: in the DMX_RMT build the RDM output stays on RMT permanently. RDM
+// requests are sent via RMT and responses read on a RX-only UART -- see rdm_rmt.h. Nothing is
+// ever installed/deleted at runtime, so the esp_dmx interrupt-leak path is gone entirely.)
+
+static void dmxTxTask(void*) {
+    const TickType_t period = pdMS_TO_TICKS(25);        // 40 Hz
+    TickType_t next = xTaskGetTickCount();
+    uint32_t fpsWin = millis();
+    for (;;) {
+        vTaskDelayUntil(&next, period);                 // precise period, immune to loop() load
+        if (identifyCh && millis() >= identifyUntil) identifyCh = 0;
+        rdmService();                                   // queued RDM request (bus owner); no-op otherwise
+        sendDmx();                                      // clock outputs out, concurrently
+        // Roll up the real transmitted-frame rate once a second (for the "outfps" stat).
+        const uint32_t now = millis();
+        if (now - fpsWin >= 1000) {
+            for (int i = 0; i < MAX_OUTPUTS; i++) {
+                outTxFps[i] = txFrames[i] * 1000.0f / (float)(now - fpsWin);
+                txFrames[i] = 0;
+            }
+            fpsWin = now;
+        }
     }
 }
 
@@ -841,13 +916,41 @@ static bool rdmParseUid(const String& msg, rdm_uid_t& out) {
     return true;
 }
 
+// ---- RDM transport adapter -------------------------------------------------------------
+// The DMX_RMT build talks RDM over RMT-TX + a RX-only UART (rdm_rmt.h); other builds use the
+// esp_dmx controller. Both back ends present this same small op-set to the app layer below, so
+// dropping esp_dmx later is just deleting the #else half.
+#ifdef DMX_RMT
+static int  rdmOpDiscover(rdm_uid_t* u, int max)                                      { return rdmRmtDiscover(u, max); }
+static bool rdmOpDeviceInfo(const rdm_uid_t& uid, rdm_device_info_t* i, rdm_ack_t* a) { return rdmRmtGetDeviceInfo(uid, i, a); }
+static bool rdmOpSwLabel(const rdm_uid_t& uid, char* b, size_t n, rdm_ack_t* a)       { return rdmRmtGetSwLabel(uid, b, n, a); }
+static bool rdmOpSensorDef(const rdm_uid_t& uid, uint8_t s, rdm_sensor_definition_t* d, rdm_ack_t* a) { return rdmRmtGetSensorDef(uid, s, d, a); }
+static bool rdmOpSensorVal(const rdm_uid_t& uid, uint8_t s, rdm_sensor_value_t* v, rdm_ack_t* a)      { return rdmRmtGetSensorValue(uid, s, v, a); }
+static bool rdmOpSetAddr(const rdm_uid_t& uid, uint16_t addr, rdm_ack_t* a)           { return rdmRmtSetStartAddr(uid, addr, a); }
+static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)             { return rdmRmtSetIdentify(uid, on, a); }
+#else
+static dmx_port_t rdmPort() { return (dmx_port_t)cfg.outputs[rdmOut].port; }
+static int  rdmOpDiscover(rdm_uid_t* u, int max)                                      { return rdm_discover_devices_simple(rdmPort(), u, max); }
+static bool rdmOpDeviceInfo(const rdm_uid_t& uid, rdm_device_info_t* i, rdm_ack_t* a) { return rdm_send_get_device_info(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, i, a); }
+static bool rdmOpSwLabel(const rdm_uid_t& uid, char* b, size_t n, rdm_ack_t* a)       { return rdm_send_get_software_version_label(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, b, n, a); }
+static bool rdmOpSensorDef(const rdm_uid_t& uid, uint8_t s, rdm_sensor_definition_t* d, rdm_ack_t* a) {
+    rdm_request_t req = { (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND, RDM_PID_SENSOR_DEFINITION, "b$", &s, 1 };
+    return rdm_send_request(rdmPort(), &req, "bbbbwwwwba$", d, sizeof(*d), a);
+}
+static bool rdmOpSensorVal(const rdm_uid_t& uid, uint8_t s, rdm_sensor_value_t* v, rdm_ack_t* a) {
+    rdm_request_t req = { (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND, RDM_PID_SENSOR_VALUE, "b$", &s, 1 };
+    return rdm_send_request(rdmPort(), &req, "bwwww$", v, sizeof(*v), a);
+}
+static bool rdmOpSetAddr(const rdm_uid_t& uid, uint16_t addr, rdm_ack_t* a)           { return rdm_send_set_dmx_start_address(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, addr, a); }
+static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)             { return rdm_send_set_identify_device(rdmPort(), (rdm_uid_t*)&uid, RDM_SUB_DEVICE_ROOT, on ? 1 : 0, a); }
+#endif
+
 // Full discovery sweep + per-device GET device-info & software-version label.
 // Blocks the bus for the duration (~hundreds of ms) — DMX output pauses briefly.
 static void rdmDoDiscover() {
-    dmx_port_t port = (dmx_port_t)cfg.outputs[rdmOut].port;
     rdmBusy = true;
     rdm_uid_t uids[RDM_MAX_DEVICES];
-    int n = rdm_discover_devices_simple(port, uids, RDM_MAX_DEVICES);
+    int n = rdmOpDiscover(uids, RDM_MAX_DEVICES);
     if (n > RDM_MAX_DEVICES) n = RDM_MAX_DEVICES;
     rdmCount = 0;
     for (int i = 0; i < n; i++) {
@@ -855,8 +958,7 @@ static void rdmDoDiscover() {
         d.uid = uids[i];
         rdm_ack_t ack;
         rdm_device_info_t info;
-        if (rdm_send_get_device_info(port, &uids[i], RDM_SUB_DEVICE_ROOT, &info, &ack)
-            && ack.type == RDM_RESPONSE_TYPE_ACK) {
+        if (rdmOpDeviceInfo(uids[i], &info, &ack) && ack.type == RDM_RESPONSE_TYPE_ACK) {
             d.startAddr        = info.dmx_start_address;
             d.footprint        = info.footprint;
             d.modelId          = info.model_id;
@@ -866,8 +968,7 @@ static void rdmDoDiscover() {
             d.sensorCount      = info.sensor_count > RDM_MAX_SENSORS
                                      ? RDM_MAX_SENSORS : info.sensor_count;
         }
-        rdm_send_get_software_version_label(port, &uids[i], RDM_SUB_DEVICE_ROOT,
-                                            d.swLabel, sizeof(d.swLabel), &ack);
+        rdmOpSwLabel(uids[i], d.swLabel, sizeof(d.swLabel), &ack);
 
         // Sensors (E1.20): per sensor read its definition (name/unit) then value.
         // Sensors are numbered 0..count-1; definition and value are independent —
@@ -878,20 +979,14 @@ static void rdmDoDiscover() {
             uint8_t   sn = s;
 
             rdm_sensor_definition_t def = {};
-            rdm_request_t dreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
-                                   RDM_PID_SENSOR_DEFINITION, "b$", &sn, 1 };
-            if (rdm_send_request(port, &dreq, "bbbbwwwwba$", &def, sizeof(def), &sack)
-                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+            if (rdmOpSensorDef(uids[i], sn, &def, &sack) && sack.type == RDM_RESPONSE_TYPE_ACK) {
                 strlcpy(sen.name, def.description[0] ? def.description : rdmTypeStr(def.type),
                         sizeof(sen.name));
                 strlcpy(sen.unit, rdmUnitStr(def.unit), sizeof(sen.unit));
             }
 
             rdm_sensor_value_t val = {};
-            rdm_request_t vreq = { &uids[i], RDM_SUB_DEVICE_ROOT, RDM_CC_GET_COMMAND,
-                                   RDM_PID_SENSOR_VALUE, "b$", &sn, 1 };
-            if (rdm_send_request(port, &vreq, "bwwww$", &val, sizeof(val), &sack)
-                && sack.type == RDM_RESPONSE_TYPE_ACK) {
+            if (rdmOpSensorVal(uids[i], sn, &val, &sack) && sack.type == RDM_RESPONSE_TYPE_ACK) {
                 sen.value = val.present_value;
                 sen.valid = true;
                 if (!sen.name[0]) strlcpy(sen.name, "Sensor", sizeof(sen.name));
@@ -905,16 +1000,16 @@ static void rdmDoDiscover() {
     Serial.printf("[RDM] discovery: %d device(s)\n", rdmCount);
 }
 
-// Called once per loop() iteration; does work only when a request is queued.
+// Called once per DMX cycle from the DMX task (the sole bus owner); does work only when a
+// request is queued. On the DMX_RMT build this runs the whole RDM transaction over RMT-TX +
+// UART-RX inline -- no peripheral switch, the RDM output never leaves RMT.
 static void rdmService() {
     if (!rdmAvailable()) return;
-    dmx_port_t port = (dmx_port_t)cfg.outputs[rdmOut].port;
     rdm_ack_t ack;
 
     if (rdmSetAddrReq) {
         rdmSetAddrReq = false;
-        if (rdm_send_set_dmx_start_address(port, &rdmSetUid, RDM_SUB_DEVICE_ROOT,
-                                           rdmReqAddr, &ack)) {
+        if (rdmOpSetAddr(rdmSetUid, rdmReqAddr, &ack)) {
             RdmDevice* d = rdmFind(rdmSetUid);
             if (d) d->startAddr = rdmReqAddr;
             Serial.printf("[RDM] set " UIDSTR " addr=%u\n", UID2STR(rdmSetUid), rdmReqAddr);
@@ -922,8 +1017,7 @@ static void rdmService() {
     }
     if (rdmIdentifyReq) {
         rdmIdentifyReq = false;
-        if (rdm_send_set_identify_device(port, &rdmIdentUid, RDM_SUB_DEVICE_ROOT,
-                                         rdmReqOn ? 1 : 0, &ack)) {
+        if (rdmOpSetIdentify(rdmIdentUid, rdmReqOn, &ack)) {
             RdmDevice* d = rdmFind(rdmIdentUid);
             if (d) d->identifying = rdmReqOn;
         }
@@ -1097,8 +1191,10 @@ static void maybeLog(int outIdx, const uint8_t* cur, uint16_t len, uint32_t ip, 
 // Per-output frame rate: the live value, or 0 once that output's input has
 // stalled (>1.5 s), so a dead universe reads 0.0 instead of a stale rate. Used by
 // the WS push, dmx.json and the status display.
+// The rate we actually clock onto the DMX wire (steady ~40 Hz while an output is ready),
+// counted from the transmit side -- not the input frame rate. 0 when the output isn't running.
 static float outFpsLive(int i) {
-    return (millis() - outLastDmxMs[i] < 1500) ? outFps[i] : 0.0f;
+    return (i >= 0 && i < MAX_OUTPUTS && outReady[i]) ? outTxFps[i] : 0.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -1111,7 +1207,10 @@ static float outFpsLive(int i) {
 // ---------------------------------------------------------------------------
 static void wsPush() {
     if (ws.count() == 0) return;
-    if (ESP.getFreeHeap() < 40000) return;   // never push under heap pressure
+    // Skip under heap pressure. getFreeHeap() alone is not enough: the async WS send copies
+    // the frame into a make_shared<vector> that needs ONE CONTIGUOUS block, so a fragmented
+    // heap (heavy under a packet flood) can throw bad_alloc even with lots of total free.
+    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 12000) return;
     uint16_t fpsI  = (uint16_t)(fps * 10.0f);
     // rssi field carries the active link: <=0 WiFi STA dBm, >=10 wired Ethernet
     // link speed in Mbps, 1 standalone AP. Lets the navbar show WiFi/LAN/AP live.
@@ -1141,7 +1240,11 @@ static void wsPush() {
     }
     // Only push if the async TCP queues have room, so a slow client never
     // backs up memory or blocks.
-    if (ws.availableForWriteAll()) ws.binaryAll(wsBuf, WS_FRAME_LEN);
+    // Belt-and-suspenders: a failed async allocation inside the WS stack throws std::bad_alloc;
+    // catching it degrades a push to a no-op instead of letting the uncaught throw abort() the CPU.
+    if (ws.availableForWriteAll()) {
+        try { ws.binaryAll(wsBuf, WS_FRAME_LEN); } catch (...) {}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1395,7 +1498,10 @@ static void readSacnSocket(int outIdx) {
     // Drain all packets buffered since the last call (catches up after any gap)
     for (int guard = 0; guard < 16; guard++) {
         int pktLen = udp.parsePacket();
-        if (pktLen < SACN_MIN_LEN) return;
+        if (pktLen <= 0) return;                          // nothing pending
+        // A runt packet (stray multicast, IGMP artefact, port scan) must still be CONSUMED, else it
+        // lingers in the socket and every subsequent parsePacket() re-logs a NetworkUdp error -> flood.
+        if (pktLen < SACN_MIN_LEN) { udp.read(sacnBuf, sizeof(sacnBuf)); continue; }
         uint32_t senderIp = (uint32_t)udp.remoteIP();
         int n = udp.read(sacnBuf, sizeof(sacnBuf));
         if (n < SACN_MIN_LEN) continue;
@@ -1412,7 +1518,12 @@ static void readSacnSocket(int outIdx) {
         if (frameVec != 0x00000002u) continue;
         uint16_t universe = ((uint16_t)sacnBuf[SACN_UNIVERSE_OFF] << 8)
                            | sacnBuf[SACN_UNIVERSE_OFF + 1];
-        if ((int)universe != cfg.outputs[outIdx].universe + 1) continue;
+        // Do NOT reject by this socket's output universe. All the per-output sACN sockets share
+        // port 5568 (SO_REUSEADDR), and lwIP hands a UNICAST sACN packet to just one of them --
+        // often not the socket whose multicast group matches. Rejecting here dropped unicast sACN
+        // whenever >1 output was enabled (uni-1 landing on the uni-2 socket, etc.). Route by the
+        // packet's own universe instead: routeFrame() maps universe -> the matching output(s), and
+        // ignores a universe no output listens to. Multicast still works (each group -> its joiner).
         if (sacnBuf[SACN_STARTCODE_OFF] != 0x00) continue;
         uint8_t priority = sacnBuf[SACN_PRIORITY_OFF];
         routeFrame((int)universe - 1, sacnBuf + SACN_DATA_OFF, 512, senderIp, 1, priority);
@@ -1434,6 +1545,23 @@ static bool argStr(AsyncWebServerRequest* req, const char* n, String& out) {
     return false;
 }
 
+// Sending a dynamically-built JSON body allocates a response buffer of ~body.length(); under heap
+// pressure that operator new throws std::bad_alloc, and an uncaught throw inside the AsyncTCP task
+// aborts the board. That rebooted the gateway when the web UI polled /rdm.json (which grows with the
+// number of discovered fixtures) or /dmx.json while the heap was low under load. Guard on the largest
+// free block, and catch as a hard backstop, so a status poll degrades to a 503 instead of a reboot.
+static void sendJsonSafe(AsyncWebServerRequest* req, const String& body) {
+    if ((int)ESP.getMaxAllocHeap() < (int)body.length() + 12000) {
+        try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {}
+        return;
+    }
+    try {
+        req->send(200, "application/json", body);
+    } catch (...) {
+        try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {}
+    }
+}
+
 static void handleVersionJson(AsyncWebServerRequest* req) {
     String j = "{\"current\":\"";
     j += FIRMWARE_VERSION;
@@ -1442,7 +1570,7 @@ static void handleVersionJson(AsyncWebServerRequest* req) {
     j += "\",\"update\":";
     j += updateAvailable ? "true" : "false";
     j += "}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
 static String sendersJson() {
@@ -1493,20 +1621,26 @@ static String logJson() {
     return j;
 }
 
-static void handleSendersJson(AsyncWebServerRequest* req) { req->send(200, "application/json", sendersJson()); }
-static void handleLogJson(AsyncWebServerRequest* req)     { req->send(200, "application/json", logJson()); }
+static void handleSendersJson(AsyncWebServerRequest* req) { sendJsonSafe(req, sendersJson()); }
+static void handleLogJson(AsyncWebServerRequest* req)     { sendJsonSafe(req, logJson()); }
 
 // Push senders + log over the WebSocket (one persistent connection) so the
 // browser doesn't have to poll two HTTP endpoints every 2 s.
 static void wsPushMeta() {
     if (ws.count() == 0 || !ws.availableForWriteAll()) return;
-    if (ESP.getFreeHeap() < 40000) return;   // never push under heap pressure
-    String m = "{\"meta\":1,\"senders\":";
-    m += sendersJson();
-    m += ",\"log\":";
-    m += logJson();
-    m += "}";
-    ws.textAll(m);
+    // The meta JSON is several KB and the WS send needs a contiguous block for it, so guard on
+    // the LARGEST free block, not just total free: under a flood the heap fragments and total
+    // free (~100 KB) stays high while the biggest block shrinks, which is how ws.textAll() threw
+    // bad_alloc and abort()ed the board. try/catch is the hard backstop against that reboot.
+    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 24000) return;
+    try {
+        String m = "{\"meta\":1,\"senders\":";
+        m += sendersJson();
+        m += ",\"log\":";
+        m += logJson();
+        m += "}";
+        ws.textAll(m);
+    } catch (...) {}
 }
 
 // Static pages are served straight from PROGMEM (zero heap). Dynamic values
@@ -1629,33 +1763,70 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"board\":\"";    j += BOARD_ID;               j += "\",";
     j += "\"mcu\":\"";      j += MCU_ID;                 j += "\"";
     j += "}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
+// /dmx.json is ~2.3 KB (the 512-channel array dominates). Building it as one String and letting
+// AsyncWebServer copy that into a single contiguous send buffer needs a big contiguous block -- which
+// fails on a fragmented heap (the ESP32-S3 allocator keeps lots of total free but a small largest
+// block, esp-idf #13588) and used to abort the board. So stream it instead: only the small header is
+// a String; the channel array is generated on demand straight into AsyncWebServer's own ~1.4 KB
+// segment buffer. No large contiguous allocation is ever needed, so the endpoint stays up even when
+// the heap is badly fragmented (and never has to fall back to a 503).
 static void handleDmxJson(AsyncWebServerRequest* req) {
-    String j;
-    j.reserve(2300);
+    struct DmxJson {
+        String head;                     // everything up to and including `"ch":[`  (~150 bytes)
+        int    out    = 0;
+        size_t headOff = 0;
+        int    ch     = 1;               // 1..512
+        char   cur[8]; size_t curLen = 0, curOff = 0;
+        int    phase  = 0;               // 0 head, 1 channels, 2 footer, 3 done
+        size_t footOff = 0;
+    };
+    std::shared_ptr<DmxJson> s;
+    try { s = std::make_shared<DmxJson>(); } catch (...) {}
+    if (!s) { try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {} return; }
+    s->out = viewOutput();
     char buf[32];
     snprintf(buf, sizeof(buf), "%.1f", fps);
-    j  = "{\"fps\":";    j += buf;
-    j += ",\"outfps\":[";
+    s->head  = "{\"fps\":"; s->head += buf; s->head += ",\"outfps\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         snprintf(buf, sizeof(buf), "%.1f", outFpsLive(i));
-        if (i) j += ',';
-        j += buf;
+        if (i) s->head += ',';
+        s->head += buf;
     }
-    j += "]";
-    j += ",\"rssi\":";   j += netRSSI();
-    j += ",\"up\":\"";   j += uptimeStr();
-    j += "\",\"heap\":"; j += ESP.getFreeHeap();
-    j += ",\"manual\":"; j += manualMode ? "true" : "false";
-    j += ",\"ch\":[";
-    for (int i = 1; i <= 512; i++) {
-        j += dmxBuf[viewOutput()][i];
-        if (i < 512) j += ',';
-    }
-    j += "]}";
-    req->send(200, "application/json", j);
+    s->head += "],\"rssi\":";  s->head += netRSSI();
+    s->head += ",\"up\":\"";   s->head += uptimeStr();
+    s->head += "\",\"heap\":"; s->head += ESP.getFreeHeap();
+    s->head += ",\"manual\":"; s->head += manualMode ? "true" : "false";
+    s->head += ",\"ch\":[";
+    req->sendChunked("application/json", [s](uint8_t* b, size_t maxLen, size_t) -> size_t {
+        size_t n = 0;
+        if (s->phase == 0) {                         // stream the small header
+            while (s->headOff < s->head.length() && n < maxLen) b[n++] = (uint8_t)s->head[s->headOff++];
+            if (s->headOff < s->head.length()) return n;
+            s->phase = 1;
+        }
+        if (s->phase == 1) {                         // stream the 512 channel values
+            while (n < maxLen) {
+                if (s->curOff >= s->curLen) {        // load the next channel token
+                    if (s->ch > 512) { s->phase = 2; break; }
+                    s->curLen = snprintf(s->cur, sizeof(s->cur), s->ch < 512 ? "%d," : "%d",
+                                         dmxBuf[s->out][s->ch]);
+                    s->curOff = 0; s->ch++;
+                }
+                while (s->curOff < s->curLen && n < maxLen) b[n++] = (uint8_t)s->cur[s->curOff++];
+            }
+            if (s->phase == 1) return n;             // buffer full mid-array; resume next call
+        }
+        if (s->phase == 2) {                         // closing "]}"
+            static const char foot[] = "]}";
+            while (s->footOff < 2 && n < maxLen) b[n++] = (uint8_t)foot[s->footOff++];
+            if (s->footOff < 2) return n;
+            s->phase = 3;
+        }
+        return n;                                    // phase 3: next call returns 0 -> complete
+    });
 }
 
 // Escape a fixture-supplied string for safe inclusion in JSON.
@@ -1667,6 +1838,42 @@ static String rdmJsonEsc(const char* s) {
         else if ((uint8_t)c >= 0x20)  o += c;
     }
     return o;
+}
+
+// HTTP trigger for RDM ops -- a reliable, scriptable alternative to the WS control channel (the WS
+// path drops triggers under load; this never does). Used by the e2e tests and bench tooling.
+//   GET /rdm/discover
+//   GET /rdm/setaddr?uid=MMMM:DDDDDDDD&addr=N
+//   GET /rdm/identify?uid=MMMM:DDDDDDDD&on=1
+static void handleRdmTrigger(AsyncWebServerRequest* req) {
+    const String path = req->url();
+    if (path.endsWith("/discover")) {
+        rdmDiscoverReq = true;
+        req->send(200, "application/json", "{\"ok\":true,\"op\":\"discover\"}");
+        return;
+    }
+    if (req->hasParam("uid")) {
+        String us = req->getParam("uid")->value();
+        int colon = us.indexOf(':');
+        if (colon > 0) {
+            rdm_uid_t u;
+            u.man_id = (uint16_t)strtoul(us.substring(0, colon).c_str(), nullptr, 16);
+            u.dev_id = (uint32_t)strtoul(us.substring(colon + 1).c_str(), nullptr, 16);
+            if (path.endsWith("/setaddr") && req->hasParam("addr")) {
+                int a = req->getParam("addr")->value().toInt();
+                if (a >= 1 && a <= 512) {
+                    rdmSetUid = u; rdmReqAddr = (uint16_t)a; rdmSetAddrReq = true;
+                    req->send(200, "application/json", "{\"ok\":true,\"op\":\"setaddr\"}"); return;
+                }
+            } else if (path.endsWith("/identify")) {
+                rdmIdentUid = u;
+                rdmReqOn = req->hasParam("on") && req->getParam("on")->value().toInt() != 0;
+                rdmIdentifyReq = true;
+                req->send(200, "application/json", "{\"ok\":true,\"op\":\"identify\"}"); return;
+            }
+        }
+    }
+    req->send(400, "application/json", "{\"ok\":false}");
 }
 
 static void handleRdmJson(AsyncWebServerRequest* req) {
@@ -1704,7 +1911,7 @@ static void handleRdmJson(AsyncWebServerRequest* req) {
         j += "]}";
     }
     j += "]}";
-    req->send(200, "application/json", j);
+    sendJsonSafe(req, j);
 }
 
 static void handleConfigGet(AsyncWebServerRequest* req) {
@@ -1759,7 +1966,7 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
 // Channel labels — browser owns the JSON object, device just persists it
 // ---------------------------------------------------------------------------
 static void handleLabelsGet(AsyncWebServerRequest* req) {
-    req->send(200, "application/json", g_labels);
+    sendJsonSafe(req, g_labels);
 }
 
 // Body handler for POST /labels (raw JSON). Accumulates chunks then persists.
@@ -1833,18 +2040,32 @@ static int parseBuild(const String& v) {
 }
 
 static bool httpsGet(const char* url, String& out, size_t maxLen) {
-    WiFiClientSecure client;
-    client.setInsecure();
-    HTTPClient h;
-    h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    if (!h.begin(client, url)) return false;
-    bool ok = false;
-    if (h.GET() == 200) {
-        String s = h.getString();
-        s.trim();
-        if (s.length() > 0 && s.length() <= maxLen) { out = s; ok = true; }
+    // A TLS client allocates a big (~40 KB) contiguous block for the mbedTLS buffers. Under a
+    // packet flood the heap fragments; attempting the handshake then throws std::bad_alloc, and
+    // an uncaught throw abort()s the board. Worse, this runs 8 s after every boot, so during a
+    // flood it turns into a reboot loop. Skip when a big block isn't available, and catch as a
+    // hard backstop so a version check can never reboot the gateway.
+    if (ESP.getMaxAllocHeap() < 50000) {
+        Serial.printf("[VER] skipped: largest free block %u too small for TLS\n", ESP.getMaxAllocHeap());
+        return false;
     }
-    h.end();
+    bool ok = false;
+    try {
+        WiFiClientSecure client;
+        client.setInsecure();
+        HTTPClient h;
+        h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        if (!h.begin(client, url)) return false;
+        if (h.GET() == 200) {
+            String s = h.getString();
+            s.trim();
+            if (s.length() > 0 && s.length() <= maxLen) { out = s; ok = true; }
+        }
+        h.end();
+    } catch (...) {
+        Serial.println("[VER] check threw under memory pressure, skipped");
+        return false;
+    }
     return ok;
 }
 
@@ -1886,6 +2107,13 @@ static void doGithubOta() {
     // luxdmx.org/firmware/ota/<target>/<file> 301-redirects to the matching GitHub
     // release asset (releases/download/<target>/<file>) -- target is "latest" or a
     // "vX.Y.Z" tag, so per-version OTA / downgrade still works through the redirect.
+    // TLS + the OTA download need a big contiguous block; if the heap is fragmented (e.g. a flood
+    // is in progress) defer rather than throw bad_alloc and abort. No restart here, so this can't
+    // become a reboot loop while an auto-update keeps retrying under load.
+    if (ESP.getMaxAllocHeap() < 50000) {
+        Serial.printf("[OTA] deferred: largest free block %u too small\n", ESP.getMaxAllocHeap());
+        otaProgPhase = 3; dmxReady = true; return;
+    }
     String otaUrl = String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
@@ -1898,11 +2126,15 @@ static void doGithubOta() {
     });
     httpUpdate.onEnd([]()      { otaProgPhase = 2; otaProgPct = 100; });
     httpUpdate.onError([](int) { otaProgPhase = 3; });
-    WiFiClientSecure client;
-    client.setInsecure();
-    httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    httpUpdate.rebootOnUpdate(true);
-    httpUpdate.update(client, otaUrl);
+    try {
+        WiFiClientSecure client;
+        client.setInsecure();
+        httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        httpUpdate.rebootOnUpdate(true);
+        httpUpdate.update(client, otaUrl);
+    } catch (...) {
+        Serial.println("[OTA] update threw under memory pressure");
+    }
     // Only reaches here on failure (success reboots inside update()).
     otaProgPhase = 3;
     Serial.printf("[OTA] Failed (%d): %s\n",
@@ -2096,6 +2328,26 @@ static void initDmx() {
             continue;
         }
 
+#ifdef DMX_RMT
+        // Every output starts on the RMT peripheral -- hardware-sequenced frames, immune to
+        // core-0 network-DMA contention (issue #64 hard-zero). An RDM-capable output (has a DE
+        // pin, rtsPin >= 0) is switched RMT->esp_dmx on demand ONLY for an RDM transaction and
+        // back to RMT afterwards (see the DMX task), so it gets both immune DMX and RDM.
+        {
+            if (rmtDmxInit(&g_rmt[i], cfg.outputs[i].txPin)) {
+                outReady[i] = true; dmxReady = true;
+                if (firstEnabled) { monitorOut = i; firstEnabled = false; }
+                if (rdmOut < 0 && cfg.outputs[i].rtsPin >= 0) {                 // RDM-capable output
+                    rdmOut = i;
+                    // RDM runs on this same RMT channel for TX + a RX-only UART for responses.
+                    rdmRmtInit(&g_rmt[i], cfg.outputs[i].rtsPin, cfg.outputs[i].rxPin);
+                }
+                Serial.printf("[DMX] out%d ready (RMT%s): uni=%d tx=%d\n",
+                    i, cfg.outputs[i].rtsPin >= 0 ? "+RDM" : "", cfg.outputs[i].universe, cfg.outputs[i].txPin);
+            } else Serial.printf("[DMX] out%d RMT init FAILED\n", i);
+            continue;
+        }
+#endif
         dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
         dmx_config_t config = DMX_CONFIG_DEFAULT;
         dmx_driver_install(port, &config, nullptr, 0);
@@ -2492,15 +2744,34 @@ static eth_clock_mode_t rmiiClkMode(int idx) {
 // Bring up RMII Ethernet via the ESP32 internal EMAC. The PHY family, SMI address,
 // MDC/MDIO/PHY-power pins and REF_CLK mode are runtime config (cfg.rmii*); the RMII
 // data lines are fixed by the EMAC. Defaults reproduce the LAN8720/WT32-ETH01 wiring.
-static void startEthRmii() {
+//
+// The internal EMAC's RX interrupt is allocated on whichever core calls ETH.begin(), so
+// we bring it up from a task pinned to core 0 -- exactly like the W5500 path (ethUpTask)
+// -- to keep the EMAC interrupt off core 1, where the DMX transmit (sendDmx/dmx_send in
+// loop()) runs. Brought up inline in setup() the EMAC ISR lands on core 1, and a busy
+// wired link (Art-Net flood) then preempts the DMX break/frame timing enough to put
+// framing errors on the output (issue #64). Measured on the bench: idle 0 framing
+// errors, ~4.4/min under a heavy flood with the inline (core-1) bring-up.
+static volatile bool s_ethRmiiUpDone;
+static void ethRmiiUpTask(void *arg) {
     int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
-    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d\n",
-        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
     ETH.begin(rmiiPhyType(phy), cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio,
               cfg.rmiiPwr, rmiiClkMode(cfg.rmiiClk));
     ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link
     applyEthStaticIp();
     waitEthLink();
+    s_ethRmiiUpDone = true;
+    vTaskDelete(NULL);
+}
+static void startEthRmii() {
+    int phy = constrain(cfg.rmiiPhy, 0, RMII_PHY_COUNT - 1);
+    Serial.printf("[ETH] %s RMII addr=%d mdc=%d mdio=%d pwr=%d clk=%d (bring-up on core 0)\n",
+        RMII_PHY_NAMES[phy], cfg.rmiiAddr, cfg.rmiiMdc, cfg.rmiiMdio, cfg.rmiiPwr, cfg.rmiiClk);
+    s_ethRmiiUpDone = false;
+    xTaskCreatePinnedToCore(ethRmiiUpTask, "ethrmii", 8192, NULL, 5, NULL, 0);
+    uint32_t t0 = millis();
+    while (!s_ethRmiiUpDone && millis() - t0 < 30000) delay(20);
+    if (!s_ethRmiiUpDone) Serial.println("[ETH] RMII core-0 bring-up still running after 30s");
 }
 #endif
 
@@ -2729,6 +3000,9 @@ void setup() {
     http.on("/version.json",      HTTP_GET,  handleVersionJson);
     http.on("/info.json",         HTTP_GET,  handleInfoJson);
     http.on("/rdm.json",          HTTP_GET,  handleRdmJson);
+    http.on("/rdm/discover",      HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/setaddr",       HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/identify",      HTTP_GET,  handleRdmTrigger);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
@@ -2743,6 +3017,34 @@ void setup() {
     xTaskCreate(ledTask, "led", 2048, nullptr, 1, nullptr);
     if (dispReady) xTaskCreate(displayTask, "disp", 4096, nullptr, 1, nullptr);
     xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr);
+    // issue #64 core separation: DMX transmit on core 1, Art-Net/sACN receive on core 0.
+    // dmxTxTask: high priority (19, above loop()=1), pinned core 1, strict 40 Hz cadence,
+    //   sole owner of the DMX ports; self-gates on dmxReady so it is safe to start early.
+    // netRxTask: moderate priority (5, below lwIP/WiFi so it can't starve them), pinned
+    //   core 0, drains the UDP sockets and re-merges idle sources. With receive on core 0
+    //   nothing on core 1 can disturb esp_dmx's break/MAB timer ISR -> rock-solid frames.
+    xTaskCreatePinnedToCore(dmxTxTask, "dmxtx", 4096, nullptr, 19, &g_dmxTask, 1);
+    xTaskCreatePinnedToCore(netRxTask, "netrx", 8192, nullptr, 5,  nullptr,   0);
+
+    // Survive a network flood without resetting. Under heavy inbound traffic (e.g. an Art-Net
+    // storm on the wired link) the lwIP task pegs core 0, so core 0's idle task can't feed the
+    // task watchdog and the default handler PANICS -> SW_CPU_RESET. On the HIL bench a sustained
+    // ~6k+ pkt/s Art-Net flood crash-looped the WT32 every ~15 s (task_wdt: IDLE0, CPU 0: tiT).
+    // That is not a hang -- core 0 is just busy -- and a gateway must keep clocking DMX through it
+    // (DMX lives on core 1 and is unaffected). So reconfigure the task WDT to LOG a warning on
+    // starvation instead of rebooting. The idle tasks stay subscribed (arduino-esp32's idle hook
+    // keeps feeding them, so no "esp_task_wdt_reset: task not found" spam that disableCore0WDT()
+    // caused), the timeout is widened, and a real hang is still reported on the console + backtrace
+    // -- we just don't self-reset a busy-but-alive gateway mid-show. (This is what the analyzer saw
+    // as the DMX "freeze": the controller was rebooting, not the wire.)
+    {
+        esp_task_wdt_config_t twdt = {
+            .timeout_ms     = 10000,
+            .idle_core_mask  = (1u << portNUM_PROCESSORS) - 1,   // keep both idle tasks watched (no hook spam)
+            .trigger_panic  = false,                            // log-and-continue, don't reboot under load
+        };
+        esp_task_wdt_reconfigure(&twdt);
+    }
     Serial.println("[BOOT] ready.");
 }
 
@@ -2781,58 +3083,59 @@ static void simArtnetTick() {
 #endif
 
 // ---------------------------------------------------------------------------
-// loop()
+// Network receive task -- runs on CORE 0, the network core. This is the other half
+// of the issue #64 fix: it takes Art-Net / sACN receive (artnet.read / readSacn) and
+// source-timeout re-merge OFF core 1, so the DMX transmit on core 1 (dmxTxTask) runs
+// with NOTHING else competing for the core. esp_dmx sequences its break/MAB with a
+// hardware-timer ISR on core 1; any lwIP/packet work on core 1 (as loop() used to do)
+// can delay that ISR and corrupt a frame while the DMX task is between frames. Moving
+// receive to core 0 removes that entirely: core 1 = DMX only. Receive writes dmxBuf,
+// the DMX task reads it -- a plain byte array, so a rare torn frame is harmless (the
+// next frame 25 ms later is consistent) and no lock is needed (a lock would risk
+// priority-inverting the high-priority DMX task).
+static void netRxTask(void*) {
+    for (;;) {
+        if (netConnected()) {
+            // Drain all queued Art-Net packets (bounded) so a socket backlog catches up
+            // to the newest frame. read() runs onArtDmx per ART_DMX, returns 0 when empty.
+            if (cfg.protocol != 1)
+                for (int n = 0; n < 64 && artnet.read(); ++n) { }
+            if (cfg.protocol != 0) readSacn();
+        }
+        ArduinoOTA.handle();
+
+        uint32_t now = millis();
+        // Re-merge outputs whose input has gone quiet so a stopped source drops out of
+        // the mix even without a new frame (issue #10 source timeout).
+        static uint32_t lastMergeMs = 0;
+        if (now - lastMergeMs >= 100) {
+            for (int i = 0; i < MAX_OUTPUTS; i++)
+                if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
+            g_srcStatus = sourceStatus();
+            lastMergeMs = now;
+        }
+        vTaskDelay(1);   // yield ~1 ms; the 64-packet drain + lwIP buffering keep up easily
+    }
+}
+
+// ---------------------------------------------------------------------------
+// loop()  (core 1) -- DMX (dmxTxTask) and receive (netRxTask) run in their own tasks now;
+// loop() only does the non-time-critical housekeeping (serial console, WS pushes).
 // ---------------------------------------------------------------------------
 void loop() {
     cfgserial::poll();   // serial config console (non-blocking line reader)
 
-    // AsyncWebServer + AsyncWebSocket run in their own task, so loop() never
-    // blocks on the network — only Art-Net/sACN input and DMX output here.
-    // Only poll the UDP sockets while a link is actually up: on arduino-esp32 v3,
-    // calling parsePacket() with no network spams "[E][NetworkUdp.cpp] parsePacket():
-    // could not check for data" every loop (and wastes CPU) — seen with the W5500
-    // link down (or before it comes up).
-    if (netConnected()) {
-        // Drain all queued Art-Net packets this loop (bounded), so a transient
-        // socket backlog catches up to the newest frame instead of clearing one
-        // packet per loop. read() runs onArtDmx for each ART_DMX and returns 0
-        // once the socket is empty. Mirrors readSacn()'s drain — without it
-        // Art-Net visibly lags sACN whenever the loop hitches under WiFi jitter.
-        // The 64-packet cap keeps loop() responsive if a source ever floods us.
-        if (cfg.protocol != 1)
-            for (int n = 0; n < 64 && artnet.read(); ++n) { }
-        if (cfg.protocol != 0) readSacn();
-    }
-    ArduinoOTA.handle();
 #ifdef SIM_ARTNET
     simArtnetTick();
 #endif
 
     uint32_t now = millis();
 
-    // Re-merge outputs whose input has gone quiet, so a source that stops sending
-    // drops out of the mix even without a new frame to trigger routeFrame()
-    // (issue #10 source timeout). Outputs still actively receiving are already
-    // merged per-frame in routeFrame(), so skip them here to avoid redundant work.
-    static uint32_t lastMergeMs = 0;
-    if (now - lastMergeMs >= 100) {
-        for (int i = 0; i < MAX_OUTPUTS; i++)
-            if (cfg.outputs[i].enabled && now - outLastDmxMs[i] >= 100) mergeOutput(i);
-        g_srcStatus = sourceStatus();   // also refresh cached state when input is idle
-        lastMergeMs = now;
-    }
-
-    // Continuous DMX output at ~40 Hz: holds the last frame as a failsafe so
-    // brief input gaps (lost multicast on a weak link) never interrupt the
-    // lights. sendDmx() applies any identify override and manual changes too.
-    static uint32_t lastDmxTx = 0;
-    if (identifyCh && now >= identifyUntil) identifyCh = 0;
-    if (now - lastDmxTx >= 25) { sendDmx(); lastDmxTx = now; }
-
-    // RDM discovery / GET-SET on the bus (no-op unless a request is queued and
-    // the direction-enable pin is configured). A full discovery briefly pauses
-    // DMX output while it sweeps the line.
-    rdmService();
+    // Art-Net/sACN receive + source-timeout re-merge -> netRxTask (core 0).
+    // DMX output + RDM bus service -> dmxTxTask (core 1, high priority).
+    // Keeping both off this loop is the issue #64 fix: core 1 does only DMX, so no
+    // packet processing can delay/jitter the break/frame timing. loop() just does the
+    // non-time-critical housekeeping below.
 
     if (now - lastWsPush >= 100) {
         wsPush();
@@ -2927,4 +3230,9 @@ void loop() {
             fps, netRSSI(), (int)WiFi.status(), ws.count(), (unsigned)httpReqCount,
             (unsigned)wsConnCount, (unsigned)wsDiscCount);
     }
+
+    // Yield one tick so IDLE1 runs (feeds its task watchdog) and core 1 keeps genuine idle
+    // slack. loop() is only housekeeping, so 1 ms latency here is irrelevant; without it
+    // loopTask (prio 1) can monopolise core 1 under load and trip the IDLE1 watchdog.
+    delay(1);
 }

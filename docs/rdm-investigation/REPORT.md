@@ -2,7 +2,7 @@
 title: "Reliable RDM on the ESP32-S3"
 subtitle: "An on-the-wire study of RDM timing and DMX-receive reliability on the LuxDMX node"
 author: "Thomas Büngener"
-date: "June 2026"
+date: "June 2026 (rev 2, July 2026)"
 abstract: |
   On-the-wire measurements (a calibrated logic analyzer, N $\ge$ 20 per result) show the LuxDMX
   ESP32-S3 node is a reliable RDM (ANSI E1.20) controller: it switches its transceiver to receive
@@ -23,6 +23,16 @@ abstract: |
 *All timing is measured on the physical RS485 wire with a calibrated logic analyzer (§4); every
 quantitative claim is N $\ge$ 20 with a stated confidence level. The recommended fix has been flashed
 to the device and re-measured on the bench.*
+
+> **Update, rev 2 (July 2026).** Since this study, the DMX/RDM path on the hardware builds was
+> rewritten to remove the interrupt-latency mechanism at its root. DMX is now clocked out of the
+> **RMT peripheral** (bit timing generated in hardware, not by a UART ISR), and RDM was rebuilt
+> **esp_dmx-free**: RMT transmit for the request, a receive-only UART for the reply, and the
+> transceiver direction on a plain GPIO. That structural fix supersedes the core-affinity tweak of
+> §8, and it also resolves the field-reported DMX *transmit* framing errors under wired-Ethernet load
+> (issue #64), the transmit-side sibling of the turnaround jitter measured here. It has been validated
+> on real ESP32-S3 silicon, RDM sensor polling included. Details and measurements are in **§11**. The
+> conclusions below still hold; they were measured on the esp_dmx path and remain the record of it.
 
 ---
 
@@ -568,6 +578,85 @@ FIFO). The one piece left is the spread across many *real* consoles with their o
 timing, which needs actual desks, or a precision RP2040 PIO source feeding adversarial timing on its own
 rig. (3) **Cross-check the LA's time
 base** with a second, independent capture method (e.g. an RP2040 / sigrok logic analyzer).
+
+## 11. Update (rev 2): RMT-DMX and the esp_dmx-free RDM path
+
+*Added July 2026. §4 through §10 record the original esp_dmx-based measurements and stand as written;
+this section documents the structural fix that replaced the core-affinity tweak of §8 and its
+validation on real ESP32-S3 hardware.*
+
+### 11.1 Why a structural fix
+
+§7 traced the RDM turnaround jitter to interrupt latency: the RTS flip rides an esp_dmx UART ISR, and
+network DMA stretches that ISR under load. The same mechanism has a transmit-side twin. A user on the
+WT32-ETH01 (issue #64) saw the DMX *output* pick up framing errors on a Swisson tester once wired
+Ethernet was busy: esp_dmx clocks the break and MAB from a timer ISR, and under RMII-Ethernet DMA that
+ISR is delayed just enough to malform a frame's break. Moving tasks between cores narrows the tail
+(§8) but does not remove the dependency: as long as the frame timing is produced by an ISR, a late ISR
+can still corrupt a frame.
+
+The fix that removes the dependency is to stop timing DMX from an ISR at all.
+
+### 11.2 RMT-DMX (transmit)
+
+DMX transmit now runs through the ESP32 **RMT peripheral** (`dmx_rmt.h`). A frame is pre-encoded into a
+(level, duration) symbol stream and the RMT clocks it out entirely in hardware at its own 1 MHz tick
+(1 tick = 1 µs, one DMX bit = 4 ticks, exact, no jitter). The CPU only refills a buffer; the timing is
+the RMT's. If a refill is ever late the RMT idles the line HIGH (a benign extra mark) instead of
+corrupting the break, so the failure mode of §7 simply cannot happen on transmit. On the S3 the first
+output takes the one DMA-capable RMT channel (the IDF driver is blunt about it: "Only the last channel
+has the DMA capability") and streams a whole frame from RAM with no refill ISR at all; a second output
+falls back to the refill-ISR path, which is safe here because DMX runs on core 1, away from the core-0
+network DMA that caused #64.
+
+Measured on the same LA rig as the rest of this report: **0 framing errors at 40.0 Hz under a
+15,000 packet/s Art-Net flood**, on both the WT32-ETH01 (internal RMII) and a bare ESP32-S3 driving a
+MAX485. Issue #64 does not reproduce on the RMT path.
+
+### 11.3 esp_dmx-free RDM
+
+With transmit on the RMT, the RDM controller was rebuilt to match (`rdm_rmt.h`): the request is sent
+from the RMT channel, the reply is read on a dedicated **receive-only UART**, and the transceiver
+direction (DE/RE) is a plain GPIO toggled around the transaction. The turnaround measured in §6/§8
+(about 15 µs, comfortably inside the 176 µs budget) is preserved, and it no longer depends on an
+esp_dmx UART ISR: the direction flip is now a direct GPIO write, so the class of contention §7
+describes is gone from the turnaround too. The E1.20 behaviour is unchanged: discovery, GET and SET all
+round-trip.
+
+### 11.4 Validated on real ESP32-S3 silicon
+
+The original numbers ran on the bench controller; rev 2 adds a full pass on an actual ESP32-S3 node
+(RMT-DMA transmit), over both WiFi and the W5500 wired interface, against the RP2350 responder:
+
+- DMX output clean at 40.0 Hz, 0 framing errors on both universes (`outfps [40, 40]`).
+- RDM **discovery** found all 32 fixtures; **GET** DEVICE_INFO and the software-version label, **SET**
+  DMX start address, and **sensor polling** (GET SENSOR_DEFINITION / SENSOR_VALUE against a responder
+  exposing a drifting temperature sensor) all round-tripped.
+- W5500 wired came up cleanly once the SPI clock was dropped for the flying-lead bench: the default
+  20 MHz hangs on jumper wires, 8 MHz is solid (`ethfreq`). On the real v4 board 20 MHz is fine.
+
+### 11.5 Crash-hardening found under stress
+
+Pushing the node hard (sustained 15k packet/s floods with a WebSocket client and JSON polling open
+throughout) surfaced a separate class of failure that has nothing to do with DMX timing. Under
+post-flood heap **fragmentation** (esp-idf #13588: the free heap stays high but the largest contiguous
+block collapses) a large contiguous allocation in the web / OTA / WebSocket paths could throw an
+uncaught `bad_alloc` and reboot the node. That reboot, not the wire, was the source of the occasional
+framing-error bursts seen during a flood: the DMX line was clean until the node reset and sprayed
+garbage on the way down. Fixes: guard the big allocations on the largest-contiguous-block figure (not
+total free) with a try/catch backstop, degrade to a 503 or a skipped push instead of aborting, and
+stream `/dmx.json` in ~1.4 KB chunks so it needs no large contiguous buffer at all. After that a 15k
+packet/s flood produced **0 reboots, 0 aborts, and the DMX output stayed clean throughout**. On a wired
+S3 (heap around 153 KB) there were zero 503s; the fragmentation pressure is a WiFi-heap effect.
+
+### 11.6 What this changes, and what it does not
+
+The reliability picture from §8 and §10 is unchanged and, if anything, stronger: RDM is a solid
+controller over WiFi and wired, and the DMX output is now clean under load by construction rather than
+by task placement. The core-affinity change of §8 is no longer the mechanism that carries the fix (the
+RMT path does), though keeping the network work on core 0 is still good hygiene. The receive-path study
+of §9 stands unchanged: LuxDMX transmits DMX and runs RDM, it does not receive a continuous DMX stream,
+and a dedicated small MCU or an RP2040 PIO is still the right tool for that separate job.
 
 ## Appendix A. LA firmware (`s3-logic-analyzer`)  ·  B. `la_analyze.py`  ·  C. raw captures + figures
 *(listings attached in the repo; figures/hr05_timing.png is the reference transaction.)*
