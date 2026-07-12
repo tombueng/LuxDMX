@@ -26,7 +26,7 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: false,          // one device, keep requests serial
   workers: 1,
-  timeout: 30_000,
+  timeout: 120_000,              // HIL: a full RDM discovery of a large responder set can be slow
   expect: { timeout: 10_000 },
   // The mutating tests reboot the device; a following test can briefly hit it
   // mid-reboot (ECONNRESET / WS not-yet-up). Retry so a transient reboot-window

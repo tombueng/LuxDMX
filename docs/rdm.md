@@ -3,6 +3,203 @@
 Add **RDM** to LuxDMX: auto-discovery + bidirectional comms, on top of the existing
 Art-Net / sACN → DMX output.
 
+> **Status (implemented).** RDM is built. The controller no longer rides on esp_dmx — it's a
+> self-contained **RMT-TX + UART-RX** engine (`src/rdm_rmt.h`) that shares the DMX output's RMT
+> channel: it transmits DISC/GET/SET requests through RMT, flips the transceiver's DE/RE (a plain
+> GPIO) to receive, and reads the reply on a dedicated RX-only UART. No peripheral install/teardown
+> per transaction, so nothing leaks or stalls the DMX clock. Discovery is an **iterative** binary
+> search (an explicit range stack, not recursion — a 48-deep recursion overflowed the DMX task
+> stack and reset the board) and re-reads a garbled branch before calling it a collision, so a stray
+> bit flip on a lone fixture doesn't split forever. Trigger it over HTTP (`/rdm/discover`,
+> `/rdm/setaddr`, `/rdm/identify`) or the web UI. Validated on the RP2350 responder rig: discovery +
+> GET DEVICE_INFO / SW_VERSION_LABEL + SET address / identify all round-trip. This design doc below
+> is the original plan and the hardware/transceiver background — still accurate except that the
+> firmware path is now RMT, not esp_dmx.
+
+> **RDM over Art-Net (implemented).** LuxDMX is now an Art-Net 4 RDM *output gateway*: a console
+> (DMX-Workshop, MagicQ, grandMA3, OLA, or the bundled `docs/tests/artnet_rdm_ctrl.py`) does RDM
+> to the fixtures on the physical wire over the network. See the **RDM over Art-Net** section below.
+
+---
+
+## The RDM tab (web UI)
+
+RDM has its own page now, reachable from the **RDM** link in the nav (served at `/rdm`).
+
+- **Fixtures table**: one row per discovered fixture with everything visible at a glance, no
+  expanding needed, name, UID, DMX start address, footprint, personality, manufacturer, model,
+  category, and its sensors. The personality is an inline dropdown, and each row has an **ID**
+  (identify) button. Click a row only when you want to *change* it: it opens an inline editor for
+  the DMX start address and the device label, plus software version and sub-device count. Up to 64
+  fixtures are supported.
+- **Which sensors to poll**: every sensor in the table has its own little switch, and each fixture
+  has an "all" switch for its whole set. A switch means "poll this sensor and plot it". You enable
+  sensors explicitly, one at a time, so a stray click can never light up hundreds of sensors and dip
+  the DMX frame rate. The per-fixture "all" switch and the top **Live sensors** switch are
+  select-off / restore controls, not select-all: clicking one while anything in its scope is on
+  remembers that set and switches it all off, and clicking again restores exactly what was on. From
+  a cold state (nothing enabled) they do nothing. The whole selection is saved on the device, so it
+  survives a reload or reboot and is re-applied after the next discovery.
+- **Sensors, grouped by type**: the sensors you switch on are aggregated into one chart per RDM
+  sensor type (Temperature, Voltage, Speed, and so on). Each chart is a real time-series plot with a
+  value (Y) axis and a time (X) axis, gridlines, and units, and it overlays every switched-on
+  fixture-sensor of that type as its own coloured line with a legend. Colours are stable (assigned
+  per series, they don't flicker).
+- **Polling cost scales with what you switch on**: the gateway refreshes each enabled sensor about
+  once a second, and it only touches the bus on a frame where a sensor is actually due. So one
+  sensor is essentially free (measured 43 → 42 fps), and the frame-rate cost grows with how many
+  sensors you enable rather than being a flat hit the moment anything is on. Nothing enabled means
+  nothing is polled. Discovery is behind a confirmation prompt since it briefly shares the wire and
+  can dip the frame rate while it runs.
+
+While a scan is running, the status line shows **what the discovery is actually doing right now**
+instead of a static "scanning" message: a progress bar plus text like *"Reading fixture 17 of 32 ·
+sensor values"*. It tracks the state machine through its phases (searching the tree, then reading
+each fixture's info/software/labels/sensors, then publishing), so a long sweep on a big rig shows
+real progress rather than an indeterminate spinner.
+
+All three tabs (Status, RDM, Settings) share **one** navbar: it's a single fragment
+(`src/pages/_nav.html`) that `extra_scripts.py` injects into every page at build time, so there is
+one definition of the bar, its CSS and its behaviour. It shows FPS per output, link, heap, uptime,
+jitter, the number of discovered fixtures, the RDM frames sent / responses received on the wire
+(counters in `rdm_rmt.h`), and the hostname/IP/version subtitle. All of that rides on the one binary
+`/ws` status frame (the RDM figures are a fixed trailer appended to it), which every page already
+receives, so the bar is live and identical everywhere, a page just calls `LuxNav.stats(frame)`.
+Every stat has a fixed-width column so a changing value never reflows the bar, the values are cached
+across page loads, and the pages opt into cross-document view transitions, so switching tabs is a
+quick crossfade with the bar held steady instead of a flicker.
+
+RDM runs on **every** output that has a DE/RE (direction) pin, i.e. a real RS485 transceiver that can
+receive. Each such output is its own RDM "line" with its own RMT TX, DE pin and RX UART, so RDM can
+discover and talk to fixtures on both universes. The engine is serialised on the DMX task and selects
+the active line per transaction (`rdmRmtSelect`), so it drives one line at a time without ever
+stalling either output's DMX. Each discovered fixture is tagged with its universe (the **Uni** column
+in the table), and the RDM tab has a **Discover** button per universe (plus "Scan all"); discovering
+one universe re-reads only that line and leaves the other universes' fixtures in place. On the wire
+this needs one spare RX UART per line (`UART_NUM_2`, then `UART_NUM_1`), which the RMT DMX build
+leaves free. `/rdm.json` carries `rdmLines` (the RDM-capable universes), a `uni` on every fixture, and
+`discLine` (the line a sweep is on). Over **Art-Net** it's multi-port too: the node advertises RDM on
+every RDM universe (`ArtPollReply` GoodOutputB per port), and `ArtTodRequest`/`ArtTodControl`/`ArtRdm`
+are routed by port-address to the right line, so `ArtTodData` for a universe carries only that
+universe's fixtures and a relayed GET/SET goes out on the matching line. An external console
+(DMX-Workshop, MagicQ, grandMA3, OLA) can therefore do RDM on both universes.
+
+All of this is backed by `/rdm.json`, which grew the per-fixture fields (`mfg`, `modelName`, `label`,
+`cat`, `swVer`, and per-sensor `lo`/`hi`/`rec`/`type`/`poll`), a top-level `sensorPoll` flag, and the
+live discovery-progress fields (`discStage` 0-3, `discFound`, `discCur`, `discSub`). At 64 fixtures
+the document is ~32 KB, so `/rdm.json` is streamed device-by-device (a chunked response) rather than
+built as one big string, which the fragmented ESP32-S3 heap can't allocate in one piece. The controls
+go over the existing WebSocket: `rdm_setaddr`, `rdm_identify`, `rdm_setpers`, `rdm_setlabel`,
+`rdm_sensorpoll` (all sensors on/off), and `rdm_sensorsel` (`{uid, sensor, on}`, with `sensor:-1`
+meaning the whole fixture). A responder that does not implement a given PID just NACKs it and that
+field stays blank, which is normal.
+
+---
+
+## RDM over Art-Net
+
+Art-Net carries RDM natively (sACN/E1.31 does not, network-native RDM there is the much heavier
+E1.33 "RDMnet", not implemented). The node side is four opcodes:
+
+| Packet | OpCode | Direction | What it does |
+|---|---|---|---|
+| `ArtPoll` / `ArtPollReply` | 0x2000 / 0x2100 | console to/from node | discovery; the reply advertises our output ports and that RDM is enabled |
+| `ArtTodRequest` to `ArtTodData` | 0x8000 to 0x8100 | console to node | return our **Table of Devices** (the UIDs we discovered on the wire) |
+| `ArtTodControl` (AtcFlush) | 0x8200 | console to node | flush the TOD and run a fresh discovery |
+| `ArtRdm` | 0x8300 | console to/from node | relay one GET/SET to a fixture and hand back the reply |
+
+**Discovery is proxied, GET/SET are pass-through.** The gateway runs E1.20 discovery on its own
+DMX wire and keeps a TOD; the console never touches the wire, it reads the TOD and sends GET/SET
+that the gateway relays. Discovery runs on demand (a manual Discover or an `AtcFlush`), and updated `ArtTodData` is
+pushed to any console that asked once the TOD changes.
+
+### Keeping DMX smooth while RDM runs (the real problem)
+
+RDM shares the half-duplex wire with DMX, so naive RDM starves the output. Measured on the bench
+(ESP32-S3 + W5500 + real 485 bus, 32-fixture responder): a full **blocking** discovery grabbed the
+bus for ~2.3 s and the DMX output on the wire **dropped from 40 fps to ~4-6 fps** the whole time.
+
+The fix is a scheduler, not just faster discovery. The Art-Net socket and all packet I/O run on the
+network core (`netRxTask`, core 0), which **queues** bus work to the DMX task (core 1, the sole bus
+owner). That task drains **at most one RDM transaction per DMX frame**, in the idle gap after the
+frame is clocked out. Discovery is a **resumable state machine** (one DISC branch or one GET per
+frame), so a full sweep spreads over a few seconds in the gaps instead of one long freeze. On-demand
+`ArtRdm` GET/SET take priority over background discovery.
+
+Result on the same rig, with a steady 40 fps Art-Net source running: through a full re-discovery
+*plus* a 1000-request `ArtRdm` GET flood, DMX holds **~26-40 fps with zero framing errors** and the
+board never reboots, versus the 4-6 fps freeze before. (DMX itself is clocked from the RMT
+peripheral, `dmx_rmt.h`, so it is hardware-timed and never corrupts even while RDM shares the task.)
+
+### Config + status
+
+- **`RDM over Art-Net`** toggle (config key `artrdm`, JSON `artnetRdm`), **default on**, and only
+  active on an RDM-capable output (one with a DE/RE pin). Turn it off and the node ignores every RDM
+  opcode; plain Art-Net/sACN DMX is untouched.
+- `/rdm.json` gains `artnetRdm`, `artPort` (the RDM output's Art-Net port-address), `discovering`,
+  `bqPolicy` (the BackgroundQueuePolicy), `outputs[]` (per-output `{i, uni, merge}` for the RDM tab's
+  merge control), and the `artTodReqs` / `artRdmReqs` / `artFlushes` / `artPolls` counters alongside
+  the device TOD. The RDM tab shows a **Merge** selector per universe (off/HTP/LTP) that both sets the
+  mode (`GET /rdm/merge?out=<i>&mode=<0/1/2>`) and reflects changes made from a console over Art-Net.
+- Only built into the `DMX_RMT` (esp_dmx-free) firmware path, which is every hardware env.
+
+### Remote configuration over Art-Net (`ArtAddress`)
+
+A console's port-config dialog (e.g. DMX-Workshop's *Configure Port*) reaches the node with an
+`ArtAddress` (OpCode `0x6000`); the node applies the change and confirms with an `ArtPollReply`.
+Art-Net 4 addresses the target port by the `BindIndex` field, so the deprecated per-port command
+variants (`…1/2/3`) are treated the same as `…0`. Handled commands:
+
+- **Merge mode**: `AcMergeHtp0` (0x50) → HTP, `AcMergeLtp0` (0x10) → LTP, `AcCancelMerge` (0x01) →
+  off. Maps straight onto that output's `mergeMode`, applied **live** (merge reads it per frame, no
+  reboot) and persisted to NVS so it survives a power cycle (the spec requires Ltp/Htp to be
+  retained). Merge only does anything when two sources hit the same universe.
+- **BackgroundQueuePolicy**: `AcBqp0`…`AcBqp15` (0xe0…0xef). This is a node-wide knob telling the
+  gateway to harvest RDM status from the fixtures in the background: `0` collect all, `1` advisory+,
+  `2` warning+, `3` error only, `4` off (default). The node advertises support in `ArtPollReply`
+  (`Status3` bit 1) and echoes the current value in byte 228. While a policy is set the gateway polls
+  one fixture's `STATUS_MESSAGE` per idle DMX frame (throttled, lowest priority, so DMX is untouched)
+  and caches the highest-severity result per device, surfaced in `/rdm.json` (`stType` / `stId` /
+  `stCount`) and as a badge on the RDM tab. Also settable locally: the **Health poll** selector on the
+  RDM tab, or `GET /rdm/bqp?p=N`.
+- Universe / port-name programming from `ArtAddress` is **not** handled yet (changing a universe would
+  desync the boot-time RDM line mapping); set those on the device's own web config instead.
+
+### Interop notes
+
+- `ArtRdm` is unicast per Art-Net 4. `ArtPoll` is received on both the subnet-directed broadcast and
+  the limited broadcast (255.255.255.255): the node opens its 6454 socket with `SO_BROADCAST`, so
+  tools that poll on 255.255.255.255 (DMX-Workshop, OLA) still find it.
+- A non-RDM-aware DMX splitter between the gateway and the fixtures will silently kill RDM (it won't
+  pass the line turnaround). That is out of our control but a common support question.
+- Art-Net's OEM code in `ArtPollReply` is currently 0 (unregistered). Apply for a free OEM code from
+  Artistic Licence before any commercial release; RDM interop does not depend on it.
+
+### Testing it
+
+- `docs/tests/artnet_rdm_ctrl.py <gateway-ip> --pa 0 selftest` drives the whole thing as a controller
+  (ArtPoll, TOD, GET/SET, sensors) and prints pass/fail.
+- `docs/tests/artnet-rdm.spec.mjs` is the Playwright e2e (read-only paths by default; the wire GET/SET
+  + flush + DMX-not-disturbed checks and the `ArtAddress` merge / BackgroundQueuePolicy config checks
+  gate behind `LUXDMX_WRITE=1`). The read-only pass also asserts `ArtPollReply` advertises RDM-capable
+  + BackgroundQueue support.
+- `docs/qlcplus-rdm-test.qxw` is a ready QLC+ workspace (Art-Net output to the gateway, dimmers at the
+  sim's fixture addresses) for driving the gateway from a real console while RDM runs. QLC+ itself has
+  no RDM, so it only exercises the DMX side (useful for "RDM doesn't disturb DMX").
+- **Independent validation with OLA** (the reference open RDM stack). `ola_rdm_discover -u 0`,
+  `ola_rdm_get --universe 0 --uid <uid> DEVICE_INFO`, `... DMX_START_ADDRESS`, `ola_rdm_set ... 50`,
+  `... SENSOR_VALUE 0` all round-trip against the gateway (patch OLA's Art-Net output port to universe
+  0 first). This was run and confirmed on the bench: OLA discovers all fixtures and reads/writes them
+  cleanly, so a completely separate implementation drives the node end to end.
+- The DMX-stays-40fps-under-RDM numbers above come from the RP2350 analyzer's ground-truth UART
+  (`anRefresh` / `gtFramingErr`), the same rig as the issue-#64 framing work.
+
+**PC tools that can drive Art-Net RDM:** DMX-Workshop (Artistic Licence, the simplest), OLA, MagicQ,
+grandMA3. Note: **QLC+ has no RDM at all** (DMX only), and **grandMA3 onPC cannot output Art-Net
+without MA hardware** unlocking parameters. OLA has no native Windows build; under WSL2 its Art-Net
+replies (fixed UDP port 6454) don't survive the default NAT, so either use WSL "mirrored" networking
+or a small host-side Art-Net relay that bridges the WSL subnet to the LAN.
+
 > **TL;DR** — RDM needs a transceiver whose **DE/RE (direction) pin is controlled by a GPIO**,
 > plus galvanic isolation and a 120 Ω terminator. The current **Waveshare TTL→RS485 (C)** is
 > *auto-direction* and **cannot do RDM**. **Note:** Amazon.de/eBay.de don't sell RDM-capable *isolated*
@@ -318,3 +515,7 @@ optionally the cached metadata) in NVS, mirroring how channel labels work today.
 - Conceptinetics 2.5 kV Isolated DMX/RDM shield: <https://www.tindie.com/products/Conceptinetics/25kv-isolated-dmx-512-shield-for-arduino-r2/>
 - Mornsun TD301D485H (auto-direction): <https://www.mornsun-power.com/html/products-detail/TD301D485H.html>
 - M5Stack DMX Unit / Isolated RS485 Unit (auto, Grove TX/RX only): <https://docs.m5stack.com/en/unit/Unit-DMX> · <https://docs.m5stack.com/en/unit/iso485>
+
+---
+
+Art-Net™ Designed by and Copyright Artistic Licence Engineering Ltd.

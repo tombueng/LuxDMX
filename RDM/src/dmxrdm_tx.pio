@@ -1,0 +1,17 @@
+; dmxrdm_tx.pio - DMX/RDM byte transmitter, 250 kBaud 8N2.
+; PIO runs at 8x baud (2 MHz) so 1 bit = 8 PIO cycles (clkdiv = clk_sys / 2e6).
+; The same GPIO is used for OUT (data bits) and side-set (idle / start / stop level):
+;   side 1 = line high (idle + the two stop bits), side 0 = line low (start bit).
+; A byte is 11 bit-times: 1 start + 8 data + 2 stop, matching DMX/RDM framing so the
+; receiving UART frames every byte cleanly. Breaks are done in firmware (drive the pin
+; low via SIO) since only the mute/GET/SET responses need one; the discovery response
+; is just this byte stream with no break.
+
+.program dmxrdm_tx
+.side_set 1 opt
+    pull       side 1 [7]   ; stop bit 1 / idle high; stall here until a byte is queued
+    set x, 7   side 1 [7]   ; stop bit 2 (line stays high); preload the data-bit counter
+    nop        side 0 [7]   ; start bit (line low), 8 cycles
+bitloop:
+    out pins, 1        [6]   ; shift out one data bit, LSB first, 8 cycles/bit
+    jmp x-- bitloop          ; 8 data bits, then fall through and loop back to pull

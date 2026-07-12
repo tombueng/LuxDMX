@@ -1,0 +1,16 @@
+Qty,Designators,Value,Description / part
+4,"J_485A_L,J_485A_R,J_485B_R,J_485B_L",,"Female header socket 1x5, 2.54mm"
+1,J_LA,,"Pin header (male) 2x8, 2.54mm"
+1,J_MEAS,,"Pin header (male) 1x7, 2.54mm"
+2,"J_PICOA,J_PICOB",,"Female header socket 1x20, 2.54mm"
+2,"J_S3B,J_S3A",,"Female header socket 1x22, 2.54mm"
+1,J_TERM,,"Screw terminal 3-pin, 5.08mm"
+1,J_W5500,,"Female header socket 2x5, 2.54mm"
+2,"Rb1,Rb2",270R,"Resistor THT axial, 7.62mm pitch"
+4,"Rd1,Rd2,Rd3,Rd4",10k,"Resistor THT axial, 7.62mm pitch"
+
+"# plug-in modules (seat in the sockets, not soldered / not on the PCB)"
+1,,,"ESP32-S3-DevKitC-1 - DUT: LuxDMX controller (0.9"" / 2x22)"
+1,,,Pimoroni Pico Plus 2 W (RP2350) - RDM simulator (standard Pico 2x20)
+2,,,"MAX485 module (RXD/TXD variant) - one per node, cross-wired"
+1,,,W5500 SPI Ethernet module (2x5) - for the S3

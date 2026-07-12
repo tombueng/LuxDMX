@@ -85,6 +85,9 @@ const CfgField CONFIG_FIELDS[] = {
     SFIELD("subnet",   "subnet",       subnet,       "Subnet mask",        "Network", CFG_NONE),
     SFIELD("dns",      "dns",          dns,          "DNS server",         "Network", CFG_NONE),
 
+    // --- RDM ----------------------------------------------------------------
+    BFIELD("artrdm", "artnetRdm", artnetRdm, "RDM over Art-Net", "RDM", CFG_NONE),
+
     // --- Updates (own route, not the /config form) -------------------------
     BFIELD("autoupd", "autoUpdate", autoUpdate, "Auto-update firmware", "Updates", CFG_NOWEB),
 };
@@ -99,7 +102,7 @@ const size_t CONFIG_FIELD_COUNT = ARRSZ(CONFIG_FIELDS);
 
 const CfgOutputField OUTPUT_FIELDS[] = {
     OBOOL("en",    "en",    enabled,   nullptr,             "Enabled"),
-    OINT ("uni",   "uni",   universe,  "universe", 0, 15,   "Universe"),
+    OINT ("uni",   "uni",   universe,  "universe", 0, 32767, "Universe"),
     OINT ("port",  "port",  port,      "dmxport",  1,  2,   "UART port"),
     OINT ("tx",    "tx",    txPin,     "dmxtx",   -1, 48,   "TX pin"),
     OINT ("rx",    "rx",    rxPin,     "dmxrx",   -1, 48,   "RX pin"),

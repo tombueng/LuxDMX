@@ -14,7 +14,16 @@ async function openPickerWith(page, boardId) {
 }
 
 test.describe('Pin picker physical layout (issue #17)', () => {
+  // The board dropdown only offers boards whose MCU matches the running device (a classic-ESP32
+  // pin map can't run on an ESP32-S3 and vice-versa), so a board-specific test only applies when
+  // the target is that chip family. Against the web-UI sim (no mcu reported) all of them run.
+  let mcu = null;
+  test.beforeEach(async ({ request }) => {
+    try { mcu = (await (await request.get('/info.json')).json()).mcu || null; } catch { mcu = null; }
+  });
+
   test('ESP32 DevKitC: power rail + silk labels render, power pin not assignable', async ({ page }) => {
+    test.skip(!!mcu && mcu !== 'esp32', 'classic-ESP32 board picker only offered on an esp32 device');
     await openPickerWith(page, 'esp32-devkitc');
 
     // a power rail pin (3V3) is shown
@@ -34,6 +43,7 @@ test.describe('Pin picker physical layout (issue #17)', () => {
   });
 
   test('ESP32-S3 DevKitC-1: assignable GPIO pad click fills the target field', async ({ page }) => {
+    test.skip(!!mcu && mcu !== 'esp32s3', 'ESP32-S3 board picker only offered on an esp32s3 device');
     // open the picker bound to a specific role by clicking a pin-pick button
     await page.goto('/config');
     await page.selectOption('#board-sel', 'esp32s3-devkitc-1');
@@ -49,6 +59,7 @@ test.describe('Pin picker physical layout (issue #17)', () => {
   });
 
   test('DOIT DevKit v1: D21 silk + VIN rail are shown', async ({ page }) => {
+    test.skip(!!mcu && mcu !== 'esp32', 'classic-ESP32 board picker only offered on an esp32 device');
     await openPickerWith(page, 'esp32-devkit-v1');
     // DOIT board silks GPIOs as Dxx; D21 must appear in a label
     await expect(page.locator('#board-svg-wrap text', { hasText: /D21/ }).first()).toBeVisible();
