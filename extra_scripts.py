@@ -17,7 +17,7 @@ def escape_c(s: str) -> str:
 # Large static pages are gzip-compressed (served with Content-Encoding: gzip)
 # to slash per-connection heap/airtime. They must contain no {{placeholders}}
 # (dynamic values are fetched client-side from /info.json).
-GZIP_PAGES = {"index", "config"}
+GZIP_PAGES = {"index", "config", "rdm"}
 
 def html_to_header(path: pathlib.Path, out_dir: pathlib.Path, version: str):
     var = path.stem.upper().replace("-", "_").replace(".", "_") + "_HTML"

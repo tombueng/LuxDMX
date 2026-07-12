@@ -346,6 +346,46 @@ static bool rdmRmtSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* ack) {
     return ack->type == RDM_RESPONSE_TYPE_ACK;
 }
 
+// --- extended typed GET/SET (labels, personality, full sensor value) ------------------------
+// Generic string GET (MANUFACTURER_LABEL, DEVICE_MODEL_DESCRIPTION, DEVICE_LABEL, ...).
+static bool rdmRmtGetString(const rdm_uid_t& uid, uint16_t pid, char* buf, size_t len, rdm_ack_t* ack) {
+    uint8_t pd[40]; int pdl = 0;
+    if (len) buf[0] = 0;
+    if (!rdmTransaction(uid, RDM_CC_GET_COMMAND, pid, nullptr, 0, pd, sizeof(pd), &pdl, ack)) return false;
+    if (ack->type != RDM_RESPONSE_TYPE_ACK) return false;
+    int n = pdl; if (n > (int)len - 1) n = len - 1; if (n < 0) n = 0;
+    memcpy(buf, pd, n); buf[n] = 0;
+    return true;
+}
+// Generic string SET (DEVICE_LABEL, ...).
+static bool rdmRmtSetString(const rdm_uid_t& uid, uint16_t pid, const char* s, rdm_ack_t* ack) {
+    uint8_t resp[8]; int rpdl = 0;
+    int n = (int)strlen(s); if (n > 32) n = 32;
+    if (!rdmTransaction(uid, RDM_CC_SET_COMMAND, pid, (const uint8_t*)s, (uint8_t)n, resp, sizeof(resp), &rpdl, ack))
+        return false;
+    return ack->type == RDM_RESPONSE_TYPE_ACK;
+}
+static bool rdmRmtSetPersonality(const rdm_uid_t& uid, uint8_t pers, rdm_ack_t* ack) {
+    uint8_t resp[8]; int rpdl = 0;
+    if (!rdmTransaction(uid, RDM_CC_SET_COMMAND, RDM_PID_DMX_PERSONALITY, &pers, 1, resp, sizeof(resp), &rpdl, ack))
+        return false;
+    return ack->type == RDM_RESPONSE_TYPE_ACK;
+}
+// SENSOR_VALUE GET returning present + lowest/highest/recorded (E1.20 gives all four; older/simple
+// responders may only return present, so the tail fields fall back to present).
+static bool rdmRmtGetSensorFull(const rdm_uid_t& uid, uint8_t sensorNum,
+                                int16_t* present, int16_t* lo, int16_t* hi, int16_t* rec, rdm_ack_t* ack) {
+    uint8_t pd[16]; int pdl = 0;
+    if (!rdmTransaction(uid, RDM_CC_GET_COMMAND, RDM_PID_SENSOR_VALUE, &sensorNum, 1, pd, sizeof(pd), &pdl, ack))
+        return false;
+    if (ack->type != RDM_RESPONSE_TYPE_ACK || pdl < 3) return false;
+    *present = (int16_t)((pd[1] << 8) | pd[2]);
+    *lo  = pdl >= 5 ? (int16_t)((pd[3] << 8) | pd[4]) : *present;
+    *hi  = pdl >= 7 ? (int16_t)((pd[5] << 8) | pd[6]) : *present;
+    *rec = pdl >= 9 ? (int16_t)((pd[7] << 8) | pd[8]) : *present;
+    return true;
+}
+
 // --- ArtRdm raw pass-through ----------------------------------------------------------------
 // Relay an RDM request exactly as an Art-Net controller supplied it. ArtRdm carries the full RDM
 // message WITHOUT the 0xCC start code (the controller already computed the checksum over the whole

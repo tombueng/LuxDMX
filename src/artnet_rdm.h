@@ -85,6 +85,11 @@ static void artAddSub(uint32_t ip) {
 // ---- stats (for /rdm.json + web UI) ---------------------------------------
 static volatile uint32_t g_artTodReqs = 0, g_artRdmReqs = 0, g_artFlushes = 0, g_artPolls = 0;
 static volatile bool     g_artDiscovering = false;
+// Live discovery progress for the RDM tab's "scanning" display. Written by the core-1
+// discovery step, read by /rdm.json on core 0. stage: 0=idle 1=search 2=enrich 3=publish;
+// found=UIDs seen so far; cur=device being read (0-based) of found; sub=PID within a device
+// (0=info 1=sw 2=mfg 3=model 4=label 5=sensor-def 6=sensor-val 7=done).
+static volatile uint8_t g_discStage = 0, g_discFound = 0, g_discCur = 0, g_discSub = 0;
 
 // ===========================================================================
 //  Packet builders
@@ -334,6 +339,12 @@ static void artPushTodToSubs() {
 // Advance the discovery state machine by one bus transaction. Returns true if still working.
 static bool artDiscStep() {
     rdm_ack_t ack;
+    // snapshot progress for the web UI (one cheap write per bus step)
+    g_discStage = (g_adPhase == AD_SEARCH) ? 1 : (g_adPhase == AD_ENRICH) ? 2
+                : (g_adPhase == AD_PUBLISH) ? 3 : (g_adPhase == AD_START) ? 1 : 0;
+    g_discFound = (uint8_t)g_adFoundN;
+    g_discCur   = (uint8_t)g_adEi;
+    g_discSub   = (uint8_t)g_adSub;
     switch (g_adPhase) {
     case AD_START:
         rdmUnMuteAll();
@@ -378,6 +389,7 @@ static bool artDiscStep() {
             if (rdmRmtGetDeviceInfo(d.uid, &info, &ack) && ack.type == RDM_RESPONSE_TYPE_ACK) {
                 d.startAddr = info.dmx_start_address; d.footprint = info.footprint;
                 d.modelId = info.model_id; d.subDeviceCount = info.sub_device_count;
+                d.productCategory = info.product_category; d.swVersionId = info.software_version_id;
                 d.personality = info.personality.current; d.personalityCount = info.personality.count;
                 d.sensorCount = info.sensor_count > RDM_MAX_SENSORS ? RDM_MAX_SENSORS : info.sensor_count;
             }
@@ -386,31 +398,44 @@ static bool artDiscStep() {
         }
         case 1:                                                 // SOFTWARE_VERSION_LABEL
             rdmRmtGetSwLabel(d.uid, d.swLabel, sizeof(d.swLabel), &ack);
-            g_adSensor = 0;
-            g_adSub = (d.sensorCount > 0) ? 2 : 4;
+            g_adSub = 2;
             return true;
-        case 2: {                                               // SENSOR_DEFINITION (sensor g_adSensor)
+        case 2:                                                 // MANUFACTURER_LABEL
+            rdmRmtGetString(d.uid, RDM_PID_MANUFACTURER_LABEL, d.mfgLabel, sizeof(d.mfgLabel), &ack);
+            g_adSub = 3;
+            return true;
+        case 3:                                                 // DEVICE_MODEL_DESCRIPTION
+            rdmRmtGetString(d.uid, RDM_PID_DEVICE_MODEL_DESCRIPTION, d.modelDesc, sizeof(d.modelDesc), &ack);
+            g_adSub = 4;
+            return true;
+        case 4:                                                 // DEVICE_LABEL (user-assignable)
+            rdmRmtGetString(d.uid, RDM_PID_DEVICE_LABEL, d.deviceLabel, sizeof(d.deviceLabel), &ack);
+            g_adSensor = 0;
+            g_adSub = (d.sensorCount > 0) ? 5 : 7;
+            return true;
+        case 5: {                                               // SENSOR_DEFINITION (sensor g_adSensor)
             RdmSensor& sen = d.sensors[g_adSensor];
             rdm_sensor_definition_t def = {};
             if (rdmRmtGetSensorDef(d.uid, g_adSensor, &def, &ack) && ack.type == RDM_RESPONSE_TYPE_ACK) {
+                sen.type = def.type;
                 strlcpy(sen.name, def.description[0] ? def.description : rdmTypeStr(def.type), sizeof(sen.name));
                 strlcpy(sen.unit, rdmUnitStr(def.unit), sizeof(sen.unit));
             }
-            g_adSub = 3;
+            g_adSub = 6;
             return true;
         }
-        case 3: {                                               // SENSOR_VALUE (sensor g_adSensor)
+        case 6: {                                               // SENSOR_VALUE (present + lowest/highest/recorded)
             RdmSensor& sen = d.sensors[g_adSensor];
-            rdm_sensor_value_t val = {};
-            if (rdmRmtGetSensorValue(d.uid, g_adSensor, &val, &ack) && ack.type == RDM_RESPONSE_TYPE_ACK) {
-                sen.value = val.present_value; sen.valid = true;
+            int16_t p, lo, hi, rec;
+            if (rdmRmtGetSensorFull(d.uid, g_adSensor, &p, &lo, &hi, &rec, &ack)) {
+                sen.value = p; sen.lowest = lo; sen.highest = hi; sen.recorded = rec; sen.valid = true;
                 if (!sen.name[0]) strlcpy(sen.name, "Sensor", sizeof(sen.name));
             }
             g_adSensor++;
-            g_adSub = (g_adSensor < d.sensorCount) ? 2 : 4;
+            g_adSub = (g_adSensor < d.sensorCount) ? 5 : 7;
             return true;
         }
-        default:                                                // 4 -> this device is done
+        default:                                                // 7 -> this device is done
             g_adTabN = g_adEi + 1;
             g_adEi++; g_adSub = 0;
             return true;
@@ -420,6 +445,7 @@ static bool artDiscStep() {
         bool changed = artTodChanged();
         for (int i = 0; i < g_adTabN; i++) rdmDevices[i] = g_adTab[i];
         rdmCount = g_adTabN;
+        rdmApplySavedPoll();     // restore each fixture's per-sensor poll switches
         rdmScanned = true;
         rdmBusy = false;
         g_artDiscovering = false;
@@ -434,11 +460,56 @@ static bool artDiscStep() {
     }
 }
 
-// Called once per DMX frame from rdmService (core 1). Does at most ONE bus op: an on-demand
-// ArtRdm relay / TOD reply takes priority, otherwise one discovery step. Never blocks the frame.
+// Live sensor poll: refresh each *enabled* sensor about once a second. A bus op only happens on
+// a frame where an enabled sensor is actually due, so the DMX frame rate only takes a hit
+// proportional to how many sensors are switched on (roughly one read per second per sensor)
+// instead of one RDM transaction on every single frame. Disabled sensors are never touched.
+static int g_pollDev = 0, g_pollSen = 0;
+static const uint32_t SENSOR_POLL_MS = 1000;
+static void artSensorPollStep() {
+    uint32_t now = millis();
+    for (int tries = 0; tries < RDM_MAX_DEVICES * RDM_MAX_SENSORS; tries++) {
+        if (rdmCount == 0) return;
+        if (g_pollDev >= rdmCount) { g_pollDev = 0; g_pollSen = 0; }
+        RdmDevice& d = rdmDevices[g_pollDev];
+        if (d.sensorCount == 0 || g_pollSen >= d.sensorCount) { g_pollDev++; g_pollSen = 0; continue; }
+        RdmSensor& s = d.sensors[g_pollSen];
+        if (!s.poll || (uint32_t)(now - s.pollMs) < SENSOR_POLL_MS) { g_pollSen++; continue; }
+        rdm_ack_t ack; int16_t p, lo, hi, rec;
+        if (rdmRmtGetSensorFull(d.uid, g_pollSen, &p, &lo, &hi, &rec, &ack)) {
+            s.value = p; s.lowest = lo; s.highest = hi; s.recorded = rec; s.valid = true;
+        }
+        s.pollMs = now;
+        g_pollSen++;
+        return;   // one due sensor read this frame
+    }
+    // nothing due this frame -> no bus op, DMX keeps its full frame rate
+}
+
+// Called once per DMX frame from rdmService (core 1). Does at most ONE bus op: a user control
+// (set personality/label) or a queued ArtRdm relay/TOD takes priority, otherwise one discovery
+// step, otherwise (when live polling is on) one sensor read. Never blocks the frame.
 static void artRdmService() {
     if (!rdmAvailable()) return;
     g_artRdmEnabled = cfg.artnetRdm;
+    rdm_ack_t ack;
+
+    // RDM-tab controls: set personality / device label (one op, user-initiated).
+    if (rdmSetPersReq) {
+        rdmSetPersReq = false;
+        if (rdmRmtSetPersonality(rdmPersUid, rdmReqPers, &ack)) {
+            RdmDevice* d = rdmFind(rdmPersUid); if (d) d->personality = rdmReqPers;
+            Serial.printf("[RDM] set personality=%u\n", rdmReqPers);
+        }
+        return;
+    }
+    if (rdmSetLabelReq) {
+        rdmSetLabelReq = false;
+        if (rdmRmtSetString(rdmLabelUid, RDM_PID_DEVICE_LABEL, rdmReqLabel, &ack)) {
+            RdmDevice* d = rdmFind(rdmLabelUid); if (d) strlcpy(d->deviceLabel, rdmReqLabel, sizeof(d->deviceLabel));
+        }
+        return;
+    }
 
     // A queued Art-Net request (highest priority: a console is waiting on it).
     ArtRdmReq req;
@@ -474,7 +545,10 @@ static void artRdmService() {
     if (rdmDiscoverReq) { rdmDiscoverReq = false; artStartDiscovery(); }
 
     // One discovery step, if a discovery is in progress.
-    if (g_adPhase != AD_IDLE) artDiscStep();
+    if (g_adPhase != AD_IDLE) { artDiscStep(); return; }
+
+    // Idle: live sensor polling (lowest priority) — runs while any sensor switch is enabled.
+    if (g_pollAny) artSensorPollStep();
 }
 
 // ---- setup + config -------------------------------------------------------

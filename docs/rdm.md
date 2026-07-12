@@ -22,6 +22,59 @@ Art-Net / sACN → DMX output.
 
 ---
 
+## The RDM tab (web UI)
+
+RDM has its own page now, reachable from the **RDM** link in the nav (served at `/rdm`).
+
+- **Fixtures table**: one row per discovered fixture with everything visible at a glance, no
+  expanding needed, name, UID, DMX start address, footprint, personality, manufacturer, model,
+  category, and its sensors. The personality is an inline dropdown, and each row has an **ID**
+  (identify) button. Click a row only when you want to *change* it: it opens an inline editor for
+  the DMX start address and the device label, plus software version and sub-device count. Up to 64
+  fixtures are supported.
+- **Which sensors to poll**: every sensor in the table has its own little switch, and each fixture
+  has an "all" switch for its whole set. A switch means "poll this sensor and plot it". You enable
+  sensors explicitly, one at a time, so a stray click can never light up hundreds of sensors and dip
+  the DMX frame rate. The per-fixture "all" switch and the top **Live sensors** switch are
+  select-off / restore controls, not select-all: clicking one while anything in its scope is on
+  remembers that set and switches it all off, and clicking again restores exactly what was on. From
+  a cold state (nothing enabled) they do nothing. The whole selection is saved on the device, so it
+  survives a reload or reboot and is re-applied after the next discovery.
+- **Sensors, grouped by type**: the sensors you switch on are aggregated into one chart per RDM
+  sensor type (Temperature, Voltage, Speed, and so on). Each chart is a real time-series plot with a
+  value (Y) axis and a time (X) axis, gridlines, and units, and it overlays every switched-on
+  fixture-sensor of that type as its own coloured line with a legend. Colours are stable (assigned
+  per series, they don't flicker).
+- **Polling cost scales with what you switch on**: the gateway refreshes each enabled sensor about
+  once a second, and it only touches the bus on a frame where a sensor is actually due. So one
+  sensor is essentially free (measured 43 → 42 fps), and the frame-rate cost grows with how many
+  sensors you enable rather than being a flat hit the moment anything is on. Nothing enabled means
+  nothing is polled. Discovery is behind a confirmation prompt since it briefly shares the wire and
+  can dip the frame rate while it runs.
+
+While a scan is running, the status line shows **what the discovery is actually doing right now**
+instead of a static "scanning" message: a progress bar plus text like *"Reading fixture 17 of 32 ·
+sensor values"*. It tracks the state machine through its phases (searching the tree, then reading
+each fixture's info/software/labels/sensors, then publishing), so a long sweep on a big rig shows
+real progress rather than an indeterminate spinner.
+
+The top bar is the same live strip as the Status page (FPS per output, link, heap, uptime, jitter,
+and the hostname/IP/version subtitle). It's cached across page loads and the pages opt into
+cross-document view transitions, so switching tabs is a quick crossfade with the bar held steady
+instead of a flicker.
+
+All of this is backed by `/rdm.json`, which grew the per-fixture fields (`mfg`, `modelName`, `label`,
+`cat`, `swVer`, and per-sensor `lo`/`hi`/`rec`/`type`/`poll`), a top-level `sensorPoll` flag, and the
+live discovery-progress fields (`discStage` 0-3, `discFound`, `discCur`, `discSub`). At 64 fixtures
+the document is ~32 KB, so `/rdm.json` is streamed device-by-device (a chunked response) rather than
+built as one big string, which the fragmented ESP32-S3 heap can't allocate in one piece. The controls
+go over the existing WebSocket: `rdm_setaddr`, `rdm_identify`, `rdm_setpers`, `rdm_setlabel`,
+`rdm_sensorpoll` (all sensors on/off), and `rdm_sensorsel` (`{uid, sensor, on}`, with `sensor:-1`
+meaning the whole fixture). A responder that does not implement a given PID just NACKs it and that
+field stays blank, which is normal.
+
+---
+
 ## RDM over Art-Net
 
 Art-Net carries RDM natively (sACN/E1.31 does not, network-native RDM there is the much heavier

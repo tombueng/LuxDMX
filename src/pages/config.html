@@ -33,8 +33,14 @@
 .form-control:focus,.form-select:focus{border-color:#23e6f7;box-shadow:0 0 0 .25rem rgba(35,230,247,.25);}
 .form-range::-webkit-slider-thumb{background:#23e6f7;}
 .form-range::-moz-range-thumb{background:#23e6f7;}
-body { background: var(--gh-bg); }
-.site-nav { background:var(--gh-surface); border-bottom:1px solid var(--gh-border); padding:.6rem 1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+html { background: var(--gh-bg); }   /* dark from first paint: no white flash on tab switch */
+body { background: var(--gh-bg); animation:lxfade .16s ease-out; }
+@keyframes lxfade { from { opacity:0 } to { opacity:1 } }
+/* Smooth tab switching (progressive enhancement): quick crossfade, nav stays put. */
+@view-transition { navigation: auto; }
+::view-transition-group(site-nav) { animation-duration:.18s; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration:.18s; }
+.site-nav { background:var(--gh-surface); border-bottom:1px solid var(--gh-border); padding:.6rem 1rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; view-transition-name:site-nav; }
 .brand { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
 .brand img { height:48px; }
 .brand-text { font-size:1.2rem; font-weight:700; color:#fff; }
@@ -100,6 +106,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
   </a>
   <div class="nav-links">
     <a href="/" class="btn btn-outline-secondary btn-sm">Status</a>
+    <a href="/rdm" class="btn btn-outline-secondary btn-sm">RDM</a>
     <a href="/config" class="btn btn-primary btn-sm">Settings</a>
   </div>
 </nav>

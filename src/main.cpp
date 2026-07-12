@@ -119,6 +119,7 @@ static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64
 #include "generated/version.h"
 #include "generated/index_html.h"
 #include "generated/config_html.h"
+#include "generated/rdm_html.h"
 #include "generated/config_saved_html.h"
 #include "generated/reset_html.h"
 #include "generated/reset_done_html.h"
@@ -408,6 +409,7 @@ static bool parseIp(const String& s, IPAddress& out) {
 // Global objects
 // ---------------------------------------------------------------------------
 Preferences       prefs;
+static void rdmLoadPoll();   // fwd decl (defined with the RDM sensor-poll persistence, below)
 AsyncWebServer    http(80);
 AsyncWebSocket    ws("/ws");
 ArtnetWifi        artnet;
@@ -510,6 +512,7 @@ static void loadConfig() {
     prefs.begin(PREF_NS, true);
     if (prefs.isKey("labels")) g_labels = prefs.getString("labels", "{}");   // isKey: avoid the NOT_FOUND log on a fresh device
     prefs.end();
+    rdmLoadPoll();   // restore which sensors are enabled for live polling + graphing
     sanitizeOutputs();
 }
 
@@ -829,22 +832,33 @@ struct RdmSensor {
     char    name[20];   // SENSOR_DEFINITION description, or a type label
     char    unit[8];    // SI unit string derived from the definition
     int16_t value;      // SENSOR_VALUE present value
+    int16_t lowest;     // lowest detected (min)
+    int16_t highest;    // highest detected (max)
+    int16_t recorded;   // recorded value
+    uint8_t type;       // RDM sensor type enum (SENSOR_DEFINITION)
     bool    valid;      // a value was read
+    bool    poll;       // include this sensor in live polling + the graph (per-UID, persisted)
+    uint32_t pollMs;    // millis() of the last live read (rate-limits polling to ~1 Hz/sensor)
 };
 struct RdmDevice {
     rdm_uid_t uid;
     uint16_t  startAddr;
     uint16_t  footprint;
     uint16_t  modelId;
+    uint16_t  productCategory;   // DEVICE_INFO product category
+    uint32_t  swVersionId;       // DEVICE_INFO software version id (numeric)
     uint16_t  subDeviceCount;
     uint8_t   personality;
     uint8_t   personalityCount;
     bool      identifying;
-    char      swLabel[33];
+    char      swLabel[33];       // SOFTWARE_VERSION_LABEL
+    char      mfgLabel[33];      // MANUFACTURER_LABEL
+    char      modelDesc[33];     // DEVICE_MODEL_DESCRIPTION
+    char      deviceLabel[33];   // DEVICE_LABEL (user-assignable)
     uint8_t   sensorCount;
     RdmSensor sensors[RDM_MAX_SENSORS];
 };
-static constexpr int RDM_MAX_DEVICES = 32;
+static constexpr int RDM_MAX_DEVICES = 64;
 static RdmDevice rdmDevices[RDM_MAX_DEVICES];
 static int       rdmCount      = 0;
 static bool      rdmScanned    = false;       // a discovery has completed at least once
@@ -859,6 +873,13 @@ static rdm_uid_t     rdmSetUid      = {0, 0};
 static rdm_uid_t     rdmIdentUid    = {0, 0};
 static volatile uint16_t rdmReqAddr = 1;
 static volatile bool rdmReqOn       = false;
+// Extended controls (RDM tab): set personality, set device label, toggle live sensor polling.
+static volatile bool rdmSetPersReq  = false;
+static rdm_uid_t     rdmPersUid     = {0, 0};
+static volatile uint8_t rdmReqPers  = 1;
+static volatile bool rdmSetLabelReq = false;
+static rdm_uid_t     rdmLabelUid    = {0, 0};
+static char          rdmReqLabel[33] = {0};
 
 // RDM only works when the DMX driver is up AND a direction-enable pin is set.
 static bool rdmAvailable() { return dmxReady && rdmOut >= 0 && outReady[rdmOut]; }
@@ -916,6 +937,72 @@ static bool rdmParseUid(const String& msg, rdm_uid_t& out) {
     out.man_id = (uint16_t)strtoul(msg.substring(k, colon).c_str(), nullptr, 16);
     out.dev_id = (uint32_t)strtoul(msg.substring(colon + 1, end).c_str(), nullptr, 16);
     return true;
+}
+
+// ── per-sensor live-poll selection, persisted in NVS (the RDM tab switches) ──
+// Each (device UID, sensor) can be enabled individually for background polling + graphing.
+// The enabled set is stored as "UID:mask" entries so it survives reboots and re-discovery.
+struct RdmPollSave { uint64_t uid; uint8_t mask; };
+static RdmPollSave   g_savedPoll[RDM_MAX_DEVICES];
+static int           g_savedPollN = 0;
+static volatile bool g_pollAny    = false;   // any sensor enabled -> the round-robin runs
+static volatile bool rdmPollDirty = false;   // a switch changed -> loop() persists
+
+static inline uint64_t uidPack64(const rdm_uid_t& u) { return ((uint64_t)u.man_id << 32) | u.dev_id; }
+
+static void rdmRecalcPollAny() {
+    for (int i = 0; i < rdmCount; i++)
+        for (int s = 0; s < rdmDevices[i].sensorCount; s++)
+            if (rdmDevices[i].sensors[s].poll) { g_pollAny = true; return; }
+    g_pollAny = false;
+}
+static void rdmLoadPoll() {
+    prefs.begin(PREF_NS, true);
+    String s = prefs.isKey("rdmpoll") ? prefs.getString("rdmpoll", "") : "";
+    prefs.end();
+    g_savedPollN = 0;
+    for (int i = 0; i < (int)s.length() && g_savedPollN < RDM_MAX_DEVICES; ) {
+        int c = s.indexOf(',', i); if (c < 0) c = s.length();
+        int col = s.indexOf(':', i);
+        if (col > i && col < c) {
+            g_savedPoll[g_savedPollN].uid  = strtoull(s.substring(i, col).c_str(), nullptr, 16);
+            g_savedPoll[g_savedPollN].mask = (uint8_t)strtoul(s.substring(col + 1, c).c_str(), nullptr, 16);
+            g_savedPollN++;
+        }
+        i = c + 1;
+    }
+}
+// Restore each discovered device's sensor.poll from the saved mask (run after a discovery).
+static void rdmApplySavedPoll() {
+    for (int i = 0; i < rdmCount; i++) {
+        uint8_t mask = 0;
+        uint64_t u = uidPack64(rdmDevices[i].uid);
+        for (int k = 0; k < g_savedPollN; k++) if (g_savedPoll[k].uid == u) { mask = g_savedPoll[k].mask; break; }
+        for (int s = 0; s < RDM_MAX_SENSORS; s++) rdmDevices[i].sensors[s].poll = (mask >> s) & 1;
+    }
+    rdmRecalcPollAny();
+}
+// Rebuild the saved map from the live flags and persist it (called from loop() on dirty).
+static void rdmSavePoll() {
+    g_savedPollN = 0;
+    String out;
+    for (int i = 0; i < rdmCount; i++) {
+        uint8_t mask = 0;
+        for (int s = 0; s < rdmDevices[i].sensorCount && s < 8; s++)
+            if (rdmDevices[i].sensors[s].poll) mask |= (1 << s);
+        if (!mask) continue;
+        if (g_savedPollN < RDM_MAX_DEVICES) {
+            g_savedPoll[g_savedPollN].uid  = uidPack64(rdmDevices[i].uid);
+            g_savedPoll[g_savedPollN].mask = mask; g_savedPollN++;
+        }
+        char buf[24];
+        snprintf(buf, sizeof(buf), "%012llX:%X", (unsigned long long)uidPack64(rdmDevices[i].uid), mask);
+        if (out.length()) out += ",";
+        out += buf;
+    }
+    prefs.begin(PREF_NS, false);
+    prefs.putString("rdmpoll", out);
+    prefs.end();
 }
 
 #ifdef DMX_RMT
@@ -1005,6 +1092,7 @@ static void rdmDoDiscover() {
         }
         rdmDevices[rdmCount++] = d;
     }
+    rdmApplySavedPoll();     // restore each fixture's per-sensor poll switches
     rdmScanned    = true;
     rdmLastScanMs = millis();
     rdmBusy       = false;
@@ -1324,6 +1412,51 @@ static void handleWsText(const char* payload, size_t len) {
             rdmIdentUid = u;
             rdmReqOn    = (msg.indexOf("\"on\":true") >= 0);
             rdmIdentifyReq = true;
+        }
+        return;
+    }
+    if (msg.indexOf("\"rdm_setpers\"") >= 0) {
+        rdm_uid_t u;
+        int k = msg.indexOf("\"pers\":");
+        if (rdmParseUid(msg, u) && k >= 0) {
+            int p = msg.substring(k + 7).toInt();
+            if (p >= 1 && p <= 255) { rdmPersUid = u; rdmReqPers = (uint8_t)p; rdmSetPersReq = true; }
+        }
+        return;
+    }
+    if (msg.indexOf("\"rdm_setlabel\"") >= 0) {
+        rdm_uid_t u;
+        int k = msg.indexOf("\"label\":\"");
+        if (rdmParseUid(msg, u) && k >= 0) {
+            int s = k + 9, e = msg.indexOf('"', s);
+            if (e > s) {
+                strlcpy(rdmReqLabel, msg.substring(s, e).c_str(), sizeof(rdmReqLabel));
+                rdmLabelUid = u; rdmSetLabelReq = true;
+            }
+        }
+        return;
+    }
+    if (msg.indexOf("\"rdm_sensorpoll\"") >= 0) {   // master switch: enable/disable every sensor
+        bool on = (msg.indexOf("\"on\":true") >= 0);
+        for (int i = 0; i < rdmCount; i++)
+            for (int s = 0; s < rdmDevices[i].sensorCount; s++) rdmDevices[i].sensors[s].poll = on;
+        rdmRecalcPollAny();
+        rdmPollDirty = true;
+        return;
+    }
+    if (msg.indexOf("\"rdm_sensorsel\"") >= 0) {    // a sensor switch (poll + graph); sensor=-1 -> whole fixture
+        rdm_uid_t u;
+        int k = msg.indexOf("\"sensor\":");
+        if (rdmParseUid(msg, u) && k >= 0) {
+            int sn = msg.substring(k + 9).toInt();
+            bool on = (msg.indexOf("\"on\":true") >= 0);
+            RdmDevice* d = rdmFind(u);
+            if (d) {
+                if (sn < 0) { for (int s = 0; s < d->sensorCount; s++) d->sensors[s].poll = on; }  // all of this fixture
+                else if (sn < d->sensorCount) d->sensors[sn].poll = on;
+                rdmRecalcPollAny();
+                rdmPollDirty = true;
+            }
         }
         return;
     }
@@ -1899,57 +2032,116 @@ static void handleRdmTrigger(AsyncWebServerRequest* req) {
     req->send(400, "application/json", "{\"ok\":false}");
 }
 
-static void handleRdmJson(AsyncWebServerRequest* req) {
-    String j;
-    j.reserve(96 + rdmCount * 280);
-    j  = "{\"available\":"; j += rdmAvailable() ? "true" : "false";
-    j += ",\"busy\":";      j += rdmBusy ? "true" : "false";
-    j += ",\"scanned\":";   j += rdmScanned ? "true" : "false";
-#ifdef DMX_RMT
-    j += ",\"artnetRdm\":"; j += g_artRdmEnabled ? "true" : "false";
-    j += ",\"artPort\":";   j += artRdmPortAddr();
-    j += ",\"discovering\":"; j += g_artDiscovering ? "true" : "false";
-    j += ",\"artTodReqs\":"; j += (uint32_t)g_artTodReqs;
-    j += ",\"artRdmReqs\":"; j += (uint32_t)g_artRdmReqs;
-    j += ",\"artFlushes\":"; j += (uint32_t)g_artFlushes;
-    j += ",\"artPolls\":";   j += (uint32_t)g_artPolls;
-#endif
-    j += ",\"devices\":[";
-    for (int i = 0; i < rdmCount; i++) {
-        const RdmDevice& d = rdmDevices[i];
-        char uid[20];
-        snprintf(uid, sizeof(uid), "%04X:%08lX", d.uid.man_id, (unsigned long)d.uid.dev_id);
-        if (i) j += ',';
-        j += "{\"uid\":\"";     j += uid;          j += "\"";
-        j += ",\"addr\":";      j += d.startAddr;
-        j += ",\"footprint\":"; j += d.footprint;
-        j += ",\"model\":";     j += d.modelId;
-        j += ",\"pers\":";      j += d.personality;
-        j += ",\"persCount\":"; j += d.personalityCount;
-        j += ",\"subs\":";      j += d.subDeviceCount;
-        j += ",\"identify\":";  j += d.identifying ? "true" : "false";
-        j += ",\"sw\":\"";      j += rdmJsonEsc(d.swLabel); j += "\"";
-        j += ",\"sensors\":[";
-        bool firstSen = true;
-        for (int s = 0; s < d.sensorCount; s++) {
-            const RdmSensor& sn = d.sensors[s];
-            if (!sn.valid) continue;
-            if (!firstSen) j += ',';
-            firstSen = false;
-            j += "{\"name\":\"";  j += rdmJsonEsc(sn.name);
-            j += "\",\"value\":"; j += sn.value;
-            j += ",\"unit\":\"";  j += rdmJsonEsc(sn.unit); j += "\"}";
-        }
-        j += "]}";
+// One RDM device as a JSON object (~420 bytes). Built on demand so /rdm.json can be *streamed*
+// device-by-device: at 64 fixtures the whole document is ~27 KB, which sendJsonSafe() refuses to
+// send in one piece on the fragmented S3 heap (largest contiguous block < 39 KB). Streaming never
+// needs more than one device's worth of contiguous heap.
+static String rdmDeviceJson(const RdmDevice& d) {
+    String j; j.reserve(440);
+    char uid[20];
+    snprintf(uid, sizeof(uid), "%04X:%08lX", d.uid.man_id, (unsigned long)d.uid.dev_id);
+    j += "{\"uid\":\"";     j += uid;          j += "\"";
+    j += ",\"addr\":";      j += d.startAddr;
+    j += ",\"footprint\":"; j += d.footprint;
+    j += ",\"model\":";     j += d.modelId;
+    j += ",\"pers\":";      j += d.personality;
+    j += ",\"persCount\":"; j += d.personalityCount;
+    j += ",\"subs\":";      j += d.subDeviceCount;
+    j += ",\"identify\":";  j += d.identifying ? "true" : "false";
+    j += ",\"sw\":\"";      j += rdmJsonEsc(d.swLabel); j += "\"";
+    j += ",\"mfg\":\"";     j += rdmJsonEsc(d.mfgLabel); j += "\"";
+    j += ",\"modelName\":\""; j += rdmJsonEsc(d.modelDesc); j += "\"";
+    j += ",\"label\":\"";   j += rdmJsonEsc(d.deviceLabel); j += "\"";
+    j += ",\"cat\":";       j += d.productCategory;
+    j += ",\"swVer\":";     j += (uint32_t)d.swVersionId;
+    j += ",\"sensors\":[";
+    bool firstSen = true;
+    for (int s = 0; s < d.sensorCount; s++) {
+        const RdmSensor& sn = d.sensors[s];
+        if (!sn.valid) continue;
+        if (!firstSen) j += ',';
+        firstSen = false;
+        j += "{\"name\":\"";  j += rdmJsonEsc(sn.name);
+        j += "\",\"value\":"; j += sn.value;
+        j += ",\"lo\":";      j += sn.lowest;
+        j += ",\"hi\":";      j += sn.highest;
+        j += ",\"rec\":";     j += sn.recorded;
+        j += ",\"type\":";    j += sn.type;
+        j += ",\"poll\":";    j += sn.poll ? "true" : "false";
+        j += ",\"unit\":\"";  j += rdmJsonEsc(sn.unit); j += "\"}";
     }
     j += "]}";
-    sendJsonSafe(req, j);
+    return j;
+}
+
+static void handleRdmJson(AsyncWebServerRequest* req) {
+    struct RdmGen {
+        String head; size_t headOff = 0;      // header up to and including `"devices":[`
+        int    dev = 0;                       // next device index
+        String cur; size_t curOff = 0, curLen = 0;  // current device (with its leading comma)
+        int    phase = 0;                     // 0 head, 1 devices, 2 footer, 3 done
+        size_t footOff = 0;
+    };
+    auto s = std::make_shared<RdmGen>();
+    s->head  = "{\"available\":"; s->head += rdmAvailable() ? "true" : "false";
+    s->head += ",\"busy\":";      s->head += rdmBusy ? "true" : "false";
+    s->head += ",\"scanned\":";   s->head += rdmScanned ? "true" : "false";
+#ifdef DMX_RMT
+    s->head += ",\"artnetRdm\":"; s->head += g_artRdmEnabled ? "true" : "false";
+    s->head += ",\"artPort\":";   s->head += artRdmPortAddr();
+    s->head += ",\"discovering\":"; s->head += g_artDiscovering ? "true" : "false";
+    s->head += ",\"discStage\":"; s->head += (int)g_discStage;   // 0 idle 1 search 2 enrich 3 publish
+    s->head += ",\"discFound\":"; s->head += (int)g_discFound;   // devices seen so far
+    s->head += ",\"discCur\":";   s->head += (int)g_discCur;     // enrich: current device (0-based)
+    s->head += ",\"discSub\":";   s->head += (int)g_discSub;     // enrich: PID sub-step 0..7
+    s->head += ",\"artTodReqs\":"; s->head += (uint32_t)g_artTodReqs;
+    s->head += ",\"artRdmReqs\":"; s->head += (uint32_t)g_artRdmReqs;
+    s->head += ",\"artFlushes\":"; s->head += (uint32_t)g_artFlushes;
+    s->head += ",\"artPolls\":";   s->head += (uint32_t)g_artPolls;
+    s->head += ",\"sensorPoll\":"; s->head += g_pollAny ? "true" : "false";   // any sensor switch enabled
+#endif
+    s->head += ",\"devices\":[";
+    req->sendChunked("application/json", [s](uint8_t* b, size_t maxLen, size_t) -> size_t {
+        size_t n = 0;
+        if (s->phase == 0) {                         // small header
+            while (s->headOff < s->head.length() && n < maxLen) b[n++] = (uint8_t)s->head[s->headOff++];
+            if (s->headOff < s->head.length()) return n;
+            s->phase = 1;
+        }
+        if (s->phase == 1) {                         // one device object at a time
+            while (n < maxLen) {
+                if (s->curOff >= s->curLen) {         // load the next device
+                    if (s->dev >= rdmCount) { s->phase = 2; break; }
+                    s->cur  = s->dev ? "," : "";
+                    s->cur += rdmDeviceJson(rdmDevices[s->dev]);
+                    s->curLen = s->cur.length(); s->curOff = 0; s->dev++;
+                }
+                while (s->curOff < s->curLen && n < maxLen) b[n++] = (uint8_t)s->cur[s->curOff++];
+            }
+            if (s->phase == 1) return n;              // buffer full mid-array; resume next call
+        }
+        if (s->phase == 2) {                         // closing "]}"
+            static const char foot[] = "]}";
+            while (s->footOff < 2 && n < maxLen) b[n++] = (uint8_t)foot[s->footOff++];
+            if (s->footOff < 2) return n;
+            s->phase = 3;
+        }
+        return n;                                    // phase 3: next call returns 0 -> complete
+    });
 }
 
 static void handleConfigGet(AsyncWebServerRequest* req) {
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", CONFIG_HTML, CONFIG_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
     r->addHeader("Cache-Control", "no-cache");   // revalidate after OTA (assets stay versioned)
+    req->send(r);
+}
+
+// The dedicated RDM tab (fixture list + per-fixture detail, live sensors, controls).
+static void handleRdmPage(AsyncWebServerRequest* req) {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", RDM_HTML, RDM_HTML_LEN);
+    r->addHeader("Content-Encoding", "gzip");
+    r->addHeader("Cache-Control", "no-cache");
     req->send(r);
 }
 
@@ -3042,6 +3234,9 @@ void setup() {
     http.on("/rdm/discover",      HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/setaddr",       HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/identify",      HTTP_GET,  handleRdmTrigger);
+    // The page route matches "/rdm" and prefix "/rdm/…", so register it AFTER the /rdm/* handlers
+    // (first match wins) or it would swallow /rdm/discover etc.
+    http.on("/rdm",               HTTP_GET,  handleRdmPage);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
@@ -3171,6 +3366,8 @@ static void netRxTask(void*) {
 // ---------------------------------------------------------------------------
 void loop() {
     cfgserial::poll();   // serial config console (non-blocking line reader)
+
+    if (rdmPollDirty) { rdmPollDirty = false; rdmSavePoll(); }   // persist sensor switch changes
 
 #ifdef SIM_ARTNET
     simArtnetTick();
