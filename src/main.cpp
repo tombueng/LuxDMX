@@ -3398,6 +3398,11 @@ void setup() {
 
     loadConfig();
     rdmAllocTables();   // size the RDM device tables to available RAM (before any RDM use)
+    if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
+        Serial.printf("[MEM] PSRAM %u KB total / %u KB free; internal heap %u KB free\n",
+            (unsigned)(heap_caps_get_total_size(MALLOC_CAP_SPIRAM) / 1024),
+            (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)  / 1024),
+            (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
     cfgserial::begin(Serial, SERIAL_HOOKS);   // serial config console: type 'help'
 #if defined(HAS_WIRED_ETH)
     // Wired Ethernet is active when the user selected it; the W5500 path additionally
