@@ -916,6 +916,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Static IP / gateway / subnet / DNS | DHCP | Web `/config` (Network) |
 | Auto-update | off | Web `/config` (Firmware) |
 | RDM over Art-Net (`artrdm`) | on | Web `/config` (RDM) |
+| RDM device limit (`rdmmaxdev`) | `0` (auto) | Web `/config` (RDM) |
 | Channel labels | — | Status page (channel modal) |
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password (IDE `espota` only) | `dmxota` | Web `/config` |

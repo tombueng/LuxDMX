@@ -89,6 +89,7 @@ const CfgField CONFIG_FIELDS[] = {
 
     // --- RDM ----------------------------------------------------------------
     BFIELD("artrdm", "artnetRdm", artnetRdm, "RDM over Art-Net", "RDM", CFG_NONE),
+    IFIELD("rdmmaxdev", "rdmMaxDev", rdmMaxDev, 0, 64, "RDM device limit (0 = auto)", "RDM"),
 
     // --- Updates (own route, not the /config form) -------------------------
     BFIELD("autoupd", "autoUpdate", autoUpdate, "Auto-update firmware", "Updates", CFG_NOWEB),

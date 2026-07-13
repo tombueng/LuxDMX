@@ -43,6 +43,7 @@ struct Config {
     String    ip, gateway, subnet, dns;
     bool      autoUpdate;
     bool      artnetRdm;      // respond to RDM-over-Art-Net (ArtTodRequest / ArtRdm)
+    int       rdmMaxDev;      // RDM device table cap; 0 = auto-detect from available RAM (+ PSRAM)
 };
 
 extern Config cfg;

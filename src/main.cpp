@@ -882,8 +882,17 @@ struct RdmDevice {
     uint16_t  statusMsgId;       // STATUS_MESSAGE_ID of that message
     uint8_t   statusCount;       // number of messages in the last harvest
 };
-static constexpr int RDM_MAX_DEVICES = 64;
-static RdmDevice rdmDevices[RDM_MAX_DEVICES];
+// RDM device tables are dynamically allocated at boot (rdmAllocTables), sized to the RAM the
+// board actually has. This is the single biggest RAM consumer in the firmware: each RdmDevice
+// is ~350 B and there are TWO full tables (rdmDevices here + g_adTab in artnet_rdm.h) plus
+// g_savedPoll, so 64 devices is ~45 KB of DRAM -- most of the free heap on a classic ESP32.
+// rdmAllocTables() auto-detects: PSRAM present -> full cap from PSRAM; big internal RAM (S3)
+// -> full cap; a plain classic ESP32 -> a small cap so the web server keeps its headroom.
+// cfg.rdmMaxDev overrides the auto value (0 = auto). RDM_HW_MAX is the hard ceiling and also
+// sizes the couple of small fixed discovery buffers (uids[], the ArtTod packet).
+static constexpr int RDM_HW_MAX = 64;
+static int        g_rdmMaxDev = RDM_HW_MAX;   // effective cap, set in rdmAllocTables() (1..RDM_HW_MAX)
+static RdmDevice* rdmDevices  = nullptr;      // [g_rdmMaxDev], allocated in rdmAllocTables()
 static int       rdmCount      = 0;
 static bool      rdmScanned    = false;       // a discovery has completed at least once
 static volatile bool rdmBusy   = false;       // discovery in progress
@@ -968,7 +977,7 @@ static bool rdmParseUid(const String& msg, rdm_uid_t& out) {
 // Each (device UID, sensor) can be enabled individually for background polling + graphing.
 // The enabled set is stored as "UID:mask" entries so it survives reboots and re-discovery.
 struct RdmPollSave { uint64_t uid; uint8_t mask; };
-static RdmPollSave   g_savedPoll[RDM_MAX_DEVICES];
+static RdmPollSave*  g_savedPoll  = nullptr;   // [g_rdmMaxDev], allocated in rdmAllocTables()
 static int           g_savedPollN = 0;
 static volatile bool g_pollAny    = false;   // any sensor enabled -> the round-robin runs
 static volatile bool rdmPollDirty = false;   // a switch changed -> loop() persists
@@ -986,7 +995,7 @@ static void rdmLoadPoll() {
     String s = prefs.isKey("rdmpoll") ? prefs.getString("rdmpoll", "") : "";
     prefs.end();
     g_savedPollN = 0;
-    for (int i = 0; i < (int)s.length() && g_savedPollN < RDM_MAX_DEVICES; ) {
+    for (int i = 0; i < (int)s.length() && g_savedPollN < g_rdmMaxDev; ) {
         int c = s.indexOf(',', i); if (c < 0) c = s.length();
         int col = s.indexOf(':', i);
         if (col > i && col < c) {
@@ -1016,7 +1025,7 @@ static void rdmSavePoll() {
         for (int s = 0; s < rdmDevices[i].sensorCount && s < 8; s++)
             if (rdmDevices[i].sensors[s].poll) mask |= (1 << s);
         if (!mask) continue;
-        if (g_savedPollN < RDM_MAX_DEVICES) {
+        if (g_savedPollN < g_rdmMaxDev) {
             g_savedPoll[g_savedPollN].uid  = uidPack64(rdmDevices[i].uid);
             g_savedPoll[g_savedPollN].mask = mask; g_savedPollN++;
         }
@@ -1035,6 +1044,44 @@ static void rdmSavePoll() {
 // primitives and the RdmDevice table / rdmDevices[] declared above. See docs/rdm.md.
 #include "artnet_rdm.h"
 #endif
+
+// Allocate the RDM device tables sized to the RAM this board actually has. Called once at boot
+// (setup, right after loadConfig). PSRAM present -> full cap from PSRAM; an S3-class chip -> full
+// cap; a plain classic ESP32 -> a small cap so the WiFi/web stack keeps its heap headroom. A
+// non-zero cfg.rdmMaxDev forces a specific cap. The two big RdmDevice tables (rdmDevices + g_adTab)
+// plus g_savedPoll are the firmware's largest RAM users, so this is the main heap lever.
+static bool rdmAllocTables() {
+    const bool   psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+    const size_t intB  = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    int cap; const char* how;
+    if      (cfg.rdmMaxDev > 0)    { cap = cfg.rdmMaxDev; how = "manual"; }
+    else if (psram)               { cap = RDM_HW_MAX;    how = "auto/psram"; }
+    else if (intB >= 380u * 1024) { cap = RDM_HW_MAX;    how = "auto/ram-hi"; }   // S3-class internal RAM
+    else                          { cap = 16;            how = "auto/ram-lo"; }   // classic ESP32 (~300 KB)
+    if (cap < 1) cap = 1;
+    if (cap > RDM_HW_MAX) cap = RDM_HW_MAX;
+    g_rdmMaxDev = cap;
+
+    // Prefer PSRAM for the big tables, fall back to internal when there is none.
+    auto grab = [](int n, size_t sz) -> void* {
+        void* p = heap_caps_calloc(n, sz, MALLOC_CAP_SPIRAM);
+        return p ? p : heap_caps_calloc(n, sz, MALLOC_CAP_8BIT);
+    };
+    rdmDevices  = (RdmDevice*)  grab(cap, sizeof(RdmDevice));
+    g_savedPoll = (RdmPollSave*)grab(cap, sizeof(RdmPollSave));
+    bool ok = rdmDevices && g_savedPoll;
+    size_t bytes = (size_t)cap * (sizeof(RdmDevice) + sizeof(RdmPollSave));
+#ifdef DMX_RMT
+    g_adTab = (RdmDevice*)grab(cap, sizeof(RdmDevice));
+    ok = ok && g_adTab;
+    bytes += (size_t)cap * sizeof(RdmDevice);
+#endif
+    Serial.printf("[RDM] device cap=%d (%s), tables ~%u B %s%s\n",
+        cap, how, (unsigned)bytes, psram ? "in PSRAM" : "internal",
+        ok ? "" : "  -- ALLOC FAILED, RDM disabled");
+    if (!ok) g_rdmMaxDev = 0;   // no memory -> RDM stays inert (every loop is bounded by g_rdmMaxDev)
+    return ok;
+}
 
 // ---- RDM transport adapter -------------------------------------------------------------
 // The DMX_RMT build talks RDM over RMT-TX + a RX-only UART (rdm_rmt.h); other builds use the
@@ -1072,9 +1119,9 @@ static bool rdmOpSetIdentify(const rdm_uid_t& uid, bool on, rdm_ack_t* a)       
 #ifndef DMX_RMT
 static void rdmDoDiscover() {
     rdmBusy = true;
-    rdm_uid_t uids[RDM_MAX_DEVICES];
-    int n = rdmOpDiscover(uids, RDM_MAX_DEVICES);
-    if (n > RDM_MAX_DEVICES) n = RDM_MAX_DEVICES;
+    rdm_uid_t uids[RDM_HW_MAX];
+    int n = rdmOpDiscover(uids, g_rdmMaxDev);
+    if (n > g_rdmMaxDev) n = g_rdmMaxDev;
     rdmCount = 0;
     for (int i = 0; i < n; i++) {
         RdmDevice d = {};
@@ -3334,17 +3381,23 @@ static const cfgserial::Hooks SERIAL_HOOKS = {
     cfgserialSave, cfgserialReboot, cfgserialFactory, cfgserialWifi };
 
 void setup() {
-    // Brownout detector: on the classic ESP32 (esp32dev/wt32eth01) this register
-    // write disables it. On the ESP32-S3 under arduino-esp32 v3 / IDF 5 the BOD is
-    // already armed during IDF startup (before setup() runs), so this write is too
-    // late there — the v3 env disables it at the sdkconfig level instead
-    // (CONFIG_ESP_BROWNOUT_DET=n in platformio.ini). Harmless to keep here.
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+    // Brownout detector. The ESP32-S3 disables it at the sdkconfig level (its BOD arms during
+    // IDF startup, before setup() runs, so a register write here is too late). The WT32-ETH01
+    // keeps it disabled via this write (its RMII PHY has its own inrush and it is not retested
+    // with the BOD on). On the generic classic ESP32 (esp32dev) we now LEAVE THE BOD ON: a board
+    // whose 3.3V rail cannot supply the WiFi RF turn-on will reboot with a clear
+    // "Brownout detector was triggered" instead of hanging silently at WiFi.mode(), so a user
+    // knows it is a power problem (weak regulator / missing decoupling), not a dead board. See
+    // docs/hardware notes: such boards need a solid 3.3V supply or a bulk cap near the module.
+#if defined(USE_ETH_RMII)
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);   // WT32-ETH01 only
+#endif
     Serial.begin(115200);
     startMs = millis();
     Serial.println("\n[BOOT] LuxDMX — Art-Net / sACN DMX Gateway");
 
     loadConfig();
+    rdmAllocTables();   // size the RDM device tables to available RAM (before any RDM use)
     cfgserial::begin(Serial, SERIAL_HOOKS);   // serial config console: type 'help'
 #if defined(HAS_WIRED_ETH)
     // Wired Ethernet is active when the user selected it; the W5500 path additionally
