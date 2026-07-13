@@ -462,7 +462,6 @@ static bool     dmxReady     = false;
 static bool     manualMode   = false;
 static uint32_t lastWsPush   = 0;
 static uint32_t lastDmxMs    = 0;
-static bool     pendingGithubOta = false;
 static String   otaTarget       = "latest";   // release tag to install
 static String   latestVersion   = "";
 // Live OTA progress, polled by the update page via /ota/status. Written from the
@@ -2419,14 +2418,41 @@ static void checkForUpdate() {
         v.c_str(), FIRMWARE_VERSION, updateAvailable ? "yes" : "no");
 }
 
+// Persist the update target and reboot into it. A firmware self-update pulls the image
+// over HTTPS, and TLS needs a big contiguous heap block. Once DMX/RDM/Art-Net/web/WS are
+// running the heap is too fragmented to allocate it (worse with RDM, worse still on the
+// classic ESP32), so the update is refused -- that is the bug that broke OTA on the RDM
+// release. Instead of updating in place, we stash the target in NVS and reboot; early in
+// setup() (before any of those subsystems start) otaBootUpdate() runs the download against
+// a pristine heap. The flag is one-shot and cleared before the attempt, so a failed or
+// interrupted update just falls through to a normal boot -- never a reboot loop.
+static void scheduleOtaReboot(const String& target) {
+    prefs.begin(PREF_NS, false);
+    prefs.putString("otatgt", target);
+    prefs.putUChar("otapend", 1);
+    prefs.end();
+    Serial.printf("[OTA] scheduled clean-heap update to %s, rebooting\n", target.c_str());
+    pendingRebootAt = millis() + 1200;   // let the progress page load + the response flush first
+}
+
 static void versionCheckTask(void*) {
     vTaskDelay(pdMS_TO_TICKS(8000));
     for (;;) {
         checkForUpdate();
         if (cfg.autoUpdate && updateAvailable) {
-            Serial.println("[OTA] auto-update enabled, installing latest...");
-            otaTarget = "latest";
-            pendingGithubOta = true;   // loop() performs the update
+            // Can't install in place (fragmented heap -> no room for TLS), so schedule a
+            // clean-heap update on reboot -- but only within a small retry budget so a
+            // download that keeps failing can't become a reboot loop. loop() clears the
+            // budget once the device has stayed up a while (a real loop never gets there).
+            prefs.begin(PREF_NS, true);
+            uint8_t tries = prefs.getUChar("otatries", 0);
+            prefs.end();
+            if (tries < 3) {
+                Serial.println("[OTA] auto-update available, scheduling clean-heap update on reboot");
+                scheduleOtaReboot("latest");
+            } else {
+                Serial.println("[OTA] auto-update available but retry budget spent; will retry later");
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(6UL * 3600UL * 1000UL));  // re-check every 6 h
     }
@@ -2496,10 +2522,42 @@ static void handleOtaGithub(AsyncWebServerRequest* req) {
         if (v[0] == 'v' || v[0] == 'V') v = v.substring(1);
         otaTarget = "v" + v;
     }
-    Serial.printf("[OTA] Target requested: %s\n", otaTarget.c_str());
-    otaProgPhase = 0; otaProgPct = 0;   // reset for this run; loop() fills it in
+    Serial.printf("[OTA] Target requested: %s (reboot into clean-heap update)\n", otaTarget.c_str());
+    otaProgPhase = 0; otaProgPct = 0;
     req->send_P(200, "text/html", OTA_PROGRESS_HTML);
-    pendingGithubOta = true;
+    scheduleOtaReboot(otaTarget);   // persist target + reboot; otaBootUpdate() installs it next boot
+}
+
+// Runs early in setup() -- after the network is up but BEFORE DMX/RDM/Art-Net/web/WS start,
+// so the heap is pristine and the TLS download has all the contiguous room it needs. It only
+// acts on the one-shot NVS flag set by scheduleOtaReboot() (from the manual /ota/github button
+// or the auto-update task), so a normal boot returns immediately at no cost. doGithubOta()
+// reboots into the new image on success and only returns here on failure, after which we fall
+// through into the normal boot.
+static void otaBootUpdate() {
+    prefs.begin(PREF_NS, false);
+    bool    pend  = prefs.getUChar("otapend", 0) == 1;
+    String  tgt   = pend ? prefs.getString("otatgt", "latest") : String();
+    uint8_t tries = prefs.getUChar("otatries", 0);
+    if (pend) {
+        prefs.putUChar("otapend", 0);          // one-shot: clear BEFORE the attempt (never a loop)
+        prefs.putUChar("otatries", tries + 1); // count it; loop() resets the budget on a stable boot
+    }
+    prefs.end();
+
+    if (!pend) return;    // only a scheduled update (manual button or auto-update) installs here
+
+    // The Ethernet link comes up asynchronously; give it a moment before we need the network.
+    uint32_t t0 = millis();
+    while (!netConnected() && millis() - t0 < 20000) delay(100);
+    if (!netConnected()) { Serial.println("[OTA] no network at boot, update skipped"); return; }
+
+    otaTarget = tgt;
+    Serial.printf("[OTA] clean-heap update to %s (attempt %u), largest free block=%u\n",
+                  tgt.c_str(), (unsigned)(tries + 1), ESP.getMaxAllocHeap());
+    setLedColor(NEO_BLUE, true);
+    doGithubOta();        // reboots into the new image on success; returns here only on failure
+    Serial.println("[OTA] update did not complete, continuing normal boot");
 }
 
 // Live OTA progress for the update page. Stays reachable during the install
@@ -3321,6 +3379,12 @@ void setup() {
         startWiFiStation();
     }
 
+    // Clean-heap OTA: install a pending (or auto-) update now, while only the network stack
+    // is up and the heap is unfragmented. A self-update needs a big contiguous block for TLS
+    // that the fully-booted system (DMX/RDM/Art-Net/web/WS) no longer leaves free. Reboots
+    // into the new image on success; returns here (and boots normally) on nothing-to-do/failure.
+    otaBootUpdate();
+
     if (MDNS.begin(cfg.hostname.c_str())) {
         MDNS.addService("http",   "tcp", 80);
         if (cfg.protocol != 1) MDNS.addService("artnet", "udp", 6454);
@@ -3540,9 +3604,15 @@ void loop() {
         lastWsClean = now;
     }
 
-    if (pendingGithubOta) {
-        pendingGithubOta = false;
-        doGithubOta();
+    // Once the device has run stably for a minute, clear the OTA retry budget so the next
+    // update starts fresh. A device stuck reboot-looping on a failing update would never
+    // reach this point, so the budget only resets on a genuinely stable boot -- that caps it.
+    static bool otaBudgetReset = false;
+    if (!otaBudgetReset && millis() - startMs > 60000) {
+        otaBudgetReset = true;
+        prefs.begin(PREF_NS, false);
+        if (prefs.getUChar("otatries", 0)) prefs.putUChar("otatries", 0);
+        prefs.end();
     }
 
     // Deferred reboot (config save / reset / OTA done) so the HTTP response
