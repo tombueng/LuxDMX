@@ -36,6 +36,8 @@ struct Config {
     int       rmiiPhy, rmiiAddr, rmiiMdc, rmiiMdio, rmiiPwr, rmiiClk;
     bool      useEthernet;
     int       wifiMode;
+    String    wifiSsid;       // STA: the router SSID we join. Empty on a fresh device -> run the setup portal.
+    String    wifiPsk;        // STA: the router password (empty = open network)
     bool      apFallback;     // derived legacy mirror of linkLossMode (not a schema field)
     int       linkLossMode;
     String    apPassword;

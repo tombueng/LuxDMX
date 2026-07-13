@@ -102,7 +102,7 @@
 #ifndef DEF_RMII_CLK
 #define DEF_RMII_CLK  RMII_CLK_GPIO0_IN
 #endif
-#include <WiFiManager.h>  // WiFi (STA config portal) is always available
+#include <DNSServer.h>    // captive-portal DNS for the first-run setup portal
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
@@ -127,6 +127,8 @@ static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64
 #include "generated/config_html.h"
 #include "generated/rdm_html.h"
 #include "generated/config_saved_html.h"
+#include "generated/setup_html.h"
+#include "generated/setup_done_html.h"
 #include "generated/reset_html.h"
 #include "generated/reset_done_html.h"
 #include "generated/ota_progress_html.h"
@@ -280,7 +282,10 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // no longer #defined here.
 // ---------------------------------------------------------------------------
 static const char* PREF_NS = "dmxgw";
-static const char* AP_SSID = "DMX-Gateway";   // SSID of the transient setup/config portal
+// SSID of the transient first-run setup portal (its own SoftAP). Deliberately NOT the
+// hostname: the standalone AP mode (startWiFiAP) broadcasts the hostname, so a distinct
+// name here keeps the two from colliding when you're looking for the right network.
+static const char* AP_SSID = "LuxDMX-setup";
 
 // WiFi interface mode (cfg.wifiMode)
 static constexpr int NET_WIFI_STA = 0;        // station / client (join an existing router)
@@ -375,6 +380,13 @@ static uint32_t lastLogMs = 0;
 static bool g_useEth = false;
 static bool g_apMode = false;
 static bool g_apWiredFallback = false;   // in the AP only because the wired link dropped (return to Eth when it's back)
+
+// First-run setup portal (replaces the old WiFiManager config portal). Brought up only
+// when there are no stored STA credentials, or when BOOT is held at power-on. While it's
+// active the device runs an open SoftAP (AP_SSID) + a captive DNS that points everything
+// at the on-brand setup page, and loop() pumps dnsServer.processNextRequest().
+static bool      g_setupPortal = false;   // setup portal is the active "network" (no real link)
+static DNSServer dnsServer;
 
 static bool netConnected() {
 #if defined(HAS_WIRED_ETH)
@@ -1826,6 +1838,40 @@ static void sendJsonSafe(AsyncWebServerRequest* req, const String& body) {
     }
 }
 
+// Minimal JSON string escaper for values that can legally contain quotes/backslashes
+// (WiFi SSIDs). Keeps the hand-rolled JSON in handleInfoJson / the scan endpoint valid.
+static String jsonEsc(const String& s) {
+    String o; o.reserve(s.length() + 4);
+    for (size_t i = 0; i < s.length(); i++) {
+        char c = s[i];
+        if (c == '"' || c == '\\') { o += '\\'; o += c; }
+        else if (c == '\n') o += "\\n";
+        else if (c == '\r') o += "\\r";
+        else if (c == '\t') o += "\\t";
+        else if ((uint8_t)c < 0x20) continue;   // drop other control chars
+        else o += c;
+    }
+    return o;
+}
+
+// Escape a value for interpolation into HTML text (the setup-done page shows the SSID /
+// hostname the user typed). Covers the five HTML-significant characters.
+static String htmlEsc(const String& s) {
+    String o; o.reserve(s.length() + 8);
+    for (size_t i = 0; i < s.length(); i++) {
+        char c = s[i];
+        switch (c) {
+            case '&': o += "&amp;";  break;
+            case '<': o += "&lt;";   break;
+            case '>': o += "&gt;";   break;
+            case '"': o += "&quot;"; break;
+            case '\'':o += "&#39;";  break;
+            default:  o += c;
+        }
+    }
+    return o;
+}
+
 static void handleVersionJson(AsyncWebServerRequest* req) {
     String j = "{\"current\":\"";
     j += FIRMWARE_VERSION;
@@ -1909,8 +1955,19 @@ static void wsPushMeta() {
 
 // Static pages are served straight from PROGMEM (zero heap). Dynamic values
 // are fetched client-side from /info.json.
+// setup.html is small and served plain (not gzipped — see GZIP_PAGES in extra_scripts.py).
+static void handleSetupGet(AsyncWebServerRequest* req) {
+    httpReqCount++;
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", SETUP_HTML);
+    r->addHeader("Cache-Control", "no-cache");
+    req->send(r);
+}
+
 static void handleRoot(AsyncWebServerRequest* req) {
     httpReqCount++;
+    // During first-run setup the device has no real network, so "/" is the setup page —
+    // that way a phone joining the LuxDMX-setup AP lands straight on it (captive portal).
+    if (g_setupPortal) return handleSetupGet(req);
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", INDEX_HTML, INDEX_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
     // Always revalidate the page itself after a firmware update; the versioned
@@ -2016,6 +2073,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"hasEth\":false,";
 #endif
     j += "\"wifiMode\":";   j += cfg.wifiMode;           j += ",";
+    j += "\"wifiSsid\":\""; j += jsonEsc(cfg.wifiSsid);  j += "\",";   // password is never exposed
     j += "\"apFallback\":"; j += cfg.apFallback ? "true" : "false"; j += ",";
     j += "\"linkLossMode\":"; j += cfg.linkLossMode;          j += ",";   // WIRED_FB_*
     j += "\"apPassword\":\""; j += cfg.apPassword;       j += "\",";
@@ -2392,11 +2450,94 @@ static void handleResetGet(AsyncWebServerRequest* req)  {
 
 static void handleResetPost(AsyncWebServerRequest* req) {
     req->send_P(200, "text/html", RESET_DONE_HTML);
-    // Also drop static IP so recovery always comes back up on DHCP
-    cfg.staticIp = false;
+    // Forget the WiFi network so the next boot drops into the setup portal. Clearing
+    // cfg.wifiSsid is what flips startWiFiStation() into setup mode; loop() additionally
+    // wipes the WiFi NVS (pendingWifiReset). Also drop static IP + force STA so recovery
+    // always comes back on DHCP, on WiFi, at the setup page.
+    cfg.wifiSsid  = "";
+    cfg.wifiPsk   = "";
+    cfg.wifiMode  = NET_WIFI_STA;
+    cfg.staticIp  = false;
     saveConfig();
     pendingWifiReset = true;
     pendingRebootAt  = millis() + 600;
+}
+
+// ---------------------------------------------------------------------------
+// First-run setup portal (issue #45) — replaces the WiFiManager config portal
+// ---------------------------------------------------------------------------
+// GET /setup/scan — scan for nearby APs and return them as JSON for the "Join my WiFi"
+// list. De-duplicates by SSID (keeps the strongest), drops hidden/empty SSIDs, sorts by
+// signal. Shape: {"nets":[{"ssid":"Foo","rssi":-52,"lock":true}, ...]}.
+static void handleSetupScan(AsyncWebServerRequest* req) {
+    int n = WiFi.scanNetworks(false /*sync*/, false /*hidden*/);
+    String j = "{\"nets\":[";
+    bool first = true;
+    for (int i = 0; i < n; i++) {
+        String ssid = WiFi.SSID(i);
+        if (ssid.length() == 0) continue;
+        bool dup = false;                       // skip a weaker copy of an SSID we already listed
+        for (int k = 0; k < i; k++) if (WiFi.SSID(k) == ssid) { dup = true; break; }
+        if (dup) continue;
+        if (!first) j += ",";
+        first = false;
+        j += "{\"ssid\":\""; j += jsonEsc(ssid); j += "\",\"rssi\":";
+        j += (int)WiFi.RSSI(i);
+        j += ",\"lock\":"; j += (WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "false" : "true");
+        j += "}";
+    }
+    j += "]}";
+    WiFi.scanDelete();
+    req->send(200, "application/json", j);
+}
+
+// POST /setup — write the chosen network into the SAME cfg the normal config uses, then
+// reboot into it. mode=sta stores SSID + password and selects STA; mode=ap selects the
+// standalone AP and stores its optional password. We never validate the WiFi password
+// here (no router to test against during setup); a wrong password just bounces the device
+// back into this portal on next boot (cfg.wifiSsid stays set, but it can't associate — so
+// the BOOT-button forces the portal, or "Reset WiFi" clears it).
+static void handleSetupPost(AsyncWebServerRequest* req) {
+    String mode, ssid, pw;
+    argStr(req, "mode", mode);
+    // Where to send the user after the reboot, and how to describe it. STA joins their
+    // router, so the device lands on a router-assigned IP we can't predict — point them at
+    // the mDNS name (<hostname>.local). AP mode comes back as its own network at 192.168.4.1.
+    String title, msg, url, urlLabel, hint;
+    if (mode == "ap") {
+        cfg.wifiMode  = NET_WIFI_AP;
+        if (argStr(req, "appw", pw)) cfg.apPassword = pw;   // empty = open AP, >=8 = WPA2
+        title    = "Access point ready";
+        msg      = "LuxDMX is restarting as its own WiFi network \"" + htmlEsc(cfg.hostname) +
+                   "\". Join that network on this device, then open:";
+        url      = "http://192.168.4.1";
+        urlLabel = "192.168.4.1";
+        hint     = cfg.apPassword.length() >= 8 ? "The network is WPA2-protected with the password you set."
+                                                : "The network is open, no password needed.";
+    } else {                                                 // default to STA ("Join my WiFi")
+        cfg.wifiMode = NET_WIFI_STA;
+        argStr(req, "ssid", ssid);
+        argStr(req, "pw", pw);
+        cfg.wifiSsid = ssid;
+        cfg.wifiPsk  = pw;
+        title    = "Joining your WiFi";
+        msg      = "LuxDMX is restarting and connecting to \"" + htmlEsc(ssid) +
+                   "\". Reconnect this device to that network, then it opens automatically at:";
+        url      = "http://" + cfg.hostname + ".local";     // hostname is [a-z0-9-]; safe in href/JS
+        urlLabel = htmlEsc(cfg.hostname) + ".local";
+        hint     = "If the name doesn't resolve on your network, check your router for the device's IP.";
+    }
+    saveConfig();
+    Serial.printf("[SETUP] saved: mode=%s ssid='%s' — rebooting\n",
+        cfg.wifiMode == NET_WIFI_AP ? "AP" : "STA", cfg.wifiSsid.c_str());
+    String p = FPSTR(SETUP_DONE_HTML);
+    p.replace("{{TITLE}}",    title);
+    p.replace("{{MSG}}",      msg);
+    p.replace("{{URL}}",      url);
+    p.replace("{{URLLABEL}}", urlLabel);
+    p.replace("{{HINT}}",     hint);
+    req->send(200, "text/html", p);
+    pendingRebootAt = millis() + 800;
 }
 
 static void handleLogo(AsyncWebServerRequest* req) {
@@ -2645,60 +2786,34 @@ static void handleOtaUploadChunk(AsyncWebServerRequest* req, const String& filen
 }
 
 // ---------------------------------------------------------------------------
-// WiFiManager (STA config portal)
+// First-run setup portal (issue #45) — on-brand, served from our own web stack
 // ---------------------------------------------------------------------------
-static bool wm_shouldSave = false;
-static char wm_universeStr[4] = "0";
-static void wmSaveCallback() { wm_shouldSave = true; }
-
-static void startWiFiManager(bool forcePortal) {
-    WiFiManager wm;
-    wm.setHostname(cfg.hostname.c_str());   // advertise via DHCP (option 12) so the router registers the name for non-mDNS clients
-    wm.setSaveConfigCallback(wmSaveCallback);
-    wm.setAPCallback([](WiFiManager*) { setLedColor(NEO_PURPLE, true); }); // portal open
-    wm.setConnectTimeout(60);
-    wm.setConfigPortalTimeout(180);
-    if (cfg.staticIp) {
-        IPAddress ip, gw, sn, dns;
-        parseIp(cfg.ip, ip); parseIp(cfg.gateway, gw);
-        parseIp(cfg.subnet, sn); parseIp(cfg.dns, dns);
-        wm.setSTAStaticIPConfig(ip, gw, sn, dns);
-        Serial.printf("[WiFi] static IP %s\n", cfg.ip.c_str());
-    }
-    snprintf(wm_universeStr, sizeof(wm_universeStr), "%d", cfg.outputs[0].universe);
-    WiFiManagerParameter param_universe("universe", "Art-Net Universe (0-32767)", wm_universeStr, 6);
-    wm.addParameter(&param_universe);
-    // Run the captive portal NON-blocking so the serial config console stays alive
-    // while it's up: a fresh / stuck board (no WiFi yet) can then be recovered over
-    // USB with `wifi <ssid> <pass>`, the whole point of the serial console. The
-    // saved-credential connect attempt inside autoConnect still blocks briefly (up
-    // to setConnectTimeout), which is fine; only the open portal becomes non-blocking.
-    wm.setConfigPortalBlocking(false);
-    bool connected = forcePortal ? wm.startConfigPortal(AP_SSID)
-                                 : wm.autoConnect(AP_SSID);
-    if (!connected) {
-        // Portal is up (or no creds): pump it + the serial console until the user
-        // configures WiFi (via the portal page OR `wifi` over serial) or it times out.
-        uint32_t start = millis();
-        while (!WiFi.isConnected() && millis() - start < 180000) {
-            wm.process();
-            cfgserial::poll();
-            delay(5);
-        }
-        connected = WiFi.isConnected();
-    }
-    if (!connected) ESP.restart();
-    if (wm_shouldSave) {
-        cfg.outputs[0].universe = constrain(atoi(param_universe.getValue()), 0, 32767);
-        saveConfig();
-        // The captive-portal ran its own web server on port 80; it may not
-        // release the socket cleanly, which would stop our AsyncWebServer from
-        // binding (HTTP "connection refused" until reboot). Reboot for a clean
-        // start where auto-connect succeeds and the portal never runs.
-        Serial.println("[WiFi] credentials saved — rebooting for a clean start");
-        delay(400);
-        ESP.restart();
-    }
+// Replaces tzapu/WiFiManager. Instead of a separate blocking captive portal with its
+// own web server (which used to fight ours for port 80 and force a reboot), this brings
+// up our own open SoftAP + a captive DNS, sets g_setupPortal, and lets setup() register
+// the normal AsyncWebServer routes. "/" then serves setup.html, /setup/scan lists nearby
+// networks, and POST /setup writes the chosen mode/creds and reboots. loop() pumps the DNS
+// while g_setupPortal so the page pops automatically when a phone joins the AP.
+//
+// It is ONLY entered at first run (STA selected but no stored SSID) or when BOOT is held
+// at power-on — never as a runtime fallback, so it can't open mid-show (see startWiFiAP /
+// applyWiredLinkLoss for the wired link-loss policy, which is unchanged).
+static void startSetupPortal() {
+    g_setupPortal = true;
+    g_apMode      = true;     // reuse the AP net-accessors (softAPIP/SSID); there's no real link
+    g_useEth      = false;
+    WiFi.mode(WIFI_AP);
+    // Open AP on purpose: first-run setup needs physical access to the device anyway, and a
+    // pre-shared password you'd have to print on the box helps nobody. The user picks a real
+    // password for their network (or the standalone AP) inside the portal.
+    bool ok = WiFi.softAP(AP_SSID);
+    WiFi.setSleep(WIFI_PS_NONE);
+    IPAddress apIp = WiFi.softAPIP();
+    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer.start(53, "*", apIp);    // answer every lookup with our IP → captive portal
+    setLedColor(NEO_PURPLE, true);     // purple = portal active (matches the old config portal)
+    Serial.printf("[SETUP] portal AP \"%s\" %s  ip=%s  (open captive portal)\n",
+        AP_SSID, ok ? "up" : "FAILED", apIp.toString().c_str());
 }
 
 // Scan every AP for our SSID, log them, and (re)connect to the strongest one.
@@ -2707,9 +2822,9 @@ static void startWiFiManager(bool forcePortal) {
 // reveals whether the SSID has multiple BSSIDs (per-node) or a single shared
 // BSSID (seamless mesh — in which case the AP, not us, chooses the node).
 static void connectStrongestAP() {
-    String ssid = WiFi.SSID();
+    String ssid = cfg.wifiSsid;          // we own the creds now (no WiFiManager WiFi-NVS copy)
     if (ssid.length() == 0) return;
-    String pass = WiFi.psk();
+    String pass = cfg.wifiPsk;
     int curRssi = (int)WiFi.RSSI();
 
     int n = WiFi.scanNetworks(false /*async*/, true /*hidden*/);
@@ -3300,8 +3415,50 @@ static void applyWiredLinkLoss(bool atBoot) {
 }
 #endif
 
-// WiFi station (client) bring-up: optional BOOT-held config portal, then connect
-// to the strongest AP for the stored SSID. Factored out of setup() so the network
+// One-time migration for devices upgrading from a WiFiManager build: those kept the STA
+// SSID/password in the ESP32 WiFi NVS, not in our cfg, so cfg.wifiSsid is empty after the
+// OTA even though the user has a working network. Recover the persisted creds from the WiFi
+// NVS and save them into our keys, so the upgrade joins the same network instead of dropping
+// into the setup portal. Returns true if it recovered something. Runs only when cfg has no
+// SSID yet (a fresh first-run device has nothing in the WiFi NVS either, so this is a no-op).
+static bool migrateWifiCredsFromNvs() {
+    // Genuinely one-time: mark it done in our NVS the first time it's attempted, whether or
+    // not it finds anything. Without this, "Reset WiFi" (which only clears cfg.wifiSsid) would
+    // re-recover the same old creds from the ESP32 WiFi NVS on the next boot and never open
+    // the portal — the WiFi NVS itself is not reliably wipeable from here (WiFi.disconnect /
+    // esp_wifi_restore both left a stale SSID behind on the rig). Once the flag is set,
+    // cfg.wifiSsid is the single source of truth, so clearing it always reopens the portal.
+    prefs.begin(PREF_NS, false);
+    bool alreadyDone = prefs.getBool("wifimig", false);
+    if (!alreadyDone) prefs.putBool("wifimig", true);
+    prefs.end();
+    if (alreadyDone) return false;
+
+    wifi_config_t wc;
+    if (esp_wifi_get_config(WIFI_IF_STA, &wc) != ESP_OK) return false;
+    String ssid = String((const char*)wc.sta.ssid);
+    if (ssid.length() == 0) return false;
+    cfg.wifiSsid = ssid;
+    cfg.wifiPsk  = String((const char*)wc.sta.password);
+    saveConfig();
+    Serial.printf("[SETUP] migrated WiFi creds from WiFiManager NVS: ssid='%s'\n", ssid.c_str());
+    return true;
+}
+
+// Apply a static IP to the WiFi station before WiFi.begin(), or fall back to DHCP.
+// WiFiManager used to do this for us; now we own it.
+static void applyStaStaticIp() {
+    if (!cfg.staticIp) { WiFi.config((uint32_t)0, (uint32_t)0, (uint32_t)0); return; }  // DHCP
+    IPAddress ip, gw, sn, dns;
+    parseIp(cfg.ip, ip); parseIp(cfg.gateway, gw);
+    parseIp(cfg.subnet, sn); parseIp(cfg.dns, dns);
+    WiFi.config(ip, gw, sn, dns);
+    Serial.printf("[WiFi] static IP %s\n", cfg.ip.c_str());
+}
+
+// WiFi station (client) bring-up: connect to the strongest AP for the stored SSID.
+// If BOOT is held at power-on, or there are no stored credentials yet (first run), open
+// the on-brand setup portal instead (issue #45). Factored out of setup() so the network
 // dispatch there reads as interface → mode.
 static void startWiFiStation() {
     bool forcePortal = false;
@@ -3310,21 +3467,33 @@ static void startWiFiStation() {
         uint32_t t = millis();
         while (digitalRead(CFG_BOOT_PIN) == LOW && millis()-t < HOLD_MS) delay(50);
         forcePortal = (digitalRead(CFG_BOOT_PIN) == LOW);
-        Serial.println(forcePortal ? " → config portal" : " released");
+        Serial.println(forcePortal ? " → setup portal" : " released");
     }
     if (forcePortal && cfg.staticIp) {   // recovery: come back on DHCP
         cfg.staticIp = false;
         saveConfig();
     }
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_STA);   // also brings up the WiFi driver so esp_wifi_get_config() works
     WiFi.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) so the router resolves the name
+#ifndef SIM_WIFI
+    // Upgrade path: pull creds out of the old WiFiManager WiFi-NVS into our cfg, once.
+    if (cfg.wifiSsid.length() == 0) migrateWifiCredsFromNvs();
+    // First-run / BOOT-held → the setup portal (open SoftAP + captive page). Never opens
+    // by itself mid-run: only here, and only with no creds or the button physically held.
+    if (forcePortal || cfg.wifiSsid.length() == 0) {
+        Serial.println(cfg.wifiSsid.length() == 0 ? "[SETUP] no WiFi configured — opening setup portal"
+                                                  : "[SETUP] BOOT held — opening setup portal");
+        startSetupPortal();
+        return;   // setup() registers the web routes; the portal serves them
+    }
+#endif
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
     setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
 #ifdef SIM_WIFI
-    // Simulation only (Wokwi): the WiFiManager config portal cannot be reached
-    // from the host, so join Wokwi's open virtual AP directly. Never compiled
-    // into a real build — guarded by the SIM_WIFI flag set in [env:wokwi].
+    // Simulation only (Wokwi): the setup portal can't be reached from the host, so join
+    // Wokwi's open virtual AP directly. Never compiled into a real build — guarded by the
+    // SIM_WIFI flag set in [env:wokwi].
     (void)forcePortal;
     Serial.print("[SIM] joining Wokwi-GUEST");
     WiFi.begin("Wokwi-GUEST", "");
@@ -3335,10 +3504,28 @@ static void startWiFiStation() {
       } }
     Serial.println();
 #else
-    startWiFiManager(forcePortal);
-    // The ESP32's auto-connect reliably sticks to whichever AP it used before,
-    // even a distant one on a mesh. Explicitly scan and hop to the strongest
-    // AP for our SSID on every boot (also logs all APs for diagnostics).
+    // Join the stored network. We keep our own creds (cfg.wifiSsid/wifiPsk) now — the old
+    // build let WiFiManager stash them in the ESP32 WiFi NVS.
+    applyStaStaticIp();
+    Serial.printf("[WiFi] joining '%s'\n", cfg.wifiSsid.c_str());
+    WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPsk.c_str());
+    { uint32_t t = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - t < 30000) {
+          setLedColor((millis() % 600) < 300 ? NEO_BLUE : NEO_OFF, (millis() % 600) < 300);
+          delay(200);
+      } }
+    // If the stored creds simply don't work (wrong password, AP gone), reboot into the
+    // setup portal so the device stays reachable instead of silently spinning. We DON'T
+    // wipe the creds — the loop() watchdog also keeps retrying — but a fresh boot with no
+    // association lands the user back on the setup page to fix it.
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[WiFi] could not join stored network — opening setup portal");
+        startSetupPortal();
+        return;
+    }
+    // The ESP32's auto-connect reliably sticks to whichever AP it used before, even a
+    // distant one on a mesh. Explicitly scan and hop to the strongest AP for our SSID on
+    // every boot (also logs all APs for diagnostics).
     connectStrongestAP();
 #endif  // SIM_WIFI
     // Disable WiFi power save: with modem-sleep the station misses buffered
@@ -3369,9 +3556,14 @@ static void cfgserialFactory() {
     pendingRebootAt  = millis() + 300;
 }
 static bool cfgserialWifi(const String& ssid, const String& pass) {
-    // Keep WiFiManager for the portal; this just sets STA creds persistently and
-    // reconnects (the recover-a-stuck-board path). WiFi stays out of the schema.
-    WiFi.persistent(true);
+    // Recover-a-stuck-board path over USB: persist the creds into OUR config (SSID/psk are
+    // schema fields now, wifissid/wifipsk) and switch to STA, then reconnect. Persisting to
+    // cfg means the next boot joins this network from startWiFiStation() instead of the
+    // setup portal — same as if you'd typed it on the setup page.
+    cfg.wifiMode = NET_WIFI_STA;
+    cfg.wifiSsid = ssid;
+    cfg.wifiPsk  = pass;
+    saveConfig();
     WiFi.mode(WIFI_STA);
     WiFi.setHostname(cfg.hostname.c_str());
     WiFi.begin(ssid.c_str(), pass.c_str());
@@ -3480,6 +3672,12 @@ void setup() {
     http.on("/log.json",          HTTP_GET,  handleLogJson);
     http.on("/config",            HTTP_GET,  handleConfigGet);
     http.on("/config",            HTTP_POST, handleConfigPost);
+    // Register /setup/scan BEFORE /setup: this AsyncWebServer matches a plain-string route
+    // as a prefix (^/setup(/.*)?$), so a /setup handler registered first would also swallow
+    // /setup/scan and serve the HTML page instead of the JSON. Most-specific route first.
+    http.on("/setup/scan",        HTTP_GET,  handleSetupScan);
+    http.on("/setup",             HTTP_GET,  handleSetupGet);
+    http.on("/setup",             HTTP_POST, handleSetupPost);
     http.on("/reset",             HTTP_GET,  handleResetGet);
     http.on("/reset",             HTTP_POST, handleResetPost);
     http.on("/ota/github",        HTTP_POST, handleOtaGithub);
@@ -3499,7 +3697,18 @@ void setup() {
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
-    http.onNotFound([](AsyncWebServerRequest* req) { req->send(404, "text/plain", "Not found"); });
+    http.onNotFound([](AsyncWebServerRequest* req) {
+        // While the setup portal is up, send every unknown URL (incl. the OS captive-portal
+        // probes like /generate_204 and /hotspot-detect.html) to "/", so the phone shows the
+        // "sign in to network" sheet and lands on the setup page.
+        if (g_setupPortal) {
+            AsyncWebServerResponse* r = req->beginResponse(302, "text/plain", "");
+            r->addHeader("Location", "/");
+            req->send(r);
+            return;
+        }
+        req->send(404, "text/plain", "Not found");
+    });
 
     ws.onEvent(onWsEvent);
     http.addHandler(&ws);
@@ -3626,6 +3835,10 @@ static void netRxTask(void*) {
 void loop() {
     cfgserial::poll();   // serial config console (non-blocking line reader)
 
+    // First-run setup portal: pump the captive DNS so every lookup resolves to our IP and
+    // the phone captive-portal sheet opens on the setup page.
+    if (g_setupPortal) dnsServer.processNextRequest();
+
     if (rdmPollDirty) { rdmPollDirty = false; rdmSavePoll(); }   // persist sensor switch changes
     if (g_artCfgDirty) { g_artCfgDirty = false; saveConfig(); }  // ArtAddress changed a merge mode
     if (g_bqDirty) {                                             // ArtAddress changed the queue policy
@@ -3676,7 +3889,12 @@ void loop() {
     // Deferred reboot (config save / reset / OTA done) so the HTTP response
     // can flush from the async task before we restart.
     if (pendingRebootAt && now >= pendingRebootAt) {
-        if (pendingWifiReset) { WiFiManager wm; wm.resetSettings(); }
+        // handleResetPost / the serial factory hook already cleared cfg.wifiSsid/wifiPsk and
+        // saved; also drop the live association. The next boot reopens the setup portal
+        // because cfg.wifiSsid is empty AND the one-time migration flag is set (see
+        // migrateWifiCredsFromNvs) — so stale creds still sitting in the ESP32 WiFi NVS from
+        // an old WiFiManager build are NOT re-recovered.
+        if (pendingWifiReset) WiFi.disconnect(true /*wifioff*/, true /*eraseap*/);
         ESP.restart();
     }
 

@@ -64,6 +64,7 @@ They always restore the original configuration afterwards.
 | `rdm-trigger.spec.mjs` | Issue #64 RMT DMX + esp_dmx-free RDM: `/rdm.json` controller shape; the HTTP RDM trigger endpoints (`/rdm/discover`, `/rdm/setaddr`, `/rdm/identify`) — param validation returns 400, valid calls queue a bus action and return `{ok,op}` (opt-in). The RMT framing win and on-wire discovery/GET/SET are validated on the RP2350 rig, not here (see note). |
 | `artnet-rdm.spec.mjs` | RDM over Art-Net (E1.20 over Art-Net 4): `/rdm.json` node fields (`artnetRdm`/`artPort`/`discovering`/`bqPolicy` + request counters); drives the device as an Art-Net RDM controller: ArtPoll → ArtPollReply (asserts RDM-capable + BackgroundQueue-supported advertisement), ArtTodRequest → ArtTodData (TOD matches `/rdm.json`), and (opt-in) ArtRdm GET DEVICE_INFO + SET DMX_START_ADDRESS with read-back, AtcFlush re-discovery, a check that a mid-stream flush doesn't collapse the transmit rate (`outfps`), and `ArtAddress` remote config (merge HTP/LTP/cancel applied live; BackgroundQueuePolicy set + reflected in `/rdm.json` and ArtPollReply). The full DMX-stays-40fps-under-RDM proof is on the RP2350 analyzer (see `../rdm.md`). |
 | `rdm-tab.spec.mjs` | The dedicated RDM tab (`/rdm`): page serves the fixtures table + grouped sensor charts + per-sensor poll switches + the live discovery progress bar + the shared Status nav strip (full-width, view transitions); `/rdm.json` exposes the rich per-fixture fields (`mfg`/`modelName`/`label`/`cat`/`swVer`, per-sensor `lo`/`hi`/`rec`/`type`/`poll`), the `sensorPoll` flag, and the discovery-progress fields (`discStage`/`discFound`/`discCur`/`discSub`). Opt-in (drives the bus): discovery reads manufacturer/model/varied sensors, the progress fields advance through the scan, SET device label + SET personality round-trip over the WebSocket, the per-fixture switch (`rdm_sensorsel` `sensor:-1`) toggles a whole fixture's sensors, and live sensor polling moves the readings. Multi-line RDM: `/rdm.json` exposes `rdmLines` (the RDM-capable universes) + a per-fixture `uni`, the page has the Universe column + per-universe Discover buttons, and discovering one universe (`/rdm/discover?line=N`) leaves the other universes' fixtures in place. Needs a responder that answers the extra PIDs (the RP2350 sim does). |
+| `setup.spec.mjs` | Issue #45 first-run setup portal: drives the real `setup.html` (landing shows both paths on-brand; access-point path posts `mode=ap` + AP password; join path picks a scanned SSID / manual entry and posts `mode=sta` + ssid + password). Runs against the local UI sim, not a live device (during first-run setup the device has no reachable network) |
 
 ## Notes
 
@@ -88,6 +89,17 @@ They always restore the original configuration afterwards.
   back into `/rdm.json` `sensors[]`). Cross-checked on both the WT32-ETH01 (internal RMII)
   and the ESP32-S3 + W5500 wiring (see `docs/rig-wiring-*.md`).
   `rdm-trigger.spec.mjs` covers the REST surface that *is* web-observable.
+- **First-run setup portal (`setup.spec.mjs`)** is the one spec that does *not* drive a
+  live device: while the portal is up the device is its own open `LuxDMX-setup` AP with a
+  captive DNS and no route to the test host, so the spec boots the local UI sim
+  (`sim/server.js`, gitignored) on a throwaway port and drives the real `setup.html`
+  through both paths. The on-the-wire behaviour (AP actually comes up, captive-portal
+  redirect, the chosen mode/creds persist and the device reboots into them) is verified on
+  the HIL rig with the Pi witness joining `LuxDMX-setup` and walking the page. Also verified
+  on the rig: the setup-done page points STA at `http://<hostname>.local` and AP at
+  `192.168.4.1` (with the reachability-probe auto-redirect), and that "Reset WiFi" reliably
+  reopens the portal — the one-time WiFi-creds migration must not re-recover the old network
+  from the ESP32 WiFi NVS after a reset.
 - **DHCP hostname (option 12)** can't be exercised by this suite: the device
   advertising its hostname only has a visible effect on the *router's* DNS, which
   needs a real DHCP server, so it's out of e2e scope. It was verified by HIL

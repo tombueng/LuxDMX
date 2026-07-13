@@ -69,7 +69,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Signal-loss policy** | Per-output choice when the source stops: hold last frame (default), blackout, or stop sending. Continuous 40 Hz refresh bridges brief input gaps either way |
 | **Static IP or DHCP** | Configurable static IP/gateway/subnet/DNS, or automatic DHCP |
 | **Mesh-aware WiFi** | Scans all channels and joins the **strongest** AP (multi-AP/mesh friendly) |
-| **WiFi Config Portal** | First-boot AP + captive portal via WiFiManager |
+| **First-run setup portal** | On first boot (or BOOT-button held) LuxDMX opens its own `LuxDMX-setup` access point with a captive portal. The on-brand page (served from the same web UI) lets you either join your WiFi or run the device as its own access point, no router needed |
 | **Selectable network mode** | Pick the interface (WiFi or wired Ethernet) and WiFi mode (client/STA or standalone AP) in the web UI, on boards that have both |
 | **Standalone AP mode** | LuxDMX hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
 | **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, or reboot. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
@@ -276,8 +276,7 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 | built-in RMT (`dmx_rmt.h`) | DMX512 transmit — frames clocked out of the RMT peripheral so they survive the RMII-Ethernet DMA contention (issue #64). Paired with `rdm_rmt.h` for an esp_dmx-free RDM controller (RMT-TX + UART-RX, DE as GPIO). |
 | `someweisguy/esp_dmx ^4.1` | Fallback DMX/RDM path for the Wokwi sim build (the hardware envs use the RMT path via `-DDMX_RMT`) |
 | `rstephan/ArtnetWifi ^1.5` | Art-Net UDP receiver (port 6454) |
-| `tzapu/WiFiManager ^2.0` | WiFi config portal |
-| `ESP32Async/ESPAsyncWebServer` | Non-blocking HTTP server + WebSocket (port 80) |
+| `ESP32Async/ESPAsyncWebServer` | Non-blocking HTTP server + WebSocket (port 80), also serves the first-run setup portal |
 | `ESP32Async/AsyncTCP` | Async TCP backend (runs networking off the main loop) |
 | `adafruit/Adafruit NeoPixel ^1.12` | WS2812 RGB status LED support |
 | `ArduinoOTA` | OTA firmware updates |
@@ -488,14 +487,29 @@ upload_flags    = --auth=dmxota
 
 Out of the box, connect an Ethernet cable and power on — DHCP assigns an IP automatically. Open `http://dmx-gateway.local` or check your router for the assigned IP. WT32-ETH01 also has WiFi: you can switch it to WiFi client or a standalone access point in **`/config` → Network** (see [Network mode](#network-mode-wifi-ethernet-or-standalone-ap) below).
 
-### 1. Config Portal (WiFi client mode)
+### 1. Setup portal (first run)
 
-On first boot (or after WiFi reset), a board in WiFi client mode opens a WiFi access point:
+| ![Setup portal — pick a path](docs/screenshot-setup.png) | ![Setup portal — join WiFi](docs/screenshot-setup-join.png) |
+|---|---|
 
-- **SSID:** `DMX-Gateway` (no password)
-- Connect with phone or PC → browser auto-opens portal (or go to `192.168.4.1`)
-- Select your network, enter password, set Art-Net Universe (default: `0`)
-- Click **Save** → LuxDMX connects and reboots
+On first boot (or after a WiFi reset, or with the BOOT button held at power-up), LuxDMX
+opens its own setup access point and a captive portal:
+
+- **SSID:** `LuxDMX-setup` (open, no password — it's first-run physical-access setup)
+- Connect with a phone or PC → the "sign in to WiFi" sheet auto-opens the on-brand setup
+  page (or browse to `192.168.4.1`)
+- Pick one of two paths:
+  - **Join my WiFi** — choose your network from the scanned list (or type the name),
+    enter the password.
+  - **Use as access point** — the device becomes its own WiFi network, no router needed.
+    Set an optional AP password (8+ chars for WPA2), or leave it open.
+- The device saves your choice and reboots into it. The confirmation page then waits for
+  the device to come back on its new network and jumps to it automatically: `http://<hostname>.local`
+  (default `dmx-gateway.local`) after joining your WiFi, or `192.168.4.1` in access-point mode.
+  Reconnect this phone/PC to the same network and it'll open on its own.
+
+The setup AP is named `LuxDMX-setup` on purpose, so it doesn't collide with the device
+hostname that the **standalone AP mode** broadcasts.
 
 > **Mesh / multi-AP WiFi:** LuxDMX scans all channels and joins the
 > **strongest** AP for your SSID (and re-picks it on reconnect), so it won't
@@ -512,7 +526,7 @@ Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a r
 
 - **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 / DM9051 SPI module** picked under *Wired Ethernet*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first pick the SPI chip (W5500 or DM9051) under *Wired Ethernet* and set its pins, then enable "Use wired Ethernet".
 - **WiFi mode:**
-  - **Client (STA)** — join your existing 2.4 GHz network (the default; set credentials via the config portal above).
+  - **Client (STA)** — join your existing 2.4 GHz network (the default; set the SSID + password via the setup portal above, or right here in **`/config` → Network**).
   - **Standalone AP** — LuxDMX hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
 - **Wired link-loss policy** (boards on wired Ethernet), for when *the wired Ethernet link is down*:
   - **Keep retrying the wired link** (default): never opens a hotspot, reconnects on its own when the cable is back. Best on a show.
@@ -542,14 +556,17 @@ Open `http://dmx-gateway.local` (mDNS), or `http://dmx-gateway/` if your router 
 
 ### 3. Changing WiFi / Config Reset
 
-To move LuxDMX to a different WiFi network, clear its stored credentials — it will reopen the setup portal on next boot.
+The quickest way to move LuxDMX to a different WiFi network is **`/config` → Network**:
+set the new SSID + password and save. If you can't reach the web UI, clear the stored
+credentials instead and the device reopens the setup portal on next boot.
 
 | Method | Steps |
 |---|---|
-| **Web** (easiest) | Open `http://dmx-gateway.local/reset` → click **Reset WiFi** → device reboots into AP mode |
-| **Hardware** | Power off → hold **BOOT** → power on → keep holding for 3 seconds → release → device reboots into AP mode |
+| **Web** (easiest) | Open `http://dmx-gateway.local/reset` → click **Reset WiFi** → device reboots into the `LuxDMX-setup` portal |
+| **Hardware** | Power off → hold **BOOT** → power on → keep holding for 3 seconds → release → device reboots into the `LuxDMX-setup` portal |
 
-After reset, connect to the `DMX-Gateway` access point (no password) and follow the [First Setup](#1-config-portal) steps to join the new network.
+After reset, connect to the open `LuxDMX-setup` access point and follow the
+[First Setup](#1-setup-portal-first-run) steps to join the new network.
 
 ### Serial configuration (USB)
 
@@ -740,7 +757,7 @@ LuxDMX supports three LED types, configurable in the web UI:
 |---|---|---|
 | Booting | white | on |
 | Connecting to WiFi | blue blink | blink |
-| Config portal / AP active | purple | on |
+| Setup portal / AP active | purple | on |
 | No WiFi (lost) | red blink (fast) | off |
 | Idle (connected, no DMX) | amber heartbeat (½ s on/off) | pulse |
 | DMX active | solid green | solid |
@@ -924,7 +941,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | LED type / GPIO pin | board default | Web `/config` (Status LED) |
 | Per-output: enabled / universe / UART port / TX / RX / RTS | A on (uni 0, UART1, TX=17, RX=16, RTS=−1); B off | Web `/config` (DMX Outputs) |
 | Display type / pins | off | Web `/config` (Display) |
-| WiFi credentials | — | Config portal or `/reset` |
+| WiFi credentials | — | Setup portal, Web `/config` (Network), or `/reset` |
 
 ---
 
