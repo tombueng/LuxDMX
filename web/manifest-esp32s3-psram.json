@@ -1,0 +1,16 @@
+{
+  "name": "LuxDMX (ESP32-S3 + PSRAM)",
+  "version": "latest",
+  "new_install_prompt_erase": false,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        { "path": "fw/bootloader-esp32s3-psram.bin", "offset": 0 },
+        { "path": "fw/partitions-esp32s3-psram.bin", "offset": 32768 },
+        { "path": "fw/boot_app0.bin", "offset": 57344 },
+        { "path": "fw/firmware-esp32s3-psram.bin", "offset": 65536 }
+      ]
+    }
+  ]
+}

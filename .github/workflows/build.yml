@@ -84,6 +84,15 @@ jobs:
           cp .pio/build/wt32eth01/partitions.bin partitions-wt32eth01.bin
           gzip -c .pio/build/wt32eth01/firmware.elf > firmware-wt32eth01.elf.gz
 
+          # ESP32-S3 with PSRAM (N8R8 / N16R8). Its own from-source core (different sdkconfig
+          # from esp32s3dev), so free the already-copied build dirs first to keep runner disk.
+          rm -rf .pio/build/esp32dev .pio/build/wt32eth01 .pio/build/esp32s3dev
+          pio run -e esp32s3_psram
+          cp .pio/build/esp32s3_psram/firmware.bin   firmware-esp32s3-psram.bin
+          cp .pio/build/esp32s3_psram/bootloader.bin bootloader-esp32s3-psram.bin
+          cp .pio/build/esp32s3_psram/partitions.bin partitions-esp32s3-psram.bin
+          gzip -c .pio/build/esp32s3_psram/firmware.elf > firmware-esp32s3-psram.elf.gz
+
           BOOT_APP0=$(find ~/.platformio/packages -name "boot_app0.bin" | head -1)
           cp "$BOOT_APP0" boot_app0.bin
           echo "1.0.${{ github.run_number }}" > version.txt
@@ -106,6 +115,9 @@ jobs:
             firmware-wt32eth01.bin
             bootloader-wt32eth01.bin
             partitions-wt32eth01.bin
+            firmware-esp32s3-psram.bin
+            bootloader-esp32s3-psram.bin
+            partitions-esp32s3-psram.bin
             boot_app0.bin
             version.txt
           if-no-files-found: error
@@ -140,6 +152,7 @@ jobs:
             echo "## Flash files"
             echo "- **ESP32** (WROOM-32, WROVER): \`firmware.bin\` + \`flash.ps1\`"
             echo "- **ESP32-S3** (DevKitC-1): \`firmware-esp32s3.bin\`"
+            echo "- **ESP32-S3 with PSRAM** (WROOM-1-N8R8 / N16R8): \`firmware-esp32s3-psram.bin\`"
             echo "- **WT32-ETH01** (Ethernet): \`firmware-wt32eth01.bin\`"
             echo ""
             echo "Debug symbols (decode a panic): \`firmware*.elf.gz\` — \`gunzip\` it, then \`xtensa-esp32-elf-addr2line -pfiaC -e firmware.elf 0x...\`"
@@ -158,7 +171,8 @@ jobs:
             firmware.bin bootloader.bin partitions.bin boot_app0.bin \
             firmware-esp32s3.bin bootloader-esp32s3.bin partitions-esp32s3.bin \
             firmware-wt32eth01.bin bootloader-wt32eth01.bin partitions-wt32eth01.bin \
-            firmware.elf.gz firmware-esp32s3.elf.gz firmware-wt32eth01.elf.gz \
+            firmware-esp32s3-psram.bin bootloader-esp32s3-psram.bin partitions-esp32s3-psram.bin \
+            firmware.elf.gz firmware-esp32s3.elf.gz firmware-wt32eth01.elf.gz firmware-esp32s3-psram.elf.gz \
             version.txt changes.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -175,6 +189,7 @@ jobs:
             firmware.bin bootloader.bin partitions.bin boot_app0.bin \
             firmware-esp32s3.bin bootloader-esp32s3.bin partitions-esp32s3.bin \
             firmware-wt32eth01.bin bootloader-wt32eth01.bin partitions-wt32eth01.bin \
+            firmware-esp32s3-psram.bin bootloader-esp32s3-psram.bin partitions-esp32s3-psram.bin \
             version.txt changes.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
