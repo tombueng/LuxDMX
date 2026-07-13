@@ -397,10 +397,11 @@ static int      g_adSp = 0;
 static uint64_t g_adLo, g_adHi;
 static bool     g_adRange = false;
 static int      g_adBudget = 0;
-static rdm_uid_t g_adFound[RDM_MAX_DEVICES];
+static rdm_uid_t g_adFound[RDM_HW_MAX];        // small fixed uid scratch (hard max)
 static int      g_adFoundN = 0;
-// enrich (one transaction per step)
-static RdmDevice g_adTab[RDM_MAX_DEVICES];
+// enrich (one transaction per step). g_adTab is the second big RdmDevice table; like rdmDevices
+// it is allocated to g_rdmMaxDev entries in rdmAllocTables() (prefers PSRAM), not static.
+static RdmDevice* g_adTab = nullptr;           // [g_rdmMaxDev]
 static int      g_adTabN = 0;
 static int      g_adEi = 0;       // which found device
 static int      g_adSub = 0;      // 0=info 1=sw 2=sensordef 3=sensorval
@@ -443,8 +444,8 @@ static int rdmLineForUniverse(uint16_t uni) {
 
 // Enqueue an ArtTodData carrying one universe's current TOD straight back to a single requester.
 static void artSendCurrentTod(uint32_t ip, uint16_t pa) {
-    static uint8_t pkt[28 + RDM_MAX_DEVICES * 6];
-    rdm_uid_t uids[RDM_MAX_DEVICES];
+    static uint8_t pkt[28 + RDM_HW_MAX * 6];
+    rdm_uid_t uids[RDM_HW_MAX];
     int nu = 0;                                    // only the fixtures on this universe
     for (int i = 0; i < rdmCount; i++)
         if ((uint16_t)rdmDevices[i].universe == pa) uids[nu++] = rdmDevices[i].uid;
@@ -455,8 +456,8 @@ static void artSendCurrentTod(uint32_t ip, uint16_t pa) {
 
 // Push each RDM universe's own Table of Devices to every subscriber (one ArtTodData per port).
 static void artPushTodToSubs() {
-    static uint8_t pkt[28 + RDM_MAX_DEVICES * 6];
-    rdm_uid_t uids[RDM_MAX_DEVICES];
+    static uint8_t pkt[28 + RDM_HW_MAX * 6];
+    rdm_uid_t uids[RDM_HW_MAX];
     for (int L = 0; L < MAX_OUTPUTS; L++) {
         int o = rdmOutForLine[L];
         if (o < 0) continue;
@@ -488,12 +489,12 @@ static bool artDiscStep() {
         rdmUnMuteAll();
         g_adSp = 0; g_adStkLo[0] = 0; g_adStkHi[0] = uidPack(RDM_UID_MAX); g_adSp = 1;
         g_adRange = false; g_adFoundN = 0;
-        g_adBudget = 8 * RDM_MAX_DEVICES + 128;
+        g_adBudget = 8 * g_rdmMaxDev + 128;
         g_adPhase = AD_SEARCH;
         return true;
     case AD_SEARCH: {
         if (!g_adRange) {
-            if (g_adSp == 0 || g_adFoundN >= RDM_MAX_DEVICES || g_adBudget <= 0) {
+            if (g_adSp == 0 || g_adFoundN >= g_rdmMaxDev || g_adBudget <= 0) {
                 g_adEi = 0; g_adSub = 0; g_adTabN = 0; g_adPhase = AD_ENRICH;
                 return true;
             }
@@ -507,7 +508,7 @@ static bool artDiscStep() {
                 bool dup = false;
                 for (int i = 0; i < g_adFoundN; i++)
                     if (uidPack(g_adFound[i]) == uidPack(f)) { dup = true; break; }
-                if (!dup && g_adFoundN < RDM_MAX_DEVICES) g_adFound[g_adFoundN++] = f;
+                if (!dup && g_adFoundN < g_rdmMaxDev) g_adFound[g_adFoundN++] = f;
             }
             return true;                                         // re-scan this range (device muted out)
         }
@@ -587,7 +588,7 @@ static bool artDiscStep() {
         for (int i = 0; i < rdmCount; i++)
             if (rdmDevices[i].universe != uni) rdmDevices[keep++] = rdmDevices[i];
         rdmCount = keep;
-        for (int i = 0; i < g_adTabN && rdmCount < RDM_MAX_DEVICES; i++) {
+        for (int i = 0; i < g_adTabN && rdmCount < g_rdmMaxDev; i++) {
             g_adTab[i].universe = uni;
             g_adTab[i].rdmLine  = (uint8_t)g_adLine;
             rdmDevices[rdmCount++] = g_adTab[i];
@@ -620,7 +621,7 @@ static int g_pollDev = 0, g_pollSen = 0;
 static const uint32_t SENSOR_POLL_MS = 1000;
 static void artSensorPollStep() {
     uint32_t now = millis();
-    for (int tries = 0; tries < RDM_MAX_DEVICES * RDM_MAX_SENSORS; tries++) {
+    for (int tries = 0; tries < g_rdmMaxDev * RDM_MAX_SENSORS; tries++) {
         if (rdmCount == 0) return;
         if (g_pollDev >= rdmCount) { g_pollDev = 0; g_pollSen = 0; }
         RdmDevice& d = rdmDevices[g_pollDev];

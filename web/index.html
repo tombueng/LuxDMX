@@ -129,7 +129,8 @@
     <div class="cards">
       <div class="card">
         <h3>ESP32 (WROOM-32)</h3>
-        <p>Classic ESP32 DevKit v1, 30-pin, CH340 / CP2102. WiFi build.</p>
+        <p>Classic ESP32 DevKit, 30/38-pin, CH340 / CP2102. WiFi build. Needs a board with a
+           solid 3.3&nbsp;V supply (see the power note below); the ESP32-S3 has more RAM headroom.</p>
         <esp-web-install-button manifest="manifest-esp32.json">
           <button class="flash-btn" slot="activate">Flash ESP32</button>
           <span slot="unsupported" class="unsupported">Web Serial not supported. Use desktop <b>Chrome</b> or <b>Edge</b>.</span>
@@ -169,13 +170,24 @@
     <ul>
       <li>Use <b>desktop Chrome or Edge</b>. Web Serial does not work in Safari, Firefox, or any mobile browser.</li>
       <li>Connect the board over USB, click flash, then pick its serial port in the dialog.</li>
-      <li>The installer offers an <b>Erase device</b> option. Leave it unchecked to keep your saved
-          config (universe, WiFi, labels); check it for a fully clean install.</li>
+      <li>Flashing here does a <b>full erase</b>: your saved config (universe, WiFi, labels) is wiped.
+          To update <i>and keep your settings</i>, don't reflash here, use the device's own
+          <b>Firmware&nbsp;Update</b> on the <code>/config</code> page (upload a <code>firmware.bin</code>
+          or the one-click LuxDMX.org update), which only replaces the app and preserves your config.</li>
     </ul>
 
     <div class="note">
       <b>If it fails to connect</b>, put the board in download mode manually, then retry:
       hold <b>BOOT</b>, tap <b>EN/RST</b>, release <b>BOOT</b>.
+    </div>
+
+    <div class="note">
+      <b>Classic ESP32 boots but won't come online?</b> Cheap WROOM-32 boards can brown out the
+      instant the WiFi radio powers up if their 3.3&nbsp;V regulator is weak. The firmware now
+      reboots with <code>Brownout detector was triggered</code> instead of hanging silently, if you
+      see that on serial, give it a solid 3.3&nbsp;V supply or add a bulk capacitor
+      (470&nbsp;&micro;F+) across 3V3/GND near the module. The ESP32-S3 avoids this and has far more
+      RAM for RDM.
     </div>
 
     <div class="note">
