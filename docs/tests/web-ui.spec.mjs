@@ -151,6 +151,22 @@ test.describe('Web UI + REST', () => {
     }
   });
 
+  test('the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box', async ({ page, request }) => {
+    const d = await (await request.get('/info.json')).json();
+    test.skip(!d.ethSpi && !d.ethRmii, 'build has no wired Ethernet');
+    await page.goto('/config');
+    await page.locator('#wired-sel').selectOption('w5500');    // a wired PHY -> the mode + fallback rows appear
+    await page.locator('#useeth-sw').check();                  // wired mode
+    await expect(page.locator('#sta-creds-row')).toBeHidden(); // no WiFi creds while purely wired
+    await page.locator('#fb-mode').selectOption('3');          // fall back to the saved WiFi network
+    await expect(page.locator('#sta-creds-row')).toBeVisible();// now the SSID/password must be enterable
+    await expect(page.locator('input[name="wifissid"]')).toBeVisible();
+    await page.locator('#fb-mode').selectOption('1');          // AP fallback wants the AP password instead
+    await expect(page.locator('#ap-pw-row')).toBeVisible();
+    await expect(page.locator('#sta-creds-row')).toBeHidden();
+    await page.locator('#useeth-sw').uncheck();                // restore (browser-only, nothing saved)
+  });
+
   test('Wired selector: one list of None + the build PHYs, swaps the pin sections', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi && !d.ethRmii, 'build has no wired Ethernet');

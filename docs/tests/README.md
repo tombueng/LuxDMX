@@ -50,7 +50,7 @@ They always restore the original configuration afterwards.
 
 | Spec | Feature (network → web UI) |
 |---|---|
-| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; the W5500 role pins are not flagged "reserved" against their own role (Save stays enabled) and a fixed-pin board offers an Advanced unlock; home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
+| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; the W5500 role pins are not flagged "reserved" against their own role (Save stays enabled) and a fixed-pin board offers an Advanced unlock; the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box (AP fallback shows the AP password instead); home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
 | `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking; tight back-to-back burst keeps tracking (socket-drain regression). The per-loop latency win itself needs a logic analyzer on the DMX wire and isn't asserted here. |
 | `sacn.spec.mjs` | sACN / E1.31 → DMX values, live grid, sender tracking |
 | `conflict.spec.mjs` | Two simultaneous senders → conflict banner |
