@@ -179,14 +179,16 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="0">Keep retrying the wired link (recommended)</option>
             <option value="1">Standalone WiFi AP (needs an AP password)</option>
             <option value="2">Reboot and retry</option>
+            <option value="3">Join WiFi (fall back to your saved WiFi network)</option>
           </select>
           <div class="form-text">
             What to do when wired Ethernet is selected but the cable is unplugged or the switch is off.
             <b>Keep retrying</b> stays reachable once the link is back and never opens a hotspot (best on a show).
             <b>Standalone AP</b> makes the device its own network (set an AP password below; it refuses to open an
-            unsecured AP). <b>Reboot</b> power-cycles to re-attempt the link. To put the device on a new WiFi,
-            hold the BOOT button at power-up for the setup portal (it is deliberately not an automatic fallback,
-            so nobody can force the device onto their network by dropping the link).
+            unsecured AP). <b>Reboot</b> power-cycles to re-attempt the link. <b>Join WiFi</b> falls back to your
+            saved WiFi network (below) when there is no wired link, handy if the same box is sometimes wired and
+            sometimes not. To switch to a brand-new WiFi, hold the BOOT button at power-up for the setup portal
+            (a link drop alone never moves the device to another network).
           </div>
         </div>
         <div id="static-row" class="form-check form-switch mb-3">

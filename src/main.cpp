@@ -20,6 +20,7 @@
 #include <WiFi.h>
 #include <esp_wifi.h>   // for esp_wifi_get/set_config (BSSID lock clearing)
 #include <esp_task_wdt.h>  // reconfigure the task WDT to not reboot the gateway under a network flood
+#include <esp_chip_info.h> // chip model detection for the RDM device-table auto-sizing (rdmAllocTables)
 // Schema-driven config engine (src/config/). config_schema.h defines the Config +
 // DmxOutput structs + MAX_OUTPUTS (moved here out of main.cpp); config_core.h is
 // the transport-agnostic load/save/setValue/toJson engine the handlers drive. The
@@ -298,6 +299,7 @@ static constexpr int NET_WIFI_AP  = 1;        // standalone access point (no rou
 #define WIRED_FB_RETRY  0   // keep retrying the wired link; recover when the cable is back
 #define WIRED_FB_AP     1   // standalone WPA2 AP (needs an AP password, else stays on retry)
 #define WIRED_FB_REBOOT 2   // reboot and re-attempt the wired link
+#define WIRED_FB_WIFI   3   // no wired link -> join the stored WiFi network (STA), if creds are set
 // NB: there is deliberately no automatic "WiFi setup portal" fallback. An auto-portal
 // would let anyone who can drop the link force the device onto their own WiFi (very bad
 // on a show). The setup portal stays BOOT-button-only (initial setup = physical access).
@@ -428,6 +430,7 @@ static bool parseIp(const String& s, IPAddress& out) {
 // ---------------------------------------------------------------------------
 Preferences       prefs;
 static void rdmLoadPoll();   // fwd decl (defined with the RDM sensor-poll persistence, below)
+static bool rdmAllocTables();   // fwd decl: allocates the RDM tables; loadConfig() must call it before rdmLoadPoll()
 AsyncWebServer    http(80);
 AsyncWebSocket    ws("/ws");
 ArtnetWifi        artnet;
@@ -474,6 +477,7 @@ static bool     dmxReady     = false;
 static bool     manualMode   = false;
 static uint32_t lastWsPush   = 0;
 static uint32_t lastDmxMs    = 0;
+static volatile uint32_t lastDmxTxMs = 0;   // millis() of the last DMX frame actually clocked onto the wire (5-LED activity)
 static String   otaTarget       = "latest";   // release tag to install
 static String   latestVersion   = "";
 // Live OTA progress, polled by the update page via /ota/status. Written from the
@@ -540,6 +544,11 @@ static void loadConfig() {
     prefs.begin(PREF_NS, true);
     if (prefs.isKey("labels")) g_labels = prefs.getString("labels", "{}");   // isKey: avoid the NOT_FOUND log on a fresh device
     prefs.end();
+    // Allocate the RDM device tables NOW: cfgcore::load() has populated cfg.rdmMaxDev
+    // (which sizes them) and rdmLoadPoll() below writes into g_savedPoll[], so the tables
+    // must exist first. Doing it here (not later in setup) closed a null-write crash-loop
+    // that hit as soon as a saved sensor-poll list (NVS "rdmpoll") was non-empty.
+    rdmAllocTables();
     rdmLoadPoll();   // restore which sensors are enabled for live polling + graphing
     sanitizeOutputs();
 }
@@ -560,19 +569,28 @@ static constexpr uint32_t NEO_PURPLE = 0x180018;   // AP / config portal active
 static constexpr uint32_t NEO_WHITE  = 0x0a0a0a;   // booting
 
 // --- 5-LED discrete status panel (ledType 3) -------------------------------
-// Drive the five GPIO LEDs (active-high). One cached write so both the boot-time
-// setLedColor() path and the runtime ledTask() path share state and never clock
-// a pin redundantly.
+// The five LEDs are driven with LEDC PWM (not plain on/off) so each colour has its
+// own brightness: green + white are far brighter per mA than blue/yellow, so they run
+// at a much lower duty to look balanced. Per-colour duty is cfg.ledBr* (0-255), tunable
+// live via /led/bright. One cached write so the boot-time setLedColor() path and the
+// runtime ledTask() path share state and never clock a pin redundantly; g_ledDirty
+// forces a re-apply when the brightness changes without the on/off state changing.
+static constexpr uint32_t LED_PWM_FREQ = 5000;  // 5 kHz -> no visible flicker
+static constexpr uint8_t  LED_PWM_RES  = 8;     // 8-bit duty (0-255)
+static volatile bool g_ledDirty = false;        // set when a brightness edit needs re-applying
+static volatile bool g_led5Ready = false;       // true once initLed() has ledcAttach'd the panel pins
+static volatile uint32_t g_ledTestUntil = 0;    // >now: force all 5 panel LEDs on (brightness calibration, /led/bright?test=1)
 static void setLeds5(bool r, bool g, bool y, bool b, bool w) {
+    if (!g_led5Ready) return;   // never ledcWrite() a pin before initLed() attached its LEDC channel
     static uint8_t last = 0xFF;
     uint8_t state = (r?1:0) | (g?2:0) | (y?4:0) | (b?8:0) | (w?16:0);
-    if (state == last) return;
-    last = state;
-    if (cfg.ledR >= 0) digitalWrite(cfg.ledR, r ? HIGH : LOW);
-    if (cfg.ledG >= 0) digitalWrite(cfg.ledG, g ? HIGH : LOW);
-    if (cfg.ledY >= 0) digitalWrite(cfg.ledY, y ? HIGH : LOW);
-    if (cfg.ledB >= 0) digitalWrite(cfg.ledB, b ? HIGH : LOW);
-    if (cfg.ledW >= 0) digitalWrite(cfg.ledW, w ? HIGH : LOW);
+    if (state == last && !g_ledDirty) return;
+    last = state; g_ledDirty = false;
+    if (cfg.ledR >= 0) ledcWrite(cfg.ledR, r ? cfg.ledBrR : 0);
+    if (cfg.ledG >= 0) ledcWrite(cfg.ledG, g ? cfg.ledBrG : 0);
+    if (cfg.ledY >= 0) ledcWrite(cfg.ledY, y ? cfg.ledBrY : 0);
+    if (cfg.ledB >= 0) ledcWrite(cfg.ledB, b ? cfg.ledBrB : 0);
+    if (cfg.ledW >= 0) ledcWrite(cfg.ledW, w ? cfg.ledBrW : 0);
 }
 
 // Map the single-LED status colour onto the 5-LED panel. Used for the imperative
@@ -601,9 +619,12 @@ static void initLed() {
         neoPixel.setPixelColor(0, NEO_OFF);
         neoPixel.show();
     } else if (cfg.ledType == 3) {
+        // PWM each panel LED so cfg.ledBr* sets a per-colour brightness (green/white
+        // run dimmer to match blue/yellow). ledcAttach auto-assigns an LEDC channel.
         const int pins[5] = { cfg.ledR, cfg.ledG, cfg.ledY, cfg.ledB, cfg.ledW };
         for (int i = 0; i < 5; i++)
-            if (pins[i] >= 0) { pinMode(pins[i], OUTPUT); digitalWrite(pins[i], LOW); }
+            if (pins[i] >= 0) { ledcAttach((uint8_t)pins[i], LED_PWM_FREQ, LED_PWM_RES); ledcWrite((uint8_t)pins[i], 0); }
+        g_led5Ready = true;   // panel PWM ready -> setLeds5() may now drive it
     }
 }
 
@@ -628,6 +649,22 @@ static void setLedColor(uint32_t neoColor, bool gpioOn) {
     }
 }
 static void setLed(bool on) { setLedColor(on ? NEO_GREEN : NEO_OFF, on); }
+
+// Boot/connecting indicator. On the 5-LED panel it's a Knight-Rider sweep bouncing back and
+// forth across R-G-Y-B-W (each position at its own calibrated brightness, so the sweep looks
+// even); on a single LED it stays the classic blue blink. Call it in a loop while waiting for
+// the network to come up.
+static void bootConnectingLed() {
+    if (cfg.ledType == 3) {
+        static uint8_t ph = 0;                           // advances one position per call
+        int pos = (ph < 5) ? (int)ph : (int)(8 - ph);    // 0,1,2,3,4,3,2,1 bounce across R-G-Y-B-W
+        ph = (uint8_t)((ph + 1) % 8);
+        setLeds5(pos == 0, pos == 1, pos == 2, pos == 3, pos == 4);
+    } else {
+        bool on = (millis() % 600) < 300;
+        setLedColor(on ? NEO_BLUE : NEO_OFF, on);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Optional status display (Adafruit_GFX family)
@@ -807,7 +844,9 @@ static void sendDmx() {
     for (int k = 0; k < nSent; k++) dmx_wait_sent(sentPort[k], DMX_TIMEOUT_TICK);
 #ifdef DMX_RMT
     for (int k = 0; k < nRmt; k++) rmtDmxWait(&g_rmt[rmtSent[k]]);
+    if (nRmt)  lastDmxTxMs = millis();   // real DMX went out this frame (5-LED blue activity)
 #endif
+    if (nSent) lastDmxTxMs = millis();
 }
 
 // Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
@@ -1003,6 +1042,7 @@ static void rdmRecalcPollAny() {
     g_pollAny = false;
 }
 static void rdmLoadPoll() {
+    if (!g_savedPoll) return;   // tables not allocated yet -> nothing to restore into (guards the null write that crash-looped boot)
     prefs.begin(PREF_NS, true);
     String s = prefs.isKey("rdmpoll") ? prefs.getString("rdmpoll", "") : "";
     prefs.end();
@@ -1064,12 +1104,18 @@ static void rdmSavePoll() {
 // plus g_savedPoll are the firmware's largest RAM users, so this is the main heap lever.
 static bool rdmAllocTables() {
     const bool   psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
-    const size_t intB  = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    esp_chip_info_t chip; esp_chip_info(&chip);
+    // Auto-size on the CHIP, not on free internal RAM. heap_caps_get_total_size(INTERNAL)
+    // is what's left after the firmware's static .bss/.data, so it SHRINKS as the image
+    // grows -- an ESP32-S3 (512 KB SRAM) dropped below a fixed 380 KB threshold once the
+    // firmware got big enough and silently fell back to the 16-device cap (found 16 instead
+    // of 64 fixtures). The chip model is footprint-independent: classic ESP32 (~300 KB, tight
+    // once WiFi+web+DMX are up) keeps the small table; every S3-class part gets the full cap.
     int cap; const char* how;
-    if      (cfg.rdmMaxDev > 0)    { cap = cfg.rdmMaxDev; how = "manual"; }
-    else if (psram)               { cap = RDM_HW_MAX;    how = "auto/psram"; }
-    else if (intB >= 380u * 1024) { cap = RDM_HW_MAX;    how = "auto/ram-hi"; }   // S3-class internal RAM
-    else                          { cap = 16;            how = "auto/ram-lo"; }   // classic ESP32 (~300 KB)
+    if      (cfg.rdmMaxDev > 0)         { cap = cfg.rdmMaxDev; how = "manual"; }
+    else if (psram)                    { cap = RDM_HW_MAX;    how = "auto/psram"; }
+    else if (chip.model != CHIP_ESP32) { cap = RDM_HW_MAX;    how = "auto/s3"; }    // S3 & other large-SRAM parts
+    else                               { cap = 16;            how = "auto/esp32"; } // classic ESP32 (~300 KB)
     if (cap < 1) cap = 1;
     if (cap > RDM_HW_MAX) cap = RDM_HW_MAX;
     g_rdmMaxDev = cap;
@@ -2015,7 +2061,14 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ledY\":";       j += cfg.ledY;               j += ",";
     j += "\"ledB\":";       j += cfg.ledB;               j += ",";
     j += "\"ledW\":";       j += cfg.ledW;               j += ",";
+    j += "\"ledBrR\":";     j += cfg.ledBrR;             j += ",";   // 5-LED panel per-colour brightness (0-255 PWM)
+    j += "\"ledBrG\":";     j += cfg.ledBrG;             j += ",";
+    j += "\"ledBrY\":";     j += cfg.ledBrY;             j += ",";
+    j += "\"ledBrB\":";     j += cfg.ledBrB;             j += ",";
+    j += "\"ledBrW\":";     j += cfg.ledBrW;             j += ",";
     j += "\"rdmOut\":";     j += rdmOut;                 j += ",";
+    j += "\"chip\":\"";     j += ESP.getChipModel();     j += "\",";  // e.g. "ESP32" / "ESP32-S3" (RDM cap auto-sizes off this)
+    j += "\"rdmMax\":";     j += g_rdmMaxDev;            j += ",";   // effective RDM device cap (auto-sized to the chip's RAM)
     j += "\"artnetRdm\":";  j += cfg.artnetRdm ? "true" : "false"; j += ",";
     j += "\"outputs\":[";
     for (int i = 0; i < MAX_OUTPUTS; i++) {
@@ -2161,6 +2214,36 @@ static String rdmJsonEsc(const char* s) {
         else if ((uint8_t)c >= 0x20)  o += c;
     }
     return o;
+}
+
+// Live-tune the 5-LED panel per-colour brightness (0-255 PWM duty). Applies immediately
+// (setLeds5 re-drives the PWM on the next ledTask tick); persists to NVS only with
+// &save=1. Lets you balance the panel by eye without a reboot -- green/white are much
+// brighter per mA than blue/yellow, so they want a lower duty.
+//   GET /led/bright?r=180&g=45&y=200&b=255&w=45[&save=1]  (any subset of r/g/y/b/w)
+static void handleLedBright(AsyncWebServerRequest* req) {
+    auto grab = [&](const char* n, int& dst) {
+        if (req->hasParam(n)) {
+            int v = req->getParam(n)->value().toInt();
+            dst = v < 0 ? 0 : (v > 255 ? 255 : v);
+        }
+    };
+    grab("r", cfg.ledBrR); grab("g", cfg.ledBrG); grab("y", cfg.ledBrY);
+    grab("b", cfg.ledBrB); grab("w", cfg.ledBrW);
+    // test=1 lights ALL five LEDs at their brightness for calibration (10-min window,
+    // so you can see and balance every colour at once); test=0 returns to normal.
+    if (req->hasParam("test"))
+        g_ledTestUntil = req->getParam("test")->value().toInt() != 0
+                       ? (uint32_t)millis() + 600000u : 0;
+    g_ledDirty = true;   // force setLeds5 to re-apply the new duty on the next tick
+    if (req->hasParam("save") && req->getParam("save")->value().toInt() != 0)
+        g_artCfgDirty = true;   // loop() persists via saveConfig
+    int test = (g_ledTestUntil && (int32_t)(g_ledTestUntil - (uint32_t)millis()) > 0) ? 1 : 0;
+    char buf[128];
+    snprintf(buf, sizeof(buf),
+             "{\"ok\":true,\"r\":%d,\"g\":%d,\"y\":%d,\"b\":%d,\"w\":%d,\"test\":%d}",
+             cfg.ledBrR, cfg.ledBrG, cfg.ledBrY, cfg.ledBrB, cfg.ledBrW, test);
+    req->send(200, "application/json", buf);
 }
 
 // HTTP trigger for RDM ops -- a reliable, scriptable alternative to the WS control channel (the WS
@@ -2851,7 +2934,7 @@ static void connectStrongestAP() {
         WiFi.begin(ssid.c_str(), pass.c_str(), bestCh, bestBssid, true);
         uint32_t t = millis();
         while (WiFi.status() != WL_CONNECTED && millis() - t < 12000) {
-            setLedColor((millis() % 400) < 200 ? NEO_BLUE : NEO_OFF, (millis() % 400) < 200);
+            bootConnectingLed();   // 5-LED: Knight-Rider sweep; single LED: blue blink
             delay(100);
         }
         Serial.printf("[SCAN] reconnected rssi=%d bssid=%s\n",
@@ -2988,19 +3071,32 @@ static void ledTask(void*) {
     for (;;) {
         uint32_t now = millis();
         if (cfg.ledType == 3) {
-            // 5-LED panel: each LED shows its own state simultaneously.
-            //   R = no network (blink)        G = network up (solid)
-            //   Y = DMX activity (fast blink) B = source conflict (slow blink)
-            //   W = identify active (blink)
-            bool up       = netConnected();
-            bool dmx      = (now - lastDmxMs) < 1500;
-            bool r = !up && ((now % 1000) < 500);
-            bool g = up;
-            bool y = up && dmx && ((now % 250) < 125);
+            // 5-LED panel. Base state on the network; once green (up + running), the
+            // coloured LEDs signal LIVE TRAFFIC so you can see the box working from
+            // across the room:
+            //   G = network up (solid green = "all running")
+            //   B = outgoing DMX being clocked onto the wire   (blink while transmitting)
+            //   Y = outgoing RDM request sent                  (short pulse per request)
+            //   W = RDM response received / identify active    (short pulse / slow blink)
+            //   R = no network  OR (when up) a source conflict warning
+            // Calibration override: /led/bright?test=1 lights all five at their brightness
+            // so you can balance the colours by eye; it auto-reverts after the 10-min window.
+            if (g_ledTestUntil && (int32_t)(g_ledTestUntil - now) > 0) {
+                setLeds5(true, true, true, true, true);
+                vTaskDelay(period); continue;
+            }
+            bool up = netConnected();
             uint8_t ss = g_srcStatus;
-            bool b = (ss == SRC_CONFLICT) ? ((now % 600) < 300)   // conflict: slow blink
-                   : (ss == SRC_MERGING);                          // merging: steady on
-            bool w = identifyCh && ((now % 400) < 200);
+            bool r = up ? (ss == SRC_CONFLICT && (now % 500) < 250)          // up: red = two sources fighting
+                        : ((now % 1000) < 500);                              // down: red = no network
+            bool g = up;                                                     // network up: solid green
+            bool b = up && (now - lastDmxTxMs) < 400 && ((now % 200) < 100); // DMX out: steady blink while clocking
+            bool y = false;                                                  // RDM request: short yellow pulse per TX
+            bool w = identifyCh && ((now % 500) < 250);                      // identify still active: slow white blink
+#ifdef DMX_RMT
+            y = up && (now - g_rdmSentMs) < 150;                             // RDM request: short yellow pulse per TX
+            w = w || (up && (now - g_rdmRecvMs) < 150);                      // RDM response: short white pulse per RX
+#endif
             setLeds5(r, g, y, b, w);
         } else if (!netConnected()) {
             setLedColor((now % 1000) < 120 ? NEO_RED : NEO_OFF, (now % 1000) < 120);
@@ -3245,7 +3341,7 @@ static void waitEthLink() {
     Serial.print("[ETH] waiting for link");
     uint32_t t = millis();
     while (!netConnected() && millis() - t < 15000) {
-        setLedColor((millis() % 600) < 300 ? NEO_BLUE : NEO_OFF, (millis() % 600) < 300);
+        bootConnectingLed();   // 5-LED: Knight-Rider sweep; single LED: blue blink
         delay(200); Serial.print(".");
     }
     Serial.println();
@@ -3398,12 +3494,28 @@ static bool startWiFiAP(bool requirePw = false) {
 // wired netif (lwIP re-DHCPs when the cable returns). At boot we never reboot (it would
 // loop) and the portal may block; at runtime PORTAL/REBOOT restart so the portal opens
 // cleanly from setup(), while AP starts in place (non-blocking).
+static void startWiFiStation();   // fwd decl: WIRED_FB_WIFI joins WiFi when the wired link is down
 static void applyWiredLinkLoss(bool atBoot) {
     switch (cfg.linkLossMode) {
         case WIRED_FB_AP:
             // Stopgap AP: if it comes up, remember it was a wired fallback so we can hand
             // back to Ethernet once the link returns (needs an AP password, else stays on retry).
             if (startWiFiAP(true)) g_apWiredFallback = true;
+            break;
+        case WIRED_FB_WIFI:
+            // No wired link -> join the stored WiFi network (STA). Needs credentials; without
+            // them there is nothing to join, so keep retrying the wired link instead. At boot we
+            // join directly; a link drop while running reboots (a clean boot then joins WiFi with
+            // no mid-show blocking connect). The next boot prefers wired again if the cable is back.
+            if (!cfg.wifiSsid.length()) break;
+            if (atBoot) {
+                Serial.println("[NET] no wired link at boot -> joining stored WiFi");
+                g_useEth = false;
+                startWiFiStation();
+            } else {
+                Serial.println("[NET] wired link lost -> reboot to join WiFi");
+                delay(200); ESP.restart();
+            }
             break;
         case WIRED_FB_REBOOT:
             if (!atBoot) { Serial.println("[NET] wired link lost -> reboot"); delay(200); ESP.restart(); }
@@ -3499,7 +3611,7 @@ static void startWiFiStation() {
     WiFi.begin("Wokwi-GUEST", "");
     { uint32_t t = millis();
       while (WiFi.status() != WL_CONNECTED && millis() - t < 20000) {
-          setLedColor((millis() % 600) < 300 ? NEO_BLUE : NEO_OFF, (millis() % 600) < 300);
+          bootConnectingLed();   // 5-LED: Knight-Rider sweep; single LED: blue blink
           delay(200); Serial.print(".");
       } }
     Serial.println();
@@ -3511,7 +3623,7 @@ static void startWiFiStation() {
     WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPsk.c_str());
     { uint32_t t = millis();
       while (WiFi.status() != WL_CONNECTED && millis() - t < 30000) {
-          setLedColor((millis() % 600) < 300 ? NEO_BLUE : NEO_OFF, (millis() % 600) < 300);
+          bootConnectingLed();   // 5-LED: Knight-Rider sweep; single LED: blue blink
           delay(200);
       } }
     // If the stored creds simply don't work (wrong password, AP gone), reboot into the
@@ -3588,8 +3700,7 @@ void setup() {
     startMs = millis();
     Serial.println("\n[BOOT] LuxDMX — Art-Net / sACN DMX Gateway");
 
-    loadConfig();
-    rdmAllocTables();   // size the RDM device tables to available RAM (before any RDM use)
+    loadConfig();   // also allocates the RDM tables (rdmAllocTables) before rdmLoadPoll uses them
     if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
         Serial.printf("[MEM] PSRAM %u KB total / %u KB free; internal heap %u KB free\n",
             (unsigned)(heap_caps_get_total_size(MALLOC_CAP_SPIRAM) / 1024),
@@ -3691,6 +3802,7 @@ void setup() {
     http.on("/rdm/identify",      HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/bqp",           HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/merge",         HTTP_GET,  handleRdmTrigger);
+    http.on("/led/bright",        HTTP_GET,  handleLedBright);   // live-tune the 5-LED panel brightness
     // The page route matches "/rdm" and prefix "/rdm/…", so register it AFTER the /rdm/* handlers
     // (first match wins) or it would swallow /rdm/discover etc.
     http.on("/rdm",               HTTP_GET,  handleRdmPage);

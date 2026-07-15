@@ -26,6 +26,7 @@ struct Config {
     int       ledPin;
     int       ledType;
     int       ledR, ledG, ledY, ledB, ledW;
+    int       ledBrR, ledBrG, ledBrY, ledBrB, ledBrW;  // 5-LED panel per-colour brightness (0-255 PWM duty; green/white run dimmer)
     DmxOutput outputs[MAX_OUTPUTS];
     int       dispType;
     int       dispSda, dispScl, dispRot, dispCs, dispDc, dispRst, dispSck, dispMosi;

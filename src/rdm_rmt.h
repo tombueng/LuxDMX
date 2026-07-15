@@ -52,6 +52,8 @@ static uart_port_t g_rdmUart = UART_NUM_2;   // active RX UART
 static uint8_t   g_rdmTN   = 0;              // RDM transaction number (rolls)
 static volatile uint32_t g_rdmSent = 0;      // RDM frames transmitted on the bus (for the web UI)
 static volatile uint32_t g_rdmRecv = 0;      // checksum-valid RDM responses received
+static volatile uint32_t g_rdmSentMs = 0;    // millis() of the last RDM request TX (5-LED yellow activity)
+static volatile uint32_t g_rdmRecvMs = 0;    // millis() of the last valid RDM response (5-LED white activity)
 
 static inline void rdmDe(int level) { gpio_set_level((gpio_num_t)g_rdmDe, level); }
 
@@ -137,6 +139,7 @@ static void rdmTx(const uint8_t* pkt, int len) {
     RmtDmx* rd = g_rdmRmt;
     if (!rd || !rd->chan) return;
     g_rdmSent++;
+    g_rdmSentMs = millis();                   // stamp the TX for the 5-LED yellow activity blink
     uart_flush_input(g_rdmUart);              // drop anything stale before we listen
     rdmDe(1);                                    // drive
     rmtDmxEncode(rd, pkt, len);                  // break + MAB + packet bytes
@@ -218,6 +221,7 @@ static bool rdmReadResp(const rdm_uid_t& expectFrom, uint8_t* pd, int pdMax, int
     for (int i = 0; i < rpdl; i++) pd[i] = m[24 + i];
     *pdl = rpdl;
     g_rdmRecv++;
+    g_rdmRecvMs = millis();                   // stamp the RX for the 5-LED white activity blink
     return true;
 }
 
@@ -510,6 +514,7 @@ static int rdmRmtRawRelay(const uint8_t* reqNoSC, int reqLen, uint8_t* respNoSC,
         uint16_t ck = 0; for (int i = 0; i < msgLen; i++) ck += m[i];
         if (ck != (uint16_t)((m[msgLen] << 8) | m[msgLen + 1])) { esp_rom_delay_us(1000); continue; }
         g_rdmRecv++;                                  // a valid relayed reply (WS "RDM rx" counts it too)
+        g_rdmRecvMs = millis();                        // stamp the RX for the 5-LED white activity blink
         int outLen = msgLen + 2 - 1;                  // full reply minus the start code
         if (outLen > respMax) outLen = respMax;
         memcpy(respNoSC, m + 1, outLen);              // SUB_START_CODE .. checksum
