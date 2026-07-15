@@ -165,13 +165,6 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
           </select>
           <div class="form-text">Client joins your router. Access point makes the device its own WiFi network for quick standalone tests, no router needed.</div>
         </div>
-        <div id="sta-creds-row" class="mb-3">
-          <label class="form-label text-secondary small mb-1">WiFi network (SSID)</label>
-          <input class="form-control mb-2" type="text" name="wifissid" id="wifi-ssid" value="" placeholder="MyNetwork">
-          <label class="form-label text-secondary small mb-1">WiFi password</label>
-          <input class="form-control" type="text" name="wifipsk" id="wifi-psk" value="" placeholder="(leave blank to keep the current one)">
-          <div class="form-text">The router network to join in client mode. Leave the password blank to keep the one already stored. To set this up without the web UI (first run), join the <b>LuxDMX-setup</b> access point and follow the page that pops up.</div>
-        </div>
         <div id="ap-pw-row" class="mb-3" style="display:none">
           <label class="form-label text-secondary small mb-1">AP password</label>
           <input class="form-control" type="text" name="appw" id="ap-pw" value="" placeholder="(open network)">
@@ -194,6 +187,13 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             sometimes not. To switch to a brand-new WiFi, hold the BOOT button at power-up for the setup portal
             (a link drop alone never moves the device to another network).
           </div>
+        </div>
+        <div id="sta-creds-row" class="mb-3">
+          <label class="form-label text-secondary small mb-1">WiFi network (SSID)</label>
+          <input class="form-control mb-2" type="text" name="wifissid" id="wifi-ssid" value="" placeholder="MyNetwork">
+          <label class="form-label text-secondary small mb-1">WiFi password</label>
+          <input class="form-control" type="text" name="wifipsk" id="wifi-psk" value="" placeholder="(leave blank to keep the current one)">
+          <div class="form-text">The router network to join in WiFi client mode, or the network the wired link-loss fallback hands off to. Leave the password blank to keep the one already stored. To set this up without the web UI (first run), join the <b>LuxDMX-setup</b> access point and follow the page that pops up.</div>
         </div>
         <div id="static-row" class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" name="staticip" id="static-sw" value="1">
@@ -714,8 +714,9 @@ function updNetMode(){
   var eth = hasEth && $('useeth-sw').checked;
   var ap  = !eth && $('wifi-mode').value === '1';
   var fbAp = eth && $('fb-mode').value === '1';   // the standalone-AP fallback uses the AP password too
+  var fbWifi = eth && $('fb-mode').value === '3'; // the "join WiFi" fallback needs the saved STA credentials
   $('wifi-mode-row').style.display = eth ? 'none' : '';
-  $('sta-creds-row').style.display = (!eth && !ap) ? '' : 'none';   // SSID/password only in client mode
+  $('sta-creds-row').style.display = ((!eth && !ap) || fbWifi) ? '' : 'none';   // SSID/password in client mode, or the join-WiFi fallback
   $('ap-pw-row').style.display     = (ap || fbAp) ? '' : 'none';
   $('ap-fb-row').style.display     = eth ? '' : 'none';
   $('static-row').style.display    = ap  ? 'none' : '';
