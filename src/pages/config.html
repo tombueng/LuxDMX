@@ -119,6 +119,10 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
           Ethernet-reserved pins for your chip.
         </div>
         <div id="board-hardwired" class="form-text mt-2"></div>
+        <div id="pin-unlock-row" class="form-check form-switch mt-1" style="display:none">
+          <input class="form-check-input" type="checkbox" id="pin-unlock">
+          <label class="form-check-label small text-secondary" for="pin-unlock">Advanced: unlock the fixed GPIO pins (only if you reworked the board wiring)</label>
+        </div>
         <div id="pin-warnings" class="mt-2"></div>
       </div>
     </div>
@@ -850,6 +854,7 @@ $('wired-sel').addEventListener('change', function(){ updWired(); validate(); })
 });
 $('wifi-mode').addEventListener('change', updNetMode);
 $('fb-mode').addEventListener('change', updNetMode);
+{ var _pu = $('pin-unlock'); if (_pu) _pu.addEventListener('change', function(){ applyHardwiredLocks(); validate(); }); }
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
 $('dev-host').addEventListener('input', updHostUrl);
@@ -1255,6 +1260,15 @@ function renderWarnings(msgs){
     + warns.map(function(m){ return '<li>' + esc(m.text) + '</li>'; }).join('') + '</ul></div>';
   c.innerHTML = html;
 }
+function fixedUnlocked(){ var el = $('pin-unlock'); return !!(el && el.checked); }
+// An Ethernet role field legitimately owns its own bus pins, so the "reserved for the
+// Ethernet" flag must never be raised against the very field that defines that pin
+// (GPIO10 is the W5500 CS -> the CS field can't be "reserved for the W5500 Ethernet").
+function ownReservedFlag(role){
+  if (['ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst'].indexOf(role) >= 0) return 'reserved:eth-spi';
+  if (['rmiimdc','rmiimdio','rmiipwr','rmiiclk'].indexOf(role) >= 0) return 'reserved:eth-rmii';
+  return null;
+}
 function validate(){
   var roles = activeRoles(), used = {}, fields = [];
   roles.forEach(function(role){
@@ -1272,7 +1286,9 @@ function validate(){
       var others = used[f.v].filter(function(r){ return r !== f.role; }).map(roleLabel);
       probs.push('GPIO' + f.v + ' also assigned to ' + others.join(', ')); sev = 'err';
     }
-    var s = flagSeverity(pinFlags(f.v), roleType(f.role));
+    var fl = pinFlags(f.v), own = ownReservedFlag(f.role);
+    if (own) fl = fl.filter(function(x){ return x !== own; });   // a bus role field owns its own pins
+    var s = flagSeverity(fl, roleType(f.role));
     if (s.sev){
       probs.push('GPIO' + f.v + ' ' + s.msg);
       if (s.sev === 'err') sev = 'err'; else if (sev !== 'err') sev = 'warn';
@@ -1538,6 +1554,7 @@ function applyHardwiredLocks(){
   document.querySelectorAll('.fixed-field').forEach(function(el){ el.classList.remove('fixed-field'); el.disabled = false; });
   document.querySelectorAll('input.fixed-mirror').forEach(function(el){ el.remove(); });
   var b = detectedDesc(); var hw = b && b.hardwired; if (!hw) return;
+  if (fixedUnlocked()) return;   // Advanced unlock: leave the fixed pins editable for a reworked board
   hw.forEach(function(e){
     if (!e.field) return;
     var val = (e.val != null ? e.val : e.gpio);
@@ -1563,7 +1580,10 @@ function renderHeaderTable(h){
 }
 function updHardwired(){
   var el = $('board-hardwired'); if (!el) return;
-  var b = detectedDesc(); if (!b || (!b.hardwired && !b.headers)){ el.innerHTML = ''; return; }
+  var b = detectedDesc();
+  var ur = $('pin-unlock-row');
+  if (ur) ur.style.display = (b && b.hardwired && b.hardwired.length) ? '' : 'none';
+  if (!b || (!b.hardwired && !b.headers)){ el.innerHTML = ''; return; }
   var html = '';
   if (b.hardwired && b.hardwired.length){
     html += '<div class="hw-fixed"><strong>Fixed wiring on ' + esc(b.name) + '</strong>'

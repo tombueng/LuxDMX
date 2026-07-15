@@ -131,6 +131,26 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('.pin-grp input[name="ethcs"]')).toHaveCount(1);   // pin-picker button
   });
 
+  test('W5500 role pins are not flagged "reserved" against their own role (Save stays enabled)', async ({ page, request }) => {
+    const d = await (await request.get('/info.json')).json();
+    test.skip(!d.ethSpi, 'build has no W5500 SPI support');
+    await page.goto('/config');
+    await page.locator('#wired-sel').selectOption('w5500');   // activate the W5500 bus + its reserved flags
+    // Regression: GPIO9-14 carry a reserved:eth-spi flag, and the W5500 role fields
+    // (CS/SCK/MOSI/MISO/INT/RST) sit on exactly those pins. They used to be flagged
+    // "reserved for the W5500 Ethernet" against their OWN role, which blocked Save.
+    await expect(page.locator('#pin-warnings')).not.toContainText('reserved for the W5500 Ethernet');
+    await expect(page.locator('#save-btn')).toBeEnabled();
+    // A fixed-pin board (LuxDMX v4) locks the hard-wired fields, with an Advanced unlock
+    // toggle for a reworked board. Only assert it where the board is actually detected as fixed.
+    if (await page.locator('#pin-unlock-row').isVisible()) {
+      await expect(page.locator('input[name="ethcs"]')).toBeDisabled();   // locked by default
+      await page.locator('#pin-unlock').check();
+      await expect(page.locator('input[name="ethcs"]')).toBeEnabled();    // unlock re-enables it
+      await page.locator('#pin-unlock').uncheck();                        // restore
+    }
+  });
+
   test('Wired selector: one list of None + the build PHYs, swaps the pin sections', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi && !d.ethRmii, 'build has no wired Ethernet');
