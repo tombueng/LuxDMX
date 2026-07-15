@@ -72,12 +72,12 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **First-run setup portal** | On first boot (or BOOT-button held) LuxDMX opens its own `LuxDMX-setup` access point with a captive portal. The on-brand page (served from the same web UI) lets you either join your WiFi or run the device as its own access point, no router needed |
 | **Selectable network mode** | Pick the interface (WiFi or wired Ethernet) and WiFi mode (client/STA or standalone AP) in the web UI, on boards that have both |
 | **Standalone AP mode** | LuxDMX hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
-| **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, or reboot. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
+| **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, reboot, or fall back to your saved WiFi network. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
 | **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
 | **mDNS + DHCP hostname** | Reachable as `dmx-gateway.local` via mDNS, *and* the device sends its hostname over DHCP (option 12) so your router registers it by plain name. Clients without mDNS (e.g. Windows) can then reach it as `dmx-gateway` / `dmx-gateway.fritz.box`. Hostname configurable |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
-| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — codes network/idle/DMX/conflict/identify state |
+| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — the panel codes network + live DMX-out / RDM-out / RDM-reply / conflict activity on separate LEDs |
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
 | **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
 | **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
@@ -532,6 +532,7 @@ Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a r
   - **Keep retrying the wired link** (default): never opens a hotspot, reconnects on its own when the cable is back. Best on a show.
   - **Standalone WiFi AP**: the device becomes its own network (needs an **AP password**; it refuses to open an *unsecured* AP).
   - **Reboot and retry**: power-cycle to re-attempt the link.
+  - **Join WiFi**: fall back to the saved WiFi network (STA) when there is no wired link — handy for a board that is sometimes wired and sometimes not. Needs stored WiFi credentials; a link drop while running reboots (a clean boot then joins WiFi), and the next boot prefers wired again if the cable is back. It only ever joins the *already-saved* network, so a dropped link can't move the device somewhere new.
 
   A runtime watchdog applies the policy even if the cable is pulled while running (the old fallback only ran at boot, so a mid-show unplug used to strand the device). There is **no automatic WiFi setup portal** on link loss, on purpose: that would let anyone who can drop the link force the device onto their own WiFi. To move the device to a new WiFi, hold the **BOOT button** at power-up for the setup portal (physical access required).
 
@@ -612,6 +613,7 @@ values are fetched as JSON.
 | `/rdm/identify` | GET | Toggle a fixture's identify — `?uid=MMMM:DDDDDDDD&on=0/1` |
 | `/rdm/bqp` | GET | Set the Art-Net BackgroundQueuePolicy (background RDM status harvest), `?p=1..3` severity, `4` off |
 | `/rdm/merge` | GET | Set an output's merge mode, `?out=<index>&mode=0/1/2` (off/HTP/LTP), applied live + persisted |
+| `/led/bright` | GET | 5-LED panel per-colour brightness (`?r=&g=&y=&b=&w=`, 0-255), applied live; `&save=1` persists to NVS, `&test=1` lights all five for calibration (10-min window) |
 | `/version.json` | GET | Current firmware version + update-available flag |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
@@ -767,15 +769,30 @@ output), so momentary multicast loss doesn't flicker the LED. The LED runs on
 its own task, so serving the web UI never freezes it.
 
 **5-LED status panel** (`ledType 3`, the LuxDMX v5 board) — five discrete LEDs that show
-independent states *simultaneously*, instead of one LED time-sharing colours:
+independent states *simultaneously*, instead of one LED time-sharing colours. Once the
+box is green (network up), the coloured LEDs signal **live traffic** so you can see it
+working from across the room — outgoing DMX, outgoing RDM, and RDM replies each get their
+own LED:
 
 | LED | Meaning |
 |---|---|
-| **Red** | no network (blink) |
-| **Green** | network up (solid) |
-| **Yellow** | DMX activity (fast blink while frames flow) |
-| **Blue** | source conflict — two senders on one universe (slow blink) |
-| **White** | identify active (blink) / booting |
+| **Green** | network up (solid) — "all running" |
+| **Blue** | outgoing DMX being clocked onto the wire (blinks while frames go out) |
+| **Yellow** | outgoing RDM request sent (short pulse per request — flickers during discovery/polling) |
+| **White** | RDM response received (short pulse per reply); also a slow blink while a fixture identify is active |
+| **Red** | no network (blink); or, when up, a source conflict — two senders on one universe (blink) |
+
+The blue "DMX out" blink follows the actual transmit, so a `STOP`-on-signal-loss output that
+has gone dark shows no blue. Yellow and white pulse together for each RDM transaction
+(request out, reply back). During a 64-fixture discovery both flicker near-continuously.
+
+**Per-colour brightness (PWM).** The five LEDs are driven with PWM, not plain on/off, because
+green and white are far brighter per mA than the others — left raw they wash the panel out. Each
+colour has its own duty (`ledbrr`/`ledbrg`/`ledbry`/`ledbrb`/`ledbrw`, 0-255) so the panel looks
+even; the v5 board defaults dim green/white hard. Tune it live (no reboot) via `/led/bright`
+(`?g=8&w=17…`, `&save=1` to persist) — `?test=1` lights all five at once so you can balance them
+by eye. **Boot/connecting** runs a Knight-Rider sweep back and forth across the five LEDs instead
+of the single-LED blue blink.
 
 Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48` (built-in WS2812).
 The v5 board uses **R=1 G=2 Y=6 B=7 W=15**.
@@ -934,7 +951,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Static IP / gateway / subnet / DNS | DHCP | Web `/config` (Network) |
 | Auto-update | off | Web `/config` (Firmware) |
 | RDM over Art-Net (`artrdm`) | on | Web `/config` (RDM) |
-| RDM device limit (`rdmmaxdev`) | `0` (auto) | Web `/config` (RDM) |
+| RDM device limit (`rdmmaxdev`) | `0` (auto: **64** on ESP32-S3 / PSRAM, **16** on the classic ESP32) | Web `/config` (RDM) |
 | Channel labels | — | Status page (channel modal) |
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password (IDE `espota` only) | `dmxota` | Web `/config` |

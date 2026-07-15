@@ -18,7 +18,7 @@ static const char* const ENUM_DISPTYPE[] = {"off", "SSD1306 128x64", "SSD1306 12
 static const char* const ENUM_WIREDPHY[] = {"W5500 (SPI)", "LAN8720 (RMII)"};
 static const char* const ENUM_ETHSPIPHY[] = {"W5500", "DM9051"};
 static const char* const ENUM_WIFIMODE[] = {"STA (client)", "AP (standalone)"};
-static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "reboot"};
+static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "reboot", "join WiFi"};
 
 // ---- compact row builders (no defaults — neutral is derived from min) -------
 #define IFIELD(key, json, member, mn, mx, label, group) \
@@ -44,6 +44,11 @@ const CfgField CONFIG_FIELDS[] = {
     IFIELD("ledy",    "ledY",    ledY,    -1, 48, "5-LED panel Y pin", "Status LED"),
     IFIELD("ledb",    "ledB",    ledB,    -1, 48, "5-LED panel B pin", "Status LED"),
     IFIELD("ledw",    "ledW",    ledW,    -1, 48, "5-LED panel W pin", "Status LED"),
+    IFIELD("ledbrr",  "ledBrR",  ledBrR,   0, 255, "5-LED panel R brightness", "Status LED"),
+    IFIELD("ledbrg",  "ledBrG",  ledBrG,   0, 255, "5-LED panel G brightness", "Status LED"),
+    IFIELD("ledbry",  "ledBrY",  ledBrY,   0, 255, "5-LED panel Y brightness", "Status LED"),
+    IFIELD("ledbrb",  "ledBrB",  ledBrB,   0, 255, "5-LED panel B brightness", "Status LED"),
+    IFIELD("ledbrw",  "ledBrW",  ledBrW,   0, 255, "5-LED panel W brightness", "Status LED"),
 
     // --- Display ------------------------------------------------------------
     EFIELD("disptype", "dispType", dispType,        "Display type", "Display", ENUM_DISPTYPE),
