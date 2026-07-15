@@ -183,9 +183,11 @@ showing its own universe and its own frame rate (source count moves to the right
 - Source count: labelled **Sources** (number of active Art-Net / sACN senders), matching the
   `2+ sources` wording on the conflict banner.
 - DMX state: `● LIVE` when `millis() - lastDmxMs < 1500` (the LED's threshold), else `idle`.
-- **Color panel (SSD1351)** reuses the device's existing status palette: title accent + LIVE dot
-  **green** when active, **amber** when idle, **red** on no-link; the conflict banner fills
-  **red**. Same color language as the WS2812 status LED, so the panel and LED always agree.
+- **Color panel (SSD1351)** reuses the device's status palette, same language as the status LED:
+  title accent + LIVE dot **green** when up (idle *or* live — the LIVE/idle label carries the DMX
+  distinction), **orange** when Ethernet is configured but running on the WiFi/AP fallback,
+  **blue** during RDM / identify, **red** on no-link; the conflict banner fills **red**. Panel and
+  LED always agree.
 
 > **Mono panel color is irrelevant.** White / blue / yellow / yellow-blue panels are all 1 bpp —
 > the color is the physical emitter, not addressable. The yellow/blue split panel has a *fixed*

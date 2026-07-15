@@ -1,23 +1,25 @@
-// 5-LED status panel — activity signalling (LuxDMX v4/v5 board, ledType 3).
+// Status LED — one language on the single WS2812/GPIO LED and the 5-LED panel (ledType 3).
 //
-// Once the box is green (network up), the coloured LEDs signal LIVE TRAFFIC:
-//   Green  = network up (solid)
-//   Blue   = outgoing DMX being clocked onto the wire   (driven by lastDmxTxMs)
-//   Yellow = outgoing RDM request sent                  (driven by g_rdmSent / rdmTx)
-//   White  = RDM response received / identify active    (driven by g_rdmRecv / rdmRx)
-//   Red    = no network, or (when up) a source conflict
+//   green (solid)          network up, idle
+//   green (slow 2 s blink)  DMX coming in over Art-Net / sACN   (driven by lastDmxMs)
+//   blue  (solid)          RDM discovery / identify / RDM traffic in the last second
+//                          (driven by identifyCh + g_rdmSentMs / g_rdmRecvMs -> rdm.json rdmTx/rdmRx)
+//   orange (solid)         Ethernet configured but on the WiFi/AP fallback (info.json.ethFallback)
+//   red   (green off)      no network at all
+//   Knight-Rider sweep     booting / connecting
+// DMX *output* is deliberately not signalled (a gateway always transmits).
 //
-// What Playwright CAN check here: the API-visible signals that gate each LED —
+// What Playwright CAN check here: the API-visible signals that gate each state —
 //   * the RDM device cap (info.json.rdmMax), which auto-sizes to the chip and
-//     regressed to 16 on the ESP32-S3 (must be 64); and
-//   * the RDM tx/rx counters (rdm.json.rdmTx / rdmRx) that pulse the yellow/white LEDs.
-// The DMX-out (blue) signal is the same continuous 40 Hz transmit already covered by
-// artnet/sacn/signal-loss (channels route to the output; STOP-on-loss goes dark).
+//     regressed to 16 on the ESP32-S3 (must be 64);
+//   * the RDM tx/rx counters (rdm.json.rdmTx / rdmRx) that light the BLUE LED; and
+//   * info.json.ethFallback, the wired-on-WiFi-fallback flag that lights the ORANGE state.
+// DMX-in (green) is the same 40 Hz stream already covered by artnet/sacn/signal-loss.
 //
-// What it CANNOT check: the actual photons. Whether the blue/yellow/white LEDs really
-// blink is only observable with a camera or a logic analyser on the LED GPIOs (R=1 G=2
-// Y=6 B=7 W=15) — verified on the bench, the same way the on-wire DMX/RDM timing is
-// validated on the RP2350 analyzer rig rather than in Playwright (see rdm-trigger.spec).
+// What it CANNOT check: the actual photons. Which colour is lit is only observable with a
+// camera or a logic analyser on the LED GPIOs (R=1 G=2 Y=6 B=7 W=15) — verified on the bench,
+// the same way the on-wire DMX/RDM timing is validated on the RP2350 analyzer rig (see
+// rdm-trigger.spec).
 import { test, expect } from '@playwright/test';
 import { info, pollFor } from './lib/device.mjs';
 
@@ -25,12 +27,17 @@ const WRITE = process.env.LUXDMX_WRITE === '1';
 const rdm = async (request) => (await request.get('/rdm.json')).json();
 
 test.describe('5-LED panel — API-visible state (read-only, always runs)', () => {
-  test('/info.json exposes the LED panel config + chip + RDM cap', async ({ request }) => {
+  test('/info.json exposes the LED panel config + chip + RDM cap + fallback flag', async ({ request }) => {
     const i = await info(request);
     for (const k of ['ledType', 'ledR', 'ledG', 'ledY', 'ledB', 'ledW'])
       expect(typeof i[k], `info.${k}`).toBe('number');
     expect(typeof i.chip).toBe('string');       // e.g. "ESP32" / "ESP32-S3"
     expect(typeof i.rdmMax).toBe('number');      // effective RDM device cap
+    // ethFallback gates the ORANGE state: wired configured but running on the WiFi/AP fallback.
+    // On a healthy device (whatever the interface) it must be false — orange never shows unless
+    // the wired link actually dropped to a working WiFi/AP fallback.
+    expect(typeof i.ethFallback, 'info.ethFallback').toBe('boolean');
+    expect(i.ethFallback, 'a reachable device under test is not on a wired fallback').toBe(false);
   });
 
   test('/info.json + /led/bright expose the per-colour PWM brightness (0-255)', async ({ request }) => {
@@ -62,10 +69,10 @@ test.describe('5-LED panel — API-visible state (read-only, always runs)', () =
   });
 });
 
-test.describe('RDM activity counters — the yellow/white LED sources (opt-in)', () => {
+test.describe('RDM activity counters — the blue-LED source (opt-in)', () => {
   test.skip(!WRITE, 'triggers RDM discovery on the bus; set LUXDMX_WRITE=1 to enable');
 
-  test('discovery pumps rdmTx (yellow LED); a reply pumps rdmRx (white LED)', async ({ request }) => {
+  test('discovery pumps rdmTx and (if answered) rdmRx — both light the blue LED', async ({ request }) => {
     const before = await rdm(request);
     expect(typeof before.rdmTx).toBe('number');
     expect(typeof before.rdmRx).toBe('number');
@@ -73,11 +80,12 @@ test.describe('RDM activity counters — the yellow/white LED sources (opt-in)',
     const r = await request.get('/rdm/discover');
     expect(r.ok()).toBeTruthy();
 
-    // Every RDM frame put on the wire bumps rdmTx -> the yellow LED pulses on each.
+    // Every RDM frame on the wire bumps rdmTx; a request or a reply in the last second holds
+    // the blue LED on.
     const after = await pollFor(() => rdm(request), (x) => x.rdmTx > before.rdmTx, { ms: 15000 });
-    expect(after.rdmTx, 'discovery must transmit RDM frames (yellow activity)').toBeGreaterThan(before.rdmTx);
-    // rdmRx only advances if a fixture actually answers (white LED). Don't require a
-    // responder on the bench, but it must never run backwards.
+    expect(after.rdmTx, 'discovery must transmit RDM frames (blue activity)').toBeGreaterThan(before.rdmTx);
+    // rdmRx only advances if a fixture actually answers. Don't require a responder on the
+    // bench, but it must never run backwards.
     expect(after.rdmRx).toBeGreaterThanOrEqual(before.rdmRx);
   });
 });

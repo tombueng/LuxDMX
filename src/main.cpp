@@ -382,6 +382,7 @@ static uint32_t lastLogMs = 0;
 static bool g_useEth = false;
 static bool g_apMode = false;
 static bool g_apWiredFallback = false;   // in the AP only because the wired link dropped (return to Eth when it's back)
+static bool g_ethFallback     = false;   // wired Ethernet configured but running on the WiFi/AP fallback (status LED = orange)
 
 // First-run setup portal (replaces the old WiFiManager config portal). Brought up only
 // when there are no stored STA credentials, or when BOOT is held at power-on. While it's
@@ -477,7 +478,6 @@ static bool     dmxReady     = false;
 static bool     manualMode   = false;
 static uint32_t lastWsPush   = 0;
 static uint32_t lastDmxMs    = 0;
-static volatile uint32_t lastDmxTxMs = 0;   // millis() of the last DMX frame actually clocked onto the wire (5-LED activity)
 static String   otaTarget       = "latest";   // release tag to install
 static String   latestVersion   = "";
 // Live OTA progress, polled by the update page via /ota/status. Written from the
@@ -561,12 +561,12 @@ static void saveConfig() {
 // LED helpers
 // ---------------------------------------------------------------------------
 static constexpr uint32_t NEO_OFF    = 0x000000;
-static constexpr uint32_t NEO_GREEN  = 0x002200;
-static constexpr uint32_t NEO_AMBER  = 0x221000;
-static constexpr uint32_t NEO_RED    = 0x220000;
-static constexpr uint32_t NEO_BLUE   = 0x000022;   // connecting to WiFi
-static constexpr uint32_t NEO_PURPLE = 0x180018;   // AP / config portal active
-static constexpr uint32_t NEO_WHITE  = 0x0a0a0a;   // booting
+static constexpr uint32_t NEO_GREEN  = 0x002200;   // up + idle (solid) / DMX coming in (slow blink)
+static constexpr uint32_t NEO_AMBER  = 0x221000;   // orange: Ethernet configured but on the WiFi/AP fallback
+static constexpr uint32_t NEO_RED    = 0x220000;   // no network at all
+static constexpr uint32_t NEO_BLUE   = 0x000022;   // RDM discovery / identify / RDM traffic
+static constexpr uint32_t NEO_PURPLE = 0x180018;   // setup portal / config AP active
+static constexpr uint32_t NEO_WHITE  = 0x0a0a0a;   // booting / connecting
 
 // --- 5-LED discrete status panel (ledType 3) -------------------------------
 // The five LEDs are driven with LEDC PWM (not plain on/off) so each colour has its
@@ -599,12 +599,12 @@ static void setLeds5(bool r, bool g, bool y, bool b, bool w) {
 static void leds5FromColor(uint32_t c, bool& r, bool& g, bool& y, bool& b, bool& w) {
     r = g = y = b = w = false;
     switch (c) {
-        case NEO_GREEN:  g = true; break;            // active
-        case NEO_AMBER:  y = true; break;            // online, idle
-        case NEO_RED:    r = true; break;            // fault / no network
-        case NEO_BLUE:   b = true; break;            // connecting / link wait
-        case NEO_PURPLE: b = true; w = true; break;  // AP / config portal
-        case NEO_WHITE:  w = true; break;            // booting
+        case NEO_GREEN:  g = true; break;            // up / idle
+        case NEO_AMBER:  y = true; break;            // Ethernet on WiFi/AP fallback (orange)
+        case NEO_RED:    r = true; break;            // no network
+        case NEO_BLUE:   b = true; break;            // RDM / identify
+        case NEO_PURPLE: b = true; w = true; break;  // setup portal / config AP
+        case NEO_WHITE:  w = true; break;            // booting / connecting
         case NEO_OFF: default: break;
     }
 }
@@ -652,8 +652,8 @@ static void setLed(bool on) { setLedColor(on ? NEO_GREEN : NEO_OFF, on); }
 
 // Boot/connecting indicator. On the 5-LED panel it's a Knight-Rider sweep bouncing back and
 // forth across R-G-Y-B-W (each position at its own calibrated brightness, so the sweep looks
-// even); on a single LED it stays the classic blue blink. Call it in a loop while waiting for
-// the network to come up.
+// even); on a single LED it's a white "working" blink (blue is reserved for RDM now). Call it
+// in a loop while waiting for the network to come up.
 static void bootConnectingLed() {
     if (cfg.ledType == 3) {
         static uint8_t ph = 0;                           // advances one position per call
@@ -662,7 +662,7 @@ static void bootConnectingLed() {
         setLeds5(pos == 0, pos == 1, pos == 2, pos == 3, pos == 4);
     } else {
         bool on = (millis() % 600) < 300;
-        setLedColor(on ? NEO_BLUE : NEO_OFF, on);
+        setLedColor(on ? NEO_WHITE : NEO_OFF, on);
     }
 }
 
@@ -844,9 +844,7 @@ static void sendDmx() {
     for (int k = 0; k < nSent; k++) dmx_wait_sent(sentPort[k], DMX_TIMEOUT_TICK);
 #ifdef DMX_RMT
     for (int k = 0; k < nRmt; k++) rmtDmxWait(&g_rmt[rmtSent[k]]);
-    if (nRmt)  lastDmxTxMs = millis();   // real DMX went out this frame (5-LED blue activity)
 #endif
-    if (nSent) lastDmxTxMs = millis();
 }
 
 // Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
@@ -2120,6 +2118,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"wiredPhy\":";  j += cfg.wiredPhy;            j += ",";   // 0=W5500, 1=LAN8720 RMII
     j += "\"ethW5500\":";  j += cfg.ethW5500 ? "true" : "false"; j += ",";   // module enabled (opt-in)
     j += "\"useEthernet\":"; j += cfg.useEthernet ? "true" : "false"; j += ",";
+    j += "\"ethFallback\":"; j += g_ethFallback ? "true" : "false"; j += ",";   // wired configured but running on WiFi/AP fallback (status LED = orange)
 #if defined(HAS_WIRED_ETH)
     j += "\"hasEth\":true,";   // board has wired Ethernet → show the WiFi/Ethernet selector
 #else
@@ -3066,45 +3065,86 @@ static void initOTA() {
 // never freezes it. Very light (one pixel update every 50 ms) so it doesn't
 // compete with loop() for CPU. DMX output stays in loop()/callbacks.
 // ---------------------------------------------------------------------------
+// One status language, spoken identically by the single WS2812/GPIO LED and the 5-LED
+// discrete panel (v4/v5 board). Boot/connecting is handled separately by bootConnectingLed()
+// (Knight-Rider sweep on the panel, white "working" blink on a single LED) until the network
+// is up and this task takes over.
+//
+//   green, solid           board up and idle — running normally, no DMX coming in
+//   green, slow 2 s blink   DMX arriving over Art-Net/sACN
+//   blue,  solid            RDM discovery / identify, or RDM traffic in the last second
+//   orange, solid           Ethernet configured but no link — running on the WiFi/AP fallback
+//   red    (green off)      no network at all (neither Ethernet nor WiFi came up)
+//   purple, solid           setup portal / config AP active
+//
+// DMX *output* is deliberately not signalled: a gateway transmits continuously, so a DMX-out
+// blink told you nothing. Blue is RDM's; the panel has no discrete orange LED, so its amber
+// (Y) LED carries the orange fallback state.
+static constexpr uint32_t DMX_LIVE_MS   = 1500;  // treat DMX as "coming in" this long after the last frame
+static constexpr uint32_t RDM_ACTIVE_MS = 1000;  // blue stays on this long after the last RDM event
+
+enum LedState : uint8_t { LED_ST_DOWN, LED_ST_FALLBACK, LED_ST_RDM, LED_ST_DMX, LED_ST_IDLE };
+
+// True while an RDM identify or discovery is in flight, or RDM frames moved on the wire in the
+// last second. Keeps the blue LED solid across a whole discovery, not just per-frame.
+static bool rdmLedActive(uint32_t now) {
+    if (identifyCh) return true;                                         // DMX identify (a channel forced to full)
+    if (rdmBusy)    return true;                                         // RDM discovery in progress
+#ifdef DMX_RMT
+    if (g_rdmSentMs && now - g_rdmSentMs < RDM_ACTIVE_MS) return true;   // a discovery/poll request went out
+    if (g_rdmRecvMs && now - g_rdmRecvMs < RDM_ACTIVE_MS) return true;   // a fixture answered
+#endif
+    return false;
+}
+
+// Classify the running status into one LED state. Network health (down / fallback) wins over
+// activity (RDM / DMX) so a degraded link is never masked by traffic; RDM wins over DMX so an
+// identify stays visible even while frames flow.
+static LedState ledStatus(uint32_t now) {
+    if (!netConnected())                            return LED_ST_DOWN;
+    if (g_ethFallback)                              return LED_ST_FALLBACK;
+    if (rdmLedActive(now))                          return LED_ST_RDM;
+    if (lastDmxMs && now - lastDmxMs < DMX_LIVE_MS)  return LED_ST_DMX;
+    return LED_ST_IDLE;
+}
+
 static void ledTask(void*) {
     const TickType_t period = pdMS_TO_TICKS(50);
     for (;;) {
         uint32_t now = millis();
+        // Calibration override (/led/bright?test=1): light all five panel LEDs so the per-colour
+        // brightness can be balanced by eye. Auto-reverts after its 10-min window.
+        if (cfg.ledType == 3 && g_ledTestUntil && (int32_t)(g_ledTestUntil - now) > 0) {
+            setLeds5(true, true, true, true, true);
+            vTaskDelay(period); continue;
+        }
+        // Setup portal / config AP: purple until the device is configured (a pre-network state,
+        // not one of the running states below).
+        if (g_setupPortal) { setLedColor(NEO_PURPLE, true); vTaskDelay(period); continue; }
+
+        LedState st = ledStatus(now);
+        bool dmxBlink = (now % 2000) < 1000;   // slow 2 s green blink while DMX is coming in
+
         if (cfg.ledType == 3) {
-            // 5-LED panel. Base state on the network; once green (up + running), the
-            // coloured LEDs signal LIVE TRAFFIC so you can see the box working from
-            // across the room:
-            //   G = network up (solid green = "all running")
-            //   B = outgoing DMX being clocked onto the wire   (blink while transmitting)
-            //   Y = outgoing RDM request sent                  (short pulse per request)
-            //   W = RDM response received / identify active    (short pulse / slow blink)
-            //   R = no network  OR (when up) a source conflict warning
-            // Calibration override: /led/bright?test=1 lights all five at their brightness
-            // so you can balance the colours by eye; it auto-reverts after the 10-min window.
-            if (g_ledTestUntil && (int32_t)(g_ledTestUntil - now) > 0) {
-                setLeds5(true, true, true, true, true);
-                vTaskDelay(period); continue;
+            bool r = false, g = false, y = false, b = false, w = false;
+            switch (st) {
+                case LED_ST_DOWN:     r = true;     break;   // red, green off
+                case LED_ST_FALLBACK: y = true;     break;   // amber ~ orange (no discrete orange LED)
+                case LED_ST_RDM:      b = true;     break;   // blue, solid
+                case LED_ST_DMX:      g = dmxBlink; break;   // green, slow blink
+                case LED_ST_IDLE:     g = true;     break;   // green, solid
             }
-            bool up = netConnected();
-            uint8_t ss = g_srcStatus;
-            bool r = up ? (ss == SRC_CONFLICT && (now % 500) < 250)          // up: red = two sources fighting
-                        : ((now % 1000) < 500);                              // down: red = no network
-            bool g = up;                                                     // network up: solid green
-            bool b = up && (now - lastDmxTxMs) < 400 && ((now % 200) < 100); // DMX out: steady blink while clocking
-            bool y = false;                                                  // RDM request: short yellow pulse per TX
-            bool w = identifyCh && ((now % 500) < 250);                      // identify still active: slow white blink
-#ifdef DMX_RMT
-            y = up && (now - g_rdmSentMs) < 150;                             // RDM request: short yellow pulse per TX
-            w = w || (up && (now - g_rdmRecvMs) < 150);                      // RDM response: short white pulse per RX
-#endif
             setLeds5(r, g, y, b, w);
-        } else if (!netConnected()) {
-            setLedColor((now % 1000) < 120 ? NEO_RED : NEO_OFF, (now % 1000) < 120);
-        } else if (now - lastDmxMs < 1500) {
-            // Hold "active" green through brief input gaps (lost multicast)
-            setLedColor(NEO_GREEN, true);
         } else {
-            setLedColor((now % 1000) < 500 ? NEO_AMBER : NEO_OFF, (now % 1000) < 500);
+            uint32_t c; bool on;
+            switch (st) {
+                case LED_ST_DOWN:     c = NEO_RED;   on = false; break;   // solid red / GPIO off
+                case LED_ST_FALLBACK: c = NEO_AMBER; on = true;  break;   // orange / GPIO on
+                case LED_ST_RDM:      c = NEO_BLUE;  on = true;  break;   // blue / GPIO on
+                case LED_ST_DMX:      c = dmxBlink ? NEO_GREEN : NEO_OFF; on = dmxBlink; break;
+                default:              c = NEO_GREEN; on = true;  break;   // idle: green / GPIO on
+            }
+            setLedColor(c, on);
         }
         vTaskDelay(period);
     }
@@ -3172,7 +3212,13 @@ static void dispDrawStatus() {
     const bool live = (millis() - lastDmxMs) < 1500;
     const bool up   = netConnected();
     const bool dual = dispEnabledOutputs() >= 2;   // show a frame rate per universe
-    const uint16_t accent = !up ? C_RED : (live ? C_GREEN : C_AMBER);
+    // Mirror the status-LED language: red = no network, orange = Ethernet on the WiFi/AP
+    // fallback, blue = RDM/identify, green = up (idle or live; the "LIVE/idle" label carries
+    // the DMX distinction that the LED shows as a green blink).
+    const uint16_t accent = !up ? C_RED
+                          : g_ethFallback        ? C_AMBER
+                          : rdmLedActive(millis()) ? C_BLUE
+                          : C_GREEN;
     char b[40];
 
     gfx->fillScreen(0);
@@ -3500,7 +3546,7 @@ static void applyWiredLinkLoss(bool atBoot) {
         case WIRED_FB_AP:
             // Stopgap AP: if it comes up, remember it was a wired fallback so we can hand
             // back to Ethernet once the link returns (needs an AP password, else stays on retry).
-            if (startWiFiAP(true)) g_apWiredFallback = true;
+            if (startWiFiAP(true)) { g_apWiredFallback = true; g_ethFallback = true; }
             break;
         case WIRED_FB_WIFI:
             // No wired link -> join the stored WiFi network (STA). Needs credentials; without
@@ -3511,6 +3557,7 @@ static void applyWiredLinkLoss(bool atBoot) {
             if (atBoot) {
                 Serial.println("[NET] no wired link at boot -> joining stored WiFi");
                 g_useEth = false;
+                g_ethFallback = true;   // Ethernet configured but coming up on WiFi -> status LED shows orange
                 startWiFiStation();
             } else {
                 Serial.println("[NET] wired link lost -> reboot to join WiFi");
@@ -3601,7 +3648,7 @@ static void startWiFiStation() {
 #endif
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-    setLedColor(NEO_BLUE, true);   // connecting to stored WiFi
+    setLedColor(NEO_WHITE, true);   // connecting to stored WiFi (white = working; blue is RDM)
 #ifdef SIM_WIFI
     // Simulation only (Wokwi): the setup portal can't be reached from the host, so join
     // Wokwi's open virtual AP directly. Never compiled into a real build — guarded by the
