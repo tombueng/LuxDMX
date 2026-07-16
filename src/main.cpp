@@ -3406,6 +3406,34 @@ static void waitEthLink() {
 // DMX/RDM on core 1. (Investigation report 6.6: a blunt UART-interrupt priority bump
 // instead just starves the whole W5500 stack; core separation is the right lever.)
 static volatile bool s_ethUpDone;
+
+// Give the W5500 a reset that actually meets its datasheet, because nothing else does.
+//
+// hardware/VALIDATION_REPORT.md, from the datasheet: "RSTn must be held >=500us (firmware)".
+// The IDF W5500 PHY driver pulses RSTn for ~100us (measured on a v5 board: 80us), 6x short of
+// spec. A short pulse resets the chip *most* of the time; the misses leave it wedged with no
+// link, and a warm reset never recovers it because the driver just re-issues the same short
+// pulse -- only pulling the power does. That is the "red LED, no link, reset button doesn't
+// help, unplugging does" failure, and because it is a marginal timing violation it is
+// intermittent rather than reproducible.
+//
+// Two things matter here:
+//   * length: hold it low well past the 500us minimum.
+//   * order: the LAST pulse decides the chip's state, so ETH.begin() must NOT be allowed to
+//     follow this with its out-of-spec one -- the caller passes rst=-1 for that.
+// It also drives the pin from the first instant, closing the window where RSTn floats at an
+// undefined level (measured 2.63V, above V_IH, while the ESP is in reset; the net has no
+// pull-up -- ETH_RST reaches only ESP GPIO9 and the W5500).
+static void w5500HardReset() {
+    if (cfg.ethRst < 0) return;          // no reset line wired -> nothing we can do
+    pinMode(cfg.ethRst, OUTPUT);
+    digitalWrite(cfg.ethRst, LOW);
+    delayMicroseconds(600);              // >= 500us datasheet minimum, with margin
+    digitalWrite(cfg.ethRst, HIGH);
+    delay(2);                            // let the PLL settle before the driver talks SPI
+    Serial.printf("[ETH] W5500 hard reset on GPIO%d (600us, datasheet min 500us)\n", cfg.ethRst);
+}
+
 static void ethUpTask(void *arg) {
     // W5500 and DM9051 share the same SPI wiring + ETH.begin() signature; only the PHY enum
     // changes. DM9051 is gated behind its IDF SPI-Ethernet driver (CONFIG_ETH_SPI_ETHERNET_
@@ -3418,7 +3446,13 @@ static void ethUpTask(void *arg) {
     if (cfg.ethSpiPhy == ETH_SPI_PHY_DM9051)
         Serial.println("[ETH] DM9051 not in this build, using W5500");
 #endif
-    ETH.begin(phy, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
+    // W5500: reset it ourselves to spec, then hand ETH.begin() rst=-1 so the PHY driver
+    // cannot undo that with its own ~100us pulse (see w5500HardReset). DM9051 keeps the
+    // driver's reset handling -- this is a W5500 erratum, not a shared one.
+    const bool isW5500 = (phy == ETH_PHY_W5500);
+    if (isW5500) w5500HardReset();
+    ETH.begin(phy, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt,
+              isW5500 ? -1 : cfg.ethRst,
               ETH_W5500_SPI_HOST, cfg.ethSck, cfg.ethMiso, cfg.ethMosi,
               cfg.ethFreqMhz);
     ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link
