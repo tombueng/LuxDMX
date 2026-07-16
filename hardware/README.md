@@ -1,20 +1,24 @@
 > [!NOTE]
-> **First spin is being fabricated.** This v5 board is on `master`, design-complete, and passes the full
-> scripted validation (DRC, isolation, SPICE, Ethernet skew; see **VALIDATION.md**). The first physical
-> boards have been ordered but not yet bench-tested, so treat this spin as a prototype: the firmware on a
-> plain ESP32 + an isolated RS-485 module is still the longest-proven path (see the main README). The
-> ruggedization pass (USB ESD, PTC fuse, +5V TVS, a TPS2116 ideal-diode OR mux, DMX common-mode chokes,
-> ferrite supply filters), plated GND mounting holes, wider power traces, and the DMX512-A "Protected"
-> series-TBU front end are all in.
+> **v5.00 was built and works; this v5.2 spin is not built yet.** The board is on `master`,
+> design-complete, and passes the full scripted validation (DRC, isolation, SPICE, Ethernet skew; see
+> **VALIDATION.md**). The first physical article (**v5.00**) came up and works: rails, galvanic isolation,
+> PoE standalone, both DMX universes bit-exact, RDM 64/64 on both lines. It did turn up two defects, and the
+> fixes (native USB instead of the CH340 bridge, TPS2116 priority mode) plus a crystal package change are
+> what make up **v5.2**. They are in the source now but have **not been on a physical board yet**, so the
+> two of them are exactly what the next article has to prove. Treat this spin as a prototype: the
+> firmware on a plain ESP32 + an isolated RS-485 module is still the longest-proven path (see the main
+> README). The ruggedization pass (USB ESD, PTC fuse, +5V TVS, a TPS2116 priority power mux, DMX
+> common-mode chokes, ferrite supply filters), plated GND mounting holes, wider power traces, and the
+> DMX512-A "Protected" series-TBU front end are all in.
 
-# LuxDMX v5 — hardware
+# LuxDMX v5.2 — hardware
 
 A compact, open-source **Art-Net / sACN → galvanically-isolated DMX512 gateway**, built around
 an ESP32-S3 with **both** WiFi *and* wired Ethernet. Designed entirely as code (SKiDL netlist) and
 routed by a fully-scripted, placement-driven pipeline — so the board regenerates itself from your
 component placement, isolation barrier and all.
 
-![LuxDMX v5 — PCB layout](board-pcb-1.png)
+![LuxDMX v5.2 — PCB layout](board-pcb-1.png)
 
 <p align="center">
   <img src="board3d-1.png" width="49%" alt="3D render — front">
@@ -54,7 +58,7 @@ dollars to fabricate at JLCPCB.
 - **U1 — ESP32-S3-WROOM-1-N8** *(LCSC C2913198)* — the MCU + 2.4 GHz WiFi radio. Runs the Art-Net/sACN
   receiver, the web UI, OTA updates, and the DMX engine. The PCB antenna hangs over the left board edge
   (no copper underneath it — intentional, for radiation efficiency).
-- **U2 — WIZnet W5500** *(C32843)* + **Y1 — 25 MHz crystal** *(C2981624, 2520, CL 9 pF; load caps C12/C13 = 10 pF C0G)* + **J3 — HY931147C PoE RJ45 MagJack** *(C91754)* —
+- **U2 — WIZnet W5500** *(C32843)* + **Y1 — 25 MHz crystal, 3225** *(C9006, CL = 12 pF, load caps C12/C13 = 18 pF C0G)* + **J3 — HY931147C PoE RJ45 MagJack** *(C91754)* —
   a complete 10/100 wired-Ethernet subsystem on SPI. The magjack integrates the isolation magnetics,
   the link/activity LEDs, **and an internal PoE rectifier** (Mode A + Mode B → a single rectified DC pair
   on pins 9/10 — see *Power*). (Ethernet is isolated by the magjack's transformers; the W5500's
@@ -79,23 +83,37 @@ Each universe is a self-contained galvanic island; the two share no copper with 
 - **J1 / J5 — XLR-5** *(C368501)* — the two DMX output connectors (Neutrik NC5FAH), each living entirely on its isolated domain.
 - Nets: universe 1 = `VISO`/`GNDISO`/`DMX_A`/`DMX_B`; universe 2 = `VISO2`/`GNDISO2`/`DMX2_A`/`DMX2_B`.
 
-### Power — USB-C **or** PoE (diode-OR'd)
+### Power — USB-C **or** PoE (PoE has priority)
 - **PoE (802.3af):** the **J3** magjack rectifies PoE internally and outputs DC on **`VPOE+`/`VPOE-`** →
   **U7 — SDAPO DP9900M-5V** *(C5380106)*, an **isolated PD + DC-DC module** (36–57 V in, regulated 5 V out,
   1.5 kV isolation, class 0 ≈ 13 W — far more than this board's ~2–3 W). **D10 — SMAJ58A** *(C110521)* clamps
   surges on the rectified rail. The module's `-VDC` becomes board GND; its `+VDC` is the PoE 5 V source.
-- **5 V source OR-ing:** **U9 — TPS2116** ideal-diode power mux OR-s the **USB-C 5 V** (`+5V_USB`, through the
-  F1 PTC) and the **PoE 5 V** (`+5V_POE`) onto the board **`+5V`** rail — whichever source is higher runs the
-  board (USB on the bench, PoE in the rack), with no backfeed. The pass-FET drop is only ~30 mV (vs ~0.4 V for
-  a Schottky), so `+5V` stays ≈ 4.9 V on USB and the B0505S / ISO3086 VCC2 rail clears its 4.5 V minimum across
-  the whole USB range. Input caps **C30 / C31** (1 µF), OR bulk **C29** (22 µF).
-- **U4 — SY8089 buck** *(C78988)* + **L1 — 2.2 µH** — steps the OR'd 5 V down to **3.3 V**. The feedback
+- **5 V source select:** **U9 — TPS2116** power mux feeds the board **`+5V`** rail from either the **PoE 5 V**
+  (`+5V_POE`, on VIN1) or the **USB-C 5 V** (`+5V_USB`, through the F1 PTC, on VIN2), with no backfeed. It runs
+  in **priority mode**: `MODE` is tied to VIN1, so **PoE wins whenever it is present** and the board falls back
+  to USB only when PoE goes away. The **PR1 divider (R24 = 30 kΩ / R25 = 10 kΩ)** sets the VIN1 switchover
+  threshold to **Vsw = 4.0 V** (VREF 1.0 V × (30 + 10) / 10). Vsw is deliberately high, because VOUT tracks VIN1
+  down until the switch actually fires: at 4.0 V the `+5V` rail stays far above the ESP's ~2.8 V hang threshold
+  while PoE collapses. The pass-FET drop is only ~30 mV (vs ~0.4 V for a Schottky), so `+5V` stays ≈ 4.9 V on
+  USB and the B0505S / ISO3086 VCC2 rail clears its 4.5 V minimum across the whole USB range. Input caps
+  **C30 / C31** (1 µF), bulk **C29** (22 µF).
+  *(The v5 first article tied `MODE`/`PR1` to GND, which is the default "higher voltage wins" mode. With two
+  near-equal 5 V sources that hunts, and a PoE→USB handover hung the board. Priority mode is that fix.)*
+- **U4 — SY8089 buck** *(C78988)* + **L1 — 2.2 µH** — steps the muxed 5 V down to **3.3 V**. The feedback
   divider is **R10 = 45.3 kΩ / R11 = 10 kΩ → 3.318 V** (SPICE-verified). Powers everything on the logic side.
 
-### Programming & USB
-- **U3 — CH340C** *(C7464026)* + **J2 — USB-C** *(C165948)* — USB-to-UART for flashing, plus the power inlet.
-- **Q1/Q2 — MMBT3904** *(C20526)* — the classic **2-transistor auto-reset** circuit: the CH340's DTR/RTS
-  toggle EN and IO0 so `esptool` can drop the chip into the bootloader automatically — no button-dance.
+### Programming & USB — native, no bridge chip
+- **J2 — USB-C** *(C165948)* — the USB data + power inlet, wired **straight to the ESP32-S3's native USB**
+  (`USB_DM` → IO19, `USB_DP` → IO20). The S3's **USB-Serial-JTAG** peripheral sits in ROM, so a bare USB-C cable
+  gives you the flashing port, the serial console **and** JTAG debug with **no bridge chip**. `esptool` resets
+  the chip over USB by itself, so there is no auto-reset circuit either.
+- **R8 / R9** (5.1 kΩ) — the USB-C **CC pulldowns (Rd)** that tell a host to supply 5 V.
+  **U8 — USBLC6-2SC6** *(C7519)* — ESD clamp across the data pair. **F1** — self-healing PTC on VBUS.
+- **UART0 is free** and broken out on **J6 pins 8/9** (`S3_TX` / `S3_RX`), since nothing spends it on a bridge.
+  *(The v5 first article carried a **CH340C (U3)** plus a **Q1/Q2** 2-transistor auto-reset. Its collectors were
+  swapped, so EN and IO0 sat on the wrong transistors: flashing needed the manual BOOT-button dance, and a tool
+  asserting DTR or RTS alone could yank EN or IO0. Rather than re-wire it, the bridge and the reset circuit are
+  gone entirely, 6 parts fewer and 2 fewer part numbers to source.)*
 
 ### User interface & features
 - **D2–D6 — 5 status LEDs** (red/green/yellow/blue/white) wired straight to GPIOs (IO1/2/6/7/15): network
@@ -115,8 +133,8 @@ Each universe is a self-contained galvanic island; the two share no copper with 
 - 🎚 **Two independent, separately-isolated DMX512 universes** — two XLR-5 outputs, each on its own
   isolation island (RDM-capable transceivers); drive two universes from one box
 - 🌐 **Dual connectivity** — WiFi (captive-portal setup) *and* wired Ethernet (W5500)
-- ⚡ **Power-over-Ethernet (802.3af)** — single Cat-5 cable for data *and* power; **or** USB-C — the two
-  5 V sources are diode-OR'd, so either works and you can hot-swap between them
+- ⚡ **Power-over-Ethernet (802.3af)** — single Cat-5 cable for data *and* power; **or** USB-C — the TPS2116
+  mux gives **PoE priority** and falls back to USB, so either works and you can hot-swap between them
 - 🖥 **Optional OLED/TFT status display** (I²C or SPI, via the JST header)
 - 💡 **5 status LEDs** + BOOT/RST buttons
 - 🔌 **USB-C** — single-cable power + native flashing, plus **OTA** updates
@@ -236,7 +254,7 @@ The v5 board (two isolated DMX universes + PoE, **119 × 79 mm**, 4 corner plate
 - **DRC:** 3 clearance waivers only (2× W5500 0.5 mm-pitch escapes at 0.174 mm, USB-C CC2 at 0.160 mm),
   all above JLCPCB's 0.0889 mm floor. 0 silk-over-pad, 0 courtyard overlaps, 0 dangling vias.
 - **Isolation:** 0 violations of the two 4 mm DMX and the 2.5 mm PoE creepage rules (`luxdmx.kicad_dru`).
-- **Power:** SPICE-verified. The TPS2116 ideal-diode OR holds +5V at ~4.9 V on USB, so the B0505S / ISO3086
+- **Power:** SPICE-verified. The TPS2116 priority mux holds +5V at ~4.9 V on USB, so the B0505S / ISO3086
   VCC2 stays above its 4.5 V minimum across the whole USB range (>= 4.6 V even at a sagging 4.7 V VBUS);
   buck output 3.318 V.
 - **Ethernet:** diff-pair skew TX 0.35 mm / RX 2.14 mm, well inside the 100BASE-TX margin.

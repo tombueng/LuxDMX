@@ -15,7 +15,7 @@ PRO = r"C:\dev\DMX\hardware\luxdmx.kicad_pro"
 POWER = ["+5V", "+5V_POE", "+5V_DMX", "+5V_USB", "+5V_USBF", "VPOE+", "VPOE-", "VISO", "VISO2"]
 FINE = ["ETH_TXN", "ETH_TXP", "ETH_RXN", "ETH_RXP", "ETH_TCT", "ETH_RCT", "ETH_CS", "ETH_INT", "ETH_RST",
         "SCLK", "MOSI", "MISO", "TOCAP", "W5500_1V2", "XI", "XO",
-        "N$1", "N$3", "N$4", "N$5", "N$6", "N$7", "N$8", "N$9", "N$10"]
+        "N$1", "N$3", "N$4", "N$5", "N$6", "N$7", "N$8", "N$9", "N$10", "DMX2_BO"]
 
 d = json.load(open(PRO, encoding="utf-8"))
 ns = d["net_settings"]

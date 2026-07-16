@@ -7,6 +7,13 @@ review. Every number below is computed, not guessed; datasheet sources are named
 
 Companion files: `VALIDATION_PLAN.md` (what we check), `VALIDATION.md` (status matrix). Re-run after any change.
 
+> **Partly superseded, kept as the record of the v4 pass.** Three findings below no longer describe the current
+> board: the **crystal** (now the **3225 C9006**, CL = 12 pF, with **18 pF** C0G caps C12/C13, see
+> `VALIDATION.md` #18); the **CH340C bridge and the Q1/Q2 auto-reset** (both deleted, the board runs on the
+> S3's **native USB-Serial-JTAG** on IO19/IO20, which also voids the note about IO19/IO20 being free expansion
+> GPIO); and the **TPS2116 mode** (now **priority**, PoE preferred, PR1 divider R24/R25 → Vsw = 4.0 V, instead
+> of "higher voltage wins"). `hardware/README.md` describes the board as it stands (**v5.2**).
+
 ---
 
 ## 0. Overall verdict

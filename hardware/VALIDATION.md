@@ -1,4 +1,4 @@
-# LuxDMX v5.00 — Hardware Validation Tracking
+# LuxDMX v5.2 — Hardware Validation Tracking
 
 Single source of truth for "is this board safe to fabricate?" Re-run the scripts after **any**
 board change and update the table. Status: ✅ pass · ⚠️ pass-with-caveat · ❌ blocker · 🔲 needs manual/datasheet check.
@@ -10,7 +10,7 @@ DESIGN-COMPLETE, fab-ready as a first-spin PROTOTYPE, not production-proven.** E
 Board **119 x 79mm** (widened 20mm for the TBU), 4 corner M3 holes on GND, 4-layer
 **F sig / In1 GND / In2 +3V3 / B sig** stackup now **explicitly defined** (JLC04161H-7628). A
 **ruggedization pass** added USB ESD (U8), a self-healing PTC fuse (F1), a +5V transient clamp (D11), a
-**TPS2116 ideal-diode OR mux (U9)**, DMX common-mode chokes (L2/L3) and ferrite supply filters (FB1-3).
+**TPS2116 priority power mux (U9)**, DMX common-mode chokes (L2/L3) and ferrite supply filters (FB1-3).
 
 Honest gaps before this is "production": it has **never been fabricated** (first build = prototype), and
 the **Ethernet pairs are single-ended — widened toward ~50Ω SE (`widen_eth.py`) but not coupled and not
@@ -109,7 +109,7 @@ bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DR
 | 15 | Via current / annular | ✅ | validate_geometry.py | via current fine; **escape-via annular fixed 0.125 -> 0.150mm** (14 vias re-drilled 0.25->0.20, pad unchanged); **0 sub-min** |
 | 16 | DFM vs JLCPCB 4-layer | ✅ | validate_geometry.py | min trace 0.2mm, drill 0.2mm OK |
 | 17 | Magjack HY931147C pinout | ✅ | datasheet | verified vs HanRun REV.A/1 (2026-06-22): TD=5/6, RD=1/2, RCT=3/TCT=4, V+=9/V-=10, LED-Y=11/12 (A/K), LED-G=13/14 (A/K); straight MDI correct (no auto-MDIX) |
-| 18 | W5500 crystal CL vs caps | ✅ | datasheet (2520-25-**9**) | **FIXED**: crystal **C2981624 CL=9pF**; caps **10pF C0G** (presented 9.0pF). Swapped from the OOS-prone CL=20pF C2981622 + 33pF caps. |
+| 18 | W5500 crystal CL vs caps | ✅ | datasheet (3225-25-**12**) | **UPDATED (this spin)**: crystal **C9006 (X322525MOB4SI), 3225 package, CL=12pF**; caps **C12/C13 = 18pF C0G** (C = 2×(CL − Cstray) = 2×(12 − 3) = 18pF). Moved off the **2520 C2981624 / CL=9pF / 10pF caps** because the 2520 package kept going OOS at JLC; 3225 is the mainstream, always-stocked size. Older history: CL=20pF C2981622 + 33pF caps. **Unvalidated on hardware** (no built board carries it yet). |
 | 19 | W5500 EXRES1 | ✅ | datasheet | **FIXED**: R3 12k→**12.4k 1%** (on-spec PHY bias) |
 | 27 | PoE TVS margin | ✅ | datasheet | **FIXED**: D10 SMAJ58A→**SMAJ60A** (58V standoff was only 1V over 57V max) |
 | 28 | Every part rating/value/datasheet | ✅/⚠️ | 4-agent datasheet pass | see **VALIDATION_REPORT.md**: all active parts + crystal + connectors read from official datasheets; ratings/values recomputed. 3 fixes applied, open items listed. |
@@ -134,7 +134,7 @@ Added a protection layer for touring/stage/field use. The DMX outputs were alrea
 (galvanic isolation via B0505S + ISO3086 + SM712 TVS); PoE is isolated (DP9900M 1500V + SMAJ58A). This
 pass closed the remaining gaps and improved EMC. Full rationale + part numbers in **docs/ruggedization.md**.
 - **U8 USBLC6-2SC6** — ESD/TVS array on USB D+/D- (+VBUS clamp), at the connector. (item 21)
-- **F1 PPTC (1.5A/16V, 25mΩ)** — self-healing fuse on USB VBUS; the TPS2116 OR mux (U9) keeps the B0505S margin. (22/9)
+- **F1 PPTC (1.5A/16V, 25mΩ)** — self-healing fuse on USB VBUS; the TPS2116 priority mux (U9) keeps the B0505S margin. (22/9)
 - **D11 SMAJ5.0A** — +5V transient/overvoltage clamp. (23)
 - **L2/L3 ACM2012-201-2P** — common-mode chokes on each DMX pair, cable side, after the TVS. (24)
 - **F2-F5 Bourns TBU-CA065-200-WH (200mA/650V high-speed protector, C913221)** — series TBU per DMX data
@@ -152,7 +152,7 @@ pass closed the remaining gaps and improved EMC. Full rationale + part numbers i
   chassis (isolating XLR mount). Soft-ground bridge (GNDISO→GND via 1nF+1M) was evaluated but NOT
   fitted — it can't cross the 4mm void cleanly at the packed PS1/PS2 barrier. (docs/ruggedization.md)
 Net restructuring: DMX_A/B (transceiver) → choke → DMX_AO/BO (cable side, where the TVS, XLR and the
-J7/J8 breakouts now sit); +5V_USB → F1 → +5V_USBF and +5V_POE → **U9 (TPS2116 OR mux)** → +5V → FB1 →
+J7/J8 breakouts now sit); +5V_USB → F1 → +5V_USBF and +5V_POE → **U9 (TPS2116 priority mux)** → +5V → FB1 →
 +5V_DMX → PS1/PS2; VISO → FB2 → VISO_DRV.
 
 ## PoE isolation note (item 6/8)

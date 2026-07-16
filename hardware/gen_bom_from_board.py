@@ -11,7 +11,7 @@ OUT = r"C:\dev\DMX\hardware\luxdmx_BOM_jlcpcb.csv"
 INFO = {
     "U1": ("ESP32-S3-WROOM-1-N8 (8MB)", "C2913198"),
     "U2": ("W5500 SPI Ethernet", "C32843"),
-    "U3": ("CH340C USB-UART", "C7464026"),
+    # U3 CH340C + Q1/Q2 auto-reset removed -- native USB (S3 USB-Serial-JTAG on IO19/IO20)
     "U4": ("SY8089 buck 5->3.3V", "C78988"),
     "U5": ("ISO3086DWR isolated RS-485", "C183095"),
     "PS1": ("B0505S-1W iso DC-DC (EVISUN)", "C7465127"),
@@ -19,14 +19,14 @@ INFO = {
     "J2": ("USB-C data (TYPE-C-31-M-12)", "C165948"),
     "J3": ("RJ45 MagJack HY931147C PoE 10/100 (integrated rectifier + magnetics)", "C91754"),
     "J4": ("JST SH 1.0mm 9-pin SMD SM09B-SRSS-TB (optional display; pre-crimped cables)", "C160408"),
-    "Y1": ("25MHz crystal 2520 (CL=9pF; in-stock C2981624)", "C2981624"),
+    "Y1": ("25MHz crystal 3225 SMD (C9006 X322525MOB4SI, CL=12pF, mainstream/always-in-stock pkg)", "C9006"),
     "L1": ("2.2uH power inductor (CKCS4030)", "C354584"),
     "D1": ("SM712 TVS SOT-23", "C404012"),
-    "Q1": ("MMBT3904 SOT-23", "C20526"), "Q2": ("MMBT3904 SOT-23", "C20526"),
     "SW1": ("tact sw B3U-1000P", "C231329"), "SW2": ("tact sw B3U-1000P", "C231329"),
     # resistors
-    "R1": ("10k 0402", "C60490"), "R2": ("10k 0402", "C60490"), "R6": ("10k 0402", "C60490"),
-    "R7": ("10k 0402", "C60490"), "R11": ("10k 0402", "C60490"),   # C25744 (Basic) went OOS; C60490 YAGEO 3M stock
+    "R1": ("10k 0402", "C60490"), "R2": ("10k 0402", "C60490"), "R11": ("10k 0402", "C60490"),
+    "R24": ("30k 0402 1% (TPS2116 PR1 divider top, Vsw=4.0V)", "C138008"),   # 30k is Extended-only at JLC; C138008 = 714k stock vs C25776's 4.9k
+    "R25": ("10k 0402 (TPS2116 PR1 divider bottom)", "C60490"),   # C25744 (Basic) OOS; C60490 YAGEO 3M stock
     "R3": ("12k 0402 W5500 EXRES1 (12.4k spec OOS at LCSC; 12k within 100BASE-TX +-5%)", "C25752"),
     "R10": ("45.3k 0402 1% (buck FB top -> 3.32V)", "C2933099"),
     "R13": ("1k 0402", "C106235"), "R15": ("1k 0402", "C106235"),
@@ -41,7 +41,7 @@ INFO = {
     "C8": ("100nF 0402", "C1525"), "C9": ("100nF 0402", "C1525"), "C10": ("100nF 0402", "C1525"),
     "C11": ("100nF 0402", "C1525"), "C14": ("100nF 0402", "C1525"), "C15": ("100nF 0402", "C1525"),
     "C18": ("100nF 0402", "C1525"), "C19": ("100nF 0402", "C1525"),
-    "C12": ("10pF 0402 C0G (W5500 xtal load)", "C32949"), "C13": ("10pF 0402 C0G (W5500 xtal load)", "C32949"),
+    "C12": ("18pF 0402 C0G (W5500 xtal load, CL=12pF)", "C307443"), "C13": ("18pF 0402 C0G (W5500 xtal load, CL=12pF)", "C307443"),
     "C4": ("1uF 0402", "C52923"), "C6": ("4.7uF 0402", "C23733"),
     "C2": ("10uF 0805", "C15850"), "C16": ("22uF 0805", "C45783"), "C17": ("22uF 0805", "C45783"),
     "C20": ("10uF 1206", "C13585"), "C21": ("10uF 1206", "C13585"), "C22": ("100nF 0402", "C1525"),
