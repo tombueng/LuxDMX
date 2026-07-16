@@ -298,8 +298,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="3">5-LED status panel (LuxDMX v4)</option>
           </select>
           <div class="form-text">
-            Single LED: blue blink = booting / connecting &nbsp;&middot;&nbsp; red blink = no network &nbsp;&middot;&nbsp; amber blink = idle &nbsp;&middot;&nbsp; green = DMX active.<br>
-            5-LED panel: <span class="text-danger">red</span> = no network &nbsp;&middot;&nbsp; <span class="text-success">green</span> = network up &nbsp;&middot;&nbsp; <span class="text-warning">yellow</span> = DMX activity &nbsp;&middot;&nbsp; <span class="text-primary">blue</span> = source conflict &nbsp;&middot;&nbsp; white = identify.
+            Same status language on every type: <span class="text-success">green</span> = up (slow blink = DMX coming in) &nbsp;&middot;&nbsp; <span class="text-primary">blue</span> = RDM / identify &nbsp;&middot;&nbsp; <span class="text-warning">orange</span> = Ethernet on WiFi fallback &nbsp;&middot;&nbsp; <span class="text-danger">red</span> = no network &nbsp;&middot;&nbsp; white/Knight-Rider = booting.<br>
+            5-LED panel shows the same states one LED at a time (its amber LED carries the orange fallback state).
           </div>
         </div>
         <div id="led-pin-row">
