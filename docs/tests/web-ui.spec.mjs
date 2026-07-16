@@ -67,11 +67,19 @@ test.describe('Web UI + REST', () => {
     expect(Array.isArray(await (await request.get('/log.json')).json())).toBeTruthy();
   });
 
-  test('/version.json reports current + latest', async ({ request }) => {
+  test('/version.json reports current + latest, and null latest when unknown', async ({ request }) => {
     const d = await (await request.get('/version.json')).json();
     expect(d).toHaveProperty('current');
+    expect(typeof d.current).toBe('string');
     expect(d).toHaveProperty('latest');
     expect(typeof d.update).toBe('boolean');
+    // latest is either a version string or null -- NEVER a copy of current as a stand-in for
+    // "the check didn't run". That fallback made a failed check look like "up to date" and hid
+    // real updates (a device reported latest=1.0.166 while 1.0.171 was published). The device
+    // fetches it over plain HTTP now, so it should normally succeed; null is the honest answer
+    // when it hasn't yet (e.g. no internet on the bench).
+    expect(d.latest === null || typeof d.latest === 'string').toBeTruthy();
+    if (d.latest !== null) expect(d.latest).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   test('/labels.json returns a JSON object', async ({ request }) => {
