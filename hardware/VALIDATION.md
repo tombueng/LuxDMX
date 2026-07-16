@@ -13,7 +13,7 @@ Board **119 x 79mm** (widened 20mm for the TBU), 4 corner M3 holes on GND, 4-lay
 **TPS2116 priority power mux (U9)**, DMX common-mode chokes (L2/L3) and ferrite supply filters (FB1-3).
 
 Honest gaps before this is "production": it has **never been fabricated** (first build = prototype), and
-the **Ethernet pairs are single-ended — widened toward ~50Ω SE (`widen_eth.py`) but not coupled and not
+the **Ethernet pairs are single-ended — widened toward ~50Ω SE (`scripts/widen_eth.py`) but not coupled and not
 length-matched** (see the 2026-07-01 notes; ETH_TXN also stays 0.15mm in a dense corridor). The prior 3
 W5500/USB-C clearance near-misses and the sub-min via annular are **resolved**.
 
@@ -24,25 +24,25 @@ hard gates PASS** (`validate_all.sh`). Schematic/netlist were **not touched** th
 schematic-based item below (SPICE #30, rail margins #9-13, crystal #18, EXRES1 #19, PoE-TVS #27, ratings
 #28, GPIO #29, magjack #17, E1.11 TBU protection) is unaffected and stays valid.
 
-- **Net classes** (`setup_netclasses.py`): **Default 0.20 / Power 0.40 / Fine 0.15mm** (Fine = only the
+- **Net classes** (`scripts/setup_netclasses.py`): **Default 0.20 / Power 0.40 / Fine 0.15mm** (Fine = only the
   W5500-dense nets). Freerouting routes each net at its class width in ONE pass — no more "everything thin
   + post-widen". Confirmed in the exported DSN.
 - **Reproducible, hands-off pipeline** — one command each on any placement change: `./route_all.sh`
-  (setup_netclasses → rebuild_iso → escape_connectors → **Freerouting loop** → `finish_partial.py` →
-  maze straggler → cleanup → tighten → `widen_eth.py`) and `./validate_all.sh` (7-gate verdict + exit code).
-  `finish_partial.py` deletes any net FR left a pad short (via kicad-cli `unconnected_items`) so the maze
+  (setup_netclasses → rebuild_iso → escape_connectors → **Freerouting loop** → `scripts/finish_partial.py` →
+  maze straggler → cleanup → tighten → `scripts/widen_eth.py`) and `./validate_all.sh` (7-gate verdict + exit code).
+  `scripts/finish_partial.py` deletes any net FR left a pad short (via kicad-cli `unconnected_items`) so the maze
   finishes it — no hand-routing.
 - **7-gate production gate**: connectivity, DRC, geometry/DFM+current, DMX isolation, electrical, EMC
-  placement, and the new **`validate_critical.py`** (eth/SPI/crystal length, vias, intra-pair skew, detour,
+  placement, and the new **`scripts/validate_critical.py`** (eth/SPI/crystal length, vias, intra-pair skew, detour,
   net-class widths).
 - **DRC rules aligned to the relaxed-but-JLC-safe spec** (`.kicad_pro`): min track **0.15mm** (JLC min
   0.0889), hole-to-hole **0.2mm**, vias **0.5/0.2 = 0.15mm annular**, min-annular rule **0.13**.
-- **Ethernet impedance improved** (`widen_eth.py`, run last): the MDI pairs are widened toward ~50Ω SE on
+- **Ethernet impedance improved** (`scripts/widen_eth.py`, run last): the MDI pairs are widened toward ~50Ω SE on
   the JLC04161H-7628 stackup — **ETH_RXN/RXP/TXP now ~0.34mm ≈ 53Ω**, with short 0.15mm necks at the QFN.
   **ETH_TXN stays 0.15mm/~78Ω** (its corridor is too dense to widen without eating the 0.15mm clearance to a
   Default neighbour). Better than the old 0.2mm/69Ω, but still **single-ended / not length-matched** —
   coupled diff-pair routing remains deferred to a supervised interactive-GUI production spin.
-- **DMX iso B-pour** (`validate_tbu_iso.py` check B): FR puts a REST-side DMX trace (**DMX_AO**, behind the
+- **DMX iso B-pour** (`scripts/validate_tbu_iso.py` check B): FR puts a REST-side DMX trace (**DMX_AO**, behind the
   TBU, not fault-exposed) on B.Cu inside the GNDISO pour. The gate now enforces B.Cu-off-pour only for the
   **CABLE-side** fault-exposed nets (*_AX/BX); the REST cut is bridged by the F.Cu pour + stitch vias
   (keepouts can't be used — Freerouting chokes on rule areas).
@@ -70,15 +70,15 @@ the board was never left worse than the prior step; backups taken at each step.
   length-matched diff-pair routing needs the interactive GUI (the single-net auto-router can't do it) and a
   botched Ethernet re-route is the worst failure mode, so it is left for a supervised production spin.
   Functional for short 100BASE-TX as-is.
-- **Silk** — `normalize_silk.py` re-placed 89 ref-des clear of pads/silk, dropping cosmetic warnings
+- **Silk** — `scripts/normalize_silk.py` re-placed 89 ref-des clear of pads/silk, dropping cosmetic warnings
   **62 -> 46** (24 overlap / 16 edge / 6 over-copper). The rest are dense-area ref-on-ref, refs near the
   edge (J*/MH* not moved) and the informative back-silk tables; fab auto-clips silk off pads/edges.
 
 ## How to re-run the validation
 ```
-python validate_electrical.py      # DC/RC operating points (no KiCad needed)
-"<KiCad>/bin/python" validate_geometry.py     # trace width / via current / DFM
-"<KiCad>/bin/python" validate_placement.py    # decoupling/ferrite/switcher proximity (EMC); also auto-run by gen_gerbers.py, exits non-zero on drift
+python scripts/validate_electrical.py      # DC/RC operating points (no KiCad needed)
+"<KiCad>/bin/python" scripts/validate_geometry.py     # trace width / via current / DFM
+"<KiCad>/bin/python" scripts/validate_placement.py    # decoupling/ferrite/switcher proximity (EMC); also auto-run by scripts/gen_gerbers.py, exits non-zero on drift
 "<KiCad>/bin/kicad-cli" pcb drc --format json -o drc.json luxdmx.kicad_pcb   # DRC + connectivity
 # --- 2026-07-01: after ANY placement/netlist change, just two commands (the above validators are all
 #     wrapped by validate_all.sh; run them standalone only to debug a specific gate) ---
@@ -90,24 +90,24 @@ bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DR
 
 | # | Item | Status | Method | Result / action |
 |---|------|--------|--------|-----------------|
-| 1 | Routing complete (MACHINE-ENFORCED) | ✅ | `validate_connectivity.py` (kicad-cli DRC `unconnected_items`), wired into gen_gerbers.py + gen_cpl.py | **v4.01: 0 unrouted, machine-verified.** The gate ABORTS any fab export while a single net is unrouted; it caught **C17** (stranded INSIDE the DMX2 isolation void, planes cut away -> unconnectable). v4.01 (2026-06-28): C17 moved to the buck + via-in-pad; **bias R20-R23** placed + **re-routed by Freerouting on F.Cu only** (0 signal B.Cu, so the iso GND pour is not cut), and **122 GNDISO/GNDISO2 stitch vias** reconnect the F-pour fragments to the solid B-pour. **Isolation verified: 0 island-net copper leaves its island.** EN/IO0 preserved from HEAD (digital side locked, not re-routed). **0 DRC errors** after the 2026-06-29 hardening (the W5500 fan-out + USB-C CC2 fine-pitch near-misses resolved by the 0.15mm Default clearance). Fab package regenerated. |
+| 1 | Routing complete (MACHINE-ENFORCED) | ✅ | `scripts/validate_connectivity.py` (kicad-cli DRC `unconnected_items`), wired into scripts/gen_gerbers.py + scripts/gen_cpl.py | **v4.01: 0 unrouted, machine-verified.** The gate ABORTS any fab export while a single net is unrouted; it caught **C17** (stranded INSIDE the DMX2 isolation void, planes cut away -> unconnectable). v4.01 (2026-06-28): C17 moved to the buck + via-in-pad; **bias R20-R23** placed + **re-routed by Freerouting on F.Cu only** (0 signal B.Cu, so the iso GND pour is not cut), and **122 GNDISO/GNDISO2 stitch vias** reconnect the F-pour fragments to the solid B-pour. **Isolation verified: 0 island-net copper leaves its island.** EN/IO0 preserved from HEAD (digital side locked, not re-routed). **0 DRC errors** after the 2026-06-29 hardening (the W5500 fan-out + USB-C CC2 fine-pitch near-misses resolved by the 0.15mm Default clearance). Fab package regenerated. |
 | 1b | 4-layer power stackup | ✅ | rebuild_iso (In1=GND, In2=+3V3 LT_POWER) | signals F/B only, planes solid; +3V3/GND pads stitched to planes |
 | 2 | DRC (electrical) | ✅ | kicad-cli pcb drc | **0 shorts, 0 clearance errors.** The 3 fine-pitch near-misses (W5500 0.5mm QFN + USB-C CC2, 0.16-0.174mm) resolved by setting Default clearance 0.2 -> 0.15mm; re-route to 0.2mm is geometrically impossible at 0.5mm pitch, 0.15mm still 68% over JLC's 0.0889mm min |
-| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | **46 cosmetic** silk warnings (24 overlap / 16 edge / 6 over-copper) after `normalize_silk.py` re-placed 89 ref-des clear of pads/silk (down from 62). The rest are dense-area ref-on-ref, refs near the edge (J*/MH* not moved) and the informative back-silk tables; fab auto-clips silk off pads/edges = no functional or fab impact. Accepted |
+| 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | **46 cosmetic** silk warnings (24 overlap / 16 edge / 6 over-copper) after `scripts/normalize_silk.py` re-placed 89 ref-des clear of pads/silk (down from 62). The rest are dense-area ref-on-ref, refs near the edge (J*/MH* not moved) and the informative back-silk tables; fab auto-clips silk off pads/edges = no functional or fab impact. Accepted |
 | 4 | Net connectivity = intent | ✅ | board generated from `luxdmx.net` (SKiDL) | by construction; schematic reviewed pin-by-pin |
-| 5 | Decoupling/xtal/switcher placement (EMC) | ✅ enforced | **validate_placement.py** (per-part pad-to-pad distance to the served IC pin, incl. crystal load caps + **FB1/2/3 supply ferrites**) **wired into gen_gerbers.py** (reports drift on every fab export, exits non-zero standalone) + place_decoupling.py to re-snap | each cap/ferrite has a per-part max distance to its IC pin; after any placement change, re-run place_decoupling.py to re-cluster + validate_placement.py to confirm. Connectivity stays the HARD gate; placement is a loud quality WARNING (never blocks fab on a fuzzy threshold) |
-| 5b | Board outline / mounting holes | ✅ | set_outline_holes.py | **99 x 79mm**; 4 corner M3 holes at **90 x 70mm spacing, uniform 4.5mm inset** (all 4 equal edge distance); 0 hole-vs-body collisions. Holes are **plated + tied to GND** (MountingHole_3.2mm_M3_Pad) so the 4 corners bond board GND to a metal chassis — see docs/ruggedization.md "Grounding & shielding". |
+| 5 | Decoupling/xtal/switcher placement (EMC) | ✅ enforced | **scripts/validate_placement.py** (per-part pad-to-pad distance to the served IC pin, incl. crystal load caps + **FB1/2/3 supply ferrites**) **wired into scripts/gen_gerbers.py** (reports drift on every fab export, exits non-zero standalone) + scripts/place_decoupling.py to re-snap | each cap/ferrite has a per-part max distance to its IC pin; after any placement change, re-run scripts/place_decoupling.py to re-cluster + scripts/validate_placement.py to confirm. Connectivity stays the HARD gate; placement is a loud quality WARNING (never blocks fab on a fuzzy threshold) |
+| 5b | Board outline / mounting holes | ✅ | scripts/set_outline_holes.py | **99 x 79mm**; 4 corner M3 holes at **90 x 70mm spacing, uniform 4.5mm inset** (all 4 equal edge distance); 0 hole-vs-body collisions. Holes are **plated + tied to GND** (MountingHole_3.2mm_M3_Pad) so the 4 corners bond board GND to a metal chassis — see docs/ruggedization.md "Grounding & shielding". |
 | 6 | PoE module ↔ magjack distance | ⚠️ | geometry | VPOE runs ~50mm; functional, see PoE note |
 | 7 | Isolation surface creepage (DMX 4mm / PoE 2.5mm) | ✅ | DRC `.kicad_dru` | 0 isolation-clearance violations |
 | 8 | Isolation inner-plane (vertical) | ✅ | rebuild_iso + tighten_poe_void | DMX islands voided 4mm; PoE TH-pins moated 2.5mm; VPOE surface trace over plane = functional 58V (D10-clamped) |
 | 9 | +5V rail vs B0505S 4.5V min | ✅ | sim/power_chain.cir | **Fixed:** OR diodes (D8/D9) replaced by a **TPS2116 ideal-diode mux (U9)** — OR drop ~0.03V not ~0.40V. +5V ≈ 4.91V from a 5.0V USB; **VCC2 ≥ 4.61V even at VBUS 4.70V** (was ~4.29V ❌). PoE clean. SPICE-verified across the full USB range. |
-| 10 | Buck +3V3 output | ✅ | validate_electrical.py | 3.318V (R10/R11) |
-| 11 | LED currents | ✅ | validate_electrical.py | 1.3-8.7mA, all < GPIO 40mA |
-| 12 | EN power-on RC | ✅ | validate_electrical.py | 10ms |
-| 13 | USB-C CC / power budget | ⚠️ | validate_electrical.py | Rd=5.1k correct; ~370mA → needs ≥1A source for both universes |
-| 14 | Power trace width vs current | ✅ | widen_power.py | +5V family widened to **0.5mm** where clearance allows (0.5mm=1.45A@10°C); only short pad-entry necks remain 0.2mm (heat sinks into the pad). Fuse coordination ok: F1 trips ~3A, a 0.2mm trace doesn't fuse below ~8A. Re-run widen_power.py after any re-route (it resets widths). |
-| 15 | Via current / annular | ✅ | validate_geometry.py | via current fine; **escape-via annular fixed 0.125 -> 0.150mm** (14 vias re-drilled 0.25->0.20, pad unchanged); **0 sub-min** |
-| 16 | DFM vs JLCPCB 4-layer | ✅ | validate_geometry.py | min trace 0.2mm, drill 0.2mm OK |
+| 10 | Buck +3V3 output | ✅ | scripts/validate_electrical.py | 3.318V (R10/R11) |
+| 11 | LED currents | ✅ | scripts/validate_electrical.py | 1.3-8.7mA, all < GPIO 40mA |
+| 12 | EN power-on RC | ✅ | scripts/validate_electrical.py | 10ms |
+| 13 | USB-C CC / power budget | ⚠️ | scripts/validate_electrical.py | Rd=5.1k correct; ~370mA → needs ≥1A source for both universes |
+| 14 | Power trace width vs current | ✅ | scripts/widen_power.py | +5V family widened to **0.5mm** where clearance allows (0.5mm=1.45A@10°C); only short pad-entry necks remain 0.2mm (heat sinks into the pad). Fuse coordination ok: F1 trips ~3A, a 0.2mm trace doesn't fuse below ~8A. Re-run scripts/widen_power.py after any re-route (it resets widths). |
+| 15 | Via current / annular | ✅ | scripts/validate_geometry.py | via current fine; **escape-via annular fixed 0.125 -> 0.150mm** (14 vias re-drilled 0.25->0.20, pad unchanged); **0 sub-min** |
+| 16 | DFM vs JLCPCB 4-layer | ✅ | scripts/validate_geometry.py | min trace 0.2mm, drill 0.2mm OK |
 | 17 | Magjack HY931147C pinout | ✅ | datasheet | verified vs HanRun REV.A/1 (2026-06-22): TD=5/6, RD=1/2, RCT=3/TCT=4, V+=9/V-=10, LED-Y=11/12 (A/K), LED-G=13/14 (A/K); straight MDI correct (no auto-MDIX) |
 | 18 | W5500 crystal CL vs caps | ✅ | datasheet (3225-25-**12**) | **UPDATED (this spin)**: crystal **C9006 (X322525MOB4SI), 3225 package, CL=12pF**; caps **C12/C13 = 18pF C0G** (C = 2×(CL − Cstray) = 2×(12 − 3) = 18pF). Moved off the **2520 C2981624 / CL=9pF / 10pF caps** because the 2520 package kept going OOS at JLC; 3225 is the mainstream, always-stocked size. Older history: CL=20pF C2981622 + 33pF caps. **Unvalidated on hardware** (no built board carries it yet). |
 | 19 | W5500 EXRES1 | ✅ | datasheet | **FIXED**: R3 12k→**12.4k 1%** (on-spec PHY bias) |
@@ -125,8 +125,8 @@ bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DR
 
 ## ✅ RESOLVED — EMC placement (was a blocker)
 Decoupling/crystal/switcher caps were at 20-56mm auto-grid positions (HF decoupling essentially absent).
-Fixed by `place_decoupling.py`: every cap snapped hard to its IC power pin (≤2-3mm, same side), crystal +
-load caps hugging the W5500, buck Cin/Cout/L tight at U4, TVS at the XLR. `validate_placement.py` now
+Fixed by `scripts/place_decoupling.py`: every cap snapped hard to its IC power pin (≤2-3mm, same side), crystal +
+load caps hugging the W5500, buck Cin/Cout/L tight at U4, TVS at the XLR. `scripts/validate_placement.py` now
 passes (0 overlaps, 2mm min gap). Re-routed + re-validated.
 
 ## Ruggedization (harsh-environment hardening, 2026-06-22)

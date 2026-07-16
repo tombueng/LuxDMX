@@ -13,7 +13,7 @@ GUI plot in ABSOLUTE page coordinates is exactly the regression this script prev
 """
 import os, glob, shutil, tempfile, zipfile, subprocess
 
-HERE   = os.path.dirname(os.path.abspath(__file__))
+HERE   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PCB    = os.path.join(HERE, "luxdmx.kicad_pcb")
 ZIP    = os.path.join(HERE, "luxdmx_gerbers.zip")
 LAYERS = "F.Cu,In1.Cu,In2.Cu,B.Cu,F.Mask,B.Mask,F.Paste,B.Paste,F.Silkscreen,B.Silkscreen,Edge.Cuts"

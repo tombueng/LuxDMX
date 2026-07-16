@@ -11,7 +11,7 @@ inner-plane void geometry, so this checks it explicitly:
 
 Run: <kicad10>/python validate_tbu_iso.py   -> prints PASS/FAIL per check."""
 import os
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import pcbnew, sys
 PCB = sys.argv[1] if len(sys.argv) > 1 else os.path.join(_HERE, "luxdmx.kicad_pcb")
 FM, TM = pcbnew.FromMM, pcbnew.ToMM

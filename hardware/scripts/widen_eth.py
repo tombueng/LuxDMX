@@ -6,9 +6,11 @@ wherever the local clearance allows -- greedy per-segment, never shrinks, never 
 back at the 0.5mm-pitch W5500 fan-out where 0.35mm can't fit. Run LAST (after route + cleanup + tighten;
 a re-route resets widths). The pairs are still single-ended / not length-matched (coupled diff-pair routing
 needs the interactive GUI), but the impedance is now close to target instead of ~40% high. KiCad 10."""
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import pcbnew, math
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HW, "luxdmx.kicad_pcb")
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 ETH = {"ETH_TXN", "ETH_TXP", "ETH_RXN", "ETH_RXP"}
 MAXW, CLR, EDGE_CLR = 0.35, 0.15, 0.25   # target ~51 ohm SE; keep 0.15mm to other copper (Fine rule is 0.10)

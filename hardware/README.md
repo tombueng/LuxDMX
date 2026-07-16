@@ -158,39 +158,51 @@ gives every trace a solid 0.21 mm-away reference. The result: clean ~100 Ω Ethe
   are exempt. The board's only galvanic tie to the PoE line is through the module + magjack magnetics.
 
 The inner ground planes are **carved** (keepout rule-areas) around every isolated/hot region so no inner
-copper crosses any barrier — [`rebuild_iso.py`](rebuild_iso.py) regenerates this for all three domains from
+copper crosses any barrier — [`scripts/rebuild_iso.py`](scripts/rebuild_iso.py) regenerates this for all three domains from
 the live part positions.
 
 ---
 
 ## Design-as-code & the routing pipeline
 
-The board is **generated, not hand-drawn**. [`luxdmx.py`](luxdmx.py) is a [SKiDL](https://github.com/devbisme/skidl)
+> [!CAUTION]
+> **Do not run the pipeline steps casually on the committed board.** Everything in the list below that
+> touches the `.kicad_pcb` (`sync_board`, `rebuild_iso`, `escape_connectors`, `autoroute_fr2`,
+> `cleanup_pads`, `normalize_silk`, `widen_eth`, `tighten_poe_void`, `finish_partial`, `route_tbu`,
+> `build_v3`) **rewrites** it. The board as committed carries **hand-made placement and silk edits** that
+> those steps would wipe out. They are the tools for a *deliberate re-route from a new placement*, not a
+> "refresh". Re-running them by reflex is how you lose a day.
+>
+> **Always safe** (read the board, never write it): `scripts/luxdmx.py` (writes only the netlist),
+> `gen_schematic` / `gen_bom_from_board` / `gen_cpl` / `gen_gerbers` (write only outputs), and every
+> `validate_*` gate.
+
+The board is **generated, not hand-drawn**. [`scripts/luxdmx.py`](scripts/luxdmx.py) is a [SKiDL](https://github.com/devbisme/skidl)
 netlist — the single source of truth for every part and connection. From a placement, the rest is scripted
 and **adapts to wherever you put the parts**:
 
 ```text
-0. python luxdmx.py            # SKiDL → luxdmx.net (only after editing the netlist source)
-0b python sync_board.py          # add NEW/changed parts to the board, KEEPING existing placement,
-                                 #   gridded in the enlarged area (build_v3.py = full from-scratch grid)
+0. python scripts/luxdmx.py            # SKiDL → luxdmx.net (only after editing the netlist source)
+0b python scripts/sync_board.py          # add NEW/changed parts to the board, KEEPING existing placement,
+                                 #   gridded in the enlarged area (scripts/build_v3.py = full from-scratch grid)
 1. place / move parts in KiCad   →  save
-2. python rebuild_iso.py         # regenerates inner GND planes + the two GNDISO pours + the three
+2. python scripts/rebuild_iso.py         # regenerates inner GND planes + the two GNDISO pours + the three
                                  #   isolation keepouts (DMX1/DMX2/PoE) from LIVE positions — no hardcoded coords
-3. python escape_connectors.py   # escapes the few fine-pitch connector pins to LOCKED vias
-4. python autoroute_fr2.py       # Freerouting 2.2.4 routes the whole board, keeping locked escapes
-5. python cleanup_pads.py        # mounting posts → NPTH, widen tight THT annular rings
+3. python scripts/escape_connectors.py   # escapes the few fine-pitch connector pins to LOCKED vias
+4. python scripts/autoroute_fr2.py       # Freerouting 2.2.4 routes the whole board, keeping locked escapes
+5. python scripts/cleanup_pads.py        # mounting posts → NPTH, widen tight THT annular rings
 ```
 
-Run everything with the **KiCad 10 bundled Python** (it ships `pcbnew`). `autoroute_fr2.py` drives
+Run everything with the **KiCad 10 bundled Python** (it ships `pcbnew`). `scripts/autoroute_fr2.py` drives
 **Freerouting 2.2.4**, which needs **Java 25+**; the jar and a portable JDK live in `tools/` (git-ignored).
 Locked tracks survive every re-route (KiCad exports them as DSN `(type fix)`), so connector escapes only
 get done once. Move a part, re-run — done.
 
-> **Adding the dual-universe + PoE parts to an existing board:** [`sync_board.py`](sync_board.py) is the
+> **Adding the dual-universe + PoE parts to an existing board:** [`scripts/sync_board.py`](scripts/sync_board.py) is the
 > incremental path — it keeps every already-placed footprint where it is, refreshes pad nets (e.g. J2's VBUS
 > moving onto `+5V_USB`), swaps J3 to the PoE magjack, and drops the brand-new parts (U6/PS2/J5/D7, U7/D10,
 > the new caps) in a grid on the right of the enlarged outline for you to place. Then run the normal
-> 2→5 pipeline. `build_v3.py` remains the full from-scratch grid build if you'd rather re-place everything.
+> 2→5 pipeline. `scripts/build_v3.py` remains the full from-scratch grid build if you'd rather re-place everything.
 
 ---
 
@@ -211,7 +223,7 @@ Everything you upload is already generated in this folder.
 4. In the BOM matching step, confirm each LCSC part (they're all pre-filled, every line in JLC stock). The
    optional display / expansion headers **J4 / J6** (JST SH 9-pin, C160408) are in the BOM — mark them **Do
    Not Populate** if you don't want the on-board panel.
-5. **Review the placement preview** — the CPL is rotation/position-corrected by `gen_cpl.py`, so parts
+5. **Review the placement preview** — the CPL is rotation/position-corrected by `scripts/gen_cpl.py`, so parts
    should sit correctly. The ESP32-S3's antenna intentionally overhangs the left edge.
 
 ### 3 — Through-hole parts
@@ -229,15 +241,15 @@ fee. A complete, assembled prototype lands well under typical hobby budgets.
 
 | File | What |
 |---|---|
-| `luxdmx.py` | **SKiDL source** — authoritative netlist (`python luxdmx.py` → `luxdmx.net`) |
+| `scripts/luxdmx.py` | **SKiDL source** — authoritative netlist (`python scripts/luxdmx.py` → `luxdmx.net`) |
 | `luxdmx.kicad_pcb` / `.kicad_pro` | the board + KiCad project |
 | `luxdmx.kicad_dru` | custom design rules — the two 4 mm DMX isolations, the 2.5 mm PoE isolation + exemptions |
-| `sync_board.py` | **incremental** netlist→board: keep existing placement, grid the new parts (dual-universe + PoE) |
-| `build_v3.py` | full from-scratch grid build (clears + re-drops every part) |
-| `rebuild_iso.py` · `escape_connectors.py` · `autoroute_fr2.py` · `cleanup_pads.py` | the routing pipeline |
+| `scripts/sync_board.py` | **incremental** netlist→board: keep existing placement, grid the new parts (dual-universe + PoE) |
+| `scripts/build_v3.py` | full from-scratch grid build (clears + re-drops every part) |
+| `scripts/rebuild_iso.py` · `scripts/escape_connectors.py` · `scripts/autoroute_fr2.py` · `scripts/cleanup_pads.py` | the routing pipeline |
 | `route.py` · `autoroute.py` | older Freerouting-1.9 fallbacks (no Java 25 needed) |
-| `gen_bom_from_board.py` → `luxdmx_BOM_jlcpcb.csv` | JLCPCB assembly BOM |
-| `gen_cpl.py` → `luxdmx_CPL.csv` / `.xlsx` | JLCPCB pick-and-place (corrected) |
+| `scripts/gen_bom_from_board.py` → `luxdmx_BOM_jlcpcb.csv` | JLCPCB assembly BOM |
+| `scripts/gen_cpl.py` → `luxdmx_CPL.csv` / `.xlsx` | JLCPCB pick-and-place (corrected) |
 | `luxdmx_gerbers.zip` | 4-layer gerbers + PTH/NPTH drill — the fab upload |
 | `easyeda/` | LCSC/easyeda footprints + 3D models for the specific parts |
 | `tools/` | Freerouting 2.2.4 jar + portable JDK 25 *(git-ignored — see Toolchain)* |

@@ -6,8 +6,10 @@ also get a function label, placed the same way. Idempotent for the chip labels.
 
 Uses only segfault-safe ops (pad bboxes + estimated text extents -- pcbnew segfaults on FP_TEXT
 GetBoundingBox()/footprint GraphicalItems() in this build). Run AFTER add_port_pinout_silk.py. KiCad 10."""
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import pcbnew, math
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HW, "luxdmx.kicad_pcb")
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 FS = pcbnew.F_SilkS
 b = pcbnew.LoadBoard(PCB)

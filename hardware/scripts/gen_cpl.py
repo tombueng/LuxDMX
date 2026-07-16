@@ -24,7 +24,7 @@ matching the gerbers (also exported --use-drill-file-origin).
 """
 import pcbnew, csv, os
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
 OUT = os.path.join(HERE, "luxdmx_CPL.csv")
 

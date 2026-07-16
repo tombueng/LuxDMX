@@ -24,7 +24,7 @@ import uuid
 
 import luxdmx_sklib as sklib
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NET = os.path.join(HERE, 'luxdmx.net')
 OUT = os.path.join(HERE, 'luxdmx.kicad_sch')
 PROJECT = 'luxdmx'

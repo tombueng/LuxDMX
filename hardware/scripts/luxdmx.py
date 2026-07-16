@@ -20,7 +20,7 @@ from skidl import Part, Pin, Net, TEMPLATE, SKIDL, generate_netlist, ERC, set_de
 
 set_default_tool(KICAD9)
 PT = Pin.types
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def mk(name, prefix, fp, pins, value=None):

@@ -142,12 +142,12 @@ Implementation: U9 (SOT-583) sits at the old OR junction with 1µF input caps (C
 bulk (C29); PR1/MODE tied low (priority off → simple highest-input-wins OR); ST/PG open. Hand-routed (the
 fine-pitch fanout fought the autorouter) and DRC-clean; ERC 0 errors. One second-order effect: the mux's low
 drop lets the +5V rail reach ~5.20V on a 5.25V USB — see the D11 TVS note in §2 (still fine, µA leakage).
-`validate_electrical.py` + `sim/power_chain.cir` model the fixed chain.
+`scripts/validate_electrical.py` + `sim/power_chain.cir` model the fixed chain.
 
 ---
 
 ## 4. Power integrity, geometry, DFM
-- **+5V/+5V_USB trace width:** bulk widened to 0.5mm (`widen_power.py`); a few short pad-entry necks remain
+- **+5V/+5V_USB trace width:** bulk widened to 0.5mm (`scripts/widen_power.py`); a few short pad-entry necks remain
   0.2mm (heat sinks into the pad — acceptable). IPC-2221: 0.5mm/1oz = 1.45A@10°C ≫ 0.8A.
 - **Via current** fine; **min annular = 0.125mm** on the 0.5/0.25 escape vias — **0.005mm under JLCPCB's 0.13mm
   preferred** (open item: bump escape-via pad to 0.55mm → 0.15mm annular, or accept; JLCPCB often allows 0.1mm).
@@ -170,7 +170,7 @@ drop lets the +5V rail reach ~5.20V on a 5.25V USB — see the D11 TVS note in �
   hand-routing needed. (Pairs aren't impedance-controlled by the autorouter but the runs are short.)
 
 ## 6. Placement (decoupling proximity) — real findings
-`validate_placement.py` (after ASSOC update for the new nets) flags a few caps slightly past target:
+`scripts/validate_placement.py` (after ASSOC update for the new nets) flags a few caps slightly past target:
 **C27 (PoE out bulk) 24mm from U7** (worst; PoE ripple — C28 is close at 4.5mm so functional), C13 7.6mm,
 L1 7.2mm, C6 (TOCAP) 7.1mm, C5/C10 ~5.6–5.9mm. All are the user's tight-pack tradeoff; none breaks function,
 but C27 and the buck inductor loop are worth tightening on a future placement pass.

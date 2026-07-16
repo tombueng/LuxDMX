@@ -8,7 +8,7 @@
 
 Run: python validate_geometry.py   (KiCad 10 python)."""
 import os
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import pcbnew, math
 from collections import defaultdict
 

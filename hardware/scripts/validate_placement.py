@@ -6,7 +6,7 @@ Importable as check_placement(PCB) -> list of (part, ic, dist, max, role) violat
 (gen_gerbers.py) reports drift on EVERY board change. Runnable standalone (exits non-zero on any violation)
 so it can also be used as a CI/manual gate. Re-runnable. KiCad 10 python."""
 import os
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import pcbnew, math, sys
 
 PCB = os.path.join(_HERE, "luxdmx.kicad_pcb")

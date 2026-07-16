@@ -3,8 +3,10 @@ locked board). Dijkstra over (cell, layer) with a high via penalty -> prefers F.
 where a net must cross another (e.g. DMX_BX reaching the far XLR pin). Obstacles = every other-net copper
 inflated by clearance, and EACH routed net is added to the obstacle grids before the next routes (so the 8
 new nets never cross each other). Re-runnable: deletes any existing tracks on the 8 nets first. KiCad 10."""
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import pcbnew, math, heapq
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HW, "luxdmx.kicad_pcb")
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 

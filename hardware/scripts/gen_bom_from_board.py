@@ -2,7 +2,7 @@
 Maps each designator -> part + LCSC#. Every part now has a firm in-stock LCSC#; rows are
 grouped by LCSC# so each part appears on exactly one line (JLCPCB requirement)."""
 import os
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import pcbnew, csv, re
 from collections import defaultdict
 
@@ -139,7 +139,7 @@ rows += body
 with open(OUT, "w", newline="") as f:
     csv.writer(f).writerows(rows)
 
-import os, sys; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import os, sys; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     import csv_to_xlsx                               # real openpyxl xlsx; emit matching .xlsx so no stale spreadsheet
     csv_to_xlsx.convert(OUT, OUT.replace(".csv", ".xlsx"))

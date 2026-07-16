@@ -10,7 +10,7 @@ These are SI targets, not fab blockers -- a crystal trace that grew long or spro
 with a detour/extra via or big skew, or a net routed at the wrong width, all degrade quality. Exits 1 if
 any target is missed (validate_all.sh surfaces it as a soft warning; it does not block fab). KiCad 10."""
 import os
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import pcbnew, math, sys
 from collections import defaultdict
 

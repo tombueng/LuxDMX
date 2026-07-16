@@ -16,7 +16,7 @@ any net is unrouted. Trust the tool, not a comment.
 Run it after every routing change. KiCad 10 (kicad-cli)."""
 import os, json, shutil, subprocess, tempfile, sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
 
 
