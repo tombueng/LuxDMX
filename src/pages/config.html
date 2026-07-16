@@ -71,7 +71,7 @@ footer a:hover { color:var(--gh-text); }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#45d85c; } .lg-warn::before{ background:#ffaa1c; } .lg-bad::before{ background:#f33abc; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #23e6f7 inset; }
-/* Hard-wired (fixed) on-board pins (LuxDMX v4): locked, shown but not editable */
+/* Hard-wired (fixed) on-board pins (LuxDMX v5): locked, shown but not editable */
 .fixed-field { background:#161b22 !important; color:var(--gh-muted) !important; cursor:not-allowed; opacity:.9; }
 .hw-fixed, .hw-headers { font-size:.8rem; margin-top:.55rem; }
 .hw-fixed .hwb { display:inline-block; background:#161b22; border:1px solid var(--gh-border); border-radius:4px; padding:.05rem .4rem; margin:.12rem .25rem .12rem 0; color:var(--gh-text); white-space:nowrap; }
@@ -295,7 +295,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="0">Disabled</option>
             <option value="1">Plain GPIO (active high)</option>
             <option value="2">WS2812 RGB (NeoPixel)</option>
-            <option value="3">5-LED status panel (LuxDMX v4)</option>
+            <option value="3">5-LED status panel (LuxDMX v5)</option>
           </select>
           <div class="form-text">
             Same status language on every type: <span class="text-success">green</span> = up (slow blink = DMX coming in) &nbsp;&middot;&nbsp; <span class="text-primary">blue</span> = RDM / identify &nbsp;&middot;&nbsp; <span class="text-warning">orange</span> = Ethernet on WiFi fallback &nbsp;&middot;&nbsp; <span class="text-danger">red</span> = no network &nbsp;&middot;&nbsp; white/Knight-Rider = booting.<br>
@@ -939,7 +939,7 @@ function showAllVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['luxdmx_v4','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var BUILTINS = ['luxdmx_v5','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families: used when no full board descriptor is selected (Custom).
@@ -959,7 +959,7 @@ function finalizeDesc(d){
   (d.cols || []).forEach(function(col){ col.forEach(function(p){ d.byGpio[p.gpio] = p; }); });
   return d;
 }
-// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LuxDMX v4 module).
+// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LuxDMX v5 module).
 var S3L = [4,5,6,7,15,16,17,18,8,19,20,3,46,9,10,11,12,13,14];
 var S3R = [21,47,48,45,0,35,36,37,38,39,40,41,42,44,43,2,1];
 function s3silk(g){ return g===43 ? 'TX0' : g===44 ? 'RX0' : 'IO'+g; }
@@ -1041,7 +1041,7 @@ function physS3DevKitC(){ return phys('bottom',
   [['GND'],['TX0',43],['RX0',44],['IO1',1],['IO2',2],['IO42',42],['IO41',41],['IO40',40],['IO39',39],['IO38',38],['IO37',37],['IO36',36],['IO35',35],['IO0',0],['IO45',45],['IO48',48],['IO47',47],['IO21',21],['IO20',20],['IO19',19],['GND'],['GND']]); }
 function buildBoards(){
   BOARDS = {};
-  BOARDS['luxdmx_v4'] = finalizeDesc({ id:'luxdmx_v4', name:'LuxDMX v4 (ESP32-S3 + W5500)', mcu:'esp32s3',
+  BOARDS['luxdmx_v5'] = finalizeDesc({ id:'luxdmx_v5', name:'LuxDMX v5 (ESP32-S3 + W5500)', mcu:'esp32s3',
     cols:s3cols(true),
     // Everything on this board is fixed in copper except the J4 display header and the
     // J6 expansion header. `field` = the form field it locks; `gpio` is the pin it sits on.
@@ -1530,7 +1530,7 @@ function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply
 // <select> is pointed at for browsing. Locks follow the real board, not the dropdown.
 function detectedDesc(){ return (INFO_BOARD && BOARDS[INFO_BOARD]) || null; }
 
-// On a board that wires its pins in copper (LuxDMX v4), lock the matching form fields so
+// On a board that wires its pins in copper (LuxDMX v5), lock the matching form fields so
 // they can't be changed: set the fixed value, disable the input, hide its pin-pick button,
 // and drop in a hidden mirror so the value still POSTs (disabled inputs don't submit).
 // Idempotent — safe to re-run after the output cards or LED/display fields rebuild.

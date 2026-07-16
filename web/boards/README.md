@@ -7,7 +7,7 @@ fetches it from `https://luxdmx.org/web/boards/`.
 
 ## How it is used
 
-The five **core boards** (`luxdmx_v4`, `esp32s3-devkitc-1`, `esp32-devkitc`,
+The five **core boards** (`luxdmx_v5`, `esp32s3-devkitc-1`, `esp32-devkitc`,
 `esp32-devkit-v1`, `xiao-esp32s3`) are also baked into the firmware
 (`src/pages/config.html`) so the picker works fully offline on an isolated stage LAN.
 This catalog:
@@ -15,6 +15,13 @@ This catalog:
 - lets the config page lazily discover **all the other supported boards** beyond the
   built-ins (fetched on demand, then cached in the browser's `localStorage`),
 - documents the descriptor format for contributors.
+
+`luxdmx_v4` is the **previous revision of our own board**, kept here as a legacy
+descriptor. Nothing builds it any more (the env, the template and `BOARD_ID` are all
+`luxdmx_v5`), but a v4 still running older firmware reports `board: "luxdmx_v4"`, and it
+fetches this catalog to draw its pinout. Deleting the descriptor would break the picker on
+those boards, so it stays. It is not a built-in (an old board already carries its own copy
+in its firmware), so it costs no flash.
 
 The picker draws its own **horizontal pin diagram** from each descriptor's two pin
 columns. There are no board photos or realistic graphics. If the catalog cannot be
@@ -97,7 +104,7 @@ no edit there.
 
 ### Fixed wiring (`hardwired`) and headers — for boards with a fixed pinout
 
-A purpose-built board (the **LuxDMX v4**) wires nearly everything in copper, so the picker
+A purpose-built board (the **LuxDMX v5**) wires nearly everything in copper, so the picker
 should not let you change those pins. Two optional fields drive that, keyed on the
 **detected** board (what `/info.json` reports), not the dropdown:
 
@@ -139,7 +146,7 @@ red = do-not-use (`flash`/`serial`/`reserved:*`), blue ring = currently assigned
 
 ## Regenerating
 
-Every descriptor is generated so it cannot drift from the hardware: LuxDMX v4 from the
+Every descriptor is generated so it cannot drift from the hardware: LuxDMX v5 from the
 PCB netlist (`hardware/luxdmx.py`), the hand-tuned dev boards from published header
 pinouts, and the long tail auto-derived from the arduino-esp32 core
 `variants/<dir>/pins_arduino.h`:
