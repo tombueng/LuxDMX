@@ -479,6 +479,10 @@ static bool     manualMode   = false;
 static uint32_t lastWsPush   = 0;
 static uint32_t lastDmxMs    = 0;
 static String   otaTarget       = "latest";   // release tag to install
+// How many boots a scheduled update may fail before it is abandoned. The brake on any retry
+// loop is NVS "otatries" + loop() only zeroing it after 60 s of stable uptime: a device stuck
+// retrying never gets there, so this really is a hard cap, not a suggestion.
+static constexpr uint8_t OTA_BOOT_TRIES = 3;
 static String   latestVersion   = "";
 // Live OTA progress, polled by the update page via /ota/status. Written from the
 // httpUpdate callbacks (loop task), read from the web handler (AsyncTCP task);
@@ -2717,7 +2721,7 @@ static void versionCheckTask(void*) {
             prefs.begin(PREF_NS, true);
             uint8_t tries = prefs.getUChar("otatries", 0);
             prefs.end();
-            if (tries < 3) {
+            if (tries < OTA_BOOT_TRIES) {
                 Serial.println("[OTA] auto-update available, scheduling clean-heap update on reboot");
                 scheduleOtaReboot("latest");
             } else {
@@ -2767,12 +2771,25 @@ static void doGithubOta() {
         WiFiClientSecure client;
         client.setInsecure();
         httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-        httpUpdate.rebootOnUpdate(true);
-        httpUpdate.update(client, otaUrl);
+        // We reboot ourselves rather than letting httpUpdate do it, because the pending flag
+        // has to be cleared FIRST. otaBootUpdate() now keeps otapend set across an attempt so a
+        // failure can retry; if the new image booted with it still set it would reinstall the
+        // same target on every boot until the retry budget ran out.
+        httpUpdate.rebootOnUpdate(false);
+        if (httpUpdate.update(client, otaUrl) == HTTP_UPDATE_OK) {
+            prefs.begin(PREF_NS, false);
+            prefs.putUChar("otapend", 0);    // installed -> stop asking
+            prefs.putUChar("otatries", 0);   // and hand the next update a full budget
+            prefs.end();
+            otaProgPhase = 2; otaProgPct = 100;
+            Serial.println("[OTA] installed, rebooting into the new image");
+            delay(200);
+            ESP.restart();
+        }
     } catch (...) {
         Serial.println("[OTA] update threw under memory pressure");
     }
-    // Only reaches here on failure (success reboots inside update()).
+    // Only reaches here on failure (success restarts above).
     otaProgPhase = 3;
     Serial.printf("[OTA] Failed (%d): %s\n",
         httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
@@ -2809,18 +2826,39 @@ static void otaBootUpdate() {
     bool    pend  = prefs.getUChar("otapend", 0) == 1;
     String  tgt   = pend ? prefs.getString("otatgt", "latest") : String();
     uint8_t tries = prefs.getUChar("otatries", 0);
-    if (pend) {
-        prefs.putUChar("otapend", 0);          // one-shot: clear BEFORE the attempt (never a loop)
-        prefs.putUChar("otatries", tries + 1); // count it; loop() resets the budget on a stable boot
-    }
+    if (!pend) { prefs.end(); return; }   // no scheduled update -> a normal boot costs nothing
+    tries++;
+    prefs.putUChar("otatries", tries);
+    // otapend deliberately stays SET across the attempt now. It used to be cleared here, one-shot,
+    // before even trying -- so a single bad moment (no link yet, a download that died) dropped the
+    // update on the floor for good: no retry, no error, the web UI had already said "updating,
+    // rebooting", and the device just quietly came back on the old version. That is exactly how a
+    // v5 stayed on 1.0.166 while reporting itself up to date.
+    //
+    // Looping is capped by the existing budget, not by throwing the request away: every attempt
+    // increments otatries, and loop() only resets it after 60 s of stable uptime -- which a device
+    // stuck retrying never reaches. So a genuinely broken update gets OTA_BOOT_TRIES shots and then
+    // stops for good; a transient one survives. doGithubOta() clears otapend the moment the image
+    // is actually installed, or the new firmware would reinstall itself on every boot.
+    const bool giveUp = tries > OTA_BOOT_TRIES;
+    if (giveUp) prefs.putUChar("otapend", 0);
     prefs.end();
-
-    if (!pend) return;    // only a scheduled update (manual button or auto-update) installs here
+    if (giveUp) {
+        Serial.printf("[OTA] update to %s failed %u times, giving up (ask again to retry)\n",
+                      tgt.c_str(), (unsigned)OTA_BOOT_TRIES);
+        return;
+    }
 
     // The Ethernet link comes up asynchronously; give it a moment before we need the network.
     uint32_t t0 = millis();
     while (!netConnected() && millis() - t0 < 20000) delay(100);
-    if (!netConnected()) { Serial.println("[OTA] no network at boot, update skipped"); return; }
+    if (!netConnected()) {
+        // Keep it pending: no network at THIS boot says nothing about the next one. This is the
+        // case that silently ate updates.
+        Serial.printf("[OTA] no network at boot; update to %s still pending (attempt %u/%u)\n",
+                      tgt.c_str(), (unsigned)tries, (unsigned)OTA_BOOT_TRIES);
+        return;
+    }
 
     otaTarget = tgt;
     Serial.printf("[OTA] clean-heap update to %s (attempt %u), largest free block=%u\n",
