@@ -160,6 +160,40 @@ jobs:
             echo "_Build 1.0.${{ github.run_number }} from ${{ github.sha }}_"
           } > notes.md
 
+      # Prove we can publish version.txt BEFORE anything is released.
+      # version.txt has to go out LAST (it must never advertise binaries that aren't live yet),
+      # but that means a failure there would leave a release that no device ever hears about:
+      # the bits are live, version.txt still names the old build, every device thinks it is up to
+      # date. Silent and easy to miss. So test the write path up front, while failing is still
+      # free -- that catches the realistic causes (bad/expired key, host down, path gone).
+      # A failure between here and the real upload is still possible, just not the likely one.
+      - name: Preflight - can we write to luxdmx.org?
+        if: github.ref == 'refs/heads/master'
+        env:
+          SSH_KEY:  ${{ secrets.LUXDMX_SSH_KEY }}
+          SSH_HOST: ${{ secrets.LUXDMX_SSH_HOST }}
+          SSH_USER: ${{ secrets.LUXDMX_SSH_USER }}
+          SSH_PORT: ${{ secrets.LUXDMX_SSH_PORT }}
+        run: |
+          umask 077
+          printf '%s' "$SSH_KEY" > key
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "preflight-${{ github.run_number }}" > preflight.txt
+          sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
+          -mkdir /luxdmx.org/firmware
+          put preflight.txt /luxdmx.org/firmware/preflight.txt
+          SFTP
+          # It must be readable over plain HTTP too -- that is how the device fetches it.
+          GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/preflight.txt | tr -d '[:space:]')
+          [ "$GOT" = "preflight-${{ github.run_number }}" ] \
+            || { echo "::error::preflight readback got '$GOT'"; exit 1; }
+          sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
+          -rm /luxdmx.org/firmware/preflight.txt
+          SFTP
+          rm -f key preflight.txt
+          echo "write path to luxdmx.org verified"
+
       - name: Publish preserved versioned release
         if: github.ref == 'refs/heads/master'   # never release from a PR/branch build
         run: |
