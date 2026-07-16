@@ -5,9 +5,11 @@ scales with this distance, so switching + HF-decoupling caps must sit very close
 Importable as check_placement(PCB) -> list of (part, ic, dist, max, role) violations, so the fab pipeline
 (gen_gerbers.py) reports drift on EVERY board change. Runnable standalone (exits non-zero on any violation)
 so it can also be used as a CI/manual gate. Re-runnable. KiCad 10 python."""
+import os
+_HERE = os.path.dirname(os.path.abspath(__file__))
 import pcbnew, math, sys
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HERE, "luxdmx.kicad_pcb")
 
 # (cap/ferrite, ic, shared-net, role, max_mm)  -- mirrors place_decoupling.py's intent (which IC pin each
 # support part serves). Keep in sync with it. Distances are pad-to-pad on the shared net.

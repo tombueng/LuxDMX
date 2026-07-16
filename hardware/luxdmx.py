@@ -2,7 +2,7 @@
 """LuxDMX v5.2 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
 
 Self-contained board (no plug-in module):
-  ESP32-S3-WROOM-1-N8  +  W5500 SPI-Ethernet + HR911105A MagJack
+  ESP32-S3-WROOM-1-N8R2  +  W5500 SPI-Ethernet + HR911105A MagJack
   Native USB (S3 USB-Serial-JTAG, IO19/IO20) on a USB-C (data) inlet  +  SY8089 5V->3.3V buck
   Isolated DMX out: CA-IS3082W + B0505S iso-DC-DC + XLR-3 (+ SM712 TVS, 120R term)
   5 status LEDs (red/green/yellow/blue/white) direct on GPIOs
@@ -80,9 +80,9 @@ ETH_TCT = Net('ETH_TCT'); ETH_RCT = Net('ETH_RCT'); ETH_LL = Net('ETH_LINKLED');
 LX = Net('BUCK_LX'); FB = Net('BUCK_FB')
 
 # ============================================================================
-# U1  ESP32-S3-WROOM-1-N8  (module)
+# U1  ESP32-S3-WROOM-1-N8R2  (module)
 # ============================================================================
-S3 = mk('ESP32-S3-WROOM-1-N8', 'U', 'RF_Module:ESP32-S3-WROOM-1',
+S3 = mk('ESP32-S3-WROOM-1-N8R2', 'U', 'RF_Module:ESP32-S3-WROOM-1',
         [(1, 'GND', PT.PWRIN), (2, '3V3', PT.PWRIN), (3, 'EN', PT.INPUT),
          (4, 'IO4', PT.BIDIR), (5, 'IO5', PT.BIDIR), (6, 'IO6', PT.BIDIR), (7, 'IO7', PT.BIDIR),
          (8, 'IO15', PT.BIDIR), (9, 'IO16', PT.BIDIR), (10, 'IO17', PT.BIDIR), (11, 'IO18', PT.BIDIR),
@@ -93,7 +93,7 @@ S3 = mk('ESP32-S3-WROOM-1-N8', 'U', 'RF_Module:ESP32-S3-WROOM-1',
          (28, 'IO35', PT.BIDIR), (29, 'IO36', PT.BIDIR), (30, 'IO37', PT.BIDIR), (31, 'IO38', PT.BIDIR),
          (32, 'IO39', PT.BIDIR), (33, 'IO40', PT.BIDIR), (34, 'IO41', PT.BIDIR), (35, 'IO42', PT.BIDIR),
          (36, 'RXD0', PT.BIDIR), (37, 'TXD0', PT.BIDIR), (38, 'IO2', PT.BIDIR), (39, 'IO1', PT.BIDIR),
-         (40, 'GND', PT.PWRIN), (41, 'EP', PT.PWRIN)], value='ESP32-S3-WROOM-1-N8')
+         (40, 'GND', PT.PWRIN), (41, 'EP', PT.PWRIN)], value='ESP32-S3-WROOM-1-N8R2')
 U1 = S3(); U1.ref = 'U1'
 U1['GND'] += GND; U1[40] += GND; U1['EP'] += GND
 U1['3V3'] += P3V3

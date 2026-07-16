@@ -113,7 +113,7 @@ bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DR
 | 19 | W5500 EXRES1 | ✅ | datasheet | **FIXED**: R3 12k→**12.4k 1%** (on-spec PHY bias) |
 | 27 | PoE TVS margin | ✅ | datasheet | **FIXED**: D10 SMAJ58A→**SMAJ60A** (58V standoff was only 1V over 57V max) |
 | 28 | Every part rating/value/datasheet | ✅/⚠️ | 4-agent datasheet pass | see **VALIDATION_REPORT.md**: all active parts + crystal + connectors read from official datasheets; ratings/values recomputed. 3 fixes applied, open items listed. |
-| 29 | ESP32-S3 GPIO map | ✅ | datasheet | **every pin validated, zero must-change**. IO35/36/37 free (N8 no PSRAM), strapping safe, no flash/input-only conflict, UART/SPI routable, IO19/20 native-USB noted |
+| 29 | ESP32-S3 GPIO map | ✅ | datasheet | **every pin validated, zero must-change**. IO35/36/37 carry `EXP_IO35/36/37` and stay valid on the **N8R2**: its PSRAM is **quad**, which does not touch GPIO33–37 (only **octal** R8 parts wire those to memory). Strapping safe, no flash/input-only conflict, UART/SPI routable, IO19/20 native-USB noted |
 | 30 | SPICE power chain | ✅ | ngspice-42 (WSL) | DC + transient (sim/*.cir): with the TPS2116 mux, VCC2 ≥ 4.5V across the **whole** USB range (4.61V @ 4.70V VBUS, 65mΩ-max-over-temp case 4.59V); PoE 5.0V→4.91V ✓; load-step ok. See report §3 (margin now resolved). |
 | 20 | ESP32-S3 strapping pins | ⚠️ | schematic | IO0 pulled-up ✓; IO3/IO45/IO46 float (standard for WROOM-1, verify) |
 | 21 | ESD on USB data / DMX | ✅ | schematic | DMX has SM712 TVS ✓; **USB D+/D- now protected by U8 USBLC6-2SC6** ESD/TVS array (VBUS clamp at the connector) |

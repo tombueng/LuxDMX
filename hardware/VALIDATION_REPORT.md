@@ -12,7 +12,10 @@ Companion files: `VALIDATION_PLAN.md` (what we check), `VALIDATION.md` (status m
 > `VALIDATION.md` #18); the **CH340C bridge and the Q1/Q2 auto-reset** (both deleted, the board runs on the
 > S3's **native USB-Serial-JTAG** on IO19/IO20, which also voids the note about IO19/IO20 being free expansion
 > GPIO); and the **TPS2116 mode** (now **priority**, PoE preferred, PR1 divider R24/R25 → Vsw = 4.0 V, instead
-> of "higher voltage wins"). `hardware/README.md` describes the board as it stands (**v5.2**).
+> of "higher voltage wins"); and the **module** (now the **N8R2**, C2913204, 8 MB flash + **2 MB quad PSRAM**,
+> instead of the PSRAM-less N8 named below. Quad PSRAM does not touch GPIO33–37, so the GPIO map in §"GPIO"
+> still holds and IO35/36/37 remain the expansion pins). `hardware/README.md` describes the board as it
+> stands (**v5.2**).
 
 ---
 

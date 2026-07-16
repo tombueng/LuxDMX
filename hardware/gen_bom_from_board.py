@@ -1,15 +1,17 @@
 """Generate JLCPCB BOM (Comment, Designator, Footprint, LCSC) from the v3 board.
 Maps each designator -> part + LCSC#. Every part now has a firm in-stock LCSC#; rows are
 grouped by LCSC# so each part appears on exactly one line (JLCPCB requirement)."""
+import os
+_HERE = os.path.dirname(os.path.abspath(__file__))
 import pcbnew, csv, re
 from collections import defaultdict
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
-OUT = r"C:\dev\DMX\hardware\luxdmx_BOM_jlcpcb.csv"
+PCB = os.path.join(_HERE, "luxdmx.kicad_pcb")
+OUT = os.path.join(_HERE, "luxdmx_BOM_jlcpcb.csv")
 
 # ref -> (comment, LCSC#)   ("" = choose in JLCPCB picker)
 INFO = {
-    "U1": ("ESP32-S3-WROOM-1-N8 (8MB)", "C2913198"),
+    "U1": ("ESP32-S3-WROOM-1-N8R2 (8MB flash + 2MB quad PSRAM; quad keeps IO35/36/37 free, octal R8 would not)", "C2913204"),
     "U2": ("W5500 SPI Ethernet", "C32843"),
     # U3 CH340C + Q1/Q2 auto-reset removed -- native USB (S3 USB-Serial-JTAG on IO19/IO20)
     "U4": ("SY8089 buck 5->3.3V", "C78988"),

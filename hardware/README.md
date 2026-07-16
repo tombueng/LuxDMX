@@ -44,7 +44,7 @@ dollars to fabricate at JLCPCB.
 
 | Decision | Why |
 |---|---|
-| **ESP32-S3** as the MCU | Plenty of GPIO, fast dual-core, native USB, mature Arduino/IDF support, and cheap. The N8 variant (no PSRAM) **frees up GPIO33–37**, which we need for the LEDs + display. |
+| **ESP32-S3** as the MCU | Plenty of GPIO, fast dual-core, native USB, mature Arduino/IDF support, and cheap. The **N8R2** brings 8 MB flash + **2 MB PSRAM**, and because that PSRAM is **quad**, it leaves **GPIO35–37** free for the expansion header. Only the **octal**-PSRAM parts (R8 and up) wire GPIO33–37 to the memory and lose them. |
 | **W5500 SPI Ethernet** (not the ESP's RMII) | The S3 has **no built-in Ethernet MAC** (unlike the original ESP32), so RMII/LAN8720 is physically impossible. The W5500 is a self-contained TCP/IP-offload Ethernet controller on SPI — the *only* practical wired-Ethernet path for the S3. Wired Ethernet matters: a packed venue's 2.4 GHz band is hostile, and a show can't drop frames. |
 | **Galvanically-isolated DMX** | DMX runs long cables between gear sitting on different mains circuits with different ground potentials. Without isolation you get **ground loops** (noise, flicker) and, worse, **fault currents** that can destroy the gateway when something downstream shorts. Pro DMX gear is *always* isolated. We isolate both the data (ISO3086) and the power feeding it (B0505S DC-DC), so the DMX domain shares **no copper** with the logic side. |
 | **USB-C** | Reversible, modern, and carries both **power and native flashing** — one cable to power and program. |
@@ -55,7 +55,7 @@ dollars to fabricate at JLCPCB.
 ## The components, in detail
 
 ### Brains & networking
-- **U1 — ESP32-S3-WROOM-1-N8** *(LCSC C2913198)* — the MCU + 2.4 GHz WiFi radio. Runs the Art-Net/sACN
+- **U1 — ESP32-S3-WROOM-1-N8R2** *(LCSC C2913204; 8 MB flash + 2 MB quad PSRAM)* — the MCU + 2.4 GHz WiFi radio. Runs the Art-Net/sACN
   receiver, the web UI, OTA updates, and the DMX engine. The PCB antenna hangs over the left board edge
   (no copper underneath it — intentional, for radiation efficiency).
 - **U2 — WIZnet W5500** *(C32843)* + **Y1 — 25 MHz crystal, 3225** *(C9006, CL = 12 pF, load caps C12/C13 = 18 pF C0G)* + **J3 — HY931147C PoE RJ45 MagJack** *(C91754)* —

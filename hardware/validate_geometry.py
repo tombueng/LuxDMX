@@ -7,10 +7,12 @@
     measure the inner-plane vertical situation (informational)
 
 Run: python validate_geometry.py   (KiCad 10 python)."""
+import os
+_HERE = os.path.dirname(os.path.abspath(__file__))
 import pcbnew, math
 from collections import defaultdict
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HERE, "luxdmx.kicad_pcb")
 TM = pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 _fail = False   # any power net under capacity, or any DFM minimum below JLCPCB -> exit 1 (usable as a gate)
