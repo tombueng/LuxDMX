@@ -614,7 +614,7 @@ values are fetched as JSON.
 | `/rdm/bqp` | GET | Set the Art-Net BackgroundQueuePolicy (background RDM status harvest), `?p=1..3` severity, `4` off |
 | `/rdm/merge` | GET | Set an output's merge mode, `?out=<index>&mode=0/1/2` (off/HTP/LTP), applied live + persisted |
 | `/led/bright` | GET | 5-LED panel per-colour brightness (`?r=&g=&y=&b=&w=`, 0-255), applied live; `&save=1` persists to NVS, `&test=1` lights all five for calibration (10-min window) |
-| `/version.json` | GET | Current firmware version + update-available flag |
+| `/version.json` | GET | Current firmware version + update-available flag. `latest` is `null` when the check hasn't succeeded (it is never faked to equal `current`). The device checks `http://luxdmx.org/firmware/version.txt` over **plain HTTP** — no TLS at runtime, because a handshake needs ~40 KB of contiguous heap that a running gateway doesn't have. The old code used `setInsecure()` (no cert validation), so this gives up no authenticity that existed; the firmware image itself is the thing worth signing |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
 | `/ota/github` | POST | Install a release (downloaded via luxdmx.org; `version=latest` or `1.0.N`) |

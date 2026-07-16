@@ -1917,11 +1917,17 @@ static String htmlEsc(const String& s) {
 }
 
 static void handleVersionJson(AsyncWebServerRequest* req) {
+    // latest is null when the check has not succeeded yet -- NOT current. It used to fall back to
+    // FIRMWARE_VERSION, which made "I couldn't find out" indistinguishable from "you're up to
+    // date" and silently hid real updates (a device sat on 1.0.166 reporting latest=1.0.166 while
+    // 1.0.171 was out). Unknown is its own state; say so. Nothing in the UI reads this field --
+    // index.html gets the release list straight from the GitHub API -- it is here for API users.
     String j = "{\"current\":\"";
     j += FIRMWARE_VERSION;
-    j += "\",\"latest\":\"";
-    j += latestVersion.length() > 0 ? latestVersion : String(FIRMWARE_VERSION);
-    j += "\",\"update\":";
+    j += "\",\"latest\":";
+    if (latestVersion.length() > 0) { j += "\""; j += latestVersion; j += "\""; }
+    else                            { j += "null"; }
+    j += ",\"update\":";
     j += updateAvailable ? "true" : "false";
     j += "}";
     sendJsonSafe(req, j);
@@ -2649,22 +2655,35 @@ static int parseBuild(const String& v) {
     return dot >= 0 ? v.substring(dot + 1).toInt() : 0;
 }
 
-static bool httpsGet(const char* url, String& out, size_t maxLen) {
-    // A TLS client allocates a big (~40 KB) contiguous block for the mbedTLS buffers. Under a
-    // packet flood the heap fragments; attempting the handshake then throws std::bad_alloc, and
-    // an uncaught throw abort()s the board. Worse, this runs 8 s after every boot, so during a
-    // flood it turns into a reboot loop. Skip when a big block isn't available, and catch as a
-    // hard backstop so a version check can never reboot the gateway.
-    if (ESP.getMaxAllocHeap() < 50000) {
-        Serial.printf("[VER] skipped: largest free block %u too small for TLS\n", ESP.getMaxAllocHeap());
+// Plain HTTP, deliberately. This runs 8 s after boot and then every 6 h in the fully-booted
+// system, where the heap is fragmented -- and a TLS handshake wants a ~40 KB *contiguous* block
+// that simply isn't there (seen in the field: "largest free block 34804 too small for TLS"). The
+// check then skipped itself, and because latest fell back to current it reported "up to date",
+// hiding real updates. HTTP needs almost none of that, so the check just works.
+//
+// Nothing is given up by dropping TLS here: the old code called setInsecure(), i.e. it did no
+// certificate validation whatsoever. It never authenticated anything -- it encrypted a version
+// string that is public on a public GitHub release. Against a man-in-the-middle that is worth
+// exactly as much as plain HTTP, at ~40 KB of contiguous heap. (If OTA authenticity ever matters,
+// the answer is signing the image, not the transport: a signature is checked regardless of how
+// the bytes arrived. Verifying certs on-device instead would mean shipping and rotating a CA
+// bundle in flash.)
+//
+// The URL is a real file on luxdmx.org, not the /firmware/version redirect: that rule is anchored
+// (^firmware/version/?$) so it does not catch .txt, and it stays pointed at GitHub so older
+// firmware in the field keeps working unchanged.
+static bool httpGet(const char* url, String& out, size_t maxLen) {
+    // Still a floor, just a realistic one: without TLS this needs single-digit KB, not 50.
+    if (ESP.getMaxAllocHeap() < 12000) {
+        Serial.printf("[VER] skipped: largest free block %u too small\n", ESP.getMaxAllocHeap());
         return false;
     }
     bool ok = false;
     try {
-        WiFiClientSecure client;
-        client.setInsecure();
+        WiFiClient client;              // no WiFiClientSecure -> no mbedTLS buffers at all
         HTTPClient h;
         h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        h.setTimeout(8000);
         if (!h.begin(client, url)) return false;
         if (h.GET() == 200) {
             String s = h.getString();
@@ -2673,6 +2692,7 @@ static bool httpsGet(const char* url, String& out, size_t maxLen) {
         }
         h.end();
     } catch (...) {
+        // Kept as a hard backstop: an uncaught throw abort()s the board, and this runs on a timer.
         Serial.println("[VER] check threw under memory pressure, skipped");
         return false;
     }
@@ -2681,7 +2701,7 @@ static bool httpsGet(const char* url, String& out, size_t maxLen) {
 
 static void checkForUpdate() {
     String v;
-    if (!httpsGet("https://luxdmx.org/firmware/version", v, 24)) return;
+    if (!httpGet("http://luxdmx.org/firmware/version.txt", v, 24)) return;
     latestVersion   = v;
     updateAvailable = parseBuild(v) > parseBuild(String(FIRMWARE_VERSION));
     Serial.printf("[VER] latest=%s current=%s update=%s\n",
