@@ -1573,6 +1573,11 @@ function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply
 // The detected hardware (what the firmware reports), as opposed to whatever the board
 // <select> is pointed at for browsing. Locks follow the real board, not the dropdown.
 function detectedDesc(){ return (INFO_BOARD && BOARDS[INFO_BOARD]) || null; }
+// Board whose copper-pin locks apply: the one the USER selected if any, else the one the
+// firmware reported. So picking "LuxDMX v5" locks its W5500 / DMX / LED pins even on the
+// generic esp32s3dev build (which reports esp32s3-devkitc-1); the Advanced unlock is the
+// escape hatch for a reworked board.
+function lockDesc(){ return currentBoardDesc() || detectedDesc(); }
 
 // On a board that wires its pins in copper (LuxDMX v5), lock the matching form fields so
 // they can't be changed: set the fixed value, disable the input, hide its pin-pick button,
@@ -1581,7 +1586,7 @@ function detectedDesc(){ return (INFO_BOARD && BOARDS[INFO_BOARD]) || null; }
 function applyHardwiredLocks(){
   document.querySelectorAll('.fixed-field').forEach(function(el){ el.classList.remove('fixed-field'); el.disabled = false; });
   document.querySelectorAll('input.fixed-mirror').forEach(function(el){ el.remove(); });
-  var b = detectedDesc(); var hw = b && b.hardwired; if (!hw) return;
+  var b = lockDesc(); var hw = b && b.hardwired; if (!hw) return;
   if (fixedUnlocked()) return;   // Advanced unlock: leave the fixed pins editable for a reworked board
   hw.forEach(function(e){
     if (!e.field) return;
@@ -1608,7 +1613,7 @@ function renderHeaderTable(h){
 }
 function updHardwired(){
   var el = $('board-hardwired'); if (!el) return;
-  var b = detectedDesc();
+  var b = lockDesc();
   var ur = $('pin-unlock-row');
   if (ur) ur.style.display = (b && b.hardwired && b.hardwired.length) ? '' : 'none';
   if (!b || (!b.hardwired && !b.headers)){ el.innerHTML = ''; return; }
@@ -1677,7 +1682,7 @@ function initBoards(){
   $('board-detected').textContent = INFO_BOARD ? ('detected: ' + INFO_BOARD + (INFO_MCU ? (' / ' + INFO_MCU) : '')) : '';
   decorateAllPins();
   // re-render the open picker (and re-sync the modal select) after a board change
-  var afterBoardChange = function(){ updBoardButtons(); validate();
+  var afterBoardChange = function(){ updBoardButtons(); applyHardwiredLocks(); validate();
     if ($('board-modal').classList.contains('show')){ syncModalBoardSel(); renderCurrent(); } };
   $('board-sel').addEventListener('change', function(){
     var id = $('board-sel').value;

@@ -97,6 +97,12 @@ to block Save on the LuxDMX v4). On a board that fixes its pins in copper the ha
 fields are locked read-only; an **Advanced: unlock the fixed GPIO pins** toggle re-enables
 them for anyone who reworked the board.
 
+The lock follows the **selected** board, not only the one the firmware auto-detects. That
+matters because the v5 ships as the generic `esp32s3dev` build (it reports
+`esp32s3-devkitc-1`): the moment you pick **LuxDMX v5** in the dropdown, its W5500 / DMX /
+LED pins snap to the board values and lock, so you can't accidentally move the Ethernet or
+DMX pins. Switch the board back (or hit Advanced unlock) to edit them again.
+
 **Header pins stay editable.** Pins that reach a user header are deliberately *not* in
 `hardwired`, so they stay pickable even on a fixed-pin board. On the LuxDMX v5 that's the
 J4 display header (SDA/SCL/SCK/MOSI/CS/DC/RST) and the J6 expansion header — you can point

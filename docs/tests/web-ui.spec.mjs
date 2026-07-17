@@ -161,16 +161,24 @@ test.describe('Web UI + REST', () => {
     }
   });
 
-  test('luxdmx_v5 picker tags each header GPIO with its J4/J6 pin', async ({ page }) => {
-    // The diagram follows the SELECTED board (currentBoardDesc), so this works on any build
-    // that offers luxdmx_v5, regardless of what board the firmware detects. (The board-card
-    // header panel + copper-pin locks are detection-gated and covered by v5-locks.mjs.)
+  test('selecting luxdmx_v5 locks the copper pins and tags the header pads', async ({ page }) => {
     await page.goto('/config');
     test.skip(await page.locator('#board-sel option[value="luxdmx_v5"]').count() === 0,
       'luxdmx_v5 board not offered on this chip');
+    await page.locator('#wired-sel').selectOption('w5500').catch(() => {});   // reveal the W5500 fields
     await page.locator('#board-sel').selectOption('luxdmx_v5');
-    await page.locator('#board-open').click();                        // open the picker diagram
-    // GPIO4 is J4 pin 3 (SDA) on the v5 -> tagged on the pad + in its tooltip.
+    // Picking the board applies its copper-pin locks even when the firmware detects a generic
+    // esp32s3dev / esp32s3-devkitc-1, so you can't accidentally move the W5500 or DMX pins.
+    // The J4 display pins stay editable; the Advanced unlock is the escape hatch.
+    await expect(page.locator('#eth-cs')).toBeDisabled();          // W5500 CS locked
+    await expect(page.locator('#eth-cs')).toHaveValue('10');       // to the v5 value
+    await expect(page.locator('#disp-sda')).toBeEnabled();         // J4 display pin editable
+    await expect(page.locator('#pin-unlock-row')).toBeVisible();
+    await page.locator('#pin-unlock').check();
+    await expect(page.locator('#eth-cs')).toBeEnabled();           // unlock re-enables it
+    await page.locator('#pin-unlock').uncheck();
+    // the diagram tags each header GPIO with its physical header pin
+    await page.locator('#board-open').click();
     await expect(page.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');
     await expect(page.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 4');
   });
