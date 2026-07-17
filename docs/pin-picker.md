@@ -87,7 +87,31 @@ Per active GPIO field, value `>= 0`:
 | `input-only` used as an output | error |
 | `strapping`, `usb-jtag`, `absent` (not broken out on this board) | warning |
 
-Errors disable **Save & Restart**; warnings do not. Family fallbacks:
+Errors disable **Save & Restart**; warnings do not.
+
+The `reserved:eth-spi` / `reserved:eth-rmii` flag guards the Ethernet bus against *other*
+roles, but it is **not** raised against the Ethernet role fields themselves
+(CS/SCK/MOSI/MISO/INT/RST, or the RMII MDC/MDIO/PWR/CLK) — those fields legitimately own
+those GPIOs, so a board that hard-wires its own W5500 never flags its own pins (that used
+to block Save on the LuxDMX v4). On a board that fixes its pins in copper the hard-wired
+fields are locked read-only; an **Advanced: unlock the fixed GPIO pins** toggle re-enables
+them for anyone who reworked the board.
+
+The lock follows the **selected** board, not only the one the firmware auto-detects. That
+matters because the v5 ships as the generic `esp32s3dev` build (it reports
+`esp32s3-devkitc-1`): the moment you pick **LuxDMX v5** in the dropdown, its W5500 / DMX /
+LED pins snap to the board values and lock, so you can't accidentally move the Ethernet or
+DMX pins. Switch the board back (or hit Advanced unlock) to edit them again.
+
+**Header pins stay editable.** Pins that reach a user header are deliberately *not* in
+`hardwired`, so they stay pickable even on a fixed-pin board. On the LuxDMX v5 that's the
+J4 display header (SDA/SCL/SCK/MOSI/CS/DC/RST) and the J6 expansion header — you can point
+the display at the J4 defaults or wire it to J6 instead, whatever you soldered. The board
+card lists each header's pinout, and the diagram tags every header GPIO with its physical
+header pin (e.g. `G4 · J4.3`, tooltip `GPIO4 · J4 pin 3 (SDA)`). This is also where future
+add-on inputs (buttons, a rotary encoder) will bind — any header GPIO is fair game.
+
+Family fallbacks:
 
 ```
 esp32   : flash 6-11, serial 1/3, input-only 34/35/36/39, strapping 0/2/5/12/15, max 39

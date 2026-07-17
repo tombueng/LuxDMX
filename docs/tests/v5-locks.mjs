@@ -2,8 +2,9 @@
 //
 // Serves the real src/pages/config.html with a stub /info.json that reports the v5
 // board, drives it in a real browser, and asserts that the hard-wired fields (DMX A/B,
-// W5500, LEDs, display) are disabled and carry their fixed values + a hidden mirror so
-// the value still submits, while the genuinely configurable fields stay editable.
+// W5500, LEDs) are disabled and carry their fixed values + a hidden mirror so the value
+// still submits, while the genuinely configurable fields stay editable. The J4 display
+// header pins are deliberately NOT locked (you can wire a display to J4 or J6).
 //
 // Run:  node docs/tests/v5-locks.mjs     (from the repo root)
 import http from 'node:http';
@@ -71,7 +72,7 @@ try {
   const fixed = {
     o0_tx: '17', o0_rx: '18', o0_rts: '8', o0_port: '1',
     o1_tx: '16', o1_rx: '21', o1_rts: '47', o1_port: '2',
-    ethsck: '12', ethcs: '10', ledr: '1', ledw: '15', ledtype: '3', dispsda: '4', disprst: '38',
+    ethsck: '12', ethcs: '10', ledr: '1', ledw: '15', ledtype: '3',
   };
   for (const [name, val] of Object.entries(fixed)) {
     fails += check(`${name} is locked (disabled, =${val})`, r[name].found && r[name].disabled && r[name].value === val);
@@ -79,6 +80,10 @@ try {
   // configurable fields stay editable
   fails += check('o0_uni stays editable', r.o0_uni.found && !r.o0_uni.disabled);
   fails += check('disptype stays editable', r.disptype.found && !r.disptype.disabled);
+  // the J4 display header pins are NOT locked in copper: you can point the display at J4
+  // or wire it to J6, so they stay editable/pickable.
+  fails += check('dispsda stays editable (J4 display header)', r.dispsda.found && !r.dispsda.disabled);
+  fails += check('disprst stays editable (J4 display header)', r.disprst.found && !r.disprst.disabled);
   // every locked field has a hidden mirror so its value still POSTs
   const mirrorNames = new Set(r.mirrors.map((m) => m.name));
   fails += check(`hidden mirrors present for all ${Object.keys(fixed).length}+ fixed fields`,
