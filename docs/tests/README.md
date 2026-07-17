@@ -52,7 +52,8 @@ Two behaviour tests drive the real `src/pages/config.html` in a headless browser
 device — run them directly with `node`, they self-report and exit non-zero on failure:
 
 ```bash
-node docs/tests/v5-locks.mjs      # board detected as luxdmx_v5 -> copper pins are locked + mirrored
+node docs/tests/v5-locks.mjs      # board detected as luxdmx_v5 -> copper pins locked + mirrored,
+                                  #   the J4 display-header pins stay editable, headers listed
 node docs/tests/v5-template.mjs   # generic S3 board -> picking the "LuxDMX v5" template fills the
                                   #   fixed pin map: W5500 SPI + LED + display + DMX pins get set,
                                   #   panel brightness is pushed to /led/bright?...&save=1, and
@@ -64,7 +65,7 @@ node docs/tests/v5-template.mjs   # generic S3 board -> picking the "LuxDMX v5" 
 
 | Spec | Feature (network → web UI) |
 |---|---|
-| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
+| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; the W5500 role pins are not flagged "reserved" against their own role (Save stays enabled) and a fixed-pin board offers an Advanced unlock while the J4 display pins stay editable; the picker lists the J4 + J6 header pinouts and tags each header pad with its pin; home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
 | `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking; tight back-to-back burst keeps tracking (socket-drain regression). The per-loop latency win itself needs a logic analyzer on the DMX wire and isn't asserted here. |
 | `sacn.spec.mjs` | sACN / E1.31 → DMX values, live grid, sender tracking |
 | `conflict.spec.mjs` | Two simultaneous senders → conflict banner |

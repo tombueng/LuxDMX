@@ -278,14 +278,7 @@
     { "field": "ledg",    "gpio": 2,  "label": "LED · Green" },
     { "field": "ledy",    "gpio": 6,  "label": "LED · Yellow" },
     { "field": "ledb",    "gpio": 7,  "label": "LED · Blue" },
-    { "field": "ledw",    "gpio": 15, "label": "LED · White" },
-    { "field": "dispsda",  "gpio": 4,  "label": "Display J4 · SDA" },
-    { "field": "dispscl",  "gpio": 5,  "label": "Display J4 · SCL" },
-    { "field": "dispsck",  "gpio": 39, "label": "Display J4 · SCK" },
-    { "field": "dispmosi", "gpio": 40, "label": "Display J4 · MOSI" },
-    { "field": "dispcs",   "gpio": 41, "label": "Display J4 · CS" },
-    { "field": "dispdc",   "gpio": 42, "label": "Display J4 · DC" },
-    { "field": "disprst",  "gpio": 38, "label": "Display J4 · RST" }
+    { "field": "ledw",    "gpio": 15, "label": "LED · White" }
   ],
   "headers": [
     { "ref": "J4", "name": "Display header", "pins": [

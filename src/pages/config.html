@@ -119,6 +119,10 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
           Ethernet-reserved pins for your chip.
         </div>
         <div id="board-hardwired" class="form-text mt-2"></div>
+        <div id="pin-unlock-row" class="form-check form-switch mt-1" style="display:none">
+          <input class="form-check-input" type="checkbox" id="pin-unlock">
+          <label class="form-check-label small text-secondary" for="pin-unlock">Advanced: unlock the fixed GPIO pins (only if you reworked the board wiring)</label>
+        </div>
         <div id="pin-warnings" class="mt-2"></div>
       </div>
     </div>
@@ -850,6 +854,7 @@ $('wired-sel').addEventListener('change', function(){ updWired(); validate(); })
 });
 $('wifi-mode').addEventListener('change', updNetMode);
 $('fb-mode').addEventListener('change', updNetMode);
+{ var _pu = $('pin-unlock'); if (_pu) _pu.addEventListener('change', function(){ applyHardwiredLocks(); validate(); }); }
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
 $('dev-host').addEventListener('input', updHostUrl);
@@ -1065,14 +1070,10 @@ function buildBoards(){
       {field:'ledg', gpio:2, label:'LED · Green'},
       {field:'ledy', gpio:6, label:'LED · Yellow'},
       {field:'ledb', gpio:7, label:'LED · Blue'},
-      {field:'ledw', gpio:15,label:'LED · White'},
-      {field:'dispsda', gpio:4,  label:'Display J4 · SDA'},
-      {field:'dispscl', gpio:5,  label:'Display J4 · SCL'},
-      {field:'dispsck', gpio:39, label:'Display J4 · SCK'},
-      {field:'dispmosi',gpio:40, label:'Display J4 · MOSI'},
-      {field:'dispcs',  gpio:41, label:'Display J4 · CS'},
-      {field:'dispdc',  gpio:42, label:'Display J4 · DC'},
-      {field:'disprst', gpio:38, label:'Display J4 · RST'}
+      {field:'ledw', gpio:15,label:'LED · White'}
+      // NB: the display pins (dispsda/scl/sck/mosi/cs/dc/rst) are deliberately NOT locked.
+      // They land on the J4 header (see `headers` below), so the user can pick them freely
+      // and even wire a display to J6 instead. They default to the J4 wiring via `preset`.
     ],
     headers:[
       {ref:'J4', name:'Display header', pins:[
@@ -1258,6 +1259,15 @@ function renderWarnings(msgs){
     + warns.map(function(m){ return '<li>' + esc(m.text) + '</li>'; }).join('') + '</ul></div>';
   c.innerHTML = html;
 }
+function fixedUnlocked(){ var el = $('pin-unlock'); return !!(el && el.checked); }
+// An Ethernet role field legitimately owns its own bus pins, so the "reserved for the
+// Ethernet" flag must never be raised against the very field that defines that pin
+// (GPIO10 is the W5500 CS -> the CS field can't be "reserved for the W5500 Ethernet").
+function ownReservedFlag(role){
+  if (['ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst'].indexOf(role) >= 0) return 'reserved:eth-spi';
+  if (['rmiimdc','rmiimdio','rmiipwr','rmiiclk'].indexOf(role) >= 0) return 'reserved:eth-rmii';
+  return null;
+}
 function validate(){
   var roles = activeRoles(), used = {}, fields = [];
   roles.forEach(function(role){
@@ -1275,7 +1285,9 @@ function validate(){
       var others = used[f.v].filter(function(r){ return r !== f.role; }).map(roleLabel);
       probs.push('GPIO' + f.v + ' also assigned to ' + others.join(', ')); sev = 'err';
     }
-    var s = flagSeverity(pinFlags(f.v), roleType(f.role));
+    var fl = pinFlags(f.v), own = ownReservedFlag(f.role);
+    if (own) fl = fl.filter(function(x){ return x !== own; });   // a bus role field owns its own pins
+    var s = flagSeverity(fl, roleType(f.role));
     if (s.sev){
       probs.push('GPIO' + f.v + ' ' + s.msg);
       if (s.sev === 'err') sev = 'err'; else if (sev !== 'err') sev = 'warn';
@@ -1322,10 +1334,21 @@ function renderBoard(){
 // (pins along the horizon), silk + GPIO labels stand vertically just inside each
 // row, and assigned-function callouts stack outward above/below. Geometry is in
 // fixed board units at a fixed scale, so a pin is the SAME size on every board.
+// gpio -> { ref, pin, silk } from the board's `headers`, so a pad on a user header can
+// be tagged with its physical header + pin (e.g. GPIO4 = J4.3 SDA). Only signal pins
+// (those with a gpio) are indexed; power/GND pins are skipped.
+function headerIndex(b){
+  var idx = {};
+  ((b && b.headers) || []).forEach(function(h){
+    (h.pins || []).forEach(function(pp){ if (pp.gpio != null) idx[pp.gpio] = { ref:h.ref, pin:pp.pin, silk:pp.silk }; });
+  });
+  return idx;
+}
 function renderBoardCols(b, wrap){
   if (!b || !b.cols){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
   var assign = {};
   activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
+  var hIdx = headerIndex(b);
   var topPins = b.cols[0] || [], botPins = b.cols[1] || [];
   var n = Math.max(topPins.length, botPins.length, 1);
   var PITCH = 22, LM = 28, RM = 16, PAD = 13, PH = PAD / 2, SILK = 40, MOD = 42, GAPM = 8, SFONT = 7, SCALE = 1.5;
@@ -1359,8 +1382,11 @@ function renderBoardCols(b, wrap){
   [[8,8],[BW-8,8],[8,BH-8],[BW-8,BH-8]].forEach(function(c){ s += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="3" fill="#0d1117" stroke="#1f8a63" stroke-width="0.6"/>'; });
   function drawRow(pins, padY, top){
     for (var i = 0; i < pins.length; i++){ var p = pins[i], x = xOf(i), fl = p.flags || [], u = assign[p.gpio], col = u ? '#23e6f7' : statusColor(padClass(fl));
-      var tip = 'GPIO' + p.gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' · ' + fl.join(', ') : ' · free') + (u ? ' · ' + u.map(roleLabel).join(', ') : '');
-      var lbl = 'G' + p.gpio + (p.silk && p.silk !== ('IO' + p.gpio) ? ' ' + p.silk : '');
+      var hr = hIdx[p.gpio], hrTag = hr ? (hr.ref + '.' + hr.pin) : '';
+      var tip = 'GPIO' + p.gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' · ' + fl.join(', ') : ' · free')
+        + (hr ? ' · ' + hr.ref + ' pin ' + hr.pin + (hr.silk ? ' (' + hr.silk + ')' : '') : '')
+        + (u ? ' · ' + u.map(roleLabel).join(', ') : '');
+      var lbl = 'G' + p.gpio + (p.silk && p.silk !== ('IO' + p.gpio) ? ' ' + p.silk : '') + (hrTag ? ' · ' + hrTag : '');
       var ly = top ? (padY - PH - 2) : (padY + PH + 2), rot = top ? -90 : 90;
       s += '<g class="pad' + (u ? ' used' : '') + '" data-gpio="' + p.gpio + '"><title>' + esc(tip) + '</title>'
         + '<rect class="pin-pad" x="' + (x - PH) + '" y="' + (padY - PH) + '" width="' + PAD + '" height="' + PAD + '" rx="2" fill="' + col + '" fill-opacity="0.22" stroke="' + col + '" stroke-width="' + (u ? 2.4 : 1.3) + '"/>'
@@ -1556,6 +1582,7 @@ function applyHardwiredLocks(){
   document.querySelectorAll('.fixed-field').forEach(function(el){ el.classList.remove('fixed-field'); el.disabled = false; });
   document.querySelectorAll('input.fixed-mirror').forEach(function(el){ el.remove(); });
   var b = detectedDesc(); var hw = b && b.hardwired; if (!hw) return;
+  if (fixedUnlocked()) return;   // Advanced unlock: leave the fixed pins editable for a reworked board
   hw.forEach(function(e){
     if (!e.field) return;
     var val = (e.val != null ? e.val : e.gpio);
@@ -1581,7 +1608,10 @@ function renderHeaderTable(h){
 }
 function updHardwired(){
   var el = $('board-hardwired'); if (!el) return;
-  var b = detectedDesc(); if (!b || (!b.hardwired && !b.headers)){ el.innerHTML = ''; return; }
+  var b = detectedDesc();
+  var ur = $('pin-unlock-row');
+  if (ur) ur.style.display = (b && b.hardwired && b.hardwired.length) ? '' : 'none';
+  if (!b || (!b.hardwired && !b.headers)){ el.innerHTML = ''; return; }
   var html = '';
   if (b.hardwired && b.hardwired.length){
     html += '<div class="hw-fixed"><strong>Fixed wiring on ' + esc(b.name) + '</strong>'

@@ -139,6 +139,42 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('.pin-grp input[name="ethcs"]')).toHaveCount(1);   // pin-picker button
   });
 
+  test('W5500 role pins are not flagged "reserved" against their own role (Save stays enabled)', async ({ page, request }) => {
+    const d = await (await request.get('/info.json')).json();
+    test.skip(!d.ethSpi, 'build has no W5500 SPI support');
+    await page.goto('/config');
+    await page.locator('#wired-sel').selectOption('w5500');   // activate the W5500 bus + its reserved flags
+    // Regression: GPIO9-14 carry a reserved:eth-spi flag, and the W5500 role fields
+    // (CS/SCK/MOSI/MISO/INT/RST) sit on exactly those pins. They used to be flagged
+    // "reserved for the W5500 Ethernet" against their OWN role, which blocked Save.
+    await expect(page.locator('#pin-warnings')).not.toContainText('reserved for the W5500 Ethernet');
+    await expect(page.locator('#save-btn')).toBeEnabled();
+    // A fixed-pin board (LuxDMX v4) locks the hard-wired fields, with an Advanced unlock
+    // toggle for a reworked board. Only assert it where the board is actually detected as fixed.
+    if (await page.locator('#pin-unlock-row').isVisible()) {
+      // target the real inputs by id — locking adds a hidden .fixed-mirror with the same name
+      await expect(page.locator('#eth-cs')).toBeDisabled();    // internal (no-header) pin locked
+      await expect(page.locator('#disp-sda')).toBeEnabled();   // J4 display pin stays editable
+      await page.locator('#pin-unlock').check();
+      await expect(page.locator('#eth-cs')).toBeEnabled();     // unlock re-enables it
+      await page.locator('#pin-unlock').uncheck();             // restore
+    }
+  });
+
+  test('luxdmx_v5 picker tags each header GPIO with its J4/J6 pin', async ({ page }) => {
+    // The diagram follows the SELECTED board (currentBoardDesc), so this works on any build
+    // that offers luxdmx_v5, regardless of what board the firmware detects. (The board-card
+    // header panel + copper-pin locks are detection-gated and covered by v5-locks.mjs.)
+    await page.goto('/config');
+    test.skip(await page.locator('#board-sel option[value="luxdmx_v5"]').count() === 0,
+      'luxdmx_v5 board not offered on this chip');
+    await page.locator('#board-sel').selectOption('luxdmx_v5');
+    await page.locator('#board-open').click();                        // open the picker diagram
+    // GPIO4 is J4 pin 3 (SDA) on the v5 -> tagged on the pad + in its tooltip.
+    await expect(page.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');
+    await expect(page.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 4');
+  });
+
   test('Wired selector: one list of None + the build PHYs, swaps the pin sections', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi && !d.ethRmii, 'build has no wired Ethernet');
