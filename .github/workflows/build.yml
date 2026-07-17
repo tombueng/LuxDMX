@@ -176,7 +176,11 @@ jobs:
           SSH_PORT: ${{ secrets.LUXDMX_SSH_PORT }}
         run: |
           umask 077
-          printf '%s' "$SSH_KEY" > key
+          # printf '%s\n', NOT '%s'. `gh secret set` strips the trailing newline off stdin, and
+          # OpenSSH rejects a private key whose END marker is not newline-terminated:
+          # "Load key: error in libcrypto" -- which reads like a wrong key and is not.
+          # Reproduced against ssh-keygen -y: no trailing newline fails, one or more is fine.
+          printf '%s\n' "$SSH_KEY" > key
           mkdir -p ~/.ssh
           ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           echo "preflight-${{ github.run_number }}" > preflight.txt
@@ -251,7 +255,11 @@ jobs:
           # Failing here fails the build on purpose: a stale version.txt tells every device it is
           # up to date and silently stops all updates. Better a red build than a mute fleet.
           umask 077
-          printf '%s' "$SSH_KEY" > key
+          # printf '%s\n', NOT '%s'. `gh secret set` strips the trailing newline off stdin, and
+          # OpenSSH rejects a private key whose END marker is not newline-terminated:
+          # "Load key: error in libcrypto" -- which reads like a wrong key and is not.
+          # Reproduced against ssh-keygen -y: no trailing newline fails, one or more is fine.
+          printf '%s\n' "$SSH_KEY" > key
           mkdir -p ~/.ssh
           ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
