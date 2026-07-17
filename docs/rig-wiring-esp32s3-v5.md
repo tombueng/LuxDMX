@@ -4,9 +4,13 @@ The hardware-in-the-loop bench with an **ESP32-S3** as the controller, wired to 
 transceiver for DMX/RDM and a W5500 for wired Ethernet, with an RP2350 acting as the
 DMX analyzer / ground-truth / RDM responder on the bus.
 
-Firmware: `luxdmx_v5` env (RMT DMX + the crash fixes). Flash the factory image over USB:
-`esptool --chip esp32s3 --port <COM> --baud 921600 write_flash 0x0 .pio/build/luxdmx_v5/firmware.factory.bin`
+Firmware: there is no dedicated v5 env any more — build the released `esp32s3dev` target with the
+source-build escape-hatch flags so it boots straight into the v5 pin map (see platformio.ini):
+`pio run -e esp32s3dev --build-flags "-DBOARD_LUXDMX_V5 -DDEFAULT_TEMPLATE=luxdmx_v5"`
+then flash the factory image over USB:
+`esptool --chip esp32s3 --port <COM> --baud 921600 write_flash 0x0 .pio/build/esp32s3dev/firmware.factory.bin`
 (a factory flash wipes NVS → fresh config below; set WiFi/`useeth` afterwards over the serial console).
+Or flash a plain `esp32s3dev` build and apply the **LuxDMX v5** board template in `/config` instead.
 
 ## Controller pins (luxdmx_v5 config defaults)
 

@@ -13,7 +13,7 @@ import { dirname, resolve } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // The dev build that exercises the new progress page + /ota/status. Override with
 // LUXDMX_FW if your build dir differs.
-const FW = process.env.LUXDMX_FW || resolve(__dirname, '../../.pio/build/luxdmx_v5/firmware.bin');
+const FW = process.env.LUXDMX_FW || resolve(__dirname, '../../.pio/build/esp32s3dev/firmware.bin');
 
 async function currentVersion(request) {
   const r = await request.get('/version.json', { timeout: 5_000 });

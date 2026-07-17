@@ -284,8 +284,10 @@ See **VALIDATION.md** for the full matrix. Open items to confirm before fab (non
 
 ### Firmware support
 
-Both board-specific firmware features are implemented and build-verified in `env:luxdmx_v5`
-(see [platformio.ini](../platformio.ini)) on **arduino-esp32 v3 / ESP-IDF 5.5**:
+Both board-specific firmware features ship in the released **`esp32s3dev`** build (the v5 has no
+dedicated env — it is an ESP32-S3 + W5500 with a fixed pin map; flash that build and pick the
+**LuxDMX v5** board template in `/config`). See [platformio.ini](../platformio.ini). Built on
+**arduino-esp32 v3 / ESP-IDF 5.5**:
 
 - [x] **W5500 SPI-Ethernet driver.** `ETH.begin(ETH_PHY_W5500, …)` registers the W5500 as an lwIP
   netif, so the existing AsyncWebServer / Art-Net / sACN / OTA stack runs over wired Ethernet

@@ -881,7 +881,7 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
-| LuxDMX v5 (ESP32-S3 + W5500) | `luxdmx_v5` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| LuxDMX v5 (ESP32-S3 + W5500) | `esp32s3dev` + **LuxDMX v5** template | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). No dedicated build — flash `esp32s3dev` and apply the **LuxDMX v5** template in `/config` for the fixed pin map. 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 | ESP32-S3 with PSRAM (WROOM-1-N8R8 / N16R8) | `esp32s3_psram` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 | Enables the 8 MB octal PSRAM: the RDM device tables and the WiFi/lwIP buffers move to PSRAM, so the RDM cap auto-detects to 64 and the internal heap stays wide open (measured ~150 KB free vs ~88 KB on an N8). From-source build; still boots on a non-PSRAM S3, it just won't use PSRAM there. PSRAM occupies GPIO33-37, DMX on 16/17 is clear |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external SPI module**: the W5500 and
