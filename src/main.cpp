@@ -2033,13 +2033,15 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // Compile-time board identity. Lets the /config pin-picker auto-select the right
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
-// BOARD_LUXDMX_V5 is set ONLY by [env:luxdmx_v5] — it means the real board, not just
-// "has a W5500". USE_ETH_SPI is too coarse to identify the board: esp32dev and esp32s3dev
-// set it too (so a DIY user can add a W5500 module), so keying the id on it made every
-// W5500 build claim to be the board. That matters now the descriptor locks its hard-wired
-// pins — a plain DevKitC must not report luxdmx_v5 and get its pins frozen.
-// (luxdmx_v4 was the previous revision of this same board; its descriptor is kept in
-// web/boards/ as a legacy entry so a v4 still resolves its pinout, but nothing builds it.)
+// BOARD_LUXDMX_V5 is NOT set by any shipped env — the v5 has no dedicated build, it is the
+// esp32s3dev build plus the "LuxDMX v5" board template applied in /config (see platformio.ini).
+// So a released v5 reports "esp32s3-devkitc-1" like any S3, and the copper-pin locks (which key
+// on the reported board) are inactive on it. This branch is the source-build escape hatch: build
+// esp32s3dev with -DBOARD_LUXDMX_V5 to get a firmware that reports "luxdmx_v5" and gets the locks.
+// USE_ETH_SPI alone is too coarse to key the id on — esp32dev/esp32s3dev set it too so a DIY user
+// can add a W5500 — which is why the id needs the explicit flag, not the presence of the W5500 path.
+// (luxdmx_v4 was the previous revision of this same board; its descriptor is kept in web/boards/
+// as a legacy entry so a v4 still resolves its pinout, but nothing builds it.)
 #if defined(BOARD_LUXDMX_V5)
 static const char BOARD_ID[] = "luxdmx_v5";
 #elif defined(USE_ETH_RMII) || defined(USE_ETHERNET)

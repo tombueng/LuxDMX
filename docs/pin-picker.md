@@ -60,10 +60,15 @@ boards and manual GPIO entry still work; catalog fetch failures degrade silently
 
 | Build | `board` | `mcu` |
 |---|---|---|
-| `luxdmx_v5` (USE_ETH_SPI) | `luxdmx_v5` | `esp32s3` |
 | `wt32eth01` (USE_ETHERNET) | `wt32eth01` | `esp32` |
 | `esp32s3dev` | `esp32s3-devkitc-1` | `esp32s3` |
 | `esp32dev` | `esp32-devkitc` | `esp32` |
+| `esp32s3dev` + `-DBOARD_LUXDMX_V5` | `luxdmx_v5` | `esp32s3` |
+
+The **LuxDMX v5** has no dedicated build — it runs the released `esp32s3dev` firmware (so it reports
+`esp32s3-devkitc-1`) and gets its fixed pin map from the **LuxDMX v5** board template applied in
+`/config`. Only a source build with the `-DBOARD_LUXDMX_V5` escape hatch reports `luxdmx_v5` and
+activates the copper-pin locks.
 
 If the id matches a descriptor, the board is preselected; otherwise the page falls back
 to **Custom**, which still validates against the chip family rules for `mcu`. The board

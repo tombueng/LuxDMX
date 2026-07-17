@@ -46,6 +46,20 @@ LUXDMX_WRITE=1 npm test
 
 They always restore the original configuration afterwards.
 
+### Standalone config-UI tests (no device, no Playwright runner)
+
+Two behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
+device — run them directly with `node`, they self-report and exit non-zero on failure:
+
+```bash
+node docs/tests/v5-locks.mjs      # board detected as luxdmx_v5 -> copper pins are locked + mirrored
+node docs/tests/v5-template.mjs   # generic S3 board -> picking the "LuxDMX v5" template fills the
+                                  #   fixed pin map: W5500 SPI + LED + display + DMX pins get set,
+                                  #   panel brightness is pushed to /led/bright?...&save=1, and
+                                  #   nothing is locked (the board isn't a detected v5). This is the
+                                  #   flow a v5 owner uses now that there is no dedicated v5 build.
+```
+
 ## What's covered
 
 | Spec | Feature (network → web UI) |
