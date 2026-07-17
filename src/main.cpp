@@ -191,7 +191,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812, 3=5-LED discrete panel
 #endif
 
-// 5-LED discrete status panel (ledType 3) — the LuxDMX v4 board. Five LEDs on
+// 5-LED discrete status panel (ledType 3) — the LuxDMX v5 board. Five LEDs on
 // their own GPIOs, active-high (GPIO → R → LED anode, cathode → GND). -1 = absent.
 #ifndef DEF_LED_R
 #define DEF_LED_R -1   // red    — fault / no network
@@ -213,7 +213,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // runtime config (cfg.eth*) on ANY board: a DIY user can wire a W5500 module to a
 // plain ESP32 / ESP32-S3 and enable it in /config, not just boards that bake the
 // pins in at build time. Defaults are the classic-ESP32 VSPI pins (the most common
-// W5500 wiring); luxdmx_v4 overrides them via build_flags. A build without
+// W5500 wiring); luxdmx_v5 overrides them via build_flags. A build without
 // USE_ETH_SPI never calls ETH.begin() with these, so they cost nothing there.
 #ifndef ETH_W5500_SCK
 #define ETH_W5500_SCK 18
@@ -2033,13 +2033,15 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // Compile-time board identity. Lets the /config pin-picker auto-select the right
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
-// BOARD_LUXDMX_V4 is set ONLY by [env:luxdmx_v4] — it means the real board, not just
+// BOARD_LUXDMX_V5 is set ONLY by [env:luxdmx_v5] — it means the real board, not just
 // "has a W5500". USE_ETH_SPI is too coarse to identify the board: esp32dev and esp32s3dev
 // set it too (so a DIY user can add a W5500 module), so keying the id on it made every
-// W5500 build claim to be a luxdmx_v4. That matters now the v4 descriptor locks its
-// hard-wired pins — a plain DevKitC must not report luxdmx_v4 and get its pins frozen.
-#if defined(BOARD_LUXDMX_V4)
-static const char BOARD_ID[] = "luxdmx_v4";
+// W5500 build claim to be the board. That matters now the descriptor locks its hard-wired
+// pins — a plain DevKitC must not report luxdmx_v5 and get its pins frozen.
+// (luxdmx_v4 was the previous revision of this same board; its descriptor is kept in
+// web/boards/ as a legacy entry so a v4 still resolves its pinout, but nothing builds it.)
+#if defined(BOARD_LUXDMX_V5)
+static const char BOARD_ID[] = "luxdmx_v5";
 #elif defined(USE_ETH_RMII) || defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)

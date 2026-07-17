@@ -12,7 +12,7 @@ python tools\gen_config_templates.py "%ROOT%" "%ROOT%\src\generated\config_templ
 if errorlevel 1 ( echo template generation failed & popd & exit /b 1 )
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul
 cl /nologo /EHsc /std:c++17 /I test\native\shim /I lib\EmbeddedConfig\src /I include ^
-   /DDEFAULT_TEMPLATE=luxdmx_v4 ^
+   /DDEFAULT_TEMPLATE=luxdmx_v5 ^
    test\native\test_main.cpp ^
    lib\EmbeddedConfig\src\config_core.cpp lib\EmbeddedConfig\src\config_serial.cpp ^
    src\config\config_schema.cpp src\config_templates_gen.cpp ^

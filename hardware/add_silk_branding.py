@@ -29,7 +29,7 @@ b = pcbnew.LoadBoard(PCB)
 
 # idempotent: drop ONLY the two branding lines (and any legacy github line) so a
 # re-run replaces them in place. Match the exact branding texts -- do NOT prefix-match
-# "luxdmx", that would also nuke the back-silk "LuxDMX v4 -- KEY FEATURES" heading.
+# "luxdmx", that would also nuke the back-silk "LuxDMX v5.00 -- KEY FEATURES" heading.
 brand_texts = {text.lower() for text, _x, _y in LINES}
 for d in list(b.GetDrawings()):
     if isinstance(d, pcbnew.PCB_TEXT):
