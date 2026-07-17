@@ -175,6 +175,11 @@ jobs:
           SSH_USER: ${{ secrets.LUXDMX_SSH_USER }}
           SSH_PORT: ${{ secrets.LUXDMX_SSH_PORT }}
         run: |
+          # umask 077 protects the key we are about to write. It also makes every other file
+          # here mode 600 -- and `sftp put` carries the local mode to the server, so the
+          # uploaded file lands unreadable by Apache: HTTP 403, not 404. Hence the explicit
+          # `chmod 644` after each put below. (Measured: -rw------- on the server vs
+          # -rw-r--r-- on a file Apache does serve.)
           umask 077
           # printf '%s\n', NOT '%s'. `gh secret set` strips the trailing newline off stdin, and
           # OpenSSH rejects a private key whose END marker is not newline-terminated:
@@ -187,6 +192,7 @@ jobs:
           sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
           -mkdir /luxdmx.org/firmware
           put preflight.txt /luxdmx.org/firmware/preflight.txt
+          chmod 644 /luxdmx.org/firmware/preflight.txt
           SFTP
           # It must be readable over plain HTTP too -- that is how the device fetches it.
           GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/preflight.txt | tr -d '[:space:]')
@@ -254,6 +260,11 @@ jobs:
           #
           # Failing here fails the build on purpose: a stale version.txt tells every device it is
           # up to date and silently stops all updates. Better a red build than a mute fleet.
+          # umask 077 protects the key we are about to write. It also makes every other file
+          # here mode 600 -- and `sftp put` carries the local mode to the server, so the
+          # uploaded file lands unreadable by Apache: HTTP 403, not 404. Hence the explicit
+          # `chmod 644` after each put below. (Measured: -rw------- on the server vs
+          # -rw-r--r-- on a file Apache does serve.)
           umask 077
           # printf '%s\n', NOT '%s'. `gh secret set` strips the trailing newline off stdin, and
           # OpenSSH rejects a private key whose END marker is not newline-terminated:
@@ -265,6 +276,7 @@ jobs:
           sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
           -mkdir /luxdmx.org/firmware
           put version.txt /luxdmx.org/firmware/version.txt
+          chmod 644 /luxdmx.org/firmware/version.txt
           SFTP
           rm -f key
           # Prove it is live and matches this build, rather than trusting the upload.
