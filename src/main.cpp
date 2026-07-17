@@ -3145,10 +3145,8 @@ static void initOTA() {
 static constexpr uint32_t DMX_LIVE_MS   = 1500;  // treat DMX as "coming in" this long after the last frame
 static constexpr uint32_t RDM_ACTIVE_MS = 1000;  // blue stays on this long after the last RDM event
 
-enum LedState : uint8_t { LED_ST_DOWN, LED_ST_FALLBACK, LED_ST_RDM, LED_ST_DMX, LED_ST_IDLE };
-
 // True while an RDM identify or discovery is in flight, or RDM frames moved on the wire in the
-// last second. Keeps the blue LED solid across a whole discovery, not just per-frame.
+// last second. Keeps the blue LED on across a whole discovery, not just per-frame.
 static bool rdmLedActive(uint32_t now) {
     if (identifyCh) return true;                                         // DMX identify (a channel forced to full)
     if (rdmBusy)    return true;                                         // RDM discovery in progress
@@ -3159,17 +3157,11 @@ static bool rdmLedActive(uint32_t now) {
     return false;
 }
 
-// Classify the running status into one LED state. Network health (down / fallback) wins over
-// activity (RDM / DMX) so a degraded link is never masked by traffic; RDM wins over DMX so an
-// identify stays visible even while frames flow.
-static LedState ledStatus(uint32_t now) {
-    if (!netConnected())                            return LED_ST_DOWN;
-    if (g_ethFallback)                              return LED_ST_FALLBACK;
-    if (rdmLedActive(now))                          return LED_ST_RDM;
-    if (lastDmxMs && now - lastDmxMs < DMX_LIVE_MS)  return LED_ST_DMX;
-    return LED_ST_IDLE;
-}
-
+// Status LED. Green means "up and running" and STAYS ON whenever the network is healthy — RDM
+// does not replace it, it adds blue on top: separate LEDs light together on the panel, a
+// green+blue = cyan mix on the single RGB LED. Only the network-health states replace green
+// (red = no network, orange = Ethernet configured but on the WiFi/AP fallback). Incoming DMX
+// pulses the green (slow 2 s blink). DMX *output* is not signalled.
 static void ledTask(void*) {
     const TickType_t period = pdMS_TO_TICKS(50);
     for (;;) {
@@ -3184,28 +3176,29 @@ static void ledTask(void*) {
         // not one of the running states below).
         if (g_setupPortal) { setLedColor(NEO_PURPLE, true); vTaskDelay(period); continue; }
 
-        LedState st = ledStatus(now);
-        bool dmxBlink = (now % 2000) < 1000;   // slow 2 s green blink while DMX is coming in
+        // Green is a persistent "up" base; blue overlays it for RDM; red/orange replace it.
+        const bool up       = netConnected();
+        const bool fb       = g_ethFallback;
+        const bool dmxLive  = lastDmxMs && (now - lastDmxMs < DMX_LIVE_MS);
+        const bool rdm      = up && rdmLedActive(now);
+        const bool dmxBlink = (now % 2000) < 1000;                 // slow 2 s green pulse while DMX arrives
+        const bool green    = up && !fb && (dmxLive ? dmxBlink : true);
 
         if (cfg.ledType == 3) {
-            bool r = false, g = false, y = false, b = false, w = false;
-            switch (st) {
-                case LED_ST_DOWN:     r = true;     break;   // red, green off
-                case LED_ST_FALLBACK: y = true;     break;   // amber ~ orange (no discrete orange LED)
-                case LED_ST_RDM:      b = true;     break;   // blue, solid
-                case LED_ST_DMX:      g = dmxBlink; break;   // green, slow blink
-                case LED_ST_IDLE:     g = true;     break;   // green, solid
-            }
-            setLeds5(r, g, y, b, w);
+            // Panel: independent LEDs, so green (up) and blue (RDM) light TOGETHER.
+            setLeds5(!up,        // red   : no network at all (green off)
+                     green,      // green : up + running (pulses while DMX arrives)
+                     up && fb,   // orange: Ethernet on the WiFi/AP fallback (green off)
+                     rdm,        // blue  : RDM / identify, ADDED on top of green
+                     false);
         } else {
+            // One LED can't show two states, so it MIXES: green (up) + blue (RDM) = cyan. A plain
+            // GPIO LED has no colour, so it just tracks "up" (green/cyan/orange -> on, red -> off).
             uint32_t c; bool on;
-            switch (st) {
-                case LED_ST_DOWN:     c = NEO_RED;   on = false; break;   // solid red / GPIO off
-                case LED_ST_FALLBACK: c = NEO_AMBER; on = true;  break;   // orange / GPIO on
-                case LED_ST_RDM:      c = NEO_BLUE;  on = true;  break;   // blue / GPIO on
-                case LED_ST_DMX:      c = dmxBlink ? NEO_GREEN : NEO_OFF; on = dmxBlink; break;
-                default:              c = NEO_GREEN; on = true;  break;   // idle: green / GPIO on
-            }
+            if (!up)     { c = NEO_RED;   on = false; }            // red / GPIO off
+            else if (fb) { c = NEO_AMBER; on = true;  }            // orange / GPIO on
+            else         { c = (green ? NEO_GREEN : NEO_OFF) | (rdm ? NEO_BLUE : 0);   // green + blue = cyan
+                           on = green || rdm; }
             setLedColor(c, on);
         }
         vTaskDelay(period);
