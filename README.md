@@ -423,7 +423,7 @@ LuxDMX/
 │   └── generated/        ← auto-created at build time, gitignored
 ├── include/              ← config_schema.h (Config struct) + config_enums.h
 ├── lib/EmbeddedConfig/   ← reusable schema-driven config engine (NVS + serial console)
-├── templates/            ← per-board default VALUES (esp32dev.ini, luxdmx_v4.ini, ...)
+├── templates/            ← per-board default VALUES (esp32dev.ini, luxdmx_v5.ini, ...)
 ├── docs/                 ← documentation assets (README images)
 ├── extra_scripts.py      ← PlatformIO pre-build hook
 └── platformio.ini
@@ -614,7 +614,7 @@ values are fetched as JSON.
 | `/rdm/bqp` | GET | Set the Art-Net BackgroundQueuePolicy (background RDM status harvest), `?p=1..3` severity, `4` off |
 | `/rdm/merge` | GET | Set an output's merge mode, `?out=<index>&mode=0/1/2` (off/HTP/LTP), applied live + persisted |
 | `/led/bright` | GET | 5-LED panel per-colour brightness (`?r=&g=&y=&b=&w=`, 0-255), applied live; `&save=1` persists to NVS, `&test=1` lights all five for calibration (10-min window) |
-| `/version.json` | GET | Current firmware version + update-available flag |
+| `/version.json` | GET | Current firmware version + update-available flag. `latest` is `null` when the check hasn't succeeded (it is never faked to equal `current`). The device checks `http://luxdmx.org/firmware/version.txt` over **plain HTTP** — no TLS at runtime, because a handshake needs ~40 KB of contiguous heap that a running gateway doesn't have. The old code used `setInsecure()` (no cert validation), so this gives up no authenticity that existed; the firmware image itself is the thing worth signing |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
 | `/ota/github` | POST | Install a release (downloaded via luxdmx.org; `version=latest` or `1.0.N`) |
@@ -683,7 +683,7 @@ LuxDMX has a lot of GPIOs to set (status LED, 5-LED panel, OLED, two DMX outputs
 To make this idiot-proof, **Settings → Hardware board** offers:
 
 - **Templates** — pick your board and click **Apply template** to fill every LED /
-  display / DMX pin with the tested map in one step. Selecting the *LuxDMX v4*
+  display / DMX pin with the tested map in one step. Selecting the *LuxDMX v5*
   board applies the exact pin map of the open-hardware PCB.
 - **Click pins on a board diagram** — the pick button next to each GPIO field opens an
   interactive board so you click the actual pin instead of guessing GPIO numbers. The
@@ -700,7 +700,7 @@ variants (which are **not** all the same pinout):
 
 | Board | Notes |
 |---|---|
-| LuxDMX v4 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
+| LuxDMX v5 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
 | ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
 | ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
@@ -881,7 +881,7 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
-| LuxDMX v4 (ESP32-S3 + W5500) | `luxdmx_v4` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| LuxDMX v5 (ESP32-S3 + W5500) | `luxdmx_v5` | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 | ESP32-S3 with PSRAM (WROOM-1-N8R8 / N16R8) | `esp32s3_psram` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 | Enables the 8 MB octal PSRAM: the RDM device tables and the WiFi/lwIP buffers move to PSRAM, so the RDM cap auto-detects to 64 and the internal heap stays wide open (measured ~150 KB free vs ~88 KB on an N8). From-source build; still boots on a non-PSRAM S3, it just won't use PSRAM there. PSRAM occupies GPIO33-37, DMX on 16/17 is clear |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external SPI module**: the W5500 and

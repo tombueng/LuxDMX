@@ -1,14 +1,14 @@
-# HIL rig wiring, ESP32-S3 (luxdmx_v4 pinout) + MAX485 + W5500
+# HIL rig wiring, ESP32-S3 (luxdmx_v5 pinout) + MAX485 + W5500
 
 The hardware-in-the-loop bench with an **ESP32-S3** as the controller, wired to a MAX485
 transceiver for DMX/RDM and a W5500 for wired Ethernet, with an RP2350 acting as the
 DMX analyzer / ground-truth / RDM responder on the bus.
 
-Firmware: `luxdmx_v4` env (RMT DMX + the crash fixes). Flash the factory image over USB:
-`esptool --chip esp32s3 --port <COM> --baud 921600 write_flash 0x0 .pio/build/luxdmx_v4/firmware.factory.bin`
+Firmware: `luxdmx_v5` env (RMT DMX + the crash fixes). Flash the factory image over USB:
+`esptool --chip esp32s3 --port <COM> --baud 921600 write_flash 0x0 .pio/build/luxdmx_v5/firmware.factory.bin`
 (a factory flash wipes NVS → fresh config below; set WiFi/`useeth` afterwards over the serial console).
 
-## Controller pins (luxdmx_v4 config defaults)
+## Controller pins (luxdmx_v5 config defaults)
 
 | Signal | S3 GPIO | config key |
 |---|---|---|
@@ -51,7 +51,7 @@ Firmware: `luxdmx_v4` env (RMT DMX + the crash fixes). Flash the factory image o
   out-of-the-box the board comes up on WiFi.
 - **Do NOT use the generic `esp32s3dev` env's default W5500 pins**, they're inherited from the
   classic-ESP32 base and include GPIO23/25, which don't exist on the S3. Use the pins above.
-- **SPI clock (bit us):** the default `ethfreq=20` (20 MHz) is fine on the real v4 board but too fast
+- **SPI clock (bit us):** the default `ethfreq=20` (20 MHz) is fine on the real v5 board but too fast
   for flying breadboard leads, the W5500 bring-up then HANGS in `ETH.begin()` (no serial after the
   banner, looks like a wiring fault but isn't). On this jumper-wire bench it comes up clean at
   `ethfreq=8`. Drop the clock before you suspect the wiring. Recover a hung board by re-flashing the

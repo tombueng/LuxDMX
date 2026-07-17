@@ -83,6 +83,15 @@ v1.0.2, WCH CH340, Suzhou-Liming 2520 crystal, TDK ACM2012, Fenghua CBM bead, Ne
   input-only/flash conflicts. **CH340C** SOP-16 pinout matches, V3→VCC for 3.3V correct, integrated clock (no
   xtal) correct, pin8 left NC correct. **W5500** SPI mode 0/3, PMODE float = all-capable auto-neg, RSTn must be
   held ≥500µs (firmware), EXRES1 now 12.4k.
+  > **Followed up 2026-07-16.** This ≥500µs was never actually implemented: the firmware left the
+  > reset to the IDF W5500 PHY driver, which pulses RSTn for only ~100µs (**measured on the v5
+  > first article: 80µs**) — 6× short of spec. It reset the chip most of the time; a miss left the
+  > W5500 wedged with no link, unrecoverable by a warm reset (the driver just re-issues the same
+  > short pulse) and only cleared by pulling power. `w5500HardReset()` in `src/main.cpp` now does an
+  > in-spec 600µs reset and passes `rst=-1` to `ETH.begin()` so the driver cannot follow it with the
+  > short one. Also measured: with the ESP in reset, RSTn floats at **2.63 V** (above V_IH, so the
+  > W5500 reads "not reset") — ETH_RST has no pull-up, it reaches only ESP GPIO9 and the W5500.
+  > A pull-up would *define* that level but would not fix the wedge; the reset length is the bug.
 
 ### Passives / crystal / connectors
 - **Crystal C2981624 = 25MHz, CL=9pF, ±10ppm** (well within W5500 ±50ppm) — load caps 10pF C0G. (Replaced C2981622 CL=20pF, which kept going OOS at JLC; 10pF‖10pF + ~4pF stray = 9pF.)

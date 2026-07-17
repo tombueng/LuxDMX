@@ -99,12 +99,21 @@ jobs:
         env:
           LUXDMX_VERSION: "1.0.${{ github.run_number }}"
 
-      # Make every build (incl. PRs) downloadable so a branch can be flashed and
-      # checked on real hardware before it ever merges + auto-releases to OTA.
-      - name: Upload firmware artifacts
+      # PR builds only, and short-lived. The point is to flash a branch on real hardware before
+      # it merges and auto-releases to OTA -- so it is worth exactly as long as the PR is open.
+      #
+      # On master this upload was pure duplication: every one of these files is published as a
+      # release asset seconds later, and release assets do NOT count against the account's Actions
+      # storage while artifacts do. At ~3.6 MB a build with the 90-day default retention that
+      # filled the 500 MB personal-account quota (111 artifacts / 396 MB, oldest 3 weeks old),
+      # which eventually breaks the upload step and with it the release.
+      # To fetch a released build, use the release assets, not artifacts.
+      - name: Upload firmware artifacts (PR builds only)
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: firmware-1.0.${{ github.run_number }}
+          retention-days: 7
           path: |
             firmware.bin
             bootloader.bin
@@ -160,6 +169,50 @@ jobs:
             echo "_Build 1.0.${{ github.run_number }} from ${{ github.sha }}_"
           } > notes.md
 
+      # Prove we can publish version.txt BEFORE anything is released.
+      # version.txt has to go out LAST (it must never advertise binaries that aren't live yet),
+      # but that means a failure there would leave a release that no device ever hears about:
+      # the bits are live, version.txt still names the old build, every device thinks it is up to
+      # date. Silent and easy to miss. So test the write path up front, while failing is still
+      # free -- that catches the realistic causes (bad/expired key, host down, path gone).
+      # A failure between here and the real upload is still possible, just not the likely one.
+      - name: Preflight - can we write to luxdmx.org?
+        if: github.ref == 'refs/heads/master'
+        env:
+          SSH_KEY:  ${{ secrets.LUXDMX_SSH_KEY }}
+          SSH_HOST: ${{ secrets.LUXDMX_SSH_HOST }}
+          SSH_USER: ${{ secrets.LUXDMX_SSH_USER }}
+          SSH_PORT: ${{ secrets.LUXDMX_SSH_PORT }}
+        run: |
+          # umask 077 protects the key we are about to write. It also makes every other file
+          # here mode 600 -- and `sftp put` carries the local mode to the server, so the
+          # uploaded file lands unreadable by Apache: HTTP 403, not 404. Hence the explicit
+          # `chmod 644` after each put below. (Measured: -rw------- on the server vs
+          # -rw-r--r-- on a file Apache does serve.)
+          umask 077
+          # printf '%s\n', NOT '%s'. `gh secret set` strips the trailing newline off stdin, and
+          # OpenSSH rejects a private key whose END marker is not newline-terminated:
+          # "Load key: error in libcrypto" -- which reads like a wrong key and is not.
+          # Reproduced against ssh-keygen -y: no trailing newline fails, one or more is fine.
+          printf '%s\n' "$SSH_KEY" > key
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "preflight-${{ github.run_number }}" > preflight.txt
+          sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
+          -mkdir /luxdmx.org/firmware
+          put preflight.txt /luxdmx.org/firmware/preflight.txt
+          chmod 644 /luxdmx.org/firmware/preflight.txt
+          SFTP
+          # It must be readable over plain HTTP too -- that is how the device fetches it.
+          GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/preflight.txt | tr -d '[:space:]')
+          [ "$GOT" = "preflight-${{ github.run_number }}" ] \
+            || { echo "::error::preflight readback got '$GOT'"; exit 1; }
+          sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
+          -rm /luxdmx.org/firmware/preflight.txt
+          SFTP
+          rm -f key preflight.txt
+          echo "write path to luxdmx.org verified"
+
       - name: Publish preserved versioned release
         if: github.ref == 'refs/heads/master'   # never release from a PR/branch build
         run: |
@@ -193,3 +246,51 @@ jobs:
             version.txt changes.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # MUST run AFTER the rolling 'latest' release above. version.txt is what tells a device
+      # "a newer build exists"; it must never advertise a version whose binaries aren't
+      # downloadable yet. Published first, a device could read 1.0.N, pull /firmware/ota/latest/
+      # while that still held 1.0.N-1, flash the OLD image, boot, see 1.0.N again -> update loop
+      # (only stopped by the otatries budget). Advertise last, once the bits are actually live.
+      - name: Publish version.txt to luxdmx.org (the device's plain-HTTP version endpoint)
+        if: github.ref == 'refs/heads/master'
+        env:
+          SSH_KEY:  ${{ secrets.LUXDMX_SSH_KEY }}
+          SSH_HOST: ${{ secrets.LUXDMX_SSH_HOST }}
+          SSH_USER: ${{ secrets.LUXDMX_SSH_USER }}
+          SSH_PORT: ${{ secrets.LUXDMX_SSH_PORT }}
+        run: |
+          # The firmware checks http://luxdmx.org/firmware/version.txt over PLAIN HTTP. It used to
+          # fetch the GitHub redirect over TLS, but a TLS handshake wants ~40KB of *contiguous*
+          # heap, which a fully-booted gateway does not have -- the check skipped itself and then
+          # claimed "up to date". This is a real file on the webspace, served without any rewrite
+          # (the ^firmware/version/?$ redirect is anchored and does not match .txt, so it stays
+          # pointed at GitHub for older firmware in the field).
+          #
+          # Failing here fails the build on purpose: a stale version.txt tells every device it is
+          # up to date and silently stops all updates. Better a red build than a mute fleet.
+          # umask 077 protects the key we are about to write. It also makes every other file
+          # here mode 600 -- and `sftp put` carries the local mode to the server, so the
+          # uploaded file lands unreadable by Apache: HTTP 403, not 404. Hence the explicit
+          # `chmod 644` after each put below. (Measured: -rw------- on the server vs
+          # -rw-r--r-- on a file Apache does serve.)
+          umask 077
+          # printf '%s\n', NOT '%s'. `gh secret set` strips the trailing newline off stdin, and
+          # OpenSSH rejects a private key whose END marker is not newline-terminated:
+          # "Load key: error in libcrypto" -- which reads like a wrong key and is not.
+          # Reproduced against ssh-keygen -y: no trailing newline fails, one or more is fine.
+          printf '%s\n' "$SSH_KEY" > key
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
+          -mkdir /luxdmx.org/firmware
+          put version.txt /luxdmx.org/firmware/version.txt
+          chmod 644 /luxdmx.org/firmware/version.txt
+          SFTP
+          rm -f key
+          # Prove it is live and matches this build, rather than trusting the upload.
+          sleep 2
+          GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/version.txt | tr -d '[:space:]')
+          WANT="1.0.${{ github.run_number }}"
+          echo "live=$GOT want=$WANT"
+          [ "$GOT" = "$WANT" ] || { echo "::error::luxdmx.org/firmware/version.txt says '$GOT', expected '$WANT'"; exit 1; }

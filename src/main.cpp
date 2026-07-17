@@ -191,7 +191,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812, 3=5-LED discrete panel
 #endif
 
-// 5-LED discrete status panel (ledType 3) — the LuxDMX v4 board. Five LEDs on
+// 5-LED discrete status panel (ledType 3) — the LuxDMX v5 board. Five LEDs on
 // their own GPIOs, active-high (GPIO → R → LED anode, cathode → GND). -1 = absent.
 #ifndef DEF_LED_R
 #define DEF_LED_R -1   // red    — fault / no network
@@ -213,7 +213,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // runtime config (cfg.eth*) on ANY board: a DIY user can wire a W5500 module to a
 // plain ESP32 / ESP32-S3 and enable it in /config, not just boards that bake the
 // pins in at build time. Defaults are the classic-ESP32 VSPI pins (the most common
-// W5500 wiring); luxdmx_v4 overrides them via build_flags. A build without
+// W5500 wiring); luxdmx_v5 overrides them via build_flags. A build without
 // USE_ETH_SPI never calls ETH.begin() with these, so they cost nothing there.
 #ifndef ETH_W5500_SCK
 #define ETH_W5500_SCK 18
@@ -479,6 +479,10 @@ static bool     manualMode   = false;
 static uint32_t lastWsPush   = 0;
 static uint32_t lastDmxMs    = 0;
 static String   otaTarget       = "latest";   // release tag to install
+// How many boots a scheduled update may fail before it is abandoned. The brake on any retry
+// loop is NVS "otatries" + loop() only zeroing it after 60 s of stable uptime: a device stuck
+// retrying never gets there, so this really is a hard cap, not a suggestion.
+static constexpr uint8_t OTA_BOOT_TRIES = 3;
 static String   latestVersion   = "";
 // Live OTA progress, polled by the update page via /ota/status. Written from the
 // httpUpdate callbacks (loop task), read from the web handler (AsyncTCP task);
@@ -1917,11 +1921,17 @@ static String htmlEsc(const String& s) {
 }
 
 static void handleVersionJson(AsyncWebServerRequest* req) {
+    // latest is null when the check has not succeeded yet -- NOT current. It used to fall back to
+    // FIRMWARE_VERSION, which made "I couldn't find out" indistinguishable from "you're up to
+    // date" and silently hid real updates (a device sat on 1.0.166 reporting latest=1.0.166 while
+    // 1.0.171 was out). Unknown is its own state; say so. Nothing in the UI reads this field --
+    // index.html gets the release list straight from the GitHub API -- it is here for API users.
     String j = "{\"current\":\"";
     j += FIRMWARE_VERSION;
-    j += "\",\"latest\":\"";
-    j += latestVersion.length() > 0 ? latestVersion : String(FIRMWARE_VERSION);
-    j += "\",\"update\":";
+    j += "\",\"latest\":";
+    if (latestVersion.length() > 0) { j += "\""; j += latestVersion; j += "\""; }
+    else                            { j += "null"; }
+    j += ",\"update\":";
     j += updateAvailable ? "true" : "false";
     j += "}";
     sendJsonSafe(req, j);
@@ -2023,13 +2033,15 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // Compile-time board identity. Lets the /config pin-picker auto-select the right
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
-// BOARD_LUXDMX_V4 is set ONLY by [env:luxdmx_v4] — it means the real board, not just
+// BOARD_LUXDMX_V5 is set ONLY by [env:luxdmx_v5] — it means the real board, not just
 // "has a W5500". USE_ETH_SPI is too coarse to identify the board: esp32dev and esp32s3dev
 // set it too (so a DIY user can add a W5500 module), so keying the id on it made every
-// W5500 build claim to be a luxdmx_v4. That matters now the v4 descriptor locks its
-// hard-wired pins — a plain DevKitC must not report luxdmx_v4 and get its pins frozen.
-#if defined(BOARD_LUXDMX_V4)
-static const char BOARD_ID[] = "luxdmx_v4";
+// W5500 build claim to be the board. That matters now the descriptor locks its hard-wired
+// pins — a plain DevKitC must not report luxdmx_v5 and get its pins frozen.
+// (luxdmx_v4 was the previous revision of this same board; its descriptor is kept in
+// web/boards/ as a legacy entry so a v4 still resolves its pinout, but nothing builds it.)
+#if defined(BOARD_LUXDMX_V5)
+static const char BOARD_ID[] = "luxdmx_v5";
 #elif defined(USE_ETH_RMII) || defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -2649,22 +2661,35 @@ static int parseBuild(const String& v) {
     return dot >= 0 ? v.substring(dot + 1).toInt() : 0;
 }
 
-static bool httpsGet(const char* url, String& out, size_t maxLen) {
-    // A TLS client allocates a big (~40 KB) contiguous block for the mbedTLS buffers. Under a
-    // packet flood the heap fragments; attempting the handshake then throws std::bad_alloc, and
-    // an uncaught throw abort()s the board. Worse, this runs 8 s after every boot, so during a
-    // flood it turns into a reboot loop. Skip when a big block isn't available, and catch as a
-    // hard backstop so a version check can never reboot the gateway.
-    if (ESP.getMaxAllocHeap() < 50000) {
-        Serial.printf("[VER] skipped: largest free block %u too small for TLS\n", ESP.getMaxAllocHeap());
+// Plain HTTP, deliberately. This runs 8 s after boot and then every 6 h in the fully-booted
+// system, where the heap is fragmented -- and a TLS handshake wants a ~40 KB *contiguous* block
+// that simply isn't there (seen in the field: "largest free block 34804 too small for TLS"). The
+// check then skipped itself, and because latest fell back to current it reported "up to date",
+// hiding real updates. HTTP needs almost none of that, so the check just works.
+//
+// Nothing is given up by dropping TLS here: the old code called setInsecure(), i.e. it did no
+// certificate validation whatsoever. It never authenticated anything -- it encrypted a version
+// string that is public on a public GitHub release. Against a man-in-the-middle that is worth
+// exactly as much as plain HTTP, at ~40 KB of contiguous heap. (If OTA authenticity ever matters,
+// the answer is signing the image, not the transport: a signature is checked regardless of how
+// the bytes arrived. Verifying certs on-device instead would mean shipping and rotating a CA
+// bundle in flash.)
+//
+// The URL is a real file on luxdmx.org, not the /firmware/version redirect: that rule is anchored
+// (^firmware/version/?$) so it does not catch .txt, and it stays pointed at GitHub so older
+// firmware in the field keeps working unchanged.
+static bool httpGet(const char* url, String& out, size_t maxLen) {
+    // Still a floor, just a realistic one: without TLS this needs single-digit KB, not 50.
+    if (ESP.getMaxAllocHeap() < 12000) {
+        Serial.printf("[VER] skipped: largest free block %u too small\n", ESP.getMaxAllocHeap());
         return false;
     }
     bool ok = false;
     try {
-        WiFiClientSecure client;
-        client.setInsecure();
+        WiFiClient client;              // no WiFiClientSecure -> no mbedTLS buffers at all
         HTTPClient h;
         h.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        h.setTimeout(8000);
         if (!h.begin(client, url)) return false;
         if (h.GET() == 200) {
             String s = h.getString();
@@ -2673,6 +2698,7 @@ static bool httpsGet(const char* url, String& out, size_t maxLen) {
         }
         h.end();
     } catch (...) {
+        // Kept as a hard backstop: an uncaught throw abort()s the board, and this runs on a timer.
         Serial.println("[VER] check threw under memory pressure, skipped");
         return false;
     }
@@ -2681,7 +2707,7 @@ static bool httpsGet(const char* url, String& out, size_t maxLen) {
 
 static void checkForUpdate() {
     String v;
-    if (!httpsGet("https://luxdmx.org/firmware/version", v, 24)) return;
+    if (!httpGet("http://luxdmx.org/firmware/version.txt", v, 24)) return;
     latestVersion   = v;
     updateAvailable = parseBuild(v) > parseBuild(String(FIRMWARE_VERSION));
     Serial.printf("[VER] latest=%s current=%s update=%s\n",
@@ -2717,7 +2743,7 @@ static void versionCheckTask(void*) {
             prefs.begin(PREF_NS, true);
             uint8_t tries = prefs.getUChar("otatries", 0);
             prefs.end();
-            if (tries < 3) {
+            if (tries < OTA_BOOT_TRIES) {
                 Serial.println("[OTA] auto-update available, scheduling clean-heap update on reboot");
                 scheduleOtaReboot("latest");
             } else {
@@ -2767,12 +2793,25 @@ static void doGithubOta() {
         WiFiClientSecure client;
         client.setInsecure();
         httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-        httpUpdate.rebootOnUpdate(true);
-        httpUpdate.update(client, otaUrl);
+        // We reboot ourselves rather than letting httpUpdate do it, because the pending flag
+        // has to be cleared FIRST. otaBootUpdate() now keeps otapend set across an attempt so a
+        // failure can retry; if the new image booted with it still set it would reinstall the
+        // same target on every boot until the retry budget ran out.
+        httpUpdate.rebootOnUpdate(false);
+        if (httpUpdate.update(client, otaUrl) == HTTP_UPDATE_OK) {
+            prefs.begin(PREF_NS, false);
+            prefs.putUChar("otapend", 0);    // installed -> stop asking
+            prefs.putUChar("otatries", 0);   // and hand the next update a full budget
+            prefs.end();
+            otaProgPhase = 2; otaProgPct = 100;
+            Serial.println("[OTA] installed, rebooting into the new image");
+            delay(200);
+            ESP.restart();
+        }
     } catch (...) {
         Serial.println("[OTA] update threw under memory pressure");
     }
-    // Only reaches here on failure (success reboots inside update()).
+    // Only reaches here on failure (success restarts above).
     otaProgPhase = 3;
     Serial.printf("[OTA] Failed (%d): %s\n",
         httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
@@ -2809,18 +2848,39 @@ static void otaBootUpdate() {
     bool    pend  = prefs.getUChar("otapend", 0) == 1;
     String  tgt   = pend ? prefs.getString("otatgt", "latest") : String();
     uint8_t tries = prefs.getUChar("otatries", 0);
-    if (pend) {
-        prefs.putUChar("otapend", 0);          // one-shot: clear BEFORE the attempt (never a loop)
-        prefs.putUChar("otatries", tries + 1); // count it; loop() resets the budget on a stable boot
-    }
+    if (!pend) { prefs.end(); return; }   // no scheduled update -> a normal boot costs nothing
+    tries++;
+    prefs.putUChar("otatries", tries);
+    // otapend deliberately stays SET across the attempt now. It used to be cleared here, one-shot,
+    // before even trying -- so a single bad moment (no link yet, a download that died) dropped the
+    // update on the floor for good: no retry, no error, the web UI had already said "updating,
+    // rebooting", and the device just quietly came back on the old version. That is exactly how a
+    // v5 stayed on 1.0.166 while reporting itself up to date.
+    //
+    // Looping is capped by the existing budget, not by throwing the request away: every attempt
+    // increments otatries, and loop() only resets it after 60 s of stable uptime -- which a device
+    // stuck retrying never reaches. So a genuinely broken update gets OTA_BOOT_TRIES shots and then
+    // stops for good; a transient one survives. doGithubOta() clears otapend the moment the image
+    // is actually installed, or the new firmware would reinstall itself on every boot.
+    const bool giveUp = tries > OTA_BOOT_TRIES;
+    if (giveUp) prefs.putUChar("otapend", 0);
     prefs.end();
-
-    if (!pend) return;    // only a scheduled update (manual button or auto-update) installs here
+    if (giveUp) {
+        Serial.printf("[OTA] update to %s failed %u times, giving up (ask again to retry)\n",
+                      tgt.c_str(), (unsigned)OTA_BOOT_TRIES);
+        return;
+    }
 
     // The Ethernet link comes up asynchronously; give it a moment before we need the network.
     uint32_t t0 = millis();
     while (!netConnected() && millis() - t0 < 20000) delay(100);
-    if (!netConnected()) { Serial.println("[OTA] no network at boot, update skipped"); return; }
+    if (!netConnected()) {
+        // Keep it pending: no network at THIS boot says nothing about the next one. This is the
+        // case that silently ate updates.
+        Serial.printf("[OTA] no network at boot; update to %s still pending (attempt %u/%u)\n",
+                      tgt.c_str(), (unsigned)tries, (unsigned)OTA_BOOT_TRIES);
+        return;
+    }
 
     otaTarget = tgt;
     Serial.printf("[OTA] clean-heap update to %s (attempt %u), largest free block=%u\n",
@@ -3406,6 +3466,34 @@ static void waitEthLink() {
 // DMX/RDM on core 1. (Investigation report 6.6: a blunt UART-interrupt priority bump
 // instead just starves the whole W5500 stack; core separation is the right lever.)
 static volatile bool s_ethUpDone;
+
+// Give the W5500 a reset that actually meets its datasheet, because nothing else does.
+//
+// hardware/VALIDATION_REPORT.md, from the datasheet: "RSTn must be held >=500us (firmware)".
+// The IDF W5500 PHY driver pulses RSTn for ~100us (measured on a v5 board: 80us), 6x short of
+// spec. A short pulse resets the chip *most* of the time; the misses leave it wedged with no
+// link, and a warm reset never recovers it because the driver just re-issues the same short
+// pulse -- only pulling the power does. That is the "red LED, no link, reset button doesn't
+// help, unplugging does" failure, and because it is a marginal timing violation it is
+// intermittent rather than reproducible.
+//
+// Two things matter here:
+//   * length: hold it low well past the 500us minimum.
+//   * order: the LAST pulse decides the chip's state, so ETH.begin() must NOT be allowed to
+//     follow this with its out-of-spec one -- the caller passes rst=-1 for that.
+// It also drives the pin from the first instant, closing the window where RSTn floats at an
+// undefined level (measured 2.63V, above V_IH, while the ESP is in reset; the net has no
+// pull-up -- ETH_RST reaches only ESP GPIO9 and the W5500).
+static void w5500HardReset() {
+    if (cfg.ethRst < 0) return;          // no reset line wired -> nothing we can do
+    pinMode(cfg.ethRst, OUTPUT);
+    digitalWrite(cfg.ethRst, LOW);
+    delayMicroseconds(600);              // >= 500us datasheet minimum, with margin
+    digitalWrite(cfg.ethRst, HIGH);
+    delay(2);                            // let the PLL settle before the driver talks SPI
+    Serial.printf("[ETH] W5500 hard reset on GPIO%d (600us, datasheet min 500us)\n", cfg.ethRst);
+}
+
 static void ethUpTask(void *arg) {
     // W5500 and DM9051 share the same SPI wiring + ETH.begin() signature; only the PHY enum
     // changes. DM9051 is gated behind its IDF SPI-Ethernet driver (CONFIG_ETH_SPI_ETHERNET_
@@ -3418,7 +3506,13 @@ static void ethUpTask(void *arg) {
     if (cfg.ethSpiPhy == ETH_SPI_PHY_DM9051)
         Serial.println("[ETH] DM9051 not in this build, using W5500");
 #endif
-    ETH.begin(phy, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt, cfg.ethRst,
+    // W5500: reset it ourselves to spec, then hand ETH.begin() rst=-1 so the PHY driver
+    // cannot undo that with its own ~100us pulse (see w5500HardReset). DM9051 keeps the
+    // driver's reset handling -- this is a W5500 erratum, not a shared one.
+    const bool isW5500 = (phy == ETH_PHY_W5500);
+    if (isW5500) w5500HardReset();
+    ETH.begin(phy, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt,
+              isW5500 ? -1 : cfg.ethRst,
               ETH_W5500_SPI_HOST, cfg.ethSck, cfg.ethMiso, cfg.ethMosi,
               cfg.ethFreqMhz);
     ETH.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) for the wired link

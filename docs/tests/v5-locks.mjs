@@ -1,11 +1,11 @@
-// Behaviour test for the LuxDMX v4 fixed-pin locking (issue #17 follow-up).
+// Behaviour test for the LuxDMX v5 fixed-pin locking (issue #17 follow-up).
 //
-// Serves the real src/pages/config.html with a stub /info.json that reports the v4
+// Serves the real src/pages/config.html with a stub /info.json that reports the v5
 // board, drives it in a real browser, and asserts that the hard-wired fields (DMX A/B,
 // W5500, LEDs, display) are disabled and carry their fixed values + a hidden mirror so
 // the value still submits, while the genuinely configurable fields stay editable.
 //
-// Run:  node docs/tests/v4-locks.mjs     (from the repo root)
+// Run:  node docs/tests/v5-locks.mjs     (from the repo root)
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,9 +15,9 @@ import { chromium } from 'playwright';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CONFIG = fs.readFileSync(path.join(ROOT, 'src/pages/config.html'), 'utf8').replace(/__FWVER__/g, 'test');
 
-// What a real v4 reports. Only board/mcu + two outputs matter for the lock; the rest is filler.
+// What a real v5 reports. Only board/mcu + two outputs matter for the lock; the rest is filler.
 const INFO = {
-  hostname: 'luxdmx', ip: '192.168.1.42', version: 'test', board: 'luxdmx_v4', mcu: 'esp32s3',
+  hostname: 'luxdmx', ip: '192.168.1.42', version: 'test', board: 'luxdmx_v5', mcu: 'esp32s3',
   universe: 0, protocol: 2, useEthernet: false, ethSpi: true, ethRmii: false, hasEth: true, wifiMode: 0,
   ledType: 3, ledPin: -1, ledR: 1, ledG: 2, ledY: 6, ledB: 7, ledW: 15,
   dispType: 1, dispSda: 4, dispScl: 5, dispSck: 39, dispMosi: 40, dispCs: 41, dispDc: 42, dispRst: 38,
@@ -46,7 +46,7 @@ try {
   const page = await browser.newPage();
   await page.route('**://luxdmx.org/**', (route) => route.abort());   // keep the offline catalog fetch from stalling
   await page.goto(`http://127.0.0.1:${port}/config`, { waitUntil: 'domcontentloaded' });
-  // wait until the v4 board is detected and the locks have been applied
+  // wait until the v5 board is detected and the locks have been applied
   await page.waitForFunction(() => {
     const i = document.getElementsByName('o0_tx')[0];
     return i && i.disabled;
@@ -92,5 +92,5 @@ try {
   await browser.close();
   server.close();
 }
-console.log(fails ? `\n${fails} check(s) FAILED` : '\nAll v4-lock checks passed');
+console.log(fails ? `\n${fails} check(s) FAILED` : '\nAll v5-lock checks passed');
 process.exit(fails ? 1 : 0);
