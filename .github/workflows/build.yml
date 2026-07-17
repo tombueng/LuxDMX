@@ -99,12 +99,21 @@ jobs:
         env:
           LUXDMX_VERSION: "1.0.${{ github.run_number }}"
 
-      # Make every build (incl. PRs) downloadable so a branch can be flashed and
-      # checked on real hardware before it ever merges + auto-releases to OTA.
-      - name: Upload firmware artifacts
+      # PR builds only, and short-lived. The point is to flash a branch on real hardware before
+      # it merges and auto-releases to OTA -- so it is worth exactly as long as the PR is open.
+      #
+      # On master this upload was pure duplication: every one of these files is published as a
+      # release asset seconds later, and release assets do NOT count against the account's Actions
+      # storage while artifacts do. At ~3.6 MB a build with the 90-day default retention that
+      # filled the 500 MB personal-account quota (111 artifacts / 396 MB, oldest 3 weeks old),
+      # which eventually breaks the upload step and with it the release.
+      # To fetch a released build, use the release assets, not artifacts.
+      - name: Upload firmware artifacts (PR builds only)
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: firmware-1.0.${{ github.run_number }}
+          retention-days: 7
           path: |
             firmware.bin
             bootloader.bin
