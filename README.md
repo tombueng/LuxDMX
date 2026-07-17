@@ -77,7 +77,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
 | **mDNS + DHCP hostname** | Reachable as `dmx-gateway.local` via mDNS, *and* the device sends its hostname over DHCP (option 12) so your router registers it by plain name. Clients without mDNS (e.g. Windows) can then reach it as `dmx-gateway` / `dmx-gateway.fritz.box`. Hostname configurable |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
-| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — one status language on both: green = up (slow blink = DMX coming in), blue = RDM/identify, orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
+| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — one status language: green = up (stays on; slow blink = DMX coming in), blue = RDM/identify **added on top of green** (both LEDs on the panel, cyan on a single RGB LED), orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
 | **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
 | **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
@@ -762,29 +762,31 @@ the matching LED:
 | Booting / connecting | white blink | Knight-Rider sweep | blink |
 | Up, idle (no DMX in) | green (solid) | green (solid) | on |
 | DMX coming in (Art-Net / sACN) | green, slow 2 s blink | green, slow 2 s blink | slow blink |
-| RDM discovery / identify / RDM traffic | blue (solid) | blue (solid) | on |
+| RDM discovery / identify / RDM traffic | **green + blue = cyan** | **green stays + blue lights too** | on |
 | Ethernet configured but on WiFi/AP fallback | orange (solid) | amber (solid) | on |
 | No network at all | red (solid) | red (green off) | off |
 | Setup portal / config AP active | purple | purple (blue + white) | on |
 
 A few deliberate choices:
 
-- **DMX *output* is not signalled.** A gateway transmits continuously, so a "DMX out" light
-  is on all the time and tells you nothing. The green LED tracks DMX *coming in* from the
-  network instead (a slow blink while frames arrive, solid when idle).
-- **Blue is RDM.** It's on solid whenever an RDM identify is active or RDM frames moved on the
-  wire in the last second (discovery, sensor polling, or a fixture answering).
-- **Green health beats traffic.** Red (no network) and orange (running on the WiFi fallback
-  because the wired link is down) always win over the green/blue activity states, so a degraded
-  link is never hidden by traffic. The DMX-in green is held through brief input gaps (continuous
-  40 Hz output), so momentary multicast loss doesn't flicker it.
+- **Green means "up and running", and it stays on.** RDM does **not** replace it — blue is *added*
+  on top. On the panel that's literally two LEDs lit at once (green + blue); on the single RGB LED
+  they mix to cyan. So "board is alive **and** doing RDM" reads at a glance, instead of the green
+  vanishing whenever a sensor poll fires.
+- **DMX *output* is not signalled.** A gateway transmits continuously, so a "DMX out" light is on
+  all the time and tells you nothing. The green LED tracks DMX *coming in* from the network instead
+  (a slow blink while frames arrive, solid when idle) — and blue can ride on top of that too.
+- **Blue is RDM.** On whenever an RDM identify is active or RDM frames moved on the wire in the last
+  second (discovery, sensor polling, or a fixture answering).
+- **Only health replaces green.** Red (no network) and orange (running on the WiFi fallback because
+  the wired link is down) turn the green off, because those aren't "up". Everything else keeps green.
 
 The LED runs on its own task, so serving the web UI never freezes it.
 
-**5-LED status panel** (`ledType 3`, the LuxDMX v5 board) — five discrete LEDs (R G Y B W).
-It shows the same states as the single LED, one lit at a time. There is no discrete orange LED,
-so the panel's amber (Y) LED carries the Ethernet-on-fallback state; purple (setup portal) lights
-blue + white together.
+**5-LED status panel** (`ledType 3`, the LuxDMX v5 board) — five discrete LEDs (R G Y B W). Because
+they're independent, green (up) and blue (RDM) light **together**; on the single RGB LED the same
+pair mixes to cyan. There is no discrete orange LED, so the panel's amber (Y) LED carries the
+Ethernet-on-fallback state; purple (setup portal) lights blue + white together.
 
 **Per-colour brightness (PWM).** The five LEDs are driven with PWM, not plain on/off, because
 green and white are far brighter per mA than the others — left raw they wash the panel out. Each

@@ -1,12 +1,15 @@
 // Status LED — one language on the single WS2812/GPIO LED and the 5-LED panel (ledType 3).
 //
-//   green (solid)          network up, idle
+//   green (solid)          network up + running -- STAYS ON whenever healthy
 //   green (slow 2 s blink)  DMX coming in over Art-Net / sACN   (driven by lastDmxMs)
-//   blue  (solid)          RDM discovery / identify / RDM traffic in the last second
-//                          (driven by identifyCh + g_rdmSentMs / g_rdmRecvMs -> rdm.json rdmTx/rdmRx)
+//   blue  ADDED to green   RDM discovery / identify / RDM traffic in the last second -- green does
+//                          NOT go away; on the panel green+blue light together, on the single RGB
+//                          LED they mix to cyan (driven by identifyCh + rdmBusy + g_rdmSentMs /
+//                          g_rdmRecvMs -> rdm.json rdmTx/rdmRx)
 //   orange (solid)         Ethernet configured but on the WiFi/AP fallback (info.json.ethFallback)
 //   red   (green off)      no network at all
 //   Knight-Rider sweep     booting / connecting
+// Only the health states (red / orange) replace green; RDM and DMX never suppress it.
 // DMX *output* is deliberately not signalled (a gateway always transmits).
 //
 // What Playwright CAN check here: the API-visible signals that gate each state —
