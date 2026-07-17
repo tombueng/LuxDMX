@@ -7,9 +7,11 @@ cleanly (2-layer). Run between the Freerouting loop and the maze straggler. Idem
 The re-routed nets come out at the maze's 0.15mm width. That's fine: signals are unaffected, and the only
 power nets that ever end up here (+5V_POE 0.4A, +5V_USBF 0.5A-on-USB) carry <=0.5A, which 0.15mm/1oz meets
 (so validate_geometry still passes). KiCad 10."""
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import os, re, json, shutil, subprocess, tempfile, sys, pcbnew
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HW, "luxdmx.kicad_pcb")
 
 
 def find_cli():

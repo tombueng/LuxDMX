@@ -1,5 +1,7 @@
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import pcbnew, math
-PCB=r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"; FM=pcbnew.FromMM; TM=pcbnew.ToMM
+PCB=os.path.join(_HW, "luxdmx.kicad_pcb"); FM=pcbnew.FromMM; TM=pcbnew.ToMM
 b=pcbnew.LoadBoard(PCB)
 # gather ALL pad data BEFORE any mutation
 pads=[]

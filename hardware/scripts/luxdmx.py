@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""LuxDMX v5 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
+"""LuxDMX v5.2 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
 
 Self-contained board (no plug-in module):
-  ESP32-S3-WROOM-1-N8  +  W5500 SPI-Ethernet + HR911105A MagJack
-  CH340K USB-UART (auto-reset) on a USB-C (data) inlet  +  SY8089 5V->3.3V buck
+  ESP32-S3-WROOM-1-N8R2  +  W5500 SPI-Ethernet + HR911105A MagJack
+  Native USB (S3 USB-Serial-JTAG, IO19/IO20) on a USB-C (data) inlet  +  SY8089 5V->3.3V buck
   Isolated DMX out: CA-IS3082W + B0505S iso-DC-DC + XLR-3 (+ SM712 TVS, 120R term)
   5 status LEDs (red/green/yellow/blue/white) direct on GPIOs
 
@@ -20,7 +20,7 @@ from skidl import Part, Pin, Net, TEMPLATE, SKIDL, generate_netlist, ERC, set_de
 
 set_default_tool(KICAD9)
 PT = Pin.types
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def mk(name, prefix, fp, pins, value=None):
@@ -53,7 +53,7 @@ VPOE_P = Net('VPOE+'); VPOE_N = Net('VPOE-')                   # rectified PoE 3
 VISO = Net('VISO'); GND2 = Net('GNDISO')                       # isolated DMX bus side
 USB_DP = Net('USB_DP'); USB_DM = Net('USB_DM'); CC1 = Net('CC1'); CC2 = Net('CC2')
 S3_TX = Net('S3_TX'); S3_RX = Net('S3_RX')                     # UART0 console/flash
-EN = Net('EN'); IO0 = Net('IO0'); DTR = Net('DTR'); RTS = Net('RTS')
+EN = Net('EN'); IO0 = Net('IO0')
 SCLK = Net('SCLK'); MOSI = Net('MOSI'); MISO = Net('MISO')
 ETH_CS = Net('ETH_CS'); ETH_INT = Net('ETH_INT'); ETH_RST = Net('ETH_RST')
 DMX_TX = Net('DMX_TX'); DMX_RX = Net('DMX_RX'); DMX_EN = Net('DMX_EN')
@@ -80,9 +80,9 @@ ETH_TCT = Net('ETH_TCT'); ETH_RCT = Net('ETH_RCT'); ETH_LL = Net('ETH_LINKLED');
 LX = Net('BUCK_LX'); FB = Net('BUCK_FB')
 
 # ============================================================================
-# U1  ESP32-S3-WROOM-1-N8  (module)
+# U1  ESP32-S3-WROOM-1-N8R2  (module)
 # ============================================================================
-S3 = mk('ESP32-S3-WROOM-1-N8', 'U', 'RF_Module:ESP32-S3-WROOM-1',
+S3 = mk('ESP32-S3-WROOM-1-N8R2', 'U', 'RF_Module:ESP32-S3-WROOM-1',
         [(1, 'GND', PT.PWRIN), (2, '3V3', PT.PWRIN), (3, 'EN', PT.INPUT),
          (4, 'IO4', PT.BIDIR), (5, 'IO5', PT.BIDIR), (6, 'IO6', PT.BIDIR), (7, 'IO7', PT.BIDIR),
          (8, 'IO15', PT.BIDIR), (9, 'IO16', PT.BIDIR), (10, 'IO17', PT.BIDIR), (11, 'IO18', PT.BIDIR),
@@ -93,7 +93,7 @@ S3 = mk('ESP32-S3-WROOM-1-N8', 'U', 'RF_Module:ESP32-S3-WROOM-1',
          (28, 'IO35', PT.BIDIR), (29, 'IO36', PT.BIDIR), (30, 'IO37', PT.BIDIR), (31, 'IO38', PT.BIDIR),
          (32, 'IO39', PT.BIDIR), (33, 'IO40', PT.BIDIR), (34, 'IO41', PT.BIDIR), (35, 'IO42', PT.BIDIR),
          (36, 'RXD0', PT.BIDIR), (37, 'TXD0', PT.BIDIR), (38, 'IO2', PT.BIDIR), (39, 'IO1', PT.BIDIR),
-         (40, 'GND', PT.PWRIN), (41, 'EP', PT.PWRIN)], value='ESP32-S3-WROOM-1-N8')
+         (40, 'GND', PT.PWRIN), (41, 'EP', PT.PWRIN)], value='ESP32-S3-WROOM-1-N8R2')
 U1 = S3(); U1.ref = 'U1'
 U1['GND'] += GND; U1[40] += GND; U1['EP'] += GND
 U1['3V3'] += P3V3
@@ -161,17 +161,17 @@ Ctoc = C('C6', '4.7uF'); Ctoc[1] += TOCAP; Ctoc[2] += GND             # TOCAP ~4
 for i, ref in enumerate(['C8', 'C9', 'C10', 'C11']):
     cc = C(ref, '100nF'); cc[1] += P3V3; cc[2] += GND                  # AVDD/VDD decoupling
 # 25 MHz crystal
-XT = mk('Crystal', 'Y', 'Crystal:Crystal_SMD_2520-4Pin_2.5x2.0mm',
+XT = mk('Crystal', 'Y', 'Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm',
         [(1, '1', PT.PASSIVE), (2, '2', PT.PASSIVE), (3, '3', PT.PASSIVE), (4, '4', PT.PASSIVE)],
         value='25MHz')
 Y1 = XT(); Y1.ref = 'Y1'
 Y1[1] += XI; Y1[3] += XO; Y1[2] += GND; Y1[4] += GND
-# crystal C2981624 is CL=9pF (2520-25-9; the CL=20pF C2981622 kept going OOS at JLC; C2981624 is in stock).
-# CL=(C1*C2)/(C1+C2)+Cstray; 10pF || 10pF + ~4pF stray = 9pF, matching the 9pF crystal. C0G/NP0 required.
-# NOTE: a mainstream 3225 package (C9006, JLC Basic 247k) would be the durable "always-available" fix, but the
-# 2520->3225 footprint swap needs a supervised re-route of the packed W5500 crystal corner (deferred).
-Cx1 = C('C12', '10pF C0G'); Cx1[1] += XI; Cx1[2] += GND
-Cx2 = C('C13', '10pF C0G'); Cx2[1] += XO; Cx2[2] += GND
+# crystal C9006 (X322525MOB4SI): 25 MHz, CL=12pF, mainstream 3225 package -- the durable, always-available
+# part (JLC Basic ~247k, LCSC ~83k). Replaces the 2520 C2981624/CL=9pF stopgap that kept flirting with OOS.
+# CL=(C1*C2)/(C1+C2)+Cstray; 18pF || 18pF + ~3pF stray = 12pF, matching the 12pF crystal (the larger 3225
+# pads add a touch of stray -> CL lands ~12-13pF, well inside the W5500 tolerance). C0G/NP0 required.
+Cx1 = C('C12', '18pF C0G'); Cx1[1] += XI; Cx1[2] += GND
+Cx2 = C('C13', '18pF C0G'); Cx2[1] += XO; Cx2[2] += GND
 # MagJack HY931147C (C91754) — THT 10/100 PoE magjack: integrated magnetics + an INTEGRATED
 # PoE rectifier (Mode A+B bridge -> V+ pin9 / V- pin10) + 2 LEDs. Replaces the non-PoE
 # HR961160C: the internal bridge does the rectification, so no external BR1/BR2 are needed.
@@ -200,26 +200,14 @@ Rll = R('R4', '330R'); Rll[1] += P3V3; Rll[2] += J3['LEDGA']; J3['LEDGK'] += ETH
 Ral = R('R5', '330R'); Ral[1] += P3V3; Ral[2] += J3['LEDYA']; J3['LEDYK'] += ETH_AL   # yellow = act
 
 # ============================================================================
-# U3  CH340K USB-UART (auto-reset)  + USB-C data inlet J2
+# Native USB (ESP32-S3 USB-Serial-JTAG) on the USB-C data inlet J2 -- no bridge chip.
 # ============================================================================
-CH = mk('CH340C', 'U', 'C84681:SOP-16_L10.0-W3.9-P1.27-LS6.0-BL',
-        [(1, 'GND', PT.PWRIN), (2, 'TXD', PT.OUTPUT), (3, 'RXD', PT.INPUT), (4, 'V3', PT.PWROUT),
-         (5, 'UDP', PT.PASSIVE), (6, 'UDM', PT.PASSIVE), (7, 'NC', PT.NOCONNECT), (8, 'OUT', PT.OUTPUT),
-         (9, 'CTS', PT.INPUT), (10, 'DSR', PT.INPUT), (11, 'RI', PT.INPUT), (12, 'DCD', PT.INPUT),
-         (13, 'DTR', PT.OUTPUT), (14, 'RTS', PT.OUTPUT), (15, 'R232', PT.INPUT), (16, 'VCC', PT.PWRIN)],
-        value='CH340C')
-U3 = CH(); U3.ref = 'U3'
-U3['VCC'] += P3V3; U3['V3'] += P3V3; U3['GND'] += GND   # 3.3V operation: V3 tied to VCC (SOP-16, no EP)
-U3['UDP'] += USB_DP; U3['UDM'] += USB_DM
-U3['TXD'] += S3_RX; U3['RXD'] += S3_TX        # CH340 TXD -> S3 RX, CH340 RXD <- S3 TX
-U3['DTR'] += DTR; U3['RTS'] += RTS
-Cch = C('C15', '100nF'); Cch[1] += P3V3; Cch[2] += GND
-# 2-transistor auto-reset (NodeMCU style): emitters cross to the opposite signal
-NPN = mk('MMBT3904', 'Q', 'Package_TO_SOT_SMD:SOT-23',
-         [(1, 'B', PT.INPUT), (2, 'E', PT.PASSIVE), (3, 'C', PT.OUTPUT)], value='MMBT3904')
-Q1 = NPN(); Q1.ref = 'Q1'; Q2 = NPN(); Q2.ref = 'Q2'
-Rq1 = R('R6', '10k'); Rq1[1] += RTS; Rq1[2] += Q1['B']; Q1['E'] += DTR; Q1['C'] += EN
-Rq2 = R('R7', '10k'); Rq2[1] += DTR; Rq2[2] += Q2['B']; Q2['E'] += RTS; Q2['C'] += IO0
+# The CH340C and its 2-transistor auto-reset are GONE. The S3 has a USB-Serial-JTAG controller in ROM on
+# IO19(D-)/IO20(D+): flashing + serial console + JTAG with no external part, working even from a blank chip,
+# and esptool resets/enters the bootloader over USB itself -- no DTR/RTS circuit, so the first-article
+# auto-reset EN/IO0 bug simply cannot exist. USB_DP/USB_DM run J2 -> U8 (ESD) -> the S3's native USB pins
+# (connected in the expansion section, since IO19/IO20 were previously the J6 EXP pins). The freed UART0
+# (S3_TX/S3_RX) is broken out on the J6 header instead. EN/IO0 keep their reset-RC + pull-ups + buttons.
 
 # USB-C (data) inlet
 UC = mk('USB_C', 'J', 'C165948:USB-C_SMD-TYPE-C-31-M-12_1',
@@ -269,20 +257,29 @@ D10 = TVSP(); D10.ref = 'D10'; D10['K'] += VPOE_P; D10['A'] += VPOE_N   # rectif
 Cpoe1 = C('C27', '100uF', 'Capacitor_SMD:CP_Elec_6.3x7.7'); Cpoe1[1] += P5V_POE; Cpoe1[2] += GND   # module output bulk (datasheet 100uF/25V)
 Cpoe2 = C('C28', '10uF', 'Capacitor_SMD:C_0805_2012Metric'); Cpoe2[1] += P5V_POE; Cpoe2[2] += GND
 
-# 5V source OR-ing via the TPS2116 ideal power-mux (replaces the SS54 OR diodes D8/D9). With MODE=GND and
-# PR1=GND it automatically passes the HIGHER of VIN1 (fused USB) / VIN2 (PoE) to +5V, with reverse-current
-# blocking (no backfeed). Rdson ~40mOhm -> ~32mV drop at 0.8A (vs ~0.4V for a Schottky), restoring the
-# B0505S/ISO3086 VCC2 >=4.5V margin on USB power. LCSC C3235557, SOT-583 (8-pin). 1.6-5.5V in, 2.5A.
+# 5V source OR-ing via the TPS2116 ideal power-mux (replaces the SS54 OR diodes D8/D9), in PRIORITY mode.
+# The first article HUNTED: MODE=GND/PR1=GND is "higher-voltage-wins", and with two ~5V sources it flips
+# between them, every flip a break-before-make dropout (measured ~945mV collapse on 3V3 -> ESP brownouts).
+# Fix: PRIORITY mode with VIN1 = PoE (MODE tied to VIN1). PoE is used whenever it's present and above the
+# PR1 threshold, so plugging USB in for debugging never disturbs the rail. Rdson ~40mOhm -> ~32mV at 0.8A.
+# LCSC C3235557, SOT-583 (8-pin). 1.6-5.5V in, 2.5A.
 MUX = mk('TPS2116', 'U', 'Package_TO_SOT_SMD:SOT-583-8',
          [(1, 'GND', PT.PWRIN), (2, 'VOUT', PT.PWROUT), (3, 'VIN1', PT.PWRIN), (4, 'PR1', PT.INPUT),
           (5, 'MODE', PT.INPUT), (6, 'VIN2', PT.PWRIN), (7, 'VOUT', PT.PASSIVE), (8, 'ST', PT.PASSIVE)],
          value='TPS2116DRLR')
 U9 = MUX(); U9.ref = 'U9'
-U9['VIN1'] += P5V_USBF; U9['VIN2'] += P5V_POE; U9[2] += P5V; U9[7] += P5V; U9['GND'] += GND
-U9['PR1'] += GND; U9['MODE'] += GND          # PR1=GND -> auto highest-voltage select; MODE=GND -> non-priority
+U9['VIN1'] += P5V_POE; U9['VIN2'] += P5V_USBF; U9[2] += P5V; U9[7] += P5V; U9['GND'] += GND   # VIN1=PoE (priority)
+U9['MODE'] += P5V_POE     # MODE tied to VIN1 -> PRIORITY: use VIN1(PoE) while it's above the PR1 threshold
+# PR1 divider off VIN1(PoE): VREF(PR1)=1.0V -> drop to VIN2(USB) below Vsw = 1.0*(Rtop+Rbot)/Rbot = 4.0V.
+# In priority mode VOUT tracks VIN1 down until the switch, so Vsw IS the worst-case sag during a PoE loss:
+# 4.0V leaves the most headroom over the ESP hang (~2.8V), and the switch is sub-ms anyway. 30k/10k ->
+# ~7.5k Thevenin at PR1 (noise-immune next to the buck LX), 125uA divider current is nothing. (5k1 for a
+# 12k/5.1k combo was OOS at LCSC, so we keep 30k/10k: 10k = C60490 3M stock, 30k = C25776.)
+PRt = R('R24', '30k'); PRt[1] += P5V_POE;  PRt[2] += U9['PR1']
+PRb = R('R25', '10k'); PRb[1] += U9['PR1']; PRb[2] += GND
 # ST (pin 8) = open-drain status, left unconnected (optional 100k pull-up to +3V3 for a "which source" GPIO)
-Cmuxa = C('C30', '1uF', 'Capacitor_SMD:C_0603_1608Metric'); Cmuxa[1] += P5V_USBF; Cmuxa[2] += GND  # TPS2116 VIN1 cap
-Cmuxb = C('C31', '1uF', 'Capacitor_SMD:C_0603_1608Metric'); Cmuxb[1] += P5V_POE;  Cmuxb[2] += GND  # TPS2116 VIN2 cap
+Cmuxa = C('C30', '1uF', 'Capacitor_SMD:C_0603_1608Metric'); Cmuxa[1] += P5V_USBF; Cmuxa[2] += GND  # VIN2(USB) cap
+Cmuxb = C('C31', '1uF', 'Capacitor_SMD:C_0603_1608Metric'); Cmuxb[1] += P5V_POE;  Cmuxb[2] += GND  # VIN1(PoE) cap
 Cor = C('C29', '22uF', 'Capacitor_SMD:C_0805_2012Metric'); Cor[1] += P5V; Cor[2] += GND
 # +5V rail transient clamp (D11) + EMC ferrite (FB1) feeding the isolated DMX DC-DC inputs
 TVS5 = mk('SMAJ5.0A', 'D', 'Diode_SMD:D_SMA', [(1, 'K', PT.PASSIVE), (2, 'A', PT.PASSIVE)], value='SMAJ5.0A')
@@ -455,13 +452,14 @@ J4['MP'] += GND     # mounting tabs -> GND (mechanical anchor + shield)
 #   also the S3 native-USB D-/D+ (free here because USB-UART is the CH340).
 # ============================================================================
 EXP35 = Net('EXP_IO35'); EXP36 = Net('EXP_IO36'); EXP37 = Net('EXP_IO37')
-EXP48 = Net('EXP_IO48'); EXP19 = Net('EXP_IO19'); EXP20 = Net('EXP_IO20')
+EXP48 = Net('EXP_IO48')
 U1['IO35'] += EXP35; U1['IO36'] += EXP36; U1['IO37'] += EXP37
-U1['IO48'] += EXP48; U1['IO19'] += EXP19; U1['IO20'] += EXP20
+U1['IO48'] += EXP48
+U1['IO20'] += USB_DP; U1['IO19'] += USB_DM   # NATIVE USB: IO20=D+, IO19=D- (was the J6 EXP19/EXP20 pins)
 J6 = HDR(); J6.ref = 'J6'; J6.value = 'EXP SH9'
 J6[1] += P5V;   J6[2] += P3V3;  J6[3] += GND
 J6[4] += EXP35; J6[5] += EXP36; J6[6] += EXP37
-J6[7] += EXP48; J6[8] += EXP19; J6[9] += EXP20
+J6[7] += EXP48; J6[8] += S3_TX; J6[9] += S3_RX   # freed UART0 on 8/9 (IO19/IO20 are native USB now)
 J6['MP'] += GND
 
 # ============================================================================

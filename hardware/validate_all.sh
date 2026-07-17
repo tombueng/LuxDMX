@@ -25,7 +25,7 @@ gate(){ # $1=label  $2=HARD|SOFT  $3=script
   echo
 }
 
-gate "1  CONNECTIVITY  (0 unrouted)"        HARD validate_connectivity.py
+gate "1  CONNECTIVITY  (0 unrouted)"        HARD scripts/validate_connectivity.py
 
 echo "### 2  DRC  (0 violations)"
 "$KC" pcb drc --severity-error --schematic-parity --format json -o /c/tmp/_drc.json "$PCB" >/dev/null 2>&1
@@ -34,11 +34,11 @@ echo "  DRC violations: ${DN:-?}"
 if [ "${DN:-1}" != 0 ]; then echo ">>> 2  DRC: FAIL  [blocks fab]"; hard=$((hard+1)); else echo ">>> 2  DRC: PASS"; fi
 echo
 
-gate "3  GEOMETRY / DFM + power current"     HARD validate_geometry.py
-gate "4  DMX ISOLATION  (>=4mm creepage)"    HARD validate_tbu_iso.py
-gate "5  ELECTRICAL  (rails/current/loads)"  HARD validate_electrical.py
-gate "6  PLACEMENT / EMC  (decoupling)"      SOFT validate_placement.py
-gate "7  CRITICAL NETS  (length/via/skew)"   SOFT validate_critical.py
+gate "3  GEOMETRY / DFM + power current"     HARD scripts/validate_geometry.py
+gate "4  DMX ISOLATION  (>=4mm creepage)"    HARD scripts/validate_tbu_iso.py
+gate "5  ELECTRICAL  (rails/current/loads)"  HARD scripts/validate_electrical.py
+gate "6  PLACEMENT / EMC  (decoupling)"      SOFT scripts/validate_placement.py
+gate "7  CRITICAL NETS  (length/via/skew)"   SOFT scripts/validate_critical.py
 
 echo "=================================================================="
 if [ $hard -eq 0 ]; then

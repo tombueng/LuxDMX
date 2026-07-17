@@ -1,5 +1,7 @@
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import pcbnew
-PCB=r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"; FM=pcbnew.FromMM; TM=pcbnew.ToMM
+PCB=os.path.join(_HW, "luxdmx.kicad_pcb"); FM=pcbnew.FromMM; TM=pcbnew.ToMM
 b=pcbnew.LoadBoard(PCB)
 npth=0; widened=0
 for fp in b.GetFootprints():

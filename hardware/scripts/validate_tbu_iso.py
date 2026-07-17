@@ -10,8 +10,10 @@ inner-plane void geometry, so this checks it explicitly:
      net (GND/+3V3/+5V*) -- DRC catches surface shorts, this is a belt-and-braces same-layer proximity scan.
 
 Run: <kicad10>/python validate_tbu_iso.py   -> prints PASS/FAIL per check."""
+import os
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import pcbnew, sys
-PCB = sys.argv[1] if len(sys.argv) > 1 else r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = sys.argv[1] if len(sys.argv) > 1 else os.path.join(_HERE, "luxdmx.kicad_pcb")
 FM, TM = pcbnew.FromMM, pcbnew.ToMM
 b = pcbnew.LoadBoard(PCB)
 

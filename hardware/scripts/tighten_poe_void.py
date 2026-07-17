@@ -10,9 +10,11 @@ ONLY the real VPOE copper (tracks + pads + vias) inflated by POE_MARGIN, leaving
 Regenerates the In1/In2 GND planes = board rect - DMX iso bbox holes - tight VPOE polygon, then
 refills every zone. Run AFTER autoroute_fr2 + cleanup_pads (it needs the routed VPOE tracks).
 Re-runnable / idempotent. KiCad 10 python."""
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import pcbnew
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HW, "luxdmx.kicad_pcb")
 FM = pcbnew.FromMM
 POE_MARGIN = 2.5     # mm, isolation around the 48 V PD-side copper
 DMX = [("DMX1", {"GNDISO", "VISO", "DMX_A", "DMX_B", "DMX_A_TERM"}, 4.0),

@@ -55,8 +55,9 @@ detailed write-up). Re-run the whole thing after any change.
 - [ ] Mounting holes (M3), board size, connector reach, no body collisions
 
 ## H. Simulation
-- [ ] SPICE (ngspice/WSL): diode-OR + PTC + ferrite load step; buck loop; LED currents; DMX bias
-- [ ] RC/timing (EN reset, auto-reset); crystal load; TVS clamp transient if modelable
+- [ ] SPICE (ngspice/WSL): priority mux + PTC + ferrite load step; buck loop; LED currents; DMX bias
+- [ ] RC/timing (EN reset); crystal load; TVS clamp transient if modelable
+- [ ] PoE ↔ USB handover on the TPS2116 priority mux: +5V must stay above the PR1 threshold (Vsw = 4.0 V)
 - [ ] Any other modelable critical node
 
 ## I. DFM / fab

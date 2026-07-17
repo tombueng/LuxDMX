@@ -17,7 +17,7 @@ place the newly-added parts. build_v3.py remains the full from-scratch grid buil
 Run with the KiCad 10 bundled python (ships pcbnew)."""
 import pcbnew, re, os
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PCB = os.path.join(HERE, "luxdmx.kicad_pcb")
 NET = os.path.join(HERE, "luxdmx.net")
 STOCK = r"C:\Program Files\KiCad\10.0\share\kicad\footprints"

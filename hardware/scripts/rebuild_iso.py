@@ -12,9 +12,11 @@ no hardcoded coordinates. Generalised for the multi-domain v3.1:
 
 Domains are data-driven; each domain's pad bbox (+ its creepage margin) drives the hole.
 Run after placing, then escape_connectors -> autoroute_fr2 -> cleanup_pads. KiCad 10 python."""
+import os
+_HW = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # hardware/
 import pcbnew, math
 
-PCB = r"C:\dev\DMX\hardware\luxdmx.kicad_pcb"
+PCB = os.path.join(_HW, "luxdmx.kicad_pcb")
 FM = pcbnew.FromMM; TM = pcbnew.ToMM
 
 # name -> (set of nets, F/B pour net or None, creepage margin mm)
