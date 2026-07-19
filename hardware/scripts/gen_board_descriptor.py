@@ -567,10 +567,15 @@ def main():
 
     write = "--write" in sys.argv
 
-    # Frozen legacy descriptors: hand-kept, NOT regenerated (the boards are gone, and their
-    # presets differ from the current one), but they stay in the index so an old board in the
-    # field can still fetch its pinout. Read straight off disk so we can't misreport them.
-    LEGACY = ["luxdmx_v4"]
+    # Frozen legacy descriptors: hand-kept, NOT regenerated, but they stay in the index so an
+    # older board in the field can still fetch its pinout. Read straight off disk so we can't
+    # misreport them.
+    #   luxdmx_v4  a different board with a different preset.
+    #   luxdmx_v5  same GPIO map as the v6, but its J6 expansion header is wired differently
+    #              (pin 1 is +5V, the signals sit one position lower). luxdmx.py describes the
+    #              v6 copper, so regenerating a v5 from it would hand a v5 owner the v6 pinout
+    #              — exactly the mis-plug the v6 re-pin exists to prevent. Frozen on purpose.
+    LEGACY = ["luxdmx_v5", "luxdmx_v4"]
     legacy = []
     for lid in LEGACY:
         with open(os.path.join(OUT, lid + ".json"), encoding="utf-8") as fh:
@@ -578,7 +583,7 @@ def main():
         legacy.append({"id": d["id"], "name": d["name"], "mcu": d["mcu"]})
 
     # Boards also baked inline into src/pages/config.html (work fully offline).
-    INLINE = {"luxdmx_v6", "esp32s3-devkitc-1", "esp32-devkitc",
+    INLINE = {"luxdmx_v6", "luxdmx_v5", "esp32s3-devkitc-1", "esp32-devkitc",
               "esp32-devkit-v1", "xiao-esp32s3"}
     entries = [{"id": b["id"], "name": b["name"], "mcu": b["mcu"]} for b in boards]
     # keep the legacy entries next to our current board, matching the committed index order
