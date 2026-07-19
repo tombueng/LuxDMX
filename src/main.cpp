@@ -2630,8 +2630,48 @@ static bool formChecked(AsyncWebServerRequest* req, const String& name) {
     return req->hasParam(name, true) || req->hasParam(name);
 }
 
+// Re-apply the settings that don't need a restart. Most CFG_LIVE fields need nothing at all (the
+// merge engine and the DMX task simply re-read cfg), but a few own a resource that has to be
+// re-pointed: the sACN sockets are bound per universe and per protocol, and the 5-LED panel caches
+// its brightness. Called after every save that touched only live fields.
+static void startSacn();                    // fwd decl
+static void applyLiveConfig(bool universeOrProtocolChanged) {
+    // Everything else genuinely needs nothing: the merge engine, the DMX task, the LED writer and
+    // the input/menu code all read cfg on every use, so the new value is already in effect. Only
+    // the sACN sockets hold state derived from config -- they are bound per universe (multicast
+    // group 239.255.x.y) and only opened at all for the sACN protocols.
+    if (universeOrProtocolChanged) startSacn();
+}
+
+// Snapshot every schema field's current value, so a save can tell what actually CHANGED rather than
+// assuming the worst and rebooting unconditionally. Keys are the canonical schema keys, so this
+// covers per-output fields too.
+struct CfgSnapshot {
+    String keys[96];
+    String vals[96];
+    int    n = 0;
+    void take() {
+        n = 0;
+        for (size_t k = 0; k < CONFIG_FIELD_COUNT && n < 96; k++) {
+            String v;
+            if (cfgcore::getValue(CONFIG_FIELDS[k].key, v)) { keys[n] = CONFIG_FIELDS[k].key; vals[n++] = v; }
+        }
+        for (int i = 0; i < MAX_OUTPUTS; i++)
+            for (size_t k = 0; k < OUTPUT_FIELD_COUNT && n < 96; k++) {
+                String key = okey(i, OUTPUT_FIELDS[k].suffix), v;
+                if (cfgcore::getValue(key, v)) { keys[n] = key; vals[n++] = v; }
+            }
+    }
+    bool changed(const String& key, String& oldVal) const {
+        for (int i = 0; i < n; i++) if (keys[i] == key) { oldVal = vals[i]; return true; }
+        return false;
+    }
+};
+
 static void handleConfigPost(AsyncWebServerRequest* req) {
     String s, e;
+    static CfgSnapshot before;   // static: 96 String pairs is far too much for the async task's stack
+    before.take();               // what the config looked like before this form touched it
     // Drive every field from the schema (config_schema.cpp), preserving the old
     // web-form semantics exactly: a bool/checkbox is set from presence; an int /
     // enum / string is updated only when its param is present (and clamped to the
@@ -2669,10 +2709,52 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     }
     cfg.apFallback = (cfg.linkLossMode == WIRED_FB_AP);   // keep the legacy mirror in sync
     sanitizeOutputs();   // never persist an enabled output with no TX pin
-    dmxReady = false;
+
+    // Which REBOOT-flagged fields actually changed? Only those force a restart. Collect their
+    // human labels so the UI can tell the user *why* instead of just rebooting on them.
+    String needReboot;   // comma-separated labels
+    int    nReboot = 0;
+    bool   netTouched = false;
+    for (size_t k = 0; k < CONFIG_FIELD_COUNT; k++) {
+        const CfgField& f = CONFIG_FIELDS[k];
+        String now, was;
+        if (!cfgcore::getValue(f.key, now)) continue;
+        if (!before.changed(f.key, was) || was == now) continue;
+        if (!strcmp(f.key, "protocol")) netTouched = true;
+        if (f.flags & CFG_REBOOT) {
+            if (nReboot++ < 8) { if (needReboot.length()) needReboot += ", "; needReboot += f.label; }
+        }
+    }
+    for (int i = 0; i < MAX_OUTPUTS; i++)
+        for (size_t k = 0; k < OUTPUT_FIELD_COUNT; k++) {
+            const CfgOutputField& f = OUTPUT_FIELDS[k];
+            String key = okey(i, f.suffix), now, was;
+            if (!cfgcore::getValue(key, now)) continue;
+            if (!before.changed(key, was) || was == now) continue;
+            if (!strcmp(f.suffix, "uni")) netTouched = true;
+            if (f.flags & CFG_REBOOT) {
+                if (nReboot++ < 8) {
+                    if (needReboot.length()) needReboot += ", ";
+                    needReboot += String(i == 0 ? "A " : "B ") + f.label;
+                }
+            }
+        }
+
+    if (nReboot > 0) dmxReady = false;        // a driver is about to be rebuilt; stop clocking it
     saveConfig();
-    req->send_P(200, "text/html", CONFIG_SAVED_HTML);
-    pendingRebootAt = millis() + 600;
+
+    String j = "{\"saved\":true,\"reboot\":";
+    j += nReboot > 0 ? "true" : "false";
+    j += ",\"fields\":\"" + jsonEsc(needReboot) + "\"}";
+    req->send(200, "application/json", j);
+
+    if (nReboot > 0) {
+        Serial.printf("[CFG] reboot required, changed: %s\n", needReboot.c_str());
+        pendingRebootAt = millis() + 600;
+    } else {
+        applyLiveConfig(netTouched);
+        Serial.println("[CFG] saved and applied live (no reboot needed)");
+    }
 }
 
 // ---------------------------------------------------------------------------

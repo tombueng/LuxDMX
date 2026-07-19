@@ -764,7 +764,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <div id="save-bar">
   <div class="save-inner">
-    <button type="submit" form="cfg-form" class="btn btn-primary w-100" id="save-btn" disabled>Save &amp; Restart</button>
+    <button type="submit" form="cfg-form" class="btn btn-primary w-100" id="save-btn" disabled>Save</button>
   </div>
 </div>
 
@@ -989,7 +989,27 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   INFO_BOARD = d.board || ''; INFO_MCU = d.mcu || ''; SEL_BOARD = d.boardSel || '';
   initBoards();
   loadVersions();
-}).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; INFO_BOARD=''; INFO_MCU=''; SEL_BOARD=''; initBoards(); loadVersions(); });
+}).catch(function(){
+  // Could not read the device's current settings. Render the skeleton so the page isn't blank,
+  // but do NOT let it be saved: these are hardcoded placeholders, not this device's config, and
+  // saving them would overwrite a perfectly good setup with defaults. Seen for real when the page
+  // was opened while the device was still rebooting -- it silently offered "output A on GPIO17,
+  // output B off" and a save wrote exactly that.
+  buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]);
+  INFO_BOARD=''; INFO_MCU=''; SEL_BOARD=''; initBoards(); loadVersions();
+  var sb = $('save-btn');
+  sb.disabled = true;
+  sb.textContent = 'Cannot read settings';
+  sb.title = 'The device did not answer /info.json, so this page is showing placeholders rather '
+           + 'than your settings. Reload once it is back; saving now would overwrite your config.';
+  showModal({
+    title: 'Could not load the current settings',
+    body: 'The device did not answer, so this page is showing placeholder values instead of your '
+        + 'actual configuration. Saving has been disabled so it cannot overwrite anything. '
+        + 'Reload the page once the device is reachable again (it may still be restarting).',
+    okText: 'OK', cancel: false
+  });
+});
 
 // Bootstrap-styled confirm/info dialog (no Bootstrap JS dependency).
 // opts: {title, body, okText, okClass, cancel:false}  ->  Promise<bool>
@@ -1034,7 +1054,38 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
         + 'or turn the output off. TX = -1 means "no data line".',
       okText: 'Got it', cancel: false
     });
+    return;
   }
+  // Submit over fetch so we can act on the device's answer. Most settings apply live now, and
+  // the firmware tells us whether this particular save actually needs a restart and which
+  // settings forced it -- so we can say why instead of rebooting on the user unannounced.
+  e.preventDefault();
+  var btn = $('save-btn'), was = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving...';
+  fetch('/config', { method: 'POST', body: new FormData(this) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.reboot){
+        showModal({
+          title: 'Restarting to apply this',
+          body: 'Saved. Most settings take effect immediately, but these need a restart because '
+              + 'they are bound to a pin or a driver that is set up at boot:\n\n' + j.fields
+              + '\n\nThe device is restarting now and will be back in a few seconds. '
+              + 'If its address changed you will have to reconnect.',
+          okText: 'OK', cancel: false
+        });
+      } else {
+        btn.textContent = 'Saved';
+        setTimeout(function(){ btn.textContent = was; btn.disabled = false; }, 1500);
+      }
+    })
+    .catch(function(){
+      // Older firmware answered with an HTML page and rebooted regardless. Don't leave the
+      // button stuck in that case.
+      btn.textContent = was; btn.disabled = false;
+      showModal({ title: 'Saved', body: 'The device did not report back. It may be restarting.',
+                  okText: 'OK', cancel: false });
+    });
 });
 
 $('proto-sel').addEventListener('change', updAllUniHints);
