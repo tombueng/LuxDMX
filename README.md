@@ -717,8 +717,8 @@ catalog ([web/boards/](web/boards/), served via GitHub Pages) and cached in your
 no network means you still get the built-ins plus manual entry. You can switch boards from
 a dropdown inside the pin-picker popup itself.
 
-Descriptors come from authoritative pinout data
-(`hardware/scripts/gen_board_descriptor.py`, currently one schema revision behind the committed
+All descriptors are generated from authoritative pinout data
+(`hardware/scripts/gen_board_descriptor.py`, which doubles as a drift check over the committed
 catalog): `hardware/scripts/luxdmx.py` for our own board, published header
 pinouts for the hand-tuned dev boards, and the Arduino core `variants/<dir>/pins_arduino.h`
 for the rest, so the GPIO numbers and reserved/strapping/flash flags are accurate per
