@@ -1,25 +1,16 @@
 #!/usr/bin/env python
 """Generate the board descriptors served by the /config pin picker (issue #12).
 
-!! STATUS: ONE SCHEMA REVISION BEHIND. DO NOT RUN THIS BLIND OVER web/boards/. !!
+Run it with no arguments to CHECK the committed catalog for drift; it regenerates every
+descriptor in memory and compares the parsed JSON against web/boards/. Formatting is not
+drift, content is: the committed files are hand-formatted (compact, column-aligned pin
+tables) and that stays, so the comparison is semantic, never byte-wise. --write actually
+overwrites, which reformats; check the diff before committing a full regen.
 
-    This script fell out of git for a while (hardware/.gitignore gained a blanket
-    `*.py` rule with a per-file whitelist, and this file was never added to it), so
-    the committed catalog moved on without it. Measured against web/boards/ today:
-
-      * 19 of 34 descriptors still regenerate byte-identical.
-      * 14 differ by exactly one key: `phys`, the curated physical-header block the
-        picker uses to draw a board's real header rows. This script never learned to
-        emit it, so running it would DELETE that data.
-      * luxdmx_v4.json differs structurally (this script still emits the older
-        `connectors`/`fixed` shape; the committed file uses `hardwired`/`headers`/
-        `preset`), and there is no luxdmx_v5 / luxdmx_v6 board in here at all -- our
-        own board is now v6, with v5 kept as a legacy entry.
-
-    Before trusting it again it needs: `phys` emission, the LuxDMX board updated to
-    v6 (+ v5/v4 as legacy), and the INLINE set below refreshed. Until then treat the
-    committed JSON as authoritative and diff into a scratch dir, never straight into
-    web/boards/.
+Two things are deliberately NOT derived, because they are read off the real board rather
+than computed: the curated physical header layouts (board_phys.json -> the `phys` key) and
+the display labels for the LuxDMX board's fixed pins. Every GPIO NUMBER is derived, so the
+pin data cannot drift from the hardware even though the cosmetics are hand-kept.
 
 Single source of truth (for the parts it does cover): the LuxDMX board descriptor is
 derived directly from the PCB netlist source (luxdmx.py), so the clickable diagram, the
@@ -33,18 +24,20 @@ variants/<dir>/pins_arduino.h (authoritative GPIOs); see auto_board().
 Outputs (committed; GitHub Pages serves web/ -> https://tombueng.github.io/LuxDMX/):
     web/boards/index.json              catalog index (lazy-loaded by config.html)
     web/boards/<id>.json               one descriptor per board
-    web/boards/luxdmx_v4.json        generated from luxdmx.py
+    web/boards/luxdmx_v6.json          generated from hardware/scripts/luxdmx.py
 
 Five core boards are also baked into src/pages/config.html so they work fully offline;
 the catalog adds the long tail. The /config pin picker draws a generated horizontal
 diagram from each descriptor's two pin columns (no board photos / realistic graphics).
 
-Run:  python hardware/scripts/gen_board_descriptor.py
+Run:  python hardware/scripts/gen_board_descriptor.py            # check for drift
+      python hardware/scripts/gen_board_descriptor.py --write    # regenerate
 """
 import glob
 import json
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))          # hardware/scripts
 ROOT = os.path.dirname(os.path.dirname(HERE))              # repo root
@@ -315,99 +308,144 @@ named = lambda gs, silk: [(g, silk(g)) for g in gs]
 
 
 def parse_v3():
-    """Read U1['IOxx'] += NET lines from luxdmx.py -> {gpio: net}."""
+    """Read the U1 pin assignments from luxdmx.py -> {gpio: net}.
+
+    Most pins are wired by GPIO name (U1['IO17']), but the module symbol also has a few
+    FUNCTION-named pins. UART0 is the one that matters: luxdmx.py says U1['TXD0'] += S3_TX,
+    and since v5.2 that pair is broken out on the J6 header (IO19/IO20 became native USB).
+    Miss these and J6 pins 8/9 come out with no GPIO at all."""
     text = open(os.path.join(HERE, "luxdmx.py"), encoding="utf-8").read()
     pin_net = {}
     for g, net in re.findall(r"U1\['IO(\d+)'\]\s*\+=\s*(\w+)", text):
         pin_net[int(g)] = net
+    for name, net in re.findall(r"U1\['(TXD0|RXD0)'\]\s*\+=\s*(\w+)", text):
+        pin_net[{"TXD0": 43, "RXD0": 44}[name]] = net     # ESP32-S3 U0TXD/U0RXD
     return pin_net
 
 
-def parse_connectors(pin_net):
-    """Read the J4/J6 header wiring from luxdmx.py into a picker-friendly pinout:
-    a list of {name, desc, pins:[{p, gpio, fn} | {p, pwr}]}. This is what the /config
-    picker shows as the header pinout panel, and the surface add-on roles bind onto."""
+def luxdmx_headers(pin_net):
+    """Build the J4/J6 header pinouts from luxdmx.py: [{ref, name, pins:[{pin, silk, gpio?}]}].
+
+    Pin NUMBERS and GPIOs come from the netlist. The silk names are the board's own: the
+    display header is labelled by function (SDA/SCL/...), the expansion header by GPIO."""
     text = open(os.path.join(HERE, "luxdmx.py"), encoding="utf-8").read()
     net_gpio = {net: g for g, net in pin_net.items()}
     FN = {"DISP_SDA": "SDA", "DISP_SCL": "SCL", "DISP_SCK": "SCK", "DISP_MOSI": "MOSI",
           "DISP_CS": "CS", "DISP_DC": "DC", "DISP_RST": "RST"}
-    PWR = {"P3V3": "+3V3", "P5V": "+5V", "P5V_USB": "+5V", "GND": "GND"}
-    conns = []
-    for ref, desc in (("J4", "Display header"), ("J6", "Expansion header")):
+    PWR = {"P3V3": "3V3", "P5V": "5V", "P5V_USB": "5V", "GND": "GND"}
+    out = []
+    for ref, name in (("J4", "Display header"), ("J6", "Expansion header")):
         pins = []
         for pin, net in re.findall(r"%s\[(\d+)\]\s*\+=\s*(\w+)" % ref, text):
             pin = int(pin)
-            if net in net_gpio:
-                d = {"p": pin, "gpio": net_gpio[net]}
-                if net in FN:
-                    d["fn"] = FN[net]
-                pins.append(d)
+            if net in PWR:
+                pins.append({"pin": pin, "silk": PWR[net]})
             else:
-                pins.append({"p": pin, "pwr": PWR.get(net, net)})
-        pins.sort(key=lambda d: d["p"])
-        conns.append({"name": ref, "desc": desc, "pins": pins})
-    return conns
+                g = net_gpio.get(net)
+                # display header is labelled by function, everything else by the module's
+                # own silk (so UART0 shows as TX0/RX0, not IO43/IO44)
+                silk = FN.get(net) or (s3_silk(g) if g is not None else net)
+                d = {"pin": pin, "silk": silk}
+                if g is not None:
+                    d["gpio"] = g
+                pins.append(d)
+        pins.sort(key=lambda d: d["pin"])
+        out.append({"ref": ref, "name": name, "pins": pins})
+    return out
 
 
-def v3_descriptor():
+# Everything the PCB wires in copper with NO user header: the W5500 SPI bus, both DMX
+# transceivers (U5 = o0_*, U6 = o1_*) and the 5 status LEDs. /config shows these read-only,
+# because you cannot reassign them without cutting a trace. Order + labels are what the
+# picker displays; the GPIO behind each one comes from the netlist, so it cannot drift.
+# The DISP_* pins are deliberately absent: they land on J4, so they stay user-editable.
+LUXDMX_HARDWIRED = [
+    ("DMX_TX",   "o0_tx",   "DMX A · TX → DI"),
+    ("DMX_RX",   "o0_rx",   "DMX A · RX → RO"),
+    ("DMX_EN",   "o0_rts",  "DMX A · DE/RE → EN"),
+    (None,       "o0_port", "DMX A · UART port", 1),
+    ("DMX2_TX",  "o1_tx",   "DMX B · TX → DI"),
+    ("DMX2_RX",  "o1_rx",   "DMX B · RX → RO"),
+    ("DMX2_EN",  "o1_rts",  "DMX B · DE/RE → EN"),
+    (None,       "o1_port", "DMX B · UART port", 2),
+    ("SCLK",     "ethsck",  "W5500 · SCLK"),
+    ("MOSI",     "ethmosi", "W5500 · MOSI"),
+    ("MISO",     "ethmiso", "W5500 · MISO"),
+    ("ETH_CS",   "ethcs",   "W5500 · CS"),
+    ("ETH_INT",  "ethint",  "W5500 · INT"),
+    ("ETH_RST",  "ethrst",  "W5500 · RST"),
+    (None,       "ledtype", "5-LED status panel", 3),
+    ("LED_R",    "ledr",    "LED · Red"),
+    ("LED_G",    "ledg",    "LED · Green"),
+    ("LED_Y",    "ledy",    "LED · Yellow"),
+    ("LED_B",    "ledb",    "LED · Blue"),
+    ("LED_W",    "ledw",    "LED · White"),
+]
+
+# Panel brightness tuned by eye on a real board: green + white are far brighter per mA than
+# the others, so they run at a low duty. Not derivable from the netlist.
+LUXDMX_LEDBRIGHT = {"r": 255, "g": 8, "y": 255, "b": 255, "w": 17}
+
+
+def luxdmx_descriptor(board_id, name):
+    """The LuxDMX board descriptor, derived from the PCB netlist (hardware/scripts/luxdmx.py).
+
+    v6 is the current revision. v4 is NOT generated: it is an older board with a different
+    preset, frozen as a hand-kept legacy descriptor so it can't be silently rewritten."""
     pin_net = parse_v3()
-    # net -> preset role (lower-case, matching config.html field names)
-    net_role = {
-        "DMX_TX": ("dmx", "tx"), "DMX_RX": ("dmx", "rx"), "DMX_EN": ("dmx", "rts"),
-        "LED_R": ("ledr", None), "LED_G": ("ledg", None), "LED_Y": ("ledy", None),
-        "LED_B": ("ledb", None), "LED_W": ("ledw", None),
-        "DISP_SDA": ("dispsda", None), "DISP_SCL": ("dispscl", None),
-        "DISP_SCK": ("dispsck", None), "DISP_MOSI": ("dispmosi", None),
-        "DISP_CS": ("dispcs", None), "DISP_DC": ("dispdc", None), "DISP_RST": ("disprst", None),
-    }
+    net_gpio = {net: g for g, net in pin_net.items()}
     eth_nets = {"SCLK", "MOSI", "MISO", "ETH_CS", "ETH_INT", "ETH_RST"}
     eth_pins = {g for g, net in pin_net.items() if net in eth_nets}
 
-    preset = {"ledType": 3, "dispType": 1}
-    dmx = {"en": True, "uni": 0, "port": 1, "tx": -1, "rx": -1, "rts": -1}
-    for g, net in pin_net.items():
-        if net in net_role:
-            role, sub = net_role[net]
-            if role == "dmx":
-                dmx[sub] = g
-            else:
-                preset[role] = g
-    preset["outputs"] = [dmx]
+    def gp(net):
+        g = net_gpio.get(net)
+        if g is None:
+            raise SystemExit("luxdmx.py no longer assigns net %s - descriptor would be wrong" % net)
+        return g
 
-    # net -> config.html field NAME for every GPIO the PCB hard-wires with NO user header.
-    # These fields are shown read-only in /config (the board routes them internally; the
-    # user can't reassign them without cutting traces): the W5500 SPI bus, both DMX
-    # transceivers (U5 = o0_*, U6 = o1_*) and the 5 on-board LEDs. The DISP_* pins are
-    # deliberately NOT here: they land on the J4 display header, so they stay user-editable.
-    fixed_net_role = {
-        "SCLK": "ethsck", "MOSI": "ethmosi", "MISO": "ethmiso",
-        "ETH_CS": "ethcs", "ETH_INT": "ethint", "ETH_RST": "ethrst",
-        "DMX_TX": "o0_tx", "DMX_RX": "o0_rx", "DMX_EN": "o0_rts",
-        "DMX2_TX": "o1_tx", "DMX2_RX": "o1_rx", "DMX2_EN": "o1_rts",
-        "LED_R": "ledr", "LED_G": "ledg", "LED_Y": "ledy", "LED_B": "ledb", "LED_W": "ledw",
-    }
-    fixed = {fixed_net_role[net]: g for g, net in pin_net.items() if net in fixed_net_role}
-    # GPIOs broken out to a user header: J4 display (DISP_*) + J6 expansion (EXP*). Anything
-    # else is internal to the module and can't be reached without reworking the board.
-    headers = sorted(g for g, net in pin_net.items()
-                     if net.startswith("DISP") or net.startswith("EXP"))
+    preset = {"ledType": 3, "dispType": 1}
+    for net, field in (("LED_R", "ledr"), ("LED_G", "ledg"), ("LED_Y", "ledy"),
+                       ("LED_B", "ledb"), ("LED_W", "ledw")):
+        preset[field] = gp(net)
+    preset["ledbright"] = dict(LUXDMX_LEDBRIGHT)
+    for net, field in (("ETH_CS", "ethcs"), ("SCLK", "ethsck"), ("MOSI", "ethmosi"),
+                       ("MISO", "ethmiso"), ("ETH_INT", "ethint"), ("ETH_RST", "ethrst")):
+        preset[field] = gp(net)
+    for net, field in (("DISP_SDA", "dispsda"), ("DISP_SCL", "dispscl"), ("DISP_SCK", "dispsck"),
+                       ("DISP_MOSI", "dispmosi"), ("DISP_CS", "dispcs"), ("DISP_DC", "dispdc"),
+                       ("DISP_RST", "disprst")):
+        preset[field] = gp(net)
+    preset["outputs"] = [
+        {"en": True, "uni": 0, "port": 1, "tx": gp("DMX_TX"), "rx": gp("DMX_RX"), "rts": gp("DMX_EN")},
+        {"en": True, "uni": 1, "port": 2, "tx": gp("DMX2_TX"), "rx": gp("DMX2_RX"), "rts": gp("DMX2_EN")},
+    ]
+
+    hardwired = []
+    for entry in LUXDMX_HARDWIRED:
+        if entry[0] is None:                       # fixed VALUE, not a pin (UART port, LED type)
+            _, field, label, val = entry
+            hardwired.append({"field": field, "val": val, "label": label})
+        else:
+            net, field, label = entry
+            hardwired.append({"field": field, "gpio": gp(net), "label": label})
 
     return {
-        "id": "luxdmx_v4",
-        "name": "LuxDMX v4 (ESP32-S3 + W5500)",
+        "id": board_id,
+        "name": name,
         "mcu": "esp32s3",
         "cols": cols(S3L, S3R, s3_silk, lambda g: s3_flags(g, eth_pins)),
         "preset": preset,
-        "fixed": fixed,
-        "headers": headers,
-        "connectors": parse_connectors(pin_net),
-        "_source": "generated from hardware/luxdmx.py",
+        "_source": "generated from hardware/scripts/luxdmx.py",
+        "hardwired": hardwired,
+        "headers": luxdmx_headers(pin_net),
     }
 
 
 def main():
     boards = [
-        v3_descriptor(),
+        # Our own board, straight off the netlist. v4 is an older revision and is NOT
+        # generated: it is frozen as a hand-kept legacy descriptor (see LEGACY below).
+        luxdmx_descriptor("luxdmx_v6", "LuxDMX v6 (ESP32-S3 + W5500)"),
         {
             "id": "esp32s3-devkitc-1", "name": "ESP32-S3 DevKitC-1", "mcu": "esp32s3",
             "cols": cols(S3L, S3R, s3_silk, lambda g: s3_flags(g, set())),
@@ -517,26 +555,92 @@ def main():
         if b["id"] in HARDWIRED:
             b["hardwired"] = [{"gpio": g, "label": l} for g, l in HARDWIRED[b["id"]]]
 
+    # Curated physical header layouts (board_phys.json). Which row + silk label a pad sits on
+    # is read off the real board, so it is data, not derived -- but it must survive a regen,
+    # otherwise the picker loses the faithful header diagrams for these boards.
+    phys_path = os.path.join(HERE, "board_phys.json")
+    with open(phys_path, encoding="utf-8") as fh:
+        PHYS = json.load(fh)["boards"]
     for b in boards:
-        path = os.path.join(OUT, b["id"] + ".json")
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(b, fh, indent=2)
-        print("wrote", os.path.relpath(path, ROOT))
+        if b["id"] in PHYS:
+            b["phys"] = PHYS[b["id"]]        # last key, matching the committed descriptors
+
+    write = "--write" in sys.argv
+
+    # Frozen legacy descriptors: hand-kept, NOT regenerated, but they stay in the index so an
+    # older board in the field can still fetch its pinout. Read straight off disk so we can't
+    # misreport them.
+    #   luxdmx_v4  a different board with a different preset.
+    #   luxdmx_v5  same GPIO map as the v6, but its J6 expansion header is wired differently
+    #              (pin 1 is +5V, the signals sit one position lower). luxdmx.py describes the
+    #              v6 copper, so regenerating a v5 from it would hand a v5 owner the v6 pinout
+    #              — exactly the mis-plug the v6 re-pin exists to prevent. Frozen on purpose.
+    LEGACY = ["luxdmx_v5", "luxdmx_v4"]
+    legacy = []
+    for lid in LEGACY:
+        with open(os.path.join(OUT, lid + ".json"), encoding="utf-8") as fh:
+            d = json.load(fh)
+        legacy.append({"id": d["id"], "name": d["name"], "mcu": d["mcu"]})
 
     # Boards also baked inline into src/pages/config.html (work fully offline).
-    INLINE = {"luxdmx_v4", "esp32s3-devkitc-1", "esp32-devkitc", "esp32-devkit-v1", "xiao-esp32s3"}
+    INLINE = {"luxdmx_v6", "luxdmx_v5", "esp32s3-devkitc-1", "esp32-devkitc",
+              "esp32-devkit-v1", "xiao-esp32s3"}
+    entries = [{"id": b["id"], "name": b["name"], "mcu": b["mcu"]} for b in boards]
+    # keep the legacy entries next to our current board, matching the committed index order
+    at = max(i for i, e in enumerate(entries) if e["id"].startswith("luxdmx_")) + 1
+    entries[at:at] = legacy
     index = {
         "schema": 1,
         "updated": "auto",
         # "builtin" = also baked into src/pages/config.html (works fully offline);
         # the rest are catalog-only (fetched on demand from GitHub Pages).
-        "boards": [{"id": b["id"], "name": b["name"], "mcu": b["mcu"],
-                    "builtin": b["id"] in INLINE} for b in boards],
+        "boards": [{"id": e["id"], "name": e["name"], "mcu": e["mcu"],
+                    "builtin": e["id"] in INLINE} for e in entries],
     }
-    with open(os.path.join(OUT, "index.json"), "w", encoding="utf-8") as fh:
-        json.dump(index, fh, indent=2)
-    print("wrote", os.path.relpath(os.path.join(OUT, "index.json"), ROOT))
+    targets = [(b["id"] + ".json", b) for b in boards] + [("index.json", index)]
+
+    if not write:
+        # DEFAULT = check, not write. The committed JSON is hand-formatted (compact, column
+        # aligned pin tables) and that formatting is worth keeping, so we compare PARSED data,
+        # not bytes: formatting is not drift, content is. This is the gate that makes the
+        # "descriptors cannot drift from the hardware" claim actually true and runnable.
+        bad = 0
+        for fname, want in targets:
+            path = os.path.join(OUT, fname)
+            if not os.path.exists(path):
+                print("MISSING   %s (run with --write to create it)" % fname); bad += 1; continue
+            with open(path, encoding="utf-8") as fh:
+                have = json.load(fh)
+            if have == want:
+                continue
+            bad += 1
+            keys = sorted(set(have) | set(want)) if isinstance(have, dict) else []
+            diffs = [k for k in keys if have.get(k) != want.get(k)]
+            print("DRIFTED   %s  keys: %s" % (fname, ", ".join(diffs) or "(structure)"))
+        extra = sorted(f for f in os.listdir(OUT)
+                       if f.endswith(".json") and f not in {t[0] for t in targets}
+                       and f[:-5] not in LEGACY)
+        for f in extra:
+            print("UNTRACKED %s (in the catalog, not produced by this script)" % f)
+        if bad:
+            print("\n%d descriptor(s) drifted from the hardware sources. "
+                  "Re-run with --write to regenerate, then review the diff." % bad)
+            return 1
+        print("OK: %d generated descriptors + index match the committed catalog "
+              "(%d frozen legacy, %d curated phys layouts)."
+              % (len(boards), len(LEGACY), len(PHYS)))
+        return 0
+
+    for fname, data in targets:
+        path = os.path.join(OUT, fname)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            json.dump(data, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+        print("wrote", os.path.relpath(path, ROOT))
+    print("\nNOTE: --write uses plain json formatting. The committed catalog is hand-formatted "
+          "(compact pin tables); re-check the diff before committing a full regen.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
