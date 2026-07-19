@@ -19,6 +19,8 @@ static const char* const ENUM_WIREDPHY[] = {"W5500 (SPI)", "LAN8720 (RMII)"};
 static const char* const ENUM_ETHSPIPHY[] = {"W5500", "DM9051"};
 static const char* const ENUM_WIFIMODE[] = {"STA (client)", "AP (standalone)"};
 static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "reboot", "join WiFi"};
+// On-unit controls button roles — order == stored value == BtnRole in input_map.h.
+static const char* const ENUM_BTNROLE[]  = {"off", "Enter / Select", "Back", "Next (+)", "Prev (-)"};
 
 // ---- compact row builders (no defaults — neutral is derived from min) -------
 #define IFIELD(key, json, member, mn, mx, label, group) \
@@ -64,6 +66,23 @@ const CfgField CONFIG_FIELDS[] = {
     IFIELD("disprst",  "dispRst",  dispRst,  -1, 48, "SPI RST",     "Display"),
     IFIELD("dispsck",  "dispSck",  dispSck,  -1, 48, "SPI SCK",     "Display"),
     IFIELD("dispmosi", "dispMosi", dispMosi, -1, 48, "SPI MOSI",    "Display"),
+
+    // --- On-unit controls: rotary encoder + buttons + display menu (issue #24) ---
+    IFIELD("enca",     "encA",     encA,      -1, 48, "Encoder A pin",        "Controls"),
+    IFIELD("encb",     "encB",     encB,      -1, 48, "Encoder B pin",        "Controls"),
+    IFIELD("encsw",    "encSw",    encSw,     -1, 48, "Encoder push pin",     "Controls"),
+    IFIELD("encsteps", "encSteps", encSteps,   1,  4, "Encoder steps/detent", "Controls"),
+    BFIELD("encrev",   "encReverse", encReverse,     "Reverse encoder dir",  "Controls", CFG_NONE),
+    IFIELD("btn1pin",  "btn1Pin",  btn1Pin,   -1, 48, "Button 1 pin",         "Controls"),
+    EFIELD("btn1act",  "btn1Act",  btn1Act,           "Button 1 action",      "Controls", ENUM_BTNROLE),
+    IFIELD("btn2pin",  "btn2Pin",  btn2Pin,   -1, 48, "Button 2 pin",         "Controls"),
+    EFIELD("btn2act",  "btn2Act",  btn2Act,           "Button 2 action",      "Controls", ENUM_BTNROLE),
+    IFIELD("btn3pin",  "btn3Pin",  btn3Pin,   -1, 48, "Button 3 pin",         "Controls"),
+    EFIELD("btn3act",  "btn3Act",  btn3Act,           "Button 3 action",      "Controls", ENUM_BTNROLE),
+    IFIELD("btn4pin",  "btn4Pin",  btn4Pin,   -1, 48, "Button 4 pin",         "Controls"),
+    EFIELD("btn4act",  "btn4Act",  btn4Act,           "Button 4 action",      "Controls", ENUM_BTNROLE),
+    BFIELD("btnah",    "btnActiveHigh", btnActiveHigh, "Buttons active-high", "Controls", CFG_NONE),
+    IFIELD("ctlunimax","ctlUniMax", ctlUniMax,  1, 511, "Menu max universe",  "Controls"),
 
     // --- Wired Ethernet: W5500 (SPI) ---------------------------------------
     BFIELD("ethon",   "ethW5500", ethW5500,           "W5500 module enabled", "Ethernet (W5500)", CFG_NONE),

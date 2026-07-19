@@ -46,9 +46,20 @@ LUXDMX_WRITE=1 npm test
 
 They always restore the original configuration afterwards.
 
+One more device-mutating test lives outside the Playwright runner, because it drives raw
+sockets rather than a browser:
+
+```bash
+LUXDMX_WRITE=1 LUXDMX_URL=http://<ip> node docs/tests/ota-upload-truncated.mjs
+```
+
+It proves a firmware upload that stops mid-stream is rejected instead of being reported as
+a success (see the header comment for the failure it guards). It writes the device's OTA
+slot but never completes a valid image, so the running firmware is never replaced.
+
 ### Standalone config-UI tests (no device, no Playwright runner)
 
-Three behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
+These behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
 device — run them directly with `node`, they self-report and exit non-zero on failure:
 
 ```bash
@@ -64,13 +75,17 @@ node docs/tests/board-persist.mjs # the picked board STICKS: /info.json boardSel
                                   #   the selector submits as board=..., "custom" stays custom, a
                                   #   device with no saved pick still falls back to detection, and
                                   #   the legacy luxdmx_v5 pick still resolves offline
+node docs/tests/dm9051-roundtrip.mjs  # a DM9051 box survives a /config save: the wired selector
+                                  #   reads ethSpiPhy from /info.json and posts it back unchanged.
+                                  #   Guards the bug where /info.json didn't publish the field, so
+                                  #   any save silently rewrote a DM9051 device to W5500.
 ```
 
 ## What's covered
 
 | Spec | Feature (network → web UI) |
 |---|---|
-| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; the W5500 role pins are not flagged "reserved" against their own role (Save stays enabled) and a fixed-pin board offers an Advanced unlock while the J4 display pins stay editable; the picker lists the J4 + J6 header pinouts and tags each header pad with its pin; the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box (AP fallback shows the AP password instead); home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
+| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; the W5500 role pins are not flagged "reserved" against their own role (Save stays enabled) and a fixed-pin board offers an Advanced unlock while the J4 display pins stay editable; the picker lists the J4 + J6 header pinouts and tags each header pad with its pin; **luxdmx_v6** shows J4/J6 with identical power pins (+3V3, GND) and no 5V anywhere on J6, with IO35 moved to pin 3 and pin 9 a 2nd GND, while **luxdmx_v5** still reports its real (hazardous) 5V-on-J6-pin-1 layout and UART0 on 8/9; the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box (AP fallback shows the AP password instead); home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
 | `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking; tight back-to-back burst keeps tracking (socket-drain regression). The per-loop latency win itself needs a logic analyzer on the DMX wire and isn't asserted here. |
 | `sacn.spec.mjs` | sACN / E1.31 → DMX values, live grid, sender tracking |
 | `conflict.spec.mjs` | Two simultaneous senders → conflict banner |
@@ -86,6 +101,7 @@ node docs/tests/board-persist.mjs # the picked board STICKS: /info.json boardSel
 | `rdm-tab.spec.mjs` | The dedicated RDM tab (`/rdm`): page serves the fixtures table + grouped sensor charts + per-sensor poll switches + the live discovery progress bar + the shared Status nav strip (full-width, view transitions); `/rdm.json` exposes the rich per-fixture fields (`mfg`/`modelName`/`label`/`cat`/`swVer`, per-sensor `lo`/`hi`/`rec`/`type`/`poll`), the `sensorPoll` flag, and the discovery-progress fields (`discStage`/`discFound`/`discCur`/`discSub`). Opt-in (drives the bus): discovery reads manufacturer/model/varied sensors, the progress fields advance through the scan, SET device label + SET personality round-trip over the WebSocket, the per-fixture switch (`rdm_sensorsel` `sensor:-1`) toggles a whole fixture's sensors, and live sensor polling moves the readings. Multi-line RDM: `/rdm.json` exposes `rdmLines` (the RDM-capable universes) + a per-fixture `uni`, the page has the Universe column + per-universe Discover buttons, and discovering one universe (`/rdm/discover?line=N`) leaves the other universes' fixtures in place. Needs a responder that answers the extra PIDs (the RP2350 sim does). |
 | `led-activity.spec.mjs` | Status LED — one language on the single WS2812/GPIO LED and the 5-LED panel (`ledType 3`): green = up (slow 2 s blink = DMX in), blue = RDM/identify, orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot. `/info.json` exposes the panel config (`ledType`/`ledR..W`), the per-colour PWM brightness (`ledBr*`), `chip`, `rdmMax`, and `ethFallback` (the orange-state flag — must be **false** on a reachable device); the RDM device cap auto-sizes to the chip and must be **64** on an ESP32-S3 / **16** on the classic ESP32 — a regression guard, since the old free-RAM heuristic shipped the S3 at 16 (found 16 instead of 64 fixtures); the RDM tx/rx counters that light the **blue** LED advance on discovery (opt-in). `/led/bright` round-trips: read the current brightness + calibration flag (always), and (opt-in) set a colour live + toggle the all-on calibration mode, restoring after. The actual LED photons, the Knight-Rider boot sweep, and the live no-wired-link→WiFi fallback (orange) are bench-verified with a camera / logic analyser / a link pull on real hardware, out of Playwright scope, like the on-wire DMX/RDM timing. |
 | `setup.spec.mjs` | Issue #45 first-run setup portal: drives the real `setup.html` (landing shows both paths on-brand; access-point path posts `mode=ap` + AP password; join path picks a scanned SSID / manual entry and posts `mode=sta` + ssid + password). Runs against the local UI sim, not a live device (during first-run setup the device has no reachable network) |
+| `config-roundtrip.spec.mjs` | Every `/config` web-form option survives the schema-driven POST → reboot → `/info.json` read-back, including the issue #24 on-unit controls fields (encoder pins/steps/reverse, the four button pins + actions, active-high, menu top universe). A non-destructive check also asserts the controls surface is present in `/info.json` with the right shape/types. Round-trip is opt-in (reboots the device twice). The physical encoder/button interaction itself needs a knob wired to a board and is bench-verified, not automatable here. |
 
 ## Notes
 

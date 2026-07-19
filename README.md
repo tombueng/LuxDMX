@@ -82,6 +82,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
 | **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
+| **On-unit controls** | Optional rotary encoder and/or up to 4 buttons drive a small on-display menu to set the universe (and protocol) without a phone or PC, and the choice persists. Works with any mix of inputs — encoder-only, one button, or the lot. See [docs/controls.md](docs/controls.md) |
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
@@ -599,7 +600,7 @@ values are fetched as JSON.
 | URL | Method | Function |
 |---|---|---|
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
-| `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins (gzip) |
+| `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins, on-unit controls (rotary encoder + buttons) (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
@@ -838,6 +839,17 @@ FPS** (shown above). The source count is labelled **Sources** (active Art-Net / 
 Mono panels are 1-bit — white, blue and yellow/blue-split versions all behave identically
 (the colour is the physical emitter, not addressable). The I²C address is auto-detected
 (`0x3C` / `0x3D`). SPI colour panels need ~5 pins, so they only fit the non-Ethernet boards.
+
+> **⚠ Using a LuxDMX board v5.2 or older? Check which header you're plugging into.** Those boards have
+> two identical JST SH 9-pin headers side by side, **J4 (display)** and **J6 (expansion)**, whose power
+> pins do *not* match. Putting the display on J6 feeds it **+5V on VCC and +3V3 on GND** and kills it
+> instantly. v6 gave both headers the same power pins so a mix-up is harmless, but on an older board
+> it isn't — [docs/display.md → Header safety](docs/display.md#header-safety-j4-vs-j6) explains how to
+> key your cables so it can't happen.
+>
+> Pick the board template that matches the silk on your board (**LuxDMX v5** or **LuxDMX v6**) under
+> Settings → Pins. They're listed separately because their J6 pinout really is different, so the
+> picker shows you the pinout you actually have rather than the one you wish you had.
 
 ### Settings (Settings → Display)
 

@@ -89,6 +89,65 @@ existing units are unaffected until a user opts in.
 
 ---
 
+## Header safety: J4 vs J6
+
+The LuxDMX board has **two** JST SH 1.0 mm 9-pin headers next to each other: **J4** (display) and
+**J6** (expansion). Same connector, so a cable physically plugs into either one.
+
+### v6 and later — safe either way
+
+Both headers carry the **same power pins**, and a hard validator
+(`hardware/scripts/validate_header_parity.py`) fails the fab export if that ever stops being true:
+
+| pin | J4 — display | J6 — expansion |
+|---|---|---|
+| **1** | **+3V3** | **+3V3** |
+| **2** | **GND** | **GND** |
+| 3 | SDA (IO4) | IO35 |
+| 4 | SCL (IO5) | IO36 |
+| 5 | SCK (IO39) | IO37 |
+| 6 | MOSI (IO40) | IO48 |
+| 7 | CS (IO41) | TX0 (IO43) |
+| 8 | DC (IO42) | RX0 (IO44) |
+| 9 | RST (IO38) | GND |
+
+Get it wrong and nothing breaks. The panel still receives correct power; only 3V3 CMOS signals land
+in the wrong places, which both sides tolerate. A display plugged into J6 lands its RST on GND, so it
+sits harmlessly in reset — dark, but fine. Move it to J4 and it comes up.
+
+**+5V is not on J6 anymore.** It was, up to v5.2, and that is exactly what made the mistake fatal.
+Anything needing 5 V gets it from your own supply.
+
+### ⚠ v5.2 and earlier — plugging a display into J6 destroys it
+
+On v5.2 and older boards the two headers did **not** agree:
+
+| pin | J4 — display | J6 — expansion | what happens if you swap |
+|---|---|---|---|
+| 1 | +3V3 | **+5V** | **+5V onto the panel's VCC** → dead panel |
+| 2 | GND | **+3V3** | **panel ground lifted to +3V3** → dead panel |
+| 3 | SDA | GND | data line shorted to ground |
+
+This is not theoretical, it killed a panel on the bench. The reverse hurts too: an expansion board in
+J4 returns its whole ground current through IO4 and can take the GPIO with it.
+
+**If you have a v5.2 or older board, key your cables so the mistake can't happen.** The display cable
+only uses pins 1–9 and the housings are symmetric, so give the display cable a physical key:
+
+1. Pick a position the display doesn't use — on a mono I²C panel that's **pin 7, 8 or 9** (CS/DC/RST
+   are SPI-only).
+2. **Plug that position** in the display cable's housing: push a short offcut of wire (no crimp) into
+   the contact slot, or fill it with a dab of hot glue.
+3. **Pull the matching contact** out of a J6 cable, or just never build one with that position.
+
+The keyed display cable then refuses to seat properly on a J6 cable's mate, and you feel it before
+any power is applied. Label both cables while you're at it — a strip of tape saying `DISP` / `EXP`
+costs nothing and is what you'll actually read at 2am during a show.
+
+Simplest alternative if you only ever use one: **populate only J4** and leave J6 unfitted.
+
+---
+
 ## 3. Config keys
 
 Mirrors how the status LED is wired through the stack (`ledType`/`ledPin`).
@@ -211,6 +270,14 @@ The renderer branches on `gfx->height()`, so the same data helpers feed every la
 reuse one centred-text routine with a font chosen by height. **Why size/type is configured, not
 detected:** over I²C both heights answer at 0x3C with no resolution read-back, and SPI panels
 can't be enumerated at all — so the panel is part of `dispType`, picked in `/config`.
+
+### Controls menu (issue #24)
+
+If a rotary encoder or buttons are wired (see [controls.md](controls.md)), a highest-priority
+menu screen takes over the display while you're navigating: a scrolling item list on the tall
+panels, or the single selected item on the 128×32 strip. A `>` caret marks the highlight (the
+only cue that survives the 1-bit mono collapse), and editing a value wraps it in `<angle
+brackets>`. It shows instantly on the first turn and disappears the moment the menu closes.
 
 ### Future extra screens (not in v1)
 

@@ -418,6 +418,128 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       </div>
     </div>
 
+    <!-- On-unit controls: a rotary encoder and/or buttons drive a menu on the display (issue #24) -->
+    <div class="card mb-3">
+      <div class="card-header">Controls (encoder + buttons)</div>
+      <div class="card-body">
+        <div class="form-text mb-3">
+          Optional physical controls to pick the universe (and protocol) from the unit itself,
+          shown live on the display. Wire a rotary encoder and/or up to four buttons to any free
+          GPIOs and leave a pin at <code>-1</code> to skip it. Turn or tap to move through the menu,
+          press to select, hold to go back. All off until you set a pin.
+        </div>
+
+        <div class="row g-2">
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">Encoder A</label>
+            <input class="form-control" type="number" name="enca" id="enc-a" min="-1" max="48" value="-1">
+          </div>
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">Encoder B</label>
+            <input class="form-control" type="number" name="encb" id="enc-b" min="-1" max="48" value="-1">
+          </div>
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">Push</label>
+            <input class="form-control" type="number" name="encsw" id="enc-sw" min="-1" max="48" value="-1">
+          </div>
+        </div>
+        <div class="row g-2 mt-1 align-items-end">
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">Steps per detent</label>
+            <select class="form-select" name="encsteps" id="enc-steps">
+              <option value="1">1 (non-detented)</option>
+              <option value="2">2 (half-step)</option>
+              <option value="4">4 (standard EC11)</option>
+            </select>
+          </div>
+          <div class="col">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="encrev" id="enc-rev" value="1">
+              <label class="form-check-label small" for="enc-rev">Reverse direction</label>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <label class="form-label text-secondary small mb-1">Buttons</label>
+        <div class="form-text mb-2">
+          Any push-button to GND (the default). A long press fills in whatever action is missing,
+          so even a single button can drive the whole menu (tap&nbsp;=&nbsp;move, hold&nbsp;=&nbsp;select).
+          The encoder's own push is always Select (tap) / Back (hold).
+        </div>
+
+        <div class="row g-2 mt-1">
+          <div class="col-4">
+            <label class="form-label text-secondary small mb-1">Button 1 pin</label>
+            <input class="form-control" type="number" name="btn1pin" id="btn1-pin" min="-1" max="48" value="-1">
+          </div>
+          <div class="col-8">
+            <label class="form-label text-secondary small mb-1">Button 1 action</label>
+            <select class="form-select" name="btn1act" id="btn1-act">
+              <option value="0">Off</option><option value="1">Enter / Select</option>
+              <option value="2">Back</option><option value="3">Next (+)</option><option value="4">Prev (-)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-4">
+            <label class="form-label text-secondary small mb-1">Button 2 pin</label>
+            <input class="form-control" type="number" name="btn2pin" id="btn2-pin" min="-1" max="48" value="-1">
+          </div>
+          <div class="col-8">
+            <label class="form-label text-secondary small mb-1">Button 2 action</label>
+            <select class="form-select" name="btn2act" id="btn2-act">
+              <option value="0">Off</option><option value="1">Enter / Select</option>
+              <option value="2">Back</option><option value="3">Next (+)</option><option value="4">Prev (-)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-4">
+            <label class="form-label text-secondary small mb-1">Button 3 pin</label>
+            <input class="form-control" type="number" name="btn3pin" id="btn3-pin" min="-1" max="48" value="-1">
+          </div>
+          <div class="col-8">
+            <label class="form-label text-secondary small mb-1">Button 3 action</label>
+            <select class="form-select" name="btn3act" id="btn3-act">
+              <option value="0">Off</option><option value="1">Enter / Select</option>
+              <option value="2">Back</option><option value="3">Next (+)</option><option value="4">Prev (-)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-4">
+            <label class="form-label text-secondary small mb-1">Button 4 pin</label>
+            <input class="form-control" type="number" name="btn4pin" id="btn4-pin" min="-1" max="48" value="-1">
+          </div>
+          <div class="col-8">
+            <label class="form-label text-secondary small mb-1">Button 4 action</label>
+            <select class="form-select" name="btn4act" id="btn4-act">
+              <option value="0">Off</option><option value="1">Enter / Select</option>
+              <option value="2">Back</option><option value="3">Next (+)</option><option value="4">Prev (-)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-2 align-items-end">
+          <div class="col">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="btnah" id="btn-ah" value="1">
+              <label class="form-check-label small" for="btn-ah">Buttons wired active-high (to&nbsp;3V3)</label>
+            </div>
+          </div>
+          <div class="col">
+            <label class="form-label text-secondary small mb-1">Menu top universe</label>
+            <input class="form-control" type="number" name="ctlunimax" id="ctl-unimax" min="1" max="511" value="15">
+          </div>
+        </div>
+        <div class="form-text mt-2">
+          The universe knob wraps <code>0…top</code>. Keep it at 15 for a single Art-Net net;
+          raise it if you want to reach higher universes from the knob.
+        </div>
+      </div>
+    </div>
+
     <!-- DMX outputs: up to 2 independent universes -->
     <div class="card mb-3">
       <div class="card-header">DMX Outputs</div>
@@ -772,6 +894,22 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('disp-rst').value  = d.dispRst  !== undefined ? d.dispRst  : -1;
   $('disp-sck').value  = d.dispSck  !== undefined ? d.dispSck  : -1;
   $('disp-mosi').value = d.dispMosi !== undefined ? d.dispMosi : -1;
+  // On-unit controls (issue #24): rotary encoder + buttons -> display menu
+  $('enc-a').value     = d.encA     !== undefined ? d.encA     : -1;
+  $('enc-b').value     = d.encB     !== undefined ? d.encB     : -1;
+  $('enc-sw').value    = d.encSw    !== undefined ? d.encSw    : -1;
+  $('enc-steps').value = d.encSteps !== undefined ? d.encSteps : 4;
+  $('enc-rev').checked = !!d.encReverse;
+  $('btn1-pin').value  = d.btn1Pin  !== undefined ? d.btn1Pin  : -1;
+  $('btn1-act').value  = d.btn1Act  !== undefined ? d.btn1Act  : 3;
+  $('btn2-pin').value  = d.btn2Pin  !== undefined ? d.btn2Pin  : -1;
+  $('btn2-act').value  = d.btn2Act  !== undefined ? d.btn2Act  : 4;
+  $('btn3-pin').value  = d.btn3Pin  !== undefined ? d.btn3Pin  : -1;
+  $('btn3-act').value  = d.btn3Act  !== undefined ? d.btn3Act  : 1;
+  $('btn4-pin').value  = d.btn4Pin  !== undefined ? d.btn4Pin  : -1;
+  $('btn4-act').value  = d.btn4Act  !== undefined ? d.btn4Act  : 2;
+  $('btn-ah').checked  = !!d.btnActiveHigh;
+  $('ctl-unimax').value = d.ctlUniMax !== undefined ? d.ctlUniMax : 15;
   $('eth-cs').value   = d.ethCs   !== undefined ? d.ethCs   : 5;
   $('eth-sck').value  = d.ethSck  !== undefined ? d.ethSck  : 18;
   $('eth-mosi').value = d.ethMosi !== undefined ? d.ethMosi : 23;
@@ -1048,11 +1186,15 @@ function physDoit(){ return phys('bottom',
 function physS3DevKitC(){ return phys('bottom',
   [['3V3'],['3V3'],['RST'],['IO4',4],['IO5',5],['IO6',6],['IO7',7],['IO15',15],['IO16',16],['IO17',17],['IO18',18],['IO8',8],['IO3',3],['IO46',46],['IO9',9],['IO10',10],['IO11',11],['IO12',12],['IO13',13],['IO14',14],['5V'],['GND']],
   [['GND'],['TX0',43],['RX0',44],['IO1',1],['IO2',2],['IO42',42],['IO41',41],['IO40',40],['IO39',39],['IO38',38],['IO37',37],['IO36',36],['IO35',35],['IO0',0],['IO45',45],['IO48',48],['IO47',47],['IO21',21],['IO20',20],['IO19',19],['GND'],['GND']]); }
-// The LuxDMX board's own pin map. v6 is the current revision; v5 has the SAME map, so one
-// spec builds both descriptors and v5 stays selectable for boards already in the field (and
-// for any device that saved boardSel=luxdmx_v5). Split them the day the maps diverge.
-function luxdmxDesc(id, name){
-  return finalizeDesc({ id:id, name:name, mcu:'esp32s3',
+function buildBoards(){
+  BOARDS = {};
+  // The LuxDMX board template. v5 and v6 are identical in copper EXCEPT the J6 expansion
+  // header, which v6 re-pinned so that swapping a cable between J4 and J6 can no longer
+  // destroy hardware (hardware/VALIDATION.md item 30, docs/display.md "Header safety").
+  // They stay SEPARATE entries on purpose: a v5 in the field really does have +5V on J6
+  // pin 1, and showing its owner the v6 pinout is the exact mistake this split prevents.
+  function luxdmxBoard(id, name, j6pins){
+   return finalizeDesc({ id:id, name:name, mcu:'esp32s3',
     cols:s3cols(true),
     // Everything on this board is fixed in copper except the J4 display header and the
     // J6 expansion header. `field` = the form field it locks; `gpio` is the pin it sits on.
@@ -1086,10 +1228,7 @@ function luxdmxDesc(id, name){
         {pin:1,silk:'3V3'},{pin:2,silk:'GND'},{pin:3,silk:'SDA',gpio:4},{pin:4,silk:'SCL',gpio:5},
         {pin:5,silk:'SCK',gpio:39},{pin:6,silk:'MOSI',gpio:40},{pin:7,silk:'CS',gpio:41},
         {pin:8,silk:'DC',gpio:42},{pin:9,silk:'RST',gpio:38} ]},
-      {ref:'J6', name:'Expansion header', pins:[
-        {pin:1,silk:'5V'},{pin:2,silk:'3V3'},{pin:3,silk:'GND'},{pin:4,silk:'IO35',gpio:35},
-        {pin:5,silk:'IO36',gpio:36},{pin:6,silk:'IO37',gpio:37},{pin:7,silk:'IO48',gpio:48},
-        {pin:8,silk:'IO19',gpio:19},{pin:9,silk:'IO20',gpio:20} ]}
+      {ref:'J6', name:'Expansion header', pins:j6pins}
     ],
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15,
              ledbright:{r:255, g:8, y:255, b:255, w:17},
@@ -1098,11 +1237,20 @@ function luxdmxDesc(id, name){
              dispsck:39, dispmosi:40, dispcs:41, dispdc:42, disprst:38,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8},
                       {en:true, uni:1, port:2, tx:16, rx:21, rts:47}] } });
-}
-function buildBoards(){
-  BOARDS = {};
-  BOARDS['luxdmx_v6'] = luxdmxDesc('luxdmx_v6', 'LuxDMX v6 (ESP32-S3 + W5500)');
-  BOARDS['luxdmx_v5'] = luxdmxDesc('luxdmx_v5', 'LuxDMX v5 (legacy, same pin map)');
+  }
+  // v5 (incl. v5.2): 5V on pin 1, and UART0 on 8/9. NB pins 8/9 were IO19/IO20 on the v5.0/v5.1
+  // first article; v5.2 moved IO19/IO20 to native USB and put the freed UART0 there instead.
+  BOARDS['luxdmx_v5'] = luxdmxBoard('luxdmx_v5', 'LuxDMX v5 (ESP32-S3 + W5500)', [
+    {pin:1,silk:'5V'},{pin:2,silk:'3V3'},{pin:3,silk:'GND'},{pin:4,silk:'IO35',gpio:35},
+    {pin:5,silk:'IO36',gpio:36},{pin:6,silk:'IO37',gpio:37},{pin:7,silk:'IO48',gpio:48},
+    {pin:8,silk:'TX0',gpio:43},{pin:9,silk:'RX0',gpio:44} ]);
+  // v6: pins 1/2 now match J4 exactly (+3V3, GND) so a swapped cable is harmless. 5V is gone
+  // from this header, and pin 9 is a 2nd return rather than a 7th GPIO (no free non-strapping
+  // GPIO was left on the module). Everything else slid up one position.
+  BOARDS['luxdmx_v6'] = luxdmxBoard('luxdmx_v6', 'LuxDMX v6 (ESP32-S3 + W5500)', [
+    {pin:1,silk:'3V3'},{pin:2,silk:'GND'},{pin:3,silk:'IO35',gpio:35},{pin:4,silk:'IO36',gpio:36},
+    {pin:5,silk:'IO37',gpio:37},{pin:6,silk:'IO48',gpio:48},{pin:7,silk:'TX0',gpio:43},
+    {pin:8,silk:'RX0',gpio:44},{pin:9,silk:'GND'} ]);
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
     cols:s3cols(false), phys:physS3DevKitC(),
     preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,
@@ -1145,7 +1293,11 @@ var ROLE_META = {
   dispsck:{l:'Display SCK',t:'out'}, dispmosi:{l:'Display MOSI',t:'out'},
   ethcs:{l:'W5500 Ethernet CS',t:'out'},   ethsck:{l:'W5500 Ethernet SCK',t:'out'},
   ethmosi:{l:'W5500 Ethernet MOSI',t:'out'}, ethmiso:{l:'W5500 Ethernet MISO',t:'in'},
-  ethint:{l:'W5500 Ethernet Interrupt',t:'in'}, ethrst:{l:'W5500 Ethernet Reset',t:'out'}
+  ethint:{l:'W5500 Ethernet Interrupt',t:'in'}, ethrst:{l:'W5500 Ethernet Reset',t:'out'},
+  // On-unit controls (issue #24) — all inputs, so they're happy on input-only pins too
+  enca:{l:'Encoder A',t:'in'}, encb:{l:'Encoder B',t:'in'}, encsw:{l:'Encoder push',t:'in'},
+  btn1pin:{l:'Button 1',t:'in'}, btn2pin:{l:'Button 2',t:'in'},
+  btn3pin:{l:'Button 3',t:'in'}, btn4pin:{l:'Button 4',t:'in'}
 };
 function roleLabel(role){
   if (ROLE_META[role]) return ROLE_META[role].l;
@@ -1168,6 +1320,9 @@ function activeRoles(){
   if (dt === '4') r = r.concat(['dispcs','dispdc','disprst','dispsck','dispmosi']);
   document.querySelectorAll('.out-card').forEach(function(card, i){ r.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
   if ($('ethon-sw') && $('ethon-sw').checked) r = r.concat(['ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst']);
+  // On-unit controls: a pin counts as claimed only once it's actually set (>= 0),
+  // which the conflict map already filters on, so listing them here is enough.
+  r = r.concat(['enca','encb','encsw','btn1pin','btn2pin','btn3pin','btn4pin']);
   return r;
 }
 
@@ -1195,7 +1350,8 @@ function decoratePin(input){
 function decorateAllPins(){
   var names = ['ledpin','ledr','ledg','ledy','ledb','ledw',
                'dispsda','dispscl','dispcs','dispdc','disprst','dispsck','dispmosi',
-               'ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst'];
+               'ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst',
+               'enca','encb','encsw','btn1pin','btn2pin','btn3pin','btn4pin'];
   document.querySelectorAll('.out-card').forEach(function(card, i){ names.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
   names.forEach(function(n){ decoratePin(byRole(n)); });
   document.querySelectorAll('.out-en').forEach(function(en){

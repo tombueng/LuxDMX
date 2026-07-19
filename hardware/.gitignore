@@ -49,6 +49,8 @@ tools/
 !validate_electrical.py
 !validate_tbu_iso.py
 !validate_critical.py
+# 2026-07-19 mis-plug gate: J4/J6 are the same connector, so their power pins must stay identical
+!validate_header_parity.py
 # 2026-07-01 reproducible routing pipeline (route_all.sh) + the impedance/partial-net steps
 !route_tbu.py
 !setup_netclasses.py

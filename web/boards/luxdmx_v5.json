@@ -1,6 +1,6 @@
 {
   "id": "luxdmx_v5",
-  "name": "LuxDMX v5 (legacy, same pin map)",
+  "name": "LuxDMX v5 (ESP32-S3 + W5500)",
   "mcu": "esp32s3",
   "cols": [
     [
@@ -257,7 +257,7 @@
       }
     ]
   },
-  "_source": "generated from hardware/luxdmx.py",
+  "_source": "generated from hardware/scripts/luxdmx.py",
   "hardwired": [
     { "field": "o0_tx",   "gpio": 17, "label": "DMX A · TX → DI" },
     { "field": "o0_rx",   "gpio": 18, "label": "DMX A · RX → RO" },
@@ -292,7 +292,7 @@
       { "pin": 1, "silk": "5V" }, { "pin": 2, "silk": "3V3" }, { "pin": 3, "silk": "GND" },
       { "pin": 4, "silk": "IO35", "gpio": 35 }, { "pin": 5, "silk": "IO36", "gpio": 36 },
       { "pin": 6, "silk": "IO37", "gpio": 37 }, { "pin": 7, "silk": "IO48", "gpio": 48 },
-      { "pin": 8, "silk": "IO19", "gpio": 19 }, { "pin": 9, "silk": "IO20", "gpio": 20 }
+      { "pin": 8, "silk": "TX0", "gpio": 43 }, { "pin": 9, "silk": "RX0", "gpio": 44 }
     ] }
   ]
 }
