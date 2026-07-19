@@ -13,4 +13,4 @@ Consumed by add_silk_branding.py:
   * silk  "LuxDMX v<HW_VERSION>" on F.Silkscreen
   * board title-block Revision = v<HW_VERSION> (prints on the fab drawing)
 """
-HW_VERSION = "5.2"
+HW_VERSION = "6.0"

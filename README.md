@@ -834,6 +834,13 @@ Mono panels are 1-bit — white, blue and yellow/blue-split versions all behave 
 (the colour is the physical emitter, not addressable). The I²C address is auto-detected
 (`0x3C` / `0x3D`). SPI colour panels need ~5 pins, so they only fit the non-Ethernet boards.
 
+> **⚠ Using a LuxDMX board v5.2 or older? Check which header you're plugging into.** Those boards have
+> two identical JST SH 9-pin headers side by side, **J4 (display)** and **J6 (expansion)**, whose power
+> pins do *not* match. Putting the display on J6 feeds it **+5V on VCC and +3V3 on GND** and kills it
+> instantly. v6.0 gave both headers the same power pins so a mix-up is harmless, but on an older board
+> it isn't — [docs/display.md → Header safety](docs/display.md#header-safety-j4-vs-j6) explains how to
+> key your cables so it can't happen.
+
 ### Settings (Settings → Display)
 
 | Field | Notes |

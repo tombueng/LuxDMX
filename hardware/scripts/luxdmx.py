@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""LuxDMX v5.2 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
+"""LuxDMX v6.0 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
 
 Self-contained board (no plug-in module):
   ESP32-S3-WROOM-1-N8R2  +  W5500 SPI-Ethernet + HR911105A MagJack
@@ -427,6 +427,10 @@ for ref, net, rref, rval in [('D2', LED_R, 'R13', '1k'), ('D3', LED_G, 'R14', '1
 #   color SPI OLED/TFT (SSD1351/ST7789): SCK=IO39 MOSI=IO40 CS=IO41 DC=IO42 RST=IO38
 #   NB: v3 uses these FREE GPIOs, NOT the doc's S3 default 8/9 (here 8=DMX_DE, 9=ETH_RST).
 #   Firmware must set dispSda/dispScl (+ SPI pins) in /config to match this header.
+#
+#   Pins 1/2 (+3V3, GND) are the shared power pair: J6 is the same connector and was
+#   re-pinned in v6.0 to match them, so plugging a cable into the wrong header is
+#   survivable. Never reorder them -- see the J6 block for the full reasoning.
 # ============================================================================
 DISP_SDA = Net('DISP_SDA'); DISP_SCL = Net('DISP_SCL')
 DISP_SCK = Net('DISP_SCK'); DISP_MOSI = Net('DISP_MOSI'); DISP_CS = Net('DISP_CS')
@@ -446,10 +450,28 @@ J4['MP'] += GND     # mounting tabs -> GND (mechanical anchor + shield)
 # ============================================================================
 # J6  Expansion header (JST SH 1.0mm 9-pin) — breaks out 6 FREE, non-strapping
 #   ESP32-S3 GPIOs + power for I2C / SPI / UART / GPIO add-ons.
-#     1 +5V  2 +3V3  3 GND  4 IO35  5 IO36  6 IO37  7 IO48  8 IO19  9 IO20
+#     1 +3V3  2 GND  3 IO35  4 IO36  5 IO37  6 IO48  7 IO43  8 IO44  9 GND
 #   Any pin muxes to I2C (SDA/SCL), SPI (SCK/MOSI/MISO/CS), UART, PWM or ADC in
-#   firmware, so the port can run an I2C bus AND a SPI bus at once. IO19/IO20 are
-#   also the S3 native-USB D-/D+ (free here because USB-UART is the CH340).
+#   firmware, so the port can run an I2C bus AND a SPI bus at once. Pins 7/8 are the
+#   freed UART0 (IO19/IO20 are native USB since v5.2).
+#
+#   POWER-PIN PARITY WITH J4 (v6.0). J4 and J6 are the same JST SH 9-pin part, so a
+#   cable physically plugs into either. Up to v5.2 their power pins disagreed (J4 was
+#   1=+3V3 2=GND, J6 was 1=+5V 2=+3V3 3=GND), so a display plugged into J6 got +5V on
+#   its VCC and +3V3 on its GND and died on the spot; an expansion board plugged into
+#   J4 sank its whole ground current through IO4. J6 now carries J4's 1=+3V3 2=GND, so
+#   a swap can only shuffle 3V3 CMOS signals, which both sides survive.
+#
+#   Consequences, deliberately chosen (see docs/display.md "Header safety"):
+#     * +5V is GONE from this header. Nothing was built against the v5.2 J6 pinout yet,
+#       whereas the J4 display cables are in use, so J6 is the one that moves. Feed
+#       5V loads externally.
+#     * pin 9 is a 2nd GND, not a 7th GPIO: the module has no free non-strapping GPIO
+#       left (only IO3/IO45/IO46 remain and all three are strapping pins). A second
+#       return on a 6-signal 1.0mm header is the better use anyway. It also means a
+#       mis-plugged display lands its RST (J4 pin 9) on GND, i.e. sits harmlessly in
+#       reset rather than half-booting.
+#   DO NOT reorder pins 1/2 on either header without re-reading this block.
 # ============================================================================
 EXP35 = Net('EXP_IO35'); EXP36 = Net('EXP_IO36'); EXP37 = Net('EXP_IO37')
 EXP48 = Net('EXP_IO48')
@@ -457,9 +479,9 @@ U1['IO35'] += EXP35; U1['IO36'] += EXP36; U1['IO37'] += EXP37
 U1['IO48'] += EXP48
 U1['IO20'] += USB_DP; U1['IO19'] += USB_DM   # NATIVE USB: IO20=D+, IO19=D- (was the J6 EXP19/EXP20 pins)
 J6 = HDR(); J6.ref = 'J6'; J6.value = 'EXP SH9'
-J6[1] += P5V;   J6[2] += P3V3;  J6[3] += GND
-J6[4] += EXP35; J6[5] += EXP36; J6[6] += EXP37
-J6[7] += EXP48; J6[8] += S3_TX; J6[9] += S3_RX   # freed UART0 on 8/9 (IO19/IO20 are native USB now)
+J6[1] += P3V3;  J6[2] += GND;   J6[3] += EXP35   # 1/2 match J4 exactly -- do not reorder
+J6[4] += EXP36; J6[5] += EXP37; J6[6] += EXP48
+J6[7] += S3_TX; J6[8] += S3_RX; J6[9] += GND     # freed UART0 on 7/8; 9 = 2nd return
 J6['MP'] += GND
 
 # ============================================================================
