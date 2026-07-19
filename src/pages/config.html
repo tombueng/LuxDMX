@@ -1083,7 +1083,7 @@ function showAllVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['luxdmx_v5','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var BUILTINS = ['luxdmx_v5','luxdmx_v6','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families: used when no full board descriptor is selected (Custom).
@@ -1185,7 +1185,13 @@ function physS3DevKitC(){ return phys('bottom',
   [['GND'],['TX0',43],['RX0',44],['IO1',1],['IO2',2],['IO42',42],['IO41',41],['IO40',40],['IO39',39],['IO38',38],['IO37',37],['IO36',36],['IO35',35],['IO0',0],['IO45',45],['IO48',48],['IO47',47],['IO21',21],['IO20',20],['IO19',19],['GND'],['GND']]); }
 function buildBoards(){
   BOARDS = {};
-  BOARDS['luxdmx_v5'] = finalizeDesc({ id:'luxdmx_v5', name:'LuxDMX v5 (ESP32-S3 + W5500)', mcu:'esp32s3',
+  // The LuxDMX board template. v5 and v6 are identical in copper EXCEPT the J6 expansion
+  // header, which v6 re-pinned so that swapping a cable between J4 and J6 can no longer
+  // destroy hardware (hardware/VALIDATION.md item 30, docs/display.md "Header safety").
+  // They stay SEPARATE entries on purpose: a v5 in the field really does have +5V on J6
+  // pin 1, and showing its owner the v6 pinout is the exact mistake this split prevents.
+  function luxdmxBoard(id, name, j6pins){
+   return finalizeDesc({ id:id, name:name, mcu:'esp32s3',
     cols:s3cols(true),
     // Everything on this board is fixed in copper except the J4 display header and the
     // J6 expansion header. `field` = the form field it locks; `gpio` is the pin it sits on.
@@ -1219,10 +1225,7 @@ function buildBoards(){
         {pin:1,silk:'3V3'},{pin:2,silk:'GND'},{pin:3,silk:'SDA',gpio:4},{pin:4,silk:'SCL',gpio:5},
         {pin:5,silk:'SCK',gpio:39},{pin:6,silk:'MOSI',gpio:40},{pin:7,silk:'CS',gpio:41},
         {pin:8,silk:'DC',gpio:42},{pin:9,silk:'RST',gpio:38} ]},
-      {ref:'J6', name:'Expansion header', pins:[
-        {pin:1,silk:'5V'},{pin:2,silk:'3V3'},{pin:3,silk:'GND'},{pin:4,silk:'IO35',gpio:35},
-        {pin:5,silk:'IO36',gpio:36},{pin:6,silk:'IO37',gpio:37},{pin:7,silk:'IO48',gpio:48},
-        {pin:8,silk:'IO19',gpio:19},{pin:9,silk:'IO20',gpio:20} ]}
+      {ref:'J6', name:'Expansion header', pins:j6pins}
     ],
     preset:{ ledType:3, ledr:1, ledg:2, ledy:6, ledb:7, ledw:15,
              ledbright:{r:255, g:8, y:255, b:255, w:17},
@@ -1231,6 +1234,20 @@ function buildBoards(){
              dispsck:39, dispmosi:40, dispcs:41, dispdc:42, disprst:38,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8},
                       {en:true, uni:1, port:2, tx:16, rx:21, rts:47}] } });
+  }
+  // v5 (incl. v5.2): 5V on pin 1, and UART0 on 8/9. NB pins 8/9 were IO19/IO20 on the v5.0/v5.1
+  // first article; v5.2 moved IO19/IO20 to native USB and put the freed UART0 there instead.
+  BOARDS['luxdmx_v5'] = luxdmxBoard('luxdmx_v5', 'LuxDMX v5 (ESP32-S3 + W5500)', [
+    {pin:1,silk:'5V'},{pin:2,silk:'3V3'},{pin:3,silk:'GND'},{pin:4,silk:'IO35',gpio:35},
+    {pin:5,silk:'IO36',gpio:36},{pin:6,silk:'IO37',gpio:37},{pin:7,silk:'IO48',gpio:48},
+    {pin:8,silk:'TX0',gpio:43},{pin:9,silk:'RX0',gpio:44} ]);
+  // v6: pins 1/2 now match J4 exactly (+3V3, GND) so a swapped cable is harmless. 5V is gone
+  // from this header, and pin 9 is a 2nd return rather than a 7th GPIO (no free non-strapping
+  // GPIO was left on the module). Everything else slid up one position.
+  BOARDS['luxdmx_v6'] = luxdmxBoard('luxdmx_v6', 'LuxDMX v6 (ESP32-S3 + W5500)', [
+    {pin:1,silk:'3V3'},{pin:2,silk:'GND'},{pin:3,silk:'IO35',gpio:35},{pin:4,silk:'IO36',gpio:36},
+    {pin:5,silk:'IO37',gpio:37},{pin:6,silk:'IO48',gpio:48},{pin:7,silk:'TX0',gpio:43},
+    {pin:8,silk:'RX0',gpio:44},{pin:9,silk:'GND'} ]);
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
     cols:s3cols(false), phys:physS3DevKitC(),
     preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,

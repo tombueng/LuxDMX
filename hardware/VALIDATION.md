@@ -1,7 +1,30 @@
-# LuxDMX v5.2 — Hardware Validation Tracking
+# LuxDMX v6 — Hardware Validation Tracking
 
 Single source of truth for "is this board safe to fabricate?" Re-run the scripts after **any**
 board change and update the table. Status: ✅ pass · ⚠️ pass-with-caveat · ❌ blocker · 🔲 needs manual/datasheet check.
+
+## 2026-07-19 — v6: J4/J6 mis-plug fix (breaking pinout change)
+
+**Why the MAJOR bump:** J6's pinout changed incompatibly, so a v5.2 expansion cable does not fit a v6
+board. That is the versioning scheme's definition of MAJOR (`scripts/hw_version.py`).
+
+J4 (display) and J6 (expansion) are the same JST SH 9-pin connector, sitting 9mm apart. Their power pins
+used to disagree, and plugging a display into J6 fed it **+5V on VCC and +3V3 on GND**. That killed a
+display on the bench — this fix is reactive, not theoretical.
+
+- **J6 re-pinned** `1=+5V 2=+3V3 3=GND 4..9=sig` → **`1=+3V3 2=GND 3..8=sig 9=GND`**, matching J4's power
+  pins. A swapped cable can now only shuffle 3V3 CMOS signals, which both sides survive.
+- **J6, not J4, moved.** Whichever header changes invalidates its cables, and J6's pinout was only
+  introduced in v5.2 with nothing built against it, while J4 display cables are in active use. Changing J4
+  would have put +5V on old display cables all over again.
+- **+5V is gone from J6**, and pin 9 is a **2nd GND**, not a 7th GPIO: the module has no free
+  non-strapping GPIO left (IO3/IO45/IO46 are all strapping). The extra return also means a mis-plugged
+  display lands RST on GND and sits harmlessly in reset.
+- **New HARD gate 8**, `scripts/validate_header_parity.py`, re-checks the invariant on the board every run.
+  Proven against the v5.2 board: it fails on exactly pins 1 and 2.
+- **Surgical re-route, not a board-wide one.** Every J6 signal slid exactly one 1.00mm pitch, 45° geometry
+  preserved, long hauls to the S3 untouched. **0 unrouted, 0 DRC**, and the pre-existing C12 placement
+  warning (6.9mm) is byte-identical to the v5.2 baseline.
 
 **Overall verdict (2026-07-01, re-routed on a new placement + full re-validation, all 7 hard gates pass):
 DESIGN-COMPLETE, fab-ready as a first-spin PROTOTYPE, not production-proven.** Electrically sound, **0 unrouted / 0 schematic-parity / 0 DRC errors**
@@ -83,7 +106,7 @@ python scripts/validate_electrical.py      # DC/RC operating points (no KiCad ne
 # --- 2026-07-01: after ANY placement/netlist change, just two commands (the above validators are all
 #     wrapped by validate_all.sh; run them standalone only to debug a specific gate) ---
 bash route_all.sh       # setup_netclasses -> rebuild_iso -> escape -> Freerouting-loop -> finish_partial -> maze -> cleanup -> tighten -> widen_eth
-bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DRC/geometry/DMX-iso/electrical/placement/critical)
+bash validate_all.sh    # 8-gate production verdict + exit code (connectivity/DRC/geometry/DMX-iso/electrical/placement/critical/header-parity)
 ```
 
 ## Status matrix
@@ -114,6 +137,7 @@ bash validate_all.sh    # 7-gate production verdict + exit code (connectivity/DR
 | 27 | PoE TVS margin | ✅ | datasheet | **FIXED**: D10 SMAJ58A→**SMAJ60A** (58V standoff was only 1V over 57V max) |
 | 28 | Every part rating/value/datasheet | ✅/⚠️ | 4-agent datasheet pass | see **VALIDATION_REPORT.md**: all active parts + crystal + connectors read from official datasheets; ratings/values recomputed. 3 fixes applied, open items listed. |
 | 29 | ESP32-S3 GPIO map | ✅ | datasheet | **every pin validated, zero must-change**. IO35/36/37 carry `EXP_IO35/36/37` and stay valid on the **N8R2**: its PSRAM is **quad**, which does not touch GPIO33–37 (only **octal** R8 parts wire those to memory). Strapping safe, no flash/input-only conflict, UART/SPI routable, IO19/20 native-USB noted |
+| 30 | J4/J6 mis-plug safety (MACHINE-ENFORCED) | ✅ | **`scripts/validate_header_parity.py`** (HARD gate 8 in validate_all.sh) | **v6 fix for a defect that destroyed hardware.** J4 (display) and J6 (expansion) are the same JST SH 9-pin part, so a cable fits either. Up to v5.2 their power pins disagreed (J4 `1=+3V3 2=GND`, J6 `1=+5V 2=+3V3 3=GND`): plugging a display into J6 put **+5V on its VCC and +3V3 on its GND** and killed it on the bench; the reverse returned an expansion board's ground current through IO4. **J6 re-pinned to `1=+3V3 2=GND 3..8=signals 9=GND`** so both headers share one power layout, **+5V removed from J6** (no free non-strapping GPIO remained for a 7th signal — only IO3/IO45/IO46, all strapping — so pin 9 became a 2nd return, which also lands a mis-plugged display's RST on GND = harmlessly held in reset). J6 was the header to move because nothing was built against its v5.2 pinout yet while J4 display cables are in use. The gate re-checks the invariant on the **board** each run: FATAL on two different rails at one position or a positive rail opposite a signal; GND-vs-signal allowed (current-limited, same class as GPIO-vs-GPIO contention). **Verified to catch the real defect: run against the v5.2 board it fails on exactly pins 1 and 2.** Re-pin was surgical (each signal slid one 1.00mm pitch, 45° geometry preserved) — **0 unrouted, 0 DRC**, no board-wide re-route |
 | 30 | SPICE power chain | ✅ | ngspice-42 (WSL) | DC + transient (sim/*.cir): with the TPS2116 mux, VCC2 ≥ 4.5V across the **whole** USB range (4.61V @ 4.70V VBUS, 65mΩ-max-over-temp case 4.59V); PoE 5.0V→4.91V ✓; load-step ok. See report §3 (margin now resolved). |
 | 20 | ESP32-S3 strapping pins | ⚠️ | schematic | IO0 pulled-up ✓; IO3/IO45/IO46 float (standard for WROOM-1, verify) |
 | 21 | ESD on USB data / DMX | ✅ | schematic | DMX has SM712 TVS ✓; **USB D+/D- now protected by U8 USBLC6-2SC6** ESD/TVS array (VBUS clamp at the connector) |

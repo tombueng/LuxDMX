@@ -3,7 +3,9 @@
 # Run after any routing/placement/netlist change:  ./validate_all.sh
 #
 # HARD gates (block fab):  connectivity (0 unrouted), DRC (0 violations), geometry/DFM + power current,
-#                          DMX isolation (>=4mm creepage), electrical (no FAIL item).
+#                          DMX isolation (>=4mm creepage), electrical (no FAIL item),
+#                          header parity (J4/J6 carry the same power pins -- a swapped cable must not
+#                          destroy hardware; it did on v5.2 and cost a display).
 # SOFT gates (quality, surfaced but do not block):  EMC placement (decoupling distances), critical-net SI
 #                          (eth/SPI/crystal length, vias, skew, detour, net-class widths).
 # Exit code = number of HARD gates failed (0 = production-ready).
@@ -39,6 +41,7 @@ gate "4  DMX ISOLATION  (>=4mm creepage)"    HARD scripts/validate_tbu_iso.py
 gate "5  ELECTRICAL  (rails/current/loads)"  HARD scripts/validate_electrical.py
 gate "6  PLACEMENT / EMC  (decoupling)"      SOFT scripts/validate_placement.py
 gate "7  CRITICAL NETS  (length/via/skew)"   SOFT scripts/validate_critical.py
+gate "8  HEADER PARITY  (J4/J6 mis-plug)"    HARD scripts/validate_header_parity.py
 
 echo "=================================================================="
 if [ $hard -eq 0 ]; then

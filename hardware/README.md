@@ -109,7 +109,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
   the chip over USB by itself, so there is no auto-reset circuit either.
 - **R8 / R9** (5.1 kΩ) — the USB-C **CC pulldowns (Rd)** that tell a host to supply 5 V.
   **U8 — USBLC6-2SC6** *(C7519)* — ESD clamp across the data pair. **F1** — self-healing PTC on VBUS.
-- **UART0 is free** and broken out on **J6 pins 8/9** (`S3_TX` / `S3_RX`), since nothing spends it on a bridge.
+- **UART0 is free** and broken out on **J6 pins 7/8** (`S3_TX` / `S3_RX`), since nothing spends it on a bridge.
   *(The v5 first article carried a **CH340C (U3)** plus a **Q1/Q2** 2-transistor auto-reset. Its collectors were
   swapped, so EN and IO0 sat on the wrong transistors: flashing needed the manual BOOT-button dance, and a tool
   asserting DTR or RTS alone could yank EN or IO0. Rather than re-wire it, the bridge and the reset circuit are
@@ -124,6 +124,34 @@ Each universe is a self-contained galvanic island; the two share no copper with 
   Carries **both** I²C (SDA/SCL → for SSD1306/SH1106 mono OLEDs) **and** SPI (SCK/MOSI/CS/DC/RST → for
   SSD1351 colour OLED / ST7789 TFT) on free, non-strapping GPIOs. JST SH is tiny and uses widely-available
   pre-crimped cables. *(Optional — populate only if you want the panel.)*
+- **J6 — JST SH 1.0 mm 9-pin expansion header** — six free, non-strapping GPIOs for I²C / SPI / UART / PWM /
+  ADC add-ons, plus 3V3 and two grounds. Any pin muxes to whatever the S3's GPIO matrix supports, so the port
+  can run an I²C bus and a SPI bus at once. *(Optional.)*
+
+#### Both headers share one power layout — on purpose
+
+J4 and J6 are the **same connector**, so a cable fits either one. Their power pins are therefore
+**identical**, and a validator (`scripts/validate_header_parity.py`, hard gate) keeps them that way:
+
+| pin | J4 — display | J6 — expansion |
+|---|---|---|
+| **1** | **+3V3** | **+3V3** |
+| **2** | **GND** | **GND** |
+| 3 | SDA (IO4) | IO35 |
+| 4 | SCL (IO5) | IO36 |
+| 5 | SCK (IO39) | IO37 |
+| 6 | MOSI (IO40) | IO48 |
+| 7 | CS (IO41) | TX0 (IO43) |
+| 8 | DC (IO42) | RX0 (IO44) |
+| 9 | RST (IO38) | GND |
+
+Plug a cable into the wrong header and nothing dies: the module still gets correct power, and only 3V3 CMOS
+signals land in the wrong places. A mis-plugged display sees GND on its RST and just sits quietly in reset.
+
+> **⚠ v5.2 and earlier did NOT have this.** Back then J6 was `1=+5V 2=+3V3 3=GND`, so a display plugged into
+> J6 got **+5V on its VCC and +3V3 on its GND** and died instantly. If you have a v5.2 board, see
+> [docs/display.md → Header safety](../docs/display.md#header-safety-j4-vs-j6) before plugging anything in.
+> **+5V is no longer on J6** as of v6 — feed 5 V loads from your own supply.
 
 ---
 
