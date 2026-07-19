@@ -30,6 +30,16 @@ struct Config {
     DmxOutput outputs[MAX_OUTPUTS];
     int       dispType;
     int       dispSda, dispScl, dispRot, dispCs, dispDc, dispRst, dispSck, dispMosi;
+    // On-unit controls (issue #24): optional rotary encoder + up to 4 buttons that
+    // drive a small menu on the display. Every pin -1 = unset; the whole subsystem
+    // stays off (and costs nothing) unless something is wired. See input_map.h.
+    int       encA, encB, encSw;   // rotary encoder A/B + push button (-1 = none)
+    int       encSteps;            // quadrature edges per detent (1/2/4)
+    bool      encReverse;          // flip rotation direction (A/B-swapped wiring)
+    int       btn1Pin, btn2Pin, btn3Pin, btn4Pin;   // extra buttons (-1 = none)
+    int       btn1Act, btn2Act, btn3Act, btn4Act;   // BtnRole per button (off/enter/back/next/prev)
+    bool      btnActiveHigh;       // buttons + push: true = active-high (to Vcc), false = active-low (to GND)
+    int       ctlUniMax;           // top universe the knob/menu reaches (wraps 0..ctlUniMax)
     int       ethCs, ethSck, ethMosi, ethMiso, ethInt, ethRst, ethFreqMhz;
     bool      ethW5500;
     int       ethSpiPhy;   // SPI Ethernet chip: 0=W5500, 1=DM9051 (used when wiredPhy = SPI)

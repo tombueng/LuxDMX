@@ -138,6 +138,12 @@ static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64
 #include "generated/favicon_png.h"
 #include "generated/bootstrap_min_css.h"
 
+// On-unit controls (issue #24): rotary encoder + buttons -> a small display menu.
+// Pure, host-tested decode/mapping/menu logic (no Arduino); main.cpp only samples
+// the pins, renders the menu, and applies the result.
+#include "input_map.h"
+#include "menu.h"
+
 // ---------------------------------------------------------------------------
 // Hardware
 // ---------------------------------------------------------------------------
@@ -2106,6 +2112,22 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispRst\":";    j += cfg.dispRst;            j += ",";
     j += "\"dispSck\":";    j += cfg.dispSck;            j += ",";
     j += "\"dispMosi\":";   j += cfg.dispMosi;           j += ",";
+    // On-unit controls (issue #24): rotary encoder + buttons that drive the display menu.
+    j += "\"encA\":";       j += cfg.encA;               j += ",";
+    j += "\"encB\":";       j += cfg.encB;               j += ",";
+    j += "\"encSw\":";      j += cfg.encSw;              j += ",";
+    j += "\"encSteps\":";   j += cfg.encSteps;           j += ",";
+    j += "\"encReverse\":"; j += cfg.encReverse ? "true" : "false"; j += ",";
+    j += "\"btn1Pin\":";    j += cfg.btn1Pin;            j += ",";
+    j += "\"btn1Act\":";    j += cfg.btn1Act;            j += ",";
+    j += "\"btn2Pin\":";    j += cfg.btn2Pin;            j += ",";
+    j += "\"btn2Act\":";    j += cfg.btn2Act;            j += ",";
+    j += "\"btn3Pin\":";    j += cfg.btn3Pin;            j += ",";
+    j += "\"btn3Act\":";    j += cfg.btn3Act;            j += ",";
+    j += "\"btn4Pin\":";    j += cfg.btn4Pin;            j += ",";
+    j += "\"btn4Act\":";    j += cfg.btn4Act;            j += ",";
+    j += "\"btnActiveHigh\":"; j += cfg.btnActiveHigh ? "true" : "false"; j += ",";
+    j += "\"ctlUniMax\":";  j += cfg.ctlUniMax;          j += ",";
     j += "\"ethCs\":";      j += cfg.ethCs;              j += ",";
     j += "\"ethSck\":";     j += cfg.ethSck;             j += ",";
     j += "\"ethMosi\":";    j += cfg.ethMosi;            j += ",";
@@ -3266,6 +3288,43 @@ static const char* dispProto() {
     return cfg.protocol == 0 ? "Art-Net" : cfg.protocol == 1 ? "sACN" : "Both";
 }
 
+// ---------------------------------------------------------------------------
+// On-unit controls state (issue #24). Shared between the input task (the writer:
+// it owns all navigation) and the display task (a reader: it only draws the menu/
+// overlay). A one-frame-stale read just redraws next tick and nothing is ever
+// freed, so plain volatiles are enough — no lock on the DMX path.
+// ---------------------------------------------------------------------------
+enum { CTL_ID_UNI_A = 1, CTL_ID_UNI_B = 2, CTL_ID_PROTO = 3, CTL_ID_EXIT = 9 };
+
+static bool        ctlEnabled = false;   // any control wired -> input task runs
+static bool        ctlUseMenu = false;   // an ENTER-capable input exists -> full menu (else direct nudge)
+static InputMapper ctlMapper;
+static Menu        ctlMenu;
+
+// Direct fallback (no ENTER-capable input, or no display): rotation just nudges
+// one output's universe and auto-saves after a short idle.
+static volatile bool     ctlDirectEditing = false;
+static volatile int      ctlDirectOut     = 0;
+static volatile int      ctlDirectUni     = 0;
+
+static volatile uint32_t ctlFlashUntil = 0;      // brief SAVED/REBOOT banner deadline
+static char              ctlFlashMsg[10] = "SAVED";
+static volatile bool     g_sacnRejoin  = false;  // ask netRxTask (the socket owner) to re-join sACN
+
+// The display shows the controls overlay/menu whenever it's open, being edited, or
+// a just-committed banner is still up.
+static bool ctlOverlayActive() {
+    return ctlEnabled && (ctlMenu.isOpen() || ctlDirectEditing ||
+                          (int32_t)(millis() - ctlFlashUntil) < 0);
+}
+
+// Human label for a menu item's value (protocol names; everything else numeric).
+static void ctlItemValue(const MenuItem& it, int32_t v, char* buf, size_t n) {
+    if (it.kind == MI_ACTION)       buf[0] = '\0';
+    else if (it.id == CTL_ID_PROTO) snprintf(buf, n, "%s", v == 0 ? "Art-Net" : v == 1 ? "sACN" : "Both");
+    else                            snprintf(buf, n, "%d", (int)v);
+}
+
 // Compact universe label for the status display: "0" for a single output, "0+5"
 // when both outputs are enabled (each output carries its own universe). Falls
 // back to output 0's universe if nothing is enabled yet. Single static buffer is
@@ -3433,8 +3492,103 @@ static void dispDrawBanner(const char* l1, const char* l2, uint16_t accent) {
     dispCenter(l2, 1, H >= 64 ? H / 2 + 4 : 16);
 }
 
-// Priority: 1=conflict, 2=identify, 3=manual, 4=merging, 0=status.
+// On-unit controls menu / edit overlay (issue #24). Adapts to the panel size:
+// the tall panels show a scrolling item list; the 128x32 strip shows just the
+// selected item. A ">" caret marks the highlight (the only cue that survives the
+// 1-bit mono collapse); editing wraps the value in <angle brackets> and tints it
+// amber on the colour panel.
+static void dispDrawControls() {
+    const int H = gfx->height(), W = gfx->width();
+    const bool editing = (ctlMenu.mode == MENU_EDIT);
+    gfx->fillScreen(0);
+    gfx->setTextSize(1);
+
+    // Just-committed banner (SAVED / REBOOT) takes the whole screen for a moment.
+    if (!ctlMenu.isOpen() && !ctlDirectEditing && (int32_t)(millis() - ctlFlashUntil) < 0) {
+        dispDrawBanner(ctlFlashMsg, "", C_GREEN);
+        return;
+    }
+
+    // Direct fallback overlay: one output's universe, big and centred.
+    if (!ctlMenu.isOpen()) {
+        if (!ctlDirectEditing) return;
+        const bool dual = dispEnabledOutputs() >= 2;
+        char l1[12], l2[14];
+        if (dual) snprintf(l1, sizeof(l1), "OUT %c", (char)('A' + ctlDirectOut));
+        else      snprintf(l1, sizeof(l1), "UNIVERSE");
+        snprintf(l2, sizeof(l2), "Uni %d", ctlDirectUni);
+        gfx->setTextColor(col(C_AMBER)); dispCenter(l1, 1, H >= 64 ? 16 : 0);
+        gfx->setTextColor(col(C_WHITE)); dispCenter(l2, H >= 64 ? 3 : 2, H >= 64 ? H / 2 - 4 : 12);
+        if (H >= 64) { gfx->setTextColor(col(C_GREY)); dispCenter("turn=set  wait=save", 1, H - 10); }
+        return;
+    }
+
+    // Disabled items (e.g. Uni B on a single-output unit) are hidden, so work over
+    // the enabled ones only: no blank rows, and the "n/total" counter is honest.
+    int order[MENU_MAX_ITEMS], nEn = 0, selPos = 0;
+    for (int i = 0; i < ctlMenu.count; i++) {
+        if (!ctlMenu.items[i].enabled) continue;
+        if (i == ctlMenu.sel) selPos = nEn;
+        order[nEn++] = i;
+    }
+    if (nEn == 0) return;
+
+    char val[16], shown[20];
+    // Compact 128x32 strip: header + the selected item only.
+    if (H <= 32) {
+        const MenuItem& it = ctlMenu.items[ctlMenu.sel];
+        int32_t v = editing ? ctlMenu.edit : it.value;
+        ctlItemValue(it, v, val, sizeof(val));
+        gfx->setTextColor(col(C_GREY));
+        gfx->setCursor(0, 0); gfx->print("MENU");
+        char pos[8]; snprintf(pos, sizeof(pos), "%d/%d", selPos + 1, nEn);
+        gfx->setCursor(W - (int)strlen(pos) * 6, 0); gfx->print(pos);
+        gfx->setTextColor(col(editing ? C_AMBER : C_WHITE));
+        gfx->setCursor(0, 12); gfx->print(it.label);
+        if (it.kind != MI_ACTION) {
+            if (editing) snprintf(shown, sizeof(shown), "<%s>", val);
+            else         snprintf(shown, sizeof(shown), "%s", val);
+            gfx->setCursor(W - (int)strlen(shown) * 6, 12); gfx->print(shown);
+        }
+        return;
+    }
+
+    // Tall panels: title, a scrolling list window (over enabled items), and a hint.
+    gfx->setTextColor(col(C_AMBER));
+    gfx->setCursor(0, 0); gfx->print(editing ? "EDIT" : "MENU");
+    const int top = 16, hintY = H - 10;
+    const int rowH = (H >= 96) ? 14 : 12;
+    int maxRows = (hintY - top) / rowH; if (maxRows < 1) maxRows = 1;
+    int start = 0;
+    if (nEn > maxRows) {
+        start = selPos - maxRows / 2;
+        if (start < 0) start = 0;
+        if (start > nEn - maxRows) start = nEn - maxRows;
+    }
+    int y = top;
+    for (int r = start; r < nEn && r < start + maxRows; r++) {
+        const MenuItem& it = ctlMenu.items[order[r]];
+        const bool selRow = (order[r] == ctlMenu.sel);
+        int32_t v = (selRow && editing) ? ctlMenu.edit : it.value;
+        ctlItemValue(it, v, val, sizeof(val));
+        gfx->setTextColor(col(selRow ? (editing ? C_AMBER : C_WHITE) : C_GREY));
+        gfx->setCursor(0, y);
+        gfx->print(selRow ? ">" : " ");
+        gfx->print(it.label);
+        if (it.kind != MI_ACTION) {
+            if (selRow && editing) snprintf(shown, sizeof(shown), "<%s>", val);
+            else                   snprintf(shown, sizeof(shown), "%s", val);
+            gfx->setCursor(W - (int)strlen(shown) * 6, y); gfx->print(shown);
+        }
+        y += rowH;
+    }
+    gfx->setTextColor(col(C_GREY));
+    dispCenter(editing ? "turn=value  press=ok" : "turn=move  press=select", 1, hintY);
+}
+
+// Priority: 5=controls menu, 1=conflict, 2=identify, 3=manual, 4=merging, 0=status.
 static uint8_t dispPickScreen() {
+    if (ctlOverlayActive())          return 5;
     if (g_srcStatus == SRC_CONFLICT) return 1;
     if (identifyCh)                  return 2;
     if (manualMode)                  return 3;
@@ -3445,6 +3599,7 @@ static uint8_t dispPickScreen() {
 static void dispRender(uint8_t screen) {
     char b[16];
     switch (screen) {
+        case 5: dispDrawControls(); break;
         case 1: dispDrawBanner("CONFLICT", "2+ sources", C_RED); break;
         case 2: snprintf(b, sizeof(b), "ch %u", identifyCh);
                 dispDrawBanner("IDENTIFY", b, C_AMBER); break;
@@ -3456,21 +3611,191 @@ static void dispRender(uint8_t screen) {
 }
 
 static void displayTask(void*) {
-    const TickType_t period = pdMS_TO_TICKS(250);
     uint8_t  lastScreen  = 255;
     uint32_t screenSince = 0;
     for (;;) {
+        TickType_t period = pdMS_TO_TICKS(250);
         if (dispReady && gfx) {
             uint32_t now  = millis();
             uint8_t  want = dispPickScreen();
             // Dwell: hold a banner >=1.5 s before falling back, so a blip stays readable.
-            if (want == 0 && lastScreen != 0 && lastScreen != 255 && now - screenSince < 1500)
+            // Skip the dwell for the controls menu (5) so a turn shows instantly and the
+            // menu vanishes the moment it closes.
+            if (want == 0 && lastScreen != 0 && lastScreen != 5 && lastScreen != 255
+                && now - screenSince < 1500)
                 want = lastScreen;
             if (want != lastScreen) { lastScreen = want; screenSince = now; }
             dispRender(want);
+            if (want == 5) period = pdMS_TO_TICKS(60);   // responsive while the menu is up
         }
         vTaskDelay(period);
     }
+}
+
+// ---------------------------------------------------------------------------
+// On-unit controls input task (issue #24)
+// ---------------------------------------------------------------------------
+// Samples the encoder + buttons, turns them into nav events (input_map.h) and
+// drives either the display menu (menu.h) or, when there's no ENTER-capable input
+// or no display, a direct "nudge the universe" fallback. Runs in its own low-prio
+// task off the DMX timing path, and is a complete no-op unless something's wired.
+
+static int ctlFirstEnabledOut() {
+    for (int i = 0; i < MAX_OUTPUTS; i++) if (cfg.outputs[i].enabled) return i;
+    return 0;
+}
+
+static void ctlFlash(const char* msg, uint32_t ms) {
+    strncpy(ctlFlashMsg, msg, sizeof(ctlFlashMsg) - 1);
+    ctlFlashMsg[sizeof(ctlFlashMsg) - 1] = 0;
+    ctlFlashUntil = millis() + ms;
+}
+
+// Persist one output's universe live. Art-Net re-routes by the packet's own
+// universe on the next frame, so it needs nothing; sACN listens on a per-universe
+// multicast group that must be re-joined, and only the socket-owning netRxTask may
+// touch the sockets — so raise a flag and let it re-join.
+static void ctlApplyUniverse(int out, int uni) {
+    if (out < 0 || out >= MAX_OUTPUTS) return;
+    if (cfg.outputs[out].universe == uni) return;      // no real change (rolled back to start)
+    cfg.outputs[out].universe = uni;
+    saveConfig();
+    if (cfg.protocol != 0) g_sacnRejoin = true;
+    Serial.printf("[CTL] out%d universe -> %d (saved)\n", out, uni);
+}
+
+static void ctlBuildMenu() {
+    ctlMenu.clear();
+    const int  mx   = cfg.ctlUniMax > 0 ? cfg.ctlUniMax : 15;
+    const bool dual = dispEnabledOutputs() >= 2;
+    const bool a0   = cfg.outputs[0].enabled || dispEnabledOutputs() == 0;   // keep at least one universe item
+    ctlMenu.addValue(CTL_ID_UNI_A, dual ? "Uni A" : "Universe", cfg.outputs[0].universe, 0, mx, a0);
+    if (MAX_OUTPUTS > 1)
+        ctlMenu.addValue(CTL_ID_UNI_B, "Uni B", cfg.outputs[1].universe, 0, mx, cfg.outputs[1].enabled);
+    ctlMenu.addValue(CTL_ID_PROTO, "Protocol", cfg.protocol, 0, 2, true);
+    ctlMenu.addAction(CTL_ID_EXIT, "Exit", true);
+}
+
+static void ctlApplyCommit(int id, int value) {
+    switch (id) {
+        case CTL_ID_UNI_A: ctlApplyUniverse(0, value); ctlFlash("SAVED", 900); break;
+        case CTL_ID_UNI_B: ctlApplyUniverse(1, value); ctlFlash("SAVED", 900); break;
+        case CTL_ID_PROTO:
+            if (cfg.protocol != value) {
+                cfg.protocol = value; saveConfig();
+                // The Art-Net / sACN listeners are wired up at boot; a clean restart
+                // is the safe way to switch protocol, matching the web form.
+                ctlMenu.close();
+                ctlFlash("REBOOT", 1500);
+                pendingRebootAt = millis() + 1500;
+                Serial.printf("[CTL] protocol -> %d (save + reboot)\n", value);
+            }
+            break;
+    }
+}
+
+static void ctlHandleMenu(NavEvent e) {
+    if (!ctlMenu.isOpen()) { ctlBuildMenu(); ctlMenu.open(); return; }   // first input just wakes it
+    MenuResult r = ctlMenu.handle(e);
+    if (r.committedId >= 0) ctlApplyCommit(r.committedId, r.value);
+    if (r.actionId == CTL_ID_EXIT) ctlMenu.close();
+    // r.closed (a BACK in browse) already left the menu closed.
+}
+
+static void ctlHandleDirect(NavEvent e) {
+    const int mx = cfg.ctlUniMax > 0 ? cfg.ctlUniMax : 15;
+    if (!ctlDirectEditing) {                       // first input wakes the overlay
+        ctlDirectOut = ctlFirstEnabledOut();
+        ctlDirectUni = cfg.outputs[ctlDirectOut].universe;
+        ctlDirectEditing = true;
+        return;
+    }
+    switch (e) {
+        case NAV_INC: ctlDirectUni = Menu::wrap(ctlDirectUni + 1, 0, mx); break;
+        case NAV_DEC: ctlDirectUni = Menu::wrap(ctlDirectUni - 1, 0, mx); break;
+        case NAV_ENTER:                            // explicit confirm (if any enter input exists)
+            ctlApplyUniverse(ctlDirectOut, ctlDirectUni);
+            ctlDirectEditing = false; ctlFlash("SAVED", 900);
+            break;
+        case NAV_BACK:                             // cancel without saving
+            ctlDirectEditing = false;
+            break;
+        default: break;
+    }
+}
+
+static InputSample ctlSample() {
+    InputSample s;
+    if (cfg.encA >= 0 && cfg.encB >= 0) {
+        s.encPresent = true;
+        s.a = (uint8_t)digitalRead(cfg.encA);
+        s.b = (uint8_t)digitalRead(cfg.encB);
+    }
+    if (cfg.encSw >= 0) { s.swPresent = true; s.swLevel = digitalRead(cfg.encSw); }
+    const int bp[INPUT_MAX_BTN] = { cfg.btn1Pin, cfg.btn2Pin, cfg.btn3Pin, cfg.btn4Pin };
+    for (int i = 0; i < INPUT_MAX_BTN; i++)
+        if (bp[i] >= 0) { s.btnPresent[i] = true; s.btnLevel[i] = digitalRead(bp[i]); }
+    return s;
+}
+
+static void controlsTask(void*) {
+    const TickType_t period = pdMS_TO_TICKS(2);    // ~500 Hz: catches the fastest human twist
+    uint32_t lastInputMs = millis();
+    for (;;) {
+        uint32_t now = millis();
+        ctlMapper.poll(ctlSample(), now);
+        NavEvent e; bool acted = false;
+        while ((e = ctlMapper.next()) != NAV_NONE) {
+            acted = true;
+            if (ctlUseMenu) ctlHandleMenu(e);
+            else            ctlHandleDirect(e);
+        }
+        if (acted) lastInputMs = now;
+
+        // Idle: the menu auto-closes (discarding a half-made edit so a stray nudge
+        // never persists); the direct overlay auto-saves the shown value, which is
+        // the only way an encoder-with-no-button unit can commit.
+        if (ctlUseMenu) {
+            if (ctlMenu.isOpen() && now - lastInputMs > 12000) ctlMenu.close();
+        } else if (ctlDirectEditing && now - lastInputMs > 1500) {
+            ctlApplyUniverse(ctlDirectOut, ctlDirectUni);
+            ctlDirectEditing = false; ctlFlash("SAVED", 900);
+        }
+        vTaskDelay(period);
+    }
+}
+
+// Configure the control pins and start the input task. A no-op unless at least one
+// control is wired, so it costs nothing on a board without any. The menu needs both
+// an ENTER-capable input and a display; otherwise we fall back to direct nudge mode.
+static void initControls() {
+    InputConfig ic;
+    ic.hasEncoder = (cfg.encA >= 0 && cfg.encB >= 0);
+    ic.encSteps   = (uint8_t)(cfg.encSteps >= 1 ? cfg.encSteps : 4);
+    ic.encReverse = cfg.encReverse;
+    ic.hasSw      = (cfg.encSw >= 0);
+    const int bp[INPUT_MAX_BTN] = { cfg.btn1Pin, cfg.btn2Pin, cfg.btn3Pin, cfg.btn4Pin };
+    const int ba[INPUT_MAX_BTN] = { cfg.btn1Act, cfg.btn2Act, cfg.btn3Act, cfg.btn4Act };
+    for (int i = 0; i < INPUT_MAX_BTN; i++) {
+        ic.btnPresent[i] = (bp[i] >= 0);
+        ic.role[i]       = (BtnRole)ba[i];
+    }
+    ic.activeHigh = cfg.btnActiveHigh;
+    ctlMapper.begin(ic);
+    ctlEnabled = ctlMapper.hasAnyInput();
+    if (!ctlEnabled) return;
+    ctlUseMenu = ctlMapper.canSelect() && dispReady;   // menu needs a way to select AND a screen
+
+    const uint8_t pull = cfg.btnActiveHigh ? INPUT_PULLDOWN : INPUT_PULLUP;
+    if (cfg.encA >= 0)  pinMode(cfg.encA,  pull);
+    if (cfg.encB >= 0)  pinMode(cfg.encB,  pull);
+    if (cfg.encSw >= 0) pinMode(cfg.encSw, pull);
+    for (int i = 0; i < INPUT_MAX_BTN; i++) if (bp[i] >= 0) pinMode(bp[i], pull);
+
+    xTaskCreate(controlsTask, "ctls", 3584, nullptr, 1, nullptr);
+    Serial.printf("[CTL] on: enc A=%d B=%d SW=%d steps=%d rev=%d | btn=%d/%d/%d/%d | activeHigh=%d menu=%d\n",
+                  cfg.encA, cfg.encB, cfg.encSw, cfg.encSteps, cfg.encReverse,
+                  cfg.btn1Pin, cfg.btn2Pin, cfg.btn3Pin, cfg.btn4Pin, cfg.btnActiveHigh, ctlUseMenu);
 }
 
 // Apply the configured static IP (if any) to the just-started wired interface.
@@ -4013,6 +4338,7 @@ void setup() {
     // LED on its own low-priority task so web traffic can't freeze it.
     xTaskCreate(ledTask, "led", 2048, nullptr, 1, nullptr);
     if (dispReady) xTaskCreate(displayTask, "disp", 4096, nullptr, 1, nullptr);
+    initControls();   // optional on-unit rotary encoder + buttons -> display menu (issue #24); no-op unless wired
     xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr);
     // issue #64 core separation: DMX transmit on core 1, Art-Net/sACN receive on core 0.
     // dmxTxTask: high priority (19, above loop()=1), pinned core 1, strict 40 Hz cadence,
@@ -4092,6 +4418,10 @@ static void simArtnetTick() {
 // priority-inverting the high-priority DMX task).
 static void netRxTask(void*) {
     for (;;) {
+        // The on-unit controls menu changed a universe -> re-join the sACN multicast
+        // groups here, where this task owns the sockets (issue #24). Art-Net needs
+        // nothing: routeFrame() already dispatches by each packet's own universe.
+        if (g_sacnRejoin) { g_sacnRejoin = false; if (cfg.protocol != 0) startSacn(); }
         if (netConnected()) {
 #ifdef DMX_RMT
             // Art-Net on our own 6454 socket: ArtDmx -> routeFrame, and the RDM opcodes

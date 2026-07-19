@@ -212,6 +212,14 @@ reuse one centred-text routine with a font chosen by height. **Why size/type is 
 detected:** over I²C both heights answer at 0x3C with no resolution read-back, and SPI panels
 can't be enumerated at all — so the panel is part of `dispType`, picked in `/config`.
 
+### Controls menu (issue #24)
+
+If a rotary encoder or buttons are wired (see [controls.md](controls.md)), a highest-priority
+menu screen takes over the display while you're navigating: a scrolling item list on the tall
+panels, or the single selected item on the 128×32 strip. A `>` caret marks the highlight (the
+only cue that survives the 1-bit mono collapse), and editing a value wraps it in `<angle
+brackets>`. It shows instantly on the first turn and disappears the moment the menu closes.
+
 ### Future extra screens (not in v1)
 
 Button-cycled diagnostics — DMX mini-bargraph, RDM device count (`rdmCount`), uptime/heap. The

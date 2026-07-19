@@ -48,10 +48,20 @@ function fullForm(info, flips = {}) {
     rmiipwr: String(info.rmiiPwr ?? 16), rmiiclk: String(info.rmiiClk ?? 0),
     wifimode: String(info.wifiMode), fbmode: String(info.linkLossMode),
     ip: info.sip || '', gateway: info.gateway || '', subnet: info.subnet || '', dns: info.dns || '',
+    // on-unit controls (issue #24)
+    enca: String(info.encA ?? -1), encb: String(info.encB ?? -1), encsw: String(info.encSw ?? -1),
+    encsteps: String(info.encSteps ?? 4),
+    btn1pin: String(info.btn1Pin ?? -1), btn1act: String(info.btn1Act ?? 3),
+    btn2pin: String(info.btn2Pin ?? -1), btn2act: String(info.btn2Act ?? 4),
+    btn3pin: String(info.btn3Pin ?? -1), btn3act: String(info.btn3Act ?? 1),
+    btn4pin: String(info.btn4Pin ?? -1), btn4act: String(info.btn4Act ?? 2),
+    ctlunimax: String(info.ctlUniMax ?? 15),
   };
   if (info.ethW5500)   f.ethon = '1';
   if (info.useEthernet) f.useeth = '1';
   if (info.staticIp)   f.staticip = '1';
+  if (info.encReverse)    f.encrev = '1';
+  if (info.btnActiveHigh) f.btnah  = '1';
   info.outputs.forEach((o, i) => {
     if (o.en) f[`o${i}_en`] = '1';
     f[`o${i}_uni`] = String(o.uni); f[`o${i}_port`] = String(o.port);
@@ -112,6 +122,17 @@ test('every web-form option round-trips through /config', async ({ request }) =>
     ['o1_rts',  '25', (d) => d.outputs[1].rts],
     ['o1_merge', '1', (d) => d.outputs[1].merge],
     ['o1_loss',  '2', (d) => d.outputs[1].loss],
+    // on-unit controls (issue #24)
+    ['enca',    '35', (d) => d.encA],
+    ['encb',    '36', (d) => d.encB],
+    ['encsw',   '37', (d) => d.encSw],
+    ['encsteps', '2', (d) => d.encSteps],
+    ['encrev', true,  (d) => d.encReverse],
+    ['btn1pin', '19', (d) => d.btn1Pin],
+    ['btn1act',  '1', (d) => d.btn1Act],
+    ['btn2act',  '2', (d) => d.btn2Act],
+    ['btnah',  true,  (d) => d.btnActiveHigh],
+    ['ctlunimax','31',(d) => d.ctlUniMax],
   ];
 
   // /info.json only echoes the RMII pin fields on a chip with an internal EMAC
@@ -137,5 +158,27 @@ test('every web-form option round-trips through /config', async ({ request }) =>
     // restore the original config exactly
     await request.post('/config', { form: fullForm(before) });
     await waitForState(request, (d) => d.ledPin === before.ledPin && d.outputs[1].en === before.outputs[1].en);
+  }
+});
+
+// Read-only: the on-unit controls (issue #24) config surface is exposed in
+// /info.json with the right shape, so the web UI can populate the Controls card.
+// Non-destructive, runs without LUXDMX_WRITE.
+test('on-unit controls config surface is present in /info.json', async ({ request }) => {
+  const d = await (await request.get('/info.json')).json();
+  const keys = ['encA', 'encB', 'encSw', 'encSteps', 'encReverse',
+                'btn1Pin', 'btn1Act', 'btn2Pin', 'btn2Act',
+                'btn3Pin', 'btn3Act', 'btn4Pin', 'btn4Act',
+                'btnActiveHigh', 'ctlUniMax'];
+  const missing = keys.filter((k) => !(k in d));
+  expect(missing, `missing controls keys in /info.json: ${missing.join(', ')}`).toHaveLength(0);
+  expect(typeof d.encReverse).toBe('boolean');
+  expect(typeof d.btnActiveHigh).toBe('boolean');
+  expect(d.encSteps).toBeGreaterThanOrEqual(1);
+  expect(d.encSteps).toBeLessThanOrEqual(4);
+  // button actions are the BtnRole enum 0..4
+  for (const k of ['btn1Act', 'btn2Act', 'btn3Act', 'btn4Act']) {
+    expect(d[k]).toBeGreaterThanOrEqual(0);
+    expect(d[k]).toBeLessThanOrEqual(4);
   }
 });
