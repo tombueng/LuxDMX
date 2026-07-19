@@ -146,20 +146,25 @@ red = do-not-use (`flash`/`serial`/`reserved:*`), blue ring = currently assigned
 
 ## Regenerating
 
-Descriptors started out generated from authoritative pinout data: LuxDMX from the PCB netlist
+Every descriptor is generated from authoritative pinout data: LuxDMX from the PCB netlist
 (`hardware/scripts/luxdmx.py`), the hand-tuned dev boards from published header pinouts, and the
 long tail auto-derived from the arduino-esp32 core `variants/<dir>/pins_arduino.h`.
 
-> **The generator is one schema revision behind the committed catalog, so the JSON in this folder
-> is authoritative, not the script.** Measured: 19 of 34 descriptors still regenerate byte-identical,
-> 14 differ only by the `phys` block (the curated physical-header rows the script never learned to
-> emit, so a blind run would delete them), and our own board is still emitted as `luxdmx_v4` in the
-> old `connectors`/`fixed` shape. Regenerate into a scratch dir and diff, don't point it straight at
-> `web/boards/`:
+Run it with no arguments and it **checks** the committed catalog instead of overwriting it: it
+regenerates everything in memory and compares, so a descriptor that has drifted from the hardware
+fails the run. `--write` actually regenerates.
 
 ```sh
-python hardware/scripts/gen_board_descriptor.py
+python hardware/scripts/gen_board_descriptor.py           # check for drift (exit 1 if any)
+python hardware/scripts/gen_board_descriptor.py --write   # regenerate
 ```
+
+The comparison is on parsed JSON, not bytes, because the committed files are hand-formatted
+(compact, column-aligned pin tables) and that formatting is worth keeping. Formatting is not
+drift; content is. Two things are curated rather than derived, since they are read off the real
+board: the physical header layouts in `hardware/scripts/board_phys.json` (the `phys` key) and the
+display labels on the LuxDMX board's fixed pins. Every GPIO number is derived, so the pin data
+can't drift even though the cosmetics are hand-kept. `luxdmx_v4` is frozen and not regenerated.
 
 ## Adding a board
 
