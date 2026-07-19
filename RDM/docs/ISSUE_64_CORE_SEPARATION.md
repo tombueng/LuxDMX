@@ -57,13 +57,13 @@ framing errors **cluster on the refresh dips** — the fingerprint of the DMX tr
 
 ### 3a. What it is NOT (a false lead, disproven by measuring)
 
-First hypothesis: "the lwIP TCP/IP task floats onto core 1 on the non-v4 boards; pin it to core 0 with
-`CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y` like `luxdmx_v4` does."
+First hypothesis: "the lwIP TCP/IP task floats onto core 1 on the other boards; pin it to core 0 with
+`CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y` like `luxdmx_v6` does."
 
 **Wrong — that setting is a no-op.** Stock arduino-esp32 already ships
 `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y` for **every** ESP32 variant (verified in
 `~/.platformio/packages/framework-arduinoespressif32-libs/esp32/sdkconfig` and the S3's). lwIP was
-already on core 0 in the baseline. The `luxdmx_v4` platformio.ini lines (`CONFIG_LWIP_TCPIP_TASK_AFFINITY_*`)
+already on core 0 in the baseline. The `luxdmx_v6` platformio.ini lines (`CONFIG_LWIP_TCPIP_TASK_AFFINITY_*`)
 are redundant with the default, and adding them to the WT32 changes nothing. Building a firmware with
 those lines confirmed it: `Replace: CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y with: ...=y` (already set).
 
@@ -74,13 +74,13 @@ The ESP32 internal EMAC's RX interrupt is allocated on **whichever core calls `E
 
 In `src/main.cpp`, the two wired paths were asymmetric:
 
-- **W5500 SPI** (esp32dev / esp32s3 / luxdmx_v4): `startEthSpi()` brings Ethernet up on a **core-0 task**
+- **W5500 SPI** (esp32dev / esp32s3 / luxdmx_v6): `startEthSpi()` brings Ethernet up on a **core-0 task**
   — `xTaskCreatePinnedToCore(ethUpTask, "ethup", …, 0)` — *deliberately, so its ISR sits off the DMX core.*
 - **RMII / LAN8720** (WT32-ETH01): `startEthRmii()` called `ETH.begin()` **inline in `setup()` on core 1**.
   So the EMAC RX interrupt landed on **core 1 — the same core as the DMX transmit.**
 
 Under a busy wired link the EMAC RX interrupt storm preempts the DMX break/frame generation on core 1 →
-framing errors on the output. This is the real "core separation `luxdmx_v4` (W5500) has but the WT32
+framing errors on the output. This is the real "core separation `luxdmx_v6` (W5500) has but the WT32
 (RMII) doesn't" — it was never the sdkconfig line, it's the **bring-up core**. It also explains the whole
 gradient: wired RMII worst (EMAC on core 1), WiFi less (the WiFi task is already core 0), AP/idle zero.
 

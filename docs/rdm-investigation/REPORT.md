@@ -105,7 +105,7 @@ sub-step, never conclude from a single unvalidated run.**
 
 | Role | Board | Access | DMX pins | Notes |
 |---|---|---|---|---|
-| **Controller (DUT)** | ESP32-S3 DevKitC, `luxdmx_v4` fw | WiFi; updated over OTA | TX=GPIO17, EN/RTS=GPIO8, RX=GPIO18 | the node under test; RDM controller on output 0 |
+| **Controller (DUT)** | ESP32-S3 DevKitC, `luxdmx_v6` fw | WiFi; updated over OTA | TX=GPIO17, EN/RTS=GPIO8, RX=GPIO18 | the node under test; RDM controller on output 0 |
 | **Sim (responder)** | ESP32-S3 DevKitC | USB serial | TX=17, EN=8, RX=18 | RDM fixture sim, UID 05E0:6EA87A8D, model 0x4C31 |
 | **Logic analyzer** | ESP32-S3 DevKitC | USB serial | taps below | custom 4-ch LA, see §3 |
 
@@ -633,7 +633,7 @@ The original numbers ran on the bench controller; rev 2 adds a full pass on an a
   DMX start address, and **sensor polling** (GET SENSOR_DEFINITION / SENSOR_VALUE against a responder
   exposing a drifting temperature sensor) all round-tripped.
 - W5500 wired came up cleanly once the SPI clock was dropped for the flying-lead bench: the default
-  20 MHz hangs on jumper wires, 8 MHz is solid (`ethfreq`). On the real v4 board 20 MHz is fine.
+  20 MHz hangs on jumper wires, 8 MHz is solid (`ethfreq`). On the real LuxDMX board 20 MHz is fine.
 
 ### 11.5 Crash-hardening found under stress
 

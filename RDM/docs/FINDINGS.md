@@ -37,9 +37,9 @@ RMT can't RX); every plain-DMX output uses RMT. So RMT where we can, esp_dmx onl
 All at a flat **40.0 fps on both channels**. The `outfps` web stat was also fixed to report the real
 transmit rate (counted in the DMX task), not the input-match rate.
 
-**Status / remaining:** validated on the WT32 (classic ESP32) only. Before ship: test on esp32/S3/v4
+**Status / remaining:** validated on the WT32 (classic ESP32) only. Before ship: test on esp32/S3/the LuxDMX board
 (the **S3 has RMT-DMA** → even more autonomous, set `flags.with_dma`), re-verify RDM still works on a
-v4/S3 (esp_dmx path, unchanged), clean up a one-shot `rmt: flush timeout` logged at init (benign).
+LuxDMX/S3 (esp_dmx path, unchanged), clean up a one-shot `rmt: flush timeout` logged at init (benign).
 Gated behind `-DDMX_RMT`. In the worktree `C:/tmp/luxdmx-master`, not committed/pushed.
 
 ---
@@ -93,8 +93,8 @@ contention limit that isn't fixable in software with this DMX stack; eliminating
 different, more autonomous output path (e.g. RMT-based DMX). It is a **non-issue at realistic load**
 (1-2 universes = a clean 0), which is what real gateways see. Flat 40.0 fps is unconditional regardless.
 
-**Still to do before ship:** verify on esp32/esp32s3/luxdmx_v4 (only wt32eth01 tested); verify RDM still
-works on a v4/S3 (the DMX task now owns the bus + runs rdmService); chase the rare residual bursts if a
+**Still to do before ship:** verify on esp32/esp32s3/luxdmx_v6 (only wt32eth01 tested); verify RDM still
+works on a LuxDMX/S3 (the DMX task now owns the bus + runs rdmService); chase the rare residual bursts if a
 true hard-zero is required. Not committed/pushed. `src/**` on master auto-releases to OTA, so this ships
 via a reviewed PR after multi-board + RDM validation.
 
@@ -169,11 +169,11 @@ with FreeStyler, QLC+, and even with no Art-Net source (web-panel control), so n
   control, so the under-load errors are real (not a measurement artefact). Matches KM-LED's ~4/min.
 
 **FALSE lead (disproven by measuring the built sdkconfig, not guessing):** the first hypothesis was
-"lwIP TCP/IP task floats onto core 1 on the non-v4 boards; pin it to core 0
-(`CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y`) like `luxdmx_v4` does." **Wrong — it's a no-op.** Stock
+"lwIP TCP/IP task floats onto core 1 on the other boards; pin it to core 0
+(`CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y`) like `luxdmx_v6` does." **Wrong — it's a no-op.** Stock
 arduino-esp32 already ships `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y` for **every** ESP32 variant
 (checked `framework-arduinoespressif32-libs/esp32/sdkconfig` etc.). lwIP was already on core 0 in the
-baseline; the `luxdmx_v4` platformio.ini lines are redundant, and adding them to the WT32 changes
+baseline; the `luxdmx_v6` platformio.ini lines are redundant, and adding them to the WT32 changes
 nothing. Do NOT ship that "fix".
 
 **REAL root cause:** the ESP32 internal EMAC's RX interrupt is allocated on whichever core calls
@@ -182,7 +182,7 @@ nothing. Do NOT ship that "fix".
 LAN8720** path (`startEthRmii()`) called `ETH.begin()` **inline in `setup()` on core 1**, so the EMAC
 RX interrupt landed on **core 1 — the same core as `sendDmx()`/`dmx_send()`**. Under a busy wired link
 the EMAC interrupt storm preempts the DMX break/frame generation → framing errors + refresh jitter.
-That is the real "core separation luxdmx_v4 (W5500) has but the WT32 (RMII) doesn't" — it was never the
+That is the real "core separation luxdmx_v6 (W5500) has but the WT32 (RMII) doesn't" — it was never the
 sdkconfig line, it's the bring-up core. Explains wired-worst / WiFi-less / AP-idle-zero exactly (WiFi
 task is already core 0).
 
@@ -264,7 +264,7 @@ Full write-up + data table: `RDM_S3_RX_RELIABILITY.md`.
 
 ## 2026-07-01 — Pin-picker reserves the W5500's own pins against the W5500  (CONFIRMED, real bug)
 
-**What:** In the S3 web config pin-picker, selecting the `luxdmx_v4` board template flags the
+**What:** In the S3 web config pin-picker, selecting the `luxdmx_v6` board template flags the
 W5500 Ethernet pins (GPIO9–14) as conflicting — with the W5500 itself. A peripheral's own pins
 should not be reported as a conflict against that same peripheral.
 

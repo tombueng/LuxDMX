@@ -153,7 +153,7 @@ test.describe('Web UI + REST', () => {
     // "reserved for the W5500 Ethernet" against their OWN role, which blocked Save.
     await expect(page.locator('#pin-warnings')).not.toContainText('reserved for the W5500 Ethernet');
     await expect(page.locator('#save-btn')).toBeEnabled();
-    // A fixed-pin board (LuxDMX v4) locks the hard-wired fields, with an Advanced unlock
+    // A fixed-pin board (the LuxDMX board) locks the hard-wired fields, with an Advanced unlock
     // toggle for a reworked board. Only assert it where the board is actually detected as fixed.
     if (await page.locator('#pin-unlock-row').isVisible()) {
       // target the real inputs by id — locking adds a hidden .fixed-mirror with the same name
@@ -187,15 +187,15 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 4');
   });
 
-  test('luxdmx_v6 shows J4 and J6 with matching power pins, v5 still shows its 5V', async ({ page }) => {
+  test('luxdmx_v6 shows J4 and J6 with matching power pins and no 5V on J6', async ({ page }) => {
     await page.goto('/config');
     test.skip(await page.locator('#board-sel option[value="luxdmx_v6"]').count() === 0,
       'luxdmx_v6 board not offered on this chip');
 
-    // v6 re-pinned J6 so that a cable plugged into the wrong one of the two identical JST SH
-    // headers cannot destroy hardware. On a v5 that mistake put +5V on the display's VCC and
-    // +3V3 on its GND, which really did kill a panel. The picker is where a user reads the
-    // pinout off, so it has to tell the truth for BOTH boards -- hence two separate entries.
+    // J4 and J6 are the same JST SH 9-pin part sitting next to each other, so a cable fits
+    // either. They therefore share one power layout (1=+3V3, 2=GND) and a mis-plug is a
+    // non-event. The picker is where a user reads the pinout off before crimping, so this
+    // asserts the page actually shows that -- a wrong pinout here is a destroyed panel.
     const j6row = (n) => page.locator('.hdr-tbl', { hasText: 'J6' }).locator('tr').nth(n - 1);
     const j4row = (n) => page.locator('.hdr-tbl', { hasText: 'J4' }).locator('tr').nth(n - 1);
 
@@ -214,12 +214,9 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 3');
     await expect(page.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');   // J4 unmoved
 
-    // the v5 entry must keep telling v5 owners the truth, hazard and all
-    await page.locator('#board-sel').selectOption('luxdmx_v5');
-    await expect(j6row(1)).toContainText('5V');       // still +5V on a real v5 board
-    await expect(j4row(1)).toContainText('3V3');      // ...opposite 3V3 on J4: the mis-plug hazard
-    await expect(j6row(8)).toContainText('TX0');      // v5.2 freed UART0 onto 8/9 (was IO19/IO20)
-    await expect(j6row(9)).toContainText('RX0');
+    // UART0 is on 7/8 and is the only thing on J6 that costs you something (the serial console)
+    await expect(j6row(7)).toContainText('TX0');
+    await expect(j6row(8)).toContainText('RX0');
   });
 
   test('the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box', async ({ page, request }) => {

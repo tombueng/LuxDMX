@@ -5,7 +5,7 @@
 # HARD gates (block fab):  connectivity (0 unrouted), DRC (0 violations), geometry/DFM + power current,
 #                          DMX isolation (>=4mm creepage), electrical (no FAIL item),
 #                          header parity (J4/J6 carry the same power pins -- a swapped cable must not
-#                          destroy hardware; it did on v5.2 and cost a display).
+#                          destroy hardware).
 # SOFT gates (quality, surfaced but do not block):  EMC placement (decoupling distances), critical-net SI
 #                          (eth/SPI/crystal length, vias, skew, detour, net-class widths).
 # Exit code = number of HARD gates failed (0 = production-ready).

@@ -59,7 +59,7 @@ def _find_variants():
 
 VARIANTS = _find_variants()
 
-# ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LuxDMX v4 module)
+# ESP32-S3-WROOM-1 castellation order (ESP32-S3-DevKitC-1 headers / LuxDMX module)
 S3L = [4, 5, 6, 7, 15, 16, 17, 18, 8, 19, 20, 3, 46, 9, 10, 11, 12, 13, 14]
 S3R = [21, 47, 48, 45, 0, 35, 36, 37, 38, 39, 40, 41, 42, 44, 43, 2, 1]
 # ESP32 DevKitC (WROOM-32, 38-pin) headers — breaks out the flash pins (6-11) too
@@ -312,7 +312,7 @@ def parse_v3():
 
     Most pins are wired by GPIO name (U1['IO17']), but the module symbol also has a few
     FUNCTION-named pins. UART0 is the one that matters: luxdmx.py says U1['TXD0'] += S3_TX,
-    and since v5.2 that pair is broken out on the J6 header (IO19/IO20 became native USB).
+    and that pair is broken out on the J6 header (IO19/IO20 are the native USB lines).
     Miss these and J6 pins 8/9 come out with no GPIO at all."""
     text = open(os.path.join(HERE, "luxdmx.py"), encoding="utf-8").read()
     pin_net = {}
@@ -388,10 +388,7 @@ LUXDMX_LEDBRIGHT = {"r": 255, "g": 8, "y": 255, "b": 255, "w": 17}
 
 
 def luxdmx_descriptor(board_id, name):
-    """The LuxDMX board descriptor, derived from the PCB netlist (hardware/scripts/luxdmx.py).
-
-    v6 is the current revision. v4 is NOT generated: it is an older board with a different
-    preset, frozen as a hand-kept legacy descriptor so it can't be silently rewritten."""
+    """The LuxDMX board descriptor, derived from the PCB netlist (hardware/scripts/luxdmx.py)."""
     pin_net = parse_v3()
     net_gpio = {net: g for g, net in pin_net.items()}
     eth_nets = {"SCLK", "MOSI", "MISO", "ETH_CS", "ETH_INT", "ETH_RST"}
@@ -443,8 +440,7 @@ def luxdmx_descriptor(board_id, name):
 
 def main():
     boards = [
-        # Our own board, straight off the netlist. v4 is an older revision and is NOT
-        # generated: it is frozen as a hand-kept legacy descriptor (see LEGACY below).
+        # Our own board, straight off the netlist.
         luxdmx_descriptor("luxdmx_v6", "LuxDMX v6 (ESP32-S3 + W5500)"),
         {
             "id": "esp32s3-devkitc-1", "name": "ESP32-S3 DevKitC-1", "mcu": "esp32s3",
@@ -535,10 +531,6 @@ def main():
     # Fixed on-board wiring (changeable in /config but physically wired). Hand-tuned boards
     # get curated labels here; auto boards already carry their own hardwired list.
     HARDWIRED = {
-        "luxdmx_v4": [(1,"LED Red"),(2,"LED Green"),(6,"LED Yellow"),(7,"LED Blue"),(15,"LED White"),
-                        (17,"DMX TX"),(18,"DMX RX"),(8,"DMX DE/RE"),(12,"W5500 SCLK"),(11,"W5500 MOSI"),
-                        (13,"W5500 MISO"),(10,"W5500 CS"),(14,"W5500 INT"),(9,"W5500 RST"),
-                        (4,"Display SDA (J4)"),(5,"Display SCL (J4)")],
         "esp32-devkitc": [(2,"onboard LED")],
         "esp32-devkit-v1": [(2,"onboard LED")],
         "nodemcu-32s": [(2,"onboard LED")],
@@ -567,28 +559,10 @@ def main():
 
     write = "--write" in sys.argv
 
-    # Frozen legacy descriptors: hand-kept, NOT regenerated, but they stay in the index so an
-    # older board in the field can still fetch its pinout. Read straight off disk so we can't
-    # misreport them.
-    #   luxdmx_v4  a different board with a different preset.
-    #   luxdmx_v5  same GPIO map as the v6, but its J6 expansion header is wired differently
-    #              (pin 1 is +5V, the signals sit one position lower). luxdmx.py describes the
-    #              v6 copper, so regenerating a v5 from it would hand a v5 owner the v6 pinout
-    #              — exactly the mis-plug the v6 re-pin exists to prevent. Frozen on purpose.
-    LEGACY = ["luxdmx_v5", "luxdmx_v4"]
-    legacy = []
-    for lid in LEGACY:
-        with open(os.path.join(OUT, lid + ".json"), encoding="utf-8") as fh:
-            d = json.load(fh)
-        legacy.append({"id": d["id"], "name": d["name"], "mcu": d["mcu"]})
-
     # Boards also baked inline into src/pages/config.html (work fully offline).
-    INLINE = {"luxdmx_v6", "luxdmx_v5", "esp32s3-devkitc-1", "esp32-devkitc",
+    INLINE = {"luxdmx_v6", "esp32s3-devkitc-1", "esp32-devkitc",
               "esp32-devkit-v1", "xiao-esp32s3"}
     entries = [{"id": b["id"], "name": b["name"], "mcu": b["mcu"]} for b in boards]
-    # keep the legacy entries next to our current board, matching the committed index order
-    at = max(i for i, e in enumerate(entries) if e["id"].startswith("luxdmx_")) + 1
-    entries[at:at] = legacy
     index = {
         "schema": 1,
         "updated": "auto",
@@ -619,7 +593,7 @@ def main():
             print("DRIFTED   %s  keys: %s" % (fname, ", ".join(diffs) or "(structure)"))
         extra = sorted(f for f in os.listdir(OUT)
                        if f.endswith(".json") and f not in {t[0] for t in targets}
-                       and f[:-5] not in LEGACY)
+                       )
         for f in extra:
             print("UNTRACKED %s (in the catalog, not produced by this script)" % f)
         if bad:
@@ -627,8 +601,7 @@ def main():
                   "Re-run with --write to regenerate, then review the diff." % bad)
             return 1
         print("OK: %d generated descriptors + index match the committed catalog "
-              "(%d frozen legacy, %d curated phys layouts)."
-              % (len(boards), len(LEGACY), len(PHYS)))
+              "(%d curated phys layouts)." % (len(boards), len(PHYS)))
         return 0
 
     for fname, data in targets:

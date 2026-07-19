@@ -1,13 +1,13 @@
-# LuxDMX v4 — detailed pre-fabrication validation report
+# LuxDMX — detailed pre-fabrication validation report
 
-Date: 2026-06-23. Branch: `v4-hardware`. Method: 4 parallel datasheet-research passes (every active part +
+Date: 2026-06-23. Method: 4 parallel datasheet-research passes (every active part +
 crystal + connectors read from official datasheets), the re-runnable validation scripts
 (`validate_electrical/geometry/placement.py`), KiCad DRC + SKiDL ERC, and a manual net/GPIO/EMC/footprint
 review. Every number below is computed, not guessed; datasheet sources are named.
 
 Companion files: `VALIDATION_PLAN.md` (what we check), `VALIDATION.md` (status matrix). Re-run after any change.
 
-> **Partly superseded, kept as the record of the v4 pass.** Three findings below no longer describe the current
+> **Partly superseded, kept as the record of that pass.** Several findings below no longer describe the current
 > board: the **crystal** (now the **3225 C9006**, CL = 12 pF, with **18 pF** C0G caps C12/C13, see
 > `VALIDATION.md` #18); the **CH340C bridge and the Q1/Q2 auto-reset** (both deleted, the board runs on the
 > S3's **native USB-Serial-JTAG** on IO19/IO20, which also voids the note about IO19/IO20 being free expansion
@@ -15,7 +15,7 @@ Companion files: `VALIDATION_PLAN.md` (what we check), `VALIDATION.md` (status m
 > of "higher voltage wins"); and the **module** (now the **N8R2**, C2913204, 8 MB flash + **2 MB quad PSRAM**,
 > instead of the PSRAM-less N8 named below. Quad PSRAM does not touch GPIO33–37, so the GPIO map in §"GPIO"
 > still holds and IO35/36/37 remain the expansion pins). `hardware/README.md` describes the board as it
-> stands (**v5.2**).
+> stands.
 
 ---
 
@@ -84,7 +84,7 @@ v1.0.2, WCH CH340, Suzhou-Liming 2520 crystal, TDK ACM2012, Fenghua CBM bead, Ne
   xtal) correct, pin8 left NC correct. **W5500** SPI mode 0/3, PMODE float = all-capable auto-neg, RSTn must be
   held ≥500µs (firmware), EXRES1 now 12.4k.
   > **Followed up 2026-07-16.** This ≥500µs was never actually implemented: the firmware left the
-  > reset to the IDF W5500 PHY driver, which pulses RSTn for only ~100µs (**measured on the v5
+  > reset to the IDF W5500 PHY driver, which pulses RSTn for only ~100µs (**measured on the
   > first article: 80µs**) — 6× short of spec. It reset the chip most of the time; a miss left the
   > W5500 wedged with no link, unrecoverable by a warm reset (the driver just re-issues the same
   > short pulse) and only cleared by pulling power. `w5500HardReset()` in `src/main.cpp` now does an

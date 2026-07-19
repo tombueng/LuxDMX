@@ -9,7 +9,7 @@ Scheme: MAJOR[.MINOR]
   MAJOR -> incompatible board / mechanical / footprint / pinout change (new case, new fab run)
   MINOR -> backward-compatible tweak (value change, silk, reroute) on the same outline
 
-  A fresh MAJOR drops the minor: the board is "v6", not "v6.0" (same as v3/v4/v5 before it).
+  A fresh MAJOR drops the minor: the board is "v6", not "v6.0".
   The first backward-compatible tweak on top of it becomes v6.1.
 
 Consumed by add_silk_branding.py:

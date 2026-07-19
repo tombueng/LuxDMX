@@ -74,7 +74,7 @@ node docs/tests/board-persist.mjs # the picked board STICKS: /info.json boardSel
                                   #   (compile-time) board id, the locks follow the restored pick,
                                   #   the selector submits as board=..., "custom" stays custom, a
                                   #   device with no saved pick still falls back to detection, and
-                                  #   the legacy luxdmx_v5 pick still resolves offline
+                                  #   an unknown saved board degrades to detection instead of wedging
 node docs/tests/dm9051-roundtrip.mjs  # a DM9051 box survives a /config save: the wired selector
                                   #   reads ethSpiPhy from /info.json and posts it back unchanged.
                                   #   Guards the bug where /info.json didn't publish the field, so
@@ -85,7 +85,7 @@ node docs/tests/dm9051-roundtrip.mjs  # a DM9051 box survives a /config save: th
 
 | Spec | Feature (network → web UI) |
 |---|---|
-| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; the W5500 role pins are not flagged "reserved" against their own role (Save stays enabled) and a fixed-pin board offers an Advanced unlock while the J4 display pins stay editable; the picker lists the J4 + J6 header pinouts and tags each header pad with its pin; **luxdmx_v6** shows J4/J6 with identical power pins (+3V3, GND) and no 5V anywhere on J6, with IO35 moved to pin 3 and pin 9 a 2nd GND, while **luxdmx_v5** still reports its real (hazardous) 5V-on-J6-pin-1 layout and UART0 on 8/9; the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box (AP fallback shows the AP password instead); home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
+| `web-ui.spec.mjs` | Pages load; REST contract (`/info`, `/dmx`, `/senders`, `/log`, `/version`, `/labels`, `/rdm`); W5500 SPI-Ethernet config fields + `/config` pin card; the W5500 role pins are not flagged "reserved" against their own role (Save stays enabled) and a fixed-pin board offers an Advanced unlock while the J4 display pins stay editable; the picker lists the J4 + J6 header pinouts and tags each header pad with its pin; **luxdmx_v6** shows J4/J6 with identical power pins (+3V3, GND) and no 5V anywhere on J6, IO35 on pin 3, UART0 on 7/8 and pin 9 a 2nd GND; the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box (AP fallback shows the AP password instead); home-page Update button → in-place install popup (newest version, no `/config` detour); OTA UI labelled "LuxDMX.org"; `/logo.webp` served as a small WebP image (replaces the ~117 KB PNG) |
 | `artnet.spec.mjs` | Art-Net ArtDMX → DMX values, live grid, sender + FPS tracking; tight back-to-back burst keeps tracking (socket-drain regression). The per-loop latency win itself needs a logic analyzer on the DMX wire and isn't asserted here. |
 | `sacn.spec.mjs` | sACN / E1.31 → DMX values, live grid, sender tracking |
 | `conflict.spec.mjs` | Two simultaneous senders → conflict banner |
