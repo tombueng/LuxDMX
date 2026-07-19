@@ -40,6 +40,20 @@ static const char* const ENUM_TXSRC[]   = {"set here", "set over Art-Net"};
     { key, json, CfgKind::Str,  offsetof(Config, member), 0, 0, label, group, (CFG_REBOOT | (flags)), nullptr, 0 }
 #define EFIELD(key, json, member, label, group, labels) \
     { key, json, CfgKind::Enum, offsetof(Config, member), 0, (int32_t)ARRSZ(labels) - 1, label, group, CFG_REBOOT, labels, (uint8_t)ARRSZ(labels) }
+// ---- the same four, but CFG_LIVE -------------------------------------------------------------
+// A field is LIVE when the running firmware re-reads it (or applyLiveConfig() can re-apply it)
+// without anything having to be torn down. Everything bound to a GPIO or to a driver installed at
+// boot stays CFG_REBOOT, because changing those under a running driver is how you get a half-
+// configured UART. handleConfigPost reboots only when a REBOOT field actually CHANGED value, so
+// the common case -- fixing a universe, a merge mode, an output rate -- no longer costs a restart.
+#define IFIELD_L(key, json, member, mn, mx, label, group) \
+    { key, json, CfgKind::Int,  offsetof(Config, member), mn, mx, label, group, CFG_LIVE, nullptr, 0 }
+#define BFIELD_L(key, json, member, label, group, flags) \
+    { key, json, CfgKind::Bool, offsetof(Config, member), 0, 1, label, group, (uint16_t)(CFG_LIVE | (flags)), nullptr, 0 }
+#define SFIELD_L(key, json, member, label, group, flags) \
+    { key, json, CfgKind::Str,  offsetof(Config, member), 0, 0, label, group, (uint16_t)(CFG_LIVE | (flags)), nullptr, 0 }
+#define EFIELD_L(key, json, member, label, group, labels) \
+    { key, json, CfgKind::Enum, offsetof(Config, member), 0, (int32_t)ARRSZ(labels) - 1, label, group, CFG_LIVE, labels, (uint8_t)ARRSZ(labels) }
 
 const CfgField CONFIG_FIELDS[] = {
     // --- Identity / general -------------------------------------------------
@@ -47,9 +61,9 @@ const CfgField CONFIG_FIELDS[] = {
     // The /config board selector's choice ("luxdmx_v6", "custom", a catalog id, ...). UI state,
     // not something the firmware reads, but it must survive a reboot/OTA, since the board a
     // build reports is compile-time and a v6 runs the generic esp32s3dev build.
-    SFIELD("board",    "boardSel", boardSel,    "Board",          "Identity", CFG_NONE),
+    SFIELD_L("board",    "boardSel", boardSel,    "Board",          "Identity", CFG_NONE),
     SFIELD("otapw",    "otapw",    otaPassword, "OTA password",   "Identity", CFG_SECRET | CFG_KEEPNE),
-    EFIELD("protocol", "protocol", protocol,    "Input protocol", "Identity", ENUM_PROTOCOL),
+    EFIELD_L("protocol", "protocol", protocol,    "Input protocol", "Identity", ENUM_PROTOCOL),
 
     // --- Status LED ---------------------------------------------------------
     IFIELD("ledpin",  "ledPin",  ledPin,  -1, 48, "LED pin",           "Status LED"),
@@ -59,17 +73,17 @@ const CfgField CONFIG_FIELDS[] = {
     IFIELD("ledy",    "ledY",    ledY,    -1, 48, "5-LED panel Y pin", "Status LED"),
     IFIELD("ledb",    "ledB",    ledB,    -1, 48, "5-LED panel B pin", "Status LED"),
     IFIELD("ledw",    "ledW",    ledW,    -1, 48, "5-LED panel W pin", "Status LED"),
-    IFIELD("ledbrr",  "ledBrR",  ledBrR,   0, 255, "5-LED panel R brightness", "Status LED"),
-    IFIELD("ledbrg",  "ledBrG",  ledBrG,   0, 255, "5-LED panel G brightness", "Status LED"),
-    IFIELD("ledbry",  "ledBrY",  ledBrY,   0, 255, "5-LED panel Y brightness", "Status LED"),
-    IFIELD("ledbrb",  "ledBrB",  ledBrB,   0, 255, "5-LED panel B brightness", "Status LED"),
-    IFIELD("ledbrw",  "ledBrW",  ledBrW,   0, 255, "5-LED panel W brightness", "Status LED"),
+    IFIELD_L("ledbrr",  "ledBrR",  ledBrR,   0, 255, "5-LED panel R brightness", "Status LED"),
+    IFIELD_L("ledbrg",  "ledBrG",  ledBrG,   0, 255, "5-LED panel G brightness", "Status LED"),
+    IFIELD_L("ledbry",  "ledBrY",  ledBrY,   0, 255, "5-LED panel Y brightness", "Status LED"),
+    IFIELD_L("ledbrb",  "ledBrB",  ledBrB,   0, 255, "5-LED panel B brightness", "Status LED"),
+    IFIELD_L("ledbrw",  "ledBrW",  ledBrW,   0, 255, "5-LED panel W brightness", "Status LED"),
 
     // --- Display ------------------------------------------------------------
     EFIELD("disptype", "dispType", dispType,        "Display type", "Display", ENUM_DISPTYPE),
     IFIELD("dispsda",  "dispSda",  dispSda,  -1, 48, "I2C SDA",     "Display"),
     IFIELD("dispscl",  "dispScl",  dispScl,  -1, 48, "I2C SCL",     "Display"),
-    IFIELD("disprot",  "dispRot",  dispRot,   0,  1, "Rotate 180",  "Display"),
+    IFIELD_L("disprot",  "dispRot",  dispRot,   0,  1, "Rotate 180",  "Display"),
     IFIELD("dispcs",   "dispCs",   dispCs,   -1, 48, "SPI CS",      "Display"),
     IFIELD("dispdc",   "dispDc",   dispDc,   -1, 48, "SPI DC",      "Display"),
     IFIELD("disprst",  "dispRst",  dispRst,  -1, 48, "SPI RST",     "Display"),
@@ -80,18 +94,18 @@ const CfgField CONFIG_FIELDS[] = {
     IFIELD("enca",     "encA",     encA,      -1, 48, "Encoder A pin",        "Controls"),
     IFIELD("encb",     "encB",     encB,      -1, 48, "Encoder B pin",        "Controls"),
     IFIELD("encsw",    "encSw",    encSw,     -1, 48, "Encoder push pin",     "Controls"),
-    IFIELD("encsteps", "encSteps", encSteps,   1,  4, "Encoder steps/detent", "Controls"),
-    BFIELD("encrev",   "encReverse", encReverse,     "Reverse encoder dir",  "Controls", CFG_NONE),
+    IFIELD_L("encsteps", "encSteps", encSteps,   1,  4, "Encoder steps/detent", "Controls"),
+    BFIELD_L("encrev",   "encReverse", encReverse,     "Reverse encoder dir",  "Controls", CFG_NONE),
     IFIELD("btn1pin",  "btn1Pin",  btn1Pin,   -1, 48, "Button 1 pin",         "Controls"),
-    EFIELD("btn1act",  "btn1Act",  btn1Act,           "Button 1 action",      "Controls", ENUM_BTNROLE),
+    EFIELD_L("btn1act",  "btn1Act",  btn1Act,           "Button 1 action",      "Controls", ENUM_BTNROLE),
     IFIELD("btn2pin",  "btn2Pin",  btn2Pin,   -1, 48, "Button 2 pin",         "Controls"),
-    EFIELD("btn2act",  "btn2Act",  btn2Act,           "Button 2 action",      "Controls", ENUM_BTNROLE),
+    EFIELD_L("btn2act",  "btn2Act",  btn2Act,           "Button 2 action",      "Controls", ENUM_BTNROLE),
     IFIELD("btn3pin",  "btn3Pin",  btn3Pin,   -1, 48, "Button 3 pin",         "Controls"),
-    EFIELD("btn3act",  "btn3Act",  btn3Act,           "Button 3 action",      "Controls", ENUM_BTNROLE),
+    EFIELD_L("btn3act",  "btn3Act",  btn3Act,           "Button 3 action",      "Controls", ENUM_BTNROLE),
     IFIELD("btn4pin",  "btn4Pin",  btn4Pin,   -1, 48, "Button 4 pin",         "Controls"),
-    EFIELD("btn4act",  "btn4Act",  btn4Act,           "Button 4 action",      "Controls", ENUM_BTNROLE),
-    BFIELD("btnah",    "btnActiveHigh", btnActiveHigh, "Buttons active-high", "Controls", CFG_NONE),
-    IFIELD("ctlunimax","ctlUniMax", ctlUniMax,  1, 511, "Menu max universe",  "Controls"),
+    EFIELD_L("btn4act",  "btn4Act",  btn4Act,           "Button 4 action",      "Controls", ENUM_BTNROLE),
+    BFIELD_L("btnah",    "btnActiveHigh", btnActiveHigh, "Buttons active-high", "Controls", CFG_NONE),
+    IFIELD_L("ctlunimax","ctlUniMax", ctlUniMax,  1, 511, "Menu max universe",  "Controls"),
 
     // --- Wired Ethernet: W5500 (SPI) ---------------------------------------
     BFIELD("ethon",   "ethW5500", ethW5500,           "W5500 module enabled", "Ethernet (W5500)", CFG_NONE),
@@ -132,7 +146,7 @@ const CfgField CONFIG_FIELDS[] = {
     SFIELD("dns",      "dns",          dns,          "DNS server",         "Network", CFG_NONE),
 
     // --- RDM ----------------------------------------------------------------
-    BFIELD("artrdm", "artnetRdm", artnetRdm, "RDM over Art-Net", "RDM", CFG_NONE),
+    BFIELD_L("artrdm", "artnetRdm", artnetRdm, "RDM over Art-Net", "RDM", CFG_NONE),
     IFIELD("rdmmaxdev", "rdmMaxDev", rdmMaxDev, 0, 64, "RDM device limit (0 = auto)", "RDM"),
 
     // --- Updates (own route, not the /config form) -------------------------
@@ -144,6 +158,10 @@ const size_t CONFIG_FIELD_COUNT = ARRSZ(CONFIG_FIELDS);
 // legacyKey0 = old single-universe NVS key used only for output 0's load fallback.
 #define OINT(suffix, json, member, legacy, mn, mx, label) \
     { suffix, json, CfgKind::Int,  offsetof(DmxOutput, member), legacy, mn, mx, label, CFG_REBOOT, nullptr, 0 }
+// Live variant: universe / merge / loss are re-read by the merge engine on every frame, so they
+// take effect the moment they are saved. Nothing to tear down, no reboot.
+#define OINT_L(suffix, json, member, legacy, mn, mx, label) \
+    { suffix, json, CfgKind::Int,  offsetof(DmxOutput, member), legacy, mn, mx, label, CFG_LIVE, nullptr, 0 }
 #define OBOOL(suffix, json, member, legacy, label) \
     { suffix, json, CfgKind::Bool, offsetof(DmxOutput, member), legacy, 0, 1, label, CFG_REBOOT, nullptr, 0 }
 // Enum per output. CFG_LIVE: the DMX task re-reads these every tick, so they take effect the moment
@@ -159,13 +177,13 @@ const size_t CONFIG_FIELD_COUNT = ARRSZ(CONFIG_FIELDS);
 
 const CfgOutputField OUTPUT_FIELDS[] = {
     OBOOL("en",    "en",    enabled,   nullptr,             "Enabled"),
-    OINT ("uni",   "uni",   universe,  "universe", 0, 32767, "Universe"),
+    OINT_L("uni",   "uni",   universe,  "universe", 0, 32767, "Universe"),
     OINT ("port",  "port",  port,      "dmxport",  1,  2,   "UART port"),
     OINT ("tx",    "tx",    txPin,     "dmxtx",   -1, 48,   "TX pin"),
     OINT ("rx",    "rx",    rxPin,     "dmxrx",   -1, 48,   "RX pin"),
     OINT ("rts",   "rts",   rtsPin,    "dmxrts",  -1, 48,   "RTS / DE-RE pin"),
-    OINT ("merge", "merge", mergeMode, nullptr, MERGE_OFF, MERGE_LTP, "Merge mode"),
-    OINT ("loss",  "loss",  lossMode,  nullptr, LOSS_HOLD, LOSS_STOP, "Signal-loss policy"),
+    OINT_L("merge", "merge", mergeMode, nullptr, MERGE_OFF, MERGE_LTP, "Merge mode"),
+    OINT_L("loss",  "loss",  lossMode,  nullptr, LOSS_HOLD, LOSS_STOP, "Signal-loss policy"),
     OENUM("rate",  "rate",  txRate,     "DMX output rate",  ENUM_TXRATE),
     OENUM("style", "style", txStyle,    "Transmit style",   ENUM_TXSTYLE),
     OENUM_RO("stylesrc", "styleSrc", txStyleSrc, "Transmit style set by", ENUM_TXSRC),

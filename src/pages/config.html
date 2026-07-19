@@ -764,7 +764,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <div id="save-bar">
   <div class="save-inner">
-    <button type="submit" form="cfg-form" class="btn btn-primary w-100" id="save-btn" disabled>Save &amp; Restart</button>
+    <button type="submit" form="cfg-form" class="btn btn-primary w-100" id="save-btn" disabled>Save</button>
   </div>
 </div>
 
@@ -1034,7 +1034,38 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
         + 'or turn the output off. TX = -1 means "no data line".',
       okText: 'Got it', cancel: false
     });
+    return;
   }
+  // Submit over fetch so we can act on the device's answer. Most settings apply live now, and
+  // the firmware tells us whether this particular save actually needs a restart and which
+  // settings forced it -- so we can say why instead of rebooting on the user unannounced.
+  e.preventDefault();
+  var btn = $('save-btn'), was = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving...';
+  fetch('/config', { method: 'POST', body: new FormData(this) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.reboot){
+        showModal({
+          title: 'Restarting to apply this',
+          body: 'Saved. Most settings take effect immediately, but these need a restart because '
+              + 'they are bound to a pin or a driver that is set up at boot:\n\n' + j.fields
+              + '\n\nThe device is restarting now and will be back in a few seconds. '
+              + 'If its address changed you will have to reconnect.',
+          okText: 'OK', cancel: false
+        });
+      } else {
+        btn.textContent = 'Saved';
+        setTimeout(function(){ btn.textContent = was; btn.disabled = false; }, 1500);
+      }
+    })
+    .catch(function(){
+      // Older firmware answered with an HTML page and rebooted regardless. Don't leave the
+      // button stuck in that case.
+      btn.textContent = was; btn.disabled = false;
+      showModal({ title: 'Saved', body: 'The device did not report back. It may be restarting.',
+                  okText: 'OK', cancel: false });
+    });
 });
 
 $('proto-sel').addEventListener('change', updAllUniHints);

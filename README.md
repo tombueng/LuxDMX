@@ -678,6 +678,18 @@ Browser → ESP32 (JSON text):
 
 Channel labels are managed over REST (`GET /labels.json`, `POST /labels`).
 
+### Saving settings (and when it restarts)
+
+The save button says **Save**, not "Save & Restart", because most settings no longer need one. The
+running firmware re-reads them on every use, so a universe, merge mode, signal-loss policy, output
+rate, transmit style, LED brightness, encoder or button role takes effect the moment you save. The
+DMX line keeps clocking through it.
+
+Settings bound to a **GPIO** or to a **driver set up at boot** still need a restart: pin
+assignments, UART port, LED and display type, and the whole network block (interface, PHY, WiFi,
+static IP). When a save touches one of those, the device tells the page which ones, and you get a
+dialog naming them rather than an unannounced reboot.
+
 ### Output rate and transmit style
 
 A DMX gateway has to decide how fast to clock the wire. Until v1.0.216 LuxDMX free-ran at a fixed
