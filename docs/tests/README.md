@@ -48,7 +48,7 @@ They always restore the original configuration afterwards.
 
 ### Standalone config-UI tests (no device, no Playwright runner)
 
-Two behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
+These behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
 device — run them directly with `node`, they self-report and exit non-zero on failure:
 
 ```bash
@@ -59,6 +59,10 @@ node docs/tests/v5-template.mjs   # generic S3 board -> picking the "LuxDMX v5" 
                                   #   panel brightness is pushed to /led/bright?...&save=1, and
                                   #   nothing is locked (the board isn't a detected v5). This is the
                                   #   flow a v5 owner uses now that there is no dedicated v5 build.
+node docs/tests/dm9051-roundtrip.mjs  # a DM9051 box survives a /config save: the wired selector
+                                  #   reads ethSpiPhy from /info.json and posts it back unchanged.
+                                  #   Guards the bug where /info.json didn't publish the field, so
+                                  #   any save silently rewrote a DM9051 device to W5500.
 ```
 
 ## What's covered

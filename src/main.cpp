@@ -2130,6 +2130,10 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ethRmii\":false,";
 #endif
     j += "\"wiredPhy\":";  j += cfg.wiredPhy;            j += ",";   // 0=W5500, 1=LAN8720 RMII
+    // MUST be published: /config round-trips this through a hidden field. Without it the page
+    // reads undefined, shows W5500, and writes 0 back on the next save — silently converting a
+    // DM9051 box to W5500 and killing its wired link. See the wired selector in config.html.
+    j += "\"ethSpiPhy\":"; j += cfg.ethSpiPhy;           j += ",";   // SPI chip: 0=W5500, 1=DM9051
     j += "\"ethW5500\":";  j += cfg.ethW5500 ? "true" : "false"; j += ",";   // module enabled (opt-in)
     j += "\"useEthernet\":"; j += cfg.useEthernet ? "true" : "false"; j += ",";
     j += "\"ethFallback\":"; j += g_ethFallback ? "true" : "false"; j += ",";   // wired configured but running on WiFi/AP fallback (status LED = orange)
