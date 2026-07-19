@@ -82,7 +82,13 @@ export function parsePollReply(p) {
            numPorts: p.readUInt16BE(172),
            portTypes: [...p.slice(174, 178)], swOut: [...p.slice(190, 194)],
            status1: p[23], goodOutput: [...p.slice(182, 186)], goodOutputB: p.length > 213 ? p[213] : 0,
-           status3: p.length > 217 ? p[217] : 0, bqPolicy: p.length > 228 ? p[228] : null };
+           status3: p.length > 217 ? p[217] : 0, bqPolicy: p.length > 228 ? p[228] : null,
+           // RefreshRate = fields 51/52 of ArtPollReply, big-endian, in Hz.
+           refreshRate: p.length > 227 ? p.readUInt16BE(226) : null,
+           // GoodOutputB bit6: set = continuous output style, clear = delta (frame triggered by ArtDmx).
+           outputStyle: p.length > 213 ? ((p[213] & 0x40) ? 'continuous' : 'delta') : null,
+           // Status3 bits 7-6: 0 = hold last state, 1 = outputs to zero, 2 = to full, 3 = failsafe scene.
+           failsafe: p.length > 217 ? ((p[217] >> 6) & 0x03) : null };
 }
 
 // ---- transport ----

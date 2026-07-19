@@ -16,6 +16,7 @@ import { test, expect } from '@playwright/test';
 import { deviceHost, sleep, artDmxPacket, UdpSender, ART_PORT } from './lib/net.mjs';
 import { ArtRdmClient, parseUidStr, CC_GET, PID_DEVICE_INFO,
          AC_MERGE_HTP0, AC_MERGE_LTP0, AC_CANCEL_MERGE, AC_BQP0 } from './lib/artrdm.mjs';
+import { info, dmx } from './lib/device.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 
@@ -58,6 +59,32 @@ test.describe('Art-Net RDM — node (read-only wire, always)', () => {
     expect(reply.status1 & 0x02, 'Status1 bit1: node is RDM capable').toBe(0x02);
     expect(reply.status3 & 0x02, 'Status3 bit1: BackgroundQueue supported').toBe(0x02);
     expect(typeof reply.bqPolicy, 'BackgroundQueuePolicy byte present in reply').toBe('number');
+  });
+
+  // Issue #93: the gateway used to leave RefreshRate at 0 (which a controller reads as the 44 Hz
+  // DMX512 ceiling) while actually clocking 40 Hz, and left GoodOutputB bit6 clear, which claims
+  // "delta" output when we in fact free-run. Both made us oversold and lied about our timing, so
+  // pin them to what the wire really does.
+  test('ArtPollReply reports the real output rate, style and failsafe (issue #93)', async ({ request }) => {
+    const reply = await c.poll();
+    expect(reply, 'no ArtPollReply received').toBeTruthy();
+
+    // RefreshRate must match the rate we actually clock DMX at, as reported by /dmx.json outfps.
+    const d = await dmx(request);
+    const outFps = d.outfps.find((f) => f > 0);
+    expect(reply.refreshRate, 'RefreshRate advertised').toBeGreaterThan(0);
+    expect(reply.refreshRate, 'RefreshRate must not exceed the DMX512 ceiling').toBeLessThanOrEqual(44);
+    if (outFps) {
+      expect(Math.abs(reply.refreshRate - outFps),
+        `advertised ${reply.refreshRate} Hz vs measured ${outFps} fps`).toBeLessThanOrEqual(2);
+    }
+
+    // We free-run on a fixed timer, so the honest answer is "continuous", never "delta".
+    expect(reply.outputStyle, 'GoodOutputB bit6 = continuous output style').toBe('continuous');
+
+    // Status3 bits7-6 mirror the port's signal-loss policy: 0 = hold last state, 1 = outputs to zero.
+    const loss = (await info(request)).outputs[0].loss;
+    expect(reply.failsafe, `failsafe state matches lossMode ${loss}`).toBe(loss === 1 ? 1 : 0);
   });
 
   test('ArtTodRequest -> ArtTodData returns the TOD matching /rdm.json', async ({ request }) => {

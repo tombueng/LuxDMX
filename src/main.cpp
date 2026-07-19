@@ -322,7 +322,15 @@ static constexpr int MERGE_OFF = 0;   // most recent source wins (legacy behavio
 static constexpr int MERGE_HTP = 1;   // highest takes precedence (per-channel max)
 static constexpr int MERGE_LTP = 2;   // latest source wins (whole-frame arbitration)
 // A source that goes silent for this long stops contributing to the merge.
-static constexpr uint32_t SOURCE_TIMEOUT_MS = 2500;
+// Must comfortably outlast a console's KEEP-ALIVE interval, not just its streaming rate: on a
+// static look both E1.31 (mandated, sec 6.6.2: "a single keep-alive packet ... at intervals of
+// between 800mS and 1000mS") and every console we checked (MagicQ "Changes only", grandMA over
+// the network) throttle down to roughly 1 packet/second. At the old 2500 ms a single held look
+// plus TWO dropped UDP packets was enough to declare the source lost -- which on lossMode=ZERO
+// means the rig blacks out mid-show. 4000 ms rides out three consecutive lost keep-alives and
+// matches Art-Net's own 4-second convention. The cost is that a real cable pull now takes ~1.5 s
+// longer to register; a held look going black is the far worse failure.
+static constexpr uint32_t SOURCE_TIMEOUT_MS = 4000;
 // Art-Net has no per-packet priority; sACN's default is 100 (E1.31). Sources at
 // the highest active priority win; equal priority falls back to the merge mode.
 static constexpr uint8_t  DEFAULT_PRIORITY  = 100;
@@ -857,6 +865,16 @@ static void sendDmx() {
 #endif
 }
 
+// The DMX transmit cadence. dmxTxTask free-runs at this period, deliberately decoupled from the
+// input rate (Art-Net sanctions continuous re-transmission, and a console on a static look drops
+// to ~1 packet/s, so we cannot simply relay). Declared here rather than buried in the task because
+// ArtPollReply has to advertise this exact number as RefreshRate: a gateway that claims a rate it
+// does not deliver invites controllers to oversend, and every surplus frame is silently dropped.
+// NOTE: free-running also means any input rate that is not DMX_TX_RATE_HZ gets resampled, so some
+// frames go out twice (issue #93). Making this per-output configurable is the next step.
+static constexpr uint32_t DMX_TX_PERIOD_MS = 25;
+static constexpr uint8_t  DMX_TX_RATE_HZ   = (uint8_t)(1000UL / DMX_TX_PERIOD_MS);   // 40 Hz
+
 // Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
 // strict 25 ms cadence (vTaskDelayUntil, 40 Hz) at high priority pinned to core 1, so a
 // burst of Art-Net/sACN packet processing in loop() (also core 1) can NEVER delay or jitter
@@ -875,7 +893,7 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
 // ever installed/deleted at runtime, so the esp_dmx interrupt-leak path is gone entirely.)
 
 static void dmxTxTask(void*) {
-    const TickType_t period = pdMS_TO_TICKS(25);        // 40 Hz
+    const TickType_t period = pdMS_TO_TICKS(DMX_TX_PERIOD_MS);   // 40 Hz
     TickType_t next = xTaskGetTickCount();
     uint32_t fpsWin = millis();
     for (;;) {

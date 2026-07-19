@@ -3,7 +3,7 @@
 //
 // Shape + UI tests are read-only (safe any time). The behavioural tests set a
 // loss mode, reboot, drive a source on output A (Art-Net and sACN), stop it,
-// wait past the 2.5 s source timeout and assert the output buffer via
+// wait past the 4 s source timeout and assert the output buffer via
 // /dmx.json — opt-in via LUXDMX_WRITE=1. The original config is restored after.
 //
 // /dmx.json reports the output *buffer*, so it proves HOLD (held) vs BLACKOUT
@@ -19,7 +19,7 @@ import {
 import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
 
 const HOLD = 0, BLACKOUT = 1, STOP = 2;
-const SOURCE_TIMEOUT_MS = 2500;                 // matches firmware SOURCE_TIMEOUT_MS
+const SOURCE_TIMEOUT_MS = 4000;                 // matches firmware SOURCE_TIMEOUT_MS
 const AFTER_LOSS_MS     = SOURCE_TIMEOUT_MS + 1500;
 
 const ART_PAT  = { 1: 200, 2: 150, 3: 100, 4: 50 };
@@ -80,7 +80,7 @@ async function driveThenDropSource(request, proto, artUni, pattern) {
     expect(active.ch[1], `${proto}: source drives ch2`).toBe(pattern[2]);
     await streaming;                          // last frame sent; source now silent
   } finally { sender.close(); }
-  await sleep(AFTER_LOSS_MS);                 // let the source time out (> 2.5 s)
+  await sleep(AFTER_LOSS_MS);                 // let the source time out (> 4 s)
   return dmx(request);
 }
 

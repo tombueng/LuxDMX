@@ -152,9 +152,15 @@ static int buildArtPollReply(uint8_t* b, int outIdx, int bindIndex) {
     // mid-discovery, and a controller (e.g. DMX-Workshop) won't settle a device to "active" while it
     // believes the gateway's TOD is still being built. Set bit5 whenever discovery is idle so the
     // TOD reads as final. bit4 stays clear (background discovery is enabled/available).
+    // bit6 must be reported honestly too, and it is the one we got backwards. The spec reads
+    // "Set - Output style is continuous. Clr - Output style is delta", delta meaning the DMX frame
+    // is triggered by an arriving ArtDmx. We free-run on a fixed timer (see DMX_TX_PERIOD_MS), i.e.
+    // continuous, but left bit6 clear -- telling every controller on the wire the exact opposite of
+    // what this gateway does. Derive it so it stays true if an output ever gains a delta mode.
     bool rdmOn = rdmNode && rdmLineForOut[outIdx] >= 0 && outReady[outIdx];
     uint8_t gob = 0x00;
     if (!rdmOn)                gob |= 0x80;    // RDM disabled on this port
+    gob |= 0x40;                               // output style is continuous (we free-run, never delta)
     if (!g_artDiscovering)     gob |= 0x20;    // discovery is not currently running -> TOD is final
     b[213] = gob;
     b[200] = 0x00;                             // Style = StNode
@@ -162,7 +168,17 @@ static int buildArtPollReply(uint8_t* b, int outIdx, int bindIndex) {
     b[207] = b[10]; b[208] = b[11]; b[209] = b[12]; b[210] = b[13];   // BindIp = our IP
     b[211] = (uint8_t)bindIndex;               // BindIndex (1-based, unique per port)
     b[212] = 0x0e;                             // Status2: web-config + 15-bit + DHCP capable
-    b[217] = 0x02;                             // Status3 bit1: BackgroundQueue supported
+    // Status3: bit1 = BackgroundQueue supported, bits7-6 = failsafe state (what this port does when
+    // network data is lost). We already have that per output as lossMode, so report it rather than
+    // leaving it at 00. STOP has no Art-Net equivalent (the spec's four states all keep transmitting),
+    // so it maps to "hold last state" -- the buffer is indeed held, we just stop clocking it out.
+    uint8_t failsafe = (cfg.outputs[outIdx].lossMode == LOSS_ZERO) ? 0x01 : 0x00;
+    b[217] = 0x02 | (uint8_t)(failsafe << 6);
+    // RefreshRate (fields 51/52): the maximum rate at which this gateway can process ArtDmx. Left at
+    // zero we were claiming the DMX512 ceiling of 44 Hz while actually clocking DMX_TX_RATE_HZ, so a
+    // controller that honours the field oversends and we silently bin the surplus (measured: ~9% of
+    // frames dropped from a 44 fps source, issue #93). Advertise what we really do.
+    b[226] = 0x00; b[227] = DMX_TX_RATE_HZ;
     b[228] = g_bqPolicy;                       // BackgroundQueuePolicy (0..3 = collect severity, 4 = off)
     return 239;
 }
