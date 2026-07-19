@@ -104,12 +104,19 @@ LED pins snap to the board values and lock, so you can't accidentally move the E
 DMX pins. Switch the board back (or hit Advanced unlock) to edit them again.
 
 **Header pins stay editable.** Pins that reach a user header are deliberately *not* in
-`hardwired`, so they stay pickable even on a fixed-pin board. On the LuxDMX v5 that's the
+`hardwired`, so they stay pickable even on a fixed-pin board. On the LuxDMX v5/v6 that's the
 J4 display header (SDA/SCL/SCK/MOSI/CS/DC/RST) and the J6 expansion header — you can point
 the display at the J4 defaults or wire it to J6 instead, whatever you soldered. The board
 card lists each header's pinout, and the diagram tags every header GPIO with its physical
 header pin (e.g. `G4 · J4.3`, tooltip `GPIO4 · J4 pin 3 (SDA)`). This is also where future
 add-on inputs (buttons, a rotary encoder) will bind — any header GPIO is fair game.
+
+**Pick v5 or v6 to match the board in your hand.** They are separate entries because their
+J6 expansion header genuinely differs in copper. v6 gave J6 the same `1=+3V3 2=GND` as J4 so
+a cable in the wrong header is harmless; on a v5, J6 pin 1 is **+5V**, and plugging a display
+into it destroys the panel. The picker shows each revision truthfully, so reading the pinout
+off the wrong template is exactly the mistake to avoid. Board silk tells you which you have.
+See [display.md → Header safety](display.md#header-safety-j4-vs-j6).
 
 Family fallbacks:
 

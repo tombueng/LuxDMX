@@ -840,6 +840,10 @@ Mono panels are 1-bit — white, blue and yellow/blue-split versions all behave 
 > instantly. v6 gave both headers the same power pins so a mix-up is harmless, but on an older board
 > it isn't — [docs/display.md → Header safety](docs/display.md#header-safety-j4-vs-j6) explains how to
 > key your cables so it can't happen.
+>
+> Pick the board template that matches the silk on your board (**LuxDMX v5** or **LuxDMX v6**) under
+> Settings → Pins. They're listed separately because their J6 pinout really is different, so the
+> picker shows you the pinout you actually have rather than the one you wish you had.
 
 ### Settings (Settings → Display)
 

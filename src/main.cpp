@@ -2037,12 +2037,18 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // esp32s3dev build plus the "LuxDMX v5" board template applied in /config (see platformio.ini).
 // So a released v5 reports "esp32s3-devkitc-1" like any S3, and the copper-pin locks (which key
 // on the reported board) are inactive on it. This branch is the source-build escape hatch: build
-// esp32s3dev with -DBOARD_LUXDMX_V5 to get a firmware that reports "luxdmx_v5" and gets the locks.
+// esp32s3dev with -DBOARD_LUXDMX_V5 (or -DBOARD_LUXDMX_V6) to get a firmware that reports that
+// id and gets the locks. Either way the template is also pickable by hand in /config.
 // USE_ETH_SPI alone is too coarse to key the id on — esp32dev/esp32s3dev set it too so a DIY user
 // can add a W5500 — which is why the id needs the explicit flag, not the presence of the W5500 path.
 // (luxdmx_v4 was the previous revision of this same board; its descriptor is kept in web/boards/
 // as a legacy entry so a v4 still resolves its pinout, but nothing builds it.)
-#if defined(BOARD_LUXDMX_V5)
+// v6 is the same board with J6 re-pinned (its power pins now match J4, so swapping the two
+// cables is survivable). It needs its own id because the two revisions genuinely differ in
+// copper: telling a v5 owner the v6 J6 pinout is the mis-plug this change exists to stop.
+#if defined(BOARD_LUXDMX_V6)
+static const char BOARD_ID[] = "luxdmx_v6";
+#elif defined(BOARD_LUXDMX_V5)
 static const char BOARD_ID[] = "luxdmx_v5";
 #elif defined(USE_ETH_RMII) || defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
