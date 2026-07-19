@@ -7,7 +7,7 @@ fetches it from `https://luxdmx.org/web/boards/`.
 
 ## How it is used
 
-The five **core boards** (`luxdmx_v5`, `esp32s3-devkitc-1`, `esp32-devkitc`,
+The six **core boards** (`luxdmx_v6`, `luxdmx_v5`, `esp32s3-devkitc-1`, `esp32-devkitc`,
 `esp32-devkit-v1`, `xiao-esp32s3`) are also baked into the firmware
 (`src/pages/config.html`) so the picker works fully offline on an isolated stage LAN.
 This catalog:
@@ -16,12 +16,12 @@ This catalog:
   built-ins (fetched on demand, then cached in the browser's `localStorage`),
 - documents the descriptor format for contributors.
 
-`luxdmx_v4` is the **previous revision of our own board**, kept here as a legacy
-descriptor. Nothing builds it any more (the env, the template and `BOARD_ID` are all
-`luxdmx_v5`), but a v4 still running older firmware reports `board: "luxdmx_v4"`, and it
-fetches this catalog to draw its pinout. Deleting the descriptor would break the picker on
-those boards, so it stays. It is not a built-in (an old board already carries its own copy
-in its firmware), so it costs no flash.
+`luxdmx_v5` and `luxdmx_v4` are **previous revisions of our own board**, kept as legacy
+descriptors. The current revision is `luxdmx_v6` (that is what the template and `BOARD_ID`
+say), but an older board still reports or has saved its own id and fetches this catalog to
+draw its pinout. Deleting a descriptor would break the picker on those boards, so they stay.
+v5 shares the v6 pin map and is a built-in, so a v5 keeps working with no network at all; v4
+differs and is catalog-only (an old board already carries its own copy in its firmware).
 
 The picker draws its own **horizontal pin diagram** from each descriptor's two pin
 columns. There are no board photos or realistic graphics. If the catalog cannot be

@@ -1,18 +1,18 @@
-# HIL rig wiring, ESP32-S3 (luxdmx_v5 pinout) + MAX485 + W5500
+# HIL rig wiring, ESP32-S3 (luxdmx_v6 pinout) + MAX485 + W5500
 
 The hardware-in-the-loop bench with an **ESP32-S3** as the controller, wired to a MAX485
 transceiver for DMX/RDM and a W5500 for wired Ethernet, with an RP2350 acting as the
 DMX analyzer / ground-truth / RDM responder on the bus.
 
-Firmware: there is no dedicated v5 env any more — build the released `esp32s3dev` target with the
-source-build escape-hatch flags so it boots straight into the v5 pin map (see platformio.ini):
-`pio run -e esp32s3dev --build-flags "-DBOARD_LUXDMX_V5 -DDEFAULT_TEMPLATE=luxdmx_v5"`
+Firmware: there is no dedicated v6 env any more — build the released `esp32s3dev` target with the
+source-build escape-hatch flags so it boots straight into the v6 pin map (see platformio.ini):
+`pio run -e esp32s3dev --build-flags "-DBOARD_LUXDMX_V6 -DDEFAULT_TEMPLATE=luxdmx_v6"`
 then flash the factory image over USB:
 `esptool --chip esp32s3 --port <COM> --baud 921600 write_flash 0x0 .pio/build/esp32s3dev/firmware.factory.bin`
 (a factory flash wipes NVS → fresh config below; set WiFi/`useeth` afterwards over the serial console).
-Or flash a plain `esp32s3dev` build and apply the **LuxDMX v5** board template in `/config` instead.
+Or flash a plain `esp32s3dev` build and apply the **LuxDMX v6** board template in `/config` instead.
 
-## Controller pins (luxdmx_v5 config defaults)
+## Controller pins (luxdmx_v6 config defaults)
 
 | Signal | S3 GPIO | config key |
 |---|---|---|
@@ -55,7 +55,7 @@ Or flash a plain `esp32s3dev` build and apply the **LuxDMX v5** board template i
   out-of-the-box the board comes up on WiFi.
 - **Do NOT use the generic `esp32s3dev` env's default W5500 pins**, they're inherited from the
   classic-ESP32 base and include GPIO23/25, which don't exist on the S3. Use the pins above.
-- **SPI clock (bit us):** the default `ethfreq=20` (20 MHz) is fine on the real v5 board but too fast
+- **SPI clock (bit us):** the default `ethfreq=20` (20 MHz) is fine on the real LuxDMX board but too fast
   for flying breadboard leads, the W5500 bring-up then HANGS in `ETH.begin()` (no serial after the
   banner, looks like a wiring fault but isn't). On this jumper-wire bench it comes up clean at
   `ethfreq=8`. Drop the clock before you suspect the wiring. Recover a hung board by re-flashing the

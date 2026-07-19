@@ -17,7 +17,7 @@ import pathlib
 
 
 def template_name(path: pathlib.Path) -> str:
-    return path.stem  # "_base", "luxdmx_v5", ...
+    return path.stem  # "_base", "luxdmx_v6", ...
 
 
 def c_symbol(name: str) -> str:

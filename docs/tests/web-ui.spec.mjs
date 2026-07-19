@@ -161,17 +161,17 @@ test.describe('Web UI + REST', () => {
     }
   });
 
-  test('selecting luxdmx_v5 locks the copper pins and tags the header pads', async ({ page }) => {
+  test('selecting luxdmx_v6 locks the copper pins and tags the header pads', async ({ page }) => {
     await page.goto('/config');
-    test.skip(await page.locator('#board-sel option[value="luxdmx_v5"]').count() === 0,
-      'luxdmx_v5 board not offered on this chip');
+    test.skip(await page.locator('#board-sel option[value="luxdmx_v6"]').count() === 0,
+      'luxdmx_v6 board not offered on this chip');
     await page.locator('#wired-sel').selectOption('w5500').catch(() => {});   // reveal the W5500 fields
-    await page.locator('#board-sel').selectOption('luxdmx_v5');
+    await page.locator('#board-sel').selectOption('luxdmx_v6');
     // Picking the board applies its copper-pin locks even when the firmware detects a generic
     // esp32s3dev / esp32s3-devkitc-1, so you can't accidentally move the W5500 or DMX pins.
     // The J4 display pins stay editable; the Advanced unlock is the escape hatch.
     await expect(page.locator('#eth-cs')).toBeDisabled();          // W5500 CS locked
-    await expect(page.locator('#eth-cs')).toHaveValue('10');       // to the v5 value
+    await expect(page.locator('#eth-cs')).toHaveValue('10');       // to the v6 value
     await expect(page.locator('#disp-sda')).toBeEnabled();         // J4 display pin editable
     await expect(page.locator('#pin-unlock-row')).toBeVisible();
     await page.locator('#pin-unlock').check();

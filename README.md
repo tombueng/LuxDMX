@@ -77,7 +77,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
 | **mDNS + DHCP hostname** | Reachable as `dmx-gateway.local` via mDNS, *and* the device sends its hostname over DHCP (option 12) so your router registers it by plain name. Clients without mDNS (e.g. Windows) can then reach it as `dmx-gateway` / `dmx-gateway.fritz.box`. Hostname configurable |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
-| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v5 board) — one status language: green = up (stays on; slow blink = DMX coming in), blue = RDM/identify **added on top of green** (both LEDs on the panel, cyan on a single RGB LED), orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
+| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v6 board) — one status language: green = up (stays on; slow blink = DMX coming in), blue = RDM/identify **added on top of green** (both LEDs on the panel, cyan on a single RGB LED), orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
 | **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
 | **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
@@ -85,26 +85,26 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
-| **Ethernet support** | WT32-ETH01 (LAN8720) and the v5 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
+| **Ethernet support** | WT32-ETH01 (LAN8720) and the v6 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
 ---
 
 ## Hardware
 
-> ### 🛠 Custom PCB — LuxDMX v5
+> ### 🛠 Custom PCB — LuxDMX v6
 >
 > Want the real thing instead of breadboard + modules? There's a complete **open-source 4-layer PCB**:
 > ESP32-S3 with **both WiFi and wired Ethernet** (W5500), **two galvanically-isolated DMX universes**
 > (two XLR-5 outputs), **802.3af PoE** or USB-C power + flashing, a 5-LED status panel, BOOT/RST buttons,
 > and an optional OLED/TFT display header. All palm-sized and fabricable at JLCPCB for a few dollars.
 >
-> **v5 is DMX512-A Protected** (ANSI E1.11 Annex C): each DMX output survives a sustained fault on the data
+> **v6 is DMX512-A Protected** (ANSI E1.11 Annex C): each DMX output survives a sustained fault on the data
 > pins — someone plugging mains (30 VAC) or up to ±42 VDC into the XLR — without damage. A series Bourns TBU
 > high-speed protector blocks the fault in <1 µs and the board self-recovers when it's removed. Full
 > [E1.11 / DMX512-A compliance breakdown →](hardware/E1.11_COMPLIANCE.md)
 >
-> [<img src="hardware/board3d-1.png" width="360" alt="LuxDMX v5 custom PCB — DMX512-A Protected">](hardware/README.md)
+> [<img src="hardware/board3d-1.png" width="360" alt="LuxDMX v6 custom PCB — DMX512-A Protected">](hardware/README.md)
 >
 > **→ Full design, component rationale, BOM, gerbers & JLCPCB fab guide: [`hardware/`](hardware/README.md)**
 
@@ -423,7 +423,7 @@ LuxDMX/
 │   └── generated/        ← auto-created at build time, gitignored
 ├── include/              ← config_schema.h (Config struct) + config_enums.h
 ├── lib/EmbeddedConfig/   ← reusable schema-driven config engine (NVS + serial console)
-├── templates/            ← per-board default VALUES (esp32dev.ini, luxdmx_v5.ini, ...)
+├── templates/            ← per-board default VALUES (esp32dev.ini, luxdmx_v6.ini, ...)
 ├── docs/                 ← documentation assets (README images)
 ├── extra_scripts.py      ← PlatformIO pre-build hook
 └── platformio.ini
@@ -683,9 +683,9 @@ LuxDMX has a lot of GPIOs to set (status LED, 5-LED panel, OLED, two DMX outputs
 To make this idiot-proof, **Settings → Hardware board** offers:
 
 - **Templates** — pick your board and click **Apply template** to fill every LED /
-  display / DMX pin with the tested map in one step. Selecting the *LuxDMX v5*
+  display / DMX pin with the tested map in one step. Selecting the *LuxDMX v6*
   board applies the exact pin map of the open-hardware PCB. Your pick is saved with
-  the rest of the settings, so it survives reboots and firmware updates. The v5 runs
+  the rest of the settings, so it survives reboots and firmware updates. The v6 runs
   the generic ESP32-S3 firmware and can't be told apart from a DevKit by the firmware
   alone, so the page trusts what you picked over what it detects.
 - **Click pins on a board diagram** — the pick button next to each GPIO field opens an
@@ -698,12 +698,13 @@ To make this idiot-proof, **Settings → Hardware board** offers:
 - **Live validation** — duplicate pins, strapping/flash/input-only pins and
   Ethernet-reserved pins are flagged in red/amber before you can save.
 
-Five boards are built into the firmware and work fully offline, covering the common
+Six boards are built into the firmware and work fully offline, covering the common
 variants (which are **not** all the same pinout):
 
 | Board | Notes |
 |---|---|
-| LuxDMX v5 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
+| LuxDMX v6 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
+| LuxDMX v5 | the previous revision, same pin map; kept so boards already out there still pick up their pinout |
 | ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
 | ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
@@ -786,7 +787,7 @@ A few deliberate choices:
 
 The LED runs on its own task, so serving the web UI never freezes it.
 
-**5-LED status panel** (`ledType 3`, the LuxDMX v5 board) — five discrete LEDs (R G Y B W). Because
+**5-LED status panel** (`ledType 3`, the LuxDMX v6 board) — five discrete LEDs (R G Y B W). Because
 they're independent, green (up) and blue (RDM) light **together**; on the single RGB LED the same
 pair mixes to cyan. There is no discrete orange LED, so the panel's amber (Y) LED carries the
 Ethernet-on-fallback state; purple (setup portal) lights blue + white together.
@@ -794,13 +795,13 @@ Ethernet-on-fallback state; purple (setup portal) lights blue + white together.
 **Per-colour brightness (PWM).** The five LEDs are driven with PWM, not plain on/off, because
 green and white are far brighter per mA than the others — left raw they wash the panel out. Each
 colour has its own duty (`ledbrr`/`ledbrg`/`ledbry`/`ledbrb`/`ledbrw`, 0-255) so the panel looks
-even; the v5 board defaults dim green/white hard. Tune it live (no reboot) via `/led/bright`
+even; the v6 board defaults dim green/white hard. Tune it live (no reboot) via `/led/bright`
 (`?g=8&w=17…`, `&save=1` to persist) — `?test=1` lights all five at once so you can balance them
 by eye. **Boot/connecting** runs a Knight-Rider sweep back and forth across the five LEDs; a
 single LED shows a white "working" blink instead.
 
 Default GPIO: `2` (ESP32 DevKit on-board LED). ESP32-S3 DevKitC-1 uses GPIO `48` (built-in WS2812).
-The v5 board uses **R=1 G=2 Y=6 B=7 W=15**.
+The v6 board uses **R=1 G=2 Y=6 B=7 W=15**.
 
 ---
 
@@ -886,7 +887,7 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32 DevKit (WROOM-32) | `esp32dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 32, RX 33 | Plenty of free GPIO; RDM possible on both |
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
-| LuxDMX v5 (ESP32-S3 + W5500) | `esp32s3dev` + **LuxDMX v5** template | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). No dedicated build — flash `esp32s3dev` and apply the **LuxDMX v5** template in `/config` for the fixed pin map. 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
+| LuxDMX v6 (ESP32-S3 + W5500) | `esp32s3dev` + **LuxDMX v6** template | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). No dedicated build — flash `esp32s3dev` and apply the **LuxDMX v6** template in `/config` for the fixed pin map. 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
 | ESP32-S3 with PSRAM (WROOM-1-N8R8 / N16R8) | `esp32s3_psram` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 | Enables the 8 MB octal PSRAM: the RDM device tables and the WiFi/lwIP buffers move to PSRAM, so the RDM cap auto-detects to 64 and the internal heap stays wide open (measured ~150 KB free vs ~88 KB on an N8). From-source build; still boots on a non-PSRAM S3, it just won't use PSRAM there. PSRAM occupies GPIO33-37, DMX on 16/17 is clear |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external SPI module**: the W5500 and

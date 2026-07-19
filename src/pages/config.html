@@ -71,7 +71,7 @@ footer a:hover { color:var(--gh-text); }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#45d85c; } .lg-warn::before{ background:#ffaa1c; } .lg-bad::before{ background:#f33abc; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #23e6f7 inset; }
-/* Hard-wired (fixed) on-board pins (LuxDMX v5): locked, shown but not editable */
+/* Hard-wired (fixed) on-board pins (LuxDMX v6): locked, shown but not editable */
 .fixed-field { background:#161b22 !important; color:var(--gh-muted) !important; cursor:not-allowed; opacity:.9; }
 .hw-fixed, .hw-headers { font-size:.8rem; margin-top:.55rem; }
 .hw-fixed .hwb { display:inline-block; background:#161b22; border:1px solid var(--gh-border); border-radius:4px; padding:.05rem .4rem; margin:.12rem .25rem .12rem 0; color:var(--gh-text); white-space:nowrap; }
@@ -299,7 +299,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="0">Disabled</option>
             <option value="1">Plain GPIO (active high)</option>
             <option value="2">WS2812 RGB (NeoPixel)</option>
-            <option value="3">5-LED status panel (LuxDMX v5)</option>
+            <option value="3">5-LED status panel (LuxDMX v6)</option>
           </select>
           <div class="form-text">
             Same status language on every type: <span class="text-success">green</span> = up (slow blink = DMX coming in) &nbsp;&middot;&nbsp; <span class="text-primary">blue</span> = RDM / identify &nbsp;&middot;&nbsp; <span class="text-warning">orange</span> = Ethernet on WiFi fallback &nbsp;&middot;&nbsp; <span class="text-danger">red</span> = no network &nbsp;&middot;&nbsp; white/Knight-Rider = booting.<br>
@@ -622,7 +622,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 <script>
 var CURRENT = '';
 // INFO_BOARD = what the firmware DETECTED (compile-time BOARD_ID); SEL_BOARD = what the user
-// PICKED and saved (cfg.boardSel). They differ on a released LuxDMX v5: it runs the generic
+// PICKED and saved (cfg.boardSel). They differ on a released LuxDMX v6: it runs the generic
 // esp32s3dev build, so it detects as "esp32s3-devkitc-1" and only the saved pick knows better.
 var INFO_BOARD = '', INFO_MCU = '', SEL_BOARD = '';
 
@@ -948,7 +948,7 @@ function showAllVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['luxdmx_v5','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var BUILTINS = ['luxdmx_v6','luxdmx_v5','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families: used when no full board descriptor is selected (Custom).
@@ -968,7 +968,7 @@ function finalizeDesc(d){
   (d.cols || []).forEach(function(col){ col.forEach(function(p){ d.byGpio[p.gpio] = p; }); });
   return d;
 }
-// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LuxDMX v5 module).
+// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LuxDMX v6 module).
 var S3L = [4,5,6,7,15,16,17,18,8,19,20,3,46,9,10,11,12,13,14];
 var S3R = [21,47,48,45,0,35,36,37,38,39,40,41,42,44,43,2,1];
 function s3silk(g){ return g===43 ? 'TX0' : g===44 ? 'RX0' : 'IO'+g; }
@@ -1048,9 +1048,11 @@ function physDoit(){ return phys('bottom',
 function physS3DevKitC(){ return phys('bottom',
   [['3V3'],['3V3'],['RST'],['IO4',4],['IO5',5],['IO6',6],['IO7',7],['IO15',15],['IO16',16],['IO17',17],['IO18',18],['IO8',8],['IO3',3],['IO46',46],['IO9',9],['IO10',10],['IO11',11],['IO12',12],['IO13',13],['IO14',14],['5V'],['GND']],
   [['GND'],['TX0',43],['RX0',44],['IO1',1],['IO2',2],['IO42',42],['IO41',41],['IO40',40],['IO39',39],['IO38',38],['IO37',37],['IO36',36],['IO35',35],['IO0',0],['IO45',45],['IO48',48],['IO47',47],['IO21',21],['IO20',20],['IO19',19],['GND'],['GND']]); }
-function buildBoards(){
-  BOARDS = {};
-  BOARDS['luxdmx_v5'] = finalizeDesc({ id:'luxdmx_v5', name:'LuxDMX v5 (ESP32-S3 + W5500)', mcu:'esp32s3',
+// The LuxDMX board's own pin map. v6 is the current revision; v5 has the SAME map, so one
+// spec builds both descriptors and v5 stays selectable for boards already in the field (and
+// for any device that saved boardSel=luxdmx_v5). Split them the day the maps diverge.
+function luxdmxDesc(id, name){
+  return finalizeDesc({ id:id, name:name, mcu:'esp32s3',
     cols:s3cols(true),
     // Everything on this board is fixed in copper except the J4 display header and the
     // J6 expansion header. `field` = the form field it locks; `gpio` is the pin it sits on.
@@ -1096,6 +1098,11 @@ function buildBoards(){
              dispsck:39, dispmosi:40, dispcs:41, dispdc:42, disprst:38,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8},
                       {en:true, uni:1, port:2, tx:16, rx:21, rts:47}] } });
+}
+function buildBoards(){
+  BOARDS = {};
+  BOARDS['luxdmx_v6'] = luxdmxDesc('luxdmx_v6', 'LuxDMX v6 (ESP32-S3 + W5500)');
+  BOARDS['luxdmx_v5'] = luxdmxDesc('luxdmx_v5', 'LuxDMX v5 (legacy, same pin map)');
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
     cols:s3cols(false), phys:physS3DevKitC(),
     preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,
@@ -1578,12 +1585,12 @@ function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply
 // <select> is pointed at for browsing. Locks follow the real board, not the dropdown.
 function detectedDesc(){ return (INFO_BOARD && BOARDS[INFO_BOARD]) || null; }
 // Board whose copper-pin locks apply: the one the USER selected if any, else the one the
-// firmware reported. So picking "LuxDMX v5" locks its W5500 / DMX / LED pins even on the
+// firmware reported. So picking "LuxDMX v6" locks its W5500 / DMX / LED pins even on the
 // generic esp32s3dev build (which reports esp32s3-devkitc-1); the Advanced unlock is the
 // escape hatch for a reworked board.
 function lockDesc(){ return currentBoardDesc() || detectedDesc(); }
 
-// On a board that wires its pins in copper (LuxDMX v5), lock the matching form fields so
+// On a board that wires its pins in copper (LuxDMX v6), lock the matching form fields so
 // they can't be changed: set the fixed value, disable the input, hide its pin-pick button,
 // and drop in a hidden mirror so the value still POSTs (disabled inputs don't submit).
 // Idempotent — safe to re-run after the output cards or LED/display fields rebuild.
@@ -1701,7 +1708,7 @@ function initBoards(){
   buildBoards();
   fillBoardSelect();
   // The SAVED pick wins over detection. The compile-time board id is only the fallback for a
-  // device that has never had a board picked, because it can't tell a v5 from a bare DevKitC.
+  // device that has never had a board picked, because it can't tell a v6 from a bare DevKitC.
   setBoardSel(SEL_BOARD || (BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom'),
               BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom');
   $('board-detected').textContent = INFO_BOARD ? ('detected: ' + INFO_BOARD + (INFO_MCU ? (' / ' + INFO_MCU) : '')) : '';

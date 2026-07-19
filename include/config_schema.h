@@ -24,7 +24,7 @@ struct Config {
     String    otaPassword;
     // Board the USER picked in /config's board selector. Purely a UI/pin-map choice, the
     // firmware itself never acts on it, but it has to be persisted, because the board a
-    // build *reports* (BOARD_ID in main.cpp) is compile-time. A released LuxDMX v5 runs the
+    // build *reports* (BOARD_ID in main.cpp) is compile-time. A released LuxDMX v6 runs the
     // plain esp32s3dev build and reports "esp32s3-devkitc-1", so without this the selector
     // fell back to the DevKit on every reboot / OTA while the applied pins stayed put.
     String    boardSel;
