@@ -9,7 +9,7 @@
 	(paper "A4")
 	(title_block
 		(title "LuxDMX")
-		(rev "v6.0")
+		(rev "v6")
 		(company "luxdmx.org")
 	)
 	(layers
@@ -21676,7 +21676,7 @@
 			(justify left)
 		)
 	)
-	(gr_text "LuxDMX v6.0"
+	(gr_text "LuxDMX v6"
 		(at 108 160.5 0)
 		(layer "F.SilkS")
 		(uuid "7270be60-8084-4b89-b01a-38aa95b148bd")
@@ -22661,7 +22661,7 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "LuxDMX v6.0 -- KEY FEATURES"
+	(gr_text "LuxDMX v6 -- KEY FEATURES"
 		(at 134.5 135.4 0)
 		(layer "B.SilkS")
 		(uuid "38563c4e-1c86-4c1c-8659-3478400a8ca8")

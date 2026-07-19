@@ -94,7 +94,7 @@ existing units are unaffected until a user opts in.
 The LuxDMX board has **two** JST SH 1.0 mm 9-pin headers next to each other: **J4** (display) and
 **J6** (expansion). Same connector, so a cable physically plugs into either one.
 
-### v6.0 and later — safe either way
+### v6 and later — safe either way
 
 Both headers carry the **same power pins**, and a hard validator
 (`hardware/scripts/validate_header_parity.py`) fails the fab export if that ever stops being true:

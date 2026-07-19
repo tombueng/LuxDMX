@@ -6,7 +6,7 @@ be the thing that makes a swap harmless.
 
 Up to v5.2 they were NOT: J4 was 1=+3V3 2=GND while J6 was 1=+5V 2=+3V3 3=GND. Plugging a
 display into J6 therefore put +5V on the module's VCC and +3V3 on its GND, which killed a
-real display on the bench. v6.0 re-pinned J6 to match J4 (see the J6 block in luxdmx.py).
+real display on the bench. v6 re-pinned J6 to match J4 (see the J6 block in luxdmx.py).
 
 This gate re-checks that invariant on the BOARD (what actually gets fabbed, not just what
 the netlist says), position by position:

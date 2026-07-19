@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""LuxDMX v6.0 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
+"""LuxDMX v6 — standalone ESP32-S3 Art-Net/sACN -> isolated DMX gateway (SKiDL).
 
 Self-contained board (no plug-in module):
   ESP32-S3-WROOM-1-N8R2  +  W5500 SPI-Ethernet + HR911105A MagJack
@@ -429,7 +429,7 @@ for ref, net, rref, rval in [('D2', LED_R, 'R13', '1k'), ('D3', LED_G, 'R14', '1
 #   Firmware must set dispSda/dispScl (+ SPI pins) in /config to match this header.
 #
 #   Pins 1/2 (+3V3, GND) are the shared power pair: J6 is the same connector and was
-#   re-pinned in v6.0 to match them, so plugging a cable into the wrong header is
+#   re-pinned in v6 to match them, so plugging a cable into the wrong header is
 #   survivable. Never reorder them -- see the J6 block for the full reasoning.
 # ============================================================================
 DISP_SDA = Net('DISP_SDA'); DISP_SCL = Net('DISP_SCL')
@@ -455,7 +455,7 @@ J4['MP'] += GND     # mounting tabs -> GND (mechanical anchor + shield)
 #   firmware, so the port can run an I2C bus AND a SPI bus at once. Pins 7/8 are the
 #   freed UART0 (IO19/IO20 are native USB since v5.2).
 #
-#   POWER-PIN PARITY WITH J4 (v6.0). J4 and J6 are the same JST SH 9-pin part, so a
+#   POWER-PIN PARITY WITH J4 (v6). J4 and J6 are the same JST SH 9-pin part, so a
 #   cable physically plugs into either. Up to v5.2 their power pins disagreed (J4 was
 #   1=+3V3 2=GND, J6 was 1=+5V 2=+3V3 3=GND), so a display plugged into J6 got +5V on
 #   its VCC and +3V3 on its GND and died on the spot; an expansion board plugged into

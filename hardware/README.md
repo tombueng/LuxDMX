@@ -151,7 +151,7 @@ signals land in the wrong places. A mis-plugged display sees GND on its RST and 
 > **⚠ v5.2 and earlier did NOT have this.** Back then J6 was `1=+5V 2=+3V3 3=GND`, so a display plugged into
 > J6 got **+5V on its VCC and +3V3 on its GND** and died instantly. If you have a v5.2 board, see
 > [docs/display.md → Header safety](../docs/display.md#header-safety-j4-vs-j6) before plugging anything in.
-> **+5V is no longer on J6** as of v6.0 — feed 5 V loads from your own supply.
+> **+5V is no longer on J6** as of v6 — feed 5 V loads from your own supply.
 
 ---
 
