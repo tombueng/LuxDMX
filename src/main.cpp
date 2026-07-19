@@ -2040,9 +2040,8 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // hatch: build esp32s3dev with -DBOARD_LUXDMX_V6 for a firmware that reports "luxdmx_v6".
 // USE_ETH_SPI alone is too coarse to key the id on — esp32dev/esp32s3dev set it too so a DIY user
 // can add a W5500 — which is why the id needs the explicit flag, not the presence of the W5500 path.
-// (luxdmx_v4 and luxdmx_v5 are earlier revisions of this same board; their descriptors are kept in
-// web/boards/ as legacy entries so an older board still resolves its pinout, but nothing builds
-// them. v5 and v6 share a pin map, so templates/luxdmx_v5.ini is just an alias of the v6 one.)
+// (luxdmx_v4 is an earlier revision of this same board; its descriptor is kept in web/boards/ as
+// a legacy entry, but nothing builds it.)
 #if defined(BOARD_LUXDMX_V6)
 static const char BOARD_ID[] = "luxdmx_v6";
 #elif defined(USE_ETH_RMII) || defined(USE_ETHERNET)

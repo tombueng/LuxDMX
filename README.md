@@ -698,13 +698,12 @@ To make this idiot-proof, **Settings → Hardware board** offers:
 - **Live validation** — duplicate pins, strapping/flash/input-only pins and
   Ethernet-reserved pins are flagged in red/amber before you can save.
 
-Six boards are built into the firmware and work fully offline, covering the common
+Five boards are built into the firmware and work fully offline, covering the common
 variants (which are **not** all the same pinout):
 
 | Board | Notes |
 |---|---|
 | LuxDMX v6 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
-| LuxDMX v5 | the previous revision, same pin map; kept so boards already out there still pick up their pinout |
 | ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
 | ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |

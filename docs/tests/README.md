@@ -61,9 +61,8 @@ node docs/tests/v6-template.mjs   # generic S3 board -> picking the "LuxDMX v6" 
                                   #   owner uses now that there is no dedicated v6 build.
 node docs/tests/board-persist.mjs # the picked board STICKS: /info.json boardSel beats the detected
                                   #   (compile-time) board id, the locks follow the restored pick,
-                                  #   the selector submits as board=..., "custom" stays custom, a
-                                  #   device with no saved pick still falls back to detection, and
-                                  #   the legacy luxdmx_v5 pick still resolves offline
+                                  #   the selector submits as board=..., "custom" stays custom, and
+                                  #   a device with no saved pick still falls back to detection
 ```
 
 ## What's covered
