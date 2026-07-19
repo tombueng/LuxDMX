@@ -35,6 +35,10 @@ static const char* const ENUM_BTNROLE[]  = {"off", "Enter / Select", "Back", "Ne
 const CfgField CONFIG_FIELDS[] = {
     // --- Identity / general -------------------------------------------------
     SFIELD("hostname", "hostname", hostname,    "Hostname",       "Identity", CFG_KEEPNE),
+    // The /config board selector's choice ("luxdmx_v6", "custom", a catalog id, ...). UI state,
+    // not something the firmware reads, but it must survive a reboot/OTA, since the board a
+    // build reports is compile-time and a v6 runs the generic esp32s3dev build.
+    SFIELD("board",    "boardSel", boardSel,    "Board",          "Identity", CFG_NONE),
     SFIELD("otapw",    "otapw",    otaPassword, "OTA password",   "Identity", CFG_SECRET | CFG_KEEPNE),
     EFIELD("protocol", "protocol", protocol,    "Input protocol", "Identity", ENUM_PROTOCOL),
 

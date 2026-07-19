@@ -3,6 +3,12 @@
   "updated": "auto",
   "boards": [
     {
+      "id": "luxdmx_v6",
+      "name": "LuxDMX v6 (ESP32-S3 + W5500)",
+      "mcu": "esp32s3",
+      "builtin": true
+    },
+    {
       "id": "luxdmx_v5",
       "name": "LuxDMX v5 (ESP32-S3 + W5500)",
       "mcu": "esp32s3",

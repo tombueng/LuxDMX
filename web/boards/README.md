@@ -7,7 +7,7 @@ fetches it from `https://luxdmx.org/web/boards/`.
 
 ## How it is used
 
-The five **core boards** (`luxdmx_v5`, `esp32s3-devkitc-1`, `esp32-devkitc`,
+The six **core boards** (`luxdmx_v6`, `luxdmx_v5`, `esp32s3-devkitc-1`, `esp32-devkitc`,
 `esp32-devkit-v1`, `xiao-esp32s3`) are also baked into the firmware
 (`src/pages/config.html`) so the picker works fully offline on an isolated stage LAN.
 This catalog:
@@ -16,12 +16,12 @@ This catalog:
   built-ins (fetched on demand, then cached in the browser's `localStorage`),
 - documents the descriptor format for contributors.
 
-`luxdmx_v4` is the **previous revision of our own board**, kept here as a legacy
-descriptor. Nothing builds it any more (the env, the template and `BOARD_ID` are all
-`luxdmx_v5`), but a v4 still running older firmware reports `board: "luxdmx_v4"`, and it
-fetches this catalog to draw its pinout. Deleting the descriptor would break the picker on
-those boards, so it stays. It is not a built-in (an old board already carries its own copy
-in its firmware), so it costs no flash.
+`luxdmx_v5` and `luxdmx_v4` are **previous revisions of our own board**, kept as legacy
+descriptors. The current revision is `luxdmx_v6` (that is what the template and `BOARD_ID`
+say), but an older board still reports or has saved its own id and fetches this catalog to
+draw its pinout. Deleting a descriptor would break the picker on those boards, so they stay.
+v5 shares the v6 pin map and is a built-in, so a v5 keeps working with no network at all; v4
+differs and is catalog-only (an old board already carries its own copy in its firmware).
 
 The picker draws its own **horizontal pin diagram** from each descriptor's two pin
 columns. There are no board photos or realistic graphics. If the catalog cannot be
@@ -104,7 +104,7 @@ no edit there.
 
 ### Fixed wiring (`hardwired`) and headers — for boards with a fixed pinout
 
-A purpose-built board (the **LuxDMX v5**) wires nearly everything in copper, so the picker
+A purpose-built board (the **LuxDMX v6**) wires nearly everything in copper, so the picker
 should not let you change those pins. Two optional fields drive that, keyed on the
 **detected** board (what `/info.json` reports), not the dropdown:
 
@@ -146,18 +146,24 @@ red = do-not-use (`flash`/`serial`/`reserved:*`), blue ring = currently assigned
 
 ## Regenerating
 
-Every descriptor is generated so it cannot drift from the hardware: LuxDMX v5 from the
-PCB netlist (`hardware/luxdmx.py`), the hand-tuned dev boards from published header
-pinouts, and the long tail auto-derived from the arduino-esp32 core
-`variants/<dir>/pins_arduino.h`:
+Descriptors started out generated from authoritative pinout data: LuxDMX from the PCB netlist
+(`hardware/scripts/luxdmx.py`), the hand-tuned dev boards from published header pinouts, and the
+long tail auto-derived from the arduino-esp32 core `variants/<dir>/pins_arduino.h`.
+
+> **The generator is one schema revision behind the committed catalog, so the JSON in this folder
+> is authoritative, not the script.** Measured: 19 of 34 descriptors still regenerate byte-identical,
+> 14 differ only by the `phys` block (the curated physical-header rows the script never learned to
+> emit, so a blind run would delete them), and our own board is still emitted as `luxdmx_v4` in the
+> old `connectors`/`fixed` shape. Regenerate into a scratch dir and diff, don't point it straight at
+> `web/boards/`:
 
 ```sh
-python hardware/gen_board_descriptor.py
+python hardware/scripts/gen_board_descriptor.py
 ```
 
 ## Adding a board
 
-Add it to the board list in `hardware/gen_board_descriptor.py` (an `auto_board(...)` entry
+Add it to the board list in `hardware/scripts/gen_board_descriptor.py` (an `auto_board(...)` entry
 is usually enough - pass the arduino-esp32 variant directory), then re-run the generator
 and open a PR. Once merged to `master`, GitHub Pages redeploys and every device's config
 page can pick it from the dropdown.

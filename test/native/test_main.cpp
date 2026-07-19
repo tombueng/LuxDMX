@@ -48,7 +48,8 @@ static void checkBoard(const char* name) {
     if (b == "esp32s3dev") { ledPin = 48; ledType = 2; dispSda = 8; dispScl = 9; }
     else if (b == "wokwi") { ledPin = 48; ledType = 2; dispType = 1; dispSda = 8; dispScl = 9; }
     else if (b == "wt32eth01") { o0tx = 4; o0rx = 5; dispSda = 14; dispScl = 15; useEth = true; wiredPhy = 1; }
-    else if (b == "luxdmx_v5") {
+    // v5 is a legacy alias of v6 (same pin map), so both must resolve to these values.
+    else if (b == "luxdmx_v6" || b == "luxdmx_v5") {
         ledType = 3; ledR = 1; ledG = 2; ledY = 6; ledB = 7; ledW = 15;
         o0tx = 17; o0rx = 18; o0rts = 8;
         o1en = true; o1tx = 16; o1rx = 21; o1rts = 47;
@@ -98,7 +99,7 @@ int main() {
     CHECK(cfg.subnet == "255.255.255.0",       "extends: _base subnet");
     CHECK(cfg.outputs[0].enabled,             "extends: _base o0_en");
     CHECK(cfg.outputs[1].universe == 1,       "extends: _base o1_uni=1");
-    CHECK(cfg.ledPin == 2,                     "v5: ledPin=2 (base default, unused at type 3)");
+    CHECK(cfg.ledPin == 2,                     "luxdmx: ledPin=2 (base default, unused at type 3)");
     CHECK(cfg.dispRot == 0,                    "neutral: dispRot=0 (min)");
     CHECK(cfg.ethFreqMhz == 20,                "base: ethFreq=20");
     CHECK(cfg.outputs[0].mergeMode == 0,       "neutral: merge=OFF");
@@ -158,13 +159,14 @@ int main() {
     checkBoard("esp32s3dev");
     checkBoard("wt32eth01");
     checkBoard("wokwi");
-    checkBoard("luxdmx_v5");
+    checkBoard("luxdmx_v6");
+    checkBoard("luxdmx_v5");   // legacy alias template: must still land on the v6 values
 
     // 7) serial console grammar (cfgserial::execute), all schema-driven
     using cfgserial::execute;
     cfgserial::Hooks hk; hk.save = hSave; hk.reboot = hReboot; hk.factory = hFactory; hk.wifi = hWifi;
     static Stream dummy; cfgserial::begin(dummy, hk);
-    cfgcore::resetTo("luxdmx_v5", err);
+    cfgcore::resetTo("luxdmx_v6", err);
 
     CHECK(execute("get o0_tx") == "o0_tx=17",          "serial: get o0_tx");
     CHECK(execute("GET o0_rts") == "o0_rts=8",          "serial: verb case-insensitive");

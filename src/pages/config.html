@@ -71,7 +71,7 @@ footer a:hover { color:var(--gh-text); }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#45d85c; } .lg-warn::before{ background:#ffaa1c; } .lg-bad::before{ background:#f33abc; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #23e6f7 inset; }
-/* Hard-wired (fixed) on-board pins (LuxDMX v5): locked, shown but not editable */
+/* Hard-wired (fixed) on-board pins (LuxDMX v6): locked, shown but not editable */
 .fixed-field { background:#161b22 !important; color:var(--gh-muted) !important; cursor:not-allowed; opacity:.9; }
 .hw-fixed, .hw-headers { font-size:.8rem; margin-top:.55rem; }
 .hw-fixed .hwb { display:inline-block; background:#161b22; border:1px solid var(--gh-border); border-radius:4px; padding:.05rem .4rem; margin:.12rem .25rem .12rem 0; color:var(--gh-text); white-space:nowrap; }
@@ -107,7 +107,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       <div class="card-body">
         <label class="form-label text-secondary small mb-1">Board</label>
         <div class="d-flex gap-2 flex-wrap align-items-start">
-          <select class="form-select" id="board-sel" style="max-width:340px"></select>
+          <select class="form-select" id="board-sel" name="board" style="max-width:340px"></select>
           <button type="button" class="btn btn-outline-primary" id="board-apply">Apply template</button>
           <button type="button" class="btn btn-outline-secondary" id="board-open">Show board &amp; pick pins</button>
         </div>
@@ -299,7 +299,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <option value="0">Disabled</option>
             <option value="1">Plain GPIO (active high)</option>
             <option value="2">WS2812 RGB (NeoPixel)</option>
-            <option value="3">5-LED status panel (LuxDMX v5)</option>
+            <option value="3">5-LED status panel (LuxDMX v6)</option>
           </select>
           <div class="form-text">
             Same status language on every type: <span class="text-success">green</span> = up (slow blink = DMX coming in) &nbsp;&middot;&nbsp; <span class="text-primary">blue</span> = RDM / identify &nbsp;&middot;&nbsp; <span class="text-warning">orange</span> = Ethernet on WiFi fallback &nbsp;&middot;&nbsp; <span class="text-danger">red</span> = no network &nbsp;&middot;&nbsp; white/Knight-Rider = booting.<br>
@@ -743,7 +743,10 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <script>
 var CURRENT = '';
-var INFO_BOARD = '', INFO_MCU = '';
+// INFO_BOARD = what the firmware DETECTED (compile-time BOARD_ID); SEL_BOARD = what the user
+// PICKED and saved (cfg.boardSel). They differ on a released LuxDMX v6: it runs the generic
+// esp32s3dev build, so it detects as "esp32s3-devkitc-1" and only the saved pick knows better.
+var INFO_BOARD = '', INFO_MCU = '', SEL_BOARD = '';
 
 function $(id){ return document.getElementById(id); }
 
@@ -932,10 +935,10 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('auto-update-sw').checked = !!d.autoUpdate;
   updNetMode(); updLedPin(); updDispPins(); updHostUrl();
   $('save-btn').disabled = false;
-  INFO_BOARD = d.board || ''; INFO_MCU = d.mcu || '';
+  INFO_BOARD = d.board || ''; INFO_MCU = d.mcu || ''; SEL_BOARD = d.boardSel || '';
   initBoards();
   loadVersions();
-}).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; INFO_BOARD=''; INFO_MCU=''; initBoards(); loadVersions(); });
+}).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; INFO_BOARD=''; INFO_MCU=''; SEL_BOARD=''; initBoards(); loadVersions(); });
 
 // Bootstrap-styled confirm/info dialog (no Bootstrap JS dependency).
 // opts: {title, body, okText, okClass, cancel:false}  ->  Promise<bool>
@@ -1083,7 +1086,7 @@ function showAllVersions(){
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['luxdmx_v5','luxdmx_v6','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var BUILTINS = ['luxdmx_v6','luxdmx_v5','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families: used when no full board descriptor is selected (Custom).
@@ -1103,7 +1106,7 @@ function finalizeDesc(d){
   (d.cols || []).forEach(function(col){ col.forEach(function(p){ d.byGpio[p.gpio] = p; }); });
   return d;
 }
-// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LuxDMX v5 module).
+// ESP32-S3 WROOM-1 castellation order (DevKitC-1 headers / LuxDMX v6 module).
 var S3L = [4,5,6,7,15,16,17,18,8,19,20,3,46,9,10,11,12,13,14];
 var S3R = [21,47,48,45,0,35,36,37,38,39,40,41,42,44,43,2,1];
 function s3silk(g){ return g===43 ? 'TX0' : g===44 ? 'RX0' : 'IO'+g; }
@@ -1738,12 +1741,12 @@ function updBoardButtons(){ var b = BOARDS[$('board-sel').value]; $('board-apply
 // <select> is pointed at for browsing. Locks follow the real board, not the dropdown.
 function detectedDesc(){ return (INFO_BOARD && BOARDS[INFO_BOARD]) || null; }
 // Board whose copper-pin locks apply: the one the USER selected if any, else the one the
-// firmware reported. So picking "LuxDMX v5" locks its W5500 / DMX / LED pins even on the
+// firmware reported. So picking "LuxDMX v6" locks its W5500 / DMX / LED pins even on the
 // generic esp32s3dev build (which reports esp32s3-devkitc-1); the Advanced unlock is the
 // escape hatch for a reworked board.
 function lockDesc(){ return currentBoardDesc() || detectedDesc(); }
 
-// On a board that wires its pins in copper (LuxDMX v5), lock the matching form fields so
+// On a board that wires its pins in copper (LuxDMX v6), lock the matching form fields so
 // they can't be changed: set the fixed value, disable the input, hide its pin-pick button,
 // and drop in a hidden mirror so the value still POSTs (disabled inputs don't submit).
 // Idempotent — safe to re-run after the output cards or LED/display fields rebuild.
@@ -1839,10 +1842,31 @@ function loadRemoteCatalog(){
 }
 
 // ---- Init (called from the /info.json loader) ------------------------------
+// Point the board <select> at `id`, falling back to `alt` when that board isn't on offer.
+// A saved catalog board has no <option> until its descriptor is fetched, so sit on the
+// fallback and upgrade once it lands (offline: the fallback just stays).
+function setBoardSel(id, alt){
+  var sel = $('board-sel');
+  id = id || alt || 'custom';
+  if (BOARDS[id] && mcuMatch(BOARDS[id].mcu)) appendBoardOption(id, BOARDS[id].name);
+  sel.value = id;
+  if (sel.value === id) return;
+  sel.value = alt || 'custom';
+  if (id === 'custom' || BUILTINS.indexOf(id) >= 0) return;
+  ensureBoard(id, function(ok){
+    if (!ok || !mcuMatch(BOARDS[id].mcu)) return;
+    appendBoardOption(id, BOARDS[id].name);
+    sel.value = id;
+    updBoardButtons(); applyHardwiredLocks(); validate();
+  });
+}
 function initBoards(){
   buildBoards();
   fillBoardSelect();
-  $('board-sel').value = BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom';
+  // The SAVED pick wins over detection. The compile-time board id is only the fallback for a
+  // device that has never had a board picked, because it can't tell a v6 from a bare DevKitC.
+  setBoardSel(SEL_BOARD || (BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom'),
+              BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom');
   $('board-detected').textContent = INFO_BOARD ? ('detected: ' + INFO_BOARD + (INFO_MCU ? (' / ' + INFO_MCU) : '')) : '';
   decorateAllPins();
   // re-render the open picker (and re-sync the modal select) after a board change

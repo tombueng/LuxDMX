@@ -33,17 +33,23 @@ and the firmware turns on the internal pull-up. If you'd rather wire to 3V3, fli
 *Buttons active-high* in `/config` and it uses pull-downs instead. Encoder A/B are
 open contacts to the common pin, so the usual EC11 with the flat side up just works.
 
-On the v5 board the **J6 expansion header** breaks out six free non-strapping GPIOs
-plus power for exactly this:
+On the LuxDMX board the **J6 expansion header** breaks out the free non-strapping GPIOs
+plus power for exactly this. The two revisions wire it differently, so count the pins on
+the header you actually have (see [display.md → Header safety](display.md#header-safety-j4-vs-j6)):
 
 ```
-J6 (JST-SH, 9-pin):
-  1 +5V   2 +3V3   3 GND   4 IO35   5 IO36   6 IO37   7 IO48   8 IO19   9 IO20
+J6 (JST-SH, 9-pin) — v6:
+  1 +3V3  2 GND   3 IO35  4 IO36  5 IO37  6 IO48  7 TX0   8 RX0   9 GND
+
+J6 (JST-SH, 9-pin) — v5 (incl. v5.2):
+  1 +5V   2 +3V3  3 GND   4 IO35  5 IO36  6 IO37  7 IO48  8 TX0   9 RX0
 ```
 
-A comfortable default is encoder **A=IO35, B=IO36, push=IO37**, which leaves IO48 /
-IO19 / IO20 for buttons if you want them. (Pins aren't baked in as defaults, set
-them in `/config` for your build.)
+A comfortable default is encoder **A=IO35, B=IO36, push=IO37** on either revision, which
+leaves IO48 for a button. TX0/RX0 (IO43/IO44) are the UART0 console, so using those costs
+you the serial log. (Pins aren't baked in as defaults, set them in `/config` for your
+build. The pin picker draws the header for the board you select, which is less error-prone
+than counting.)
 
 ## How the menu is driven
 

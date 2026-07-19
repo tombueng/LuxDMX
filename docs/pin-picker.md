@@ -37,10 +37,10 @@ firmware footprint stays small regardless of how many boards the catalog grows t
 ## Architecture
 
 ```
-src/pages/config.html      renderer + validator + 5 built-in descriptors (offline)
+src/pages/config.html      renderer + validator + 6 built-in descriptors (offline)
 src/main.cpp /info.json     adds "board" + "mcu" so the UI auto-selects the right rules
 web/boards/                 catalog (index.json + per-board JSON) -> GitHub Pages
-hardware/gen_board_descriptor.py   generates every descriptor (see below)
+hardware/scripts/gen_board_descriptor.py   descriptor generator (STALE, see below)
 ```
 
 ### Deployment split
@@ -48,7 +48,7 @@ hardware/gen_board_descriptor.py   generates every descriptor (see below)
 | Part | Location | Why |
 |---|---|---|
 | Renderer + validator | firmware flash | small, must work offline |
-| 5 core descriptors (v3, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3 DevKitC-1, XIAO S3) | firmware flash | covers our HW + the common dev boards, fully offline |
+| 6 core descriptors (LuxDMX v6 + v5, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3 DevKitC-1, XIAO S3) | firmware flash | covers our HW + the common dev boards, fully offline |
 | The rest of the catalog | GitHub Pages, lazy-fetched + `localStorage` cache | keeps flash small |
 
 The core flow never depends on the network. On an isolated stage LAN the built-in
@@ -63,16 +63,29 @@ boards and manual GPIO entry still work; catalog fetch failures degrade silently
 | `wt32eth01` (USE_ETHERNET) | `wt32eth01` | `esp32` |
 | `esp32s3dev` | `esp32s3-devkitc-1` | `esp32s3` |
 | `esp32dev` | `esp32-devkitc` | `esp32` |
-| `esp32s3dev` + `-DBOARD_LUXDMX_V5` | `luxdmx_v5` | `esp32s3` |
+| `esp32s3dev` + `-DBOARD_LUXDMX_V6` | `luxdmx_v6` | `esp32s3` |
 
-The **LuxDMX v5** has no dedicated build — it runs the released `esp32s3dev` firmware (so it reports
-`esp32s3-devkitc-1`) and gets its fixed pin map from the **LuxDMX v5** board template applied in
-`/config`. Only a source build with the `-DBOARD_LUXDMX_V5` escape hatch reports `luxdmx_v5` and
-activates the copper-pin locks.
+The **LuxDMX v6** has no dedicated build — it runs the released `esp32s3dev` firmware (so it reports
+`esp32s3-devkitc-1`) and gets its fixed pin map from the **LuxDMX v6** board template applied in
+`/config`. Only a source build with the `-DBOARD_LUXDMX_V6` escape hatch reports `luxdmx_v6` from
+detection alone.
 
-If the id matches a descriptor, the board is preselected; otherwise the page falls back
-to **Custom**, which still validates against the chip family rules for `mcu`. The board
+The **v5** revision shares the v6 pin map, so it stays in the picker (and as a built-in) purely so a
+board already in the field, or a device that saved `boardSel=luxdmx_v5`, still resolves its pinout.
+`templates/luxdmx_v5.ini` is a one-line alias of the v6 template for the same reason. The older
+**v4** differs and lives in the online catalog only.
+
+Detection is only the **fallback**, because it is compile-time and can't tell a v6 from a bare
+DevKitC. The board you pick is saved on the device (config key `board`, reported back as
+`/info.json` `boardSel`) when you hit Save, and that saved pick is what the dropdown restores on
+every later visit, so a reboot or a firmware update no longer drops it back to the detected board.
+`Custom / manual` is a real choice too, so it sticks instead of snapping to detection. Only a
+device that has never had a board picked falls back to the detected id, and if that matches no
+descriptor, to **Custom**, which still validates against the chip family rules for `mcu`. The board
 can also be switched from a dropdown inside the pin-picker popup itself.
+
+The pick is UI state: the firmware itself never reads it, it only stores it. Copper-pin locks and
+the diagram follow it (see below), nothing else does.
 
 ## Validation rules
 
@@ -98,8 +111,8 @@ fields are locked read-only; an **Advanced: unlock the fixed GPIO pins** toggle 
 them for anyone who reworked the board.
 
 The lock follows the **selected** board, not only the one the firmware auto-detects. That
-matters because the v5 ships as the generic `esp32s3dev` build (it reports
-`esp32s3-devkitc-1`): the moment you pick **LuxDMX v5** in the dropdown, its W5500 / DMX /
+matters because the v6 ships as the generic `esp32s3dev` build (it reports
+`esp32s3-devkitc-1`): the moment you pick **LuxDMX v6** in the dropdown, its W5500 / DMX /
 LED pins snap to the board values and lock, so you can't accidentally move the Ethernet or
 DMX pins. Switch the board back (or hit Advanced unlock) to edit them again.
 
@@ -156,7 +169,7 @@ See [web/boards/README.md](../web/boards/README.md) for the JSON schema, the `fl
 table, and the contribution flow. Regenerate every descriptor with:
 
 ```sh
-python hardware/gen_board_descriptor.py
+python hardware/scripts/gen_board_descriptor.py
 ```
 
 ## Board coverage
@@ -165,8 +178,10 @@ python hardware/gen_board_descriptor.py
 [../web/boards/ROADMAP.md](../web/boards/ROADMAP.md) for the full list). Descriptor data
 is sourced authoritatively, not guessed:
 
-- **LuxDMX v5** is parsed straight from `hardware/luxdmx.py` (the PCB netlist source),
-  so its diagram, template and Ethernet-reserved-pin rules cannot drift from the board.
+- **LuxDMX v6** is derived from `hardware/scripts/luxdmx.py` (the PCB netlist source), so its
+  diagram, template and Ethernet-reserved-pin rules track the real board. (That file still
+  carries the board's v5.x revision markings; the hardware sources have not been renumbered,
+  only the firmware/web-facing board name has.)
 - **Hand-tuned** boards (DevKitC / DevKit v1 / NodeMCU / S3 DevKitC-1, Feather / QtPy /
   XIAO / WT32-ETH01) use their real, published header order.
 - **Every other board** is auto-generated by `auto_board()` from the arduino-esp32 core's

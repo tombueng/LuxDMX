@@ -63,13 +63,18 @@ These behaviour tests drive the real `src/pages/config.html` in a headless brows
 device — run them directly with `node`, they self-report and exit non-zero on failure:
 
 ```bash
-node docs/tests/v5-locks.mjs      # board detected as luxdmx_v5 -> copper pins locked + mirrored,
+node docs/tests/v6-locks.mjs      # board detected as luxdmx_v6 -> copper pins locked + mirrored,
                                   #   the J4 display-header pins stay editable, headers listed
-node docs/tests/v5-template.mjs   # generic S3 board -> picking the "LuxDMX v5" template fills the
+node docs/tests/v6-template.mjs   # generic S3 board -> picking the "LuxDMX v6" template fills the
                                   #   fixed pin map: W5500 SPI + LED + display + DMX pins get set,
-                                  #   panel brightness is pushed to /led/bright?...&save=1, and
-                                  #   nothing is locked (the board isn't a detected v5). This is the
-                                  #   flow a v5 owner uses now that there is no dedicated v5 build.
+                                  #   panel brightness is pushed to /led/bright?...&save=1, and the
+                                  #   v6's copper pins lock behind the pick. This is the flow a v6
+                                  #   owner uses now that there is no dedicated v6 build.
+node docs/tests/board-persist.mjs # the picked board STICKS: /info.json boardSel beats the detected
+                                  #   (compile-time) board id, the locks follow the restored pick,
+                                  #   the selector submits as board=..., "custom" stays custom, a
+                                  #   device with no saved pick still falls back to detection, and
+                                  #   the legacy luxdmx_v5 pick still resolves offline
 node docs/tests/dm9051-roundtrip.mjs  # a DM9051 box survives a /config save: the wired selector
                                   #   reads ethSpiPhy from /info.json and posts it back unchanged.
                                   #   Guards the bug where /info.json didn't publish the field, so

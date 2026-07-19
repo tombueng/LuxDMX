@@ -197,7 +197,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 #define DEF_LED_TYPE 1   // 0=off, 1=plain GPIO, 2=WS2812, 3=5-LED discrete panel
 #endif
 
-// 5-LED discrete status panel (ledType 3) — the LuxDMX v5 board. Five LEDs on
+// 5-LED discrete status panel (ledType 3) — the LuxDMX v6 board. Five LEDs on
 // their own GPIOs, active-high (GPIO → R → LED anode, cathode → GND). -1 = absent.
 #ifndef DEF_LED_R
 #define DEF_LED_R -1   // red    — fault / no network
@@ -219,7 +219,7 @@ static constexpr uint32_t   HOLD_MS     = 3000;
 // runtime config (cfg.eth*) on ANY board: a DIY user can wire a W5500 module to a
 // plain ESP32 / ESP32-S3 and enable it in /config, not just boards that bake the
 // pins in at build time. Defaults are the classic-ESP32 VSPI pins (the most common
-// W5500 wiring); luxdmx_v5 overrides them via build_flags. A build without
+// W5500 wiring); the luxdmx_v6 template overrides them. A build without
 // USE_ETH_SPI never calls ETH.begin() with these, so they cost nothing there.
 #ifndef ETH_W5500_SCK
 #define ETH_W5500_SCK 18
@@ -2039,19 +2039,20 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // Compile-time board identity. Lets the /config pin-picker auto-select the right
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
-// BOARD_LUXDMX_V5 is NOT set by any shipped env — the v5 has no dedicated build, it is the
-// esp32s3dev build plus the "LuxDMX v5" board template applied in /config (see platformio.ini).
-// So a released v5 reports "esp32s3-devkitc-1" like any S3, and the copper-pin locks (which key
-// on the reported board) are inactive on it. This branch is the source-build escape hatch: build
-// esp32s3dev with -DBOARD_LUXDMX_V5 (or -DBOARD_LUXDMX_V6) to get a firmware that reports that
-// id and gets the locks. Either way the template is also pickable by hand in /config.
+// Neither BOARD_LUXDMX_V5 nor BOARD_LUXDMX_V6 is set by any shipped env — neither revision has
+// a dedicated build, both are the esp32s3dev build plus the matching board template applied in
+// /config (see platformio.ini). So a released board reports "esp32s3-devkitc-1" like any S3, and
+// the copper-pin locks come from picking the board in /config, which now sticks (cfg.boardSel).
+// These branches are the source-build escape hatch: build esp32s3dev with -DBOARD_LUXDMX_V6 (or
+// -DBOARD_LUXDMX_V5) for a firmware that reports that id directly.
 // USE_ETH_SPI alone is too coarse to key the id on — esp32dev/esp32s3dev set it too so a DIY user
 // can add a W5500 — which is why the id needs the explicit flag, not the presence of the W5500 path.
-// (luxdmx_v4 was the previous revision of this same board; its descriptor is kept in web/boards/
-// as a legacy entry so a v4 still resolves its pinout, but nothing builds it.)
+// (luxdmx_v4 is an earlier revision of this same board; its descriptor is kept in web/boards/ as a
+// legacy entry so a v4 still resolves its pinout, but nothing builds it.)
 // v6 is the same board with J6 re-pinned (its power pins now match J4, so swapping the two
 // cables is survivable). It needs its own id because the two revisions genuinely differ in
 // copper: telling a v5 owner the v6 J6 pinout is the mis-plug this change exists to stop.
+// The pin map itself is identical, so templates/luxdmx_v5.ini is just an alias of the v6 one.
 #if defined(BOARD_LUXDMX_V6)
 static const char BOARD_ID[] = "luxdmx_v6";
 #elif defined(BOARD_LUXDMX_V5)
@@ -2181,7 +2182,8 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"subnet\":\"";   j += cfg.subnet;             j += "\",";
     j += "\"dns\":\"";      j += cfg.dns;                j += "\",";
     j += "\"autoUpdate\":"; j += cfg.autoUpdate ? "true" : "false"; j += ",";
-    j += "\"board\":\"";    j += BOARD_ID;               j += "\",";
+    j += "\"board\":\"";    j += BOARD_ID;               j += "\",";   // DETECTED (compile-time) board id
+    j += "\"boardSel\":\""; j += jsonEsc(cfg.boardSel);  j += "\",";   // board the user PICKED in /config ("" = never picked)
     j += "\"mcu\":\"";      j += MCU_ID;                 j += "\"";
     j += "}";
     sendJsonSafe(req, j);
@@ -3203,7 +3205,7 @@ static void initOTA() {
 // compete with loop() for CPU. DMX output stays in loop()/callbacks.
 // ---------------------------------------------------------------------------
 // One status language, spoken identically by the single WS2812/GPIO LED and the 5-LED
-// discrete panel (v4/v5 board). Boot/connecting is handled separately by bootConnectingLed()
+// discrete panel (the LuxDMX board, v4 onwards). Boot/connecting is handled separately by bootConnectingLed()
 // (Knight-Rider sweep on the panel, white "working" blink on a single LED) until the network
 // is up and this task takes over.
 //
