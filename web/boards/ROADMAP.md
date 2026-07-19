@@ -71,10 +71,10 @@ pins in their true positions with the board's own silk, drawn as a faithful upri
   the firmware only supports mono OLED and SSD1351 colour SPI for now (TFT is a separate
   feature). SSD1351 colour SPI is set via the GPIO fields.
 - **Ethernet boards** mark the RMII PHY pins reserved + hard-wired so they are not reused.
-- **Offline**: five core boards (LuxDMX v6, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3
-  DevKitC-1, XIAO ESP32-S3) are baked into `src/pages/config.html` and work with no network;
+- **Offline**: six core boards (LuxDMX v6, LuxDMX v5, ESP32 DevKitC, ESP32 DevKit v1,
+  ESP32-S3 DevKitC-1, XIAO ESP32-S3) are baked into `src/pages/config.html` and work with no network;
   the rest are fetched on demand from GitHub Pages.
 
-Status: **33** board descriptors (5 baked-in offline + 28 catalog, plus the legacy v4 entry), every one with a
+Status: **33** board descriptors (6 baked-in offline + 27 catalog, plus the legacy v4/v5 entries), every one with a
 generated clickable pin diagram and an "Apply template" pin map, all GPIO-verified against
 `pins_arduino.h`.

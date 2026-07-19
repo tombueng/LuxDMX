@@ -1,6 +1,6 @@
 {
-  "id": "luxdmx_v6",
-  "name": "LuxDMX v6 (ESP32-S3 + W5500)",
+  "id": "luxdmx_v5",
+  "name": "LuxDMX v5 (legacy, same pin map)",
   "mcu": "esp32s3",
   "cols": [
     [

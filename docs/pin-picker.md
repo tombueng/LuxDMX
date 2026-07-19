@@ -37,7 +37,7 @@ firmware footprint stays small regardless of how many boards the catalog grows t
 ## Architecture
 
 ```
-src/pages/config.html      renderer + validator + 5 built-in descriptors (offline)
+src/pages/config.html      renderer + validator + 6 built-in descriptors (offline)
 src/main.cpp /info.json     adds "board" + "mcu" so the UI auto-selects the right rules
 web/boards/                 catalog (index.json + per-board JSON) -> GitHub Pages
 hardware/scripts/gen_board_descriptor.py   descriptor generator (STALE, see below)
@@ -48,7 +48,7 @@ hardware/scripts/gen_board_descriptor.py   descriptor generator (STALE, see belo
 | Part | Location | Why |
 |---|---|---|
 | Renderer + validator | firmware flash | small, must work offline |
-| 5 core descriptors (LuxDMX v6, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3 DevKitC-1, XIAO S3) | firmware flash | covers our HW + the common dev boards, fully offline |
+| 6 core descriptors (LuxDMX v6 + v5, ESP32 DevKitC, ESP32 DevKit v1, ESP32-S3 DevKitC-1, XIAO S3) | firmware flash | covers our HW + the common dev boards, fully offline |
 | The rest of the catalog | GitHub Pages, lazy-fetched + `localStorage` cache | keeps flash small |
 
 The core flow never depends on the network. On an isolated stage LAN the built-in
@@ -70,7 +70,10 @@ The **LuxDMX v6** has no dedicated build — it runs the released `esp32s3dev` f
 `/config`. Only a source build with the `-DBOARD_LUXDMX_V6` escape hatch reports `luxdmx_v6` from
 detection alone.
 
-The older **v4** revision lives in the online catalog only, as a legacy descriptor.
+The **v5** revision shares the v6 pin map, so it stays in the picker (and as a built-in) purely so a
+board already in the field, or a device that saved `boardSel=luxdmx_v5`, still resolves its pinout.
+`templates/luxdmx_v5.ini` is a one-line alias of the v6 template for the same reason. The older
+**v4** differs and lives in the online catalog only.
 
 Detection is only the **fallback**, because it is compile-time and can't tell a v6 from a bare
 DevKitC. The board you pick is saved on the device (config key `board`, reported back as

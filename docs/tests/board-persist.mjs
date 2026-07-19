@@ -13,6 +13,8 @@
 //   * the selector actually SUBMITS (name="board"), so Save persists the choice
 //   * boardSel="custom" stays custom instead of snapping to the detected board
 //   * no boardSel (fresh device / older config) still falls back to detection
+//   * a saved luxdmx_v5 (the previous revision, same pin map) still resolves offline, so a
+//     board already in the field doesn't lose its pinout when the current one becomes v6
 //
 // Run:  node docs/tests/board-persist.mjs     (from the repo root)
 import http from 'node:http';
@@ -105,6 +107,20 @@ try {
   const sel4 = await page.evaluate(() => document.getElementById('board-sel').value);
   fails += check('no boardSel falls back to the detected board', sel4 === 'esp32s3-devkitc-1');
 
+  // ---- 5. the previous revision keeps working -----------------------------------------
+  // v5 boards are out there and some have already saved boardSel=luxdmx_v5. v5 shares the v6
+  // pin map and stays a BUILT-IN (not catalog-only), so it has to resolve with the network
+  // blocked, locks and all. If this fails, a v5 owner silently loses their pinout.
+  info = { ...BASE, boardSel: 'luxdmx_v5' };
+  await open(page);
+  const r5 = await page.evaluate(() => ({
+    sel: document.getElementById('board-sel').value,
+    o0tx: (() => { const e = document.getElementsByName('o0_tx')[0]; return e ? { v: e.value, disabled: e.disabled } : null; })(),
+    ethcs: (() => { const e = document.getElementsByName('ethcs')[0]; return e ? e.value : null; })(),
+  }));
+  fails += check('legacy luxdmx_v5 still selectable offline', r5.sel === 'luxdmx_v5');
+  fails += check('legacy v5 keeps the same copper pins (o0_tx 17 locked, ethcs 10)',
+    !!r5.o0tx && r5.o0tx.v === '17' && r5.o0tx.disabled && r5.ethcs === '10');
 } finally {
   await browser.close();
   server.close();

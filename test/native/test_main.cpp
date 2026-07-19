@@ -48,7 +48,8 @@ static void checkBoard(const char* name) {
     if (b == "esp32s3dev") { ledPin = 48; ledType = 2; dispSda = 8; dispScl = 9; }
     else if (b == "wokwi") { ledPin = 48; ledType = 2; dispType = 1; dispSda = 8; dispScl = 9; }
     else if (b == "wt32eth01") { o0tx = 4; o0rx = 5; dispSda = 14; dispScl = 15; useEth = true; wiredPhy = 1; }
-    else if (b == "luxdmx_v6") {
+    // v5 is a legacy alias of v6 (same pin map), so both must resolve to these values.
+    else if (b == "luxdmx_v6" || b == "luxdmx_v5") {
         ledType = 3; ledR = 1; ledG = 2; ledY = 6; ledB = 7; ledW = 15;
         o0tx = 17; o0rx = 18; o0rts = 8;
         o1en = true; o1tx = 16; o1rx = 21; o1rts = 47;
@@ -159,6 +160,7 @@ int main() {
     checkBoard("wt32eth01");
     checkBoard("wokwi");
     checkBoard("luxdmx_v6");
+    checkBoard("luxdmx_v5");   // legacy alias template: must still land on the v6 values
 
     // 7) serial console grammar (cfgserial::execute), all schema-driven
     using cfgserial::execute;
