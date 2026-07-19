@@ -215,7 +215,9 @@ GND→  DMX XLR pin 1  (Shield/Ground)  [optional but recommended]
 | — | — | A (RS485+) | → | Pin 3 |
 | — | — | B (RS485–) | → | Pin 2 |
 
-> **Do not use GPIO16 or GPIO17 on the WT32-ETH01** — they are connected to the LAN8720 Ethernet PHY (power and RMII).
+> **Do not use GPIO16 on the WT32-ETH01** — it gates the LAN8720's 50 MHz oscillator (the Arduino core declares it as `ETH_PHY_POWER`), so driving it kills the Ethernet link. GPIO0 is the RMII reference clock and is equally off-limits.
+>
+> GPIO17 **is** free to use — it's plain `TXD2` on this board and has no Ethernet role. (An earlier version of this page said otherwise; that was wrong.) Note it also drives the on-board TX activity LED, so expect a few mA of extra load and a flickering LED while DMX is clocking.
 
 ---
 
@@ -651,11 +653,11 @@ is applied live and persisted):
 - **HTP** (highest takes precedence) — each channel is the maximum across the active sources.
 - **LTP** (latest takes precedence) — the most recently seen source drives the output.
 
-The **sACN priority** field is honoured first: a higher-priority source wins outright, and equal priority falls back to the mode above (Art-Net joins at the default priority of 100). A source that stops sending drops out of the mix after ~2.5 s. While an output is actively merging, the status page shows a green "merging" indicator instead of the conflict banner.
+The **sACN priority** field is honoured first: a higher-priority source wins outright, and equal priority falls back to the mode above (Art-Net joins at the default priority of 100). A source that stops sending drops out of the mix after ~4 s (long enough to ride out a console that throttles to a ~1 Hz keep-alive on a static look, which both sACN and most consoles do). While an output is actively merging, the status page shows a green "merging" indicator instead of the conflict banner.
 
 ### Signal-loss behaviour
 
-DMX512 is a continuously-refreshed stream, so LuxDMX keeps clocking the line at ~40 Hz even when the values never change. That's normal, and it's what fixtures expect (a receiver that stops seeing frames runs its own loss timeout). What should happen once **every** source for a universe has gone quiet (no Art-Net/sACN for ~2.5 s) is a per-output choice in `/config`:
+DMX512 is a continuously-refreshed stream, so LuxDMX keeps clocking the line at ~40 Hz even when the values never change. That's normal, and it's what fixtures expect (a receiver that stops seeing frames runs its own loss timeout). What should happen once **every** source for a universe has gone quiet (no Art-Net/sACN for ~4 s) is a per-output choice in `/config`:
 
 - **Hold last frame** (default): keep refreshing the last values, so a brief network drop or a lost multicast packet never disturbs the look.
 - **Blackout**: drive every channel to 0 (still transmitted at the normal rate), so the rig goes dark when the source disappears.
