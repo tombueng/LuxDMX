@@ -21,6 +21,15 @@ static const char* const ENUM_WIFIMODE[] = {"STA (client)", "AP (standalone)"};
 static const char* const ENUM_FBMODE[]   = {"keep retrying", "open WPA2 AP", "reboot", "join WiFi"};
 // On-unit controls button roles — order == stored value == BtnRole in input_map.h.
 static const char* const ENUM_BTNROLE[]  = {"off", "Enter / Select", "Back", "Next (+)", "Prev (-)"};
+// DMX transmit rate per output (issue #93). Index 0 MUST stay 40 fps: the config engine derives a
+// missing key's neutral value from the field's min, so a device upgrading from a build without this
+// key has to land on the rate it already had. Order is therefore "default first", not fastest first.
+// A full 513-slot frame occupies 22.76 ms on the wire, so 24 ms is the fastest period we offer -- the
+// E1.11 ceiling of 44 Hz (22.68 ms) would leave no headroom at all for the RMT refill.
+static const char* const ENUM_TXRATE[]  = {"40 fps (25 ms)", "41.7 fps (24 ms)", "33.3 fps (30 ms)",
+                                           "25 fps (40 ms)", "20 fps (50 ms)"};
+static const char* const ENUM_TXSTYLE[] = {"Continuous (free-run)", "Delta (follow the input)"};
+static const char* const ENUM_TXSRC[]   = {"set here", "set over Art-Net"};
 
 // ---- compact row builders (no defaults — neutral is derived from min) -------
 #define IFIELD(key, json, member, mn, mx, label, group) \
@@ -137,6 +146,16 @@ const size_t CONFIG_FIELD_COUNT = ARRSZ(CONFIG_FIELDS);
     { suffix, json, CfgKind::Int,  offsetof(DmxOutput, member), legacy, mn, mx, label, CFG_REBOOT, nullptr, 0 }
 #define OBOOL(suffix, json, member, legacy, label) \
     { suffix, json, CfgKind::Bool, offsetof(DmxOutput, member), legacy, 0, 1, label, CFG_REBOOT, nullptr, 0 }
+// Enum per output. CFG_LIVE: the DMX task re-reads these every tick, so they take effect the moment
+// they are saved -- no reboot, no driver re-init, nothing to tear down.
+#define OENUM(suffix, json, member, label, labels) \
+    { suffix, json, CfgKind::Enum, offsetof(DmxOutput, member), nullptr, 0, (int32_t)ARRSZ(labels) - 1, \
+      label, CFG_LIVE, labels, (uint8_t)ARRSZ(labels) }
+// Same, but never rendered into the /config form: the firmware owns the value. Without CFG_NOWEB the
+// form loop would rewrite it from a field that isn't there and wipe it on every save.
+#define OENUM_RO(suffix, json, member, label, labels) \
+    { suffix, json, CfgKind::Enum, offsetof(DmxOutput, member), nullptr, 0, (int32_t)ARRSZ(labels) - 1, \
+      label, (uint16_t)(CFG_LIVE | CFG_NOWEB), labels, (uint8_t)ARRSZ(labels) }
 
 const CfgOutputField OUTPUT_FIELDS[] = {
     OBOOL("en",    "en",    enabled,   nullptr,             "Enabled"),
@@ -147,5 +166,8 @@ const CfgOutputField OUTPUT_FIELDS[] = {
     OINT ("rts",   "rts",   rtsPin,    "dmxrts",  -1, 48,   "RTS / DE-RE pin"),
     OINT ("merge", "merge", mergeMode, nullptr, MERGE_OFF, MERGE_LTP, "Merge mode"),
     OINT ("loss",  "loss",  lossMode,  nullptr, LOSS_HOLD, LOSS_STOP, "Signal-loss policy"),
+    OENUM("rate",  "rate",  txRate,     "DMX output rate",  ENUM_TXRATE),
+    OENUM("style", "style", txStyle,    "Transmit style",   ENUM_TXSTYLE),
+    OENUM_RO("stylesrc", "styleSrc", txStyleSrc, "Transmit style set by", ENUM_TXSRC),
 };
 const size_t OUTPUT_FIELD_COUNT = ARRSZ(OUTPUT_FIELDS);

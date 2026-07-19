@@ -657,7 +657,7 @@ The **sACN priority** field is honoured first: a higher-priority source wins out
 
 ### Signal-loss behaviour
 
-DMX512 is a continuously-refreshed stream, so LuxDMX keeps clocking the line at ~40 Hz even when the values never change. That's normal, and it's what fixtures expect (a receiver that stops seeing frames runs its own loss timeout). What should happen once **every** source for a universe has gone quiet (no Art-Net/sACN for ~4 s) is a per-output choice in `/config`:
+DMX512 is a continuously-refreshed stream, so LuxDMX keeps clocking the line at its configured rate (40 fps by default) even when the values never change. That's normal, and it's what fixtures expect (a receiver that stops seeing frames runs its own loss timeout). What should happen once **every** source for a universe has gone quiet (no Art-Net/sACN for ~4 s) is a per-output choice in `/config`:
 
 - **Hold last frame** (default): keep refreshing the last values, so a brief network drop or a lost multicast packet never disturbs the look.
 - **Blackout**: drive every channel to 0 (still transmitted at the normal rate), so the rig goes dark when the source disappears.
@@ -677,6 +677,44 @@ Browser → ESP32 (JSON text):
 ```
 
 Channel labels are managed over REST (`GET /labels.json`, `POST /labels`).
+
+### Output rate and transmit style
+
+A DMX gateway has to decide how fast to clock the wire. Until v1.0.216 LuxDMX free-ran at a fixed
+40 fps no matter what the console sent, and that is fine only when the console happens to sit near
+40. It isn't always: **MagicQ runs a 33.3 fps engine and MADRIX ships a 33.3 fps default**, and a
+fixed 40 fps sampler fed 33.3 fps has to emit roughly one frame in six twice. Measured against a
+DMX analyzer, the share of repeated frames tracks `(40 - input) / 40` almost exactly. On a 16-bit
+fade that reads as stepping (issue #93).
+
+Both settings are **per output** and apply the moment you save, without a restart.
+
+| Transmit style | What the wire does |
+|---|---|
+| **Continuous** (default) | Free-runs at the rate below, whatever the source does. Predictable, and what most nodes ship. |
+| **Delta** | One DMX frame per received Art-Net/sACN packet, so the wire follows your console exactly and nothing is repeated. Falls back to free-running after 800 ms of silence, so a held look keeps being refreshed. |
+
+| Rate | Period | Use it when |
+|---|---|---|
+| 40 fps | 25 ms | default; QLC+, FreeStyler and most software sit here |
+| 41.7 fps | 24 ms | fastest we offer; a full 513-slot frame already occupies 22.76 ms |
+| **33.3 fps** | 30 ms | **MagicQ and MADRIX** |
+| 25 fps | 40 ms | older or fussy fixtures |
+| 20 fps | 50 ms | very old gear |
+
+Two ways to fix stepping, then: set the rate to match your console, or switch that output to Delta
+and stop thinking about it. Delta is the more general answer but it does hand your console's timing
+jitter straight to the fixtures, which is why it isn't the default (ELC and Swisson both warn about
+the same thing on their own sync modes).
+
+There is no third option where the console tells us its rate: **neither Art-Net nor sACN has a field
+for that**. A node can advertise the rate it accepts (we do, in `ArtPollReply` `RefreshRate`), but
+nothing flows the other way. The rate is only ever inferred from how fast packets arrive, which is
+what the **In FPS** readout in the navbar shows.
+
+A console can select the style remotely with Art-Net `ArtAddress` (`AcStyleDelta` / `AcStyleConst`).
+When that happens the `/config` page labels the setting **set over Art-Net** instead of *set here*,
+so a mode you did not pick doesn't look like your own doing. Changing it in the web UI takes it back.
 
 ---
 
