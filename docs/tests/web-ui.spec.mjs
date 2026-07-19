@@ -8,8 +8,12 @@ test.describe('Web UI + REST', () => {
     await expect(page.locator('#grid .ch')).toHaveCount(512);
     await expect(page.locator('#senders-body')).toBeVisible();
     await expect(page.locator('#log-body')).toBeVisible();
-    // Subtitle is filled from /info.json (hostname · ip · Universe N · version)
-    await expect(page.locator('#nav-sub')).toContainText('Universe');
+    // Subtitle is filled from /info.json: hostname.local · ip · version. It used to carry
+    // the viewed output's "Universe N" too, but the navbar became a shared fragment in #72
+    // and _nav.html has no notion of which output tab you're on, so that segment went away
+    // on purpose. Assert what it actually shows rather than the pre-#72 shape.
+    await expect(page.locator('#nav-sub')).toContainText('.local');
+    await expect(page.locator('#nav-sub')).toContainText('v');
   });
 
   test('settings page loads with protocol + outputs + network cards', async ({ page }) => {
