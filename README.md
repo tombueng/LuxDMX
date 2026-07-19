@@ -696,6 +696,12 @@ To make this idiot-proof, **Settings → Hardware board** offers:
   S3 DevKitC-1) draw their **real physical header** — USB on the correct edge, every pin
   in its true row with the board's own silk, and the 3V3 / 5V / GND / EN pins shown (greyed,
   so you can wire VCC/GND by it) rather than only the GPIO pins.
+- **Pick pins on the connectors too**: a board with wirable connectors (the LuxDMX board's J4
+  display and J6 expansion headers) draws each one as a connector strip below the diagram:
+  pins in their real order, pin 1 marked, rails greyed and inert, and every signal pin
+  clickable. So you can assign display SCL by clicking J6 pin 5 rather than looking up which
+  GPIO that is. Each GPIO field also carries a `J4.3` tag telling you which hole it comes
+  out of.
 - **Live validation** — duplicate pins, strapping/flash/input-only pins and
   Ethernet-reserved pins are flagged in red/amber before you can save.
 

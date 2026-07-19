@@ -115,9 +115,23 @@ should not let you change those pins. Two optional fields drive that, keyed on t
 
 For each `hardwired` entry the config page sets the matching form field (`field`) to its
 fixed value (`val`, or the `gpio` if no `val`), **disables** it, hides its pin-pick button,
-and drops in a hidden mirror so the value still POSTs. The `headers` are rendered as small
-pin tables so the user sees exactly which pins on the display/expansion connectors they can
-actually wire to. Boards without `hardwired`/`headers` behave exactly as before.
+and drops in a hidden mirror so the value still POSTs. Boards without `hardwired`/`headers`
+behave exactly as before.
+
+Each entry in `headers` is rendered three ways, so the connector is usable from wherever you
+happen to be looking:
+
+- a **pin table** under the board card (the full pinout at a glance),
+- a **connector strip** in the pin picker, below the board diagram: pins left-to-right in
+  their real order with pin 1 marked, rails greyed and inert, and every signal pin a click
+  target that assigns straight into the field you are picking,
+- a **`J4.3` tag** on the matching board pad and in the GPIO field's input group, so a pin
+  number always tells you which hole in the plug it comes out of.
+
+A pin with a `gpio` is a signal (clickable, status-coloured); a pin without one is a rail,
+classified from its `silk` (`GND`/`AGND`/`VSS` → ground, `NC` → not connected, `EN`/`RST` →
+enable, anything else → power) and never assignable. `pin` is the physical pin number and
+drives the ordering, so it must match the connector's own numbering, not the array index.
 
 `phys`, `hardwired` and `headers` are hand-curated; a regenerator must preserve them.
 

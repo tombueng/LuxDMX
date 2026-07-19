@@ -114,10 +114,33 @@ DMX pins. Switch the board back (or hit Advanced unlock) to edit them again.
 **Header pins stay editable.** Pins that reach a user header are deliberately *not* in
 `hardwired`, so they stay pickable even on a fixed-pin board. On the LuxDMX v6 that's the
 J4 display header (SDA/SCL/SCK/MOSI/CS/DC/RST) and the J6 expansion header — you can point
-the display at the J4 defaults or wire it to J6 instead, whatever you soldered. The board
-card lists each header's pinout, and the diagram tags every header GPIO with its physical
-header pin (e.g. `G4 · J4.3`, tooltip `GPIO4 · J4 pin 3 (SDA)`). This is also where future
-add-on inputs (buttons, a rotary encoder) will bind — any header GPIO is fair game.
+the display at the J4 defaults or wire it to J6 instead, whatever you soldered. This is also
+where future add-on inputs (buttons, a rotary encoder) bind: any header GPIO is fair game.
+
+## Wirable connectors (J4 / J6)
+
+The board diagram answers *"which GPIO is that pad?"*. When you are actually crimping a
+cable you have the opposite question: *"which hole in the plug does display SCL go in?"*.
+So a board's `headers` are drawn as their own **connector strips** underneath the diagram:
+
+- pins left-to-right in their **real physical order**, numbered, with the usual pin-1
+  triangle, so the strip reads like the connector in front of you,
+- the rails (5V / 3V3 / GND) shown but greyed and **inert**, same rule as the board's power
+  pins: you can see where to land VCC/GND, but a signal can't be dropped on a rail,
+- every signal pin is a normal click target: with the picker open for a field, clicking
+  J6 pin 5 puts GPIO36 in that field, exactly as clicking the pad on the board would,
+- assigned pins keep the cyan callout, so the strip doubles as the wiring plan you print.
+
+The same information also appears where you type the number: each GPIO field shows a small
+**`J4.3`** tag in its input group (hover for `J4 pin 3 (SDA)`), and every header GPIO on the
+board diagram is tagged `G4 · J4.3`. So whether you are looking at the board, the connector
+or the form field, the physical pin is never more than a glance away.
+
+Headers come from the descriptor's `headers` block
+([schema](../web/boards/README.md#fixed-wiring-hardwired-and-headers--for-boards-with-a-fixed-pinout));
+a board without one simply renders no strips. On the LuxDMX board, note that **J6 pins 7/8 are
+the UART0 console** (`TX0`/`RX0` = GPIO43/44). They show red because using them costs you the
+serial console (IO19/IO20 are the native-USB D-/D+ pair and are not broken out).
 
 **J4 and J6 share one power layout** (`1=+3V3 2=GND`), so a cable in the wrong header is
 harmless. That invariant is enforced on the board itself by a hard validator, not just

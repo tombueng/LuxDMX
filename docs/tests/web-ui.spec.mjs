@@ -181,10 +181,18 @@ test.describe('Web UI + REST', () => {
     await page.locator('#pin-unlock').check();
     await expect(page.locator('#eth-cs')).toBeEnabled();           // unlock re-enables it
     await page.locator('#pin-unlock').uncheck();
-    // the diagram tags each header GPIO with its physical header pin
+    // each GPIO field is tagged with the header pin it comes out of
+    await expect(page.locator('.pin-grp:has(#disp-sda) .hdr-hint')).toHaveText('J4.3');
+    // the diagram tags each header GPIO with its physical header pin...
     await page.locator('#board-open').click();
-    await expect(page.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');
-    await expect(page.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 4');
+    const board = page.locator('#board-svg-wrap > svg.board-svg');
+    await expect(board.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');
+    await expect(board.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 4');
+    // ...and both wirable connectors are drawn as their own strips, with the rails inert
+    // and the signal pins clickable (see docs/tests/v6-headers.mjs for the full behaviour)
+    await expect(page.locator('.hdr-strips svg.hdr-strip')).toHaveCount(2);
+    await expect(page.locator('.hdr-strips g.pad[data-gpio="36"]')).toHaveCount(1);
+    expect(await page.locator('.hdr-strips g.ppin.power[data-gpio]').count()).toBe(0);
   });
 
   test('luxdmx_v6 shows J4 and J6 with matching power pins and no 5V on J6', async ({ page }) => {
