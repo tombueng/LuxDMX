@@ -46,6 +46,17 @@ LUXDMX_WRITE=1 npm test
 
 They always restore the original configuration afterwards.
 
+One more device-mutating test lives outside the Playwright runner, because it drives raw
+sockets rather than a browser:
+
+```bash
+LUXDMX_WRITE=1 LUXDMX_URL=http://<ip> node docs/tests/ota-upload-truncated.mjs
+```
+
+It proves a firmware upload that stops mid-stream is rejected instead of being reported as
+a success (see the header comment for the failure it guards). It writes the device's OTA
+slot but never completes a valid image, so the running firmware is never replaced.
+
 ### Standalone config-UI tests (no device, no Playwright runner)
 
 Two behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub

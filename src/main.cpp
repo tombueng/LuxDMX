@@ -2903,15 +2903,50 @@ static void handleOtaStatus(AsyncWebServerRequest* req) {
     req->send(r);
 }
 
+// Upload-OTA state, tracked across the chunk callbacks.
+//
+// Every Update.* call reports failure through a return value, and an upload can also just
+// stop mid-stream (dropped link, client abort, W5500 RX glitch) in which case the `final`
+// chunk never arrives at all. Both used to be invisible here: no return value was checked,
+// and the done-handler only asked Update.hasError() -- which is false for a stream that was
+// never finished, because writing a partial image isn't an error, it's just incomplete. So
+// a truncated upload rendered "Firmware updated", rebooted, and the box came back on the
+// OLD image. Observed in the wild: 2 of 4 uploads cut off at 8-20% and all of them reported
+// success. Nothing was bricked only because Update.end() never ran, so the boot partition
+// was never switched. Track the whole chain explicitly instead of inferring it.
+static bool   otaUpBegun = false;   // Update.begin() succeeded for this request
+static bool   otaUpDone  = false;   // saw the final chunk AND Update.end() accepted the image
+static bool   otaUpDmxWas = false;  // dmxReady as it was before we muted DMX for the upload
+static size_t otaUpBytes = 0;
+static String otaUpError;           // first failure; shown to the browser
+
+static void otaUploadFail(const char* what) {
+    if (otaUpError.length()) return;      // keep the FIRST failure, later ones are fallout
+    otaUpError = what;
+    if (Update.hasError()) { otaUpError += " ("; otaUpError += Update.errorString(); otaUpError += ")"; }
+    Serial.printf("[OTA] upload failed: %s\n", otaUpError.c_str());
+}
+
 static void handleOtaUploadDone(AsyncWebServerRequest* req) {
-    bool ok = !Update.hasError();
+    // Success needs the entire chain: begin, every write, the final chunk, and end(). A
+    // connection that dies mid-upload never delivers `final`, so otaUpDone stays false --
+    // that is the truncated-upload case that used to report success.
+    if (!otaUpError.length() && !otaUpDone)
+        otaUploadFail(otaUpBegun ? "upload ended early (connection lost?)" : "no firmware received");
+    bool ok = otaUpDone && !otaUpError.length();
+    if (!ok) {
+        Update.abort();     // drop the half-written image rather than leave it staged
+        dmxReady = otaUpDmxWas;   // restore DMX exactly as it was; a box with no outputs
+                                  // enabled boots dmxReady=false and must stay that way
+        Serial.printf("[OTA] upload aborted after %u bytes\n", (unsigned)otaUpBytes);
+    }
     String p = FPSTR(OTA_DONE_HTML);
     p.replace("{{OTA_ICON}}",  ok ? "&#10003;" : "&#10007;");
     p.replace("{{OTA_CLASS}}", ok ? "text-success" : "text-danger");
     p.replace("{{OTA_TITLE}}", ok ? "Firmware updated" : "Update failed");
-    p.replace("{{OTA_MSG}}",   ok ? "Rebooting&hellip;" :
-                                    String("Error: ") + Update.errorString());
-    req->send(200, "text/html", p);
+    p.replace("{{OTA_MSG}}",   ok ? "Rebooting&hellip;" : String("Error: ") + otaUpError);
+    // 500 on failure so curl/scripts can tell too; a browser form post still renders the body.
+    req->send(ok ? 200 : 500, "text/html", p);
     if (ok) pendingRebootAt = millis() + 800;
 }
 
@@ -2919,13 +2954,21 @@ static void handleOtaUploadChunk(AsyncWebServerRequest* req, const String& filen
                                  size_t index, uint8_t* data, size_t len, bool final) {
     if (index == 0) {
         Serial.printf("[OTA] Upload: %s\n", filename.c_str());
-        dmxReady = false;
-        Update.begin(UPDATE_SIZE_UNKNOWN);
+        otaUpBegun = false; otaUpDone = false; otaUpBytes = 0; otaUpError = "";
+        // An ESP32 app image starts with the 0xE9 magic byte. Rejecting a wrong file here
+        // gives a real message instead of "successfully" flashing something unbootable.
+        if (len && data[0] != 0xE9) { otaUploadFail("not an ESP32 firmware image"); return; }
+        otaUpDmxWas = dmxReady; dmxReady = false;   // mute DMX while we write flash
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { otaUploadFail("could not start the update"); return; }
+        otaUpBegun = true;
     }
-    if (len) Update.write(data, len);
+    if (!otaUpBegun || otaUpError.length()) return;   // already failed: swallow the rest of the stream
+    if (len && Update.write(data, len) != len) { otaUploadFail("write to flash failed"); return; }
+    otaUpBytes += len;
     if (final) {
-        Update.end(true);
-        Serial.printf("[OTA] Upload done: %u bytes\n", (unsigned)(index + len));
+        if (!Update.end(true)) { otaUploadFail("image rejected on finalize"); return; }
+        otaUpDone = true;
+        Serial.printf("[OTA] Upload done: %u bytes\n", (unsigned)otaUpBytes);
     }
 }
 
