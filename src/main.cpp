@@ -819,7 +819,7 @@ static int viewOutput() {
 // frame time (~23 ms) instead of ~46 ms, so each output holds ~40 Hz instead of dropping
 // to ~20 Hz (issue #64). Runs from the dedicated high-priority dmxTxTask (see below), the
 // sole owner of the DMX ports, so its break/MAB timing is never preempted by loop().
-static void sendDmx() {
+static void sendDmx(uint8_t due) {
     if (!dmxReady) return;
     bool ovActive = identifyCh && millis() < identifyUntil;
     int  vo = viewOutput();
@@ -830,6 +830,7 @@ static void sendDmx() {
     // Phase 1: write + kick off every output that should clock this frame.
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!outReady[i]) continue;
+        if (!(due & (1u << i))) continue;      // not this port's turn (per-output rate, issue #93)
         // Identify override: force one channel to full on the wire only (on the
         // monitored output), without corrupting the stored value the UI sees.
         bool ov = ovActive && i == vo;
@@ -844,6 +845,10 @@ static void sendDmx() {
         {   // RMT-driven output -> kick (async), streams out in hardware. The RDM output stays on
             // RMT too: RDM requests go out via RMT and responses come back on a RX-only UART, so
             // there is never a switch and DMX output on this pin is uninterrupted between RDM ops.
+            // Skip (don't block) if the previous frame is still going out: the scheduler will offer
+            // this port again on the next 1 ms tick. Only reachable if a frame overran its period,
+            // which the rate table is chosen to prevent (fastest period 24 ms > 22.76 ms frame).
+            if (!rmtDmxIdle(&g_rmt[i])) { if (ov) dmxBuf[i][identifyCh] = saved; continue; }
             rmtDmxKick(&g_rmt[i], dmxBuf[i], DMX_PACKET_SIZE);
             if (ov) dmxBuf[i][identifyCh] = saved;
             rmtSent[nRmt++] = i;
@@ -858,22 +863,61 @@ static void sendDmx() {
         sentPort[nSent++] = port;
         txFrames[i]++;                         // count real transmitted frames for the output-fps stat
     }
-    // Phase 2: wait for the concurrent transmissions to complete.
+    // Phase 2: wait for the concurrent transmissions to complete. Only the esp_dmx path blocks --
+    // it has no idle query, so we have to. The RMT path deliberately returns immediately (see the
+    // rmtDmxIdle guard above) so ports on different rates stay independent.
     for (int k = 0; k < nSent; k++) dmx_wait_sent(sentPort[k], DMX_TIMEOUT_TICK);
 #ifdef DMX_RMT
-    for (int k = 0; k < nRmt; k++) rmtDmxWait(&g_rmt[rmtSent[k]]);
+    (void)nRmt;
 #endif
 }
 
-// The DMX transmit cadence. dmxTxTask free-runs at this period, deliberately decoupled from the
-// input rate (Art-Net sanctions continuous re-transmission, and a console on a static look drops
-// to ~1 packet/s, so we cannot simply relay). Declared here rather than buried in the task because
-// ArtPollReply has to advertise this exact number as RefreshRate: a gateway that claims a rate it
-// does not deliver invites controllers to oversend, and every surplus frame is silently dropped.
-// NOTE: free-running also means any input rate that is not DMX_TX_RATE_HZ gets resampled, so some
-// frames go out twice (issue #93). Making this per-output configurable is the next step.
-static constexpr uint32_t DMX_TX_PERIOD_MS = 25;
-static constexpr uint8_t  DMX_TX_RATE_HZ   = (uint8_t)(1000UL / DMX_TX_PERIOD_MS);   // 40 Hz
+// ---------------------------------------------------------------------------
+// Transmit timing (issue #93)
+// ---------------------------------------------------------------------------
+// The output used to free-run at a hard-coded 40 Hz. That is a legitimate design (ETC, Pathway,
+// Enttec and MA all ship a fixed rate), but only if the source happens to sit near it: a fixed
+// sampler on an input of a different rate emits some frames twice, at a beat of |out - in| Hz.
+// Measured on the bench against the RP2350 analyzer, injecting Art-Net at controlled rates: the
+// duplicate share tracks (40 - in)/40 exactly, so 16.4% at MagicQ's 33.3 fps against 16.7%
+// predicted, versus 4% at QLC+'s ~39 fps. On a 16-bit fade that reads as stepping.
+//
+// Two ways out, both per output, both what the rest of the industry offers:
+//   - pick a fixed rate that matches the console (ELC ships exactly 40/33/25 fps for this)
+//   - Delta: clock one DMX frame per received packet, so the wire simply follows the source
+// Periods in ms; index matches ENUM_TXRATE in config_schema.cpp. Index 0 stays 40 fps so a device
+// upgrading from a build without the key keeps the rate it already had.
+static const uint8_t DMX_RATE_MS[] = { 25, 24, 30, 40, 50 };
+static constexpr int DMX_RATE_COUNT = (int)(sizeof(DMX_RATE_MS) / sizeof(DMX_RATE_MS[0]));
+// A full 513-slot frame occupies 22.76 ms (176 us break + 12 us MAB + 513 x 44 us), so this is the
+// floor for any two consecutive frames. Delta clamps to it: a console sending faster than the wire
+// can carry gets its surplus dropped, which is exactly what Art-Net says a DMX gateway does.
+static constexpr uint32_t DMX_MIN_PERIOD_MS = 24;
+// Delta keep-alive. With no new packet for this long we resume free-running at the configured rate,
+// because DMX512 is a refreshed stream and a console on a static look legitimately drops to ~1 Hz
+// (E1.31 mandates an 800-1000 ms keep-alive). Same value Luminex uses for the same reason.
+static constexpr uint32_t DELTA_FALLBACK_MS = 800;
+
+static constexpr int TXSTYLE_CONTINUOUS = 0;
+static constexpr int TXSTYLE_DELTA      = 1;
+static constexpr int TXSRC_LOCAL        = 0;   // set in our web UI / serial console
+static constexpr int TXSRC_ARTNET       = 1;   // set by a controller via ArtAddress
+
+static inline uint32_t dmxPeriodMs(int out) {
+    int r = cfg.outputs[out].txRate;
+    if (r < 0 || r >= DMX_RATE_COUNT) r = 0;
+    return DMX_RATE_MS[r];
+}
+// Integer Hz for ArtPollReply's RefreshRate byte (25 ms -> 40, 24 -> 42, 30 -> 33, 40 -> 25, 50 -> 20).
+static inline uint8_t dmxRateHz(int out) {
+    const uint32_t p = dmxPeriodMs(out);
+    return (uint8_t)((1000UL + p / 2) / p);
+}
+static inline bool dmxIsDelta(int out) { return cfg.outputs[out].txStyle == TXSTYLE_DELTA; }
+
+// Bumped by routeFrame (core 0) every time an output receives a fresh input frame; consumed by the
+// DMX task (core 1) to decide when to clock a delta frame. One writer, one reader, 32-bit aligned.
+static volatile uint32_t outInSeq[MAX_OUTPUTS] = {0};
 
 // Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
 // strict 25 ms cadence (vTaskDelayUntil, 40 Hz) at high priority pinned to core 1, so a
@@ -893,14 +937,70 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
 // ever installed/deleted at runtime, so the esp_dmx interrupt-leak path is gone entirely.)
 
 static void dmxTxTask(void*) {
-    const TickType_t period = pdMS_TO_TICKS(DMX_TX_PERIOD_MS);   // 40 Hz
+    // 1 ms scheduler tick instead of one fixed frame period: each output now carries its own rate
+    // (and possibly delta), so the task has to be able to serve them independently. The tick itself
+    // is still vTaskDelayUntil at priority 19 on core 1, so the cadence stays immune to loop() load.
+    // Servicing RDM on EVERY tick (not once per transmitted frame) is deliberate: in delta mode a
+    // console on a static look sends ~1 packet/s, and hanging RDM off the frame cadence would drop
+    // discovery from ~40 bus ops/s to 1, turning a few seconds of discovery into minutes.
+    const TickType_t tick = pdMS_TO_TICKS(1);
     TickType_t next = xTaskGetTickCount();
-    uint32_t fpsWin = millis();
+    uint32_t fpsWin  = millis();
+    uint32_t nextDue[MAX_OUTPUTS];
+    uint32_t lastTx[MAX_OUTPUTS];
+    uint32_t seenIn[MAX_OUTPUTS];
+    bool     deltaFree[MAX_OUTPUTS];   // delta port whose source went quiet -> free-running for now
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        nextDue[i] = fpsWin; lastTx[i] = fpsWin; seenIn[i] = 0; deltaFree[i] = true;
+    }
     for (;;) {
-        vTaskDelayUntil(&next, period);                 // precise period, immune to loop() load
+        vTaskDelayUntil(&next, tick);
         if (identifyCh && millis() >= identifyUntil) identifyCh = 0;
         rdmService();                                   // queued RDM request (bus owner); no-op otherwise
-        sendDmx();                                      // clock outputs out, concurrently
+
+        const uint32_t nowT = millis();
+        uint8_t due = 0;
+        for (int i = 0; i < MAX_OUTPUTS; i++) {
+            if (!outReady[i]) continue;
+            const uint32_t period = dmxPeriodMs(i);
+            bool fire = false;
+            if (dmxIsDelta(i)) {
+                // Follow the source: one frame out per frame in, floored at the wire limit.
+                const uint32_t seq   = outInSeq[i];
+                const uint32_t since = nowT - lastTx[i];
+                if (seq != seenIn[i]) {
+                    if (since >= DMX_MIN_PERIOD_MS) {   // else wait a tick; the wire is the limit
+                        seenIn[i] = seq; fire = true;
+                        deltaFree[i] = false;           // the source is back, follow it again
+                        nextDue[i] = nowT + period;
+                    }
+                } else if (deltaFree[i]) {
+                    // Already free-running because the source went quiet. Stay on the normal
+                    // absolute schedule until it comes back -- NOT one frame per fallback window,
+                    // which is what an earlier version did and it clocked the line at 1.25 Hz.
+                    if ((int32_t)(nowT - nextDue[i]) >= 0) {
+                        fire = true;
+                        nextDue[i] += period;
+                        if ((int32_t)(nowT - nextDue[i]) > (int32_t)(4 * period)) nextDue[i] = nowT + period;
+                    }
+                } else if (since >= DELTA_FALLBACK_MS) {
+                    // Just went quiet: resume free-running at the configured rate so the line keeps
+                    // being refreshed (a console on a static look legitimately drops to ~1 Hz).
+                    deltaFree[i] = true; fire = true; nextDue[i] = nowT + period;
+                }
+            } else {
+                // Absolute schedule, not "period since last fire": the 1 ms tick would otherwise
+                // round every frame up and quietly cost us ~2% of the configured rate.
+                if ((int32_t)(nowT - nextDue[i]) >= 0) {
+                    fire = true;
+                    nextDue[i] += period;
+                    // Fell far behind (long RDM op, delta switch): resync instead of burst-catching up.
+                    if ((int32_t)(nowT - nextDue[i]) > (int32_t)(4 * period)) nextDue[i] = nowT + period;
+                }
+            }
+            if (fire) { due |= (1u << i); lastTx[i] = nowT; }
+        }
+        if (due) sendDmx(due);                          // clock the due outputs out, concurrently
         // Roll up the real transmitted-frame rate once a second (for the "outfps" stat).
         const uint32_t now = millis();
         if (now - fpsWin >= 1000) {
@@ -1470,6 +1570,20 @@ static float outFpsLive(int i) {
     return (i >= 0 && i < MAX_OUTPUTS && outReady[i]) ? outTxFps[i] : 0.0f;
 }
 
+// Per-output INPUT rate, closing its own 1 s window. wsPush() also rolls this up, but only while a
+// browser is attached -- the status display has to work with nobody watching, so it cannot rely on
+// that. Safe to call from either: closing the window twice just splits it, it never double-counts.
+static float inFpsLive(int i) {
+    if (i < 0 || i >= MAX_OUTPUTS) return 0.0f;
+    const uint32_t now = millis();
+    if (now - inWinMs[i] >= 1000) {
+        inFpsOut[i]   = (float)inFrameCnt[i] * 1000.0f / (float)(now - inWinMs[i]);
+        inFrameCnt[i] = 0;
+        inWinMs[i]    = now;
+    }
+    return inFpsOut[i];
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket push (binary, WS_FRAME_LEN bytes)
 // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
@@ -1757,6 +1871,7 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
         if (i == viewOutput()) maybeLog(i, &dmxBuf[i][1], 512, senderIp, proto);
         // Per-output frame rate over a 1 s window (this universe only).
         outLastDmxMs[i] = now;
+        outInSeq[i]++;   // wakes the DMX task in delta mode (issue #93): one frame out per frame in
         outFrameCount[i]++;
         if (now - outLastFrameMs[i] >= 1000) {
             outFps[i] = (float)outFrameCount[i] * 1000.0f / (float)(now - outLastFrameMs[i]);
@@ -2117,6 +2232,9 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
         j += ",\"rts\":";  j += o.rtsPin;
         j += ",\"merge\":"; j += o.mergeMode;
         j += ",\"loss\":";  j += o.lossMode;
+        j += ",\"rate\":";  j += o.txRate;       // index into DMX_RATE_MS (issue #93)
+        j += ",\"style\":"; j += o.txStyle;      // 0 = continuous, 1 = delta
+        j += ",\"styleSrc\":"; j += o.txStyleSrc;   // 0 = set here, 1 = set by a console over Art-Net
         j += "}";
     }
     j += "],";
@@ -2530,15 +2648,25 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
             cfgcore::setValue(f.key, s, e);
         }
     }
-    for (int i = 0; i < MAX_OUTPUTS; i++)
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        const int styleWas = cfg.outputs[i].txStyle;
         for (size_t k = 0; k < OUTPUT_FIELD_COUNT; k++) {
             const CfgOutputField& f = OUTPUT_FIELDS[k];
+            // CFG_NOWEB output fields are owned by the firmware (txStyleSrc). The form never renders
+            // them, so without this the Bool/enum branch below would rewrite them from a field that
+            // isn't in the request and wipe the value on every save.
+            if (f.flags & CFG_NOWEB) continue;
             String key = okey(i, f.suffix);
             if (f.kind == CfgKind::Bool)
                 cfgcore::setValue(key, formChecked(req, key) ? "1" : "0", e);
             else if (argStr(req, key.c_str(), s))
                 cfgcore::setValue(key, s, e);
         }
+        // Saving the page is the user speaking, so a style they actually changed here is theirs
+        // again -- otherwise a mode a console pushed over Art-Net would keep claiming that origin
+        // forever. Only on a real change: re-saving an unrelated setting must not steal the label.
+        if (cfg.outputs[i].txStyle != styleWas) cfg.outputs[i].txStyleSrc = TXSRC_LOCAL;
+    }
     cfg.apFallback = (cfg.linkLossMode == WIRED_FB_AP);   // keep the legacy mirror in sync
     sanitizeOutputs();   // never persist an enabled output with no TX pin
     dmxReady = false;
@@ -3305,6 +3433,16 @@ static inline uint16_t col(uint16_t rgb) { return cfg.dispType == 4 ? rgb : (rgb
 static const char* dispProto() {
     return cfg.protocol == 0 ? "Art-Net" : cfg.protocol == 1 ? "sACN" : "Both";
 }
+// One-letter transmit style for the panel: D = delta (following the input), C = continuous
+// (free-running at the configured rate). Deliberately terse; a 128 px mono panel has 21 columns.
+static const char* dispStyleTag(int out) { return dmxIsDelta(out) ? "D" : "C"; }
+// The whole of issue #93 lives in the RELATIONSHIP between the rate coming in and the rate going
+// out: equal means every frame is passed through, different means some get repeated. So show both
+// rather than a single ambiguous "FPS", which used to be the INPUT rate under an output-sounding
+// label. "In 33.3 Out 40.0 C" tells you at a glance that this port is resampling.
+static void dispRateLine(char* b, size_t n, int out) {
+    snprintf(b, n, "In %.1f Out %.1f %s", inFpsLive(out), outFpsLive(out), dispStyleTag(out));
+}
 
 // ---------------------------------------------------------------------------
 // On-unit controls state (issue #24). Shared between the input task (the writer:
@@ -3412,10 +3550,10 @@ static void dispDrawStatus() {
         gfx->setCursor(0, 11); gfx->print('U'); gfx->print(dispUniverseLabel());
         gfx->print(' '); gfx->print(dispProto());
         if (dual)
-            snprintf(b, sizeof(b), "%.1f/%.1f Sources %u",
-                     outFpsLive(0), outFpsLive(1), activeSenderCount());
+            snprintf(b, sizeof(b), "%.1f%s/%.1f%s Src %u",
+                     outFpsLive(0), dispStyleTag(0), outFpsLive(1), dispStyleTag(1), activeSenderCount());
         else
-            snprintf(b, sizeof(b), "%.1ffps Sources %u", fps, activeSenderCount());
+            dispRateLine(b, sizeof(b), viewOutput());
         gfx->setCursor(0, 22); gfx->print(b);
         return;
     }
@@ -3444,8 +3582,9 @@ static void dispDrawStatus() {
             gfx->setCursor(0, 102); gfx->print(dispProto());
             gfx->print("  Sources "); gfx->print(activeSenderCount());
         } else {
-            gfx->setTextColor(col(C_GREY)); gfx->setCursor(0, 48); gfx->print("FPS");
-            snprintf(b, sizeof(b), "%.1f", fps);
+            gfx->setTextColor(col(C_GREY)); gfx->setCursor(0, 48);
+            gfx->print(dmxIsDelta(viewOutput()) ? "OUT FPS (delta)" : "OUT FPS");
+            snprintf(b, sizeof(b), "%.1f", outFpsLive(viewOutput()));
             gfx->setTextSize(3); gfx->setTextColor(col(accent));
             gfx->setCursor(0, 58); gfx->print(b);
             gfx->setTextSize(1); gfx->setTextColor(col(C_WHITE));
@@ -3476,11 +3615,11 @@ static void dispDrawStatus() {
     gfx->setTextColor(col(C_WHITE));
     gfx->setCursor(0, y); gfx->print(up ? netLocalIP().toString() : String("no link"));
     y += rp;
-    if (dual) {                          // one row per output: universe + its fps
-        snprintf(b, sizeof(b), "A U%d %.1ffps", cfg.outputs[0].universe, outFpsLive(0));
+    if (dual) {                          // one row per output: universe, its out rate, its style
+        snprintf(b, sizeof(b), "A U%d %.1ffps %s", cfg.outputs[0].universe, outFpsLive(0), dispStyleTag(0));
         gfx->setCursor(0, y); gfx->print(b);
         y += rp;
-        snprintf(b, sizeof(b), "B U%d %.1ffps", cfg.outputs[1].universe, outFpsLive(1));
+        snprintf(b, sizeof(b), "B U%d %.1ffps %s", cfg.outputs[1].universe, outFpsLive(1), dispStyleTag(1));
         gfx->setCursor(0, y); gfx->print(b);
         { char s[12]; snprintf(s, sizeof(s), "Src %u", activeSenderCount());
           gfx->setCursor(W - (int)strlen(s) * 6, y); gfx->print(s); }
@@ -3489,8 +3628,13 @@ static void dispDrawStatus() {
         gfx->setCursor(0, y); gfx->print("Uni "); gfx->print(dispUniverseLabel());
         gfx->print("  "); gfx->print(dispProto());
         y += rp;
-        snprintf(b, sizeof(b), "FPS %.1f  Sources %u", fps, activeSenderCount());
+        // In vs Out, not one ambiguous "FPS": that label used to carry the INPUT rate, which is
+        // exactly the number that misleads when the two differ (issue #93).
+        snprintf(b, sizeof(b), "In %.0f Out %.0f %s",
+                 inFpsLive(viewOutput()), outFpsLive(viewOutput()), dispStyleTag(viewOutput()));
         gfx->setCursor(0, y); gfx->print(b);
+        { char s[12]; snprintf(s, sizeof(s), "Src %u", activeSenderCount());
+          gfx->setCursor(W - (int)strlen(s) * 6, y); gfx->print(s); }
         y += rp;
     }
     netStatusLabel(b, sizeof(b), up);

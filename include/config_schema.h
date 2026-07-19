@@ -17,6 +17,15 @@ struct DmxOutput {
     int  rtsPin;     // -1 = auto-direction module / no RDM
     int  mergeMode;  // how to combine multiple sources on this universe
     int  lossMode;   // what to send when every source on this universe goes silent
+    // Transmit timing (issue #93). The output used to free-run at a hard-coded 40 Hz, so any
+    // console sending at another rate got resampled and some frames went out twice.
+    int  txRate;     // index into DMX_RATE_MS: the free-running period for this port
+    int  txStyle;    // 0 = continuous (free-run at txRate), 1 = delta (one frame per input packet)
+    // Where txStyle came from: 0 = set locally (web UI / serial console), 1 = set remotely by a
+    // controller via Art-Net ArtAddress (AcStyleDelta / AcStyleConst). Persisted so the UI can
+    // still say "your console set this" after a reboot. Art-Net has no command for the RATE, so
+    // txRate is always local and needs no companion field.
+    int  txStyleSrc;
 };
 
 struct Config {

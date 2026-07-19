@@ -46,6 +46,9 @@ function configForm(snap, o0Overrides = {}) {
   if (snap.staticIp)    f.staticip = '1';
   if (snap.useEthernet) f.useeth   = '1';
   if (snap.ethW5500)    f.ethon    = '1';
+  if (snap.artnetRdm)     f.artrdm = '1';   // omitted == cleared: handleConfigPost reads bools from checkbox presence
+  if (snap.encReverse)    f.encrev = '1';
+  if (snap.btnActiveHigh) f.btnah  = '1';
   const outs = [{ ...snap.outputs[0], ...o0Overrides }, snap.outputs[1]];
   outs.forEach((o, i) => {
     if (o.en) f[`o${i}_en`] = '1';              // omitted key == disabled
@@ -56,6 +59,8 @@ function configForm(snap, o0Overrides = {}) {
     f[`o${i}_rts`]   = String(o.rts);
     f[`o${i}_merge`] = String(o.merge ?? 0);
     f[`o${i}_loss`]  = String(o.loss ?? 0);
+    f[`o${i}_rate`]  = String(o.rate ?? 0);
+    f[`o${i}_style`] = String(o.style ?? 0);
   });
   return f;
 }

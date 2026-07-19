@@ -192,7 +192,7 @@ Single output (resting):
 │ LuxDMX           1.0.42  │  title + FIRMWARE_VERSION
 │ 192.168.1.50               │  netLocalIP()  — the #1 walk-up info
 │ Uni 0    Both              │  output universe + protocol
-│ FPS 44.0  Sources 1        │  fps + activeSenderCount()
+│ In 33 Out 40 C     Src 1   │  inFpsLive/outFpsLive + style tag
 │ WiFi -47dBm         ● LIVE │  link dBm (or "ETH up") + DMX live/idle
 └────────────────────────────┘
 ```
@@ -204,8 +204,8 @@ showing its own universe and its own frame rate (source count moves to the right
 ┌────────────────────────────┐
 │ LuxDMX           1.0.42  │
 │ 192.168.1.50               │
-│ A U0 44.0fps               │  output A: universe + dispOutFps(0)
-│ B U5 43.8fps        Src 1  │  output B + activeSenderCount()
+│ A U0 44.0fps C             │  output A: universe + out fps + style
+│ B U5 43.8fps C      Src 1  │  output B + activeSenderCount()
 │ WiFi -47dBm         ● LIVE │
 └────────────────────────────┘
 ```
@@ -215,6 +215,12 @@ showing its own universe and its own frame rate (source count moves to the right
   for two) in the single-output layout; with two outputs each gets its own `A`/`B` row.
 - Per-output FPS: `dispOutFps(i)` is each universe's own 1 s frame rate, and reads `0.0` once
   that input stalls (>1.5 s). The aggregate `fps` still feeds the WebSocket / web UI.
+- Rate and style (issue #93): the single-output rows show **In** and **Out** side by side
+  rather than one ambiguous `FPS`, because the whole point is whether the two match. A
+  trailing `C` or `D` is the transmit style of that port, continuous (free-running at the
+  configured rate) or delta (one frame out per frame in). `In 33 Out 40 C` says at a glance
+  that this port is resampling a 33.3 fps console onto a 40 fps wire and therefore repeating
+  roughly one frame in six.
 - Source count: labelled **Sources** (number of active Art-Net / sACN senders), matching the
   `2+ sources` wording on the conflict banner.
 - DMX state: `● LIVE` when `millis() - lastDmxMs < 1500` (the LED's threshold), else `idle`.
@@ -238,7 +244,7 @@ Title + RSSI bars dropped; live dot moves up beside the IP:
 ┌────────────────────────────┐
 │ 10.13.37.2          ● LIVE │
 │ U0+5 Both                  │
-│ 44.0/43.8 Sources 1        │  per-output fps (single output: "40.0fps")
+│ 44.0C/43.8C Src 1          │  per-output out fps + style tag
 └────────────────────────────┘
 ```
 

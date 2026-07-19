@@ -49,6 +49,8 @@ static constexpr uint8_t  AC_CANCEL_MERGE = 0x01;  // drop the merge, next sourc
 static constexpr uint8_t  AC_MERGE_LTP0   = 0x10;  // 0x10..0x13 = set merge LTP
 static constexpr uint8_t  AC_MERGE_HTP0   = 0x50;  // 0x50..0x53 = set merge HTP
 static constexpr uint8_t  AC_CLEAR_OP0    = 0x90;  // 0x90..0x93 = zero the output buffer
+static constexpr uint8_t  AC_STYLE_DELTA0 = 0xa0;  // 0xa0..0xa3 = output style delta (frame per ArtDmx)
+static constexpr uint8_t  AC_STYLE_CONST0 = 0xb0;  // 0xb0..0xb3 = output style constant (free-run)
 static constexpr uint8_t  AC_BQP0         = 0xe0;  // 0xe0..0xef = set BackgroundQueuePolicy 0..15
 
 // BackgroundQueuePolicy (node-wide): the severity at which the gateway harvests RDM STATUS_MESSAGES
@@ -160,7 +162,7 @@ static int buildArtPollReply(uint8_t* b, int outIdx, int bindIndex) {
     bool rdmOn = rdmNode && rdmLineForOut[outIdx] >= 0 && outReady[outIdx];
     uint8_t gob = 0x00;
     if (!rdmOn)                gob |= 0x80;    // RDM disabled on this port
-    gob |= 0x40;                               // output style is continuous (we free-run, never delta)
+    if (!dmxIsDelta(outIdx)) gob |= 0x40;      // set = continuous (free-run), clear = delta
     if (!g_artDiscovering)     gob |= 0x20;    // discovery is not currently running -> TOD is final
     b[213] = gob;
     b[200] = 0x00;                             // Style = StNode
@@ -175,10 +177,11 @@ static int buildArtPollReply(uint8_t* b, int outIdx, int bindIndex) {
     uint8_t failsafe = (cfg.outputs[outIdx].lossMode == LOSS_ZERO) ? 0x01 : 0x00;
     b[217] = 0x02 | (uint8_t)(failsafe << 6);
     // RefreshRate (fields 51/52): the maximum rate at which this gateway can process ArtDmx. Left at
-    // zero we were claiming the DMX512 ceiling of 44 Hz while actually clocking DMX_TX_RATE_HZ, so a
-    // controller that honours the field oversends and we silently bin the surplus (measured: ~9% of
-    // frames dropped from a 44 fps source, issue #93). Advertise what we really do.
-    b[226] = 0x00; b[227] = DMX_TX_RATE_HZ;
+    // zero we were claiming the DMX512 ceiling of 44 Hz while actually clocking 40, so a controller
+    // that honours the field oversends and we silently bin the surplus (measured: ~9% of frames
+    // dropped from a 44 fps source, issue #93). Report THIS port's configured rate -- the reply is
+    // built per output (own BindIndex), so two ports on different rates each tell the truth.
+    b[226] = 0x00; b[227] = dmxRateHz(outIdx);
     b[228] = g_bqPolicy;                       // BackgroundQueuePolicy (0..3 = collect severity, 4 = off)
     return 239;
 }
@@ -320,6 +323,18 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
             g_bqPolicy = cmd - AC_BQP0;
             g_bqDirty  = true;
             Serial.printf("[ART-ADDR] BackgroundQueuePolicy = %u\n", g_bqPolicy);
+        } else if (hi == AC_STYLE_DELTA0 || hi == AC_STYLE_CONST0) {
+            // The console picks our transmit style (issue #93). This is the standard Art-Net way to
+            // ask a gateway to clock one DMX frame per ArtDmx instead of free-running, and it is the
+            // same setting the web UI exposes -- so remember that it arrived over the wire, and say
+            // so in the UI rather than letting it look like something the user chose.
+            if (out >= 0) {
+                cfg.outputs[out].txStyle    = (hi == AC_STYLE_DELTA0) ? TXSTYLE_DELTA : TXSTYLE_CONTINUOUS;
+                cfg.outputs[out].txStyleSrc = TXSRC_ARTNET;
+                g_artCfgDirty = true;                          // loop() persists via saveConfig()
+                Serial.printf("[ART-ADDR] out%d transmit style = %s (set over Art-Net, bind %u)\n",
+                              out, hi == AC_STYLE_DELTA0 ? "delta" : "continuous", bindIndex);
+            }
         } else if (hi == AC_MERGE_LTP0 || hi == AC_MERGE_HTP0 || cmd == AC_CANCEL_MERGE) {
             if (out >= 0) {
                 if (hi == AC_MERGE_HTP0)      cfg.outputs[out].mergeMode = MERGE_HTP;

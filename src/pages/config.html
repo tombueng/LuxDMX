@@ -622,7 +622,26 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
                 <option value="1">Blackout (send zeros)</option>
                 <option value="2">Stop sending</option>
               </select>
-              <div class="form-text">What this output does when its Art-Net/sACN source stops (after ~2.5 s). Hold keeps the last look; blackout drives every channel to 0; stop idles the line so fixtures run their own DMX-loss failsafe.</div>
+              <div class="form-text">What this output does when its Art-Net/sACN source stops (after ~4 s). Hold keeps the last look; blackout drives every channel to 0; stop idles the line so fixtures run their own DMX-loss failsafe.</div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label text-secondary small mb-1">Transmit style</label>
+              <select class="form-select out-style">
+                <option value="0">Continuous (free-run)</option>
+                <option value="1">Delta (follow the input)</option>
+              </select>
+              <div class="form-text out-style-note">Continuous clocks DMX at the fixed rate below, whatever the console does. Delta sends one DMX frame per received packet, so the wire follows your console exactly and nothing gets repeated.</div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label text-secondary small mb-1">DMX output rate</label>
+              <select class="form-select out-rate">
+                <option value="0">40 fps (25 ms)</option>
+                <option value="1">41.7 fps (24 ms, fastest)</option>
+                <option value="2">33.3 fps (30 ms)</option>
+                <option value="3">25 fps (40 ms)</option>
+                <option value="4">20 fps (50 ms)</option>
+              </select>
+              <div class="form-text">Match your console to avoid repeated frames: MagicQ and MADRIX both run 33.3 fps, most other software sits near 40. In Delta this is only the fall-back rate used while the source is quiet. Applies immediately, no restart.</div>
             </div>
           </div>
           <div class="form-text mt-2 out-rdm-note">Set RTS/EN to a GPIO to enable RDM on this output; leave −1 to disable.</div>
@@ -798,11 +817,35 @@ function wireCard(cont, tpl, i, o){
   rts.name = 'o'+i+'_rts';  rts.value  = (o.rts  != null ? o.rts  : -1);
   merge.name = 'o'+i+'_merge'; merge.value = (o.merge != null ? o.merge : 0);
   loss.name = 'o'+i+'_loss'; loss.value = (o.loss != null ? o.loss : 0);
+  var style = node.querySelector('.out-style');
+  var rate  = node.querySelector('.out-rate');
+  style.name = 'o'+i+'_style'; style.value = (o.style != null ? o.style : 0);
+  rate.name  = 'o'+i+'_rate';  rate.value  = (o.rate  != null ? o.rate  : 0);
+  // Say where the transmit style came from. A console can set it over Art-Net (ArtAddress
+  // AcStyleDelta / AcStyleConst), and then the dropdown shows a value the user never picked --
+  // which looks like a bug unless we label it.
+  markStyleSource(node, o.styleSrc);
+  style.addEventListener('change', function(){ markStyleSource(node, 0); });
   en.addEventListener('change', function(){ syncOutBody(node); });
   uni.addEventListener('input', function(){ updCardHint(node); });
   cont.appendChild(node);
   updCardHint(node);
   syncOutBody(node);
+}
+// Badge next to "Transmit style" saying who set it. 1 = a controller pushed it over Art-Net
+// (ArtAddress AcStyleDelta / AcStyleConst); 0 = picked here. Without this a mode the console
+// changed silently looks like the user's own setting.
+function markStyleSource(node, src){
+  var lab = node.querySelector('.out-style').closest('.col-sm-6').querySelector('.form-label');
+  var old = lab.querySelector('.style-src');
+  if (old) old.remove();
+  var b = document.createElement('span');
+  b.className = 'style-src badge ms-2 ' + (src == 1 ? 'text-bg-info' : 'text-bg-secondary');
+  b.textContent = src == 1 ? 'set over Art-Net' : 'set here';
+  b.title = src == 1
+    ? 'A controller selected this over Art-Net (ArtAddress). Changing it here takes it back.'
+    : 'Chosen in this page (or the serial console).';
+  lab.appendChild(b);
 }
 function updStatic(){ $('static-fields').style.display = $('static-sw').checked ? '' : 'none'; }
 // Wired-Ethernet capability flags from the firmware build (set in populate()).

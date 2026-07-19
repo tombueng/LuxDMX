@@ -141,6 +141,15 @@ static void rmtDmxWait(RmtDmx* rd) {
     if (!rd->chan) return;
     rmt_tx_wait_all_done(rd->chan, 100);
 }
+// Non-blocking "is the previous frame fully clocked out?". The transmit task uses this instead of
+// blocking, so two outputs running at DIFFERENT rates (issue #93) never delay each other: waiting
+// ~23 ms for port A would push port B's due time and hand it exactly the timing jitter we are trying
+// to remove. Must be checked before every kick, because rmtDmxEncode rewrites rd->sym in place and
+// the RMT is still streaming out of that buffer until it reports done.
+static bool rmtDmxIdle(RmtDmx* rd) {
+    if (!rd->chan) return false;
+    return rmt_tx_wait_all_done(rd->chan, 0) == ESP_OK;
+}
 // Release the RMT channel + encoder (frees the GPIO so esp_dmx can take it for an RDM
 // transaction). Keeps rd->sym so a following rmtDmxInit() reuses the buffer. After this,
 // rd->chan == nullptr, so rmtDmxKick/Wait become no-ops until re-init.
