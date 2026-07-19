@@ -71,6 +71,14 @@ footer a:hover { color:var(--gh-text); }
 .board-legend { font-size:.74rem; color:#8b949e; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; margin-top:.5rem; }
 .board-legend span::before { content:''; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.3rem; vertical-align:middle; }
 .lg-free::before{ background:#45d85c; } .lg-warn::before{ background:#ffaa1c; } .lg-bad::before{ background:#f33abc; } .lg-used::before{ background:#0d1117; box-shadow:0 0 0 2px #23e6f7 inset; }
+/* rails get a square swatch so they can't be mistaken for the (similar orange) caution dot */
+.lg-pwr::before{ background:#d98c1f; border-radius:2px; } .lg-gnd::before{ background:#7d8590; border-radius:2px; }
+/* Wirable connectors (J4 display / J6 expansion) drawn under the board diagram */
+.hdr-strips { margin-top:.9rem; display:flex; flex-direction:column; align-items:center; gap:.5rem; }
+.hdr-strips .hdr-strip { max-width:100%; }
+.hdr-strips-cap { font-size:.74rem; color:#8b949e; }
+/* which header pin a GPIO field lands on, shown in the field group (e.g. "J4.3") */
+.pin-grp .hdr-hint { font-size:.7rem; padding:.15rem .4rem; color:#23e6f7; background:#161b22; cursor:help; }
 /* Hard-wired (fixed) on-board pins (LuxDMX v6): locked, shown but not editable */
 .fixed-field { background:#161b22 !important; color:var(--gh-muted) !important; cursor:not-allowed; opacity:.9; }
 .hw-fixed, .hw-headers { font-size:.8rem; margin-top:.55rem; }
@@ -1453,6 +1461,7 @@ function validate(){
     }
   });
   renderWarnings(msgs);
+  updPinHeaderHints();
   var sb = $('save-btn'); if (sb) sb.disabled = hard;
   if ($('board-modal').classList.contains('show')) renderCurrent();
   return !hard;
@@ -1481,8 +1490,9 @@ function shortRole(role){
 function renderBoard(){
   var b = diagramDesc(), wrap = $('board-svg-wrap');
   if (!b){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
-  if (b.phys && b.phys.pins && b.phys.pins.length) return renderBoardPhysical(b, wrap);
-  return renderBoardCols(b, wrap);
+  if (b.phys && b.phys.pins && b.phys.pins.length) renderBoardPhysical(b, wrap);
+  else renderBoardCols(b, wrap);
+  renderHeaderStrips(b, wrap);   // J4 / J6 connectors, drawn below the board
 }
 // Horizontal board diagram: the two pin columns become the top and bottom rows
 // (pins along the horizon), silk + GPIO labels stand vertically just inside each
@@ -1498,10 +1508,91 @@ function headerIndex(b){
   });
   return idx;
 }
-function renderBoardCols(b, wrap){
-  if (!b || !b.cols){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
+// gpio -> [roles currently assigned to it], from the live form fields.
+function assignMap(){
   var assign = {};
   activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
+  return assign;
+}
+// A header pin with no `gpio` is a rail. Classify it by silk so it gets the same
+// colours (and the same "not assignable" treatment) as a rail on the board diagram.
+function headerPinType(p){
+  if (p.gpio != null) return 'gpio';
+  var s = String(p.silk || '').toUpperCase();
+  if (s === 'GND' || s === 'AGND' || s === 'VSS') return 'gnd';
+  if (s === 'NC' || s === '') return 'nc';
+  if (s === 'EN' || s === 'RST' || s === 'RESET') return 'en';
+  return 'power';
+}
+// ---- Wirable connectors (J4 display / J6 expansion) ------------------------
+// The board diagram answers "which GPIO is that pad?"; a header answers "which
+// hole in the plug do I crimp this wire into?". Those are different questions, so
+// each header is drawn as its own connector strip: pins left->right in their REAL
+// order with pin 1 marked, the rails greyed and inert, and every signal pin a
+// click target that assigns straight into the field being picked. Assigned pins
+// get the same cyan callout as the board, so the strip doubles as the wiring plan.
+function renderHeaderStrips(b, wrap){
+  var hs = (b && b.headers) || [];
+  if (!hs.length) return;
+  var assign = assignMap();
+  wrap.insertAdjacentHTML('beforeend',
+    '<div class="hdr-strips"><div class="hdr-strips-cap">Wirable connectors. Click a pin to assign it, same as on the board.</div>'
+    + hs.map(function(h){ return headerStripSvg(h, assign); }).join('') + '</div>');
+  wrap.querySelectorAll('.hdr-strips g.pad').forEach(function(node){
+    node.addEventListener('click', function(){ onPinClick(+node.getAttribute('data-gpio')); });
+  });
+}
+function headerStripSvg(h, assign){
+  var pins = (h.pins || []).slice().sort(function(a, c){ return a.pin - c.pin; });
+  var n = Math.max(pins.length, 1);
+  // Board units, scaled once at the end so a header pin is the same size everywhere.
+  var PITCH = 32, LM = 24, RM = 18, PAD = 15, PH = PAD / 2, SCALE = 1.5;
+  var CAPY = 10, HY0 = 17, NUMY = 30, PADY = 47, SILKY = 71, GPIOY = 80.5, CALLY = 89;
+  var HY1 = PADY + PH + 5, CFONT = 8, CADV = CFONT * 0.58;
+  var W = LM + (n - 1) * PITCH + RM;
+  var xOf = function(i){ return LM + i * PITCH; };
+  var maxCall = 0;
+  pins.forEach(function(p){ var u = (p.gpio != null) && assign[p.gpio];
+    if (u) maxCall = Math.max(maxCall, u.map(calloutLabel).join(', ').length); });
+  var H = maxCall ? (CALLY + maxCall * CADV + 5) : (GPIOY + 6);
+  var s = '<svg class="board-svg hdr-strip" width="' + Math.round(W * SCALE) + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+  s += '<text x="2" y="' + CAPY + '" font-size="9.5" font-weight="600" fill="#c9d1d9">' + esc(h.ref + ' · ' + h.name) + '</text>';
+  // connector housing + its keying slot; decorative, never a click target
+  s += '<g pointer-events="none">'
+    + '<rect x="6" y="' + HY0 + '" width="' + (W - 12) + '" height="' + (HY1 - HY0) + '" rx="3" fill="#1c222a" stroke="#39414b"/>'
+    + '<rect x="10" y="' + (HY0 + 3) + '" width="' + (W - 20) + '" height="' + (HY1 - HY0 - 6) + '" rx="2" fill="none" stroke="#2a313a"/>'
+    // pin-1 marker: the usual triangle pointing at the first contact
+    + '<path d="M' + (LM - 15) + ',' + (PADY - 4) + ' L' + (LM - 15) + ',' + (PADY + 4) + ' L' + (LM - 9) + ',' + PADY + ' Z" fill="#c9d1d9"/>'
+    + '</g>';
+  pins.forEach(function(p, i){
+    var x = xOf(i), type = headerPinType(p), gpio = (p.gpio != null) ? p.gpio : null;
+    var power = type !== 'gpio', fl = power ? [] : currentFlags(gpio);
+    var u = power ? null : assign[gpio];
+    var col = power ? powerColor(type) : (u ? '#23e6f7' : statusColor(padClass(fl)));
+    var tip = power
+      ? (p.silk + ' · ' + (type === 'gnd' ? 'ground' : type === 'nc' ? 'not connected' : type === 'en' ? 'enable / reset' : 'power rail') + ' (not assignable)')
+      : ('GPIO' + gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' · ' + fl.join(', ') : ' · free')
+         + ' · ' + h.ref + ' pin ' + p.pin + (u ? ' · ' + u.map(roleLabel).join(', ') : ''));
+    s += '<g class="' + (power ? 'ppin power' : 'pad') + '"' + (power ? '' : ' data-gpio="' + gpio + '"')
+      + '><title>' + esc(tip) + '</title>'
+      + '<text x="' + x + '" y="' + NUMY + '" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e">' + p.pin + '</text>'
+      + '<rect class="pin-pad" x="' + (x - PH) + '" y="' + (PADY - PH) + '" width="' + PAD + '" height="' + PAD + '" rx="' + (p.pin === 1 ? 0 : 2) + '" fill="' + col + '" fill-opacity="' + (power ? '0.30' : '0.22') + '" stroke="' + col + '" stroke-width="' + (u ? 2.4 : 1.3) + '"/>'
+      + '<circle class="pin-dot" cx="' + x + '" cy="' + PADY + '" r="2.2"/>'
+      + '<text x="' + x + '" y="' + SILKY + '" text-anchor="middle" font-size="8" fill="' + (power ? '#8b949e' : '#c9d1d9') + '">' + esc(p.silk || '') + '</text>';
+    if (gpio != null && p.silk !== ('IO' + gpio))
+      s += '<text x="' + x + '" y="' + GPIOY + '" text-anchor="middle" font-size="7.5" fill="#8b949e">G' + gpio + '</text>';
+    s += '</g>';
+    if (u){
+      var ct = u.map(calloutLabel).join(', ');
+      s += '<text x="' + x + '" y="' + CALLY + '" text-anchor="start" font-size="' + CFONT + '" font-weight="600" fill="#23e6f7"'
+        + ' transform="rotate(90 ' + x + ' ' + CALLY + ')" pointer-events="none">' + esc(ct) + '</text>';
+    }
+  });
+  return s + '</svg>';
+}
+function renderBoardCols(b, wrap){
+  if (!b || !b.cols){ wrap.innerHTML = '<p class="text-secondary small">No diagram for this board. Use the GPIO fields directly.</p>'; return; }
+  var assign = assignMap();
   var hIdx = headerIndex(b);
   var topPins = b.cols[0] || [], botPins = b.cols[1] || [];
   var n = Math.max(topPins.length, botPins.length, 1);
@@ -1570,8 +1661,8 @@ function powerColor(type){ return type === 'power' ? '#d98c1f' : type === 'gnd' 
 // one). Power/GND/EN pins are greyed and inert; GPIO pins keep the exact same
 // status colours, callouts and click-to-assign behaviour as the column diagram.
 function renderBoardPhysical(b, wrap){
-  var assign = {};
-  activeRoles().forEach(function(role){ var v = parseInt(byRole(role).value, 10); if (!isNaN(v) && v >= 0) (assign[v] = assign[v] || []).push(role); });
+  var assign = assignMap();
+  var hIdx = headerIndex(b);
   var pins = b.phys.pins, usb = b.phys.usb || 'bottom';
   var L = pins.filter(function(p){ return p.side === 'L'; }).sort(function(a,c){ return a.pos - c.pos; });
   var R = pins.filter(function(p){ return p.side === 'R'; }).sort(function(a,c){ return a.pos - c.pos; });
@@ -1605,11 +1696,16 @@ function renderBoardPhysical(b, wrap){
       var power = isPower(p.type), u = (gpio != null) ? assign[gpio] : null;
       var col = power ? powerColor(p.type) : (u ? '#23e6f7' : statusColor(padClass(currentFlags(gpio))));
       var fl = (gpio != null) ? currentFlags(gpio) : [];
+      var hr = (gpio != null) ? hIdx[gpio] : null;
       var tip = power
         ? p.silk + (p.type === 'power' ? ' — power rail (not assignable)' : p.type === 'gnd' ? ' — ground (not assignable)' : p.type === 'en' ? ' — enable / reset (not assignable)' : ' — not connected')
-        : ('GPIO' + gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' — ' + fl.join(', ') : ' — free') + (u ? ' — ' + u.map(roleLabel).join(', ') : ''));
-      // label text: silk, plus the GPIO number when the silk hides it
-      var lbl = p.silk + (gpio != null && p.silk !== ('IO' + gpio) && p.silk !== ('GPIO' + gpio) ? ' ·G' + gpio : '');
+        : ('GPIO' + gpio + (p.silk ? ' (' + p.silk + ')' : '') + (fl.length ? ' — ' + fl.join(', ') : ' — free')
+           + (hr ? ' — ' + hr.ref + ' pin ' + hr.pin + (hr.silk ? ' (' + hr.silk + ')' : '') : '')
+           + (u ? ' — ' + u.map(roleLabel).join(', ') : ''));
+      // label text: silk, plus the GPIO number when the silk hides it, plus the header
+      // pin it reaches (a board can have both a module header and a wirable connector)
+      var lbl = p.silk + (gpio != null && p.silk !== ('IO' + gpio) && p.silk !== ('GPIO' + gpio) ? ' ·G' + gpio : '')
+        + (hr ? ' · ' + hr.ref + '.' + hr.pin : '');
       var lblX = isLeft ? (padX - PH - 4) : (padX + PH + 4), anchor = isLeft ? 'end' : 'start';
       var cls = power ? 'ppin power' : 'pad';
       s += '<g class="' + cls + '"' + (power ? '' : ' data-gpio="' + gpio + '"') + '><title>' + esc(tip) + '</title>'
@@ -1664,7 +1760,8 @@ function printBoard(){
   var w = window.open('', '_blank', 'width=900,height=700'); if (!w) return;
   w.document.write('<!doctype html><html><head><title>' + esc(currentBoardName()) + ' · pin plan</title>'
     + '<style>body{background:#0d1117;color:#c9d1d9;font-family:sans-serif;margin:0;padding:24px}'
-    + 'h3{margin:0 0 14px;font-weight:600}svg{width:100%;max-width:780px;height:auto;display:block;margin:0 auto}</style></head>'
+    + 'h3{margin:0 0 14px;font-weight:600}svg{width:100%;max-width:780px;height:auto;display:block;margin:0 auto}'
+    + '.hdr-strips{margin-top:18px}svg.hdr-strip{max-width:520px;margin-top:10px}</style></head>'
     + '<body><h3>' + esc(currentBoardName()) + ' · pin assignment</h3>' + c + '</body></html>');
   w.document.close(); w.focus(); setTimeout(function(){ try { w.print(); } catch(e){} }, 450);
 }
@@ -1753,6 +1850,23 @@ function applyHardwiredLocks(){
     m.type = 'hidden'; m.name = e.field; m.value = val; m.className = 'fixed-mirror';
     inp.parentNode.appendChild(m);
     var grp = inp.closest('.pin-grp'); if (grp){ var pk = grp.querySelector('.pin-pick'); if (pk) pk.style.display = 'none'; }
+  });
+}
+
+// Tag each GPIO field with the physical header pin that GPIO comes out on ("J4.3"),
+// so the number in the box tells you which hole to crimp without reopening the diagram.
+// Follows the same board as the locks, and clears itself when the pin isn't on a header.
+function updPinHeaderHints(){
+  var idx = headerIndex(lockDesc());
+  document.querySelectorAll('.pin-grp').forEach(function(grp){
+    var inp = grp.querySelector('input[name]'); if (!inp) return;
+    var v = parseInt(inp.value, 10);
+    var hr = (!isNaN(v) && v >= 0) ? idx[v] : null;
+    var tag = grp.querySelector('.hdr-hint');
+    if (!hr){ if (tag) tag.remove(); return; }
+    if (!tag){ tag = document.createElement('span'); tag.className = 'input-group-text hdr-hint'; grp.appendChild(tag); }
+    tag.textContent = hr.ref + '.' + hr.pin;
+    tag.title = hr.ref + ' pin ' + hr.pin + (hr.silk ? ' (' + hr.silk + ')' : '');
   });
 }
 
@@ -1908,6 +2022,8 @@ function initBoards(){
         <span class="lg-warn">caution (strapping / USB-JTAG / input-only)</span>
         <span class="lg-bad">do not use (flash / serial / Ethernet)</span>
         <span class="lg-used">assigned</span>
+        <span class="lg-pwr">power</span>
+        <span class="lg-gnd">GND (rails are not assignable)</span>
       </div>
       <div class="d-flex justify-content-end align-items-center mt-3 flex-wrap gap-2">
         <button type="button" class="btn btn-outline-secondary btn-sm" id="board-print">Print plan</button>
