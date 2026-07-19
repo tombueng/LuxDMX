@@ -60,7 +60,7 @@ pins in their true positions with the board's own silk, drawn as a faithful upri
 ## Notes
 
 - **Accurate GPIOs**: pinouts come from `variants/<dir>/pins_arduino.h` (authoritative),
-  generated via `hardware/gen_board_descriptor.py`; LuxDMX v6 from `hardware/luxdmx.py`.
+  generated via `hardware/scripts/gen_board_descriptor.py`; LuxDMX v6 from `hardware/scripts/luxdmx.py`.
 - **Diagram only**: the picker draws its own horizontal SVG diagram from each board's two
   pin columns. There are no board photos or realistic/Fritzing graphics (too few clean-
   license images to be worth it) - the generated diagram is the interactive tool and works

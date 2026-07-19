@@ -104,7 +104,7 @@ no edit there.
 
 ### Fixed wiring (`hardwired`) and headers — for boards with a fixed pinout
 
-A purpose-built board (the **LuxDMX v5**) wires nearly everything in copper, so the picker
+A purpose-built board (the **LuxDMX v6**) wires nearly everything in copper, so the picker
 should not let you change those pins. Two optional fields drive that, keyed on the
 **detected** board (what `/info.json` reports), not the dropdown:
 
@@ -146,18 +146,24 @@ red = do-not-use (`flash`/`serial`/`reserved:*`), blue ring = currently assigned
 
 ## Regenerating
 
-Every descriptor is generated so it cannot drift from the hardware: LuxDMX v5 from the
-PCB netlist (`hardware/luxdmx.py`), the hand-tuned dev boards from published header
-pinouts, and the long tail auto-derived from the arduino-esp32 core
-`variants/<dir>/pins_arduino.h`:
+Descriptors started out generated from authoritative pinout data: LuxDMX from the PCB netlist
+(`hardware/scripts/luxdmx.py`), the hand-tuned dev boards from published header pinouts, and the
+long tail auto-derived from the arduino-esp32 core `variants/<dir>/pins_arduino.h`.
+
+> **The generator is one schema revision behind the committed catalog, so the JSON in this folder
+> is authoritative, not the script.** Measured: 19 of 34 descriptors still regenerate byte-identical,
+> 14 differ only by the `phys` block (the curated physical-header rows the script never learned to
+> emit, so a blind run would delete them), and our own board is still emitted as `luxdmx_v4` in the
+> old `connectors`/`fixed` shape. Regenerate into a scratch dir and diff, don't point it straight at
+> `web/boards/`:
 
 ```sh
-python hardware/gen_board_descriptor.py
+python hardware/scripts/gen_board_descriptor.py
 ```
 
 ## Adding a board
 
-Add it to the board list in `hardware/gen_board_descriptor.py` (an `auto_board(...)` entry
+Add it to the board list in `hardware/scripts/gen_board_descriptor.py` (an `auto_board(...)` entry
 is usually enough - pass the arduino-esp32 variant directory), then re-run the generator
 and open a PR. Once merged to `master`, GitHub Pages redeploys and every device's config
 page can pick it from the dropdown.

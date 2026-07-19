@@ -26,6 +26,9 @@ tools/
 # them would destroy that. They stay local under scripts/ if you need to read them.
 *.py
 !luxdmx.py
+# the pin-picker board-descriptor generator: it dropped out of git when this
+# whitelist was introduced, which is how the committed catalog drifted from it
+!gen_board_descriptor.py
 !hw_version.py
 !csv_to_xlsx.py
 !gen_bom_from_board.py
