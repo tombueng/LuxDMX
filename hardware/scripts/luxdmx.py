@@ -453,19 +453,18 @@ J4['MP'] += GND     # mounting tabs -> GND (mechanical anchor + shield)
 #     1 +3V3  2 GND  3 IO35  4 IO36  5 IO37  6 IO48  7 IO43  8 IO44  9 GND
 #   Any pin muxes to I2C (SDA/SCL), SPI (SCK/MOSI/MISO/CS), UART, PWM or ADC in
 #   firmware, so the port can run an I2C bus AND a SPI bus at once. Pins 7/8 are the
-#   freed UART0 (IO19/IO20 are native USB since v5.2).
+#   freed UART0 (IO19/IO20 are the native USB lines and are not broken out).
 #
-#   POWER-PIN PARITY WITH J4 (v6). J4 and J6 are the same JST SH 9-pin part, so a
-#   cable physically plugs into either. Up to v5.2 their power pins disagreed (J4 was
-#   1=+3V3 2=GND, J6 was 1=+5V 2=+3V3 3=GND), so a display plugged into J6 got +5V on
-#   its VCC and +3V3 on its GND and died on the spot; an expansion board plugged into
-#   J4 sank its whole ground current through IO4. J6 now carries J4's 1=+3V3 2=GND, so
-#   a swap can only shuffle 3V3 CMOS signals, which both sides survive.
+#   POWER-PIN PARITY WITH J4. J4 and J6 are the same JST SH 9-pin part, so a cable
+#   physically plugs into either. They therefore carry the same 1=+3V3 2=GND, and a
+#   swap can only shuffle 3V3 CMOS signals, which both sides survive. This is not
+#   cosmetic: when the two disagreed, a display plugged into J6 got +5V on its VCC and
+#   +3V3 on its GND and died on the spot, and an expansion board plugged into J4 sank
+#   its whole ground current through IO4. scripts/validate_header_parity.py (gate 8)
+#   fails the fab export if the invariant is ever broken again.
 #
 #   Consequences, deliberately chosen (see docs/display.md "Header safety"):
-#     * +5V is GONE from this header. Nothing was built against the v5.2 J6 pinout yet,
-#       whereas the J4 display cables are in use, so J6 is the one that moves. Feed
-#       5V loads externally.
+#     * +5V is NOT on this header. Feed 5V loads externally.
 #     * pin 9 is a 2nd GND, not a 7th GPIO: the module has no free non-strapping GPIO
 #       left (only IO3/IO45/IO46 remain and all three are strapping pins). A second
 #       return on a 6-signal 1.0mm header is the better use anyway. It also means a

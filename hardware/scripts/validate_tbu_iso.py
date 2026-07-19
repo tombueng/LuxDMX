@@ -1,4 +1,4 @@
-"""v4.02 isolation + protection validator (re-runnable). The surface-creepage DRU rule does NOT see the
+"""Isolation + protection validator (re-runnable). The surface-creepage DRU rule does NOT see the
 inner-plane void geometry, so this checks it explicitly:
 
   A. CREEPAGE: every bit of DMX-data isolated copper (the lines that carry a 30VAC/42VDC fault: DMX_A/B,

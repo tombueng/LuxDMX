@@ -100,7 +100,7 @@ idle level on RO during TX).
 1. **Logic-analyzer capture** of one discovery on the wire (the rig's custom S3 LA on COM9): see the
    exact bytes/edges at each turnaround, confirm whether the controller's TX is clean and the
    corruption is on the float→drive transition.
-2. **Add fail-safe bias** to the bus (or the v4 board) and re-run the crowded-bus sweep. If request
+2. **Add fail-safe bias** to the bus (or the LuxDMX board) and re-run the crowded-bus sweep. If request
    corruption drops to ~0 and discovery finds all fixtures → confirmed hardware root cause; fix is a
    board change (bias resistors) + a documented external-bias requirement. This is a real LuxDMX
    hardware finding, not a simulator workaround.

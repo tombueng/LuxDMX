@@ -150,7 +150,7 @@ a **real RDM fixture** (validate the S3 against real hardware, not just the sim)
 - 1× **5-pin XLR female** (Neutrik NC5F, DMX standard) and/or 1× **3-pin XLR** (many fixtures) —
   `A→pin3, B→pin2, GND→pin1`.
 - 1× **3-pin screw terminal** (`A / B / GND`) for quick cable/scope hookup.
-- **Protection at the external connector:** 1× TVS across A–B (e.g. **SM712**, like the v5 board) and
+- **Protection at the external connector:** 1× TVS across A–B (e.g. **SM712**, like the LuxDMX board) and
   optional small series resistors — cheap insurance against ESD / mis-plugging real cables.
 - The on-board **termination at this end must be jumper-disable-able**: when a real fixture is
   plugged it terminates the far end, so you don't want 60 Ω double-loading.
@@ -189,7 +189,7 @@ At **Vcc = 3.3 V** (the sim's MAX3486 supply), both ends terminated (60 Ω):
 **Recommendation for the PCB:** bias referenced to **+3V3**, `Rbias ≈ 270 Ω` per line (or a
 2-footprint parallel option to trim), verified to give **≥ +400 mV** idle on the analog probe. Put
 the bias network at one node (either end). If instead the bus is biased from a 5 V node, 470 Ω is
-fine (that's what the LuxDMX v5 board uses, see §6).
+fine (that's what the LuxDMX board uses, see §6).
 
 ---
 
@@ -237,9 +237,9 @@ fine (that's what the LuxDMX v5 board uses, see §6).
 
 ---
 
-## 6. Reference: how the LuxDMX v5 board does it (for the "real" side)
+## 6. Reference: how the LuxDMX board does it (for the "real" side)
 
-The production LuxDMX v5 (`c:/dev/DMX/hardware/luxdmx.kicad_*`) is the gold reference for a clean RDM
+The production LuxDMX board (`c:/dev/DMX/hardware/luxdmx.kicad_*`) is the gold reference for a clean RDM
 front end and is worth mirroring where sensible:
 - **ISO3086DWR** isolated RS485 transceiver (5 V isolated bus side via a B0505S-1W), common-mode choke
   (ACM2012), SM712 TVS, series TBU fault protection.
@@ -287,5 +287,5 @@ front end and is worth mirroring where sensible:
   `docs/FINDINGS.md`). Sim console: `d` wiring-check LED, `m` metrics, `w` WiFi retry.
 - LuxDMX S3 firmware + live pin config: `c:/dev/DMX/src/main.cpp`, and the device `/info.json`
   (tx=17, rx=18, rts=8; ethCs=10/Sck=12/Mosi=11/Miso=13/Int=14/Rst=9).
-- LuxDMX v5 hardware reference: `c:/dev/DMX/hardware/luxdmx.kicad_sch` / `.kicad_pcb`.
+- LuxDMX hardware reference: `c:/dev/DMX/hardware/luxdmx.kicad_sch` / `.kicad_pcb`.
 - Agent memories: `rs485-rxd-txd-cross-wire`, `v4-check-rdm-bias-termination`, `rp2350-rdm-fixture`.

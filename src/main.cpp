@@ -2039,24 +2039,16 @@ static void handleRoot(AsyncWebServerRequest* req) {
 // Compile-time board identity. Lets the /config pin-picker auto-select the right
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
-// Neither BOARD_LUXDMX_V5 nor BOARD_LUXDMX_V6 is set by any shipped env — neither revision has
-// a dedicated build, both are the esp32s3dev build plus the matching board template applied in
-// /config (see platformio.ini). So a released board reports "esp32s3-devkitc-1" like any S3, and
-// the copper-pin locks come from picking the board in /config, which now sticks (cfg.boardSel).
-// These branches are the source-build escape hatch: build esp32s3dev with -DBOARD_LUXDMX_V6 (or
-// -DBOARD_LUXDMX_V5) for a firmware that reports that id directly.
+// BOARD_LUXDMX_V6 is NOT set by any shipped env — the board has no dedicated build, it is the
+// esp32s3dev build plus the "LuxDMX v6" board template applied in /config (see platformio.ini).
+// So a released board reports "esp32s3-devkitc-1" like any S3, and the copper-pin locks come from
+// picking the board in /config, which sticks across reboots (cfg.boardSel). This branch is the
+// source-build escape hatch: build esp32s3dev with -DBOARD_LUXDMX_V6 for a firmware that reports
+// "luxdmx_v6" directly.
 // USE_ETH_SPI alone is too coarse to key the id on — esp32dev/esp32s3dev set it too so a DIY user
 // can add a W5500 — which is why the id needs the explicit flag, not the presence of the W5500 path.
-// (luxdmx_v4 is an earlier revision of this same board; its descriptor is kept in web/boards/ as a
-// legacy entry so a v4 still resolves its pinout, but nothing builds it.)
-// v6 is the same board with J6 re-pinned (its power pins now match J4, so swapping the two
-// cables is survivable). It needs its own id because the two revisions genuinely differ in
-// copper: telling a v5 owner the v6 J6 pinout is the mis-plug this change exists to stop.
-// The pin map itself is identical, so templates/luxdmx_v5.ini is just an alias of the v6 one.
 #if defined(BOARD_LUXDMX_V6)
 static const char BOARD_ID[] = "luxdmx_v6";
-#elif defined(BOARD_LUXDMX_V5)
-static const char BOARD_ID[] = "luxdmx_v5";
 #elif defined(USE_ETH_RMII) || defined(USE_ETHERNET)
 static const char BOARD_ID[] = "wt32eth01";
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -2891,7 +2883,7 @@ static void otaBootUpdate() {
     // before even trying -- so a single bad moment (no link yet, a download that died) dropped the
     // update on the floor for good: no retry, no error, the web UI had already said "updating,
     // rebooting", and the device just quietly came back on the old version. That is exactly how a
-    // v5 stayed on 1.0.166 while reporting itself up to date.
+    // a bench unit stayed on 1.0.166 while reporting itself up to date.
     //
     // Looping is capped by the existing budget, not by throwing the request away: every attempt
     // increments otatries, and loop() only resets it after 60 s of stable uptime -- which a device
@@ -3205,7 +3197,7 @@ static void initOTA() {
 // compete with loop() for CPU. DMX output stays in loop()/callbacks.
 // ---------------------------------------------------------------------------
 // One status language, spoken identically by the single WS2812/GPIO LED and the 5-LED
-// discrete panel (the LuxDMX board, v4 onwards). Boot/connecting is handled separately by bootConnectingLed()
+// discrete panel (the LuxDMX board). Boot/connecting is handled separately by bootConnectingLed()
 // (Knight-Rider sweep on the panel, white "working" blink on a single LED) until the network
 // is up and this task takes over.
 //
@@ -3845,7 +3837,7 @@ static volatile bool s_ethUpDone;
 // Give the W5500 a reset that actually meets its datasheet, because nothing else does.
 //
 // hardware/VALIDATION_REPORT.md, from the datasheet: "RSTn must be held >=500us (firmware)".
-// The IDF W5500 PHY driver pulses RSTn for ~100us (measured on a v5 board: 80us), 6x short of
+// The IDF W5500 PHY driver pulses RSTn for ~100us (measured on the board: 80us), 6x short of
 // spec. A short pulse resets the chip *most* of the time; the misses leave it wedged with no
 // link, and a warm reset never recovers it because the driver just re-issues the same short
 // pulse -- only pulling the power does. That is the "red LED, no link, reset button doesn't

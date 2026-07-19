@@ -7,7 +7,7 @@ fetches it from `https://luxdmx.org/web/boards/`.
 
 ## How it is used
 
-The six **core boards** (`luxdmx_v6`, `luxdmx_v5`, `esp32s3-devkitc-1`, `esp32-devkitc`,
+The five **core boards** (`luxdmx_v6`, `esp32s3-devkitc-1`, `esp32-devkitc`,
 `esp32-devkit-v1`, `xiao-esp32s3`) are also baked into the firmware
 (`src/pages/config.html`) so the picker works fully offline on an isolated stage LAN.
 This catalog:
@@ -15,17 +15,6 @@ This catalog:
 - lets the config page lazily discover **all the other supported boards** beyond the
   built-ins (fetched on demand, then cached in the browser's `localStorage`),
 - documents the descriptor format for contributors.
-
-`luxdmx_v5` and `luxdmx_v4` are **previous revisions of our own board**, kept as legacy
-descriptors. The current revision is `luxdmx_v6` (that is what the template and `BOARD_ID`
-say), but an older board still reports or has saved its own id and fetches this catalog to
-draw its pinout. Deleting a descriptor would break the picker on those boards, so they stay.
-v5 shares the v6 GPIO map and is a built-in, so a v5 keeps working with no network at all; v4
-differs and is catalog-only (an old board already carries its own copy in its firmware).
-
-The v5 and v6 descriptors are **not** interchangeable even though their GPIO maps match: the v6
-re-pinned its J6 expansion header so that swapping a J4/J6 cable is survivable, and a v5 really
-does have +5V on J6 pin 1. Pick the revision printed on your silk.
 
 The picker draws its own **horizontal pin diagram** from each descriptor's two pin
 columns. There are no board photos or realistic graphics. If the catalog cannot be
@@ -168,9 +157,8 @@ The comparison is on parsed JSON, not bytes, because the committed files are han
 drift; content is. Two things are curated rather than derived, since they are read off the real
 board: the physical header layouts in `hardware/scripts/board_phys.json` (the `phys` key) and the
 display labels on the LuxDMX board's fixed pins. Every GPIO number is derived, so the pin data
-can't drift even though the cosmetics are hand-kept. `luxdmx_v4` and `luxdmx_v5` are frozen and
-not regenerated: `luxdmx.py` describes the v6 copper, so regenerating a v5 from it would quietly
-hand a v5 owner the v6 J6 pinout.
+can't drift even though the cosmetics are hand-kept. Every descriptor in the catalog is
+regenerated and compared on each run — nothing is exempt.
 
 ## Adding a board
 

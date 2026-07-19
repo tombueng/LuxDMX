@@ -1,24 +1,23 @@
 > [!NOTE]
-> **v5.00 was built and works; this v5.2 spin is not built yet.** The board is on `master`,
-> design-complete, and passes the full scripted validation (DRC, isolation, SPICE, Ethernet skew; see
-> **VALIDATION.md**). The first physical article (**v5.00**) came up and works: rails, galvanic isolation,
-> PoE standalone, both DMX universes bit-exact, RDM 64/64 on both lines. It did turn up two defects, and the
-> fixes (native USB instead of the CH340 bridge, TPS2116 priority mode) plus a crystal package change are
-> what make up **v5.2**. They are in the source now but have **not been on a physical board yet**, so the
-> two of them are exactly what the next article has to prove. Treat this spin as a prototype: the
-> firmware on a plain ESP32 + an isolated RS-485 module is still the longest-proven path (see the main
-> README). The ruggedization pass (USB ESD, PTC fuse, +5V TVS, a TPS2116 priority power mux, DMX
-> common-mode chokes, ferrite supply filters), plated GND mounting holes, wider power traces, and the
-> DMX512-A "Protected" series-TBU front end are all in.
+> **v6 has not been fabricated yet.** The board is on `master`, design-complete, and passes the full
+> scripted validation (DRC, isolation, SPICE, Ethernet skew, header parity; see **VALIDATION.md**).
+> An earlier spin of this design was built and came up working (rails, galvanic isolation, PoE
+> standalone, both DMX universes bit-exact, RDM 64/64 on both lines), but v6 carries changes that
+> have not been on physical copper yet: native USB instead of a CH340 bridge, TPS2116 priority mode,
+> a 3225 crystal package, and the J4/J6 header re-pin. Those are what the first v6 article has to
+> prove. Treat it as a prototype: the firmware on a plain ESP32 + an isolated RS-485 module is still
+> the longest-proven path (see the main README). The ruggedization pass (USB ESD, PTC fuse, +5V TVS,
+> a TPS2116 priority power mux, DMX common-mode chokes, ferrite supply filters), plated GND mounting
+> holes, wider power traces, and the DMX512-A "Protected" series-TBU front end are all in.
 
-# LuxDMX v5.2 — hardware
+# LuxDMX v6 — hardware
 
 A compact, open-source **Art-Net / sACN → galvanically-isolated DMX512 gateway**, built around
 an ESP32-S3 with **both** WiFi *and* wired Ethernet. Designed entirely as code (SKiDL netlist) and
 routed by a fully-scripted, placement-driven pipeline — so the board regenerates itself from your
 component placement, isolation barrier and all.
 
-![LuxDMX v5.2 — PCB layout](board-pcb-1.png)
+![LuxDMX v6 — PCB layout](board-pcb-1.png)
 
 <p align="center">
   <img src="board3d-1.png" width="49%" alt="3D render — front">
@@ -97,7 +96,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
   while PoE collapses. The pass-FET drop is only ~30 mV (vs ~0.4 V for a Schottky), so `+5V` stays ≈ 4.9 V on
   USB and the B0505S / ISO3086 VCC2 rail clears its 4.5 V minimum across the whole USB range. Input caps
   **C30 / C31** (1 µF), bulk **C29** (22 µF).
-  *(The v5 first article tied `MODE`/`PR1` to GND, which is the default "higher voltage wins" mode. With two
+  *(The first article tied `MODE`/`PR1` to GND, which is the default "higher voltage wins" mode. With two
   near-equal 5 V sources that hunts, and a PoE→USB handover hung the board. Priority mode is that fix.)*
 - **U4 — SY8089 buck** *(C78988)* + **L1 — 2.2 µH** — steps the muxed 5 V down to **3.3 V**. The feedback
   divider is **R10 = 45.3 kΩ / R11 = 10 kΩ → 3.318 V** (SPICE-verified). Powers everything on the logic side.
@@ -110,7 +109,7 @@ Each universe is a self-contained galvanic island; the two share no copper with 
 - **R8 / R9** (5.1 kΩ) — the USB-C **CC pulldowns (Rd)** that tell a host to supply 5 V.
   **U8 — USBLC6-2SC6** *(C7519)* — ESD clamp across the data pair. **F1** — self-healing PTC on VBUS.
 - **UART0 is free** and broken out on **J6 pins 7/8** (`S3_TX` / `S3_RX`), since nothing spends it on a bridge.
-  *(The v5 first article carried a **CH340C (U3)** plus a **Q1/Q2** 2-transistor auto-reset. Its collectors were
+  *(The first article carried a **CH340C (U3)** plus a **Q1/Q2** 2-transistor auto-reset. Its collectors were
   swapped, so EN and IO0 sat on the wrong transistors: flashing needed the manual BOOT-button dance, and a tool
   asserting DTR or RTS alone could yank EN or IO0. Rather than re-wire it, the bridge and the reset circuit are
   gone entirely, 6 parts fewer and 2 fewer part numbers to source.)*
@@ -148,10 +147,10 @@ J4 and J6 are the **same connector**, so a cable fits either one. Their power pi
 Plug a cable into the wrong header and nothing dies: the module still gets correct power, and only 3V3 CMOS
 signals land in the wrong places. A mis-plugged display sees GND on its RST and just sits quietly in reset.
 
-> **⚠ v5.2 and earlier did NOT have this.** Back then J6 was `1=+5V 2=+3V3 3=GND`, so a display plugged into
-> J6 got **+5V on its VCC and +3V3 on its GND** and died instantly. If you have a v5.2 board, see
-> [docs/display.md → Header safety](../docs/display.md#header-safety-j4-vs-j6) before plugging anything in.
-> **+5V is no longer on J6** as of v6 — feed 5 V loads from your own supply.
+> **There is no +5V on J6** — feed 5 V loads from your own supply. Dropping it is what lets both
+> headers share one power layout, and there was no free non-strapping GPIO left for a 7th signal
+> anyway, so pin 9 became a second ground. See
+> [docs/display.md → Header safety](../docs/display.md#header-safety-j4-vs-j6).
 
 ---
 
@@ -288,7 +287,7 @@ fee. A complete, assembled prototype lands well under typical hobby budgets.
 > **Design-complete, fully validated, and the first spin is being fabricated.** Not yet bench-tested on
 > real hardware, so treat this first spin as a prototype.
 
-The v5 board (two isolated DMX universes + PoE, **119 × 79 mm**, 4 corner plated M3 mounting holes) is
+The board (two isolated DMX universes + PoE, **119 × 79 mm**, 4 corner plated M3 mounting holes) is
 **fully routed** (0 unrouted, 0 unconnected) and passes the scripted validation:
 
 - **DRC:** 3 clearance waivers only (2× W5500 0.5 mm-pitch escapes at 0.174 mm, USB-C CC2 at 0.160 mm),
@@ -312,9 +311,9 @@ See **VALIDATION.md** for the full matrix. Open items to confirm before fab (non
 
 ### Firmware support
 
-Both board-specific firmware features ship in the released **`esp32s3dev`** build (the v5 has no
+Both board-specific firmware features ship in the released **`esp32s3dev`** build (the board has no
 dedicated env — it is an ESP32-S3 + W5500 with a fixed pin map; flash that build and pick the
-**LuxDMX v5** board template in `/config`). See [platformio.ini](../platformio.ini). Built on
+**LuxDMX v6** board template in `/config`). See [platformio.ini](../platformio.ini). Built on
 **arduino-esp32 v3 / ESP-IDF 5.5**:
 
 - [x] **W5500 SPI-Ethernet driver.** `ETH.begin(ETH_PHY_W5500, …)` registers the W5500 as an lwIP

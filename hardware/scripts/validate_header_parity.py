@@ -4,7 +4,7 @@ J4 and J6 are the SAME JST SH 1.0mm 9-pin part, so a cable physically plugs into
 one. That is not going to change (both want pre-crimped SH cables), so the pinouts have to
 be the thing that makes a swap harmless.
 
-Up to v5.2 they were NOT: J4 was 1=+3V3 2=GND while J6 was 1=+5V 2=+3V3 3=GND. Plugging a
+They have not always agreed: an earlier spin had J4 at 1=+3V3 2=GND while J6 was 1=+5V 2=+3V3 3=GND. Plugging a
 display into J6 therefore put +5V on the module's VCC and +3V3 on its GND, which killed a
 real display on the bench. v6 re-pinned J6 to match J4 (see the J6 block in luxdmx.py).
 

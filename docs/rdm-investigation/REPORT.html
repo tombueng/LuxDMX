@@ -375,7 +375,7 @@ carries the four tapped signals to the analyzer.</figcaption>
 <tbody>
 <tr>
 <td><strong>Controller (DUT)</strong></td>
-<td>ESP32-S3 DevKitC, <code>luxdmx_v4</code> fw</td>
+<td>ESP32-S3 DevKitC, <code>luxdmx_v6</code> fw</td>
 <td>WiFi; updated over OTA</td>
 <td>TX=GPIO17, EN/RTS=GPIO8, RX=GPIO18</td>
 <td>the node under test; RDM controller on output 0</td>
@@ -1381,7 +1381,7 @@ responder exposing a drifting temperature sensor) all
 round-tripped.</li>
 <li>W5500 wired came up cleanly once the SPI clock was dropped for the
 flying-lead bench: the default 20 MHz hangs on jumper wires, 8 MHz is
-solid (<code>ethfreq</code>). On the real v4 board 20 MHz is fine.</li>
+solid (<code>ethfreq</code>). On the real LuxDMX board 20 MHz is fine.</li>
 </ul>
 <h3 id="crash-hardening-found-under-stress">11.5 Crash-hardening found
 under stress</h3>

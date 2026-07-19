@@ -3,28 +3,23 @@
 Single source of truth for "is this board safe to fabricate?" Re-run the scripts after **any**
 board change and update the table. Status: ✅ pass · ⚠️ pass-with-caveat · ❌ blocker · 🔲 needs manual/datasheet check.
 
-## 2026-07-19 — v6: J4/J6 mis-plug fix (breaking pinout change)
+## 2026-07-19 — J4/J6 mis-plug safety
 
-**Why the MAJOR bump:** J6's pinout changed incompatibly, so a v5.2 expansion cable does not fit a v6
-board. That is the versioning scheme's definition of MAJOR (`scripts/hw_version.py`).
+J4 (display) and J6 (expansion) are the same JST SH 9-pin connector, sitting 9mm apart, so a cable
+plugs into either. An earlier spin had their power pins disagreeing, and plugging a display into J6
+fed it **+5V on VCC and +3V3 on GND**. That killed a display on the bench — the fix below is
+reactive, not theoretical.
 
-J4 (display) and J6 (expansion) are the same JST SH 9-pin connector, sitting 9mm apart. Their power pins
-used to disagree, and plugging a display into J6 fed it **+5V on VCC and +3V3 on GND**. That killed a
-display on the bench — this fix is reactive, not theoretical.
-
-- **J6 re-pinned** `1=+5V 2=+3V3 3=GND 4..9=sig` → **`1=+3V3 2=GND 3..8=sig 9=GND`**, matching J4's power
-  pins. A swapped cable can now only shuffle 3V3 CMOS signals, which both sides survive.
-- **J6, not J4, moved.** Whichever header changes invalidates its cables, and J6's pinout was only
-  introduced in v5.2 with nothing built against it, while J4 display cables are in active use. Changing J4
-  would have put +5V on old display cables all over again.
-- **+5V is gone from J6**, and pin 9 is a **2nd GND**, not a 7th GPIO: the module has no free
+- **Both headers carry `1=+3V3 2=GND`.** A swapped cable can now only shuffle 3V3 CMOS signals,
+  which both sides survive.
+- **+5V is not on J6**, and pin 9 is a **2nd GND**, not a 7th GPIO: the module has no free
   non-strapping GPIO left (IO3/IO45/IO46 are all strapping). The extra return also means a mis-plugged
   display lands RST on GND and sits harmlessly in reset.
-- **New HARD gate 8**, `scripts/validate_header_parity.py`, re-checks the invariant on the board every run.
-  Proven against the v5.2 board: it fails on exactly pins 1 and 2.
+- **HARD gate 8**, `scripts/validate_header_parity.py`, re-checks the invariant on the board every run.
+  Verified to catch the real defect: fed the old layout it fails on exactly pins 1 and 2.
 - **Surgical re-route, not a board-wide one.** Every J6 signal slid exactly one 1.00mm pitch, 45° geometry
   preserved, long hauls to the S3 untouched. **0 unrouted, 0 DRC**, and the pre-existing C12 placement
-  warning (6.9mm) is byte-identical to the v5.2 baseline.
+  warning (6.9mm) is unchanged from the previous baseline.
 
 **Overall verdict (2026-07-01, re-routed on a new placement + full re-validation, all 7 hard gates pass):
 DESIGN-COMPLETE, fab-ready as a first-spin PROTOTYPE, not production-proven.** Electrically sound, **0 unrouted / 0 schematic-parity / 0 DRC errors**
@@ -113,7 +108,7 @@ bash validate_all.sh    # 8-gate production verdict + exit code (connectivity/DR
 
 | # | Item | Status | Method | Result / action |
 |---|------|--------|--------|-----------------|
-| 1 | Routing complete (MACHINE-ENFORCED) | ✅ | `scripts/validate_connectivity.py` (kicad-cli DRC `unconnected_items`), wired into scripts/gen_gerbers.py + scripts/gen_cpl.py | **v4.01: 0 unrouted, machine-verified.** The gate ABORTS any fab export while a single net is unrouted; it caught **C17** (stranded INSIDE the DMX2 isolation void, planes cut away -> unconnectable). v4.01 (2026-06-28): C17 moved to the buck + via-in-pad; **bias R20-R23** placed + **re-routed by Freerouting on F.Cu only** (0 signal B.Cu, so the iso GND pour is not cut), and **122 GNDISO/GNDISO2 stitch vias** reconnect the F-pour fragments to the solid B-pour. **Isolation verified: 0 island-net copper leaves its island.** EN/IO0 preserved from HEAD (digital side locked, not re-routed). **0 DRC errors** after the 2026-06-29 hardening (the W5500 fan-out + USB-C CC2 fine-pitch near-misses resolved by the 0.15mm Default clearance). Fab package regenerated. |
+| 1 | Routing complete (MACHINE-ENFORCED) | ✅ | `scripts/validate_connectivity.py` (kicad-cli DRC `unconnected_items`), wired into scripts/gen_gerbers.py + scripts/gen_cpl.py | **0 unrouted, machine-verified.** The gate ABORTS any fab export while a single net is unrouted; it caught **C17** (stranded INSIDE the DMX2 isolation void, planes cut away -> unconnectable). C17 was moved to the buck + via-in-pad; **bias R20-R23** placed + **re-routed by Freerouting on F.Cu only** (0 signal B.Cu, so the iso GND pour is not cut), and **122 GNDISO/GNDISO2 stitch vias** reconnect the F-pour fragments to the solid B-pour. **Isolation verified: 0 island-net copper leaves its island.** EN/IO0 preserved from HEAD (digital side locked, not re-routed). **0 DRC errors** after the 2026-06-29 hardening (the W5500 fan-out + USB-C CC2 fine-pitch near-misses resolved by the 0.15mm Default clearance). Fab package regenerated. |
 | 1b | 4-layer power stackup | ✅ | rebuild_iso (In1=GND, In2=+3V3 LT_POWER) | signals F/B only, planes solid; +3V3/GND pads stitched to planes |
 | 2 | DRC (electrical) | ✅ | kicad-cli pcb drc | **0 shorts, 0 clearance errors.** The 3 fine-pitch near-misses (W5500 0.5mm QFN + USB-C CC2, 0.16-0.174mm) resolved by setting Default clearance 0.2 -> 0.15mm; re-route to 0.2mm is geometrically impossible at 0.5mm pitch, 0.15mm still 68% over JLC's 0.0889mm min |
 | 3 | DRC (silk cosmetic) | ⚠️ | kicad-cli pcb drc | **46 cosmetic** silk warnings (24 overlap / 16 edge / 6 over-copper) after `scripts/normalize_silk.py` re-placed 89 ref-des clear of pads/silk (down from 62). The rest are dense-area ref-on-ref, refs near the edge (J*/MH* not moved) and the informative back-silk tables; fab auto-clips silk off pads/edges = no functional or fab impact. Accepted |
@@ -137,7 +132,7 @@ bash validate_all.sh    # 8-gate production verdict + exit code (connectivity/DR
 | 27 | PoE TVS margin | ✅ | datasheet | **FIXED**: D10 SMAJ58A→**SMAJ60A** (58V standoff was only 1V over 57V max) |
 | 28 | Every part rating/value/datasheet | ✅/⚠️ | 4-agent datasheet pass | see **VALIDATION_REPORT.md**: all active parts + crystal + connectors read from official datasheets; ratings/values recomputed. 3 fixes applied, open items listed. |
 | 29 | ESP32-S3 GPIO map | ✅ | datasheet | **every pin validated, zero must-change**. IO35/36/37 carry `EXP_IO35/36/37` and stay valid on the **N8R2**: its PSRAM is **quad**, which does not touch GPIO33–37 (only **octal** R8 parts wire those to memory). Strapping safe, no flash/input-only conflict, UART/SPI routable, IO19/20 native-USB noted |
-| 30 | J4/J6 mis-plug safety (MACHINE-ENFORCED) | ✅ | **`scripts/validate_header_parity.py`** (HARD gate 8 in validate_all.sh) | **v6 fix for a defect that destroyed hardware.** J4 (display) and J6 (expansion) are the same JST SH 9-pin part, so a cable fits either. Up to v5.2 their power pins disagreed (J4 `1=+3V3 2=GND`, J6 `1=+5V 2=+3V3 3=GND`): plugging a display into J6 put **+5V on its VCC and +3V3 on its GND** and killed it on the bench; the reverse returned an expansion board's ground current through IO4. **J6 re-pinned to `1=+3V3 2=GND 3..8=signals 9=GND`** so both headers share one power layout, **+5V removed from J6** (no free non-strapping GPIO remained for a 7th signal — only IO3/IO45/IO46, all strapping — so pin 9 became a 2nd return, which also lands a mis-plugged display's RST on GND = harmlessly held in reset). J6 was the header to move because nothing was built against its v5.2 pinout yet while J4 display cables are in use. The gate re-checks the invariant on the **board** each run: FATAL on two different rails at one position or a positive rail opposite a signal; GND-vs-signal allowed (current-limited, same class as GPIO-vs-GPIO contention). **Verified to catch the real defect: run against the v5.2 board it fails on exactly pins 1 and 2.** Re-pin was surgical (each signal slid one 1.00mm pitch, 45° geometry preserved) — **0 unrouted, 0 DRC**, no board-wide re-route |
+| 30 | J4/J6 mis-plug safety (MACHINE-ENFORCED) | ✅ | **`scripts/validate_header_parity.py`** (HARD gate 8 in validate_all.sh) | **Fix for a defect that destroyed hardware.** J4 (display) and J6 (expansion) are the same JST SH 9-pin part, so a cable fits either. When their power pins disagreed, plugging a display into J6 put **+5V on its VCC and +3V3 on its GND** and killed it on the bench; the reverse returned an expansion board's ground current through IO4. **Both headers now carry `1=+3V3 2=GND`**, with signals on 3..8 and **no +5V on J6** (no free non-strapping GPIO remained for a 7th signal — only IO3/IO45/IO46, all strapping — so pin 9 became a 2nd return, which also lands a mis-plugged display's RST on GND = harmlessly held in reset). The gate re-checks the invariant on the **board** each run: FATAL on two different rails at one position or a positive rail opposite a signal; GND-vs-signal allowed (current-limited, same class as GPIO-vs-GPIO contention). **Verified to catch the real defect: fed the old layout it fails on exactly pins 1 and 2.** Re-pin was surgical (each signal slid one 1.00mm pitch, 45° geometry preserved) — **0 unrouted, 0 DRC**, no board-wide re-route |
 | 30 | SPICE power chain | ✅ | ngspice-42 (WSL) | DC + transient (sim/*.cir): with the TPS2116 mux, VCC2 ≥ 4.5V across the **whole** USB range (4.61V @ 4.70V VBUS, 65mΩ-max-over-temp case 4.59V); PoE 5.0V→4.91V ✓; load-step ok. See report §3 (margin now resolved). |
 | 20 | ESP32-S3 strapping pins | ⚠️ | schematic | IO0 pulled-up ✓; IO3/IO45/IO46 float (standard for WROOM-1, verify) |
 | 21 | ESD on USB data / DMX | ✅ | schematic | DMX has SM712 TVS ✓; **USB D+/D- now protected by U8 USBLC6-2SC6** ESD/TVS array (VBUS clamp at the connector) |
@@ -164,7 +159,7 @@ pass closed the remaining gaps and improved EMC. Full rationale + part numbers i
 - **F2-F5 Bourns TBU-CA065-200-WH (200mA/650V high-speed protector, C913221)** — series TBU per DMX data
   line for **DMX512-A Protected** (Annex C, the "fault-protected" approach). Chain: cable/XLR + breakout →
   **TBU** → SM712 TVS → choke → transceiver; a sustained 30VAC/42VDC fault makes the TBU trigger in <1µs and
-  BLOCK (650V standoff) so the SM712 only sees the sub-µs transient. v5.00 replaced the v4.01 PTC (its ms
+  BLOCK (650V standoff) so the SM712 only sees the sub-µs transient. The TBU replaced an earlier PTC (its ms
   thermal trip let ~19A through the SM712 → would cook). SPICE-confirmed (spice/sim_tbu.py); 8.6Ω×2 series is
   signal-OK (far receiver 7-10× threshold). 4.0mm cable-side creepage; board widened 20mm right to fit the
   bigger TBU + keep all 4 corner MH on GND. **Annex-C survival bench-test still pending** before the silk

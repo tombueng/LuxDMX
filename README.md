@@ -699,13 +699,12 @@ To make this idiot-proof, **Settings → Hardware board** offers:
 - **Live validation** — duplicate pins, strapping/flash/input-only pins and
   Ethernet-reserved pins are flagged in red/amber before you can save.
 
-Six boards are built into the firmware and work fully offline, covering the common
+Five boards are built into the firmware and work fully offline, covering the common
 variants (which are **not** all the same pinout):
 
 | Board | Notes |
 |---|---|
 | LuxDMX v6 | our board (ESP32-S3 + W5500); preset generated from the PCB source |
-| LuxDMX v5 | the previous revision; same GPIO map, but its J6 expansion header is wired differently (pin 1 is **+5V** there) — pick the one your silk says, see [display.md → Header safety](docs/display.md#header-safety-j4-vs-j6) |
 | ESP32 DevKitC (WROOM-32, 38-pin) | breaks out the flash pins too |
 | ESP32 DevKit v1 (DOIT, 30-pin) | narrower, no flash pins on the header |
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
@@ -840,16 +839,11 @@ Mono panels are 1-bit — white, blue and yellow/blue-split versions all behave 
 (the colour is the physical emitter, not addressable). The I²C address is auto-detected
 (`0x3C` / `0x3D`). SPI colour panels need ~5 pins, so they only fit the non-Ethernet boards.
 
-> **⚠ Using a LuxDMX board v5.2 or older? Check which header you're plugging into.** Those boards have
-> two identical JST SH 9-pin headers side by side, **J4 (display)** and **J6 (expansion)**, whose power
-> pins do *not* match. Putting the display on J6 feeds it **+5V on VCC and +3V3 on GND** and kills it
-> instantly. v6 gave both headers the same power pins so a mix-up is harmless, but on an older board
-> it isn't — [docs/display.md → Header safety](docs/display.md#header-safety-j4-vs-j6) explains how to
-> key your cables so it can't happen.
->
-> Pick the board template that matches the silk on your board (**LuxDMX v5** or **LuxDMX v6**) under
-> Settings → Pins. They're listed separately because their J6 pinout really is different, so the
-> picker shows you the pinout you actually have rather than the one you wish you had.
+> **Two identical headers, and either cable fits.** The board has **J4 (display)** and **J6
+> (expansion)** side by side, same JST SH 9-pin part. They deliberately share the same power pins
+> (`1=+3V3 2=GND`), so plugging a cable into the wrong one does nothing worse than leave the display
+> sitting in reset. A hard validator fails the fab export if that ever stops being true —
+> [docs/display.md → Header safety](docs/display.md#header-safety-j4-vs-j6).
 
 ### Settings (Settings → Display)
 
