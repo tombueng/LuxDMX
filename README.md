@@ -601,7 +601,7 @@ values are fetched as JSON.
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
 | `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
-| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, `board`/`mcu` id, etc.) |
+| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
@@ -684,7 +684,10 @@ To make this idiot-proof, **Settings → Hardware board** offers:
 
 - **Templates** — pick your board and click **Apply template** to fill every LED /
   display / DMX pin with the tested map in one step. Selecting the *LuxDMX v5*
-  board applies the exact pin map of the open-hardware PCB.
+  board applies the exact pin map of the open-hardware PCB. Your pick is saved with
+  the rest of the settings, so it survives reboots and firmware updates. The v5 runs
+  the generic ESP32-S3 firmware and can't be told apart from a DevKit by the firmware
+  alone, so the page trusts what you picked over what it detects.
 - **Click pins on a board diagram** — the pick button next to each GPIO field opens an
   interactive board so you click the actual pin instead of guessing GPIO numbers. The
   diagram colour-codes pins (free / caution / do-not-use) and shows your current

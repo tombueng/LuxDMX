@@ -2149,7 +2149,8 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"subnet\":\"";   j += cfg.subnet;             j += "\",";
     j += "\"dns\":\"";      j += cfg.dns;                j += "\",";
     j += "\"autoUpdate\":"; j += cfg.autoUpdate ? "true" : "false"; j += ",";
-    j += "\"board\":\"";    j += BOARD_ID;               j += "\",";
+    j += "\"board\":\"";    j += BOARD_ID;               j += "\",";   // DETECTED (compile-time) board id
+    j += "\"boardSel\":\""; j += jsonEsc(cfg.boardSel);  j += "\",";   // board the user PICKED in /config ("" = never picked)
     j += "\"mcu\":\"";      j += MCU_ID;                 j += "\"";
     j += "}";
     sendJsonSafe(req, j);

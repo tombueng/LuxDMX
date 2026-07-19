@@ -48,7 +48,7 @@ They always restore the original configuration afterwards.
 
 ### Standalone config-UI tests (no device, no Playwright runner)
 
-Two behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
+Three behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
 device — run them directly with `node`, they self-report and exit non-zero on failure:
 
 ```bash
@@ -56,9 +56,13 @@ node docs/tests/v5-locks.mjs      # board detected as luxdmx_v5 -> copper pins l
                                   #   the J4 display-header pins stay editable, headers listed
 node docs/tests/v5-template.mjs   # generic S3 board -> picking the "LuxDMX v5" template fills the
                                   #   fixed pin map: W5500 SPI + LED + display + DMX pins get set,
-                                  #   panel brightness is pushed to /led/bright?...&save=1, and
-                                  #   nothing is locked (the board isn't a detected v5). This is the
-                                  #   flow a v5 owner uses now that there is no dedicated v5 build.
+                                  #   panel brightness is pushed to /led/bright?...&save=1, and the
+                                  #   v5's copper pins lock behind the pick. This is the flow a v5
+                                  #   owner uses now that there is no dedicated v5 build.
+node docs/tests/board-persist.mjs # the picked board STICKS: /info.json boardSel beats the detected
+                                  #   (compile-time) board id, the locks follow the restored pick,
+                                  #   the selector submits as board=..., "custom" stays custom, and
+                                  #   a device with no saved pick still falls back to detection
 ```
 
 ## What's covered

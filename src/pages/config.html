@@ -107,7 +107,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       <div class="card-body">
         <label class="form-label text-secondary small mb-1">Board</label>
         <div class="d-flex gap-2 flex-wrap align-items-start">
-          <select class="form-select" id="board-sel" style="max-width:340px"></select>
+          <select class="form-select" id="board-sel" name="board" style="max-width:340px"></select>
           <button type="button" class="btn btn-outline-primary" id="board-apply">Apply template</button>
           <button type="button" class="btn btn-outline-secondary" id="board-open">Show board &amp; pick pins</button>
         </div>
@@ -621,7 +621,10 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <script>
 var CURRENT = '';
-var INFO_BOARD = '', INFO_MCU = '';
+// INFO_BOARD = what the firmware DETECTED (compile-time BOARD_ID); SEL_BOARD = what the user
+// PICKED and saved (cfg.boardSel). They differ on a released LuxDMX v5: it runs the generic
+// esp32s3dev build, so it detects as "esp32s3-devkitc-1" and only the saved pick knows better.
+var INFO_BOARD = '', INFO_MCU = '', SEL_BOARD = '';
 
 function $(id){ return document.getElementById(id); }
 
@@ -794,10 +797,10 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('auto-update-sw').checked = !!d.autoUpdate;
   updNetMode(); updLedPin(); updDispPins(); updHostUrl();
   $('save-btn').disabled = false;
-  INFO_BOARD = d.board || ''; INFO_MCU = d.mcu || '';
+  INFO_BOARD = d.board || ''; INFO_MCU = d.mcu || ''; SEL_BOARD = d.boardSel || '';
   initBoards();
   loadVersions();
-}).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; INFO_BOARD=''; INFO_MCU=''; initBoards(); loadVersions(); });
+}).catch(function(){ buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]); $('save-btn').disabled = false; INFO_BOARD=''; INFO_MCU=''; SEL_BOARD=''; initBoards(); loadVersions(); });
 
 // Bootstrap-styled confirm/info dialog (no Bootstrap JS dependency).
 // opts: {title, body, okText, okClass, cancel:false}  ->  Promise<bool>
@@ -1676,10 +1679,31 @@ function loadRemoteCatalog(){
 }
 
 // ---- Init (called from the /info.json loader) ------------------------------
+// Point the board <select> at `id`, falling back to `alt` when that board isn't on offer.
+// A saved catalog board has no <option> until its descriptor is fetched, so sit on the
+// fallback and upgrade once it lands (offline: the fallback just stays).
+function setBoardSel(id, alt){
+  var sel = $('board-sel');
+  id = id || alt || 'custom';
+  if (BOARDS[id] && mcuMatch(BOARDS[id].mcu)) appendBoardOption(id, BOARDS[id].name);
+  sel.value = id;
+  if (sel.value === id) return;
+  sel.value = alt || 'custom';
+  if (id === 'custom' || BUILTINS.indexOf(id) >= 0) return;
+  ensureBoard(id, function(ok){
+    if (!ok || !mcuMatch(BOARDS[id].mcu)) return;
+    appendBoardOption(id, BOARDS[id].name);
+    sel.value = id;
+    updBoardButtons(); applyHardwiredLocks(); validate();
+  });
+}
 function initBoards(){
   buildBoards();
   fillBoardSelect();
-  $('board-sel').value = BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom';
+  // The SAVED pick wins over detection. The compile-time board id is only the fallback for a
+  // device that has never had a board picked, because it can't tell a v5 from a bare DevKitC.
+  setBoardSel(SEL_BOARD || (BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom'),
+              BOARDS[INFO_BOARD] ? INFO_BOARD : 'custom');
   $('board-detected').textContent = INFO_BOARD ? ('detected: ' + INFO_BOARD + (INFO_MCU ? (' / ' + INFO_MCU) : '')) : '';
   decorateAllPins();
   // re-render the open picker (and re-sync the modal select) after a board change

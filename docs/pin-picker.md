@@ -67,12 +67,20 @@ boards and manual GPIO entry still work; catalog fetch failures degrade silently
 
 The **LuxDMX v5** has no dedicated build — it runs the released `esp32s3dev` firmware (so it reports
 `esp32s3-devkitc-1`) and gets its fixed pin map from the **LuxDMX v5** board template applied in
-`/config`. Only a source build with the `-DBOARD_LUXDMX_V5` escape hatch reports `luxdmx_v5` and
-activates the copper-pin locks.
+`/config`. Only a source build with the `-DBOARD_LUXDMX_V5` escape hatch reports `luxdmx_v5` from
+detection alone.
 
-If the id matches a descriptor, the board is preselected; otherwise the page falls back
-to **Custom**, which still validates against the chip family rules for `mcu`. The board
+Detection is only the **fallback**, because it is compile-time and can't tell a v5 from a bare
+DevKitC. The board you pick is saved on the device (config key `board`, reported back as
+`/info.json` `boardSel`) when you hit Save, and that saved pick is what the dropdown restores on
+every later visit, so a reboot or a firmware update no longer drops it back to the detected board.
+`Custom / manual` is a real choice too, so it sticks instead of snapping to detection. Only a
+device that has never had a board picked falls back to the detected id, and if that matches no
+descriptor, to **Custom**, which still validates against the chip family rules for `mcu`. The board
 can also be switched from a dropdown inside the pin-picker popup itself.
+
+The pick is UI state: the firmware itself never reads it, it only stores it. Copper-pin locks and
+the diagram follow it (see below), nothing else does.
 
 ## Validation rules
 

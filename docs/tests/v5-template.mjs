@@ -3,14 +3,16 @@
 // The v5 has no dedicated firmware any more: a v5 owner flashes the generic esp32s3dev
 // build (which reports board "esp32s3-devkitc-1") and picks the "LuxDMX v5" template in
 // /config to get the fixed pin map. This test drives that exact flow in a real browser
-// against a stub device that reports the GENERIC board (so no copper-pin locks apply),
-// selects the v5 template, applies it, and asserts:
+// against a stub device that reports the GENERIC board, selects the v5 template, applies
+// it, and asserts:
 //   * the W5500 SPI pins get set (the gap that made "just document it" not work — the
 //     preset used to omit them, so the picked template left a board with no Ethernet)
 //   * the LED, display and DMX-output pins get set
 //   * the tuned panel brightness is pushed to /led/bright?...&save=1 (it is not a config-
 //     form field, so it can't ride along on Save)
-//   * fields stay EDITABLE (the board isn't detected as a v5, so nothing is locked)
+//   * the v5's copper pins are then LOCKED. Picking the board is a statement about the
+//     hardware in front of you, so the locks follow the pick, not the (compile-time, and
+//     here wrong) detection. The Advanced unlock is the escape hatch for a reworked board.
 //
 // Run:  node docs/tests/v5-template.mjs     (from the repo root)
 import http from 'node:http';
@@ -22,8 +24,8 @@ import { chromium } from 'playwright';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CONFIG = fs.readFileSync(path.join(ROOT, 'src/pages/config.html'), 'utf8').replace(/__FWVER__/g, 'test');
 
-// A generic S3 with the W5500 driver compiled in (ethSpi) — i.e. the released esp32s3dev
-// build running on a v5. It reports the DevKitC id, so the picker does NOT lock anything.
+// A generic S3 with the W5500 driver compiled in (ethSpi), i.e. the released esp32s3dev
+// build running on a v5. It reports the DevKitC id, so only the user's pick knows better.
 const INFO = {
   hostname: 'luxdmx', ip: '192.168.1.42', version: 'test', board: 'esp32s3-devkitc-1', mcu: 'esp32s3',
   universe: 0, protocol: 2, useEthernet: false, ethSpi: true, ethRmii: false, hasEth: true, wifiMode: 0,
@@ -97,8 +99,8 @@ try {
   fails += check('dispsda=4', r.dispsda.value === '4');
   fails += check('output A tx=17 rts=8', r.o0_tx.value === '17' && r.o0_rts.value === '8');
   fails += check('output B tx=16 rts=47', r.o1_tx.value === '16' && r.o1_rts.value === '47');
-  // NOT locked — the board is a generic DevKitC, so the applied fields stay editable
-  fails += check('ethcs stays editable (not a detected v5, no lock)', r.ethcs.found && !r.ethcs.disabled);
+  // Locked: the pick says "this IS a v5", so its copper pins stop being editable
+  fails += check('ethcs is locked once the v5 is picked', r.ethcs.found && r.ethcs.disabled);
   // brightness pushed to the endpoint, persisted
   fails += check('fired /led/bright with the tuned duty (g=8, w=17, save=1)',
     !!ledBrightHit && /(^|&)g=8(&|$)/.test(ledBrightHit) && /(^|&)w=17(&|$)/.test(ledBrightHit) && /(^|&)save=1(&|$)/.test(ledBrightHit));
