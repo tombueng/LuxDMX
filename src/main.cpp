@@ -4407,7 +4407,6 @@ static void startWiFiStation() {
     }
     WiFi.mode(WIFI_STA);   // also brings up the WiFi driver so esp_wifi_get_config() works
     WiFi.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) so the router resolves the name
-#ifndef SIM_WIFI
     // Upgrade path: pull creds out of the old WiFiManager WiFi-NVS into our cfg, once.
     if (cfg.wifiSsid.length() == 0) migrateWifiCredsFromNvs();
     // First-run / BOOT-held → the setup portal (open SoftAP + captive page). Never opens
@@ -4418,24 +4417,9 @@ static void startWiFiStation() {
         startSetupPortal();
         return;   // setup() registers the web routes; the portal serves them
     }
-#endif
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
     setLedColor(NEO_WHITE, true);   // connecting to stored WiFi (white = working; blue is RDM)
-#ifdef SIM_WIFI
-    // Simulation only (Wokwi): the setup portal can't be reached from the host, so join
-    // Wokwi's open virtual AP directly. Never compiled into a real build — guarded by the
-    // SIM_WIFI flag set in [env:wokwi].
-    (void)forcePortal;
-    Serial.print("[SIM] joining Wokwi-GUEST");
-    WiFi.begin("Wokwi-GUEST", "");
-    { uint32_t t = millis();
-      while (WiFi.status() != WL_CONNECTED && millis() - t < 20000) {
-          bootConnectingLed();   // 5-LED: Knight-Rider sweep; single LED: blue blink
-          delay(200); Serial.print(".");
-      } }
-    Serial.println();
-#else
     // Join the stored network. We keep our own creds (cfg.wifiSsid/wifiPsk) now — the old
     // build let WiFiManager stash them in the ESP32 WiFi NVS.
     applyStaStaticIp();
@@ -4459,7 +4443,6 @@ static void startWiFiStation() {
     // distant one on a mesh. Explicitly scan and hop to the strongest AP for our SSID on
     // every boot (also logs all APs for diagnostics).
     connectStrongestAP();
-#endif  // SIM_WIFI
     // Disable WiFi power save: with modem-sleep the station misses buffered
     // multicast (sACN) and IGMP queries, causing periodic ~0.3-0.5s reception
     // gaps. WIFI_PS_NONE keeps the radio awake for reliable multicast.
@@ -4683,40 +4666,6 @@ void setup() {
     Serial.println("[BOOT] ready.");
 }
 
-#ifdef SIM_ARTNET
-// ---------------------------------------------------------------------------
-// Simulation only (Wokwi): synthesize a moving Art-Net test pattern so the
-// whole input pipeline — sender tracking, change log, fps/jitter, WS push and
-// the 40 Hz DMX output — runs without an external console. A bright "head"
-// sweeps across the universe with a soft trail; channel 1 breathes on a sine.
-// Feeds the exact same routeFrame() path a real Art-Net packet would. Guarded
-// by SIM_ARTNET (set in [env:wokwi]); never compiled into a real build.
-// ---------------------------------------------------------------------------
-static void simArtnetTick() {
-    static uint32_t last = 0;
-    uint32_t now = millis();
-    if (now - last < 25) return;            // ~40 Hz, like a lighting console
-    last = now;
-
-    static uint8_t frame[512];
-    memset(frame, 0, sizeof(frame));
-    uint16_t head = (now / 40) % 512;       // sweeps ~25 channels/sec
-    frame[head] = 255;
-    if (head >= 1)        frame[head - 1] = 120;   // trailing edge
-    if (head + 1 < 512)   frame[head + 1] = 120;   // leading edge
-    frame[0] = (uint8_t)(127.0f + 127.0f * sinf(now / 500.0f));  // ch1 breathe
-
-    routeFrame(0, frame, 512, (uint32_t)IPAddress(10, 13, 37, 1), 0, DEFAULT_PRIORITY);
-
-    static uint32_t lastLog = 0;
-    if (now - lastLog >= 1000) {            // 1 Hz proof-of-life on the console
-        lastLog = now;
-        Serial.printf("[SIM] artnet pattern: head=ch%u ch1=%u fps=%.1f\n",
-                      head + 1, frame[0], fps);
-    }
-}
-#endif
-
 // ---------------------------------------------------------------------------
 // Network receive task -- runs on CORE 0, the network core. This is the other half
 // of the issue #64 fix: it takes Art-Net / sACN receive (artnet.read / readSacn) and
@@ -4782,10 +4731,6 @@ void loop() {
         g_bqDirty = false;
         prefs.begin(PREF_NS, false); prefs.putUChar("bqpolicy", g_bqPolicy); prefs.end();
     }
-
-#ifdef SIM_ARTNET
-    simArtnetTick();
-#endif
 
     uint32_t now = millis();
 

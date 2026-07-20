@@ -282,7 +282,6 @@ lib_deps =
 [env:esp32dev]    build_flags = … -DDEF_DISP_SDA=21 -DDEF_DISP_SCL=22
 [env:esp32s3dev]  build_flags = … -DDEF_DISP_SDA=8  -DDEF_DISP_SCL=9
 [env:wt32eth01]   build_flags = … -DDEF_DISP_SDA=14 -DDEF_DISP_SCL=15
-[env:wokwi]       build_flags = … -DDEF_DISP_SDA=8  -DDEF_DISP_SCL=9   # + diagram.json SSD1306
 ```
 
 `dispType` stays `0` by default in all envs; the user enables the panel from `/config`.
@@ -300,9 +299,6 @@ cases + a larger-font layout. Out of scope for issue #5's first cut.
 
 ## 8. Verification plan
 
-- **Wokwi**: add a `board-ssd1306` part to [`diagram.json`](../diagram.json) on the `wokwi`
-  env's SDA/SCL → status screen + auto-rotate render in simulation (alongside `SIM_ARTNET`) with
-  no hardware. (Wokwi has no SSD1351 part, so the **color panel is verified on hardware.**)
 - **Hardware**: the **Retoo SH1106** on `esp32dev`/`esp32s3dev` (I²C 21/22 or 8/9) → mono path,
   address probe, rotation; the **DollaTek SSD1351** on SPI → color path, status palette; trigger
   the conflict banner by pointing two Art-Net sources at one universe.
@@ -317,7 +313,7 @@ cases + a larger-font layout. Out of scope for issue #5's first cut.
    + boot splash; `dispType 4` (SSD1351) with a `GFXcanvas16` double-buffer; per-board `DEF_DISP_*`.
 3. ✅ `displayTask()` + status screen (height-aware 128×32 / 128×64 / 128×128 hero layouts).
 4. ✅ Auto-rotate banners (conflict / identify / manual) with priority + dwell; colour status palette.
-5. ✅ Wokwi `diagram.json` SSD1306 + README "Display" section + rendered `display-preview.png`.
+5. ✅ README "Display" section + rendered `display-preview.png`.
 
 **Remaining:** on-hardware bring-up of the mono panels and the colour/SPI path; optional §7 TFT
 support (verify colour/SPI on an existing TFT instead of buying an SSD1351).
