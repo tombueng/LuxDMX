@@ -141,7 +141,7 @@ peripheral, `dmx_rmt.h`, so it is hardware-timed and never corrupts even while R
   merge control), and the `artTodReqs` / `artRdmReqs` / `artFlushes` / `artPolls` counters alongside
   the device TOD. The RDM tab shows a **Merge** selector per universe (off/HTP/LTP) that both sets the
   mode (`GET /rdm/merge?out=<i>&mode=<0/1/2>`) and reflects changes made from a console over Art-Net.
-- Only built into the `DMX_RMT` (esp_dmx-free) firmware path, which is every hardware env.
+- Built into every firmware env; there is only one DMX/RDM path now.
 
 ### Remote configuration over Art-Net (`ArtAddress`)
 
@@ -210,6 +210,12 @@ or a small host-side Art-Net relay that bridges the WSL subnet to the LAN.
 > "enable" GPIO**.
 
 ---
+
+> **Everything below this line is the original research and plan**, written before any of it was
+> built. It is kept because the hardware survey and the interop notes are still useful, but it
+> talks about `esp_dmx` in the present tense and that is no longer true: DMX and RDM are both
+> ours now (`dmx_rmt.h`, `rdm_rmt.h`, `rdm_types.h`) and the library is gone from the project.
+> For what actually shipped, read the sections above.
 
 ## What RDM can do
 

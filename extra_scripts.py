@@ -61,69 +61,6 @@ def binary_to_header(path: pathlib.Path, out_dir: pathlib.Path, type_suffix: str
     out.write_text(h, encoding="utf-8")
     print(f"  [embed] {path.name} -> {out.name}  ({len(data)} bytes)")
 
-def patch_esp_dmx():
-    """Patch esp_dmx 4.1.0 so it builds + runs on arduino-esp32 v3 (ESP-IDF 5.5).
-
-    Three fixes, all in dmx/hal/uart.c, all idempotent:
-
-    1. UART2 crash. dmx_uart_context[] guards the UART2 entry with
-       `#if DMX_NUM_MAX > 2`, but DMX_NUM_MAX is an *enum* constant — invisible to
-       the preprocessor, which reads it as 0 — so `0 > 2` is false and the UART2
-       entry is never compiled, even though the array is sized for it. Result:
-       dmx_uart_context[2].dev is NULL and installing a driver on port 2 panics
-       (LoadProhibited). The array's own size and types.h both use the real macro
-       SOC_UART_NUM, so rewrite the guard to match.
-
-    2. ESP-IDF 5.x removed the `.module` member of uart_periph_signal[] (the
-       periph_module_t per UART), so esp_dmx fails to compile on the v3 framework
-       ("'uart_signal_conn_t' has no member named 'module'"). periph_module_
-       enable/reset/disable still exist, so pass the module enum directly:
-       PERIPH_UART0_MODULE + dmx_num (PERIPH_UART0/1/2_MODULE are consecutive in
-       soc/periph_defs.h, matching what the removed field used to hold).
-
-    3. Fresh-boot Art-Net brick (issue #34). On a fresh board the TX ISR can fire
-       with a corrupt driver->dmx_num (a stomp on the heap-allocated driver struct
-       that only turns fatal in the release binary's memory layout). It then indexes
-       past the 3-entry dmx_uart_context[] and writes to a garbage UART base
-       (0x40000000) -> LoadStoreError boot loop on the first Art-Net frame. Drop any
-       ISR entry whose dmx_num is out of range instead of dereferencing junk. This is
-       a safety net; the underlying stomp still wants a root fix.
-    """
-    libdeps = pathlib.Path(env.subst("$PROJECT_LIBDEPS_DIR")) / env.subst("$PIOENV")
-    uart_c = libdeps / "esp_dmx" / "src" / "dmx" / "hal" / "uart.c"
-    if not uart_c.exists():
-        print(f"  [patch] esp_dmx uart.c not present yet — skipped ({uart_c})")
-        return
-    text = original = uart_c.read_text(encoding="utf-8")
-
-    text = text.replace("#if DMX_NUM_MAX > 2", "#if SOC_UART_NUM > 2")
-
-    # Fix 3 (issue #34): guard the TX/RX ISR against a corrupt driver->dmx_num so it
-    # cannot index past dmx_uart_context[] and dereference a garbage UART base.
-    guard = "if (dmx_num < 0 || dmx_num >= DMX_NUM_MAX) return;"
-    if guard not in text:
-        text = text.replace(
-            "  const dmx_port_t dmx_num = driver->dmx_num;\n",
-            "  const dmx_port_t dmx_num = driver->dmx_num;\n"
-            "  " + guard + "  // issue #34: drop a stray ISR with an out-of-range dmx_num\n",
-            1)
-
-    for old, new in [
-        ("periph_module_enable(uart_periph_signal[dmx_num].module)",
-         "periph_module_enable((periph_module_t)(PERIPH_UART0_MODULE + dmx_num))"),
-        ("periph_module_reset(uart_periph_signal[dmx_num].module)",
-         "periph_module_reset((periph_module_t)(PERIPH_UART0_MODULE + dmx_num))"),
-        ("periph_module_disable(uart_periph_signal[uart->num].module)",
-         "periph_module_disable((periph_module_t)(PERIPH_UART0_MODULE + uart->num))"),
-    ]:
-        text = text.replace(old, new)
-
-    if text != original:
-        uart_c.write_text(text, encoding="utf-8")
-        print("  [patch] esp_dmx uart.c: UART2 guard + IDF5 periph_module + dmx_num ISR guard applied")
-    else:
-        print("  [patch] esp_dmx uart.c: already patched")
-
 def generate_config_templates(root: pathlib.Path, gen_dir: pathlib.Path):
     """Embed templates/*.ini into src/generated/config_templates.gen.h (the board
     default values the config engine applies). Single source of truth = the .ini
@@ -155,7 +92,6 @@ def generate():
     gen_dir = root / "src" / "generated"
     gen_dir.mkdir(exist_ok=True)
     print("LuxDMX: generating embedded assets...")
-    patch_esp_dmx()
     generate_config_templates(root, gen_dir)
     version = generate_version(gen_dir)
     # The shared navbar fragment (name starts with "_") is injected into every page, not served.

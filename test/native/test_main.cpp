@@ -46,7 +46,6 @@ static void checkBoard(const char* name) {
 
     std::string b = name;
     if (b == "esp32s3dev") { ledPin = 48; ledType = 2; dispSda = 8; dispScl = 9; }
-    else if (b == "wokwi") { ledPin = 48; ledType = 2; dispType = 1; dispSda = 8; dispScl = 9; }
     else if (b == "wt32eth01") { o0tx = 4; o0rx = 5; dispSda = 14; dispScl = 15; useEth = true; wiredPhy = 1; }
     else if (b == "luxdmx_v6") {
         ledType = 3; ledR = 1; ledG = 2; ledY = 6; ledB = 7; ledW = 15;
@@ -157,7 +156,6 @@ int main() {
     checkBoard("esp32dev");
     checkBoard("esp32s3dev");
     checkBoard("wt32eth01");
-    checkBoard("wokwi");
     checkBoard("luxdmx_v6");
 
     // 7) serial console grammar (cfgserial::execute), all schema-driven
