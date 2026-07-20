@@ -2095,6 +2095,10 @@ function lockDesc(){ return currentBoardDesc() || detectedDesc(); }
 function applyHardwiredLocks(){
   document.querySelectorAll('.fixed-field').forEach(function(el){ el.classList.remove('fixed-field'); el.disabled = false; });
   document.querySelectorAll('input.fixed-mirror').forEach(function(el){ el.remove(); });
+  // ...and give every pick button back. Locking hides them; without this they stayed hidden
+  // after switching to another board or ticking the Advanced unlock, so the field went
+  // editable but you could no longer pick its pin off the diagram until a reload.
+  document.querySelectorAll('.pin-grp .pin-pick').forEach(function(el){ el.style.display = ''; });
   var b = lockDesc(); var hw = b && b.hardwired; if (!hw) return;
   if (fixedUnlocked()) return;   // Advanced unlock: leave the fixed pins editable for a reworked board
   hw.forEach(function(e){
