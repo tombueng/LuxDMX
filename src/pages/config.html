@@ -759,6 +759,27 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
         </form>
       </div>
 
+      <hr style="border-color:#30363d">
+
+      <div>
+        <div class="fw-semibold small mb-1">Install from a URL</div>
+        <p class="text-secondary small mb-2">
+          Point the device at a <code>.bin</code> it can reach and let it fetch the file itself.
+          Unlike the upload above, the device reboots first and downloads with a fresh, unfragmented
+          heap, so this still works on a box that has been running a long time and refuses an upload
+          partway through. Prefer <code>http://</code>: an <code>https://</code> handshake needs
+          about 50 KB of contiguous memory, which is usually the very thing you have run out of.
+        </p>
+        <form method="POST" action="/ota/url" class="d-flex gap-2 align-items-center flex-wrap">
+          <input type="url" name="url" id="ota-url" placeholder="http://192.168.1.20:8000/firmware.bin"
+                 class="form-control form-control-sm" style="max-width:380px"
+                 oninput="document.getElementById('ota-url-btn').disabled = !/^https?:\/\/\S+$/.test(this.value)">
+          <button type="submit" class="btn btn-outline-secondary btn-sm" id="ota-url-btn" disabled>
+            Fetch &amp; Flash
+          </button>
+        </form>
+      </div>
+
     </div>
   </div>
 

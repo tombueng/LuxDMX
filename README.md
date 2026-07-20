@@ -465,6 +465,14 @@ pio run --target upload
 ### OTA Updates (after first flash)
 
 - **From browser:** open `http://dmx-gateway.local/config` → Firmware Update section → upload a `.bin` file or click "Update from LuxDMX.org". (The home page also has an **Update** button when a newer release is out, which installs the latest straight away.)
+- **From a URL (works when the upload doesn't):** same section → **Install from a URL**. The device reboots and fetches the file itself with a fresh heap, instead of you pushing it into a running system. That matters because a gateway that has been up a while fragments its heap, and a push upload can then die partway with nothing but a dropped connection to show for it. Serve your build off the machine you built it on and paste the URL:
+
+  ```bash
+  cd .pio/build/esp32s3dev && python -m http.server 8000
+  # then: http://<your-ip>:8000/firmware.bin
+  ```
+
+  Use `http://`, not `https://` — a TLS handshake wants ~50 KB of *contiguous* heap, which is usually the exact thing you have run out of. Plain HTTP streams straight into flash and needs almost none.
 
 > When you install from LuxDMX.org, the device reboots into a dedicated update mode and pulls the new firmware there, then reboots again into it. This is deliberate: the HTTPS download needs a large block of free RAM that the fully running gateway (DMX, RDM, Art-Net, web UI) no longer leaves free, so it does the download early at boot when the RAM is untouched. The device is offline for about a minute during the install; the progress page waits for it to come back. The local `.bin` upload doesn't need this and flashes directly.
 
@@ -642,6 +650,7 @@ a blocking error can't hide behind a fold.
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
 | `/ota/github` | POST | Install a release (downloaded via luxdmx.org; `version=latest` or `1.0.N`) |
+| `/ota/url` | POST | Install a `.bin` from any URL the device can reach (`url=http://host/firmware.bin`). Reboots first and downloads with a fresh heap, so it works where a push upload fails; `http://` needs no TLS and therefore almost no contiguous memory |
 | `/ota/status` | GET | Live progress of an in-flight install (`{phase,pct}`) — the update page polls it |
 
 ### WebSocket (`ws://<device>/ws`, port 80)
