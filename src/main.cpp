@@ -456,6 +456,43 @@ static Adafruit_NeoPixel neoPixel(1, 0, NEO_GRB + NEO_KHZ800);
 // Runtime state
 // ---------------------------------------------------------------------------
 static uint8_t  dmxBuf[MAX_OUTPUTS][DMX_PACKET_SIZE] = {{0}};
+
+// ---------------------------------------------------------------------------
+// dmxBuf is written on core 0 (the receive task, via mergeOutput) and read on core 1 (the DMX
+// task, building the frame for the wire). Without synchronisation the reader can start while the
+// writer is mid-memcpy, and the frame that goes out is part old packet, part new -- a channel
+// combination NOBODY EVER SENT.
+//
+// That is unacceptable here regardless of how rarely it happens. A gateway like this drives pyro:
+// if the arm channel comes from the old frame and the fire channel from the new one, the wire
+// carries a state neither the console nor the operator ever built. "It is only a fraction of a
+// percent of frames" is not an argument when the failure mode is a cue firing.
+//
+// Fixed with a seqlock, which is the right tool for one writer and one reader: the writer bumps a
+// counter before and after touching the buffer (odd = mid-write), the reader takes a copy and
+// re-reads the counter, retrying if it moved or was odd. Nothing blocks, no interrupts are
+// disabled, and the writer is never delayed by the reader -- which matters because the reader
+// holds its copy for ~1.5 us while the DMX task is on a 1 ms schedule.
+static volatile uint32_t dmxSeq[MAX_OUTPUTS] = {0};
+// How often we declined to transmit because we could not get a clean copy. Expected to sit at 0
+// forever; exposed in /dmx.json so it is observable rather than a comfortable assumption.
+static uint32_t dmxTornSkips = 0;
+static inline void dmxWriteBegin(int i) { dmxSeq[i]++; __sync_synchronize(); }
+static inline void dmxWriteEnd(int i)   { __sync_synchronize(); dmxSeq[i]++; }
+// Take a consistent snapshot of one output's frame. false = the writer kept winning the race,
+// so the caller must NOT transmit: holding the previous frame one more tick is always safe,
+// sending a torn one never is.
+static bool dmxSnapshot(int i, uint8_t* out) {
+    for (int tries = 0; tries < 8; tries++) {
+        const uint32_t s1 = dmxSeq[i];
+        if (s1 & 1u) continue;                       // writer is inside the buffer right now
+        __sync_synchronize();
+        memcpy(out, dmxBuf[i], DMX_PACKET_SIZE);
+        __sync_synchronize();
+        if (dmxSeq[i] == s1) return true;            // nothing moved while we copied
+    }
+    return false;
+}
 static bool     outReady[MAX_OUTPUTS] = {false};   // per-output DMX driver installed
 static int      monitorOut   = 0;                  // output shown/controlled by the web UI
 static int      rdmOut       = -1;                 // primary RDM output (first RDM line), -1 = none
@@ -839,8 +876,17 @@ static void sendDmx(uint8_t due) {
         // identify are explicit user intent and keep the line clocking.
         if (cfg.outputs[i].lossMode == LOSS_STOP && outSrcLost[i]
             && !ov && !(manualMode && i == vo)) continue;
-        uint8_t saved = 0;
-        if (ov) { saved = dmxBuf[i][identifyCh]; dmxBuf[i][identifyCh] = 255; }
+        // Take a torn-free copy and clock THAT out, never the shared buffer. If the writer keeps
+        // winning the race we simply don't transmit this tick: the fixture holds its last value,
+        // which is always safe. Sending a half-updated frame is not.
+        // Staging is safe to share between outputs because both the RMT encoder and dmx_write
+        // consume it synchronously before returning.
+        static uint8_t staging[DMX_PACKET_SIZE];
+        if (!dmxSnapshot(i, staging)) { dmxTornSkips++; continue; }
+        // Identify override: force one channel to full on the wire only (on the monitored output).
+        // Applied to the copy, so the value the UI and the merge engine see is never touched --
+        // this used to poke the shared buffer and put a write on the DMX task's side of the race.
+        if (ov) staging[identifyCh] = 255;
 #ifdef DMX_RMT
         {   // RMT-driven output -> kick (async), streams out in hardware. The RDM output stays on
             // RMT too: RDM requests go out via RMT and responses come back on a RX-only UART, so
@@ -848,18 +894,16 @@ static void sendDmx(uint8_t due) {
             // Skip (don't block) if the previous frame is still going out: the scheduler will offer
             // this port again on the next 1 ms tick. Only reachable if a frame overran its period,
             // which the rate table is chosen to prevent (fastest period 24 ms > 22.76 ms frame).
-            if (!rmtDmxIdle(&g_rmt[i])) { if (ov) dmxBuf[i][identifyCh] = saved; continue; }
-            rmtDmxKick(&g_rmt[i], dmxBuf[i], DMX_PACKET_SIZE);
-            if (ov) dmxBuf[i][identifyCh] = saved;
+            if (!rmtDmxIdle(&g_rmt[i])) continue;
+            rmtDmxKick(&g_rmt[i], staging, DMX_PACKET_SIZE);
             rmtSent[nRmt++] = i;
             txFrames[i]++;                 // count real transmitted frames for the output-fps stat
             continue;
         }
 #endif
         dmx_port_t port = (dmx_port_t)cfg.outputs[i].port;
-        dmx_write(port, dmxBuf[i], DMX_PACKET_SIZE);
+        dmx_write(port, staging, DMX_PACKET_SIZE);
         dmx_send(port);
-        if (ov) dmxBuf[i][identifyCh] = saved;
         sentPort[nSent++] = port;
         txFrames[i]++;                         // count real transmitted frames for the output-fps stat
     }
@@ -1673,7 +1717,9 @@ static void handleWsText(const char* payload, size_t len) {
         return;
     }
     if (msg.indexOf("\"blackout\"") >= 0) {
-        memset(&dmxBuf[viewOutput()][1], 0, 512); return;
+        { const int mo = viewOutput();
+          dmxWriteBegin(mo); memset(&dmxBuf[mo][1], 0, 512); dmxWriteEnd(mo); }
+        return;
     }
     if (msg.indexOf("\"mode\"") >= 0) {
         manualMode = (msg.indexOf("true") >= 0); return;
@@ -1694,7 +1740,8 @@ static void handleWsText(const char* payload, size_t len) {
         int ch  = msg.substring(chIdx  + 5).toInt();
         int val = msg.substring(valIdx + 6).toInt();
         if (ch < 1 || ch > 512) return;
-        dmxBuf[viewOutput()][ch] = (uint8_t)constrain(val, 0, 255);
+        { const int mo = viewOutput();
+          dmxWriteBegin(mo); dmxBuf[mo][ch] = (uint8_t)constrain(val, 0, 255); dmxWriteEnd(mo); }
         return;
     }
     // RDM control — only set request flags here; loop() owns the bus and runs them.
@@ -1819,7 +1866,9 @@ static void mergeOutput(int outIdx) {
         // normal rate); HOLD leaves it as-is; STOP keeps the buffer but is enforced
         // in sendDmx(), which simply stops clocking this port out.
         outSrcLost[outIdx] = true;
-        if (out.lossMode == LOSS_ZERO) memset(&dmxBuf[outIdx][1], 0, 512);
+        if (out.lossMode == LOSS_ZERO) {
+            dmxWriteBegin(outIdx); memset(&dmxBuf[outIdx][1], 0, 512); dmxWriteEnd(outIdx);
+        }
         return;
     }
     outSrcLost[outIdx] = false;   // a live source is feeding this output again
@@ -1836,7 +1885,7 @@ static void mergeOutput(int outIdx) {
             for (int c = 0; c < s.dataLen; c++)
                 if (s.data[c] > merged[c]) merged[c] = s.data[c];
         }
-        memcpy(&dmxBuf[outIdx][1], merged, 512);
+        dmxWriteBegin(outIdx); memcpy(&dmxBuf[outIdx][1], merged, 512); dmxWriteEnd(outIdx);
         return;
     }
 
@@ -1851,7 +1900,11 @@ static void mergeOutput(int outIdx) {
         if (usePrio && s.priority < topPrio) continue;
         if (newest < 0 || s.lastMs >= newestMs) { newest = contrib[k]; newestMs = s.lastMs; }
     }
-    if (newest >= 0) memcpy(&dmxBuf[outIdx][1], senders[newest].data, senders[newest].dataLen);
+    if (newest >= 0) {
+        dmxWriteBegin(outIdx);
+        memcpy(&dmxBuf[outIdx][1], senders[newest].data, senders[newest].dataLen);
+        dmxWriteEnd(outIdx);
+    }
 }
 
 // Route one received universe to every enabled output mapped to it (so the
@@ -2350,6 +2403,8 @@ static void handleDmxJson(AsyncWebServerRequest* req) {
     s->head += ",\"up\":\"";   s->head += uptimeStr();
     s->head += "\",\"heap\":"; s->head += ESP.getFreeHeap();
     s->head += ",\"manual\":"; s->head += manualMode ? "true" : "false";
+    // Frames we refused to transmit because no torn-free snapshot was available. Must stay 0.
+    s->head += ",\"tornSkips\":"; s->head += dmxTornSkips;
     s->head += ",\"ch\":[";
     req->sendChunked("application/json", [s](uint8_t* b, size_t maxLen, size_t) -> size_t {
         size_t n = 0;
