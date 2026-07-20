@@ -72,6 +72,25 @@ Or flash a plain `esp32s3dev` build and apply the **LuxDMX v6** board template i
 - `gtRefresh`/`gtFramingErr` (the GP5 UART) are the authoritative "is the DMX output clean" numbers.
 - **Gotcha (bit us):** GPIO16 vs GPIO17. If the DMX-out tap/DI land on GPIO16 instead of 17, the S3
   reports `outfps 40` but nothing reaches the analyzer. Confirm the out signal is on **GPIO17**.
+- The GP5 ground-truth tap is clamped to **one** output's TX pin, while the RS485 pair carries
+  whichever output is wired to the transceiver. Wire the bus to output B (GPIO16) and leave GP5 on
+  GPIO17 and you get `gtFrames: 0` forever: the second tap is watching an output nobody is driving.
+  The wire specs treat "0 frames seen" as "tap not wired" and skip the ground-truth assertions
+  rather than reporting a vacuous 0 errors, but on a bench where both taps matter, move GP5 too.
+
+## Driving this rig from the e2e suite
+
+`docs/tests/dmx-wire.spec.mjs` and `rdm-wire.spec.mjs` measure the DMX output and the RDM
+transactions through this analyzer instead of trusting the gateway's own counters:
+
+```bash
+cd docs
+LUXDMX_ANALYZER=<rp2350-ip> LUXDMX_URL=http://<gateway-ip> LUXDMX_WRITE=1 npm test
+```
+
+The specs probe which output the analyzer actually hears (marker pattern per output, then look at
+the line), so they follow a re-wired bench instead of assuming output A. The analyzer needs a build
+whose `/api/dmx` publishes under a seqlock — see the note in `docs/tests/README.md`.
 
 ## Verified on this rig (2026-07-09)
 - RMT-DMA DMX output clean: 40.0 Hz, 0 framing errors (first real-S3 validation of the RMT path).
