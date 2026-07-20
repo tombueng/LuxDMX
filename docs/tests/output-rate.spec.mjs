@@ -13,7 +13,7 @@
 // free-running. Confirming the *duplicate frame* share needs the RP2350 analyzer on the DMX line
 // and lives on the bench rig, not here.
 import { test, expect } from '@playwright/test';
-import { deviceHost, UdpSender, artDmxPacket, prepInput, sleep, ART_PORT } from './lib/net.mjs';
+import { deviceHost, UdpSender, streamFor, artDmxPacket, prepInput, sleep, ART_PORT } from './lib/net.mjs';
 import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
 import { ArtRdmClient } from './lib/artrdm.mjs';
 
@@ -108,6 +108,27 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
     await expect(page.locator('select[name="o0_rate"] option', { hasText: '33.3' })).toHaveCount(1);
     // and the provenance badge must be rendered next to the style selector
     await expect(page.locator('.style-src').first()).toBeVisible();
+  });
+
+  test('the navbar shows the transmit style, and marks one set over Art-Net', async ({ page, request }) => {
+    const d = await info(request);
+    await page.goto('/');
+    // The /ws frame is only pushed when input arrives, so drive something first.
+    const sender = new UdpSender(host);
+    try {
+      const data = Buffer.alloc(512);
+      const streaming = streamFor(sender, ART_PORT, (i) => artDmxPacket(d.outputs[0].uni, data, i), { ms: 4000 });
+      await expect.poll(async () => page.locator('#txstyle').textContent(), { timeout: 12_000 })
+        .toMatch(/[CD]/);
+      await streaming;
+    } finally { sender.close(); }
+    const txt = (await page.locator('#txstyle').textContent()).trim();
+    const title = await page.locator('#txstyle').getAttribute('title');
+    // One letter per output: C = continuous (free-run), D = delta (following the input).
+    expect(txt.replace(/·/g, '').split(/\s+/).length, 'one style per output').toBe(d.outputs.length);
+    expect(title, 'the tooltip spells it out').toMatch(/continuous \(free-run\)|delta \(follows the input\)/);
+    // A style pushed by a controller must be distinguishable from one chosen here.
+    expect(title).toMatch(/set (here|over Art-Net)/);
   });
 
   test('ArtPollReply RefreshRate matches the configured rate', async ({ request }) => {

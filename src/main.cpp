@@ -555,7 +555,12 @@ static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
 // 528 header+dmx, then per-output OUTPUT fps (2*N) and per-output INPUT fps (2*N), then a fixed
 // 10-byte tail (fixtures + RDM tx + RDM rx). Every tab's navbar reads its stats off this one frame.
 static constexpr int WS_NAV_TAIL  = 10;
-static constexpr int WS_FRAME_LEN = 528 + 4 * MAX_OUTPUTS + WS_NAV_TAIL;
+// 5 bytes per output now: output fps(2), input fps(2), and a transmit-style byte(1) so the navbar
+// can show whether a port is free-running or following the console, and whether that was chosen
+// here or pushed over Art-Net. Both parsers derive the output count from the frame length, so the
+// stride lives in exactly one place on each side.
+static constexpr int WS_PER_OUT  = 5;
+static constexpr int WS_FRAME_LEN = 528 + WS_PER_OUT * MAX_OUTPUTS + WS_NAV_TAIL;
 static uint8_t wsBuf[WS_FRAME_LEN];
 
 // sACN receive buffer
@@ -1681,8 +1686,16 @@ static void wsPush() {
         wsBuf[528 + 2 * MAX_OUTPUTS + 2 * i]     = inI >> 8;
         wsBuf[528 + 2 * MAX_OUTPUTS + 2 * i + 1] = inI & 0xFF;
     }
+    // Per-output transmit style: bit0 = delta (clear = continuous), bit1 = the style was set by a
+    // controller over Art-Net rather than in our UI.
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        uint8_t st = 0;
+        if (dmxIsDelta(i))                                     st |= 0x01;
+        if (cfg.outputs[i].txStyleSrc == TXSRC_ARTNET)          st |= 0x02;
+        wsBuf[528 + 4 * MAX_OUTPUTS + i] = st;
+    }
     // Fixed tail: fixtures(2) rdmTx(4) rdmRx(4)
-    int t = 528 + 4 * MAX_OUTPUTS;
+    int t = 528 + WS_PER_OUT * MAX_OUTPUTS;
     uint16_t nf = (uint16_t)rdmCount;
     uint32_t rtx = 0, rrx = 0;
 #ifdef DMX_RMT

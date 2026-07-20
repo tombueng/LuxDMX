@@ -32,6 +32,7 @@ html { scrollbar-gutter: stable; }
   <div class="nav-stats">
     <div class="nav-stat" style="width:5.5rem"><span class="ns-label">DMX FPS</span><span class="ns-val" id="fps">&middot;</span></div>
     <div class="nav-stat" style="width:5.5rem"><span class="ns-label">In FPS</span><span class="ns-val" id="infps">&middot;</span></div>
+    <div class="nav-stat" style="width:4.5rem"><span class="ns-label">Style</span><span class="ns-val" id="txstyle">&middot;</span></div>
     <div class="nav-stat" style="width:4rem"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">&middot;</span></div>
     <div class="nav-stat" style="width:3.8rem"><span class="ns-label">Heap</span><span class="ns-val" id="heap">&middot;</span></div>
     <div class="nav-stat" style="width:5rem"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">&middot;</span></div>
@@ -48,9 +49,10 @@ html { scrollbar-gutter: stable; }
 </nav>
 <script>
 window.LuxNav = (function(){
-  var NAVIDS=['fps','infps','rssi','net-label','heap','uptime','jitter','nav-sub','nfix','rdm-tx','rdm-rx'];
-  var NAV_TAIL=10;   // fixed tail on the /ws frame: fixtures(2) rdmTx(4) rdmRx(4). Before it are two
-                     // per-output arrays (output fps, then input fps), 2 bytes each.
+  var NAVIDS=['fps','infps','txstyle','rssi','net-label','heap','uptime','jitter','nav-sub','nfix','rdm-tx','rdm-rx'];
+  var NAV_TAIL=10;   // fixed tail on the /ws frame: fixtures(2) rdmTx(4) rdmRx(4). Before it sit the
+                     // per-output blocks: output fps(2), input fps(2), transmit style(1) = 5 bytes.
+  var PER_OUT=5;
   function fmtK(n){ return n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e4 ? (n/1e3).toFixed(0)+'k' : String(n); }
   function saveNav(){ try{ var o={}; NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=[e.innerHTML,e.style.color||'']; }); sessionStorage.setItem('luxnav',JSON.stringify(o)); }catch(_){} }
   function paintNav(){ try{ var o=JSON.parse(sessionStorage.getItem('luxnav')||'{}'); NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e&&o[id]){ e.innerHTML=o[id][0]; if(o[id][1]) e.style.color=o[id][1]; } }); }catch(_){} }
@@ -58,10 +60,27 @@ window.LuxNav = (function(){
     if(!(buf instanceof ArrayBuffer) || buf.byteLength<16) return;
     var v=new DataView(buf);
     // two per-output arrays sit between the DMX block and the fixed tail: output fps, then input fps
-    var n=Math.max(0,(buf.byteLength-528-NAV_TAIL)>>2), out=[], inp=[];
-    for(var oi=0;oi<n;oi++){ out.push((v.getUint16(528+2*oi)/10).toFixed(1)); inp.push((v.getUint16(528+2*n+2*oi)/10).toFixed(1)); }
+    var n=Math.max(0,Math.floor((buf.byteLength-528-NAV_TAIL)/PER_OUT)), out=[], inp=[], sty=[];
+    for(var oi=0;oi<n;oi++){
+      out.push((v.getUint16(528+2*oi)/10).toFixed(1));
+      inp.push((v.getUint16(528+2*n+2*oi)/10).toFixed(1));
+      sty.push(v.getUint8(528+4*n+oi));
+    }
     document.getElementById('fps').textContent   = out.length ? out.join(' · ') : (v.getUint16(0)/10).toFixed(1);
     document.getElementById('infps').textContent = inp.length ? inp.join(' · ') : '0.0';
+    // Transmit style per output: D = delta (following the console), C = continuous (free-running).
+    // A dot marks a style a controller pushed over Art-Net, so a mode you did not pick is visible
+    // at a glance instead of looking like your own setting.
+    var se=document.getElementById('txstyle');
+    if(se){
+      if(sty.length){
+        se.textContent = sty.map(function(b){ return (b&1?'D':'C') + (b&2?'·':''); }).join(' ');
+        se.title = sty.map(function(b,i){
+          return 'Output ' + String.fromCharCode(65+i) + ': ' + (b&1?'delta (follows the input)':'continuous (free-run)')
+               + (b&2?', set over Art-Net':', set here'); }).join(String.fromCharCode(10));
+        se.style.color = sty.some(function(b){ return b&2; }) ? 'var(--lux-cyan)' : '';
+      } else { se.textContent='·'; se.title=''; }
+    }
     var rssi=v.getInt16(2), heap=v.getUint32(4), upS=v.getUint32(8);
     var re=document.getElementById('rssi'), nl=document.getElementById('net-label');
     if(rssi>=10){ nl.textContent='LAN'; re.textContent=rssi+'M'; re.style.color='#45d85c'; }        // wired
