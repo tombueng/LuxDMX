@@ -150,14 +150,8 @@ static bool rmtDmxIdle(RmtDmx* rd) {
     if (!rd->chan) return false;
     return rmt_tx_wait_all_done(rd->chan, 0) == ESP_OK;
 }
-// Release the RMT channel + encoder (frees the GPIO so esp_dmx can take it for an RDM
-// transaction). Keeps rd->sym so a following rmtDmxInit() reuses the buffer. After this,
-// rd->chan == nullptr, so rmtDmxKick/Wait become no-ops until re-init.
-static void rmtDmxDeinit(RmtDmx* rd) {
-    if (rd->chan) { rmt_tx_wait_all_done(rd->chan, 50); rmt_disable(rd->chan); }
-    if (rd->enc)  { rmt_del_encoder(rd->enc); rd->enc = nullptr; }
-    if (rd->chan) { rmt_del_channel(rd->chan); rd->chan = nullptr; }
-}
+// (rmtDmxDeinit() lived here to hand the GPIO back for an esp_dmx RDM transaction. RDM runs on
+// RMT-TX + a RX-only UART now, so the channel is never released and the helper had no callers.)
 // Convenience: encode + transmit + wait (blocking).
 static inline void rmtDmxSend(RmtDmx* rd, const uint8_t* data, int nslots) {
     rmtDmxKick(rd, data, nslots); rmtDmxWait(rd);

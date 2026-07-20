@@ -20,8 +20,7 @@
 #include "driver/gpio.h"
 #include <esp_mac.h>
 #include <esp_rom_sys.h>         // esp_rom_delay_us()
-#include <rdm/include/types.h>   // rdm_uid_t / rdm_device_info_t / rdm_sensor_* / PIDs / CCs (types only, no driver)
-#include <rdm/controller.h>      // rdm_ack_t (struct only — we never call the esp_dmx controller)
+#include "rdm_types.h"           // rdm_uid_t / rdm_device_info_t / rdm_sensor_* / rdm_ack_t / PIDs / CCs
 
 // --- config ---------------------------------------------------------------------------------
 // Each RDM-capable output ("line") is a transceiver: its own RMT TX channel, DE/RE pin and an

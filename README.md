@@ -274,18 +274,93 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 
 ## Software Stack
 
-| Library | Purpose |
+LuxDMX is built entirely on free and open-source software: firmware, web UI, tests, and
+the hardware design tooling. Firmware versions are pinned in `platformio.ini`; everything
+below is what we actually pull in and what each piece does for us.
+
+### Firmware, third-party libraries
+
+| Library | Version | License | What we use it for |
+|---|---|---|---|
+| [rstephan/ArtnetWifi](https://github.com/rstephan/ArtnetWifi) | `^1.5.0` | MIT | Art-Net receiver: parses ArtDMX/ArtPoll on UDP 6454. |
+| [ESP32Async/ESPAsyncWebServer](https://github.com/ESP32Async/ESPAsyncWebServer) | git | LGPL-3.0 | The whole HTTP side: web UI, REST API, WebSocket live channels, OTA upload, and the first-run setup portal. All non-blocking, so DMX keeps clocking while someone browses the config page. |
+| [ESP32Async/AsyncTCP](https://github.com/ESP32Async/AsyncTCP) | git | LGPL-3.0 | TCP backend for the above. We give it a bigger stack/queue and pin it to core 0 (see the build flags in `platformio.ini`) so it can't preempt the RDM bus timing on core 1. |
+| [Adafruit NeoPixel](https://github.com/adafruit/Adafruit_NeoPixel) | `^1.12.3` | LGPL-3.0 | Drives the WS2812 RGB status LED (DevKit boards, and any DIY build with an addressable LED). |
+| [Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library) | `^1.11.11` | BSD | Shared drawing primitives and fonts behind every supported display panel. |
+| [Adafruit SSD1306](https://github.com/adafruit/Adafruit_SSD1306) | `^2.5.13` | BSD | 128×64 / 128×32 mono I²C OLEDs. |
+| [Adafruit SH110X](https://github.com/adafruit/Adafruit_SH110X) | `^2.1.12` | BSD | SH1106 / SH1107 mono OLEDs (the 1.3" panels). |
+| [Adafruit SSD1351](https://github.com/adafruit/Adafruit-SSD1351-library) | `^1.3.2` | BSD | 128×128 colour SPI OLED. |
+| [Adafruit BusIO](https://github.com/adafruit/Adafruit_BusIO) | transitive | MIT | I²C/SPI abstraction the Adafruit display drivers sit on. |
+
+> The two `ESP32Async` libraries and Adafruit NeoPixel are **LGPL-3.0**. We link them
+> unmodified, which is what the LGPL asks for; the LuxDMX source itself stays MIT.
+
+There is no DMX or RDM library. Both protocols are ours: `dmx_rmt.h` clocks DMX512 out of
+the RMT peripheral, and `rdm_rmt.h` is an RDM E1.20 controller on RMT-TX plus a RX-only
+UART, with the E1.20 types declared in `rdm_types.h`. This used to be
+[someweisguy/esp_dmx](https://github.com/someweisguy/esp_dmx); we moved off its UART driver
+when Ethernet DMA contention started tearing frames (issue #64) and dropped the dependency
+entirely once nothing but its type declarations was left.
+
+### Firmware, platform and built-ins
+
+[arduino-esp32 v3](https://github.com/espressif/arduino-esp32) (LGPL-2.1) on top of
+[ESP-IDF 5.x](https://github.com/espressif/esp-idf) (Apache-2.0), delivered by the
+[pioarduino](https://github.com/pioarduino/platform-espressif32) platform fork (the
+mainline PlatformIO platform is stuck on v2.x, which has no W5500 Ethernet).
+
+| Component | What we use it for |
 |---|---|
-| built-in RMT (`dmx_rmt.h`) | DMX512 transmit — frames clocked out of the RMT peripheral so they survive the RMII-Ethernet DMA contention (issue #64). Paired with `rdm_rmt.h` for an esp_dmx-free RDM controller (RMT-TX + UART-RX, DE as GPIO). |
-| `someweisguy/esp_dmx ^4.1` | Fallback DMX/RDM path for the Wokwi sim build (the hardware envs use the RMT path via `-DDMX_RMT`) |
-| `rstephan/ArtnetWifi ^1.5` | Art-Net UDP receiver (port 6454) |
-| `ESP32Async/ESPAsyncWebServer` | Non-blocking HTTP server + WebSocket (port 80), also serves the first-run setup portal |
-| `ESP32Async/AsyncTCP` | Async TCP backend (runs networking off the main loop) |
-| `adafruit/Adafruit NeoPixel ^1.12` | WS2812 RGB status LED support |
-| `ArduinoOTA` | OTA firmware updates |
-| `ESPmDNS` | mDNS (`dmx-gateway.local`) |
-| `Preferences` | NVS persistent config |
-| *(built-in UDP)* | sACN / E1.31 multicast receive (port 5568) |
+| RMT peripheral | DMX512 transmit clocked out in hardware, immune to the core-0 network DMA contention behind issue #64, plus the TX half of the RDM controller. |
+| `WiFi.h` / `ETH.h` | WiFi STA/AP, and wired Ethernet on both paths: W5500 over SPI and LAN8720 over RMII. |
+| built-in UDP | sACN / E1.31 receive on port 5568. |
+| `ArduinoOTA`, `Update`, `HTTPUpdate`, `HTTPClient`, `WiFiClientSecure` | OTA updates: the Arduino OTA path, web upload, and the self-update check against the GitHub release. |
+| `ESPmDNS` | `dmx-gateway.local` discovery. |
+| `Preferences` | NVS-backed persistent config. |
+| `DNSServer` | Captive-portal DNS while the device is in setup-AP mode. |
+| `Wire` / `SPI` | I²C and SPI buses for the displays and the W5500. |
+| `driver/uart.h` | The RX-only UART that catches RDM responses. |
+| FreeRTOS | Tasks, queues, and the core pinning that keeps network work off the DMX/RDM core. |
+
+### Web UI
+
+| Library | Version | License | What we use it for |
+|---|---|---|---|
+| [Bootstrap](https://getbootstrap.com/) (CSS only) | 5.3.3 | MIT | Layout and styling for every page. Vendored at `src/assets/bootstrap.min.css` and served gzipped from flash, so the UI works on a device with no internet. |
+| [esp-web-tools](https://github.com/esphome/esp-web-tools) | 10 | Apache-2.0 | The browser flasher on the project page (`web/index.html`), so nobody needs a toolchain to install firmware. |
+
+No JS framework. The pages are plain ES6, and the board pin-picker and the RDM sensor
+charts are hand-rolled SVG. It all has to fit in flash next to the firmware.
+
+### Build, CI, and tests
+
+| Tool | License | What we use it for |
+|---|---|---|
+| [PlatformIO Core](https://platformio.org/) | Apache-2.0 | Build system, dependency pinning, and flashing. |
+| [esptool](https://github.com/espressif/esptool) | GPL-2.0 | Serial flashing and merging the factory image. |
+| [Playwright](https://playwright.dev/) (`@playwright/test ^1.60`) | Apache-2.0 | The end-to-end suite in [docs/tests/](docs/tests/): drives a live device with real Art-Net/sACN and asserts the REST API, WebSocket, and web UI. |
+| [Pillow](https://python-pillow.org/) | MIT-CMU | Renders the display previews in [docs/](docs/) from the firmware's own layout math. |
+| [GitHub Actions](https://github.com/actions) (`checkout`, `cache`, `setup-python`, `upload-artifact`, `*-pages`) | MIT | Builds every push, publishes the OTA release, deploys the Pages site. |
+
+The native config round-trip test (`test/native/`) deliberately uses no framework: it
+compiles the config engine on the host against small `Arduino.h` / `Preferences.h` shims.
+
+### Hardware design tooling
+
+| Tool | License | What we use it for |
+|---|---|---|
+| [KiCad 9](https://www.kicad.org/) + the `pcbnew` Python API | GPL-3.0 | The board itself, and the scripts under [hardware/scripts/](hardware/scripts/) that place parts, fix planes, and gate the design on DRC. |
+| `kicad-cli` | GPL-3.0 | Gerber/drill export, DRC runs, schematic PDF, all scripted with no GUI in the loop. |
+| [SKiDL](https://github.com/devbisme/skidl) | MIT | Schematic-as-code: `hardware/scripts/luxdmx.py` generates the netlist the schematic and board are built from. |
+| [Freerouting 2](https://github.com/freerouting/freerouting) | GPL-3.0 | Autorouting passes (the jar lives in `hardware/tools/`, not in git). |
+| [openpyxl](https://openpyxl.readthedocs.io/) | MIT | Real `.xlsx` BOM and CPL files; JLCPCB rejects hand-rolled ones. |
+
+### RDM test fixture (separate sub-project)
+
+[RDM/](RDM/) is a standalone RP2350 (Pico Plus 2 W) DMX/RDM responder used to test this
+controller's on-wire timing. It builds on [arduino-pico](https://github.com/earlephilhower/arduino-pico)
+(LGPL-2.1) and [Pico-DMX](https://github.com/jostlowe/Pico-DMX) (BSD-3-Clause) for the PIO
+DMX engine.
 
 ---
 
@@ -989,14 +1064,11 @@ management / clock / power pins, so a DMX or LED pin that lands on one is flagge
 > is the wrong end of the trade for Art-Net/sACN under full DMX load. Use a **W5500** instead: same
 > SPI bus, costs about the same, full hardware stack, and it's already built in.
 
-> **All boards drive two outputs** (UART1 + UART2). A 2nd output (UART2) used to panic on the
-> ESP32-S3 — a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the
-> preprocessor reads as 0, so it was compiled out (null peripheral pointer). That, plus an ESP-IDF 5.x
-> fix (the removed `uart_periph_signal[].module` field) needed once the firmware moved to
-> **arduino-esp32 v3**, is applied by a build-time patch in [`extra_scripts.py`](extra_scripts.py).
-> The hardware builds now clock DMX out of the **RMT** peripheral (`dmx_rmt.h`, `-DDMX_RMT`) instead
-> of the UART, which sidesteps this esp_dmx UART2 issue entirely; the patch only matters for the
-> Wokwi sim build that still uses esp_dmx.
+> **All boards drive two outputs.** A 2nd output used to panic on the ESP32-S3 back when DMX went
+> out over the UART: a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the
+> preprocessor reads as 0, so it was compiled out (null peripheral pointer), and it needed a
+> build-time patch to work at all. DMX is clocked out of the **RMT** peripheral now (`dmx_rmt.h`),
+> and esp_dmx is gone from the project entirely, so neither the bug nor the patch exists any more.
 
 **ESP32-S3 — safe GPIOs for a 2nd output:** free choices are **5, 6, 7, 8, 15, 18, 21**. Avoid
 **26–37** (SPI flash / octal PSRAM — *will* crash), **19/20** (USB), **43/44** (serial console),
