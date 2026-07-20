@@ -2881,6 +2881,20 @@ static void handleResetPost(AsyncWebServerRequest* req) {
     pendingRebootAt  = millis() + 600;
 }
 
+// POST /reboot — restart the device, touching nothing else. Every other restart path we
+// have is a side effect of something (save a setting, finish an OTA, erase the WiFi creds),
+// so there was no way to simply power-cycle a box you can reach over the network. That is
+// its own recovery tool: a long-running gateway can get its heap fragmented far enough that
+// an OTA upload no longer fits, and the only cure was walking over and pulling the plug.
+//
+// POST-only on purpose. A GET would let a browser prefetch, a link scanner, or a
+// dashboard's thumbnailer drop the DMX output of a live rig.
+static void handleRebootPost(AsyncWebServerRequest* req) {
+    req->send(200, "application/json", "{\"ok\":true,\"rebootIn\":600}");
+    Serial.println(F("[SYS] reboot requested over HTTP"));
+    pendingRebootAt = millis() + 600;   // let the response flush from the async task first
+}
+
 // ---------------------------------------------------------------------------
 // First-run setup portal (issue #45) — replaces the WiFiManager config portal
 // ---------------------------------------------------------------------------
@@ -3090,18 +3104,33 @@ static void versionCheckTask(void*) {
 #define OTA_BIN "firmware.bin"
 #endif
 
+// An OTA target is either a release ("latest" / "vX.Y.Z") or a full URL to a .bin.
+static bool otaTargetIsUrl(const String& t) {
+    return t.startsWith("http://") || t.startsWith("https://");
+}
+
 static void doGithubOta() {
     // luxdmx.org/firmware/ota/<target>/<file> 301-redirects to the matching GitHub
     // release asset (releases/download/<target>/<file>) -- target is "latest" or a
     // "vX.Y.Z" tag, so per-version OTA / downgrade still works through the redirect.
-    // TLS + the OTA download need a big contiguous block; if the heap is fragmented (e.g. a flood
-    // is in progress) defer rather than throw bad_alloc and abort. No restart here, so this can't
-    // become a reboot loop while an auto-update keeps retrying under load.
-    if (ESP.getMaxAllocHeap() < 50000) {
-        Serial.printf("[OTA] deferred: largest free block %u too small\n", ESP.getMaxAllocHeap());
+    // A target that is already a URL is used verbatim: that is the "install this exact
+    // file" path (a local build served off a laptop, a staging box, an air-gapped mirror).
+    const bool isUrl = otaTargetIsUrl(otaTarget);
+    String otaUrl = isUrl ? otaTarget
+                          : String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
+    const bool tls = otaUrl.startsWith("https://");
+    // TLS is what needs the big contiguous block (~40 KB for the handshake buffers). A plain
+    // http:// pull streams the body straight into flash and needs almost none of it, which is
+    // the whole point of allowing a URL: it still works on a box whose heap is too fragmented
+    // for the release download, and for a push upload. Guard accordingly instead of applying
+    // the TLS floor to a transfer that has no TLS. If the heap is fragmented, defer rather
+    // than throw bad_alloc and abort -- no restart here, so this can't become a reboot loop.
+    const uint32_t need = tls ? 50000 : 12000;
+    if (ESP.getMaxAllocHeap() < need) {
+        Serial.printf("[OTA] deferred: largest free block %u too small (need %u%s)\n",
+                      ESP.getMaxAllocHeap(), need, tls ? " for TLS" : "");
         otaProgPhase = 3; dmxReady = true; return;
     }
-    String otaUrl = String("https://luxdmx.org/firmware/ota/") + otaTarget + "/" + OTA_BIN;
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
     dmxReady = false;
     // Drive /ota/status so the update page can show real progress. The ESP streams
@@ -3114,8 +3143,13 @@ static void doGithubOta() {
     httpUpdate.onEnd([]()      { otaProgPhase = 2; otaProgPct = 100; });
     httpUpdate.onError([](int) { otaProgPhase = 3; });
     try {
-        WiFiClientSecure client;
-        client.setInsecure();
+        // Only build the TLS client when the URL actually needs one -- a plain WiFiClient
+        // brings no mbedTLS buffers with it at all, which is what makes an http:// pull
+        // survive a heap that could not have done the handshake.
+        WiFiClient plain;
+        WiFiClientSecure secure;
+        if (tls) secure.setInsecure();
+        WiFiClient& client = tls ? static_cast<WiFiClient&>(secure) : plain;
         httpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
         // We reboot ourselves rather than letting httpUpdate do it, because the pending flag
         // has to be cleared FIRST. otaBootUpdate() now keeps otapend set across an attempt so a
@@ -3159,6 +3193,37 @@ static void handleOtaGithub(AsyncWebServerRequest* req) {
     otaProgPhase = 0; otaProgPct = 0;
     req->send_P(200, "text/html", OTA_PROGRESS_HTML);
     scheduleOtaReboot(otaTarget);   // persist target + reboot; otaBootUpdate() installs it next boot
+}
+
+// POST /ota/url — install a .bin from any URL you can reach, instead of a luxdmx.org release.
+//
+// This is the low-heap way in. A push upload (POST /ota/upload) has to buffer the request in
+// the running system, so on a box that has been up a while it can fail partway with nothing
+// but a dead connection to show for it. This takes the same road as the release updater:
+// stash the target, reboot, and download early in setup() where the heap is pristine. With an
+// http:// URL there is no TLS in the picture either, so it needs single-digit KB rather than
+// ~50 KB contiguous. Serve firmware.bin off your laptop and point the box at it.
+//
+// Unauthenticated, like every other endpoint here, and that is worth being explicit about:
+// anyone who can reach the box can already flash it through /ota/upload, so this adds a road,
+// not a door. It is a LAN-trust device. Don't hang it on the open internet.
+static void handleOtaUrl(AsyncWebServerRequest* req) {
+    String url;
+    argStr(req, "url", url);
+    url.trim();
+    if (!otaTargetIsUrl(url)) {
+        req->send(400, "application/json",
+                  "{\"ok\":false,\"error\":\"url must start with http:// or https://\"}");
+        return;
+    }
+    // https:// still works, it just needs the contiguous block for the handshake -- and the
+    // whole reason someone reaches for this endpoint is usually that they haven't got it.
+    if (url.startsWith("https://"))
+        Serial.println(F("[OTA] URL is https; that needs ~50 KB contiguous for TLS. http:// if it fails."));
+    Serial.printf("[OTA] URL update requested: %s (reboot into clean-heap update)\n", url.c_str());
+    otaProgPhase = 0; otaProgPct = 0;
+    req->send_P(200, "text/html", OTA_PROGRESS_HTML);
+    scheduleOtaReboot(url);   // persist target + reboot; otaBootUpdate() installs it next boot
 }
 
 // Runs early in setup() -- after the network is up but BEFORE DMX/RDM/Art-Net/web/WS start,
@@ -4611,7 +4676,9 @@ void setup() {
     http.on("/setup",             HTTP_POST, handleSetupPost);
     http.on("/reset",             HTTP_GET,  handleResetGet);
     http.on("/reset",             HTTP_POST, handleResetPost);
+    http.on("/reboot",            HTTP_POST, handleRebootPost);   // POST-only: see the handler
     http.on("/ota/github",        HTTP_POST, handleOtaGithub);
+    http.on("/ota/url",           HTTP_POST, handleOtaUrl);
     http.on("/ota/status",        HTTP_GET,  handleOtaStatus);
     http.on("/ota/upload",        HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     http.on("/version.json",      HTTP_GET,  handleVersionJson);

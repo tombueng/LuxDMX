@@ -86,6 +86,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
+| **Remote restart** | Restart the box from the web UI (**Device → Restart device**) or `POST /reboot`, without changing a setting. Useful when a long-running gateway needs a nudge, or to free up memory before a firmware update |
 | **Ethernet support** | WT32-ETH01 (LAN8720) and the v6 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
@@ -464,6 +465,14 @@ pio run --target upload
 ### OTA Updates (after first flash)
 
 - **From browser:** open `http://dmx-gateway.local/config` → Firmware Update section → upload a `.bin` file or click "Update from LuxDMX.org". (The home page also has an **Update** button when a newer release is out, which installs the latest straight away.)
+- **From a URL (works when the upload doesn't):** same section → **Install from a URL**. The device reboots and fetches the file itself with a fresh heap, instead of you pushing it into a running system. That matters because a gateway that has been up a while fragments its heap, and a push upload can then die partway with nothing but a dropped connection to show for it. Serve your build off the machine you built it on and paste the URL:
+
+  ```bash
+  cd .pio/build/esp32s3dev && python -m http.server 8000
+  # then: http://<your-ip>:8000/firmware.bin
+  ```
+
+  Use `http://`, not `https://` — a TLS handshake wants ~50 KB of *contiguous* heap, which is usually the exact thing you have run out of. Plain HTTP streams straight into flash and needs almost none.
 
 > When you install from LuxDMX.org, the device reboots into a dedicated update mode and pulls the new firmware there, then reboots again into it. This is deliberate: the HTTPS download needs a large block of free RAM that the fully running gateway (DMX, RDM, Art-Net, web UI) no longer leaves free, so it does the download early at boot when the RAM is untouched. The device is offline for about a minute during the install; the progress page waits for it to come back. The local `.bin` upload doesn't need this and flashes directly.
 
@@ -623,6 +632,7 @@ a blocking error can't hide behind a fold.
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
 | `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins, on-unit controls (rotary encoder + buttons) (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
+| `/reboot` | POST | Restart the device, changing nothing. **POST only** — a GET would let a link prefetch or a crawler drop the DMX output of a live rig. Also in the UI: **`/config` → Device → Restart device** |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
@@ -640,6 +650,7 @@ a blocking error can't hide behind a fold.
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
 | `/ota/github` | POST | Install a release (downloaded via luxdmx.org; `version=latest` or `1.0.N`) |
+| `/ota/url` | POST | Install a `.bin` from any URL the device can reach (`url=http://host/firmware.bin`). Reboots first and downloads with a fresh heap, so it works where a push upload fails; `http://` needs no TLS and therefore almost no contiguous memory |
 | `/ota/status` | GET | Live progress of an in-flight install (`{phase,pct}`) — the update page polls it |
 
 ### WebSocket (`ws://<device>/ws`, port 80)
