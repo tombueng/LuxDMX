@@ -688,7 +688,19 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             does not use it.
           </div>
         </div>
-        <!-- Save & Restart lives in the fixed #save-bar at the bottom of the page -->
+        <!-- Save lives in the fixed #save-bar at the bottom of the page -->
+        <hr style="border-color:#30363d">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <div class="fw-semibold small">Restart</div>
+            <div class="form-text mb-0">
+              Restarts the device without changing a thing. DMX output stops for about
+              ten seconds, so don't do it mid-show. Handy if a long-running gateway starts
+              misbehaving, or to free up memory before a firmware update.
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="reboot-btn">Restart device</button>
+        </div>
       </div>
     </div>
   </form>
@@ -1125,6 +1137,41 @@ $('fb-mode').addEventListener('change', updNetMode);
 $('led-type').addEventListener('change', updLedPin);
 $('disp-type').addEventListener('change', updDispPins);
 $('dev-host').addEventListener('input', updHostUrl);
+
+// Restart the device (POST /reboot). Confirm first: this drops DMX output for ~10 s, and
+// the button is one click away from a live rig. Then wait for the device to answer again
+// and reload, so you land on a page showing the state it came back in.
+$('reboot-btn').addEventListener('click', function(){
+  showModal({
+    title: 'Restart the device?',
+    body: 'The device restarts and DMX output stops for about ten seconds. Nothing is changed '
+        + 'or erased. If its address is assigned by DHCP it will normally come back on the same one.',
+    okText: 'Restart', okClass: 'btn-warning'
+  }).then(function(ok){
+    if (!ok) return;
+    var btn = $('reboot-btn');
+    btn.disabled = true; btn.textContent = 'Restarting…';
+    // The device answers, then reboots ~600 ms later, so a dropped connection here is
+    // normal and not worth reporting as a failure.
+    fetch('/reboot', { method: 'POST' }).catch(function(){}).then(function(){
+      var deadline = Date.now() + 60000;
+      (function poll(){
+        setTimeout(function(){
+          fetch('/info.json?t=' + Date.now(), { cache: 'no-store' })
+            .then(function(r){ if (!r.ok) throw 0; location.reload(); })
+            .catch(function(){
+              if (Date.now() < deadline) return poll();
+              btn.disabled = false; btn.textContent = 'Restart device';
+              showModal({ title: 'Still not back',
+                body: 'The device did not answer within a minute. It may have come back on a '
+                    + 'different address, or it needs a power cycle.',
+                okText: 'OK', cancel: false });
+            });
+        }, 1000);
+      })();
+    });
+  });
+});
 
 // Auto-update toggle (persisted on device, no reboot)
 $('auto-update-sw').addEventListener('change', function(){

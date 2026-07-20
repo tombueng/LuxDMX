@@ -2881,6 +2881,20 @@ static void handleResetPost(AsyncWebServerRequest* req) {
     pendingRebootAt  = millis() + 600;
 }
 
+// POST /reboot — restart the device, touching nothing else. Every other restart path we
+// have is a side effect of something (save a setting, finish an OTA, erase the WiFi creds),
+// so there was no way to simply power-cycle a box you can reach over the network. That is
+// its own recovery tool: a long-running gateway can get its heap fragmented far enough that
+// an OTA upload no longer fits, and the only cure was walking over and pulling the plug.
+//
+// POST-only on purpose. A GET would let a browser prefetch, a link scanner, or a
+// dashboard's thumbnailer drop the DMX output of a live rig.
+static void handleRebootPost(AsyncWebServerRequest* req) {
+    req->send(200, "application/json", "{\"ok\":true,\"rebootIn\":600}");
+    Serial.println(F("[SYS] reboot requested over HTTP"));
+    pendingRebootAt = millis() + 600;   // let the response flush from the async task first
+}
+
 // ---------------------------------------------------------------------------
 // First-run setup portal (issue #45) — replaces the WiFiManager config portal
 // ---------------------------------------------------------------------------
@@ -4611,6 +4625,7 @@ void setup() {
     http.on("/setup",             HTTP_POST, handleSetupPost);
     http.on("/reset",             HTTP_GET,  handleResetGet);
     http.on("/reset",             HTTP_POST, handleResetPost);
+    http.on("/reboot",            HTTP_POST, handleRebootPost);   // POST-only: see the handler
     http.on("/ota/github",        HTTP_POST, handleOtaGithub);
     http.on("/ota/status",        HTTP_GET,  handleOtaStatus);
     http.on("/ota/upload",        HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);

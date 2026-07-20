@@ -86,6 +86,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
+| **Remote restart** | Restart the box from the web UI (**Device → Restart device**) or `POST /reboot`, without changing a setting. Useful when a long-running gateway needs a nudge, or to free up memory before a firmware update |
 | **Ethernet support** | WT32-ETH01 (LAN8720) and the v6 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
 
@@ -623,6 +624,7 @@ a blocking error can't hide behind a fold.
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
 | `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins, on-unit controls (rotary encoder + buttons) (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
+| `/reboot` | POST | Restart the device, changing nothing. **POST only** — a GET would let a link prefetch or a crawler drop the DMX output of a live rig. Also in the UI: **`/config` → Device → Restart device** |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
