@@ -238,7 +238,14 @@ controller can now query and configure fixtures, interleaved between normal DMX 
 it sends a request, **turns the bus around to receive** (the reason we need the GPIO-controlled
 `EN`/DE-RE pin), the addressed fixture replies, then the controller resumes DMX. Discovery is a
 binary search over the UID space (`DISC_UNIQUE_BRANCH` + mute/un-mute), ~hundreds of ms to ~1 s.
-Timing is strict (~2 ms response window) — **esp_dmx handles all of it.**
+
+**Reply timing (`rdm_rmt.h`):** E1.20 lets a responder wait up to 2 ms before it answers, and a
+discovery reply is ~1.06 ms on the wire, so the discovery read window is 6 ms (`RDM_DISC_TIMEOUT_MS`)
+and GET/SET replies get 9 ms (`RDM_RESP_TIMEOUT_MS`). Both discovery branch queries and GET/SET are
+retried up to three times, and a silent discovery branch is retried before it's written off as empty
+— a single lost reply high in the binary search would otherwise drop every fixture beneath it, which
+is what happens on a bus with collisions. Verified on the RP2350 rig: full discovery holds with a
+responder turnaround anywhere in the legal 0–2 ms window and with injected reply loss.
 
 ## RDM × Art-Net × E1.31 — the key architecture fact
 

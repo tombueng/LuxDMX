@@ -33,7 +33,12 @@
 #define RDM_SC_SUB         0x01         // RDM sub-start code (SC_SUB_MESSAGE)
 #define RDM_HDR_LEN        24           // fixed header bytes SC..PDL (message length = 24 + PDL)
 #define RDM_RESP_TIMEOUT_MS 9           // responder must reply within this window of the request end
-#define RDM_DISC_TIMEOUT_MS 3           // discovery reply window
+// Discovery reply window. E1.20 lets a responder wait up to 2 ms before it starts answering, and a
+// DISC_UNIQUE_BRANCH reply is ~24 bytes = ~1.06 ms on the wire at 250 kBaud, so the read has to
+// cover ~3.1 ms before you even count FreeRTOS tick granularity. At 3 ms it did not: measured on the
+// RP2350 rig, fixtures answering after ~1.35 ms of turnaround started dropping out and everything
+// from 1.5 ms up was invisible, though all of it is inside spec.
+#define RDM_DISC_TIMEOUT_MS 6           // discovery reply window (2 ms turnaround + reply + margin)
 static const uart_port_t RDM_LINE_UART[RDM_MAX_LINES] = { UART_NUM_2, UART_NUM_1 };  // RX-only, one per line
 
 // --- module state ---------------------------------------------------------------------------
@@ -249,11 +254,13 @@ static inline rdm_uid_t uidUnpack(uint64_t v) { rdm_uid_t u; u.man_id = v >> 32;
 // A reply that arrives but doesn't decode cleanly is RE-READ: on a noisy bus a lone fixture's reply
 // can pick up a stray bit flip and look just like a multi-fixture collision. A stochastic error
 // clears on a re-read (-> clean single), while a genuine collision stays garbled every time
-// (-> split). True silence returns "empty" at once (no wasted retries on the many empty branches).
+// (-> split). Silence is retried too: it cannot be told apart from a lost or collided reply, and
+// treating it as an empty branch on the first try loses every fixture below it on a lossy bus.
 static int rdmDiscBranch(uint64_t lower, uint64_t upper, rdm_uid_t* found) {
     uint8_t pd[12];
     putUid(&pd[0], uidUnpack(lower));
     putUid(&pd[6], uidUnpack(upper));
+    bool sawBytes = false;
     for (int attempt = 0; attempt < 3; attempt++) {
         uint8_t pkt[64];
         int len = rdmBuild(pkt, RDM_UID_BROADCAST_ALL, RDM_CC_DISC_COMMAND,
@@ -262,7 +269,13 @@ static int rdmDiscBranch(uint64_t lower, uint64_t upper, rdm_uid_t* found) {
         uint8_t rx[48];
         int n = uart_read_bytes(g_rdmUart, rx, sizeof(rx), pdMS_TO_TICKS(RDM_DISC_TIMEOUT_MS));
         rdmDe(1);
-        if (n <= 0) return 0;                        // silence -> genuinely empty branch
+        // Silence is ambiguous: an empty branch and a reply that got lost or collided look
+        // identical from here. Taking it as "empty" at once is what made a lossy bus fall apart --
+        // one dropped reply high in the tree writes off every fixture underneath it, so 10% loss
+        // measured 5 of 64 fixtures and 20% measured none. E1.20 has controllers send a branch
+        // query up to three times for exactly this reason, so ask again before writing it off.
+        if (n <= 0) { esp_rom_delay_us(200); continue; }
+        sawBytes = true;
         // Locate the 0xAA preamble separator (0..7 leading 0xFE preamble bytes precede it).
         int sep = -1;
         for (int i = 0; i < n; i++) { if (rx[i] == 0xAA) { sep = i; break; } if (rx[i] != 0xFE) break; }
@@ -283,7 +296,10 @@ static int rdmDiscBranch(uint64_t lower, uint64_t upper, rdm_uid_t* found) {
         // bytes present but not a clean single: stray bit flip on a lone fixture, or a real
         // collision. Re-read; if it stays dirty across attempts it is a genuine collision -> split.
     }
-    return 2;
+    // Never heard a byte in three tries -> the branch really is empty. Heard something we could not
+    // decode -> a collision, so the caller splits the range. Getting this backwards would be
+    // expensive: reporting an empty branch as a collision splits it forever.
+    return sawBytes ? 2 : 0;
 }
 
 // Mute a single device (so it drops out of further DISC_UNIQUE_BRANCH sweeps). Returns true on ACK.
