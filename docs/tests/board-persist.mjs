@@ -58,6 +58,19 @@ const server = http.createServer((req, res) => {
 
 function check(name, cond) { console.log(`  ${cond ? 'PASS' : 'FAIL'}  ${name}`); return cond ? 0 : 1; }
 
+// Read one field out of a POST body. Saving goes over fetch with a FormData body since the
+// no-reboot save landed, so /config arrives as multipart, not urlencoded -- grepping for
+// "name=value" silently stopped matching anything.
+function postedField(body, name) {
+  if (!body) return null;
+  if (/^--/.test(body)) {
+    const m = new RegExp(`name="${name}"\\r?\\n\\r?\\n([\\s\\S]*?)\\r?\\n--`).exec(body);
+    return m ? m[1] : null;
+  }
+  const m = new RegExp(`(?:^|&)${name}=([^&]*)`).exec(body);
+  return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null;
+}
+
 const port = await new Promise((r) => server.listen(0, () => r(server.address().port)));
 const browser = await chromium.launch();
 let fails = 0;
@@ -92,7 +105,7 @@ try {
   // ---- 2. Save posts the picked board so it can be persisted -------------------------
   await page.click('#save-btn');
   await page.waitForFunction(() => document.body && document.body.textContent.indexOf('saved') >= 0, { timeout: 8000 });
-  fails += check('POST /config carries board=luxdmx_v6', !!posted && /(^|&)board=luxdmx_v6(&|$)/.test(posted));
+  fails += check('POST /config carries board=luxdmx_v6', postedField(posted, 'board') === 'luxdmx_v6');
 
   // ---- 3. an explicit "Custom" pick is not overwritten by detection ------------------
   info = { ...BASE, boardSel: 'custom' };

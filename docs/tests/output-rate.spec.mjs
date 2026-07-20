@@ -16,6 +16,7 @@ import { test, expect } from '@playwright/test';
 import { deviceHost, UdpSender, streamFor, artDmxPacket, prepInput, sleep, ART_PORT } from './lib/net.mjs';
 import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
 import { ArtRdmClient } from './lib/artrdm.mjs';
+import { openConfig } from './lib/ui.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 
@@ -100,7 +101,7 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
   });
 
   test('config page renders a rate and a transmit-style selector per output', async ({ page }) => {
-    await page.goto('/config');
+    await openConfig(page);
     await expect(page.locator('select[name="o0_rate"]')).toHaveCount(1);
     await expect(page.locator('select[name="o0_style"]')).toHaveCount(1);
     await expect(page.locator('select[name="o1_rate"]')).toHaveCount(1);
@@ -136,8 +137,11 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
     const c = new ArtRdmClient(host);
     await c.ready;
     try {
-      const reply = await c.poll();
-      expect(reply).toBeTruthy();
+      // ArtPoll/ArtPollReply is UDP, so a single lost datagram is not a firmware bug. Ask a
+      // few times before calling it a failure (this flaked exactly once in a full run).
+      let reply = null;
+      for (let i = 0; i < 3 && !reply; i++) reply = await c.poll();
+      expect(reply, 'no ArtPollReply after 3 ArtPolls').toBeTruthy();
       const want = RATE_FPS[d.outputs[0].rate];
       // integer Hz field, so allow the rounding the firmware does (41.7 -> 42, 33.3 -> 33)
       expect(Math.abs(reply.refreshRate - want),

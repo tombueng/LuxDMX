@@ -2,9 +2,10 @@
 // (power/GND/EN pins shown, real silk labels, GPIO pins still clickable). These run
 // against the web-UI simulator (sim/server.js), which serves the real config.html.
 import { test, expect } from '@playwright/test';
+import { openConfig } from './lib/ui.mjs';
 
 async function openPickerWith(page, boardId) {
-  await page.goto('/config');
+  await openConfig(page);
   await expect(page.locator('#board-sel')).toBeVisible();
   // pick the curated board, then open the diagram
   await page.selectOption('#board-sel', boardId);
@@ -45,7 +46,7 @@ test.describe('Pin picker physical layout (issue #17)', () => {
   test('ESP32-S3 DevKitC-1: assignable GPIO pad click fills the target field', async ({ page }) => {
     test.skip(!!mcu && mcu !== 'esp32s3', 'ESP32-S3 board picker only offered on an esp32s3 device');
     // open the picker bound to a specific role by clicking a pin-pick button
-    await page.goto('/config');
+    await openConfig(page);
     await page.selectOption('#board-sel', 'esp32s3-devkitc-1');
     // pick a pin for Output A TX (the button sits in the same .pin-grp as the field)
     await page.locator('.pin-grp:has(input[name="o0_tx"]) button.pin-pick').click();

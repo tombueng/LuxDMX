@@ -9,6 +9,7 @@
 import { test, expect } from '@playwright/test';
 import { info, dmx } from './lib/device.mjs';
 import { sleep } from './lib/net.mjs';
+import { expandAll } from './lib/ui.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 function skipUnlessWrite() {
@@ -29,6 +30,7 @@ async function uptimeSec(request) {
 async function openConfigLoaded(page, request) {
   const want = await info(request);
   await page.goto('/config', { waitUntil: 'networkidle' });
+  await expandAll(page);          // the sections start folded; callers below drive real fields
   await expect
     .poll(async () => page.locator('input.out-uni').first().inputValue(), { timeout: 15_000 })
     .toBe(String(want.outputs[0].uni));
