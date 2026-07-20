@@ -1,5 +1,6 @@
 // Web UI loads + REST API contract (no network input required).
 import { test, expect } from '@playwright/test';
+import { openConfig } from './lib/ui.mjs';
 
 test.describe('Web UI + REST', () => {
   test('status page loads with the channel grid and key cards', async ({ page }) => {
@@ -17,7 +18,7 @@ test.describe('Web UI + REST', () => {
   });
 
   test('settings page loads with protocol + outputs + network cards', async ({ page }) => {
-    await page.goto('/config');
+    await openConfig(page);
     await expect(page.locator('select[name="protocol"]')).toBeVisible();
     await expect(page.locator('.out-card')).toHaveCount(2);
     await expect(page.locator('input[name="hostname"]')).toBeVisible();
@@ -134,7 +135,7 @@ test.describe('Web UI + REST', () => {
   test('W5500 pins appear when W5500 is picked in the wired selector', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi, 'build has no W5500 SPI support');
-    await page.goto('/config');
+    await openConfig(page);
     await expect(page.locator('#w5500-card')).toBeVisible();
     await page.locator('#wired-sel').selectOption('w5500');             // browser-only, no save
     await expect(page.locator('input[name="ethcs"]')).toBeVisible();
@@ -146,7 +147,7 @@ test.describe('Web UI + REST', () => {
   test('W5500 role pins are not flagged "reserved" against their own role (Save stays enabled)', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi, 'build has no W5500 SPI support');
-    await page.goto('/config');
+    await openConfig(page);
     await page.locator('#wired-sel').selectOption('w5500');   // activate the W5500 bus + its reserved flags
     // Regression: GPIO9-14 carry a reserved:eth-spi flag, and the W5500 role fields
     // (CS/SCK/MOSI/MISO/INT/RST) sit on exactly those pins. They used to be flagged
@@ -166,7 +167,7 @@ test.describe('Web UI + REST', () => {
   });
 
   test('selecting luxdmx_v6 locks the copper pins and tags the header pads', async ({ page }) => {
-    await page.goto('/config');
+    await openConfig(page);
     test.skip(await page.locator('#board-sel option[value="luxdmx_v6"]').count() === 0,
       'luxdmx_v6 board not offered on this chip');
     await page.locator('#wired-sel').selectOption('w5500').catch(() => {});   // reveal the W5500 fields
@@ -196,7 +197,7 @@ test.describe('Web UI + REST', () => {
   });
 
   test('luxdmx_v6 shows J4 and J6 with matching power pins and no 5V on J6', async ({ page }) => {
-    await page.goto('/config');
+    await openConfig(page);
     test.skip(await page.locator('#board-sel option[value="luxdmx_v6"]').count() === 0,
       'luxdmx_v6 board not offered on this chip');
 
@@ -230,7 +231,7 @@ test.describe('Web UI + REST', () => {
   test('the Join-WiFi link-loss fallback reveals the WiFi credentials on a wired box', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi && !d.ethRmii, 'build has no wired Ethernet');
-    await page.goto('/config');
+    await openConfig(page);
     await page.locator('#wired-sel').selectOption('w5500');    // a wired PHY -> the mode + fallback rows appear
     await page.locator('#useeth-sw').check();                  // wired mode
     await expect(page.locator('#sta-creds-row')).toBeHidden(); // no WiFi creds while purely wired
@@ -246,7 +247,7 @@ test.describe('Web UI + REST', () => {
   test('Wired selector: one list of None + the build PHYs, swaps the pin sections', async ({ page, request }) => {
     const d = await (await request.get('/info.json')).json();
     test.skip(!d.ethSpi && !d.ethRmii, 'build has no wired Ethernet');
-    await page.goto('/config');
+    await openConfig(page);
     const sel = page.locator('#wired-sel');
     await expect(sel).toBeVisible();
     await expect(sel.locator('option[value="none"]')).toHaveCount(1);   // None always present
@@ -312,8 +313,63 @@ test.describe('Web UI + REST', () => {
     expect(otaPosted).toBeFalsy();
   });
 
-  test('firmware-update UI is labelled LuxDMX.org, not GitHub', async ({ page }) => {
+  test('settings sections fold away, summarise themselves and remember it', async ({ page }) => {
+    // NB: no openConfig() here -- this test is about the folded default itself.
     await page.goto('/config');
+    const net = page.locator('[data-sec="network"]');
+
+    // The page opens as an overview: every section folded, nothing expanded for you.
+    await expect(page.locator('.card[data-sec]')).not.toHaveCount(0);
+    await expect(page.locator('.card[data-sec]:not(.sec-closed)')).toHaveCount(0);
+    await expect(page.locator('#sec-all')).toHaveText('Expand all');
+    // A folded header says what is inside it instead of just its title
+    await expect(net.locator('.sec-sum')).not.toHaveText('');
+    // Folded only hides: the fields still go out with the form (they are not disabled)
+    expect(await page.evaluate(() =>
+      [...new FormData(document.getElementById('cfg-form')).keys()].includes('wifissid'))).toBeTruthy();
+
+    // Clicking the header unfolds that one section...
+    await net.locator('.sec-title').click();
+    await expect(net.locator('.card-body')).toBeVisible();
+    await expect(net.locator('.sec-sum')).toHaveText('');           // summary yields to the real fields
+    // ...and that choice is what you get next time
+    await page.reload();
+    await expect(net.locator('.card-body')).toBeVisible();
+    await expect(page.locator('[data-sec="protocol"] .card-body')).toBeHidden();   // the rest stayed folded
+    await net.locator('.sec-title').click();                        // fold it again
+    await expect(net.locator('.card-body')).toBeHidden();
+
+    // A control that lives in a card header (the per-output Enabled switch) must keep
+    // working without folding or unfolding the card under it.
+    const out = page.locator('[data-sec="out0"]');
+    const en = page.locator('#o0_en');
+    const before = await en.isChecked();
+    const foldedBefore = await out.getAttribute('class');
+    await en.click();
+    expect(await out.getAttribute('class')).toBe(foldedBefore);
+    await en.click();                                               // restore (browser-only, nothing saved)
+    expect(await en.isChecked()).toBe(before);
+
+    // Fold/unfold everything at once
+    await page.locator('#sec-all').click();
+    await expect(page.locator('.card[data-sec].sec-closed')).toHaveCount(0);
+    await expect(page.locator('#sec-all')).toHaveText('Collapse all');
+    await page.locator('#sec-all').click();
+    await expect(page.locator('.card[data-sec]:not(.sec-closed)')).toHaveCount(0);
+
+    // Expand all has to reach sections that only get built later: the DMX output cards
+    // are cloned once /info.json lands. They used to come up folded anyway, which made
+    // "Expand all" a lie on a slow load. Delay /info.json and click before it arrives.
+    await page.route('**/info.json', async (r) => { await new Promise((s) => setTimeout(s, 800)); await r.continue(); });
+    await page.goto('/config');
+    await page.locator('#sec-all').click();                     // outputs do not exist yet
+    await expect(page.locator('.out-card')).toHaveCount(2);     // ...they show up now
+    await expect(page.locator('.out-card.sec-closed')).toHaveCount(0);
+    await page.unroute('**/info.json');
+  });
+
+  test('firmware-update UI is labelled LuxDMX.org, not GitHub', async ({ page }) => {
+    await openConfig(page);
     await expect(page.getByText('Update from LuxDMX.org')).toBeVisible();
     expect(await page.content()).not.toContain('Update from GitHub');
   });

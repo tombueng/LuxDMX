@@ -599,6 +599,25 @@ The HTTP server and WebSocket are served by ESPAsyncWebServer (non-blocking),
 so the web UI never stalls DMX output. Pages are gzip-compressed and dynamic
 values are fetched as JSON.
 
+The settings page has grown a lot, so every section on it (Hardware board,
+Protocol, Network, Wired Ethernet, Status LED, Display, Controls, each DMX output,
+Device, Firmware Update, Danger Zone) **folds away from its own header**, and the
+page **opens with everything folded**. What you get is a one-screen overview: each
+header carries a one-line summary of what is set inside it, e.g.
+
+```
+Network            WiFi client · Studio · DHCP
+Status LED         5-LED status panel (LuxDMX v5)
+Controls           encoder · 2 buttons
+DMX Output A       universe 0 · UART1 · TX 17 · RDM · 40 fps
+```
+
+Click a header to unfold that section; **Expand all** at the top opens the lot. Which
+sections you keep open is remembered in your browser, so the page comes back the way
+you left it. Folding is purely visual: a folded section still saves its values with
+the rest of the form, and a section holding a rejected pin pops back open by itself so
+a blocking error can't hide behind a fold.
+
 | URL | Method | Function |
 |---|---|---|
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |

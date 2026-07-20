@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { expandAll } from './lib/ui.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CONFIG = fs.readFileSync(path.join(ROOT, 'src/pages/config.html'), 'utf8').replace(/__FWVER__/g, 'test');
@@ -47,6 +48,7 @@ try {
   const page = await browser.newPage();
   await page.route('**://luxdmx.org/**', (route) => route.abort());   // offline: built-in descriptors only
   await page.goto(`http://127.0.0.1:${port}/config`, { waitUntil: 'domcontentloaded' });
+  await expandAll(page);   // the settings sections start folded; this test clicks real controls
   await page.waitForFunction(() => {
     const i = document.getElementsByName('o0_tx')[0];
     return i && i.disabled;                                            // v6 detected, locks applied

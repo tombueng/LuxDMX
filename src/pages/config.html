@@ -89,6 +89,19 @@ footer a:hover { color:var(--gh-text); }
 .hdr-tbl td { border:1px solid var(--gh-border); padding:.08rem .45rem; line-height:1.5; }
 .hdr-tbl .pn { color:var(--gh-muted); text-align:right; }
 .hdr-tbl .pw { color:#ffaa1c; }
+/* Collapsible sections: every settings card folds away from its own header, so a long
+   page stays readable. State is per browser (localStorage), and a folded header shows a
+   one-line summary of what's inside. */
+.card-header.sec-head { display:flex; align-items:center; gap:.5rem; cursor:pointer; user-select:none; }
+.card-header.sec-head:hover { filter:brightness(1.35); }   /* works over the Danger Zone's inline colours too */
+.card-header.sec-head:focus-visible { outline:2px solid var(--lux-cyan); outline-offset:-2px; }
+.sec-caret { flex:0 0 auto; width:11px; height:11px; color:var(--gh-muted); transition:transform .15s ease; }
+.sec-caret svg { display:block; width:100%; height:100%; }
+.card.sec-closed > .card-header .sec-caret { transform:rotate(-90deg); }
+.card.sec-closed > .card-body { display:none; }
+.sec-sum { margin-left:auto; min-width:0; font-weight:400; font-size:.78rem; color:var(--gh-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sec-head .form-check, .sec-head #board-detected { cursor:default; }
 /* Always-visible save bar. The config form submits via the button's form="cfg-form" */
 #save-bar { position:fixed; left:0; right:0; bottom:0; z-index:1030; padding:.55rem 1rem;
   background:rgba(13,17,23,.93); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
@@ -103,14 +116,20 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
 <div class="container py-4" style="max-width:960px">
 
+  <!-- Fold/unfold every section at once. Individual sections toggle from their header. -->
+  <div class="d-flex justify-content-end mb-2">
+    <!-- Label matches the folded default; the script re-labels it from the real state on load. -->
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="sec-all">Expand all</button>
+  </div>
+
   <!-- Art-Net + Device config form -->
   <form method="POST" action="/config" id="cfg-form">
 
     <!-- Hardware board / pin picker (issue #12) -->
-    <div class="card mb-3">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <span>Hardware board</span>
-        <span class="text-secondary small" id="board-detected"></span>
+    <div class="card mb-3" data-sec="board">
+      <div class="card-header d-flex align-items-center">
+        <span class="sec-title">Hardware board</span>
+        <span class="text-secondary small ms-2" id="board-detected"></span>
       </div>
       <div class="card-body">
         <label class="form-label text-secondary small mb-1">Board</label>
@@ -135,8 +154,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       </div>
     </div>
 
-    <div class="card mb-3">
-      <div class="card-header">Protocol</div>
+    <div class="card mb-3" data-sec="protocol">
+      <div class="card-header"><span class="sec-title">Protocol</span></div>
       <div class="card-body">
         <div class="mb-3">
           <label class="form-label text-secondary small mb-1">Input protocol</label>
@@ -155,8 +174,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       </div>
     </div>
 
-    <div class="card mb-3">
-      <div class="card-header">Network</div>
+    <div class="card mb-3" data-sec="network">
+      <div class="card-header"><span class="sec-title">Network</span></div>
       <div class="card-body">
         <div id="net-mode-row" class="mb-3" style="display:none">
           <div class="form-check form-switch">
@@ -231,8 +250,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
     <!-- Wired Ethernet: one selector for the PHY (or None). Replaces the old W5500
          enable switch + the separate PHY/RMII dropdowns. -->
-    <div id="w5500-card" class="card mb-3" style="display:none">
-      <div class="card-header">Wired Ethernet</div>
+    <div id="w5500-card" class="card mb-3" data-sec="wired" style="display:none">
+      <div class="card-header"><span class="sec-title">Wired Ethernet</span></div>
       <div class="card-body">
         <label class="form-label text-secondary small mb-1">Wired Ethernet PHY</label>
         <select class="form-select" id="wired-sel"><option value="none">None (WiFi only)</option></select>
@@ -298,8 +317,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       </div>
     </div>
 
-    <div class="card mb-3">
-      <div class="card-header">Status LED</div>
+    <div class="card mb-3" data-sec="led">
+      <div class="card-header"><span class="sec-title">Status LED</span></div>
       <div class="card-body">
         <div class="mb-3">
           <label class="form-label text-secondary small mb-1">LED type</label>
@@ -346,8 +365,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
     </div>
 
     <!-- Display (issue #5) -->
-    <div class="card mb-3">
-      <div class="card-header">Display</div>
+    <div class="card mb-3" data-sec="display">
+      <div class="card-header"><span class="sec-title">Display</span></div>
       <div class="card-body">
         <div class="mb-3">
           <label class="form-label text-secondary small mb-1">Display type</label>
@@ -427,8 +446,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
     </div>
 
     <!-- On-unit controls: a rotary encoder and/or buttons drive a menu on the display (issue #24) -->
-    <div class="card mb-3">
-      <div class="card-header">Controls (encoder + buttons)</div>
+    <div class="card mb-3" data-sec="controls">
+      <div class="card-header"><span class="sec-title">Controls (encoder + buttons)</span></div>
       <div class="card-body">
         <div class="form-text mb-3">
           Optional physical controls to pick the universe (and protocol) from the unit itself,
@@ -549,8 +568,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
     </div>
 
     <!-- DMX outputs: up to 2 independent universes -->
-    <div class="card mb-3">
-      <div class="card-header">DMX Outputs</div>
+    <div class="card mb-3" data-sec="outputs-help">
+      <div class="card-header"><span class="sec-title">DMX Outputs</span></div>
       <div class="card-body">
         <div class="form-text" style="line-height:1.5">
           Each output is an independent DMX universe driven by its own ESP32 UART + RS485 transceiver.
@@ -572,9 +591,9 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
     <!-- Cloned once per output by buildOutputs() -->
     <template id="out-tpl">
       <div class="card mb-3 out-card">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <span class="out-title">DMX Output</span>
-          <div class="form-check form-switch mb-0">
+        <div class="card-header d-flex align-items-center">
+          <span class="sec-title out-title">DMX Output</span>
+          <div class="form-check form-switch mb-0 ms-3">
             <input class="form-check-input out-en" type="checkbox" value="1">
             <label class="form-check-label small out-en-label">Enabled</label>
           </div>
@@ -649,8 +668,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
       </div>
     </template>
 
-    <div class="card mb-3">
-      <div class="card-header">Device</div>
+    <div class="card mb-3" data-sec="device">
+      <div class="card-header"><span class="sec-title">Device</span></div>
       <div class="card-body">
         <div class="mb-3">
           <label class="form-label text-secondary small mb-1">Hostname</label>
@@ -675,8 +694,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
   </form>
 
   <!-- Firmware OTA -->
-  <div class="card mb-3">
-    <div class="card-header">Firmware Update</div>
+  <div class="card mb-3" data-sec="firmware">
+    <div class="card-header"><span class="sec-title">Firmware Update</span></div>
     <div class="card-body">
 
       <div class="mb-3">
@@ -732,8 +751,8 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
   </div>
 
   <!-- WiFi Reset: danger zone -->
-  <div class="card border-danger mt-2">
-    <div class="card-header" style="color:#f33abc;background:#1c0a16;border-color:#6e1a4f">Danger Zone</div>
+  <div class="card border-danger mt-2" data-sec="danger">
+    <div class="card-header" style="color:#f33abc;background:#1c0a16;border-color:#6e1a4f"><span class="sec-title">Danger Zone</span></div>
     <div class="card-body">
       <p class="text-secondary small mb-3">
         Erases the stored WiFi password and reboots into setup AP mode
@@ -800,6 +819,7 @@ function buildOutputs(outs){
 }
 function wireCard(cont, tpl, i, o){
   var node = tpl.content.firstElementChild.cloneNode(true);
+  node.setAttribute('data-sec', 'out' + i);   // its own fold state, remembered per output
   node.querySelector('.out-title').textContent = 'DMX Output ' + String.fromCharCode(65 + i);
   var en  = node.querySelector('.out-en');
   var uni = node.querySelector('.out-uni');
@@ -829,6 +849,7 @@ function wireCard(cont, tpl, i, o){
   en.addEventListener('change', function(){ syncOutBody(node); });
   uni.addEventListener('input', function(){ updCardHint(node); });
   cont.appendChild(node);
+  secInit(node);          // the output cards fold like every other section
   updCardHint(node);
   syncOutBody(node);
 }
@@ -984,7 +1005,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('dev-host').value = d.hostname || '';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;
-  updNetMode(); updLedPin(); updDispPins(); updHostUrl();
+  updNetMode(); updLedPin(); updDispPins(); updHostUrl(); updSummaries();
   $('save-btn').disabled = false;
   INFO_BOARD = d.board || ''; INFO_MCU = d.mcu || ''; SEL_BOARD = d.boardSel || '';
   initBoards();
@@ -1043,8 +1064,10 @@ function showModal(opts){
 document.querySelector('form[action="/config"]').addEventListener('submit', function(e){
   var bad = [];
   document.querySelectorAll('.out-card').forEach(function(card, i){
-    if (card.querySelector('.out-en').checked && +card.querySelector('.out-tx').value < 0)
+    if (card.querySelector('.out-en').checked && +card.querySelector('.out-tx').value < 0){
       bad.push('Output ' + String.fromCharCode(65 + i));
+      secReveal(card);          // unfold it, the missing pin has to be visible
+    }
   });
   if (bad.length){
     e.preventDefault();
@@ -1181,6 +1204,142 @@ function showAllVersions(){
   tb.querySelectorAll('.ver-extra').forEach(function(r){ r.style.display = ''; });
   var more = $('ver-more-row'); if (more) more.remove();
 }
+
+/* ===================== Collapsible sections =====================
+   Every card on this page folds away from its header. The open/closed state is
+   remembered in this browser, a folded header shows a one-line summary of what's
+   inside, and a section holding a rejected pin always pops back open so an error
+   can never hide behind a fold. Folding only hides fields visually, so a collapsed
+   section still submits its values with the form. */
+var SEC_KEY = 'lux_cfg_sections';
+var SEC_CARET = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.5 5.5h11L8 12z"/></svg>';
+var secState = (function(){ try { return JSON.parse(localStorage.getItem(SEC_KEY) || '{}'); } catch(e){ return {}; } })();
+function secSave(){ try { localStorage.setItem(SEC_KEY, JSON.stringify(secState)); } catch(e){} }
+function secCards(){ return Array.prototype.slice.call(document.querySelectorAll('.container .card[data-sec]')); }
+function secKey(card){ return card.getAttribute('data-sec'); }
+// Everything starts folded: the page opens as a one-screen overview of what is set,
+// and you unfold only the section you came for. Once you open (or close) one, that
+// choice is what you get next time.
+// `_all` is what Collapse/Expand all last did. It has to be remembered separately,
+// because the DMX output cards are built later (once /info.json lands) -- without it,
+// hitting "Expand all" while the page is still loading would leave the outputs folded.
+function secIsOpen(card){
+  var k = secKey(card);
+  if (secState[k] !== undefined) return !!secState[k];
+  return secState._all !== undefined ? !!secState._all : false;
+}
+function secSet(card, open, quiet){
+  card.classList.toggle('sec-closed', !open);
+  var head = card.querySelector('.card-header');
+  if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!quiet){ secState[secKey(card)] = open ? 1 : 0; secSave(); }
+  updSummaries();
+}
+// "all of them" beats every earlier per-section choice, so drop those and keep just the
+// bulk one. That is also what makes it stick for the output cards, which are built later.
+function secSetAll(open){
+  secState = { _all: open ? 1 : 0 };
+  secCards().forEach(function(c){ secSet(c, open, true); });
+  secSave();
+  updSummaries();
+}
+function secAnyOpen(){ return secCards().some(function(c){ return !c.classList.contains('sec-closed'); }); }
+// Open the section a field lives in (used when validation rejects a pin).
+function secReveal(el){
+  var card = el && el.closest ? el.closest('.card[data-sec]') : null;
+  if (card && card.classList.contains('sec-closed')) secSet(card, true);
+  return card;
+}
+function secInit(card){
+  if (card.getAttribute('data-sec-on')) return;
+  var head = card.querySelector('.card-header'), body = card.querySelector('.card-body');
+  if (!head || !body) return;
+  card.setAttribute('data-sec-on', '1');
+  head.classList.add('sec-head');
+  head.setAttribute('role', 'button');
+  head.setAttribute('tabindex', '0');
+  var caret = document.createElement('span');
+  caret.className = 'sec-caret'; caret.innerHTML = SEC_CARET;
+  head.insertBefore(caret, head.firstChild);
+  var sum = document.createElement('span');
+  sum.className = 'sec-sum';
+  head.appendChild(sum);
+  function toggle(){ secSet(card, card.classList.contains('sec-closed')); }
+  head.addEventListener('click', function(ev){
+    // controls that live in a header (the per-output Enabled switch) keep working
+    if (ev.target.closest('input,label,select,button,a')) return;
+    toggle();
+  });
+  head.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); toggle(); }
+  });
+  secSet(card, secIsOpen(card), true);
+}
+function secInitAll(){ secCards().forEach(secInit); }
+
+// One-line summary per section, shown only while the section is folded.
+function selText(id){ var s = $(id); return (s && s.selectedIndex >= 0) ? s.options[s.selectedIndex].text : ''; }
+var PIN_ERR = 0, PIN_WARN = 0;   // pin-validation counts, set by renderWarnings()
+function plural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
+var SEC_SUM = {
+  board: function(){
+    var p = [selText('board-sel')];
+    if (PIN_ERR)  p.push(plural(PIN_ERR, 'pin error'));
+    if (PIN_WARN) p.push(plural(PIN_WARN, 'warning'));
+    return p.filter(Boolean).join(' · ');
+  },
+  protocol: function(){ return selText('proto-sel') + ($('artrdm-sw').checked ? ' · RDM over Art-Net' : ''); },
+  network: function(){
+    var eth = $('net-mode-row').style.display !== 'none' && $('useeth-sw').checked;
+    var ap  = !eth && $('wifi-mode').value === '1';
+    var p = [eth ? 'wired Ethernet' : ap ? 'WiFi access point'
+                 : ('WiFi client' + ($('wifi-ssid').value ? ' · ' + $('wifi-ssid').value : ''))];
+    if (!ap) p.push($('static-sw').checked ? 'static IP' : 'DHCP');
+    return p.join(' · ');
+  },
+  wired:   function(){ return selText('wired-sel'); },
+  led:     function(){ return selText('led-type'); },
+  display: function(){ return selText('disp-type'); },
+  controls: function(){
+    var enc = +$('enc-a').value >= 0 && +$('enc-b').value >= 0;
+    var btns = 0;
+    for (var i = 1; i <= 4; i++) if (+$('btn' + i + '-pin').value >= 0) btns++;
+    if (!enc && !btns) return 'none';
+    return [enc ? 'encoder' : '', btns ? plural(btns, 'button') : ''].filter(Boolean).join(' · ');
+  },
+  'outputs-help': function(){ return 'pins and wiring'; },
+  device:  function(){ return ($('dev-host').value || '') + '.local'; },
+  firmware:function(){ return CURRENT ? 'installed v' + CURRENT : ''; },
+  danger:  function(){ return 'erase WiFi credentials'; },
+  out:     function(card){
+    if (!card.querySelector('.out-en').checked) return 'off';
+    var rts = +card.querySelector('.out-rts').value;
+    var style = card.querySelector('.out-style'), rate = card.querySelector('.out-rate');
+    // In Delta the rate is only the fall-back while the source is quiet, so name the style
+    // instead; in Continuous the fps is the interesting number.
+    var clock = style.value === '1' ? 'delta' : rate.options[rate.selectedIndex].text.split(' ')[0] + ' fps';
+    return 'universe ' + card.querySelector('.out-uni').value
+         + ' · UART' + card.querySelector('.out-port').value
+         + ' · TX ' + card.querySelector('.out-tx').value
+         + (rts >= 0 ? ' · RDM' : '')
+         + ' · ' + clock;
+  }
+};
+function updSummaries(){
+  secCards().forEach(function(card){
+    var el = card.querySelector('.card-header > .sec-sum'); if (!el) return;
+    var k = secKey(card), fn = SEC_SUM[/^out\d+$/.test(k) ? 'out' : k];
+    var txt = '';
+    if (card.classList.contains('sec-closed') && fn){ try { txt = fn(card) || ''; } catch(e){} }
+    el.textContent = txt;
+  });
+  var all = $('sec-all'); if (all) all.textContent = secAnyOpen() ? 'Collapse all' : 'Expand all';
+}
+$('sec-all').addEventListener('click', function(){ secSetAll(!secAnyOpen()); });
+// Any field edit can change a folded section's summary line.
+document.addEventListener('input',  updSummaries);
+document.addEventListener('change', updSummaries);
+secInitAll();
 </script>
 
 <!-- ===================== Pin picker (issue #12) ===================== -->
@@ -1505,6 +1664,9 @@ function flagSeverity(flags, t){
 function setState(el, cls){ el.classList.remove('is-invalid','is-warning'); if (cls) el.classList.add(cls); }
 function renderWarnings(msgs){
   var c = $('pin-warnings'); if (!c) return;
+  PIN_ERR = PIN_WARN = 0;
+  msgs.forEach(function(m){ if (m.sev === 'err') PIN_ERR++; else PIN_WARN++; });
+  updSummaries();                       // the folded header carries the count
   if (!msgs.length){ c.innerHTML = ''; return; }
   var errs = [], warns = [];
   msgs.forEach(function(m){ (m.sev === 'err' ? errs : warns).push(m); });
@@ -1551,7 +1713,9 @@ function validate(){
     if (probs.length){
       setState(f.el, sev === 'err' ? 'is-invalid' : 'is-warning');
       msgs.push({ sev:sev, text:roleLabel(f.role) + ': ' + probs.join('; ') });
-      if (sev === 'err') hard = true;
+      // A rejected pin blocks Save, so never let it hide behind a folded section:
+      // pop open both the field's own section and the one holding the warning list.
+      if (sev === 'err'){ hard = true; secReveal(f.el); secReveal($('pin-warnings')); }
     }
   });
   renderWarnings(msgs);

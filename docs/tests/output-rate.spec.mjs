@@ -16,6 +16,7 @@ import { test, expect } from '@playwright/test';
 import { deviceHost, UdpSender, streamFor, artDmxPacket, prepInput, sleep, ART_PORT } from './lib/net.mjs';
 import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
 import { ArtRdmClient } from './lib/artrdm.mjs';
+import { openConfig } from './lib/ui.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 
@@ -100,7 +101,7 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
   });
 
   test('config page renders a rate and a transmit-style selector per output', async ({ page }) => {
-    await page.goto('/config');
+    await openConfig(page);
     await expect(page.locator('select[name="o0_rate"]')).toHaveCount(1);
     await expect(page.locator('select[name="o0_style"]')).toHaveCount(1);
     await expect(page.locator('select[name="o1_rate"]')).toHaveCount(1);
