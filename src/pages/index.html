@@ -537,7 +537,8 @@ function connect() {
 
     // Output frame rates label each output-selector button. The frame carries two per-output arrays
     // (output fps, then input fps) before the fixed 10-byte tail; we only need the output fps here.
-    var perOut = [], nOut = Math.max(0, (v.byteLength - 528 - 10) >> 2);
+    // 5 bytes per output on the /ws frame: out fps(2), in fps(2), transmit style(1).
+    var perOut = [], nOut = Math.max(0, Math.floor((v.byteLength - 528 - 10) / 5));
     for (var oi = 0; oi < nOut; oi++) perOut[oi] = v.getUint16(528 + 2 * oi) / 10;
     document.querySelectorAll('#out-sel button').forEach(function(btn){
       var sp = btn.querySelector('.out-fps'), idx = +btn.dataset.out;

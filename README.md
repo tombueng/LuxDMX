@@ -724,6 +724,10 @@ for that**. A node can advertise the rate it accepts (we do, in `ArtPollReply` `
 nothing flows the other way. The rate is only ever inferred from how fast packets arrive, which is
 what the **In FPS** readout in the navbar shows.
 
+The navbar carries it too: a `C` or `D` per output (continuous or delta), with a dot on any style a
+controller pushed over Art-Net, and the full wording in the tooltip. So you can see at a glance
+whether a port is free-running or following the console, without opening `/config`.
+
 A console can select the style remotely with Art-Net `ArtAddress` (`AcStyleDelta` / `AcStyleConst`).
 When that happens the `/config` page labels the setting **set over Art-Net** instead of *set here*,
 so a mode you did not pick doesn't look like your own doing. Changing it in the web UI takes it back.
