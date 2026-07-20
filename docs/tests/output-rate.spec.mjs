@@ -137,8 +137,11 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
     const c = new ArtRdmClient(host);
     await c.ready;
     try {
-      const reply = await c.poll();
-      expect(reply).toBeTruthy();
+      // ArtPoll/ArtPollReply is UDP, so a single lost datagram is not a firmware bug. Ask a
+      // few times before calling it a failure (this flaked exactly once in a full run).
+      let reply = null;
+      for (let i = 0; i < 3 && !reply; i++) reply = await c.poll();
+      expect(reply, 'no ArtPollReply after 3 ArtPolls').toBeTruthy();
       const want = RATE_FPS[d.outputs[0].rate];
       // integer Hz field, so allow the rounding the firmware does (41.7 -> 42, 33.3 -> 33)
       expect(Math.abs(reply.refreshRate - want),

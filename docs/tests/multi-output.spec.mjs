@@ -63,7 +63,9 @@ test.describe('Multi-output (issue #4)', () => {
       for (const k of OUT_KEYS) expect(o, `output missing "${k}"`).toHaveProperty(k);
       expect(o.port === 1 || o.port === 2, 'port is 1 or 2').toBeTruthy();
       expect(o.uni).toBeGreaterThanOrEqual(0);
-      expect(o.uni).toBeLessThanOrEqual(15);
+      // 15 was the old Art-Net-only ceiling. Universes are 0..32767 now (sACN + Art-Net 4),
+      // and the config form accepts that range, so a box on universe 77 is perfectly legal.
+      expect(o.uni).toBeLessThanOrEqual(32767);
     }
     expect(d).toHaveProperty('rdmOut');
   });
@@ -103,7 +105,9 @@ test.describe('Multi-output (issue #4)', () => {
     // Cloned-template fields are renamed per output index.
     for (const n of ['o0_uni', 'o0_port', 'o0_tx', 'o0_rx', 'o0_rts',
                      'o1_uni', 'o1_port', 'o1_tx', 'o1_rx', 'o1_rts']) {
-      await expect(page.locator(`[name="${n}"]`)).toHaveCount(1);
+      // :not(.fixed-mirror) -- on a fixed-pin board a locked field grows a hidden mirror
+      // input with the same name so the value still POSTs. One real control is the assertion.
+      await expect(page.locator(`[name="${n}"]:not(.fixed-mirror)`)).toHaveCount(1);
     }
     await expect(page.locator('#o0_en')).toBeChecked(); // Output A enabled
   });

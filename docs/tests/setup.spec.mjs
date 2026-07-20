@@ -8,6 +8,7 @@
 // POST /setup, echoing the form fields back so we can assert what the page submitted.
 import { test, expect } from '@playwright/test';
 import { spawn } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,19 +20,36 @@ const BASE = `http://127.0.0.1:${PORT}`;
 
 let sim;
 
+// `/sim/` is gitignored (it carries the video pipeline and is kept in the private ops repo),
+// so it is missing in a fresh worktree and on CI, and a checkout can be sitting on a copy
+// that predates the setup portal and serves no /setup at all. Either way that is a missing
+// harness, not a broken portal, so say so and skip -- red tests that mean "your environment
+// is stale" train people to ignore red tests.
+let simWhy = fs.existsSync(simEntry) ? null : 'sim/server.js not present (it is gitignored, see the private ops repo)';
+
 test.beforeAll(async () => {
+  if (simWhy) return;
+  const simErr = [];
   sim = spawn(process.execPath, [simEntry, String(PORT)], { cwd: repo, stdio: 'pipe' });
+  sim.stderr.on('data', (b) => simErr.push(String(b)));
   // wait until the sim answers /setup
   const deadline = Date.now() + 8000;
   for (;;) {
     try {
       const r = await fetch(BASE + '/setup');
       if (r.ok) break;
+      if (r.status === 404) { simWhy = 'this sim/server.js is older than the setup portal (no /setup route)'; break; }
     } catch { /* not up yet */ }
-    if (Date.now() > deadline) throw new Error('sim did not start');
+    if (Date.now() > deadline) {
+      simWhy = 'sim did not start: ' + (simErr.join('').trim().split('\n')[0] || 'no output');
+      break;
+    }
     await new Promise((r) => setTimeout(r, 150));
   }
+  if (simWhy && sim) { sim.kill(); sim = null; }
 });
+
+test.beforeEach(() => { test.skip(!!simWhy, simWhy || ''); });
 
 test.afterAll(() => { if (sim) sim.kill(); });
 

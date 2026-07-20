@@ -36,10 +36,18 @@ test.describe('Web UI + REST', () => {
 
   test('navbar link indicator reflects the active interface (WiFi/LAN/AP)', async ({ page, request }) => {
     await page.goto('/');
-    // wait for the first WS frame to populate the navbar (value leaves the "—" default)
-    await expect(page.locator('#rssi')).not.toHaveText('—', { timeout: 10000 });
-    const label = (await page.locator('#net-label').textContent()).trim();
-    const value = (await page.locator('#rssi').textContent()).trim();
+    // Wait for a real reading. The old guard waited for the value to leave "—", but the
+    // markup placeholder is "·", so it was satisfied instantly and the test read the
+    // placeholder next to the markup's default "WiFi" label. Wait for one of the shapes the
+    // navbar actually renders instead.
+    await expect(page.locator('#rssi')).toHaveText(/(\d+M|dBm|active)$/, { timeout: 15000 });
+    // Read both in ONE snapshot. They are written together by the same WS frame handler, so
+    // reading them in two round-trips could catch the label from before a frame and the value
+    // from after it (it saw label "WiFi" next to a value of "100M" and failed).
+    const { label, value } = await page.evaluate(() => ({
+      label: document.getElementById('net-label').textContent.trim(),
+      value: document.getElementById('rssi').textContent.trim(),
+    }));
     expect(['WiFi', 'LAN', 'AP']).toContain(label);
     if (label === 'LAN')  expect(value).toMatch(/^\d+M$/);   // wired link speed, e.g. 100M
     if (label === 'WiFi') expect(value).toMatch(/dBm$/);     // signal strength
@@ -138,10 +146,12 @@ test.describe('Web UI + REST', () => {
     await openConfig(page);
     await expect(page.locator('#w5500-card')).toBeVisible();
     await page.locator('#wired-sel').selectOption('w5500');             // browser-only, no save
-    await expect(page.locator('input[name="ethcs"]')).toBeVisible();
-    await expect(page.locator('input[name="ethsck"]')).toBeVisible();
+    // Target the real inputs by id: on a fixed-pin board a lock adds a hidden .fixed-mirror
+    // carrying the SAME name, so name= matches two elements.
+    await expect(page.locator('#eth-cs')).toBeVisible();
+    await expect(page.locator('#eth-sck')).toBeVisible();
     await expect(page.locator('#net-mode-row')).toBeVisible();          // "Use wired Ethernet" appears
-    await expect(page.locator('.pin-grp input[name="ethcs"]')).toHaveCount(1);   // pin-picker button
+    await expect(page.locator('.pin-grp:has(#eth-cs)')).toHaveCount(1);   // wrapped for the pin picker
   });
 
   test('W5500 role pins are not flagged "reserved" against their own role (Save stays enabled)', async ({ page, request }) => {
@@ -188,7 +198,9 @@ test.describe('Web UI + REST', () => {
     await page.locator('#board-open').click();
     const board = page.locator('#board-svg-wrap > svg.board-svg');
     await expect(board.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');
-    await expect(board.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 4');
+    // GPIO35 is J6 pin 3, not 4: PR #97 moved J6 to J4's power layout (1=+3V3, 2=GND), which
+    // shifted every signal pin down one. hardware/luxdmx.net has J6.3 = EXP_IO35.
+    await expect(board.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 3');
     // ...and both wirable connectors are drawn as their own strips, with the rails inert
     // and the signal pins clickable (see docs/tests/v6-headers.mjs for the full behaviour)
     await expect(page.locator('.hdr-strips svg.hdr-strip')).toHaveCount(2);
@@ -220,8 +232,11 @@ test.describe('Web UI + REST', () => {
     await expect(j6row(3)).toContainText('IO35');
     await expect(j6row(9)).toContainText('GND');
     await page.locator('#board-open').click();
-    await expect(page.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 3');
-    await expect(page.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');   // J4 unmoved
+    // Scope to the board diagram: the same GPIO also has a pad on the J4/J6 connector strips
+    // (added in #95), so an unscoped .pad[data-gpio=..] matches twice.
+    const svg = page.locator('#board-svg-wrap > svg.board-svg');
+    await expect(svg.locator('.pad[data-gpio="35"] title')).toContainText('J6 pin 3');
+    await expect(svg.locator('.pad[data-gpio="4"] title')).toContainText('J4 pin 3');   // J4 unmoved
 
     // UART0 is on 7/8 and is the only thing on J6 that costs you something (the serial console)
     await expect(j6row(7)).toContainText('TX0');
