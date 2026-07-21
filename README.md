@@ -624,6 +624,8 @@ Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a r
 
   A runtime watchdog applies the policy even if the cable is pulled while running (the old fallback only ran at boot, so a mid-show unplug used to strand the device). There is **no automatic WiFi setup portal** on link loss, on purpose: that would let anyone who can drop the link force the device onto their own WiFi. To move the device to a new WiFi, hold the **BOOT button** at power-up for the setup portal (physical access required).
 
+  On the W5500 (SPI Ethernet) the watchdog first tries to **recover the link in place** before falling back: the chip can occasionally come up (or come back after heavy traffic like an OTA) reporting no link even though the cable is fine, and a plain reboot doesn't clear it. A full re-initialise (tear the driver down, hard-reset the chip, bring it back up) re-negotiates the link and clears it, without a reboot and without DMX ever stopping. This runs both at boot and from the runtime watchdog, so a wedged link recovers on its own; `/info.json` exposes `ethRecoverAttempts` and `ethRecoveries` so you can see it happen.
+
 **Using AP mode with an iPad / console app** (Luminair, Photon, etc.): set WiFi mode to Standalone AP and reboot, join the `dmx-gateway` network, then point the app's Art-Net output at **`192.168.4.1`** (or broadcast `192.168.4.255`).
 
 > **AP-mode caveats:** the joined device has **no internet** while on LuxDMX's AP; it is **2.4 GHz only** with a small client limit; and **Art-Net** (unicast/broadcast) is more reliable than **sACN** multicast over a SoftAP, so prefer Art-Net in this mode.
