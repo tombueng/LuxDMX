@@ -414,6 +414,22 @@ static IPAddress netLocalIP() {
     if (g_apMode) return WiFi.softAPIP();
     return WiFi.localIP();
 }
+// The live interface's subnet mask / gateway. Used by ArtIpProgReply (Art-Net remote IP config) to
+// report the address the node is actually running on, which on a DHCP node is not in cfg.
+static IPAddress netSubnetMask() {
+#if defined(HAS_WIRED_ETH)
+    if (g_useEth) return ETH.subnetMask();
+#endif
+    if (g_apMode) return IPAddress(255, 255, 255, 0);
+    return WiFi.subnetMask();
+}
+static IPAddress netGatewayIP() {
+#if defined(HAS_WIRED_ETH)
+    if (g_useEth) return ETH.gatewayIP();
+#endif
+    if (g_apMode) return WiFi.softAPIP();
+    return WiFi.gatewayIP();
+}
 static String netSSID() {
 #if defined(HAS_WIRED_ETH)
     if (g_useEth) return String("Ethernet");
@@ -2248,6 +2264,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"linkLossMode\":"; j += cfg.linkLossMode;          j += ",";   // WIRED_FB_*
     j += "\"apPassword\":\""; j += cfg.apPassword;       j += "\",";
     j += "\"staticIp\":";   j += cfg.staticIp ? "true" : "false"; j += ",";
+    j += "\"ipProg\":";     j += cfg.ipProg ? "true" : "false";   j += ",";   // Art-Net ArtIpProg remote IP config (default off)
     j += "\"sip\":\"";      j += cfg.ip;                 j += "\",";
     j += "\"gateway\":\"";  j += cfg.gateway;            j += "\",";
     j += "\"subnet\":\"";   j += cfg.subnet;             j += "\",";

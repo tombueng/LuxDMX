@@ -37,11 +37,24 @@ static constexpr uint16_t ARTNET_OP_TODDATA    = 0x8100;
 static constexpr uint16_t ARTNET_OP_TODCONTROL = 0x8200;
 static constexpr uint16_t ARTNET_OP_RDM        = 0x8300;
 static constexpr uint16_t ARTNET_OP_ADDRESS    = 0x6000;
+static constexpr uint16_t ARTNET_OP_IPPROG     = 0xf800;   // remote IP programming (issue #110)
+static constexpr uint16_t ARTNET_OP_IPPROGREPLY= 0xf900;
 static constexpr int      ARTNET_PORT          = 6454;
 static const uint8_t      ARTNET_ID[8]         = {'A','r','t','-','N','e','t',0};
 
 // AtcFlush command in ArtTodControl
 static constexpr uint8_t  ATC_FLUSH = 0x01;
+
+// ArtIpProg Command byte (field @ offset 14, issue #110). bit7 gates programming; bit6 (DHCP)
+// overrides every lower bit. See the ARTNET_OP_IPPROG case in artHandlePacket().
+static constexpr uint8_t IPPROG_ENABLE  = 0x80;   // bit7: apply changes (clear = enquiry only, no change)
+static constexpr uint8_t IPPROG_DHCP    = 0x40;   // bit6: switch to DHCP, ignore all lower bits
+static constexpr uint8_t IPPROG_GATEWAY = 0x10;   // bit4: program gateway
+static constexpr uint8_t IPPROG_DEFAULT = 0x08;   // bit3: reset ip/mask/gateway to factory default
+static constexpr uint8_t IPPROG_IP      = 0x04;   // bit2: program IP address
+static constexpr uint8_t IPPROG_MASK    = 0x02;   // bit1: program subnet mask
+// (bit0 = program TCP port: deprecated, intentionally not implemented)
+static constexpr uint8_t IPPROGREPLY_DHCP = 0x40; // ArtIpProgReply Status bit6: DHCP is enabled
 
 // ArtAddress Command byte (field 13). Art-Net 4 selects the target port by BindIndex, so consoles
 // send the "...0" variant; the per-port 1/2/3 variants are deprecated -> we match on the high nibble.
@@ -116,6 +129,10 @@ static volatile uint8_t g_discStage = 0, g_discFound = 0, g_discCur = 0, g_discS
 static int rdmLineForUniverse(uint16_t uni);   // fwd decl (defined with the discovery machine)
 static inline void wrU16LE(uint8_t* p, uint16_t v) { p[0] = v & 0xff; p[1] = v >> 8; }
 
+// The DHCP/static state we report in BOTH ArtIpProgReply Status bit6 and ArtPollReply Status2 bit1,
+// so they can never disagree. cfg.staticIp set = a fixed address, so DHCP is off (issue #110).
+static inline bool artIpIsDhcp() { return !cfg.staticIp; }
+
 // ArtPollReply (239 bytes) for ONE output port. Art-Net wants a separate reply per port, each with
 // its own Net/Sub-Net switches and a unique BindIndex, because a single reply carries only one
 // Net/Sub-Net and so can't describe ports on different sub-nets. The universe is the full 15-bit
@@ -169,7 +186,11 @@ static int buildArtPollReply(uint8_t* b, int outIdx, int bindIndex) {
     memcpy(b + 201, g_nodeMac, 6);             // MAC
     b[207] = b[10]; b[208] = b[11]; b[209] = b[12]; b[210] = b[13];   // BindIp = our IP
     b[211] = (uint8_t)bindIndex;               // BindIndex (1-based, unique per port)
-    b[212] = 0x0e;                             // Status2: web-config + 15-bit + DHCP capable
+    // Status2: bit0 = supports web-browser config (we do -- was wrongly left clear), bit1 = the node's
+    // IP is *currently* DHCP-assigned (was hard-set, so we lied to every controller while on a static
+    // IP), bit2 = DHCP capable, bit3 = supports the 15-bit port-address (Art-Net 3+). bit1 comes from
+    // the same place as ArtIpProgReply's DHCP bit so the two can't disagree (issue #110).
+    b[212] = 0x0d | (artIpIsDhcp() ? 0x02 : 0x00);
     // Status3: bit1 = BackgroundQueue supported, bits7-6 = failsafe state (what this port does when
     // network data is lost). We already have that per output as lossMode, so report it rather than
     // leaving it at 00. STOP has no Art-Net equivalent (the spec's four states all keep transmitting),
@@ -236,6 +257,52 @@ static int buildArtRdm(uint8_t* b, uint16_t portAddr, const uint8_t* rdmNoSC, in
     b[23] = portAddr & 0xff;                    // Address
     memcpy(b + 24, rdmNoSC, rdmLen);
     return 24 + rdmLen;
+}
+
+// ---- ArtIpProg / ArtIpProgReply (remote IP config, issue #110) -------------
+// Write a v4 IP address as 4 octets, network order (first octet first). `u` is the ipStr/IPAddress
+// convention (first octet in the low byte), so b[0] = first octet.
+static inline void wrIpBE(uint8_t* b, uint32_t u) {
+    b[0] = u & 0xff; b[1] = (u >> 8) & 0xff; b[2] = (u >> 16) & 0xff; b[3] = (u >> 24) & 0xff;
+}
+// Read 4 octets (network order) back into that same convention.
+static inline uint32_t rdIpBE(const uint8_t* b) {
+    return (uint32_t)b[0] | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
+}
+
+// The address to REPORT for a field: the stored static value when we're in static mode and it is set,
+// otherwise the live interface value. So an enquiry on a DHCP node shows the address it actually got,
+// while reading back a just-programmed static IP returns what we stored -- the running interface only
+// picks the new address up on the next boot (we deliberately don't renumber a live interface).
+static uint32_t artReportIp() {
+    if (cfg.staticIp) { IPAddress a; if (parseIp(cfg.ip, a)) return (uint32_t)a; }
+    return (uint32_t)netLocalIP();
+}
+static uint32_t artReportSm() {
+    if (cfg.staticIp) { IPAddress a; if (parseIp(cfg.subnet, a)) return (uint32_t)a; }
+    return (uint32_t)netSubnetMask();
+}
+static uint32_t artReportGw() {
+    if (cfg.staticIp) { IPAddress a; if (parseIp(cfg.gateway, a)) return (uint32_t)a; }
+    return (uint32_t)netGatewayIP();
+}
+
+// ArtIpProgReply (34 bytes). NOTE the layout differs from the request past offset 16: Status is at
+// 26 and ProgDg at 28 here (the request has ProgDg at 26). Built AFTER any programming is applied.
+static int buildArtIpProgReply(uint8_t* b) {
+    memset(b, 0, 34);
+    memcpy(b, ARTNET_ID, 8);
+    wrU16LE(b + 8, ARTNET_OP_IPPROGREPLY);
+    b[10] = 0; b[11] = 14;                       // ProtVer H/L = 14
+    // Filler1-4 (12..15) = 0 (four fillers here, only two in the request)
+    wrIpBE(b + 16, artReportIp());               // ProgIp: current IP
+    wrIpBE(b + 20, artReportSm());               // ProgSm: current subnet mask
+    b[24] = 0; b[25] = 0;                        // ProgPort (deprecated): send 0
+    b[26] = artIpIsDhcp() ? IPPROGREPLY_DHCP : 0x00;   // Status: bit6 = DHCP enabled, else 0
+    b[27] = 0;                                   // Spare2
+    wrIpBE(b + 28, artReportGw());               // ProgDg: current gateway
+    b[32] = 0; b[33] = 0;                        // Spare
+    return 34;
 }
 
 // ===========================================================================
@@ -349,6 +416,46 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
         // Every ArtAddress must be answered with an ArtPollReply (spec) -- also how the console reads
         // back the applied value and repaints its dialog.
         artSendPollReplies(ip);
+        return;
+    }
+    case ARTNET_OP_IPPROG: {
+        // Remote IP programming (ArtIpProg 0xf800, issue #110). OFF by default (cfg.ipProg): with it
+        // clear we send NO reply, which is exactly how the spec says a node without the feature opts
+        // out -- and the Art-Net protocol has no auth, so on means anyone on the wire can renumber us.
+        // The request is 34 bytes; we read Command@14, ProgIp@16, ProgSm@20, ProgDg@26 (n>=30 covers
+        // every field we touch). Careful: ProgDg is at 26 in the *request*, 28 in the reply.
+        if (!cfg.ipProg || n < 30) return;
+        uint8_t cmd = p[14];
+        if (cmd & IPPROG_ENABLE) {                  // bit7 clear = enquiry only: reply, change nothing
+            if (cmd & IPPROG_DHCP) {                // bit6: switch to DHCP, ignore all lower bits
+                cfg.staticIp = false;
+            } else {
+                if (cmd & IPPROG_DEFAULT) {         // bit3: reset ip/mask/gateway to factory default
+                    cfg.staticIp = false;
+                    cfg.ip = ""; cfg.gateway = ""; cfg.dns = "";
+                    cfg.subnet = "255.255.255.0";
+                }
+                if (cmd & IPPROG_IP) {              // bit2: program IP -- an explicit address means static
+                    cfg.ip = ipStr(rdIpBE(p + 16));
+                    cfg.staticIp = true;
+                }
+                if (cmd & IPPROG_MASK)              // bit1: program subnet mask
+                    cfg.subnet = ipStr(rdIpBE(p + 20));
+                if (cmd & IPPROG_GATEWAY)           // bit4: program gateway
+                    cfg.gateway = ipStr(rdIpBE(p + 26));
+            }
+            g_artCfgDirty = true;                   // loop() drains this into saveConfig()
+            // Deliberately NOT applied to the running interface: renumbering a live netif mid-frame
+            // invites more failure modes than it's worth, and the reply below confirms what we stored.
+            // It takes effect on the next boot.
+            Serial.printf("[ART-IPPROG] cmd=0x%02x -> %s ip=%s sm=%s gw=%s (stored; applies on reboot)\n",
+                          cmd, artIpIsDhcp() ? "DHCP" : "static",
+                          cfg.ip.c_str(), cfg.subnet.c_str(), cfg.gateway.c_str());
+        }
+        // Reply in ALL cases (spec says so twice), unicast to the sender, built from config AFTER
+        // applying. artSendTo already targets the sender's IP on port 6454 -- never broadcast.
+        static uint8_t ipReply[34];
+        artSendTo(ip, ipReply, buildArtIpProgReply(ipReply));
         return;
     }
     case ARTNET_OP_TODREQUEST: {

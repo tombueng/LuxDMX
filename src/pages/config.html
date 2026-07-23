@@ -245,6 +245,11 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
           </div>
         </div>
         <div class="form-text mt-2">Applied after reboot. Wrong values can make the device unreachable. Use the BOOT-button reset to recover.</div>
+        <div class="form-check form-switch mt-3">
+          <input class="form-check-input" type="checkbox" name="ipprog" id="ipprog-sw" value="1">
+          <label class="form-check-label small" for="ipprog-sw">Allow remote IP config over Art-Net (ArtIpProg)</label>
+        </div>
+        <div class="form-text">Lets a controller (e.g. DMX-Workshop) read and change this node's IP / mask / gateway over the network, so a box that landed on an unreachable address is recoverable without the BOOT button. <b>Off by default:</b> Art-Net has no password, so while this is on anyone on the network can renumber the device. The new address applies after a reboot.</div>
       </div>
     </div>
 
@@ -978,6 +983,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('ap-pw').value = d.apPassword || '';
   $('fb-mode').value = String(d.linkLossMode !== undefined ? d.linkLossMode : (d.apFallback ? 1 : 0));
   $('static-sw').checked = !!d.staticIp;
+  $('ipprog-sw').checked = !!d.ipProg;
   $('net-ip').value  = d.sip || '';
   $('net-gw').value  = d.gateway || '';
   $('net-sn').value  = d.subnet || '';

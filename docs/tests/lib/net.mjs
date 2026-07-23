@@ -37,6 +37,68 @@ export function artDmxPacket(universe, data, seq = 0) {
   return buf;
 }
 
+// ── Art-Net ArtPoll (0x2000): 14-byte discovery request ─────────────────────
+export function artPollPacket() {
+  const buf = Buffer.alloc(14);
+  buf.write('Art-Net\0', 0, 'latin1');
+  buf.writeUInt16LE(0x2000, 8);            // OpCode = OpPoll (little-endian)
+  buf[10] = 0; buf[11] = 14;               // ProtVer hi/lo = 14
+  buf[12] = 0;                             // TalkToMe
+  buf[13] = 0;                             // Priority
+  return buf;
+}
+
+// Write a v4 address (dotted-quad string) as 4 octets, network order (first octet first).
+function writeIp4(buf, off, s) {
+  const o = String(s).split('.').map((x) => parseInt(x, 10) & 0xff);
+  buf[off] = o[0] || 0; buf[off + 1] = o[1] || 0; buf[off + 2] = o[2] || 0; buf[off + 3] = o[3] || 0;
+}
+// Read 4 octets (network order) at `off` back into a dotted-quad string.
+export function readIp4(buf, off) {
+  return `${buf[off]}.${buf[off + 1]}.${buf[off + 2]}.${buf[off + 3]}`;
+}
+
+// ── Art-Net ArtIpProg (0xf800): remote IP programming request (34 bytes) ────
+// cmd = Command byte: bit7 enable, bit6 DHCP, bit4 gateway, bit3 factory-default, bit2 IP, bit1 mask.
+// ip/sm/gw are dotted-quad strings, only read by the node when their command bit is set.
+export function artIpProgPacket(cmd = 0, { ip = '0.0.0.0', sm = '0.0.0.0', gw = '0.0.0.0' } = {}) {
+  const buf = Buffer.alloc(34);
+  buf.write('Art-Net\0', 0, 'latin1');
+  buf.writeUInt16LE(0xf800, 8);            // OpCode = ArtIpProg
+  buf[10] = 0; buf[11] = 14;               // ProtVer hi/lo = 14
+  buf[14] = cmd & 0xff;                    // Command
+  writeIp4(buf, 16, ip);                   // ProgIp
+  writeIp4(buf, 20, sm);                   // ProgSm
+  // 24..25 ProgPort (deprecated) left 0
+  writeIp4(buf, 26, gw);                   // ProgDg  (NOTE: 26 in the request, 28 in the reply)
+  return buf;
+}
+
+// Send one Art-Net packet from a socket bound to :6454 and resolve with the first matching reply the
+// device sends back (Art-Net replies always come to port 6454, not the sender's ephemeral port), or
+// null after `timeoutMs` of silence; used to assert a node that opted out sends NO reply. `wantOp`
+// filters by reply opcode so unrelated Art-Net chatter on the LAN is ignored.
+export function artNetRequestReply(host, packet, { timeoutMs = 1500, wantOp = null } = {}) {
+  return new Promise((resolve, reject) => {
+    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    let done = false;
+    const finish = (val) => { if (done) return; done = true; clearTimeout(timer); try { sock.close(); } catch {} resolve(val); };
+    const fail   = (e)   => { if (done) return; done = true; clearTimeout(timer); try { sock.close(); } catch {} reject(e); };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    sock.on('message', (msg, rinfo) => {
+      if (rinfo.address !== host) return;                                   // only the device under test
+      if (msg.length < 12 || msg.toString('latin1', 0, 8) !== 'Art-Net\0') return;
+      if (wantOp != null && msg.readUInt16LE(8) !== wantOp) return;         // wrong opcode, keep waiting
+      finish(msg);
+    });
+    sock.on('error', fail);
+    sock.bind(ART_PORT, () => {
+      try { sock.setBroadcast(true); } catch {}
+      sock.send(packet, ART_PORT, host, (e) => { if (e) fail(e); });
+    });
+  });
+}
+
 // ── sACN / E1.31 data packet (638 bytes, E1.31-2016) ────────────────────────
 // opts.priority sets the E1.31 framing-layer priority (0–200, default 100);
 // opts.cid overrides the 16-byte source CID.
