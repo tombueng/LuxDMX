@@ -81,6 +81,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
 | **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
 | **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
+| **Remote IP config (ArtIpProg)** | A controller can read and set the node's IP / mask / gateway (or switch it to DHCP) over the network with Art-Net `ArtIpProg`, so a box that landed on an unreachable address is recoverable without the BOOT button or a serial cable. **Off by default** (Art-Net has no auth, so on = anyone on the wire can renumber it); the new address applies on the next boot. See [Remote IP config over Art-Net](#remote-ip-config-over-art-net-artipprog-off-by-default) |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
 | **On-unit controls** | Optional rotary encoder and/or up to 4 buttons drive a small on-display menu to set the universe (and protocol) without a phone or PC, and the choice persists. Works with any mix of inputs — encoder-only, one button, or the lot. See [docs/controls.md](docs/controls.md) |
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
@@ -627,6 +628,24 @@ Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a r
 
 > **AP-mode caveats:** the joined device has **no internet** while on LuxDMX's AP; it is **2.4 GHz only** with a small client limit; and **Art-Net** (unicast/broadcast) is more reliable than **sACN** multicast over a SoftAP, so prefer Art-Net in this mode.
 
+#### Remote IP config over Art-Net (ArtIpProg): off by default
+
+A node that ends up with an address that doesn't work on the network it's plugged into normally needs
+the **BOOT button** or a serial cable to fix. Art-Net has an answer for exactly this: **ArtIpProg**
+(opcode `0xf800`). A controller (e.g. DMX-Workshop's node list, right-click, *Configure IP Address*)
+reads the node's IP / mask / gateway and can set a new one, or switch it to DHCP. LuxDMX applies the
+change, persists it, and replies with **ArtIpProgReply** (`0xf900`).
+
+This is **off by default** (`ipprog` in **`/config` → Network**), and for good reason: the Art-Net
+protocol has **no authentication or rate limiting**, so while it is on, *anyone who can send a UDP
+packet to the device can change its network address*, including onto an address you can't reach it at.
+Turn it on only on a trusted network, when you actually need it. While it's off, the device does not
+reply to ArtIpProg at all, which is the spec's own way of declaring "not supported".
+
+A programmed address is **stored and applied on the next reboot**, not slammed onto the running
+interface, so a controller can't knock a live node off the wire mid-frame. The reply confirms what was
+stored, and the change takes effect cleanly at the next boot.
+
 ### 2. Status Page
 
 Open `http://dmx-gateway.local` (mDNS), or `http://dmx-gateway/` if your router resolves DHCP hostnames (handy on Windows, which has no mDNS), or the IP shown in serial monitor at 115200 baud:
@@ -1126,6 +1145,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Art-Net Universe | `0` | Web `/config` or portal |
 | Protocol | `Both (Art-Net + sACN)` | Web `/config` |
 | Static IP / gateway / subnet / DNS | DHCP | Web `/config` (Network) |
+| Art-Net remote IP config (`ipprog`) | **off** | Web `/config` (Network) |
 | Auto-update | off | Web `/config` (Firmware) |
 | RDM over Art-Net (`artrdm`) | on | Web `/config` (RDM) |
 | RDM device limit (`rdmmaxdev`) | `0` (auto: **64** on ESP32-S3 / PSRAM, **16** on the classic ESP32) | Web `/config` (RDM) |

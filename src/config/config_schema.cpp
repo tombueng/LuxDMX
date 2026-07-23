@@ -144,6 +144,11 @@ const CfgField CONFIG_FIELDS[] = {
     SFIELD("gateway",  "gateway",      gateway,      "Gateway",            "Network", CFG_NONE),
     SFIELD("subnet",   "subnet",       subnet,       "Subnet mask",        "Network", CFG_NONE),
     SFIELD("dns",      "dns",          dns,          "DNS server",         "Network", CFG_NONE),
+    // Remote IP programming over Art-Net (ArtIpProg, issue #110). OFF by default: the Art-Net spec has
+    // no auth, rate limit or ownership, so with this on any unicast packet on the network can change
+    // the node's address. Off means we don't reply at all, which is the spec's own opt-out for a node
+    // that doesn't support the feature. LIVE: flipping it just gates the reply, so no reboot needed.
+    BFIELD_L("ipprog", "ipProg",       ipProg,       "Art-Net remote IP config (ArtIpProg)", "Network", CFG_NONE),
 
     // --- RDM ----------------------------------------------------------------
     BFIELD_L("artrdm", "artnetRdm", artnetRdm, "RDM over Art-Net", "RDM", CFG_NONE),

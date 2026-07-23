@@ -69,6 +69,10 @@ struct Config {
     String    apPassword;
     bool      staticIp;
     String    ip, gateway, subnet, dns;
+    // Honour Art-Net ArtIpProg (remote IP programming, issue #110). Default OFF: the Art-Net spec has
+    // no auth, so with this on any unicast packet on the wire can renumber the node. Off = we don't
+    // reply at all, which is exactly how the spec says a node without the feature opts out.
+    bool      ipProg;
     bool      autoUpdate;
     bool      artnetRdm;      // respond to RDM-over-Art-Net (ArtTodRequest / ArtRdm)
     int       rdmMaxDev;      // RDM device table cap; 0 = auto-detect from available RAM (+ PSRAM)
