@@ -48,7 +48,7 @@
 	(fp_line (start 13.26 -16.88) (end 13.26 9.16) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 13.26 9.16) (end -11.99 9.16) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -11.99 9.16) (end -11.99 -16.88) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C368501.3dshapes/CONN-TH_NC5FAH.step"
+	(model "${KIPRJMOD}/easyeda/C368501.3dshapes/CONN-TH_NC5FAH.step"
 		(offset (xyz 0.6 -1.4 12.85))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))

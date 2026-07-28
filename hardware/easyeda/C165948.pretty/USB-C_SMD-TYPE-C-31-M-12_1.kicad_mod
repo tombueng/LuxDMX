@@ -72,7 +72,7 @@
 	(fp_line (start -4.47 -2.26) (end 4.47 -2.26) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 4.47 -2.26) (end 4.47 5.09) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 4.47 5.09) (end -4.47 5.09) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C165948.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.step"
+	(model "${KIPRJMOD}/easyeda/C165948.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.step"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 180))

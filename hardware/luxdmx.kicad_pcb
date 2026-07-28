@@ -2844,7 +2844,7 @@
 			(uuid "4ed1ee1c-90fd-405e-bc51-db150bff8897")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C78988.3dshapes/SOT-23-5_L2.9-W1.6-H1.1-LS2.8-P0.95.step"
+		(model "${KIPRJMOD}/easyeda/C78988.3dshapes/SOT-23-5_L2.9-W1.6-H1.1-LS2.8-P0.95.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3415,7 +3415,7 @@
 			(uuid "6d4718b0-1fd0-48d7-8f05-66f11eb2fb14")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
+		(model "${KIPRJMOD}/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -5217,7 +5217,7 @@
 			(uuid "9ddb406a-f969-4294-a202-6f7d1ac04fb7")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
+		(model "${KIPRJMOD}/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -6375,7 +6375,7 @@
 			(uuid "ffa15fa9-554f-4fb7-bb8d-50554aa6b4a8")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C2912568.3dshapes/PWRM-TH_B0505S-1W.step"
+		(model "${KIPRJMOD}/easyeda/C2912568.3dshapes/PWRM-TH_B0505S-1W.step"
 			(offset
 				(xyz 0 2.159 5.08)
 			)
@@ -7693,7 +7693,7 @@
 			(uuid "7a226cf5-4e1f-48a6-8390-71295f7aea8c")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
+		(model "${KIPRJMOD}/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -8878,7 +8878,7 @@
 			(uuid "7facb2c8-3008-4897-9040-fda1aed8d5b8")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C354584.3dshapes/IND-SMD_L4.0-W4.0-H1.9.step"
+		(model "${KIPRJMOD}/easyeda/C354584.3dshapes/IND-SMD_L4.0-W4.0-H1.9.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -9801,7 +9801,7 @@
 			(uuid "9e0d4ba5-87f1-47c2-98a0-72a6d2067887")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C368501.3dshapes/CONN-TH_NC5FAH.step"
+		(model "${KIPRJMOD}/easyeda/C368501.3dshapes/CONN-TH_NC5FAH.step"
 			(offset
 				(xyz 0.6 -1.4 12.85)
 			)
@@ -11781,7 +11781,7 @@
 			(uuid "89b7b7ee-3680-4110-bea6-07e13c8db312")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C183095.3dshapes/SOIC-16_L10.3-W7.5-H2.7-LS10.3-P1.27.step"
+		(model "${KIPRJMOD}/easyeda/C183095.3dshapes/SOIC-16_L10.3-W7.5-H2.7-LS10.3-P1.27.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -12395,7 +12395,7 @@
 			(uuid "f7cec76f-86a1-4d74-9fbc-40c5aba6cc27")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C183095.3dshapes/SOIC-16_L10.3-W7.5-H2.7-LS10.3-P1.27.step"
+		(model "${KIPRJMOD}/easyeda/C183095.3dshapes/SOIC-16_L10.3-W7.5-H2.7-LS10.3-P1.27.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -14152,7 +14152,7 @@
 			(uuid "3f5ebf6a-e945-44d2-94b0-2fab4f1be6ba")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C32843.3dshapes/LQFP-48_L7.0-W7.0-H1.4-LS9.0-P0.50.step"
+		(model "${KIPRJMOD}/easyeda/C32843.3dshapes/LQFP-48_L7.0-W7.0-H1.4-LS9.0-P0.50.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -16256,7 +16256,7 @@
 			(uuid "da3f95a0-7f1b-4960-a222-3ddec27107be")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C5380106.3dshapes/PWRM-SMD_DP9900M-5V.wrl"
+		(model "${KIPRJMOD}/easyeda/C5380106.3dshapes/PWRM-SMD_DP9900M-5V.wrl"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -17356,7 +17356,7 @@
 			(uuid "c14c6df5-29a2-433e-aa45-3ad3d75440c8")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C368501.3dshapes/CONN-TH_NC5FAH.step"
+		(model "${KIPRJMOD}/easyeda/C368501.3dshapes/CONN-TH_NC5FAH.step"
 			(offset
 				(xyz 0.6 -1.4 12.85)
 			)
@@ -18748,7 +18748,7 @@
 			(uuid "b16474a4-bbb0-405b-a465-8a9dbd0d5cde")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
+		(model "${KIPRJMOD}/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -19155,7 +19155,7 @@
 			(uuid "f66ea18f-333c-46d3-a985-07f2782e11b1")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C165948.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.step"
+		(model "${KIPRJMOD}/easyeda/C165948.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.step"
 			(offset
 				(xyz 0 -2.413 0)
 			)
@@ -20262,7 +20262,7 @@
 			(uuid "ad98defd-aa72-4701-ba4e-834b9683a307")
 		)
 		(embedded_fonts no)
-		(model "C:/dev/DMX/hardware/easyeda/C2912568.3dshapes/PWRM-TH_B0505S-1W.step"
+		(model "${KIPRJMOD}/easyeda/C2912568.3dshapes/PWRM-TH_B0505S-1W.step"
 			(offset
 				(xyz 0 2.159 5.08)
 			)
