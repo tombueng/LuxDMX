@@ -72,7 +72,7 @@
 	(fp_line (start 3.50 -3.50) (end 3.50 3.50) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 3.50 3.50) (end -3.50 3.50) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -3.50 3.50) (end -3.50 -3.50) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C32843.3dshapes/LQFP-48_L7.0-W7.0-H1.4-LS9.0-P0.50.step"
+	(model "${KIPRJMOD}/easyeda/C32843.3dshapes/LQFP-48_L7.0-W7.0-H1.4-LS9.0-P0.50.step"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))

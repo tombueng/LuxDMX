@@ -38,7 +38,7 @@
 	(fp_line (start -4.95 -1.95) (end 4.95 -1.95) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 4.95 -1.95) (end 4.95 1.95) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 4.95 1.95) (end -4.95 1.95) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C84681.3dshapes/SOP-16_L9.9-W3.9-H1.5-LS6.0-P1.27.wrl"
+	(model "${KIPRJMOD}/easyeda/C84681.3dshapes/SOP-16_L9.9-W3.9-H1.5-LS6.0-P1.27.wrl"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 270))

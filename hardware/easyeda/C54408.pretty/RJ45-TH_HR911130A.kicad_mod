@@ -49,7 +49,7 @@
 	(fp_line (start -8.02 -12.90) (end 8.02 -12.90) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 8.02 -12.90) (end 8.02 8.40) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 8.02 8.40) (end -8.02 8.40) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C54408.3dshapes/RJ45-TH_HR911130A.wrl"
+	(model "${KIPRJMOD}/easyeda/C54408.3dshapes/RJ45-TH_HR911130A.wrl"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 180))

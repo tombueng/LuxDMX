@@ -86,7 +86,7 @@
 	(fp_line (start -9.00 -16.45) (end 9.00 -16.45) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 9.00 -16.45) (end 9.00 9.05) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 9.00 9.05) (end -9.00 9.05) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/ESP32S3.3dshapes/WIFIM-SMD_ESP32-S3-WROOM-1-N8.step"
+	(model "${KIPRJMOD}/easyeda/ESP32S3.3dshapes/WIFIM-SMD_ESP32-S3-WROOM-1-N8.step"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))

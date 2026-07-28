@@ -20,7 +20,7 @@
 	(fp_line (start 2.00 -2.00) (end 2.00 2.00) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 2.00 2.00) (end -2.00 2.00) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -2.00 2.00) (end -2.00 -2.00) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C36409.3dshapes/IND-SMD_L4.0-W4.0-H1.65.wrl"
+	(model "${KIPRJMOD}/easyeda/C36409.3dshapes/IND-SMD_L4.0-W4.0-H1.65.wrl"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))

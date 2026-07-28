@@ -32,7 +32,7 @@
 	(fp_line (start -2.45 1.95) (end -2.45 -1.95) (layer F.CrtYd) (width 0.05))
 	(fp_line (start -2.45 -1.95) (end 2.45 -1.95) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 2.45 -1.95) (end 2.45 1.95) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C968586.3dshapes/ESOP-10_L4.9-W3.9-H1.4-P1.00-LS6.2-BL-EP.step"
+	(model "${KIPRJMOD}/easyeda/C968586.3dshapes/ESOP-10_L4.9-W3.9-H1.4-P1.00-LS6.2-BL-EP.step"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))

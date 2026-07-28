@@ -30,7 +30,7 @@
 	(fp_line (start -3.25 -2.00) (end 3.25 -2.00) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 3.25 -2.00) (end 3.25 2.00) (layer F.CrtYd) (width 0.05))
 	(fp_line (start 3.25 2.00) (end -3.25 2.00) (layer F.CrtYd) (width 0.05))
-	(model "C:/dev/DMX/hardware/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
+	(model "${KIPRJMOD}/easyeda/C913221.3dshapes/DIO-SMD_3P-L6.5-W4.0-BI.wrl"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))
