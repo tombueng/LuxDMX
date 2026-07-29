@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
 import { deviceHost, sleep, artDmxPacket, UdpSender, ART_PORT } from './lib/net.mjs';
 import { ArtRdmClient, parseUidStr, CC_GET, PID_DEVICE_INFO,
          AC_MERGE_HTP0, AC_MERGE_LTP0, AC_CANCEL_MERGE, AC_BQP0 } from './lib/artrdm.mjs';
-import { info, dmx } from './lib/device.mjs';
+import { info, dmx, configForm, pollFor } from './lib/device.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 
@@ -197,5 +197,65 @@ test.describe('Art-Net RDM ArtAddress remote config (LUXDMX_WRITE=1)', () => {
     const reply = await c.poll();
     expect(reply.bqPolicy, 'policy advertised back in ArtPollReply byte 228').toBe(2);
     await c.address(1, AC_BQP0 + (before ?? 4));                              // restore (default 4 = off)
+  });
+});
+
+// Renumbering an output must take the fixtures already discovered on it along. The discovered
+// universe used to be a copy stored per fixture at scan time, so after a /config change the node
+// still answered ArtTodRequest for the OLD universe: a console asking about the new one got an
+// empty Table of Devices, and because the stale entries kept occupying the device cap a fresh
+// discovery had no room either -- only a reboot cleared it. Now the universe is derived from the
+// fixture's RDM line, so it follows a renumber immediately, with no re-scan and no reboot.
+test.describe('Art-Net RDM universe renumber (LUXDMX_WRITE=1)', () => {
+  test.skip(!WRITE, 'mutates node config: set LUXDMX_WRITE=1 to run');
+  let host, c;
+  test.beforeAll(async () => { host = await deviceHost(); c = new ArtRdmClient(host); await c.ready; });
+  test.afterAll(async () => { await c?.close(); });
+
+  test('the TOD follows a renumbered output, with no re-scan and no reboot', async ({ request }) => {
+    const before = await info(request);
+    let state = await rdmState(request);
+
+    // Needs fixtures on the bus to say anything. Scan once if nothing has been discovered yet.
+    if (!state.devices.length) {
+      await request.get('/rdm/discover');
+      state = await pollFor(() => rdmState(request),
+                            s => !s.discovering && s.devices.length > 0, { ms: 90000, every: 3000 });
+    }
+    test.skip(!state.devices.length, 'no RDM fixtures answering on the bench bus');
+
+    // The output the fixtures actually live on, and a universe nothing else uses.
+    const oldUni = state.devices[0].uni;
+    const outIdx = before.outputs.findIndex(o => o.uni === oldUni);
+    expect(outIdx, 'discovered universe belongs to an output').toBeGreaterThanOrEqual(0);
+    const mine = state.devices.filter(d => d.uni === oldUni).length;
+    const taken = new Set(before.outputs.map(o => o.uni));
+    const newUni = [oldUni + 1, oldUni + 2, oldUni + 3].find(u => !taken.has(u) && u <= 32767);
+
+    const todBefore = await c.todRequest(oldUni);
+    expect(todBefore?.uids.length, 'TOD on the original universe').toBe(mine);
+
+    try {
+      await request.post('/config', { form: configForm(before, { uni: newUni }, outIdx) });
+      await expect.poll(async () => (await info(request)).outputs[outIdx].uni,
+                        { timeout: 8000 }).toBe(newUni);
+
+      // No discovery, no reboot: the same fixtures answer under the new port-address at once.
+      const todNew = await c.todRequest(newUni);
+      expect(todNew?.portAddress, 'ArtTodData carries the new port-address').toBe(newUni);
+      expect(todNew?.uids.length, 'fixtures moved with the renumbered output').toBe(mine);
+      const todOld = await c.todRequest(oldUni);
+      expect(todOld?.uids.length ?? 0, 'nothing answers on the vacated universe').toBe(0);
+
+      // And the table itself is re-stamped rather than duplicated, so the cap stays free.
+      const after = await rdmState(request);
+      expect(after.devices.length, 'no orphan entries left behind').toBe(state.devices.length);
+      expect(after.devices.filter(d => d.uni === newUni).length, '/rdm.json reports the new universe').toBe(mine);
+      expect(after.devices.some(d => d.uni === oldUni), 'nothing still claims the old universe').toBe(false);
+    } finally {
+      await request.post('/config', { form: configForm(before, { uni: oldUni }, outIdx) });
+      await expect.poll(async () => (await info(request)).outputs[outIdx].uni,
+                        { timeout: 8000 }).toBe(oldUni);
+    }
   });
 });

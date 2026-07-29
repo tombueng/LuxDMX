@@ -1096,7 +1096,8 @@ struct RdmSensor {
 };
 struct RdmDevice {
     rdm_uid_t uid;
-    uint16_t  universe;          // DMX universe (output) this fixture lives on
+    // No universe here on purpose: it belongs to the line, not the fixture, and /config can
+    // change it under us. Ask rdmDevUniverse() instead.
     uint8_t   rdmLine;           // RDM engine line index (which transceiver output) to reach it on
     uint16_t  startAddr;
     uint16_t  footprint;
@@ -1196,6 +1197,20 @@ static RdmDevice* rdmFind(const rdm_uid_t& uid) {
     for (int i = 0; i < rdmCount; i++)
         if (rdm_uid_is_eq(&rdmDevices[i].uid, &uid)) return &rdmDevices[i];
     return nullptr;
+}
+
+// The universe a discovered fixture lives on RIGHT NOW. Derived from its RDM line (the
+// transceiver it answered on), never stored: /config can renumber an output long after the
+// fixture was discovered, and a stored copy went stale -- the node then answered
+// ArtTodRequest for the old universe, so a controller asking about the new one got an empty
+// Table of Devices, and the orphans still filled the device cap so a re-scan couldn't land.
+// RDM_UNI_GONE means the line no longer reaches an enabled output (a genuine orphan).
+static constexpr uint16_t RDM_UNI_GONE = 0xFFFF;
+static uint16_t rdmDevUniverse(const RdmDevice& d) {
+    if (d.rdmLine >= MAX_OUTPUTS) return RDM_UNI_GONE;
+    int out = rdmOutForLine[d.rdmLine];
+    if (out < 0 || !cfg.outputs[out].enabled) return RDM_UNI_GONE;
+    return (uint16_t)cfg.outputs[out].universe;
 }
 
 // Parse a "uid":"MMMM:DDDDDDDD" field out of a small JSON control message.
@@ -2504,7 +2519,7 @@ static String rdmDeviceJson(const RdmDevice& d) {
     char uid[20];
     snprintf(uid, sizeof(uid), "%04X:%08lX", d.uid.man_id, (unsigned long)d.uid.dev_id);
     j += "{\"uid\":\"";     j += uid;          j += "\"";
-    j += ",\"uni\":";       j += d.universe;
+    j += ",\"uni\":";       j += rdmDevUniverse(d);   // from the line, so a renumbered output shows up at once
     j += ",\"addr\":";      j += d.startAddr;
     j += ",\"footprint\":"; j += d.footprint;
     j += ",\"model\":";     j += d.modelId;
