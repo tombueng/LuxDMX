@@ -467,6 +467,18 @@ def main():
                        "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 1, "rx": 2, "rts": -1}]},
         },
         {
+            # Radig / RHS "ESP32 WLAN DMX / RDM Node" kit (SW10061): a XIAO ESP32-S3
+            # dropped onto a carrier that already has the RS-485 driver and the XLR
+            # socket, so the DMX pins are fixed in copper (issue #121). DE/RE sits on a
+            # real GPIO, which is what makes RDM work, so the preset sets `rts` rather
+            # than leaving it at -1 like the bare dev boards. The carrier is NOT
+            # galvanically isolated; that is a property of the hardware, not the preset.
+            "id": "radig-esp32s3-dmx", "name": "Radig ESP32-S3 DMX/RDM Node", "mcu": "esp32s3",
+            "cols": cols_named(XIAO_L, XIAO_R, lambda g: s3_flags(g, set())),
+            "preset": {"ledType": 2, "ledPin": 1, "dispType": 0,
+                       "outputs": [{"en": True, "uni": 0, "port": 1, "tx": 4, "rx": 5, "rts": 6}]},
+        },
+        {
             "id": "nodemcu-32s", "name": "NodeMCU-32S (ESP32-WROOM-32, 38-pin)", "mcu": "esp32",
             "cols": cols(E32L, E32R, e32_silk, e32_flags),
             "preset": {"ledType": 1, "ledPin": 2, "dispType": 1, "dispsda": 21, "dispscl": 22,
@@ -536,6 +548,8 @@ def main():
         "nodemcu-32s": [(2,"onboard LED")],
         "esp32s3-devkitc-1": [(48,"onboard RGB LED")],
         "xiao-esp32s3": [(21,"user LED (active-low)")],
+        "radig-esp32s3-dmx": [(4,"DMX TX -> RS485 DI"),(5,"DMX RX <- RS485 RO"),
+                              (6,"DMX DE/RE (RDM direction)"),(1,"WS2812 status LED")],
         "wt32eth01": [(0,"ETH ref-clock"),(16,"ETH PHY power"),(18,"ETH MDIO"),(23,"ETH MDC"),
                       (19,"ETH TXD0"),(22,"ETH TXD1"),(21,"ETH TX_EN"),(25,"ETH RXD0"),
                       (26,"ETH RXD1"),(27,"ETH CRS_DV")],

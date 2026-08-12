@@ -43,6 +43,7 @@ pins in their true positions with the board's own silk, drawn as a faithful upri
 | ESP32-S3 DevKitC-1 (44-pin) | `esp32s3` | header 📐 |
 | ESP32-S3 DevKitM-1 | `esp32s3` | header |
 | Seeed XIAO ESP32-S3 | `XIAO_ESP32S3` | header |
+| Radig ESP32-S3 DMX/RDM Node (kit) | XIAO carrier | header, fixed wiring |
 | Adafruit Feather ESP32-S3 | `adafruit_feather_esp32s3` | header |
 | Adafruit QT Py ESP32-S3 | `adafruit_qtpy_esp32s3_n4r2` | header |
 | Adafruit Metro ESP32-S3 | `adafruit_metro_esp32s3` | auto |
@@ -75,6 +76,6 @@ pins in their true positions with the board's own silk, drawn as a faithful upri
   ESP32-S3 DevKitC-1, XIAO ESP32-S3) are baked into `src/pages/config.html` and work with no network;
   the rest are fetched on demand from GitHub Pages.
 
-Status: **33** board descriptors (5 baked-in offline + 28 catalog), every one with a
+Status: **34** board descriptors (5 baked-in offline + 29 catalog), every one with a
 generated clickable pin diagram and an "Apply template" pin map, all GPIO-verified against
 `pins_arduino.h`.

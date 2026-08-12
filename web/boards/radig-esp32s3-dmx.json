@@ -1,0 +1,105 @@
+{
+  "id": "radig-esp32s3-dmx",
+  "name": "Radig ESP32-S3 DMX/RDM Node",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 1,
+        "silk": "D0",
+        "flags": []
+      },
+      {
+        "gpio": 2,
+        "silk": "D1",
+        "flags": []
+      },
+      {
+        "gpio": 3,
+        "silk": "D2",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 4,
+        "silk": "D3",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "D4",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "D5",
+        "flags": []
+      },
+      {
+        "gpio": 43,
+        "silk": "D6/TX",
+        "flags": [
+          "serial"
+        ]
+      }
+    ],
+    [
+      {
+        "gpio": 44,
+        "silk": "D7/RX",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 7,
+        "silk": "D8",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "D9",
+        "flags": []
+      },
+      {
+        "gpio": 9,
+        "silk": "D10",
+        "flags": []
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 2,
+    "ledPin": 1,
+    "dispType": 0,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 4,
+        "rx": 5,
+        "rts": 6
+      }
+    ]
+  },
+  "hardwired": [
+    {
+      "gpio": 4,
+      "label": "DMX TX -> RS485 DI"
+    },
+    {
+      "gpio": 5,
+      "label": "DMX RX <- RS485 RO"
+    },
+    {
+      "gpio": 6,
+      "label": "DMX DE/RE (RDM direction)"
+    },
+    {
+      "gpio": 1,
+      "label": "WS2812 status LED"
+    }
+  ]
+}
