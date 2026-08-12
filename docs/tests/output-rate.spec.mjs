@@ -88,6 +88,28 @@ async function measureOut(request, uni, fps, ms) {
   return { inFps: d.fps, outFps: d.outfps[0] };
 }
 
+// Like measureOut, but the value changes at `changeHz` while each change is sent `repeat` times
+// back to back -- the way MagicQ and Art-Net's send-on-change model actually transmit. The device
+// therefore sees ~changeHz*repeat packets/s but only changeHz real changes/s.
+async function measureBurst(request, uni, changeHz, repeat, ms) {
+  const sender = new UdpSender(host);
+  const data = Buffer.alloc(512);
+  const period = 1000 / changeHz;
+  try {
+    const end = Date.now() + ms;
+    let i = 0, seq = 0;
+    while (Date.now() < end) {
+      data[0] = i & 0xff; data[1] = (i >> 8) & 0xff;             // the value that actually changes
+      for (let r = 0; r < repeat; r++)                           // ...sent several times, no gap
+        await sender.send(ART_PORT, artDmxPacket(uni, data, seq++));
+      i++;
+      await sleep(Math.max(1, Math.round(period)));
+    }
+  } finally { sender.close(); }
+  const d = await dmx(request);
+  return { inFps: d.fps, outFps: d.outfps[0] };
+}
+
 test.describe('DMX output rate + transmit style — shape (always)', () => {
   test('/info.json exposes rate, style and styleSrc per output', async ({ request }) => {
     const d = await info(request);
@@ -199,6 +221,23 @@ test.describe('DMX output rate + transmit style — behaviour (LUXDMX_WRITE=1)',
     expect(delta.outFps, 'delta follows the source down').toBeLessThan(cont.outFps - 5);
     expect(Math.abs(delta.outFps - delta.inFps),
       `delta: out ${delta.outFps} should track in ${delta.inFps}`).toBeLessThan(6);
+  });
+
+  test('Delta follows the change rate, not the packet rate, when the source repeats frames', async ({ request }) => {
+    skipUnlessWrite();
+    test.setTimeout(120_000);
+    const uni = before.outputs[0].uni;
+    await request.post('/config', { form: configForm(before, { rate: 0, style: DELTA }) });
+    await waitForState(request, (d) => d.outputs[0].style === DELTA);
+
+    // The reopened half of issue #93: a MagicQ user reported ~97 packets/s off a 33.3 Hz engine,
+    // because MagicQ sends each change 3 times. Delta used to wake on every packet, so clamped to
+    // the 24 ms wire floor it clocked ~42 Hz of partly-stale frames -- a stutter. It must wake on
+    // real content changes only, so the wire tracks the ~33 Hz the console actually updates at.
+    const res = await measureBurst(request, uni, 33.3, 3, 15000);
+    expect(res.inFps, `device really sees the burst (~100 packets/s), got ${res.inFps}`).toBeGreaterThan(80);
+    expect(res.outFps, `delta tracks the ~33 Hz change rate, not the packets, got ${res.outFps}`).toBeGreaterThan(30);
+    expect(res.outFps, `delta does not clock the duplicates out, got ${res.outFps}`).toBeLessThan(38);
   });
 
   test('a quiet source in Delta falls back to free-running (the line never stops)', async ({ request }) => {

@@ -957,9 +957,20 @@ static inline uint8_t dmxRateHz(int out) {
 }
 static inline bool dmxIsDelta(int out) { return cfg.outputs[out].txStyle == TXSTYLE_DELTA; }
 
-// Bumped by routeFrame (core 0) every time an output receives a fresh input frame; consumed by the
-// DMX task (core 1) to decide when to clock a delta frame. One writer, one reader, 32-bit aligned.
+// Bumped by routeFrame (core 0) every time an output's DMX CONTENT changes; consumed by the DMX
+// task (core 1) to decide when to clock a delta frame. One writer, one reader, 32-bit aligned.
+//
+// "Content", not "packet". Art-Net sources routinely re-send the same frame: the spec's own
+// send-on-change model transmits each update 3 times before backing off, and MagicQ does exactly
+// that, so a running chase arrives as ~3x the change rate (a user reported 97 packets/s off a
+// 33.3 Hz engine). If delta woke on every packet it would clock those duplicates out too, and with
+// the 24 ms wire floor it ends up re-sending an unchanged frame instead of waiting for the real
+// next value -- which is the stutter that reopened issue #93. Waking only on a genuine change makes
+// the wire track the console's ACTUAL update rate, duplicates or not.
 static volatile uint32_t outInSeq[MAX_OUTPUTS] = {0};
+// Last frame we told delta about, per output. Compared on core 0 only (routeFrame, right after the
+// merge that may have written dmxBuf), so it needs no locking of its own.
+static uint8_t outDeltaShadow[MAX_OUTPUTS][DMX_PACKET_SIZE] = {{0}};
 
 // Dedicated DMX transmit task -- THE fix for issue #64 rock-solid output. It runs on a
 // strict 25 ms cadence (vTaskDelayUntil, 40 Hz) at high priority pinned to core 1, so a
@@ -1841,7 +1852,14 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
         if (i == viewOutput()) maybeLog(i, &dmxBuf[i][1], 512, senderIp, proto);
         // Per-output frame rate over a 1 s window (this universe only).
         outLastDmxMs[i] = now;
-        outInSeq[i]++;   // wakes the DMX task in delta mode (issue #93): one frame out per frame in
+        // Wake delta only if the merge actually changed the frame, not on every packet (issue #93,
+        // reopened). We are on core 0 right after mergeOutput wrote dmxBuf, so this read is ordered
+        // and needs no lock; the shadow is touched here and nowhere else. outFrameCount below still
+        // counts every packet, so the "In FPS" readout keeps showing the true arrival rate.
+        if (memcmp(dmxBuf[i], outDeltaShadow[i], DMX_PACKET_SIZE) != 0) {
+            memcpy(outDeltaShadow[i], dmxBuf[i], DMX_PACKET_SIZE);
+            outInSeq[i]++;
+        }
         outFrameCount[i]++;
         if (now - outLastFrameMs[i] >= 1000) {
             outFps[i] = (float)outFrameCount[i] * 1000.0f / (float)(now - outLastFrameMs[i]);
