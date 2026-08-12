@@ -828,7 +828,7 @@ Both settings are **per output** and apply the moment you save, without a restar
 | Transmit style | What the wire does |
 |---|---|
 | **Continuous** (default) | Free-runs at the rate below, whatever the source does. Predictable, and what most nodes ship. |
-| **Delta** | One DMX frame per received Art-Net/sACN packet, so the wire follows your console exactly and nothing is repeated. Falls back to free-running after 800 ms of silence, so a held look keeps being refreshed. |
+| **Delta** | One DMX frame per actual change from your console, so the wire follows its real update rate and nothing is repeated. Consoles often send each change several times (MagicQ sends it three times, which can look like ~100 packets/s off a 33 Hz engine); Delta ignores the duplicates and tracks the changes. Falls back to free-running after 800 ms of silence, so a held look keeps being refreshed. |
 
 | Rate | Period | Use it when |
 |---|---|---|
