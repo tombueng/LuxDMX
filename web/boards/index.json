@@ -33,6 +33,12 @@
       "builtin": true
     },
     {
+      "id": "radig-esp32s3-dmx",
+      "name": "Radig ESP32-S3 DMX/RDM Node",
+      "mcu": "esp32s3",
+      "builtin": false
+    },
+    {
       "id": "nodemcu-32s",
       "name": "NodeMCU-32S (ESP32-WROOM-32, 38-pin)",
       "mcu": "esp32",

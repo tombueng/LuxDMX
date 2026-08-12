@@ -896,10 +896,14 @@ variants (which are **not** all the same pinout):
 | ESP32-S3 DevKitC-1 (44-pin) | GPIO33-37 only free on no-PSRAM modules |
 | Seeed XIAO ESP32-S3 | tiny board, D0-D10 silk |
 
-The full catalog covers **33 boards** spanning every esp32 / esp32s3 board the firmware
+The full catalog covers **34 boards** spanning every esp32 / esp32s3 board the firmware
 runs on (DevKit / DOIT / NodeMCU, WEMOS LOLIN, Adafruit Feather / QtPy / HUZZAH32 / Metro,
 Heltec OLED, Olimex PoE / Gateway / wESP32 Ethernet, Unexpected Maker, M5Stack, LilyGO,
-SparkFun ...). The boards beyond the five built-ins are pulled lazily from the online
+SparkFun ...). It also carries the **Radig ESP32-S3 DMX/RDM Node** kit: a ready-made
+carrier whose RS-485 driver and XLR socket are already wired, so picking it and hitting
+Apply gives you a working, RDM-capable node without choosing a single pin (its DE/RE line
+sits on a real GPIO, which is what RDM needs). Note it is not galvanically isolated.
+The boards beyond the five built-ins are pulled lazily from the online
 catalog ([web/boards/](web/boards/), served via GitHub Pages) and cached in your browser;
 no network means you still get the built-ins plus manual entry. You can switch boards from
 a dropdown inside the pin-picker popup itself.
