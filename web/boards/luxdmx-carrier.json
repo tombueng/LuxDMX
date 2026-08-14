@@ -231,6 +231,10 @@
     "enca": 42,
     "encb": 41,
     "encsw": 21,
+    "btn1pin": 3,
+    "btn1Act": 2,
+    "btn2pin": 46,
+    "btn2Act": 1,
     "ethcs": 10,
     "ethsck": 12,
     "ethmosi": 11,
@@ -377,6 +381,16 @@
       "field": "encsw",
       "gpio": 21,
       "label": "Encoder - SW"
+    },
+    {
+      "field": "btn1pin",
+      "gpio": 3,
+      "label": "Button 1 - to GND"
+    },
+    {
+      "field": "btn2pin",
+      "gpio": 46,
+      "label": "Button 2 - to GND"
     },
     {
       "field": "p0_pin",
@@ -642,5 +656,5 @@
       ]
     }
   ],
-  "_source": "pin map read from hardware-carrier/luxdmx-carrier-4layer.kicad_pcb"
+  "_source": "pin map read from hardware-carrier/luxdmx-carrier.kicad_pcb (the 4-layer variant it used to name is gone; the pin map was identical)"
 }
