@@ -2613,12 +2613,15 @@ static bool formChecked(AsyncWebServerRequest* req, const String& name) {
 // re-pointed: the sACN sockets are bound per universe and per protocol, and the 5-LED panel caches
 // its brightness. Called after every save that touched only live fields.
 static void startSacn();                    // fwd decl
+static void applyEncoderLive();             // fwd decl (ctlMapper lives further down)
 static void applyLiveConfig(bool universeOrProtocolChanged) {
     // Everything else genuinely needs nothing: the merge engine, the DMX task, the LED writer and
     // the input/menu code all read cfg on every use, so the new value is already in effect. Only
     // the sACN sockets hold state derived from config -- they are bound per universe (multicast
     // group 239.255.x.y) and only opened at all for the sACN protocols.
     if (universeOrProtocolChanged) startSacn();
+
+    applyEncoderLive();
 }
 
 // Snapshot every schema field's current value, so a save can tell what actually CHANGED rather than
@@ -3556,6 +3559,39 @@ enum { CTL_ID_UNI_A = 1, CTL_ID_UNI_B = 2, CTL_ID_PROTO = 3, CTL_ID_EXIT = 9 };
 static bool        ctlEnabled = false;   // any control wired -> input task runs
 static bool        ctlUseMenu = false;   // an ENTER-capable input exists -> full menu (else direct nudge)
 static InputMapper ctlMapper;
+
+// The encoder's steps-per-detent and its direction are declared CFG_LIVE, but the decoder is
+// configured once in ctlMapper.begin() at boot, so a change reached the config and not the
+// knob: the setting read back correctly while the wheel kept behaving like the old one. Push
+// them into the running decoder. Only these two -- the pins need a full re-init and stay
+// CFG_REBOOT.
+static void applyEncoderLive() {
+    ctlMapper.dec.perDetent = (uint8_t)(cfg.encSteps >= 1 ? cfg.encSteps : 4);
+    ctlMapper.dec.reverse   = cfg.encReverse;
+}
+
+// Encoder diagnostics: how many quadrature edges came in, and how many detent steps came out
+// of them. Turn the knob a counted number of clicks and read edges/clicks -- that is the
+// encoder's edges-per-detent, which is what `encsteps` has to be. Guessing it is how you end up
+// with a knob that moves two menu entries per click. `?reset=1` zeroes the counters first.
+//
+// perDetent and cfgPerDetent are reported separately on purpose: when they disagree, the
+// setting has not reached the decoder, which is a different fault from a wrong value.
+static void handleEncJson(AsyncWebServerRequest* req) {
+    String s2;
+    if (argStr(req, "reset", s2) && s2 == "1") { ctlMapper.dec.edges = 0; ctlMapper.dec.steps = 0; }
+    String j = "{\"present\":"; j += ctlEnabled ? "true" : "false";
+    j += ",\"a\":";            j += cfg.encA;
+    j += ",\"b\":";            j += cfg.encB;
+    j += ",\"sw\":";           j += cfg.encSw;
+    j += ",\"perDetent\":";    j += (uint32_t)ctlMapper.dec.perDetent;   // in effect
+    j += ",\"cfgPerDetent\":"; j += cfg.encSteps;                        // stored
+    j += ",\"reverse\":";      j += cfg.encReverse ? "true" : "false";
+    j += ",\"edges\":";        j += (uint32_t)ctlMapper.dec.edges;
+    j += ",\"steps\":";        j += (uint32_t)ctlMapper.dec.steps;
+    j += "}";
+    sendJsonSafe(req, j);
+}
 static Menu        ctlMenu;
 
 // Direct fallback (no ENTER-capable input, or no display): rotation just nudges
@@ -4558,6 +4594,7 @@ void setup() {
     http.on("/rdm",               HTTP_GET,  handleRdmPage);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
+    http.on("/enc.json",          HTTP_GET,  handleEncJson);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
     http.onNotFound([](AsyncWebServerRequest* req) {
         // While the setup portal is up, send every unknown URL (incl. the OS captive-portal

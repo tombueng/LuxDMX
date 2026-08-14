@@ -121,3 +121,32 @@ on a PC with no board attached:
 the result. The host test is [`test/native/controls_test.cpp`](../test/native/controls_test.cpp)
 (run `test\native\run_controls.bat`), which covers the decode, every input
 combination, and the menu.
+
+## Measuring `encsteps` instead of guessing it
+
+The symptom of a wrong `encsteps` is a knob that moves two menu entries per click, or half a
+click at a time. Which value is right depends on the encoder's mechanics, and the datasheet is
+usually not on hand, so measure it:
+
+```
+curl "http://<device>/enc.json?reset=1"     # zero the counters
+                                            # now turn the knob exactly 10 detents
+curl "http://<device>/enc.json"
+```
+
+```json
+{"present":true,"a":42,"b":41,"sw":21,
+ "perDetent":4,        // what the running decoder uses
+ "cfgPerDetent":4,     // what is stored in the config
+ "reverse":false,
+ "edges":43,"steps":10}
+```
+
+`edges / clicks` is the encoder's edges-per-detent and therefore the value `encsteps` wants.
+A standard EC11 lands near 4 (a stray extra edge or two is the knob settling, not a problem).
+`steps / clicks` is what you are getting today: it should be 1.
+
+`perDetent` and `cfgPerDetent` are reported separately on purpose. They differed once, because
+`encsteps` is a live setting whose value was only pushed into the decoder at boot, so saving a
+new one changed the config and not the knob. Fixed, but the two fields stay: when they disagree,
+the setting has not reached the hardware and a reboot is the workaround.
