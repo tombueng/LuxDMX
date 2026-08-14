@@ -2550,6 +2550,11 @@ function applyTemplate(){
     ['ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst'].forEach(function(k){ if (p[k] != null) setVal(k, p[k]); });
     if (p.dispType != null){ $('disp-type').value = p.dispType; updDispPins(); }
     ['dispsda','dispscl','dispcs','dispdc','disprst','dispsck','dispmosi'].forEach(function(k){ if (p[k] != null) setVal(k, p[k]); });
+    // Encoder and buttons. These pins have sat in the descriptors all along and were never
+    // applied: this loop simply did not exist, so picking a board wired an OLED and three DMX
+    // ports and left the knob on -1. On the carrier they are copper, same as the rest.
+    ['enca','encb','encsw','btn1pin','btn2pin','btn1act','btn2act','btn3pin','btn3act','btn4pin','btn4act']
+      .forEach(function(k){ if (p[k] != null) setVal(k, p[k]); });
     if (p.outputs){ buildOutputs(p.outputs); decorateAllPins(); }
     // Pixel ports come along with the template too. Without this, applying a board left the
     // pixel cards holding whatever the previous board had -- so on a carrier every port sat on
