@@ -2,6 +2,7 @@
 #include "config_enums.h"
 #include <Preferences.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 // NVS namespace — MUST match main.cpp's PREF_NS ("dmxgw") so an existing device's
@@ -20,8 +21,12 @@
 namespace cfgcore {
 
 // ---- field addressing ------------------------------------------------------
-static void* rootAddr(const CfgField& f)            { return (char*)&cfg + f.offset; }
-static void* outAddr(int i, const CfgOutputField& f){ return (char*)&cfg.outputs[i] + f.offset; }
+static void* rootAddr(const CfgField& f) { return (char*)&cfg + f.offset; }
+// Element `i` of array `A`, field `f`. The array's base and stride come from the
+// registry (CONFIG_ARRAYS), so this works for outputs[], pixels[] and anything added later.
+static void* elemAddr(const CfgArray& A, int i, const CfgArrayField& f) {
+    return (char*)&cfg + A.baseOffset + (size_t)i * A.stride + f.offset;
+}
 
 // neutral value for an int/enum: a pin (min == -1) disables to -1, otherwise the
 // minimum (first enum / lowest valid number).
@@ -54,20 +59,25 @@ static String readTyped(void* a, CfgKind kind) {
     }
 }
 
-// ---- key resolution (root "ledpin" or per-output "o0_tx") ------------------
+// ---- key resolution (root "ledpin", or array element "o0_tx" / "p2_count") --
 static bool resolve(const String& key, void*& a, CfgKind& kind, int32_t& mn, int32_t& mx, uint16_t& flags) {
     const char* k = key.c_str();
-    if (k[0] == 'o' && k[1] >= '0' && k[1] <= '9' && k[2] == '_') {
-        int i = k[1] - '0';
-        if (i < 0 || i >= MAX_OUTPUTS) return false;
-        const char* suf = k + 3;
-        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++)
-            if (strcmp(OUTPUT_FIELDS[j].suffix, suf) == 0) {
-                const CfgOutputField& f = OUTPUT_FIELDS[j];
-                a = outAddr(i, f); kind = f.kind; mn = f.min; mx = f.max; flags = f.flags;
-                return true;
-            }
-        return false;
+    if (k[0] && k[1] >= '0' && k[1] <= '9' && k[2] == '_') {
+        for (size_t ai = 0; ai < CONFIG_ARRAY_COUNT; ai++) {
+            const CfgArray& A = CONFIG_ARRAYS[ai];
+            if (A.prefix != k[0]) continue;
+            int i = k[1] - '0';
+            if (i < 0 || i >= (int)A.count) return false;
+            const char* suf = k + 3;
+            for (size_t j = 0; j < A.fieldCount; j++)
+                if (strcmp(A.fields[j].suffix, suf) == 0) {
+                    const CfgArrayField& f = A.fields[j];
+                    a = elemAddr(A, i, f); kind = f.kind; mn = f.min; mx = f.max; flags = f.flags;
+                    return true;
+                }
+            return false;
+        }
+        // Fall through: a root key can legitimately look like this (none do today).
     }
     for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++)
         if (strcmp(CONFIG_FIELDS[j].key, k) == 0) {
@@ -100,13 +110,16 @@ static void applyNeutral() {
         else if (f.kind == CfgKind::Str)  *(String*)a = "";
         else                              *(int*)a    = neutralInt(f.min);
     }
-    for (int i = 0; i < MAX_OUTPUTS; i++)
-        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
-            const CfgOutputField& f = OUTPUT_FIELDS[j]; void* a = outAddr(i, f);
-            if (f.kind == CfgKind::Bool)      *(bool*)a   = false;
-            else if (f.kind == CfgKind::Str)  *(String*)a = "";
-            else                              *(int*)a    = neutralInt(f.min);
-        }
+    for (size_t ai = 0; ai < CONFIG_ARRAY_COUNT; ai++) {
+        const CfgArray& A = CONFIG_ARRAYS[ai];
+        for (int i = 0; i < (int)A.count; i++)
+            for (size_t j = 0; j < A.fieldCount; j++) {
+                const CfgArrayField& f = A.fields[j]; void* a = elemAddr(A, i, f);
+                if (f.kind == CfgKind::Bool)      *(bool*)a   = false;
+                else if (f.kind == CfgKind::Str)  *(String*)a = "";
+                else                              *(int*)a    = neutralInt(f.min);
+            }
+    }
 }
 
 static bool applyNamed(const String& name, String& err, int depth);
@@ -172,16 +185,20 @@ void load() {
         else if (f.kind == CfgKind::Str) { if (prefs.isKey(f.key)) *(String*)a = prefs.getString(f.key, *(String*)a); }
         else { int v = prefs.getInt(f.key, *(int*)a); *(int*)a = (int)constrain(v, f.min, f.max); }
     }
-    for (int i = 0; i < MAX_OUTPUTS; i++)
-        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
-            const CfgOutputField& f = OUTPUT_FIELDS[j]; void* a = outAddr(i, f);
-            String key = String("o") + i + "_" + f.suffix;
-            if (f.kind == CfgKind::Bool) { *(bool*)a = prefs.getBool(key.c_str(), *(bool*)a); continue; }
-            int base = *(int*)a;
-            if (f.legacyKey0 && i == 0) base = prefs.getInt(f.legacyKey0, base);   // legacy fallback
-            int v = prefs.getInt(key.c_str(), base);
-            *(int*)a = (int)constrain(v, f.min, f.max);
-        }
+    for (size_t ai = 0; ai < CONFIG_ARRAY_COUNT; ai++) {
+        const CfgArray& A = CONFIG_ARRAYS[ai];
+        for (int i = 0; i < (int)A.count; i++)
+            for (size_t j = 0; j < A.fieldCount; j++) {
+                const CfgArrayField& f = A.fields[j]; void* a = elemAddr(A, i, f);
+                char kb[32]; snprintf(kb, sizeof(kb), "%c%d_%s", A.prefix, i, f.suffix);
+                String key(kb);
+                if (f.kind == CfgKind::Bool) { *(bool*)a = prefs.getBool(key.c_str(), *(bool*)a); continue; }
+                int base = *(int*)a;
+                if (f.legacyKey0 && i == 0) base = prefs.getInt(f.legacyKey0, base);   // legacy fallback
+                int v = prefs.getInt(key.c_str(), base);
+                *(int*)a = (int)constrain(v, f.min, f.max);
+            }
+    }
     // apfb -> fbmode migration: an old device that only saved the apFallback bool
     // gets its link-loss policy derived from it (preserve loadConfig's behavior).
     if (!prefs.isKey("fbmode") && prefs.isKey("apfb"))
@@ -191,21 +208,43 @@ void load() {
     cfg.apFallback = (cfg.linkLossMode == WIRED_FB_AP);   // keep the legacy mirror in sync
 }
 
+// Write only what actually CHANGED. NVS is flash: rewriting every key unconditionally costs
+// both wear and time, and the time is what bit us -- with the pixel array the schema grew past
+// 200 keys, and a full rewrite inside the web handler blocked long enough for the async server
+// to reset the connection on an otherwise successful POST. A read-compare is much cheaper than
+// a write, so in the normal case (one field edited) this now writes exactly one key.
+static void putIntIfChanged(Preferences& p, const char* k, int v) {
+    if (p.isKey(k) && p.getInt(k, v ^ 1) == v) return;
+    p.putInt(k, v);
+}
+static void putBoolIfChanged(Preferences& p, const char* k, bool v) {
+    if (p.isKey(k) && p.getBool(k, !v) == v) return;
+    p.putBool(k, v);
+}
+static void putStrIfChanged(Preferences& p, const char* k, const String& v) {
+    if (p.isKey(k) && p.getString(k, String()) == v) return;
+    p.putString(k, v);
+}
+
 void save() {
     Preferences prefs; prefs.begin(CFG_PREF_NS, false);
     for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++) {
         const CfgField& f = CONFIG_FIELDS[j]; void* a = rootAddr(f);
-        if (f.kind == CfgKind::Bool)      prefs.putBool(f.key, *(bool*)a);
-        else if (f.kind == CfgKind::Str)  prefs.putString(f.key, *(String*)a);
-        else                              prefs.putInt(f.key, *(int*)a);
+        if (f.kind == CfgKind::Bool)      putBoolIfChanged(prefs, f.key, *(bool*)a);
+        else if (f.kind == CfgKind::Str)  putStrIfChanged(prefs, f.key, *(String*)a);
+        else                              putIntIfChanged(prefs, f.key, *(int*)a);
     }
-    for (int i = 0; i < MAX_OUTPUTS; i++)
-        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
-            const CfgOutputField& f = OUTPUT_FIELDS[j]; void* a = outAddr(i, f);
-            String key = String("o") + i + "_" + f.suffix;
-            if (f.kind == CfgKind::Bool) prefs.putBool(key.c_str(), *(bool*)a);
-            else                         prefs.putInt(key.c_str(), *(int*)a);
-        }
+    for (size_t ai = 0; ai < CONFIG_ARRAY_COUNT; ai++) {
+        const CfgArray& A = CONFIG_ARRAYS[ai];
+        for (int i = 0; i < (int)A.count; i++)
+            for (size_t j = 0; j < A.fieldCount; j++) {
+                const CfgArrayField& f = A.fields[j]; void* a = elemAddr(A, i, f);
+                char kb[32]; snprintf(kb, sizeof(kb), "%c%d_%s", A.prefix, i, f.suffix);
+                String key(kb);
+                if (f.kind == CfgKind::Bool) putBoolIfChanged(prefs, key.c_str(), *(bool*)a);
+                else                         putIntIfChanged(prefs, key.c_str(), *(int*)a);
+            }
+    }
     prefs.putBool("apfb", cfg.linkLossMode == WIRED_FB_AP);   // derived legacy mirror
     prefs.end();
 }
@@ -221,14 +260,18 @@ void dump(String& out, bool maskSecrets) {
         if (maskSecrets && (f.flags & CFG_SECRET)) v = "***";
         out += f.key; out += "="; out += v; out += "\n";
     }
-    for (int i = 0; i < MAX_OUTPUTS; i++)
-        for (size_t j = 0; j < OUTPUT_FIELD_COUNT; j++) {
-            const CfgOutputField& f = OUTPUT_FIELDS[j];
-            String key = String("o") + i + "_" + f.suffix;
-            String v; getValue(key, v);
-            if (maskSecrets && (f.flags & CFG_SECRET)) v = "***";
-            out += key; out += "="; out += v; out += "\n";
-        }
+    for (size_t ai = 0; ai < CONFIG_ARRAY_COUNT; ai++) {
+        const CfgArray& A = CONFIG_ARRAYS[ai];
+        for (int i = 0; i < (int)A.count; i++)
+            for (size_t j = 0; j < A.fieldCount; j++) {
+                const CfgArrayField& f = A.fields[j];
+                char kb[32]; snprintf(kb, sizeof(kb), "%c%d_%s", A.prefix, i, f.suffix);
+                String key(kb);
+                String v; getValue(key, v);
+                if (maskSecrets && (f.flags & CFG_SECRET)) v = "***";
+                out += key; out += "="; out += v; out += "\n";
+            }
+    }
 }
 
 } // namespace cfgcore

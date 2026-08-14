@@ -71,18 +71,22 @@ quick crossfade with the bar held steady instead of a flicker.
 
 RDM runs on **every** output that has a DE/RE (direction) pin, i.e. a real RS485 transceiver that can
 receive. Each such output is its own RDM "line" with its own RMT TX, DE pin and RX UART, so RDM can
-discover and talk to fixtures on both universes. The engine is serialised on the DMX task and selects
+discover and talk to fixtures on every universe. The engine is serialised on the DMX task and selects
 the active line per transaction (`rdmRmtSelect`), so it drives one line at a time without ever
-stalling either output's DMX. Each discovered fixture is tagged with its universe (the **Uni** column
+stalling any output's DMX. Each discovered fixture is tagged with its universe (the **Uni** column
 in the table), and the RDM tab has a **Discover** button per universe (plus "Scan all"); discovering
 one universe re-reads only that line and leaves the other universes' fixtures in place. On the wire
-this needs one spare RX UART per line (`UART_NUM_2`, then `UART_NUM_1`), which the RMT DMX build
-leaves free. `/rdm.json` carries `rdmLines` (the RDM-capable universes), a `uni` on every fixture, and
+all lines **share a single RX UART** (`UART_NUM_2`), whose RX pin `rdmRmtSelect()` moves to the line
+about to transact and whose FIFO it flushes afterwards. That is not a compromise: exactly one line is
+ever receiving, because the engine runs one transaction at a time and RDM has no unsolicited traffic
+to listen for in between. It used to take a UART per line, which capped RDM at two lines once the
+console had UART0; sharing one lifts that (so a three-port board is RDM-capable on all three) and
+leaves UART1 free. `/rdm.json` carries `rdmLines` (the RDM-capable universes), a `uni` on every fixture, and
 `discLine` (the line a sweep is on). Over **Art-Net** it's multi-port too: the node advertises RDM on
 every RDM universe (`ArtPollReply` GoodOutputB per port), and `ArtTodRequest`/`ArtTodControl`/`ArtRdm`
 are routed by port-address to the right line, so `ArtTodData` for a universe carries only that
 universe's fixtures and a relayed GET/SET goes out on the matching line. An external console
-(DMX-Workshop, MagicQ, grandMA3, OLA) can therefore do RDM on both universes.
+(DMX-Workshop, MagicQ, grandMA3, OLA) can therefore do RDM on every universe.
 
 All of this is backed by `/rdm.json`, which grew the per-fixture fields (`mfg`, `modelName`, `label`,
 `cat`, `swVer`, and per-sensor `lo`/`hi`/`rec`/`type`/`poll`), a top-level `sensorPoll` flag, and the

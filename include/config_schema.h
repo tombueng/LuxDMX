@@ -6,7 +6,11 @@
 // describes every field below in one table (CONFIG_FIELDS / OUTPUT_FIELDS).
 // ---------------------------------------------------------------------------
 
-static constexpr int MAX_OUTPUTS = 2;
+// Three, because the LuxDMX Carrier board wires three RS-485 transceiver modules. Everything
+// sized off this constant grows with it. The spots that are NOT automatic: the WS frame
+// (WS_FRAME_LEN, whose two browser-side parsers derive the output count from the frame
+// length, so they follow) and the RDM line table (RDM_MAX_LINES in rdm_rmt.h).
+static constexpr int MAX_OUTPUTS = 3;
 
 struct DmxOutput {
     bool enabled;
@@ -28,6 +32,34 @@ struct DmxOutput {
     int  txStyleSrc;
 };
 
+// WS281x pixel ports. Five, because the LuxDMX Carrier wires five buffered data lines.
+// A disabled port allocates nothing at all (see pixel.h): a plain ESP32 pixel node with
+// no DMX enabled must stay cheap on heap.
+static constexpr int MAX_PIXEL_PORTS = 5;
+
+struct PixelPort {
+    bool enabled;
+    int  pin;          // data GPIO, -1 = unset
+    int  count;        // pixels on this port
+    int  chip;         // PIX_CHIP_* — protocol family + channel count
+    int  order;        // PIX_ORDER_* — colour order on the wire
+    int  universe;     // first Art-Net universe this port consumes
+    int  startCh;      // 1..512, the channel inside that universe where pixel 1 starts
+    int  uniMode;      // 0 = whole pixels per universe (aligned), 1 = packed across 512
+    int  latch;        // PIX_LATCH_* — when a multi-universe frame is pushed
+    int  fpsCap;       // output rate ceiling, 0 = uncapped (the strip length still caps it)
+    int  bright;       // 0..255 master scale
+    int  gamma;        // gamma x100 (220 = 2.2); 0 = off
+    int  maxMa;        // per-port power cap in mA, 0 = off
+    int  mAPerCh;      // current one channel draws at 255, x100 mA (2000 = 20.00 mA)
+    int  quiesMa;      // per-pixel idle draw of the controller IC, x100 mA (100 = 1.00 mA)
+    int  lossMode;     // LOSS_HOLD / LOSS_ZERO (STOP is meaningless on a latching strip)
+    bool statusIdle;   // drive this port with the status colour while it has no pixel data
+    int  viewCols;     // live-view grid, user set; 0 = single wrapped row
+    int  viewRows;
+    bool viewSerp;     // live view draws the strip serpentine (display only)
+};
+
 struct Config {
     String    hostname;
     String    otaPassword;
@@ -43,6 +75,11 @@ struct Config {
     int       ledR, ledG, ledY, ledB, ledW;
     int       ledBrR, ledBrG, ledBrY, ledBrB, ledBrW;  // 5-LED panel per-colour brightness (0-255 PWM duty; green/white run dimmer)
     DmxOutput outputs[MAX_OUTPUTS];
+    PixelPort pixels[MAX_PIXEL_PORTS];
+    // Board's power-pour rating in mA, so the pixel power budget has something to measure
+    // against. Conservative default is the carrier's 2-layer figure; a 4-layer build sets
+    // 15400. Purely informational, the firmware never limits on it (that is maxMa per port).
+    int       railMa;
     int       dispType;
     int       dispSda, dispScl, dispRot, dispCs, dispDc, dispRst, dispSck, dispMosi;
     // On-unit controls (issue #24): optional rotary encoder + up to 4 buttons that

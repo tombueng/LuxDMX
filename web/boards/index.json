@@ -9,6 +9,12 @@
       "builtin": true
     },
     {
+      "id": "luxdmx_carrier",
+      "name": "LuxDMX Carrier (ESP32-S3 modules, 3x DMX + 5x pixel)",
+      "mcu": "esp32s3",
+      "builtin": true
+    },
+    {
       "id": "esp32s3-devkitc-1",
       "name": "ESP32-S3 DevKitC-1",
       "mcu": "esp32s3",

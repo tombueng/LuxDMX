@@ -41,8 +41,18 @@ function configForm(info, o1Overrides = {}) {
     subnet: info.subnet || '',
     dns: info.dns || '',
   };
-  if (info.staticIp) f.staticip = '1';
-  const outs = [info.outputs[0], { ...info.outputs[1], ...o1Overrides }];
+  // EVERY boolean: an absent key in this checkbox form is written false, and dropping `useeth`
+  // takes a wired device off Ethernet into its setup AP with no way back over the network.
+  if (info.staticIp)      f.staticip = '1';
+  if (info.useEthernet)   f.useeth   = '1';
+  if (info.ethW5500)      f.ethon    = '1';
+  if (info.artnetRdm)     f.artrdm   = '1';
+  if (info.ipProg)        f.ipprog   = '1';
+  if (info.autoUpdate)    f.autoupd  = '1';
+  if (info.encReverse)    f.encrev   = '1';
+  if (info.btnActiveHigh) f.btnah    = '1';
+  // Every output, not a fixed pair: an omitted o<i>_en reads as "disabled" (checkbox form).
+  const outs = info.outputs.map((o, i) => (i === 1 ? { ...o, ...o1Overrides } : o));
   outs.forEach((o, i) => {
     if (o.en) f[`o${i}_en`] = '1';          // omitted key == disabled
     f[`o${i}_uni`]  = String(o.uni);
@@ -55,13 +65,13 @@ function configForm(info, o1Overrides = {}) {
 }
 
 test.describe('Multi-output (issue #4)', () => {
-  test('/info.json exposes a 2-output array with the right shape', async ({ request }) => {
+  test('/info.json exposes a 3-output array with the right shape', async ({ request }) => {
     const d = await getInfo(request);
     expect(Array.isArray(d.outputs), 'outputs should be an array').toBeTruthy();
-    expect(d.outputs.length).toBe(2);
+    expect(d.outputs.length).toBe(3);
     for (const o of d.outputs) {
       for (const k of OUT_KEYS) expect(o, `output missing "${k}"`).toHaveProperty(k);
-      expect(o.port === 1 || o.port === 2, 'port is 1 or 2').toBeTruthy();
+      expect(o.port >= 1 && o.port <= 3, 'port is 1..3').toBeTruthy();
       expect(o.uni).toBeGreaterThanOrEqual(0);
       // 15 was the old Art-Net-only ceiling. Universes are 0..32767 now (sACN + Art-Net 4),
       // and the config form accepts that range, so a box on universe 77 is perfectly legal.
@@ -93,18 +103,24 @@ test.describe('Multi-output (issue #4)', () => {
 
   test('enabled outputs use distinct UART ports', async ({ request }) => {
     const d = await getInfo(request);
-    const ports = d.outputs.filter((o) => o.en).map((o) => o.port);
-    expect(new Set(ports).size, 'no two enabled outputs share a UART').toBe(ports.length);
+    // What the firmware actually enforces is one TX GPIO per output: each one binds its own
+    // RMT channel to that pin. It used to guard the `port` field instead, but that is a
+    // leftover from the esp_dmx era and no longer selects a peripheral (TX is on RMT, RDM's
+    // RX UART is shared and switched per line), so it is no longer the real constraint.
+    const txPins = d.outputs.filter((o) => o.en).map((o) => o.tx);
+    expect(new Set(txPins).size, 'no two enabled outputs share a TX pin').toBe(txPins.length);
   });
 
-  test('config page builds an Output A and Output B block', async ({ page }) => {
+  test('config page builds an Output A, B and C block', async ({ page }) => {
     await page.goto('/config');
-    await expect(page.locator('.out-card')).toHaveCount(2);
+    await expect(page.locator('.out-card')).toHaveCount(3);
     await expect(page.locator('.out-card .out-title').nth(0)).toHaveText(/Output A/);
     await expect(page.locator('.out-card .out-title').nth(1)).toHaveText(/Output B/);
+    await expect(page.locator('.out-card .out-title').nth(2)).toHaveText(/Output C/);
     // Cloned-template fields are renamed per output index.
     for (const n of ['o0_uni', 'o0_port', 'o0_tx', 'o0_rx', 'o0_rts',
-                     'o1_uni', 'o1_port', 'o1_tx', 'o1_rx', 'o1_rts']) {
+                     'o1_uni', 'o1_port', 'o1_tx', 'o1_rx', 'o1_rts',
+                     'o2_uni', 'o2_port', 'o2_tx', 'o2_rx', 'o2_rts']) {
       // :not(.fixed-mirror) -- on a fixed-pin board a locked field grows a hidden mirror
       // input with the same name so the value still POSTs. One real control is the assertion.
       await expect(page.locator(`[name="${n}"]:not(.fixed-mirror)`)).toHaveCount(1);

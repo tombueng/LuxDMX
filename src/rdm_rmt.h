@@ -23,11 +23,20 @@
 #include "rdm_types.h"           // rdm_uid_t / rdm_device_info_t / rdm_sensor_* / rdm_ack_t / PIDs / CCs
 
 // --- config ---------------------------------------------------------------------------------
-// Each RDM-capable output ("line") is a transceiver: its own RMT TX channel, DE/RE pin and an
-// RX-only UART. The RMT DMX build leaves UART1/UART2 free, so up to two lines are supported and
-// RDM can run on both universes (one at a time; the engine selects the active line per transaction).
+// Each RDM-capable output ("line") is a transceiver: its own RMT TX channel and DE/RE pin, plus
+// an RX path for responses.
+//
+// The RX path is ONE UART shared by every line, with its RX pin moved to the active line's
+// transceiver in rdmRmtSelect(). That is not a compromise, it is what the engine actually needs:
+// RDM is serialised (one transaction at a time, scheduled one op per DMX frame so it never stalls
+// the output) and RDM has no unsolicited traffic to listen for in between, so exactly one line is
+// ever receiving. A UART per line used to cap us at two, because the console owns UART0; sharing
+// one lifts that and leaves UART1 free.
+//
+// (A future E1.20 *responder* would have to listen on every line at once and would need a UART
+// each again. That is the point at which taking UART0 from the console becomes a real question.)
 #ifndef RDM_MAX_LINES
-#define RDM_MAX_LINES 2
+#define RDM_MAX_LINES MAX_OUTPUTS
 #endif
 #define RDM_SC             0xCC         // RDM start code
 #define RDM_SC_SUB         0x01         // RDM sub-start code (SC_SUB_MESSAGE)
@@ -39,7 +48,7 @@
 // RP2350 rig, fixtures answering after ~1.35 ms of turnaround started dropping out and everything
 // from 1.5 ms up was invisible, though all of it is inside spec.
 #define RDM_DISC_TIMEOUT_MS 6           // discovery reply window (2 ms turnaround + reply + margin)
-static const uart_port_t RDM_LINE_UART[RDM_MAX_LINES] = { UART_NUM_2, UART_NUM_1 };  // RX-only, one per line
+#define RDM_UART           UART_NUM_2   // the one RX-only UART, shared by every line (see above)
 
 // --- module state ---------------------------------------------------------------------------
 static rdm_uid_t g_rdmCtrl = {0x4C58, 0};   // controller UID: man_id 'LX' (<=0x7fff), dev_id from MAC
@@ -52,7 +61,9 @@ static int       g_rdmLineN = 0;
 static RmtDmx*     g_rdmRmt  = nullptr;      // active RMT channel (shared for request TX)
 static int         g_rdmDe   = -1;           // active DE/RE direction pin (HIGH=TX, LOW=RX)
 static int         g_rdmRx   = -1;           // active UART RX pin (transceiver RO)
-static uart_port_t g_rdmUart = UART_NUM_2;   // active RX UART
+static uart_port_t g_rdmUart = RDM_UART;     // active RX UART (always RDM_UART; kept as a variable
+                                             // because the transaction code below reads it)
+static int         g_rdmLineActive = -1;     // line the shared UART's RX pin currently points at
 static uint8_t   g_rdmTN   = 0;              // RDM transaction number (rolls)
 static volatile uint32_t g_rdmSent = 0;      // RDM frames transmitted on the bus (for the web UI)
 static volatile uint32_t g_rdmRecv = 0;      // checksum-valid RDM responses received
@@ -62,13 +73,29 @@ static volatile uint32_t g_rdmRecvMs = 0;    // millis() of the last valid RDM r
 static inline void rdmDe(int level) { gpio_set_level((gpio_num_t)g_rdmDe, level); }
 
 static int rdmRmtLineCount() { return g_rdmLineN; }
-// Point the transaction engine at a line (its RMT channel + DE pin + RX UART). Cheap; call it before
+// Point the transaction engine at a line (its RMT channel + DE pin + RX pin). Cheap; call it before
 // running discovery / a transaction on that line. RDM is serialised on the DMX task, so switching
 // the active line between ops is safe.
+//
+// Moving the shared UART's RX to this line's pin is a GPIO-matrix reroute, sub-microsecond against
+// an RDM TX->RX turnaround budget measured at 15 us median / 126 us worst case under HTTP load. The
+// FIFO is flushed afterwards so a byte left over from the previous line can never be read as this
+// line's response. Both are skipped when the line has not actually changed, which is the common case.
 static void rdmRmtSelect(int line) {
     if (line < 0 || line >= g_rdmLineN) return;
     RdmLine& L = g_rdmLines[line];
     g_rdmRmt = L.rmt; g_rdmDe = L.de; g_rdmRx = L.rx; g_rdmUart = L.uart;
+    if (line == g_rdmLineActive) return;
+    // An output can have a DE pin but no RX pin (a send-only transceiver wiring). It still
+    // registers as a line so DMX works, it just can never hear a reply -- so leave the UART
+    // pointed where it was rather than handing uart_set_pin a -1, which aborts inside IDF.
+    // The old code bound the pin once at init, so this was a boot-time crash; now it would
+    // have moved to the first switch onto such a line, which is worse. Guard it.
+    if (L.rx >= 0) {
+        uart_set_pin(RDM_UART, UART_PIN_NO_CHANGE, L.rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+        uart_flush_input(RDM_UART);
+        g_rdmLineActive = line;
+    }
 }
 
 // Register an RDM line (RX-only UART + DE pin; rmt is that output's already-initialised RMT channel,
@@ -77,7 +104,7 @@ static void rdmRmtSelect(int line) {
 static int rdmRmtInit(RmtDmx* rmt, int dePin, int rxPin) {
     if (g_rdmLineN >= RDM_MAX_LINES) return -1;
     int idx = g_rdmLineN;
-    uart_port_t uart = RDM_LINE_UART[idx];
+    uart_port_t uart = RDM_UART;              // shared; rdmRmtSelect() moves its RX pin per line
     if (idx == 0) {   // controller UID device-id from the base MAC (stable per board), once
         uint8_t mac[6] = {0};
         esp_read_mac(mac, ESP_MAC_WIFI_STA);
@@ -96,11 +123,17 @@ static int rdmRmtInit(RmtDmx* rmt, int dePin, int rxPin) {
     uc.stop_bits = UART_STOP_BITS_2;          // DMX/RDM is 8N2
     uc.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
     uc.source_clk = UART_SCLK_DEFAULT;
-    if (uart_driver_install(uart, 512, 0, 0, nullptr, 0) != ESP_OK) return -1;
-    uart_param_config(uart, &uc);
-    // RX only — TX/RTS/CTS left unconnected so the UART never drives the bus.
-    uart_set_pin(uart, UART_PIN_NO_CHANGE, rxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    gpio_set_pull_mode((gpio_num_t)rxPin, GPIO_PULLUP_ONLY);   // keep RO idle-high if it ever tri-states
+    // One shared UART: install and configure it on the first line only, then leave it alone.
+    // Its RX pin is not bound here at all -- rdmRmtSelect() points it at whichever line is about
+    // to transact (and the idx == 0 select at the end of this function does the first binding).
+    if (idx == 0) {
+        if (uart_driver_install(uart, 512, 0, 0, nullptr, 0) != ESP_OK) return -1;
+        uart_param_config(uart, &uc);
+    }
+    // RX only — TX/RTS/CTS are never bound, so the UART can never drive the bus.
+    // The pull-up is per line and set once here: it keeps this transceiver's RO idle-high if it
+    // ever tri-states, whether or not the UART is currently listening to it.
+    gpio_set_pull_mode((gpio_num_t)rxPin, GPIO_PULLUP_ONLY);
 
     g_rdmLines[idx].rmt = rmt; g_rdmLines[idx].de = dePin; g_rdmLines[idx].rx = rxPin;
     g_rdmLines[idx].uart = uart; g_rdmLines[idx].up = true;

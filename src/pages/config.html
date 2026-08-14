@@ -593,6 +593,123 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
 
     <div id="outputs-container"></div>
 
+    <!-- WS281x pixel ports. Hidden entirely on a board whose descriptor says it has none
+         (luxdmx_v6 declares "pixels":{"ports":0}); a board with no descriptor at all is an
+         unknown/home-made wiring and keeps the section, so nobody is locked out. -->
+    <div id="pixels-section" style="display:none">
+      <div class="d-flex align-items-center mb-2 mt-4">
+        <span class="sec-title">Pixel outputs (WS281x)</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-3" id="pix-autoassign"
+                title="Chain every enabled port's universes end to end, starting from the first port's universe">
+          Auto-assign universes
+        </button>
+      </div>
+      <div id="pixels-note" class="form-text mb-2"></div>
+      <div id="pixels-container"></div>
+      <div id="pix-plan" class="form-text"></div>
+    </div>
+
+    <!-- Cloned once per pixel port by buildPixels() -->
+    <template id="pix-tpl">
+      <div class="card mb-3 pix-card">
+        <div class="card-header d-flex align-items-center">
+          <span class="sec-title pix-title">Pixel port</span>
+          <div class="form-check form-switch mb-0 ms-3">
+            <input class="form-check-input pix-en" type="checkbox" value="1">
+            <label class="form-check-label small">Enabled</label>
+          </div>
+          <span class="ms-auto small text-secondary pix-badge"></span>
+        </div>
+        <div class="card-body pix-body">
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Data pin</label>
+              <input class="form-control pix-pin" type="number" min="-1" max="48" value="-1">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Pixels</label>
+              <input class="form-control pix-count" type="number" min="0" max="4096" value="170">
+              <div class="form-text pix-fps"></div>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">LED chip</label>
+              <select class="form-select pix-chip">
+                <option value="0">WS2812 / WS2815 (800 kHz, RGB)</option>
+                <option value="1">WS2811 (400 kHz, RGB)</option>
+                <option value="2">SK6812 / WS2814 (800 kHz, RGBW)</option>
+              </select>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">First universe</label>
+              <input class="form-control pix-uni" type="number" min="0" max="32767" value="0">
+              <div class="form-text pix-span"></div>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Start channel</label>
+              <input class="form-control pix-start" type="number" min="1" max="512" value="1">
+              <div class="form-text">Where pixel 1 begins inside that universe. Several ports can share one universe by starting at different channels.</div>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Colour order</label>
+              <select class="form-select pix-order">
+                <option value="0">GRB</option><option value="1">RGB</option>
+                <option value="2">BRG</option><option value="3">RBG</option>
+                <option value="4">GBR</option><option value="5">BGR</option>
+                <option value="6">GRBW</option><option value="7">RGBW</option>
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label text-secondary small mb-1">Latch policy</label>
+              <select class="form-select pix-latch">
+                <option value="0">On complete (follow the source)</option>
+                <option value="1">On sync (ArtSync / E1.31)</option>
+                <option value="2">Free-run at a fixed rate</option>
+              </select>
+              <div class="form-text pix-latch-note"></div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label text-secondary small mb-1">Universe packing</label>
+              <select class="form-select pix-unimode">
+                <option value="0">Whole pixels per universe</option>
+                <option value="1">Packed across universes (512)</option>
+              </select>
+              <div class="form-text">Whole pixels is what consoles assume: nothing straddles a universe boundary. Packed runs channels continuously and is only for senders that do the same.</div>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Brightness (0-255)</label>
+              <input class="form-control pix-bright" type="number" min="0" max="255" value="255">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Gamma x100 (0 = off)</label>
+              <input class="form-control pix-gamma" type="number" min="0" max="400" value="220">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Max rate (fps, 0 = uncapped)</label>
+              <input class="form-control pix-fpscap" type="number" min="0" max="200" value="0">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">Power cap (mA, 0 = off)</label>
+              <input class="form-control pix-maxma" type="number" min="0" max="60000" value="0">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">mA per channel at 255 (x100)</label>
+              <input class="form-control pix-machan" type="number" min="0" max="10000" value="2000">
+              <div class="form-text pix-macalc"></div>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label text-secondary small mb-1">On signal loss</label>
+              <select class="form-select pix-loss">
+                <option value="0">Hold last frame</option>
+                <option value="1">Blackout (send zeros)</option>
+              </select>
+              <div class="form-text">A latching strip holds its last frame by itself, so "stop sending" has no meaning here.</div>
+            </div>
+            <div class="col-12 pix-power form-text"></div>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <!-- Cloned once per output by buildOutputs() -->
     <template id="out-tpl">
       <div class="card mb-3 out-card">
@@ -855,6 +972,204 @@ function buildOutputs(outs){
   cont.innerHTML = '';
   for (var i = 0; i < outs.length; i++) wireCard(cont, tpl, i, outs[i] || {});
 }
+
+// ---- Pixel ports ----------------------------------------------------------
+// The arithmetic a user should never have to do by hand: how many universes a pixel count
+// needs, where the next port should therefore start, what frame rate that length allows, and
+// what it will draw. All of it recomputed live as the fields are typed, because "1020 pixels"
+// and "6 universes at 32 fps" are the same statement and only one of them is obvious.
+var PIX_BPP = [3, 3, 4];                       // per chip, matches pixBytesPerPixel()
+function pixBpp(chip){ return PIX_BPP[chip] || 3; }
+// Mirrors pixBuildSlices(): whole pixels per universe, first universe short by (start-1).
+function pixSpan(chip, uniMode, count, start){
+  var bpp = pixBpp(chip);
+  if (count <= 0) return 0;
+  if (start < 1) start = 1; if (start > 512) return 0;
+  if (+uniMode === 1) {                        // packed
+    var total = count * bpp, n = 0, off = start - 1;
+    while (total > 0){ var room = 512 - off; if (room <= 0) break;
+      total -= Math.min(room, total); off = 0; n++; }
+    return n;
+  }
+  var perUni = Math.floor(512 / bpp), first = Math.floor((512 - (start - 1)) / bpp);
+  var rem = count, n2 = 0;
+  while (rem > 0){ var cap = n2 === 0 ? first : perUni; if (cap <= 0) break;
+    rem -= Math.min(rem, cap); n2++; }
+  return n2;
+}
+function pixMaxFps(chip, count){
+  if (count <= 0) return 0;
+  var bits = pixBpp(chip) * 8, ns = bits * (chip === 1 ? 2500 : 1250);
+  var us = Math.floor(ns * count / 1000) + 300;
+  return us ? Math.floor(1000000 / us) : 0;
+}
+function pixCards(){ return [].slice.call(document.querySelectorAll('.pix-card')); }
+function pixRead(card){
+  var g = function(c){ return card.querySelector(c); };
+  return { en: g('.pix-en').checked, pin: +g('.pix-pin').value, count: +g('.pix-count').value,
+           chip: +g('.pix-chip').value, uni: +g('.pix-uni').value, start: +g('.pix-start').value,
+           uniMode: +g('.pix-unimode').value, machan: +g('.pix-machan').value,
+           maxma: +g('.pix-maxma').value };
+}
+
+function buildPixels(ports){
+  var tpl = $('pix-tpl'), cont = $('pixels-container');
+  if (!tpl || !cont) return;
+  cont.innerHTML = '';
+  for (var i = 0; i < ports.length; i++){
+    var p = ports[i] || {};
+    var node = tpl.content.firstElementChild.cloneNode(true);
+    node.setAttribute('data-sec', 'pix' + i);
+    node.querySelector('.pix-title').textContent = 'Pixel port ' + (i + 1);
+    var set = function(cls, key, dflt){
+      var el = node.querySelector(cls);
+      el.name = 'p' + i + '_' + key;
+      el.id   = 'p' + i + '_' + key;
+      if (el.type === 'checkbox') el.checked = !!p[dflt];
+      else el.value = (p[dflt] != null ? p[dflt] : el.value);
+      return el;
+    };
+    set('.pix-en','en','en');            set('.pix-pin','pin','pin');
+    set('.pix-count','count','count');   set('.pix-chip','chip','chip');
+    set('.pix-order','order','order');   set('.pix-uni','uni','uni');
+    set('.pix-start','start','start');   set('.pix-unimode','unimode','uniMode');
+    set('.pix-latch','latch','latch');   set('.pix-fpscap','fpscap','fpsCap');
+    set('.pix-bright','bright','bright');set('.pix-gamma','gamma','gamma');
+    set('.pix-maxma','maxma','maxMa');   set('.pix-machan','machan','mAPerCh');
+    set('.pix-loss','loss','loss');
+    cont.appendChild(node);
+  }
+  pixCards().forEach(function(card){
+    card.querySelectorAll('input,select').forEach(function(el){
+      el.addEventListener('input', pixRecalc);
+      el.addEventListener('change', pixRecalc);
+    });
+  });
+  pixRecalc();
+}
+
+// Everything computed, plus the cross-port checks. Overlaps are FLAGGED, not forbidden:
+// three short ports deliberately sharing one universe at different start channels is a real
+// and useful layout, so the UI asks rather than refuses.
+function pixRecalc(){
+  var cards = pixCards();
+  if (!cards.length) return;
+  var used = [], totalWorst = 0, msgs = [];
+  var dmxUnis = [];
+  document.querySelectorAll('.out-card').forEach(function(c){
+    if (c.querySelector('.out-en').checked) dmxUnis.push(+c.querySelector('.out-uni').value);
+  });
+
+  cards.forEach(function(card, i){
+    var v = pixRead(card);
+    var span = pixSpan(v.chip, v.uniMode, v.count, v.start);
+    var fps  = pixMaxFps(v.chip, v.count);
+    var bpp  = pixBpp(v.chip);
+    card.querySelector('.pix-span').textContent =
+      v.count > 0 ? ('uses ' + span + ' universe' + (span === 1 ? '' : 's') +
+                     ' (' + v.uni + (span > 1 ? '-' + (v.uni + span - 1) : '') + ')') : '';
+    card.querySelector('.pix-fps').textContent =
+      v.count > 0 ? (v.count * bpp + ' channels, max ' + fps + ' fps on the wire') : '';
+    // Worst case is the number worth knowing: it says what a full-white cue would draw,
+    // BEFORE somebody pushes one.
+    var worst = Math.round((v.count * bpp * v.machan + v.count * 100) / 100);
+    var badge = card.querySelector('.pix-badge');
+    if (v.en && v.count > 0){
+      totalWorst += worst;
+      badge.textContent = 'all-white ≈ ' + (worst / 1000).toFixed(2) + ' A';
+      card.querySelector('.pix-power').textContent =
+        'Estimated ' + (worst / 1000).toFixed(2) + ' A with every channel at 255' +
+        (v.maxma > 0 ? ('; capped at ' + (v.maxma / 1000).toFixed(2) + ' A') : '; no cap set');
+    } else { badge.textContent = ''; card.querySelector('.pix-power').textContent = ''; }
+    card.querySelector('.pix-macalc').textContent =
+      'From the reel: W/m ÷ V ÷ (pixels/m) × 100000 ÷ ' + bpp + ' = this number.';
+    var latch = +card.querySelector('.pix-latch').value;
+    card.querySelector('.pix-latch-note').textContent = latch === 2
+      ? 'Free-run can tear a multi-universe frame. "On complete" is what you want unless a source needs otherwise.'
+      : (latch === 1 ? 'Waits for the controller’s sync packet, falling back after ~120 ms so nothing stalls.'
+                     : 'Pushes as soon as every universe of this port has arrived, so the output follows the source exactly.');
+    if (v.en && v.count > 0) used.push({ i: i, from: v.uni, to: v.uni + span - 1, start: v.start, span: span });
+  });
+
+  // Cross-port checks.
+  for (var a = 0; a < used.length; a++){
+    for (var b = a + 1; b < used.length; b++){
+      if (used[a].from <= used[b].to && used[b].from <= used[a].to)
+        msgs.push('Port ' + (used[a].i+1) + ' and port ' + (used[b].i+1) +
+                  ' share universes. Intentional? Two ports can split one universe by using different start channels.');
+    }
+    for (var d = 0; d < dmxUnis.length; d++)
+      if (dmxUnis[d] >= used[a].from && dmxUnis[d] <= used[a].to)
+        msgs.push('Port ' + (used[a].i+1) + ' overlaps DMX universe ' + dmxUnis[d] + ' — almost always a mistake.');
+  }
+  var plan = $('pix-plan');
+  if (plan){
+    var head = used.length
+      ? ('Plan: ' + used.map(function(u){ return 'port ' + (u.i+1) + ' → ' +
+           (u.span === 1 ? ('universe ' + u.from) : ('universes ' + u.from + '-' + u.to)); }).join(', ') +
+         '. Next free universe: ' + (used.reduce(function(m,u){ return Math.max(m, u.to+1); }, 0)) +
+         '. All-white total ≈ ' + (totalWorst/1000).toFixed(2) + ' A.')
+      : 'No pixel port enabled.';
+    plan.innerHTML = esc(head) + (msgs.length ? ('<br><span class="text-warning">' +
+                     msgs.map(esc).join('<br>') + '</span>') : '');
+  }
+}
+
+// Show or hide the whole pixel section from the selected board's descriptor, and lock the
+// data pins on a board that wires them in copper. Three deliberate states:
+//   pixels.ports > 0  the board has them: show, and fix the pins it routes
+//   pixels.ports = 0  the board is known NOT to have them: hide, and say why
+//   no pixels block    unknown board (a bare DevKit, home-made wiring): show, pins free
+function applyPixelBoardCaps(){
+  var sec = $('pixels-section'); if (!sec) return;
+  var b = currentBoardDesc();
+  var px = b && b.pixels;
+  var note = $('pixels-note');
+  if (px && (px.ports | 0) === 0){
+    sec.style.display = 'none';
+    if (note) note.textContent = px.why || 'This board has no pixel outputs.';
+    return;
+  }
+  sec.style.display = '';
+  var cards = pixCards();
+  var n = px ? (px.ports | 0) : cards.length;
+  cards.forEach(function(card, i){
+    card.style.display = (i < n) ? '' : 'none';
+    var pin = card.querySelector('.pix-pin');
+    if (px && px.pins && px.pins[i] != null){
+      pin.value = px.pins[i];
+      pin.readOnly = true;
+      pin.classList.add('bg-body-secondary');
+      pin.title = 'Fixed in copper on this board';
+    } else {
+      pin.readOnly = false;
+      pin.classList.remove('bg-body-secondary');
+      pin.title = '';
+    }
+  });
+  if (note) note.textContent = px && px.note ? px.note : '';
+  pixRecalc();
+}
+
+// Chain every enabled port end to end from the first one's universe. What most people want,
+// and it removes the arithmetic entirely.
+document.addEventListener('DOMContentLoaded', function(){
+  var b = document.getElementById('pix-autoassign');
+  if (b) b.addEventListener('click', pixAutoAssign);
+});
+function pixAutoAssign(){
+  var next = null;
+  pixCards().forEach(function(card){
+    var v = pixRead(card);
+    if (!v.en || v.count <= 0) return;
+    if (next === null) next = v.uni;
+    card.querySelector('.pix-uni').value = next;
+    card.querySelector('.pix-start').value = 1;
+    next += pixSpan(v.chip, v.uniMode, v.count, 1);
+  });
+  pixRecalc();
+  validate();
+}
 function wireCard(cont, tpl, i, o){
   var node = tpl.content.firstElementChild.cloneNode(true);
   node.setAttribute('data-sec', 'out' + i);   // its own fold state, remembered per output
@@ -996,6 +1311,15 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('led-b').value = d.ledB !== undefined ? d.ledB : -1;
   $('led-w').value = d.ledW !== undefined ? d.ledW : -1;
   buildOutputs(d.outputs || [{en:true, uni:d.universe||0, port:1, tx:17, rx:16, rts:-1}]);
+  // Pixel ports come from their own endpoint (they are not part of /info.json's contract).
+  // Fetched separately so an older device that has no /pixels.json simply shows no section
+  // rather than failing the whole settings page.
+  fetch('/pixels.json').then(function(r){ return r.ok ? r.json() : null; }).then(function(px){
+    if (!px || !px.ports) return;
+    buildPixels(px.ports);
+    applyPixelBoardCaps();
+    decorateAllPins();
+  }).catch(function(){});
   $('disp-type').value = d.dispType !== undefined ? d.dispType : 0;
   $('disp-sda').value  = d.dispSda  !== undefined ? d.dispSda  : 21;
   $('disp-scl').value  = d.dispScl  !== undefined ? d.dispScl  : 22;
@@ -1421,7 +1745,7 @@ secInitAll();
 var BOARDS = {};
 var PICK_TARGET = null;
 var REMOTE_INDEX = {};
-var BUILTINS = ['luxdmx_v6','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
+var BUILTINS = ['luxdmx_v6','luxdmx_carrier','esp32s3-devkitc-1','esp32-devkitc','esp32-devkit-v1','xiao-esp32s3'];
 var CATALOG_URL = 'https://luxdmx.org/web/boards/';
 
 // Chip families: used when no full board descriptor is selected (Custom).
@@ -1456,6 +1780,16 @@ function s3flags(g, eth){
 function s3cols(eth){
   return [ S3L.map(function(g){ return P(g, s3silk(g), s3flags(g, eth)); }),
            S3R.map(function(g){ return P(g, s3silk(g), s3flags(g, eth)); }) ];
+}
+// Same diagram, but for a module that is definitely an N16R8: the octal PSRAM owns 35/36/37,
+// so they are dead even though the header brings them out. 'flash' is the right flag, it
+// already reads as "do not use" at error severity.
+function s3colsOctal(eth){
+  var c = s3cols(eth);
+  c.forEach(function(col){ col.forEach(function(p){
+    if ([35,36,37].indexOf(p.gpio) >= 0) p.flags = p.flags.concat(['flash']);
+  }); });
+  return c;
 }
 // ESP32 DevKitC (WROOM-32, 38-pin).
 var E32L = [36,39,34,35,32,33,25,26,27,14,12,13,9,10,11];
@@ -1573,6 +1907,73 @@ function buildBoards(){
              dispsck:39, dispmosi:40, dispcs:41, dispdc:42, disprst:38,
              outputs:[{en:true, uni:0, port:1, tx:17, rx:18, rts:8},
                       {en:true, uni:1, port:2, tx:16, rx:21, rts:47}] } });
+  // The LuxDMX Carrier: a passive PCB that an ESP32-S3 module, up to three RS-485 modules and a
+  // W5500 module plug into (hardware-carrier/). Everything the carrier routes is fixed in copper,
+  // so it is all hardwired here; the pixel data pins are locked too even though the pixel engine
+  // itself lands later. Status LED deliberately OFF: the module's own WS2812 sits on IO48, which
+  // is pixel port 5 on this board, and two drivers on one pin is the one combination that breaks.
+  BOARDS['luxdmx_carrier'] = finalizeDesc({ id:'luxdmx_carrier',
+    name:'LuxDMX Carrier (ESP32-S3 modules, 3x DMX + 5x pixel)', mcu:'esp32s3',
+    // No `phys`: the module that plugs in here is a USB-C clone, not the official two-micro-USB
+    // DevKitC-1, and on a carrier you find a pin by the carrier's own silk anyway. The labelled
+    // `headers` below are the useful "plug this into that" story here.
+    cols:s3colsOctal(true),
+    pixels:{ ports:5, pins:[38,39,40,47,48], buffered:true,
+             note:'IO48 also drives the module’s own RGB LED, so the status LED must be off '
+                + 'when pixel port 5 is used' },
+    hardwired:[
+      {field:'o0_tx', gpio:17, label:'DMX 1 · TX → DI'},
+      {field:'o0_rx', gpio:18, label:'DMX 1 · RX → RO'},
+      {field:'o0_rts',gpio:16, label:'DMX 1 · DE/RE'},
+      {field:'o1_tx', gpio:15, label:'DMX 2 · TX → DI'},
+      {field:'o1_rx', gpio:7,  label:'DMX 2 · RX → RO'},
+      {field:'o1_rts',gpio:6,  label:'DMX 2 · DE/RE'},
+      {field:'o2_tx', gpio:5,  label:'DMX 3 · TX → DI'},
+      {field:'o2_rx', gpio:4,  label:'DMX 3 · RX → RO'},
+      {field:'o2_rts',gpio:8,  label:'DMX 3 · DE/RE'},
+      {field:'ethsck', gpio:12, label:'W5500 · SCLK'},
+      {field:'ethmosi',gpio:11, label:'W5500 · MOSI'},
+      {field:'ethmiso',gpio:13, label:'W5500 · MISO'},
+      {field:'ethcs',  gpio:10, label:'W5500 · CS'},
+      {field:'ethint', gpio:14, label:'W5500 · INT'},
+      {field:'ethrst', gpio:9,  label:'W5500 · RST'},
+      {field:'dispsda',gpio:1,  label:'Display · SDA'},
+      {field:'dispscl',gpio:2,  label:'Display · SCL'},
+      {field:'enca',   gpio:42, label:'Encoder · CLK'},
+      {field:'encb',   gpio:41, label:'Encoder · DT'},
+      {field:'encsw',  gpio:21, label:'Encoder · SW'}
+    ],
+    headers:[
+      {ref:'DMX1', name:'DMX 1 (to XLR)', pins:[{pin:1,silk:'GND'},{pin:2,silk:'B / D−'},{pin:3,silk:'A / D+'}]},
+      {ref:'DMX2', name:'DMX 2 (to XLR)', pins:[{pin:1,silk:'GND'},{pin:2,silk:'B / D−'},{pin:3,silk:'A / D+'}]},
+      {ref:'DMX3', name:'DMX 3 (to XLR)', pins:[{pin:1,silk:'GND'},{pin:2,silk:'B / D−'},{pin:3,silk:'A / D+'}]},
+      {ref:'PIX1', name:'Pixel 1 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:38},{pin:3,silk:'GND'}]},
+      {ref:'PIX2', name:'Pixel 2 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:39},{pin:3,silk:'GND'}]},
+      {ref:'PIX3', name:'Pixel 3 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:40},{pin:3,silk:'GND'}]},
+      {ref:'PIX4', name:'Pixel 4 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:47},{pin:3,silk:'GND'}]},
+      {ref:'PIX5', name:'Pixel 5 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:48},{pin:3,silk:'GND'}]},
+      {ref:'DISP', name:'Display header', pins:[
+        {pin:1,silk:'SDA',gpio:1},{pin:2,silk:'SCL',gpio:2},{pin:3,silk:'3V3'},{pin:4,silk:'GND'} ]},
+      {ref:'ENC', name:'Encoder header (KY-040)', pins:[
+        {pin:1,silk:'GND'},{pin:2,silk:'+3V3'},{pin:3,silk:'SW',gpio:21},{pin:4,silk:'DT',gpio:41},
+        {pin:5,silk:'CLK',gpio:42} ]},
+      {ref:'EXP', name:'Expansion header', pins:[
+        {pin:1,silk:'3V3'},{pin:2,silk:'GND'},{pin:3,silk:'IO47',gpio:47},{pin:4,silk:'IO48',gpio:48},
+        {pin:5,silk:'TX0',gpio:43},{pin:6,silk:'RX0',gpio:44} ]}
+    ],
+    preset:{ ledType:0, ledPin:-1,
+             ethcs:10, ethsck:12, ethmosi:11, ethmiso:13, ethint:14, ethrst:9,
+             dispType:1, dispsda:1, dispscl:2,
+             enca:42, encb:41, encsw:21,
+             // Universes chain 0..4 so filling ports in order is already a valid plan with no
+             // arithmetic; same values as templates/luxdmx_carrier.ini. Chip stays at the
+             // per-board default (WS2815, 12 V) and every port starts disabled.
+             pixels:[{en:false, pin:38, uni:0}, {en:false, pin:39, uni:1},
+                     {en:false, pin:40, uni:2}, {en:false, pin:47, uni:3},
+                     {en:false, pin:48, uni:4}],
+             outputs:[{en:true,  uni:0, port:1, tx:17, rx:18, rts:16},
+                      {en:false, uni:1, port:2, tx:15, rx:7,  rts:6},
+                      {en:false, uni:2, port:3, tx:5,  rx:4,  rts:8}] } });
   BOARDS['esp32s3-devkitc-1'] = finalizeDesc({ id:'esp32s3-devkitc-1', name:'ESP32-S3 DevKitC-1', mcu:'esp32s3',
     cols:s3cols(false), phys:physS3DevKitC(),
     preset:{ ledType:2, ledPin:48, dispType:1, dispsda:8, dispscl:9,
@@ -1641,6 +2042,12 @@ function activeRoles(){
   if (dt === '1' || dt === '2' || dt === '3') r = r.concat(['dispsda','dispscl']);
   if (dt === '4') r = r.concat(['dispcs','dispdc','disprst','dispsck','dispmosi']);
   document.querySelectorAll('.out-card').forEach(function(card, i){ r.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
+  // A pixel data pin is a claimed GPIO like any other, so it belongs in the conflict map:
+  // this is what makes "port 5 is on the status LED's pin" show up in the UI instead of
+  // only being caught by the firmware's sanitiser after a save.
+  document.querySelectorAll('.pix-card').forEach(function(card, i){
+    if (card.querySelector('.pix-en').checked) r.push('p'+i+'_pin');
+  });
   if ($('ethon-sw') && $('ethon-sw').checked) r = r.concat(['ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst']);
   // On-unit controls: a pin counts as claimed only once it's actually set (>= 0),
   // which the conflict map already filters on, so listing them here is enough.
@@ -1675,6 +2082,7 @@ function decorateAllPins(){
                'ethcs','ethsck','ethmosi','ethmiso','ethint','ethrst',
                'enca','encb','encsw','btn1pin','btn2pin','btn3pin','btn4pin'];
   document.querySelectorAll('.out-card').forEach(function(card, i){ names.push('o'+i+'_tx','o'+i+'_rx','o'+i+'_rts'); });
+  document.querySelectorAll('.pix-card').forEach(function(card, i){ names.push('p'+i+'_pin'); });
   names.forEach(function(n){ decoratePin(byRole(n)); });
   document.querySelectorAll('.out-en').forEach(function(en){
     if (!en.dataset.vbound){ en.dataset.vbound = '1'; en.addEventListener('change', validate); }
@@ -2143,6 +2551,12 @@ function applyTemplate(){
     if (p.dispType != null){ $('disp-type').value = p.dispType; updDispPins(); }
     ['dispsda','dispscl','dispcs','dispdc','disprst','dispsck','dispmosi'].forEach(function(k){ if (p[k] != null) setVal(k, p[k]); });
     if (p.outputs){ buildOutputs(p.outputs); decorateAllPins(); }
+    // Pixel ports come along with the template too. Without this, applying a board left the
+    // pixel cards holding whatever the previous board had -- so on a carrier every port sat on
+    // universe 0 and four of the five received nothing until you noticed and fixed it by hand.
+    // The ports stay DISABLED: the pins are copper, but whether a strip is wired to them is
+    // the user's business, not the template's.
+    if (p.pixels){ buildPixels(p.pixels); decorateAllPins(); }
     // Panel brightness isn't a config-form field (it's tuned live via /led/bright), so the tested
     // per-colour duty can't ride along on Save — push it straight to the endpoint, persisted.
     if (p.ledbright){
@@ -2307,7 +2721,9 @@ function initBoards(){
   $('board-detected').textContent = INFO_BOARD ? ('detected: ' + INFO_BOARD + (INFO_MCU ? (' / ' + INFO_MCU) : '')) : '';
   decorateAllPins();
   // re-render the open picker (and re-sync the modal select) after a board change
-  var afterBoardChange = function(){ updBoardButtons(); applyHardwiredLocks(); validate();
+  var afterBoardChange = function(){ updBoardButtons(); applyHardwiredLocks();
+    applyPixelBoardCaps();   // show/hide + lock the pixel section for the new board
+    validate();
     if ($('board-modal').classList.contains('show')){ syncModalBoardSel(); renderCurrent(); } };
   $('board-sel').addEventListener('change', function(){
     var id = $('board-sel').value;

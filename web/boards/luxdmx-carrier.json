@@ -1,0 +1,646 @@
+{
+  "id": "luxdmx_carrier",
+  "name": "LuxDMX Carrier (ESP32-S3 modules, 3x DMX + 5x pixel)",
+  "mcu": "esp32s3",
+  "cols": [
+    [
+      {
+        "gpio": 4,
+        "silk": "IO4",
+        "flags": []
+      },
+      {
+        "gpio": 5,
+        "silk": "IO5",
+        "flags": []
+      },
+      {
+        "gpio": 6,
+        "silk": "IO6",
+        "flags": []
+      },
+      {
+        "gpio": 7,
+        "silk": "IO7",
+        "flags": []
+      },
+      {
+        "gpio": 15,
+        "silk": "IO15",
+        "flags": []
+      },
+      {
+        "gpio": 16,
+        "silk": "IO16",
+        "flags": []
+      },
+      {
+        "gpio": 17,
+        "silk": "IO17",
+        "flags": []
+      },
+      {
+        "gpio": 18,
+        "silk": "IO18",
+        "flags": []
+      },
+      {
+        "gpio": 8,
+        "silk": "IO8",
+        "flags": []
+      },
+      {
+        "gpio": 19,
+        "silk": "IO19",
+        "flags": [
+          "usb-jtag"
+        ]
+      },
+      {
+        "gpio": 20,
+        "silk": "IO20",
+        "flags": [
+          "usb-jtag"
+        ]
+      },
+      {
+        "gpio": 3,
+        "silk": "IO3",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 46,
+        "silk": "IO46",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 9,
+        "silk": "IO9",
+        "flags": [
+          "reserved:eth-spi"
+        ]
+      },
+      {
+        "gpio": 10,
+        "silk": "IO10",
+        "flags": [
+          "reserved:eth-spi"
+        ]
+      },
+      {
+        "gpio": 11,
+        "silk": "IO11",
+        "flags": [
+          "reserved:eth-spi"
+        ]
+      },
+      {
+        "gpio": 12,
+        "silk": "IO12",
+        "flags": [
+          "reserved:eth-spi"
+        ]
+      },
+      {
+        "gpio": 13,
+        "silk": "IO13",
+        "flags": [
+          "reserved:eth-spi"
+        ]
+      },
+      {
+        "gpio": 14,
+        "silk": "IO14",
+        "flags": [
+          "reserved:eth-spi"
+        ]
+      }
+    ],
+    [
+      {
+        "gpio": 21,
+        "silk": "IO21",
+        "flags": []
+      },
+      {
+        "gpio": 47,
+        "silk": "IO47",
+        "flags": []
+      },
+      {
+        "gpio": 48,
+        "silk": "IO48",
+        "flags": []
+      },
+      {
+        "gpio": 45,
+        "silk": "IO45",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 0,
+        "silk": "IO0",
+        "flags": [
+          "strapping"
+        ]
+      },
+      {
+        "gpio": 35,
+        "silk": "IO35",
+        "flags": [
+          "flash"
+        ]
+      },
+      {
+        "gpio": 36,
+        "silk": "IO36",
+        "flags": [
+          "flash"
+        ]
+      },
+      {
+        "gpio": 37,
+        "silk": "IO37",
+        "flags": [
+          "flash"
+        ]
+      },
+      {
+        "gpio": 38,
+        "silk": "IO38",
+        "flags": []
+      },
+      {
+        "gpio": 39,
+        "silk": "IO39",
+        "flags": []
+      },
+      {
+        "gpio": 40,
+        "silk": "IO40",
+        "flags": []
+      },
+      {
+        "gpio": 41,
+        "silk": "IO41",
+        "flags": []
+      },
+      {
+        "gpio": 42,
+        "silk": "IO42",
+        "flags": []
+      },
+      {
+        "gpio": 44,
+        "silk": "RX0",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 43,
+        "silk": "TX0",
+        "flags": [
+          "serial"
+        ]
+      },
+      {
+        "gpio": 2,
+        "silk": "IO2",
+        "flags": []
+      },
+      {
+        "gpio": 1,
+        "silk": "IO1",
+        "flags": []
+      }
+    ]
+  ],
+  "preset": {
+    "ledType": 0,
+    "ledPin": -1,
+    "dispType": 1,
+    "dispsda": 1,
+    "dispscl": 2,
+    "enca": 42,
+    "encb": 41,
+    "encsw": 21,
+    "ethcs": 10,
+    "ethsck": 12,
+    "ethmosi": 11,
+    "ethmiso": 13,
+    "ethint": 14,
+    "ethrst": 9,
+    "railMa": 9200,
+    "outputs": [
+      {
+        "en": true,
+        "uni": 0,
+        "port": 1,
+        "tx": 17,
+        "rx": 18,
+        "rts": 16
+      },
+      {
+        "en": false,
+        "uni": 1,
+        "port": 2,
+        "tx": 15,
+        "rx": 7,
+        "rts": 6
+      },
+      {
+        "en": false,
+        "uni": 2,
+        "port": 3,
+        "tx": 5,
+        "rx": 4,
+        "rts": 8
+      }
+    ]
+  },
+  "pixels": {
+    "ports": 5,
+    "pins": [
+      38,
+      39,
+      40,
+      47,
+      48
+    ],
+    "buffered": true,
+    "note": "IO48 also drives the module's own RGB LED, so the status LED must be off when pixel port 5 is used"
+  },
+  "hardwired": [
+    {
+      "field": "o0_tx",
+      "gpio": 17,
+      "label": "DMX 1 - TX -> DI"
+    },
+    {
+      "field": "o0_rx",
+      "gpio": 18,
+      "label": "DMX 1 - RX -> RO"
+    },
+    {
+      "field": "o0_rts",
+      "gpio": 16,
+      "label": "DMX 1 - DE/RE"
+    },
+    {
+      "field": "o1_tx",
+      "gpio": 15,
+      "label": "DMX 2 - TX -> DI"
+    },
+    {
+      "field": "o1_rx",
+      "gpio": 7,
+      "label": "DMX 2 - RX -> RO"
+    },
+    {
+      "field": "o1_rts",
+      "gpio": 6,
+      "label": "DMX 2 - DE/RE"
+    },
+    {
+      "field": "o2_tx",
+      "gpio": 5,
+      "label": "DMX 3 - TX -> DI"
+    },
+    {
+      "field": "o2_rx",
+      "gpio": 4,
+      "label": "DMX 3 - RX -> RO"
+    },
+    {
+      "field": "o2_rts",
+      "gpio": 8,
+      "label": "DMX 3 - DE/RE"
+    },
+    {
+      "field": "ethsck",
+      "gpio": 12,
+      "label": "W5500 - SCLK"
+    },
+    {
+      "field": "ethmosi",
+      "gpio": 11,
+      "label": "W5500 - MOSI"
+    },
+    {
+      "field": "ethmiso",
+      "gpio": 13,
+      "label": "W5500 - MISO"
+    },
+    {
+      "field": "ethcs",
+      "gpio": 10,
+      "label": "W5500 - CS"
+    },
+    {
+      "field": "ethint",
+      "gpio": 14,
+      "label": "W5500 - INT"
+    },
+    {
+      "field": "ethrst",
+      "gpio": 9,
+      "label": "W5500 - RST"
+    },
+    {
+      "field": "dispsda",
+      "gpio": 1,
+      "label": "Display - SDA"
+    },
+    {
+      "field": "dispscl",
+      "gpio": 2,
+      "label": "Display - SCL"
+    },
+    {
+      "field": "enca",
+      "gpio": 42,
+      "label": "Encoder - CLK"
+    },
+    {
+      "field": "encb",
+      "gpio": 41,
+      "label": "Encoder - DT"
+    },
+    {
+      "field": "encsw",
+      "gpio": 21,
+      "label": "Encoder - SW"
+    },
+    {
+      "field": "p0_pin",
+      "gpio": 38,
+      "label": "Pixel 1 - DATA"
+    },
+    {
+      "field": "p1_pin",
+      "gpio": 39,
+      "label": "Pixel 2 - DATA"
+    },
+    {
+      "field": "p2_pin",
+      "gpio": 40,
+      "label": "Pixel 3 - DATA"
+    },
+    {
+      "field": "p3_pin",
+      "gpio": 47,
+      "label": "Pixel 4 - DATA"
+    },
+    {
+      "field": "p4_pin",
+      "gpio": 48,
+      "label": "Pixel 5 - DATA"
+    }
+  ],
+  "headers": [
+    {
+      "ref": "DMX1",
+      "name": "DMX 1 (to XLR)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "GND"
+        },
+        {
+          "pin": 2,
+          "silk": "B / D-"
+        },
+        {
+          "pin": 3,
+          "silk": "A / D+"
+        }
+      ]
+    },
+    {
+      "ref": "DMX2",
+      "name": "DMX 2 (to XLR)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "GND"
+        },
+        {
+          "pin": 2,
+          "silk": "B / D-"
+        },
+        {
+          "pin": 3,
+          "silk": "A / D+"
+        }
+      ]
+    },
+    {
+      "ref": "DMX3",
+      "name": "DMX 3 (to XLR)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "GND"
+        },
+        {
+          "pin": 2,
+          "silk": "B / D-"
+        },
+        {
+          "pin": 3,
+          "silk": "A / D+"
+        }
+      ]
+    },
+    {
+      "ref": "PIX1",
+      "name": "Pixel 1 (to strip)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "V+ (12/24V)"
+        },
+        {
+          "pin": 2,
+          "silk": "DATA",
+          "gpio": 38
+        },
+        {
+          "pin": 3,
+          "silk": "GND"
+        }
+      ]
+    },
+    {
+      "ref": "PIX2",
+      "name": "Pixel 2 (to strip)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "V+ (12/24V)"
+        },
+        {
+          "pin": 2,
+          "silk": "DATA",
+          "gpio": 39
+        },
+        {
+          "pin": 3,
+          "silk": "GND"
+        }
+      ]
+    },
+    {
+      "ref": "PIX3",
+      "name": "Pixel 3 (to strip)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "V+ (12/24V)"
+        },
+        {
+          "pin": 2,
+          "silk": "DATA",
+          "gpio": 40
+        },
+        {
+          "pin": 3,
+          "silk": "GND"
+        }
+      ]
+    },
+    {
+      "ref": "PIX4",
+      "name": "Pixel 4 (to strip)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "V+ (12/24V)"
+        },
+        {
+          "pin": 2,
+          "silk": "DATA",
+          "gpio": 47
+        },
+        {
+          "pin": 3,
+          "silk": "GND"
+        }
+      ]
+    },
+    {
+      "ref": "PIX5",
+      "name": "Pixel 5 (to strip)",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "V+ (12/24V)"
+        },
+        {
+          "pin": 2,
+          "silk": "DATA",
+          "gpio": 48
+        },
+        {
+          "pin": 3,
+          "silk": "GND"
+        }
+      ]
+    },
+    {
+      "ref": "DISP",
+      "name": "Display header",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "SDA",
+          "gpio": 1
+        },
+        {
+          "pin": 2,
+          "silk": "SCL",
+          "gpio": 2
+        },
+        {
+          "pin": 3,
+          "silk": "3V3"
+        },
+        {
+          "pin": 4,
+          "silk": "GND"
+        }
+      ]
+    },
+    {
+      "ref": "ENC",
+      "name": "Encoder header",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "GND"
+        },
+        {
+          "pin": 2,
+          "silk": "+3V3"
+        },
+        {
+          "pin": 3,
+          "silk": "SW",
+          "gpio": 21
+        },
+        {
+          "pin": 4,
+          "silk": "DT",
+          "gpio": 41
+        },
+        {
+          "pin": 5,
+          "silk": "CLK",
+          "gpio": 42
+        }
+      ]
+    },
+    {
+      "ref": "EXP",
+      "name": "Expansion header",
+      "pins": [
+        {
+          "pin": 1,
+          "silk": "3V3"
+        },
+        {
+          "pin": 2,
+          "silk": "GND"
+        },
+        {
+          "pin": 3,
+          "silk": "IO47",
+          "gpio": 47
+        },
+        {
+          "pin": 4,
+          "silk": "IO48",
+          "gpio": 48
+        },
+        {
+          "pin": 5,
+          "silk": "TX0",
+          "gpio": 43
+        },
+        {
+          "pin": 6,
+          "silk": "RX0",
+          "gpio": 44
+        }
+      ]
+    }
+  ],
+  "_source": "pin map read from hardware-carrier/luxdmx-carrier-4layer.kicad_pcb"
+}

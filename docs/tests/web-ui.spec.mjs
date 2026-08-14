@@ -20,7 +20,7 @@ test.describe('Web UI + REST', () => {
   test('settings page loads with protocol + outputs + network cards', async ({ page }) => {
     await openConfig(page);
     await expect(page.locator('select[name="protocol"]')).toBeVisible();
-    await expect(page.locator('.out-card')).toHaveCount(2);
+    await expect(page.locator('.out-card')).toHaveCount(3);
     await expect(page.locator('input[name="hostname"]')).toBeVisible();
     await expect(page.locator('#save-btn')).toBeEnabled();
     // Save & Restart is a fixed bar, always visible, wired to the config form
@@ -378,7 +378,7 @@ test.describe('Web UI + REST', () => {
     await page.route('**/info.json', async (r) => { await new Promise((s) => setTimeout(s, 800)); await r.continue(); });
     await page.goto('/config');
     await page.locator('#sec-all').click();                     // outputs do not exist yet
-    await expect(page.locator('.out-card')).toHaveCount(2);     // ...they show up now
+    await expect(page.locator('.out-card')).toHaveCount(3);     // ...they show up now
     await expect(page.locator('.out-card.sec-closed')).toHaveCount(0);
     await page.unroute('**/info.json');
   });
