@@ -1,0 +1,19 @@
+#VRML V2.0 utf8
+# ESP32-S3 Modul auf Stiftleisten
+# 27.90 x 57.50 x 5.00 mm. Erzeugt von gen_3d_models.py, nicht von Hand pflegen.
+Transform {
+  translation 0.000000 -0.000000 1.968504
+  children [
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 0.050 0.300 0.120
+          specularColor 0.10 0.10 0.10
+          ambientIntensity 0.30
+          shininess 0.15
+        }
+      }
+      geometry Box { size 10.984252 22.637795 1.968504 }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+Ref,Val,Package,PosX,PosY,Rot,Side
+"5V Buck Converter","12-24V -> 5V buck","buck-module-universal",169.500000,-100.000000,180.000000,bottom
+"10k ETH_CS pu","10k ETH_CS pu","chip-universal",108.450000,-71.500000,180.000000,bottom
+"10k ETH_RST pu","10k ETH_RST pu","chip-universal",108.450000,-66.000000,180.000000,bottom
+"10k dir","10k dir","chip-universal",175.550000,-65.500000,180.000000,bottom
+"10k dir","10k dir","chip-universal",152.050000,-65.500000,180.000000,bottom
+"10k dir","10k dir","chip-universal",128.550000,-65.500000,180.000000,bottom
+"22uF 3V3 bulk","22uF 3V3 bulk","chip-universal",138.242500,-94.900000,180.000000,bottom
+"74AHCT541 pixel buffer","74AHCT541 pixel buffer","SOIC-20W_7.5x12.8mm_P1.27mm",104.285000,-95.150000,90.000000,bottom
+"100nF","100nF","chip-universal",97.937500,-66.000000,180.000000,bottom
+"100nF","100nF","chip-universal",138.242500,-89.400000,180.000000,bottom
+"120R term","120R term","chip-universal",154.500000,-72.500000,-90.000000,bottom
+"120R term","120R term","chip-universal",131.000000,-72.500000,-90.000000,bottom
+"120R term","120R term","chip-universal",178.000000,-72.500000,-90.000000,bottom
+"330R bias+","330R bias+","chip-universal",173.047500,-70.950000,-90.000000,bottom
+"330R bias+","330R bias+","chip-universal",149.547500,-70.950000,-90.000000,bottom
+"330R bias+","330R bias+","chip-universal",126.047500,-70.950000,-90.000000,bottom
+"330R bias-","330R bias-","chip-universal",173.000000,-78.050000,-90.000000,bottom
+"330R bias-","330R bias-","chip-universal",126.000000,-78.050000,-90.000000,bottom
+"330R bias-","330R bias-","chip-universal",149.500000,-78.050000,-90.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",143.500000,-60.000000,180.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",160.487500,-60.000000,180.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",136.987500,-60.000000,180.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",183.987500,-60.000000,180.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",167.000000,-60.000000,180.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",120.000000,-60.000000,180.000000,bottom
+"5V IN","5V in","PinHeader_1x02_P2.54mm_Vertical",189.000000,-60.775000,180.000000,top
+"12-24V IN","12-24V IN 24A","terminal-1x02-P5.08-bigpad",94.240000,-131.050000,0.000000,top
+"1000uF 35V","1000uF 35V","CP_Radial_D13.0mm_P5.00mm",124.000000,-119.000000,90.000000,top
+"Button 1","Tact 6x6 H30","SW_PUSH_6mm",176.500000,-118.500000,0.000000,top
+"Button 2","Tact 6x6 H30","SW_PUSH_6mm",155.500000,-118.500000,0.000000,top
+"DMX 1 - GND/B/A","XLR1 1=shld 2=D- 3=D+","header-1x03-P2.54-terminal",125.960000,-59.450000,90.000000,top
+"DMX 2 - GND/B/A","XLR2 1=shld 2=D- 3=D+","header-1x03-P2.54-terminal",149.460000,-59.450000,90.000000,top
+"DMX 3 - GND/B/A","XLR3 1=shld 2=D- 3=D+","header-1x03-P2.54-terminal",172.960000,-59.450000,90.000000,top
+"Display:SDA/SCL/3V3/GND","OLED SDA/SCL/VCC/GND","PinHeader_1x04_P2.54mm_Vertical",173.120000,-115.500000,-90.000000,top
+"ESP32-S3 (16N8R)","ESP32-S3 N16R8","desk_binghe-esp32-s3-devkitc1-n16r8-usbc",119.450000,-95.200000,-90.000000,top
+"EXP 3V3/GND/47/48/43/44","EXP 3V3/GND/47/48/43/44","PinHeader_1x06_P2.54mm_Vertical",189.000000,-77.660000,180.000000,top
+"Encoder A/B/SW","EC11","encoder-ec11-switch",133.500000,-114.500000,0.000000,top
+"F1","Blade fuse holder, alternative to the polyfuse","Fuseholder_Blade_Mini_Keystone_3568",98.770000,-117.930000,0.000000,top
+"Pixel1:Vcc/Data/GND","PIX1 V+/DATA/GND","terminal-1x03-P5.08-bigpad",105.577200,-130.970000,0.000000,top
+"Pixel2:Vcc/Data/GND","PIX2 V+/DATA/GND","terminal-1x03-P5.08-bigpad",121.841400,-130.970000,0.000000,top
+"Pixel3:Vcc/Data/GND","PIX3 V+/DATA/GND","terminal-1x03-P5.08-bigpad",138.105700,-130.970000,0.000000,top
+"Pixel4:Vcc/Data/GND","PIX4 V+/DATA/GND","terminal-1x03-P5.08-bigpad",154.370000,-130.970000,0.000000,top
+"Pixel5:Vcc/Data/GND","PIX5 V+/DATA/GND","terminal-1x03-P5.08-bigpad",170.634200,-130.970000,0.000000,top
+"Polyfuse MF-R 5.1(4A)/10.2(9A)","MF-R 30V: links+mitte bis 4A, links+rechts bis 9A","polyfuse-dual-pitch",98.630000,-112.230000,0.000000,top
+"U3 - MAX485 Modul","MAX3485 DMX1","desk_rakstore-max3485",128.500000,-71.500000,0.000000,top
+"U4 - MAX485 Modul","MAX3485 DMX2","desk_rakstore-max3485",152.000000,-71.500000,0.000000,top
+"U5 - MAX485 Modul","MAX3485 DMX3","desk_rakstore-max3485",175.500000,-71.500000,0.000000,top
+"W5500 Ethernet Module","USR-ES1 W5500","usr-es1-w5500",103.000000,-68.500000,90.000000,top

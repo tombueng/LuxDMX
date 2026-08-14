@@ -1,0 +1,772 @@
+{
+  "_comment": "Mechanical source of truth for every module the carrier board can host. Footprints are GENERATED from this file, never hand-drawn, and validate_module_footprints.py checks the board against it. A dimension may appear here ONLY if `confidence` is VERIFIED (a vendor mechanical drawing is in datasheets/) or MEASURED (calipers on a physical unit). UNVERIFIED entries are shopping notes: they must not get a socket on the PCB. See PLAN.md 'Not screwing up the sockets again'.",
+  "_schema": {
+    "confidence": "VERIFIED | MEASURED | UNVERIFIED",
+    "source": "file in datasheets/, or 'calipers <date> <who>', or the URL a claim came from",
+    "pcb": "outline in mm, viewed from the TOP (component side of the module)",
+    "headers": "one entry per pin row. origin is the module PCB top-left corner, x to the right, y downwards, TOP VIEW. pin1 is the position of pin 1's centre.",
+    "keepouts": "regions that must not sit over carrier copper, or must overhang the carrier edge",
+    "_units": "all lengths in mm"
+  },
+  "modules": {
+    "esp32-s3-devkitc-1": {
+      "category": "mcu",
+      "vendor": "Espressif",
+      "name": "ESP32-S3-DevKitC-1 v1.1",
+      "confidence": "VERIFIED",
+      "source": "datasheets/ESP32-S3-DevKitC-1_v1.1_dimensions.dxf, measured off the PADLAYER_TOP and BOARD_OUTLINE geometry (not off the dimension labels, see _row_spacing_note). Regulator read off datasheets/ESP32-S3-DevKitC-1_v1.1_schematic.pdf U2.",
+      "pcb": {
+        "length": 62.74,
+        "width": 25.4
+      },
+      "headers": [
+        {
+          "ref": "J1",
+          "side": "left",
+          "pins": 22,
+          "pitch": 2.54,
+          "pin1": {
+            "x": 1.27,
+            "y": 1.44
+          },
+          "direction": "down",
+          "names": [
+            "3V3",
+            "3V3",
+            "RST",
+            "IO4",
+            "IO5",
+            "IO6",
+            "IO7",
+            "IO15",
+            "IO16",
+            "IO17",
+            "IO18",
+            "IO8",
+            "IO3",
+            "IO46",
+            "IO9",
+            "IO10",
+            "IO11",
+            "IO12",
+            "IO13",
+            "IO14",
+            "5V",
+            "GND"
+          ]
+        },
+        {
+          "ref": "J3",
+          "side": "right",
+          "pins": 22,
+          "pitch": 2.54,
+          "pin1": {
+            "x": 24.13,
+            "y": 1.44
+          },
+          "direction": "down",
+          "names": [
+            "GND",
+            "IO43",
+            "IO44",
+            "IO1",
+            "IO2",
+            "IO42",
+            "IO41",
+            "IO40",
+            "IO39",
+            "IO38",
+            "IO37",
+            "IO36",
+            "IO35",
+            "IO0",
+            "IO45",
+            "IO48",
+            "IO47",
+            "IO21",
+            "IO20",
+            "IO19",
+            "GND",
+            "GND"
+          ]
+        }
+      ],
+      "row_spacing": 22.86,
+      "_row_spacing_note": "22.86 mm centre to centre (9 x 2.54), measured from the pad geometry: columns sit at x=1.270 and x=24.130. WARNING: the drawing carries a '25.40mm' dimension along the bottom. That is the BOARD WIDTH (1.27 + 22.86 + 1.27 = 25.40), NOT the row spacing. Reading that label as the row spacing makes the socket 2.54 mm too wide and the module will not fit. Note the USR-ES1 drawing uses the opposite convention: its 'B' dimension IS pad to pad. Never assume which one a drawing means, take it from the geometry.",
+      "_pin_y_note": "pad span y = 7.960 .. 61.300 in DXF coordinates (53.34 = 21 x 2.54). Bottom edge is y=0, top edge y=62.74. So pin 1 is 1.44 mm from the top edge and pin 22 is 7.96 mm from the bottom edge, which matches the '8.00mm' label on the drawing and confirms the calibration.",
+      "keepouts": [
+        {
+          "what": "PCB antenna MINI-ANT-TYPEB",
+          "where": "top end, full width between the rows, overhangs the top edge",
+          "rule": "no carrier copper underneath, prefer overhanging the carrier outline"
+        },
+        {
+          "what": "2 x micro-USB jacks (J2 UART, J4 USB)",
+          "where": "bottom 8.00 mm strip, overhang the bottom edge",
+          "rule": "must reach the enclosure panel for flashing"
+        }
+      ],
+      "electrical": {
+        "regulator": "SGM2212-3.3XKC3G",
+        "regulator_rating_mA": 800,
+        "regulator_package": "SOT-223",
+        "power_inputs": [
+          "USB",
+          "5V pin",
+          "3V3 pin"
+        ],
+        "power_inputs_note": "mutually exclusive, per the Espressif user guide"
+      },
+      "gotchas": [
+        "GPIO 35/36/37 are unusable on any R8 (octal PSRAM) variant, even though they are on the header",
+        "RGB LED is GPIO38 on v1.1 and GPIO48 on v1.0",
+        "USB end and antenna end are opposite ends, and both want to be at a board edge"
+      ]
+    },
+    "yd-esp32-s3": {
+      "category": "mcu",
+      "vendor": "VCC-GND Studio",
+      "name": "YD-ESP32-S3 (DevKitC-1 clone), N16R8 / N8R2",
+      "confidence": "UNVERIFIED",
+      "source": "https://mischianti.org/vcc-gnd-studio-yd-esp32-s3-devkitc-1-clone-high-resolution-pinout-and-specs/ claims 1.1in x 2.5in (27.94 x 63.5 mm), 44 pins",
+      "pcb": null,
+      "headers": null,
+      "row_spacing": null,
+      "gotchas": [
+        "Claimed DevKitC-1 compatible, but ~0.8 mm longer than the official 62.74 mm",
+        "CH343 USB bridge, not CP2102N",
+        "No vendor mechanical drawing exists. Must be measured before it gets a socket."
+      ]
+    },
+    "usr-es1-w5500": {
+      "category": "ethernet",
+      "vendor": "Jinan USR IOT",
+      "name": "USR-ES1 (W5500 Lite)",
+      "confidence": "VERIFIED",
+      "source": "datasheets/USR-ES1_W5500_datasheet.pdf section 3.3, dimensioned drawing rendered to img/usr-es1-dimensions-09.png",
+      "pcb": {
+        "length": 25.0,
+        "width": 23.0
+      },
+      "headers": [
+        {
+          "ref": "J1",
+          "side": "left",
+          "pins": 6,
+          "pitch": 2.54,
+          "pin1": {
+            "x": 1.34,
+            "y": 6.4
+          },
+          "direction": "down",
+          "names": [
+            "GND",
+            "GND",
+            "MOSI",
+            "SCLK",
+            "SCSn",
+            "INTn"
+          ]
+        },
+        {
+          "ref": "J2",
+          "side": "right",
+          "pins": 6,
+          "pitch": 2.54,
+          "pin1": {
+            "x": 21.66,
+            "y": 6.4
+          },
+          "direction": "down",
+          "names": [
+            "GND",
+            "+3.3V",
+            "+3.3V",
+            "NC",
+            "RSTn",
+            "MISO"
+          ]
+        }
+      ],
+      "row_spacing": 20.32,
+      "_row_spacing_note": "dimension B on the drawing, given explicitly as 20.32 (2.54 x 8). Pin centres 1.34 mm in from each long edge (C and G). Pin 1 is 6.40 mm from the top edge (I), pin 6 is 5.80 mm from the bottom edge (K).",
+      "keepouts": [
+        {
+          "what": "RJ45 body (P1)",
+          "where": "overhangs the top edge by 2.50 +/- 0.50 mm",
+          "rule": "module sits at a carrier board edge or over a cutout"
+        }
+      ],
+      "electrical": {
+        "supply_V": 3.3,
+        "supply_min_mA": 200,
+        "chip_typ_mA": 132,
+        "logic": "3.3V TTL",
+        "spi_modes": [
+          0,
+          3
+        ]
+      },
+      "gotchas": [
+        "docs.cirkitdesigner.com describes this module as 8 pins in a single row. That is WRONG. It is 2 x 6. Do not use third-party pages for this part."
+      ]
+    },
+    "max3485-module": {
+      "category": "rs485",
+      "vendor": "generic",
+      "name": "MAX3485 / SP3485 3.3V TTL-to-RS485 module",
+      "confidence": "UNVERIFIED",
+      "source": "AliExpress / Amazon listings only, no vendor drawing exists",
+      "pcb": null,
+      "headers": null,
+      "electrical": {
+        "supply_V": 3.3,
+        "logic": "3.3V"
+      },
+      "must_check_on_a_physical_unit": [
+        "header pitch, pin order, board outline",
+        "are DE and RE separate pins, or bridged?",
+        "is it the 'automatic flow control' variant? that may break RDM turnaround timing",
+        "fitted termination resistor value, and whether it can be removed",
+        "fail-safe bias resistor values"
+      ]
+    },
+    "mornsun-td321d485h-e": {
+      "category": "rs485-isolated",
+      "vendor": "Mornsun",
+      "name": "TD321D485H-E (3.3V isolated RS-485 transceiver module)",
+      "confidence": "VERIFIED",
+      "source": "datasheets/Mornsun_TD5-3-21D485H-E.pdf rev 2022.04.29-A/9, page 5 'Dimensions and Recommended Layout', rendered to img/mornsun-td321d485h-dimensions-5.png",
+      "pcb": {
+        "length": 18.2,
+        "width": 14.8,
+        "height_above_pcb": 4.1
+      },
+      "package": "DIP-10 outline, position 6 vacant",
+      "headers": [
+        {
+          "ref": "DIP",
+          "pins": 9,
+          "positions": 10,
+          "pitch": 2.54,
+          "row_spacing": 15.24,
+          "pin_dia": 0.64,
+          "pin_length": 7.1,
+          "recommended_hole_dia": 1.2,
+          "numbering": "standard DIP, counterclockwise from bottom-left in top view: 1..5 up the left column, 7..10 down the right column",
+          "names": {
+            "1": "VCC",
+            "2": "GND",
+            "3": "TXD",
+            "4": "RXD",
+            "5": "CON",
+            "6": "ABSENT",
+            "7": "Vo",
+            "8": "B",
+            "9": "A",
+            "10": "RGND"
+          }
+        }
+      ],
+      "electrical": {
+        "supply_V": 3.3,
+        "logic_V": 3.3,
+        "logic_5V_tolerant": false,
+        "isolation_VDC": 3000,
+        "data_rate_kbps": 500,
+        "static_current_mA": 40,
+        "max_operating_current_mA": 130,
+        "max_nodes": 256,
+        "isolated_output": "pin 7 Vo = +5V, pin 10 RGND, for bias/pull-ups only, max ~25 mA",
+        "turnaround_rx_to_tx_us": {
+          "typ": 5,
+          "max": 18
+        },
+        "turnaround_tx_to_rx_us": {
+          "typ": 30,
+          "max": 100
+        }
+      },
+      "gotchas": [
+        "CON IS INVERTED: low = transmit, high = receive. The datasheet says explicitly that this is the opposite of an ordinary RS-485 transceiver's DE. A slot holding this and a slot holding a MAX3485 module need opposite GPIO polarity.",
+        "The 'built-in 120' in the datasheet is a 120 kOhm pull-down, NOT a 120 Ohm terminator. External termination and fail-safe bias are still ours.",
+        "3 x 130 mA max on the 3.3V rail is what breaks the ESP32-S3 LDO budget. See PLAN.md.",
+        "TD521D485H-E is the 5V twin and is NOT 3.3V tolerant. Order the 321."
+      ]
+    },
+    "_desk": {
+      "_comment": "The specific units in `modules i have.txt`. All UNVERIFIED until measured. These are the parts the first board actually has to fit.",
+      "binghe-esp32-s3-devkitc1-n16r8-usbc": {
+        "category": "mcu",
+        "vendor": "Binghe (Amazon.de B0D6B2CYNW, 3-pack)",
+        "name": "'ESP-S3-DevKitC-1' clone, ESP32-S3-WROOM-1-N16R8, USB-C",
+        "confidence": "MEASURED",
+        "_confidence_note": "ELECTRICAL is verified on a physical unit over USB, 2026-08-01. MECHANICAL is PARTIAL: row spacing measured 2026-08-01, outline and pin-1 offsets still missing, so no footprint can be emitted yet.",
+        "source": "calipers on the physical board 2026-08-01 (outline 57.5 x 27.9, row spacing from outer-outer 26.22/26.30 less 0.63 pin width); pins confirmed centred along the length by the user; pin names from the seller's own drawing img/binghe-s3-listing-dimensions.jpg, cross-read against the board photo in the same image. Electrical facts from esptool/espefuse over USB.",
+        "mechanical_MEASURED_partial": {
+          "row_spacing": 25.4,
+          "row_spacing_evidence": "TWO independent sources agree. (1) Calipers: outer-edge to outer-edge across both header rows 26.22, 26.30 mm (mean 26.26), minus 0.63 mm pin width = 25.63 c-to-c; nearest grid value 25.40 (10 x 2.54), next candidates 2.3-2.8 mm away. (2) The seller's own dimension drawing marks 25.40 mm spanning the two pad columns with 1.27 mm edge offsets either side.",
+          "board_width": 27.9,
+          "board_width_evidence": "1.27 + 25.40 + 1.27 = 27.94, and the seller's photo is annotated '28mm / 1.10in'.",
+          "pins_per_row": 22,
+          "pitch": 2.54,
+          "edge_to_pin_centre": 1.25,
+          "CRITICAL": "ONE FULL PITCH WIDER than the official Espressif ESP32-S3-DevKitC-1, which is 22.86 mm rows (9 x 2.54) in a 25.40 mm wide board. NOT footprint compatible. The generated esp32-s3-devkitc-1 footprint describes the OFFICIAL board and must never be used for this one. Note the trap: '25.40' appears on BOTH drawings, as the board WIDTH on Espressif's and as the ROW SPACING on the clone's.",
+          "pin_order": "VERIFIED 2026-08-01 by reading img/717FdC-ihlL._AC_SL1469_.jpg at 4x zoom, both columns end to end. Photo left column top-to-bottom: GND GND 19 20 21 47 48 45 0 35 36 37 38 39 40 41 42 2 1 RX TX GND. Photo right column: GND 5Vin 14 13 12 11 10 9 46 3 8 18 17 16 15 7 6 5 4 RST 3V3 3V3. Reversed (the photo has USB at the top), these are Espressif's official J3 and J1 verbatim. So this clone keeps the official DevKitC-1 PIN ORDER while being one pitch wider. The DevKitM-1 diagram in the same listing is a different board and does NOT apply.",
+          "still_needed": [],
+          "board_length": 57.5,
+          "board_outline_evidence": "calipers on the bare PCB, 2026-08-01: 57.5 x 27.9 mm. This RESOLVES the earlier conflict. 27.9 matches the predicted 27.94 (= 1.27 + 25.40 + 1.27) to within 0.04 mm and matches the '28mm/1.10in' on the listing photo. 57.5 matches the photo's '57mm/2.24in'. The 62.74 x 25.40 on the listing's drawing belongs to Espressif's OFFICIAL board and does not apply.",
+          "edge_to_pin_centre_note": "(27.9 - 25.40)/2 = 1.25 measured, 1.27 nominal. Use 1.27.",
+          "usb_overhang_implied": "Pin span is 21 x 2.54 = 53.34, leaving only 4.16 mm of end margin in total. The official board's 8.00 mm USB strip alone would need 61.34 mm of length. So on this board the USB-C jacks necessarily overhang the edge. Another confirmation that the official layout does not apply.",
+          "courtyard_drawn": {
+            "length": 58.0,
+            "width": 28.0
+          },
+          "courtyard_note": "Silk and courtyard are drawn at a rounded-UP 58 x 28 for a little clearance. The MEASURED truth stays 57.5 x 27.9. Never round the outline DOWN: a courtyard smaller than the real part is worse than useless.",
+          "pin1_must_be_measured_not_derived": "Do NOT compute the pin-1 offset from the outline. A 0.5 mm change in assumed length (57.0 vs 57.5) shifts every pad by 0.25 mm, which is 5x the 0.05 mm gate tolerance. The end-edge-to-pin-1 distance is measured directly or the socket stays blocked.",
+          "pin1_offset_RESOLVED": "User confirms the 22 pins are CENTRED along the length. So the end margin is (57.5 - 53.34)/2 = 2.08 mm and pin 1 sits 2.08 mm from the end edge. Not measured directly, but derived from a stated symmetry plus two measured numbers, which is checkable: pin 22 lands at 55.42 on a 57.5 board.",
+          "blocking_note": "Earlier this was called 'the last blocking number'. That was an overstatement: the pin-1 offset does not affect whether the module fits, only where the body sits relative to the pads (courtyard, USB overhang, antenna keepout). Fit is decided by row spacing, pitch and pin count."
+        },
+        "listing_image_trap": "The listing also carries an 'S3-DevkitM-1 Module' pinout diagram. That is a DIFFERENT board: its left row runs 3V3,0,1,2,3...18,5V,G sequentially, and it breaks out GPIO 26/33/34 which the WROOM-1 does not. It does NOT describe this board and must not be used for the pin map.",
+        "electrical_VERIFIED": {
+          "chip": "ESP32-S3 (QFN56) rev v0.2, MAC ac:27:6e:a8:7a:8c",
+          "psram": "8 MB, vendor AP_3v3, 85C grade. eFuse BLOCK1 PSRAM_CAP=8M / PSRAM_VENDOR=AP_3v3, burned by Espressif. Chip is an ESP32-S3R8, so the PSRAM is OCTAL and GPIO 35/36/37 are consumed.",
+          "psram_functional_test": "PROVEN. 8,131,840 bytes (96.94% of 8 MB, remainder is heap allocator overhead) written with an address-derived stamp across 25 blocks, then all blocks verified AFTER all writes. 0 word errors, no aliasing. 33.3 MB/s write / 28.2 MB/s read, consistent with octal. See psram-flash-test.cpp and binghe-n16r8-verification.log.",
+          "flash": "16 MB external. JEDEC ID 0x68 (Boya) 0x4018; SFDP JEDEC Basic Flash Parameter Table DWORD 2 = 0x07FFFFFF = 128 Mbit.",
+          "flash_functional_test": "PROVEN. Four distinct 64 KB patterns written at 0x3F0000 / 0x7F0000 / 0xBF0000 / 0xFF0000, then all four read back after the last write; each held its own pattern, so no region aliased onto another. All four regions restored from backup and verify-flash confirmed byte-exact.",
+          "flash_efuse": "FLASH_CAP=None, i.e. no in-package flash on the die. The 16 MB is the module's own flash chip. Normal for a WROOM-1-N16R8.",
+          "flash_mode_efuse": "FLASH_TYPE = 4 data lines (quad). That is the FLASH, not the PSRAM.",
+          "crystal_MHz": 40,
+          "usb": "TWO USB-C ports. The one tested is the ESP32-S3 NATIVE USB, enumerating as 303a:1001 'Espressif USB JTAG/serial debug unit' on /dev/ttyACM0. The second is presumably a USB-UART bridge on GPIO 43/44, same arrangement as the official DevKitC-1. Not yet confirmed, it was not plugged in.",
+          "esptool_quirk": "Reading flash sector 0x109000 fails every time with the esptool stub flasher but succeeds with the ROM loader (--no-stub). The sector holds normal app code. Stub/USB-Serial-JTAG quirk, NOT a bad sector.",
+          "verdict": "The N16R8 advertising is CORRECT and now functionally proven. Not an N8R2."
+        },
+        "gotchas": [
+          "Espressif does not sell a DevKitC-1 in N16R8, and the official board has two micro-USB jacks, not USB-C. This is a clone. The official DXF does NOT describe it.",
+          "R8 = octal PSRAM, CONFIRMED via eFuse, so GPIO 35/36/37 are dead even though they are on the header.",
+          "The whole bottom end differs from the official drawing (one USB-C vs two micro-USB), which is where the 8.00 mm bottom strip and the board length come from.",
+          "Two USB-C ports. GPIO 19/20 are consumed by native USB; GPIO 43/44 should be treated as owned by the UART bridge on the second port and kept off the DMX map. The three UART peripherals are all still usable because the S3 routes any UART to any pin through the GPIO matrix.",
+          "The FACTORY partition table is an 8 MB layout (ends at exactly 0x800000: nvs, otadata, app0 3264K, app1 3264K, spiffs 1536K, coredump). That is just a generic Arduino default_8MB demo the seller flashed, NOT a hardware limit. Build with a 16 MB scheme or half the flash is wasted. This is almost certainly what made the board look like an N8.",
+          "Residual risk not ruled out: a counterfeit flash faking both the JEDEC ID and SFDP, and returning 0xFF above its real size, would still pass all three read-only checks. Only a write/read-back above 8 MB settles it."
+        ],
+        "measure_before_designing": [
+          "board length and width",
+          "row spacing, pad column to pad column (the official board is 22.86, NOT 25.40)",
+          "distance from the top edge to pin 1, and from the bottom edge to pin 22",
+          "pin count per row and the silk label order, both rows, top view",
+          "USB-C connector overhang past the bottom edge",
+          "antenna keepout extent at the top end"
+        ],
+        "pcb": {
+          "length": 57.5,
+          "width": 27.9
+        },
+        "row_spacing": 25.4,
+        "headers": [
+          {
+            "ref": "J1",
+            "side": "left",
+            "pins": 22,
+            "pitch": 2.54,
+            "pin1": {
+              "x": 1.25,
+              "y": 2.08
+            },
+            "direction": "down",
+            "names": [
+              "3V3",
+              "3V3",
+              "RST",
+              "IO4",
+              "IO5",
+              "IO6",
+              "IO7",
+              "IO15",
+              "IO16",
+              "IO17",
+              "IO18",
+              "IO8",
+              "IO3",
+              "IO46",
+              "IO9",
+              "IO10",
+              "IO11",
+              "IO12",
+              "IO13",
+              "IO14",
+              "5V",
+              "GND"
+            ]
+          },
+          {
+            "ref": "J3",
+            "side": "right",
+            "pins": 22,
+            "pitch": 2.54,
+            "pin1": {
+              "x": 26.65,
+              "y": 2.08
+            },
+            "direction": "down",
+            "names": [
+              "GND",
+              "IO43",
+              "IO44",
+              "IO1",
+              "IO2",
+              "IO42",
+              "IO41",
+              "IO40",
+              "IO39",
+              "IO38",
+              "IO37",
+              "IO36",
+              "IO35",
+              "IO0",
+              "IO45",
+              "IO48",
+              "IO47",
+              "IO21",
+              "IO20",
+              "IO19",
+              "GND",
+              "GND"
+            ]
+          }
+        ],
+        "keepouts": [
+          {
+            "what": "2 x USB-C jacks",
+            "where": "one end; only 2.08 mm of PCB sits beyond the last pin, so the shells overhang",
+            "rule": "this end must sit at the carrier edge or over a cutout, and must reach the enclosure panel"
+          },
+          {
+            "what": "PCB antenna",
+            "where": "opposite end, overhangs",
+            "rule": "no carrier copper underneath, prefer overhanging the carrier outline"
+          }
+        ],
+        "leds_TESTED": {
+          "method": "Two passes. (1) WS2812 protocol on one candidate pin at a time, each a different colour, so the colour seen names the pin -> found the RGB on GPIO48. (2) Binary bit-plane sweep driving 28 candidates to real logic levels, RGB used as the phase indicator -> single-colour LEDs. 2026-08-01.",
+          "rgb_led": "GPIO 48. The board showed RED, which was the code for GPIO 48; GREEN (38), BLUE (47) and WHITE (21) produced nothing.",
+          "rgb_led_significance": "Confirms the seller's drawing ('RGB@IO48', the v1.0 convention) and DISPROVES the official DevKitC-1 v1.1 assumption of GPIO38. So GPIO38 is FREE on this board, and GPIO48 can still be used as a pixel output with the on-board RGB simply becoming the first pixel in the chain.",
+          "red_led": "Silk 'PWR'. Lit constantly through every phase including all-LOW. Bare power indicator, not a GPIO.",
+          "green_led": "Silk 'TX'/'RX': UART bridge activity LEDs for the SECOND USB-C port, dark because that port was unplugged. Consistent with the sweep, which deliberately excluded GPIO 43/44 to avoid driving against the bridge, so these could not have lit. Not S3-controllable in practice.",
+          "design_impact": "None on the pin budget: neither single-colour LED consumes a usable GPIO. The RGB on GPIO48 is the only one the firmware can drive, and it doubles as pixel port 5 with the on-board LED as pixel #1.",
+          "silk_labels": "The single-colour LEDs are silk-labelled PWR, TX and RX.",
+          "confirms_43_44": "The presence of TX/RX LEDs independently confirms GPIO 43/44 are the UART bridge pins, which is the assumption behind keeping them out of the DMX allocation."
+        },
+        "board_notes": {
+          "5V_pin_is_an_input": "The 5V pin is silk-labelled '5Vin', so feeding the carrier's 5V rail into it is the intended use.",
+          "rgb_in_out_pads": "The board carries 'IN', 'OUT' and '+' pads beside the RGB LED, breaking out the WS2812 chain. Header GPIO48 is the LED's data IN, so an external strip wired to header pin 48 runs in PARALLEL with the on-board LED and mirrors pixel 1. Wiring instead to the 'OUT' pad puts the strip in SERIES after it, starting at pixel 2. The carrier takes GPIO48 from the header, so expect the mirror."
+        }
+      },
+      "hailege-w5500-51-stm32": {
+        "category": "ethernet",
+        "vendor": "Hailege (Amazon.de B0CJY22SWF, 2-pack)",
+        "name": "W5500 LAN module 3.3V/5V, '51/STM32'",
+        "confidence": "UNVERIFIED",
+        "source": "Amazon.de listing title only",
+        "gotchas": [
+          "Different product line from the USR-ES1 in this file. Has an onboard LDO so it accepts 5V, which the USR-ES1 does not.",
+          "Reported size for this class is ~25.7 x 22.8 mm vs the USR-ES1's 25.0 x 23.0 mm, and the pin names match the same 2 x 6 set, so it MAY be the same layout. Confirm, do not assume.",
+          "If it really is 5V tolerant, feeding it from 5V takes 132-200 mA off the ESP32-S3's regulator. That materially changes the power budget."
+        ],
+        "measure_before_designing": [
+          "row spacing and pin count per row",
+          "board outline and RJ45 overhang past the edge",
+          "pin order and pin 1 position, top view",
+          "whether the 3V3 pin is an input, an output from the onboard LDO, or both"
+        ]
+      },
+      "ky040-encoder": {
+        "category": "encoder",
+        "vendor": "Amazon.de B0FB82W866, 10-pack",
+        "name": "KY-040 rotary encoder module",
+        "confidence": "UNVERIFIED",
+        "source": "listing title; pin order read off img/ky040-encoder-pinout.jpg (photo of the actual module supplied by the user, 2026-08-01)",
+        "pin_order_CONFIRMED": {
+          "source": "img/ky040-encoder-pinout.jpg, 2026-08-01",
+          "order_left_to_right_top_view": [
+            "GND",
+            "+",
+            "SW",
+            "DT",
+            "CLK"
+          ],
+          "mapping": "GND = encoder pin C, + = supply, SW = push switch, DT = encoder pin B, CLK = encoder pin A",
+          "supply": "labelled 5V on the module but it will be run at 3V3, which is fine for a passive encoder + pull-ups",
+          "pins": 5,
+          "pitch": 2.54,
+          "push_switch": "PRESENT. The user confirms the encoders physically have a push switch. The listing image img/ky040-encoder-pinout.jpg annotates SW as 'Kein Drucktastenschalter' (no pushbutton), which is WRONG. Standard KY-040 modules have one. Physical part beats the caption.",
+          "push_switch_polarity": "SETTLED on the physical part: SW connects to GND when pressed. Normally open, active-low. Matches the firmware default in docs/controls.md (internal pull-up, wire common to GND), so no polarity flag is needed. The 'Kein Drucktastenschalter' caption was simply wrong."
+        },
+        "gotchas": [
+          "The listing image annotates SW as 'Kein Drucktastenschalter'. That is wrong: the encoders DO have a push switch. Do not trust listing captions over the part in hand.",
+          "Confirmed order is GND + SW DT CLK, i.e. the REVERSE of the other common KY-040 order (CLK DT SW + GND). The ambiguity was real.",
+          "CLK/DT swapped only reverses the rotation direction, which the firmware can invert. Not a hardware problem.",
+          "The shaft points perpendicular to the PCB, so a directly-soldered module puts the knob above the carrier."
+        ],
+        "measure_before_designing": [
+          "PCB outline and the two mounting hole positions visible in the photo",
+          "edge to pin-1 centre, both axes",
+          "shaft height above the PCB, for enclosure clearance"
+        ],
+        "firmware_support": "Already supported: docs/controls.md, issue #24. Encoder A/B plus optional push, any free GPIOs, active-low with internal pull-ups."
+      },
+      "sh1106-oled-1v3": {
+        "category": "display",
+        "vendor": "Binghe, Amazon.de B0DFCH21S2, 3-pack",
+        "name": "1.3 inch 128x64 I2C OLED, SH1106",
+        "confidence": "UNVERIFIED",
+        "source": "listing title only",
+        "pin_order_CONFIRMED": {
+          "source": "user confirmed off the actual modules, 2026-08-01",
+          "order": [
+            "GND",
+            "VCC",
+            "SCL",
+            "SDA"
+          ],
+          "pins": 4,
+          "pitch": 2.54,
+          "note": "This matches the DEFAULT setting (G) of the JP_DVCC jumper in SCHEMATIC.md, so no solder change is needed for the modules on hand."
+        },
+        "typical_but_unconfirmed": {
+          "module_mm": "approx 35.6 x 33.6",
+          "supply_V": "3.3 to 5",
+          "i2c_pullups": "on module"
+        },
+        "gotchas": [
+          "Vendors ship BOTH pin orders, and the difference is VCC and GND swapped. This is exactly the failure that destroyed a display on LuxDMX v6 (see the J4/J6 incident). The modules on hand are GND VCC SCL SDA, but the JP_DVCC jumper stays on the board so a replacement in the other order does not destroy anything.",
+          "SCL/SDA are also sometimes swapped relative to each other, which is harmless (it just will not enumerate) but worth checking.",
+          "SH1106 128x64 is dispType 3 in the existing firmware, already supported."
+        ],
+        "measure_before_designing": [
+          "read the silk labels off the actual module, record the order",
+          "pin pitch, PCB outline, mounting hole positions if any",
+          "glass/panel height above the PCB, for enclosure clearance"
+        ],
+        "firmware_support": "Already supported: docs/display.md, dispType 3, Adafruit_SH110X, I2C."
+      },
+      "rakstore-max3485": {
+        "category": "rs485",
+        "vendor": "RAKSTORE (Amazon.de B0C2HRQ393, 2-pack) and an eBay.de 336179058038 lot",
+        "name": "MAX3485 TTL to RS485 module",
+        "confidence": "ASSUMED",
+        "source": "listing titles; pinout and header alignment read off img/max3485-rs485-v2.01-module.png plus the user's description of the physical part, 2026-08-01",
+        "notes": "Not isolated. 3.3V part, so the logic levels suit the S3 directly. Silk reads 'RS485 V2.01'.",
+        "pinout_CONFIRMED": {
+          "source": "img/max3485-rs485-v2.01-module.png + user, off the physical module, 2026-08-01",
+          "left_header": {
+            "pins": 3,
+            "top_to_bottom": [
+              "GND",
+              "A",
+              "B"
+            ]
+          },
+          "right_header": {
+            "pins": 5,
+            "top_to_bottom": [
+              "EN",
+              "VCC",
+              "RXD",
+              "TXD",
+              "GND"
+            ]
+          },
+          "vertical_alignment": "The two headers share one 2.54 grid, 5 rows deep. Left GND sits level with right VCC, left A level with right RXD, left B level with right TXD. So the 3-pin header occupies rows 2-4 of 5.",
+          "grid": [
+            {
+              "row": 1,
+              "left": null,
+              "right": "EN"
+            },
+            {
+              "row": 2,
+              "left": "GND",
+              "right": "VCC"
+            },
+            {
+              "row": 3,
+              "left": "A",
+              "right": "RXD"
+            },
+            {
+              "row": 4,
+              "left": "B",
+              "right": "TXD"
+            },
+            {
+              "row": 5,
+              "left": null,
+              "right": "GND"
+            }
+          ],
+          "EN": "ONE direction pin, not separate DE and RE. They are tied on the module. That is exactly what RDM needs and it costs one GPIO per port.",
+          "CRITICAL_rxd_txd_are_crossed": "RXD and TXD are named from the MODULE's point of view, so they must be CROSSED to the MCU: module TXD = RO -> ESP32 RX, module RXD = DI -> ESP32 TX. Wiring by name-matching (ESP32 TX -> module TXD) leaves the receive line floating and gives 100% framing errors. This exact mistake is already on record in this project, see agent memory 'rs485-rxd-txd-cross-wire'.",
+          "both_GND_same_net": "Not an isolated module, so the left GND and the right GND are the same net."
+        },
+        "mechanical_MEASURED_partial": {
+          "row_spacing_PROVISIONAL": 15.24,
+          "row_spacing_evidence": "outer-edge to outer-edge across both header rows: 15.66, 15.66, 15.80, 15.69, 15.60 mm (mean 15.682, sd 0.074), minus 0.63 mm pin width = 15.052 centre-to-centre. Nearest grid value 6 x 2.54 = 15.24, which is 0.188 mm away, about 2.5 sigma. Next candidates 12.70 and 17.78 are 2.4-2.7 mm away.",
+          "UNRESOLVED": "15.052 measured vs 15.24 grid. The gap is small but larger than the 0.05 mm gate tolerance, so it must be settled before a footprint is cut. Cross-check needed: measure inner-edge to inner-edge across the rows (centre = inner + pin width) and measure outer-to-outer across the 4 pins of ONE row (should be 3 x 2.54 + 0.63 = 8.25 if the 0.63 pin width is right).",
+          "still_needed": [
+            "board outline",
+            "pins per header and how many headers",
+            "edge to pin-1 centre both axes",
+            "silk label order per header"
+          ]
+        },
+        "measure_before_designing": [
+          "board outline (length x width)",
+          "board edge to pin-1 centre, both axes, for BOTH headers",
+          "settle the row spacing: 15.052 measured vs 15.24 grid, see UNRESOLVED above",
+          "confirm EN high = transmit (opposite of the Mornsun CON pin)",
+          "fitted termination resistor value and whether it can be removed (measure A to B, unpowered)",
+          "fail-safe bias resistor values"
+        ],
+        "_confidence_note": "ASSUMED, not MEASURED. Pinout and row grid are confirmed from the physical part. The EN-to-edge distance was given as 'only 2-3mm, assume 3mm', and the outline is derived from that plus the grid. Row spacing takes the on-grid value 15.24 rather than the 15.052 the calipers implied. MITIGATIONS: drill oversized to 1.1mm (radial clearance +/-0.23mm, which swallows the 0.19mm row-spacing ambiguity), and placement must leave extra clearance to absorb +/-1mm of outline error. THE 1:1 PAPER TEST IS MANDATORY before fab for this part.",
+        "pcb": {
+          "length": 16.16,
+          "width": 21.24
+        },
+        "row_spacing": 15.24,
+        "drill_override": 1.1,
+        "headers": [
+          {
+            "ref": "J_BUS",
+            "side": "left",
+            "pins": 3,
+            "pitch": 2.54,
+            "pin1": {
+              "x": 3.0,
+              "y": 5.54
+            },
+            "direction": "down",
+            "names": [
+              "GND",
+              "A",
+              "B"
+            ]
+          },
+          {
+            "ref": "J_LOGIC",
+            "side": "right",
+            "pins": 5,
+            "pitch": 2.54,
+            "pin1": {
+              "x": 18.24,
+              "y": 3.0
+            },
+            "direction": "down",
+            "names": [
+              "EN",
+              "VCC",
+              "RXD",
+              "TXD",
+              "GND"
+            ]
+          }
+        ]
+      }
+    },
+    "silvertel-ag9705-2br": {
+      "category": "poe-pd",
+      "vendor": "Silvertel",
+      "name": "Ag9705-2BR (5V 9W, 802.3af, onboard bridge rectifiers)",
+      "confidence": "VERIFIED",
+      "source": "datasheets/Silvertel_Ag9700_datasheet.pdf v2.7 Feb 2025, sections 2 and 10",
+      "pcb": {
+        "length": 56.0,
+        "width": 8.5,
+        "height": 14.0
+      },
+      "headers": [
+        {
+          "ref": "SIL",
+          "pins": 10,
+          "pitch": 2.54,
+          "drill": 1.1,
+          "names": [
+            "VA1",
+            "VA2",
+            "VB1",
+            "VB2",
+            "IC",
+            "NC",
+            "-VDC",
+            "+VDC",
+            "ADJ",
+            "IC"
+          ],
+          "note": "NOT a continuous 2.54 row. There is a 30.48 mm isolation gap across the middle of the package. Take the pad positions from the package drawing (figure 20), not from a pitch multiplication."
+        }
+      ],
+      "electrical": {
+        "input_V": [
+          36,
+          57
+        ],
+        "output_V": 5.0,
+        "output_W": 9,
+        "isolation_V": 1500
+      },
+      "blocked_by": "Needs the Ethernet magnetics centre taps (VA1/VA2) and the spare pairs (VB1/VB2). Unreachable when the W5500 module owns the RJ45. Only usable if the carrier owns the magjack. See PLAN.md open decision 2."
+    },
+    "buck-module-universal": {
+      "category": "power",
+      "vendor": "generic",
+      "name": "Universal step-down module land pattern (12-24V -> 5V)",
+      "confidence": "USER-SPECIFIED",
+      "source": "user spec 2026-08-01, shrunk 2026-08-13: modules in this class run from about 22 x 18 to 30 x 18 mm, so their pins sit about 18-26 mm apart across and 12-15 mm apart up the board. Pads are 12 x 5 mm on a 24 / 12 mm grid, which covers 12-36 mm across and 7-17 mm up. The first cut was 16 x 10 mm, generous in both directions; the height was insurance against a spread that does not exist, since every module in this class is 18 mm wide, and it cost 640 mm2 of solid back-side copper right where the signals cross to the right-hand headers. 240 mm2 now.",
+      "pcb": {
+        "length": 22.0,
+        "width": 40.0
+      },
+      "smd_pads": [
+        {
+          "name": "VIN-",
+          "x": 8.0,
+          "y": 5.0,
+          "w": 12.0,
+          "h": 5.0,
+          "net": "GND"
+        },
+        {
+          "name": "VIN+",
+          "x": 8.0,
+          "y": 17.0,
+          "w": 12.0,
+          "h": 5.0,
+          "net": "V_PIX"
+        },
+        {
+          "name": "VOUT-",
+          "x": 32.0,
+          "y": 5.0,
+          "w": 12.0,
+          "h": 5.0,
+          "net": "GND"
+        },
+        {
+          "name": "VOUT+",
+          "x": 32.0,
+          "y": 17.0,
+          "w": 12.0,
+          "h": 5.0,
+          "net": "+5V"
+        }
+      ],
+      "orientation": "input LEFT, output RIGHT, minus TOP, plus BOTTOM",
+      "gotchas": [
+        "Pads are 12 x 5 mm with NO drill, larger than any single module pad, so the different module lengths all land on copper. Covers 22 x 18 and 30 x 18 mm modules with margin. Do not grow them back: this is the largest back-side obstacle on the board and the routing is tight around it.",
+        "The four lands carry a solder mask GRID, not one big opening: 7 x 3 windows of 1.1 mm on a 1.6 mm pitch, 0.5 mm of mask between them, laid by tools/mask_grid.py. The copper stays one continuous 12 x 5 mm piece, only the mask is broken up. A 60 mm2 opening is miserable to hand solder, the tin runs out flat across it instead of standing up round the pin. Re-run mask_grid.py after regenerating this footprint, gen_footprints.py does not know about it.",
+        "Envelope is 40 x 22 mm. 30 mm tall would NOT fit: the S3's pin rows leave only 23.7 mm of clear back-side strip and a taller pattern would short onto its through-hole pads.",
+        "Deliberately placed under the S3, not under the display: under the display it would sit against the antenna keepout, and a switching node next to a WiFi antenna is the worst possible neighbour.",
+        "Check your module's pin order before soldering: this pattern assumes in-left / out-right / minus-top / plus-bottom."
+      ]
+    }
+  }
+}
