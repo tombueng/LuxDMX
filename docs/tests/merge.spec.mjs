@@ -34,8 +34,18 @@ function configForm(snap, o0Overrides = {}) {
     subnet: snap.subnet || '',
     dns: snap.dns || '',
   };
-  if (snap.staticIp) f.staticip = '1';
-  const outs = [{ ...snap.outputs[0], ...o0Overrides }, snap.outputs[1]];
+  // EVERY boolean: an absent key in this checkbox form is written false, and dropping `useeth`
+  // takes a wired device off Ethernet into its setup AP with no way back over the network.
+  if (snap.staticIp)      f.staticip = '1';
+  if (snap.useEthernet)   f.useeth   = '1';
+  if (snap.ethW5500)      f.ethon    = '1';
+  if (snap.artnetRdm)     f.artrdm   = '1';
+  if (snap.ipProg)        f.ipprog   = '1';
+  if (snap.autoUpdate)    f.autoupd  = '1';
+  if (snap.encReverse)    f.encrev   = '1';
+  if (snap.btnActiveHigh) f.btnah    = '1';
+  // Every output, not a fixed pair: an omitted o<i>_en reads as "disabled" (checkbox form).
+  const outs = snap.outputs.map((o, i) => (i === 0 ? { ...o, ...o0Overrides } : o));
   outs.forEach((o, i) => {
     if (o.en) f[`o${i}_en`] = '1';            // omitted key == disabled
     f[`o${i}_uni`]   = String(o.uni);
