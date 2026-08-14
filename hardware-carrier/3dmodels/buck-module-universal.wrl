@@ -1,0 +1,19 @@
+#VRML V2.0 utf8
+# Buck, SMD auf der Rueckseite
+# 26.00 x 18.00 x 4.50 mm. Erzeugt von gen_3d_models.py, nicht von Hand pflegen.
+Transform {
+  translation 0.000000 -0.000000 0.885827
+  children [
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 0.350 0.100 0.100
+          specularColor 0.10 0.10 0.10
+          ambientIntensity 0.30
+          shininess 0.15
+        }
+      }
+      geometry Box { size 10.236220 7.086614 1.771654 }
+    }
+  ]
+}

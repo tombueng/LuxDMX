@@ -1,0 +1,237 @@
+# Bill of materials
+
+Everything fitted: 43 positions. Quantities come from the board.
+
+LCSC stock checked **2026-08-14**. Look again before ordering, it changes daily.
+
+Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume price. Converted at about 0.92 EUR/USD. Where a page could not be checked the value is an estimate and the stock column says ?.
+
+## Small parts from LCSC
+
+| Qty | Part | Description | MPN | LCSC | Stock | EUR ea. | EUR total |
+|---:|---|---|---|---|---:|---:|---:|
+| 2 | 100nF | Capacitor 100nF 50V X7R 1206 | `CL31B104KBCNNNC` | [C24497](https://www.lcsc.com/product-detail/C24497.html) | hoch | 0.023 | 0.05 |
+| 1 | 22uF 3V3 bulk | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 23.140 | 0.129 | 0.13 |
+| 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch | `KM108M035J20RR0VH2FP0` | [C10749](https://www.lcsc.com/product-detail/C10749.html) | 48.810 | 0.171 | 0.17 |
+| 1 | 74AHCT541 pixel buffer | Octal buffer 74HCT541, PDIP-20, 300 mil | `SN74HCT541N` | - | marketplace | 1.5 | 1.5 |
+| 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 644 | 0.419 | 0.42 |
+| 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 204.500 | 0.018 | 0.09 |
+| 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | - | ? | 0.004 | 0.01 |
+| 6 | 330R bias+ / 330R bias- | Resistor 330R 1206 5% (fail-safe bias) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 79.100 | 0.012 | 0.07 |
+| 1 | 12-24V IN 24A | Screw terminal, 2 pole, 5.08 mm pitch, 24 A | `KF128-5.08-2P-AA` | [C474952](https://www.lcsc.com/product-detail/C474952.html) | 63.515 | 0.177 | 0.18 |
+| 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 16.545 | 0.175 | 0.88 |
+| 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
+
+**Small parts total: about 3.63 EUR**
+
+Deliberately not listed:
+
+- **PinHeader**: 2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below.
+- **header-1x03-P2.54-terminal**: The three DMX rows: a 3-pin piece off the same header strip, or a 2.54 mm screw terminal if you would rather screw the XLR tails down. Both fit the 1.20 mm holes.
+- **Display socket**: The display sits on a 1x04 FEMALE socket, not a piece of header strip. PinSocket 1x04 P2.54, 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.
+
+### Notes
+
+- **100nF**: 1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR. Over a million in stock.
+- **22uF 3V3 bulk**: Half the price of the 25 V part (C12891, 0.24 EUR) for the same job. 6.3 V on a 3.3 V rail is roughly a factor of two margin, normal for X5R. Worth knowing: ceramics lose capacitance under DC bias, a 6.3 V part at 3.3 V keeps about half, so 11 to 13 uF rather than 22. Ample for holding up the rail when three transceivers key at once. For the full 22 uF take C12891 (25 V, keeps about 85 %) and pay 12 cents more.
+- **74AHCT541 pixel buffer**: AHCT or HCT, both have TTL input thresholds (VIH 2.0 V) and therefore switch reliably from the 3.3 V of the ESP32. The only difference is propagation delay, roughly 6 against 14 ns, irrelevant at 1250 ns per WS281x bit. LCSC does not stock the AHCT part in DIP, hence the marketplace sources. Which other types work and which do not is below.
+  - ebay: [SN74HCT541N, DIP-20, Texas](https://www.ebay.com/itm/334274626871) - approx. 1-2 EUR ea
+  - ebay: [5 x SN74HCT541N DIP-20](https://www.ebay.com/itm/392631683671) - approx. 5-8 EUR / 5 pcs
+  - ebay: [100 x SN74HCT541N DIP-20](https://www.ebay.com/itm/235008609678) - volume price
+  - amazon: [TI SN74HCT541N, DIP-20](https://www.amazon.com/INSTRUMENTS-SN74HCT541N-INVERTING-BUFFER-DIP-20/dp/B00LQQBFTC) - approx. 2-4 EUR ea
+  - distributor: [Schukat SN74HCT541N](https://shop.schukat.com/Texas-Instruments/SN74HCT541N/p/37554) - stocked
+- **MF-R 30V**: The largest that fits the current placement: body 17.4 x 3.0 mm, 3.8 mm clear of the 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series but its body is 24.2 mm and would come within 0.40 mm of the can; both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.
+- **120R term**: Same series as the verified 10k. The C number could not be confirmed by search, look up the manufacturer part number on LCSC.
+- **330R bias+ / 330R bias-**: Fail-safe bias on a 3.3 V bus needs more than 200 mV idle differential. With two terminators (60 R, the normal case once this board is the controller at one end) 330 R gives 275 mV, 470 R only 198 mV. Anything from 270 R to 430 R works, see the table. Bus loading 4.6 mA, which no RS-485 driver cares about, and 5 % tolerance is irrelevant for a bias resistor. The land takes anything from 0402 to 1206: copper runs 0.30 to 2.30 mm off centre, so every end cap lands on it, an 0402's at 0.25 to 0.50 as much as a 1206's at 1.10 to 1.60. The 390R that only exists in 0805 therefore goes in without any trickery.
+  - lcsc: [390R exists only in 0805 (C17655) and fits the 1206 land by hand if needed](https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount-UniOhm_390R-3900-1_C17655.html) - 0.004 USD
+- **TVS bidir**: The land is universal: copper runs from 0.30 to 2.90 mm off centre, so SOD-123, SOD-123F, SOD-123FL, DO-214AC (SMA) and a plain 1206 all sit on it. SMF12CA in SOD-123FL is the cheap default. SMAJ12CA in SMA is the same diode at 400 W instead of 200 W, same 12 V standoff and the same breakdown window, and its feet reach 2.80 mm so it now lands properly rather than hanging off the end. VRWM 12 V, so it does not conduct at the +12 V common mode RS-485 allows, VBR 14.7 V, clamps at 19.9 V with 10 A. Two per port, A and B to GND. A varistor is no substitute, it would not clamp until about 40 V.
+  - amazon: [50 x SMF12CA, bidirectional, SOD-123FL](https://www.amazon.com/Pcs-TVS-Diode-Bidirectional-Vrwm/dp/B0CNK4R5SC) - approx. 8-10 EUR / 50 pcs
+  - amazon: [SMF 200W SOD-123 TVS kit, 20 values x 10 pcs, bidirectional](https://www.amazon.com/Values-SOD-123-Bi-Directional-Surface-Protection/dp/B0C5SLJQBB) - approx. 15-20 EUR
+  - lcsc: [Littelfuse SMF12CA, brand part, 1265 pcs](https://www.lcsc.com/product-detail/C1851360.html) - approx. 0.19 EUR ea
+
+### What may go in the 74AHCT541 pixel buffer position, and what may not
+
+**Works**
+
+| Type | Family | Delay / catch | Why |
+|---|---|---|---|
+| `SN74AHCT541N / CD74AHCT541E` | AHCT | ~6 ns | First choice. TTL thresholds (VIH 2.0 V), fastest of the usable ones. |
+| `SN74HCT541N / CD74HCT541E` | HCT | ~14 ns | Ample. A WS281x bit lasts 1250 ns. |
+| `CD74ACT541E / SN74ACT541N` | ACT | ~7 ns | ACT also has TTL thresholds. Stronger outputs, more supply noise. |
+| `74HCT541N (Nexperia/NXP)` | HCT | ~14 ns | Same part, different maker. |
+
+**Does not work**
+
+| Type | Family | Delay / catch | Why |
+|---|---|---|---|
+| `SN74HC541N, CD74HC541E` | HC | Schwellen | HC has CMOS thresholds: VIH = 0.7 x VCC = 3.5 V at a 5 V supply. The 3.3 V from the ESP32 will not switch it reliably. The name differs by one letter. |
+| `CD74AC541E, SN74AC541N` | AC | Schwellen | AC also has CMOS thresholds. Same problem as HC. |
+| `74HCT540, 74AHCT540, CD74HCT540E` | x40 | invertierend | Same pinout, but the outputs are inverted. The strip then sees the opposite of the data. Only usable if the firmware inverts. |
+| `74HCT244, 74AHCT244` | x44 | Pinbelegung | Same package, but inputs and outputs are interleaved instead of side against side. Not a drop-in. |
+| `74LVC541A, 74LVC541` | LVC | Spannung | 1.65 to 3.6 V only. Cannot output 5 V, which is the whole point here. |
+| `SN74LS541N` | LS | veraltet | The thresholds are right, but the inputs sink 0.4 mA, quiescent current is many times higher, and the part is obsolete. It works, but there is no reason. |
+| `SN74AHCT541D / PW / DW / NS` | AHCT | Gehaeuse | SO-20, TSSOP, SOIC. All surface mount, will not fit the DIP-20 land. |
+
+### What may go in the 330R bias+ / 330R bias- position, and what may not
+
+**Usable values on a 3.3 V bus (RS-485 needs more than 200 mV idle)**
+
+| Value | one terminator (120R) | two terminators (60R) | Verdict |
+|---|---|---|---|
+| `270 R` | 600 mV | 330 mV | good, bus load 5.5 mA |
+| `300 R` | 550 mV | 300 mV | good, bus load 5.0 mA |
+| `330 R` | 508 mV | 275 mV | good, bus load 4.6 mA |
+| `390 R` | 440 mV | 236 mV | good, bus load 3.9 mA |
+| `430 R` | 404 mV | 215 mV | marginal, bus load 3.6 mA |
+| `470 R` | 374 mV | 198 mV | marginal, bus load 3.3 mA |
+| `560 R` | 319 mV | 168 mV | not enough, bus load 2.8 mA |
+| `680 R` | 268 mV | 139 mV | not enough, bus load 2.3 mA |
+
+## Modules from Amazon / eBay / AliExpress
+
+The links are examples from 2026-08-14 and will rot. The **search terms** are the durable part.
+
+### 1 x 12-24V -> 5V buck
+
+DC-DC step-down to 5 V, adjustable, 1 A or more
+
+| Platform | Search term |
+|---|---|
+| amazon | `MP1584EN DC-DC step down module 3A adjustable` |
+| ebay | `MP1584EN buck converter 3A adjustable` |
+| aliexpress | `MP1584EN DC-DC step down module 3A` |
+
+| Platform | Offer | Price |
+|---|---|---|
+| amazon | [HiLetgo 5x MP1584EN Mini Buck](https://www.amazon.com/HiLetgo-MP1584EN-Adjustable-Module-Effect/dp/B00LTQU4EQ) | approx. 1.50 EUR ea |
+| amazon | [Rakstore 4x MP1584 Step-Down](https://www.amazon.com/Rakstore-MP1584EN-Adjustable-Converter-Arduino/dp/B09J4KH116) | approx. 1.50-2 EUR ea |
+| ebay | [MP1584EN DC-DC Step Down 3A](https://www.ebay.com/itm/165434363045) | approx. 1-2 EUR |
+| aliexpress | [MP1584EN 5/10 pcs adjustable](https://www.aliexpress.us/item/3256807294351325.html) | approx. 0.40-0.80 EUR ea |
+| aliexpress | [MP1584 DC-DC 3A Buck, 10 pcs](https://www.aliexpress.us/item/3256803643955109.html) | approx. 0.50 EUR ea |
+
+> MP1584EN rather than LM2596: the LM2596 module is about 43 x 21 mm and no longer fits the 40 x 22 mm envelope. The MP1584EN input is rated to 28 V, so a 24 V supply must not rise above that at no load. Set it to 5.0 V BEFORE soldering it in.
+
+### 1 x Blade fuse holder, alternative to the polyfuse
+
+Blade fuse holder, ATO/ATC mini, PCB mount, 10.2 mm pitch
+
+| Platform | Search term |
+|---|---|
+| amazon | `mini blade fuse holder PCB mount ATO ATC` |
+| ebay | `PCB mount mini blade fuse holder 10.2mm` |
+| aliexpress | `ATO mini blade fuse holder PCB through hole` |
+
+| Platform | Offer | Price |
+|---|---|---|
+
+> Alternative to the polyfuse, not fitted alongside it. Same two nets, its own two holes. A blade fuse blows once and is replaced; the polyfuse resets itself but runs warm and drops voltage while it holds.
+
+### 1 x EC11
+
+Rotary encoder EC11, 20 mm D-shaft, with push switch
+
+| Platform | Search term |
+|---|---|
+| amazon | `EC11 rotary encoder 20mm shaft push switch` |
+| ebay | `EC11 rotary encoder switch 20mm D shaft` |
+| aliexpress | `EC11 encoder 20mm handle with switch 5 pin` |
+
+| Platform | Offer | Price |
+|---|---|---|
+
+> The part inside every KY-040 module, without the little board and its three 10k pullups: ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups, so the resistors buy nothing. 12.4 mm can, 2.5 mm pin pitch, two mounting posts. Sold in tens for small money; any EC11 clone fits, the case and pin positions are the same across the family. Add a knob for a 6 mm D-shaft.
+
+### 1 x ESP32-S3 N16R8
+
+ESP32-S3-DevKitC-1 N16R8, USB-C, two ports
+
+| Platform | Search term |
+|---|---|
+| amazon | `ESP32-S3-DevKitC-1 N16R8 16MB flash 8MB PSRAM` |
+| ebay | `ESP32-S3 DevKitC-1 N16R8 WROOM-1` |
+| aliexpress | `ESP32-S3-DevKitC-1 N16R8 development board` |
+
+| Platform | Offer | Price |
+|---|---|---|
+| amazon | [DIYmall 2x ESP32-S3-DevKitC-1 N16R8](https://www.amazon.com/DIYmall-ESP32-S3-DevKitC-1-N8R8-Development-ESP32-S3-WROOM-1-Module/dp/B0BSCXHB5S) | approx. 9-12 EUR ea |
+| amazon | [YEJMKJ ESP32-S3-DevKitC-1-N16R8 Dual Type-C](https://www.amazon.com/YEJMKJ-ESP32-S3-DevKitC-1-N16R8-Development-ESP32-S3-WROOM-1-Microcontroller/dp/B0CDRM6BGQ) | approx. 10-14 EUR |
+| amazon | [3x ESP32-S3-DevKitC-1-N16R8, Dual Type-C](https://www.amazon.com/ESP32-S3-DevKitC-1-N16R8-Development-Integrated-ESP32-S3-WROOM-1-Microcontroller/dp/B0DKF4DSQ4) | approx. 8-11 EUR ea |
+| aliexpress | [ESP32-S3-DevKitC-1 N16R8](https://de.aliexpress.com/w/wholesale-ESP32-S3-DevKitC-1-N16R8.html) | approx. 6-9 EUR |
+| ebay | [ESP32-S3 DevKitC-1 N16R8](https://www.ebay.de/sch/i.html?_nkw=ESP32-S3+DevKitC-1+N16R8) | approx. 8-13 EUR |
+
+> The socket is laid out for 25.40 mm row spacing, one full pitch wider than the official Espressif DevKitC-1 at 22.86 mm. Board size 57.5 x 27.9 mm. Hold the seller's photo against a 1:1 printout of the footprint before buying.
+
+### 3 x MAX3485 DMXn
+
+MAX3485 TTL to RS-485 module, 3.3 V, with enable pin
+
+| Platform | Search term |
+|---|---|
+| amazon | `MAX3485 TTL to RS485 module 3.3V` |
+| ebay | `MAX3485 module TTL to RS485 3.3V` |
+| aliexpress | `MAX3485 RS485 transceiver module 3.3V` |
+
+| Platform | Offer | Price |
+|---|---|---|
+| amazon | [MusRock 5x MAX3485 TTL-RS485](https://www.amazon.com/MusRock-MAX3485-Transceiver-Unidirectional-Compact/dp/B0FTFXT876) | approx. 2-3 EUR ea |
+| amazon | [MAX3485 module TTL zu RS485](https://www.amazon.com/MAX3485-Module-RS485-Development-Accessories/dp/B0DBGPC9B3) | approx. 3 EUR |
+| ebay | [5x MAX3485 TTL-RS485 3.0-3.6V](https://www.ebay.com/itm/225626333704) | approx. 2 EUR ea |
+| ebay | [UART TTL zu RS485 Konverter 3.3V/5V](https://www.ebay.com/itm/122285209187) | approx. 2-3 EUR |
+| aliexpress | [MAX3485 MAX485 RS485 Transceiver 3.3V/5V](https://www.aliexpress.us/item/3256809536271896.html) | approx. 0.80-1.50 EUR |
+| aliexpress | [MAX3485/MAX13487 TTL zu RS485](https://de.aliexpress.com/item/1005006007545162.html) | approx. 1-2 EUR |
+
+> It must have the EN pin, otherwise no RDM. Pinout is GND/A/B on the left and EN/VCC/RXD/TXD/GND on the right. Note that RXD is the module's input and belongs on the ESP32's TX.
+
+### 1 x OLED SDA/SCL/VCC/GND
+
+1.3" OLED, SH1106, I2C, 4 pins
+
+| Platform | Search term |
+|---|---|
+| amazon | `1.3 inch OLED display I2C SH1106 128x64` |
+| ebay | `1.3 inch OLED SH1106 I2C 4pin` |
+| aliexpress | `1.3 inch OLED display SH1106 IIC 128x64` |
+
+| Platform | Offer | Price |
+|---|---|---|
+| amazon | [1.3" OLED I2C SH1106 128x64](https://www.amazon.de/s?k=1.3+inch+OLED+I2C+SH1106+128x64) | approx. 6-9 EUR |
+| aliexpress | [1.3 inch OLED SH1106 IIC](https://de.aliexpress.com/w/wholesale-1.3-inch-OLED-SH1106-IIC.html) | approx. 2-4 EUR |
+| ebay | [1.3 inch OLED SH1106 I2C](https://www.ebay.de/sch/i.html?_nkw=1.3+OLED+SH1106+I2C) | approx. 4-7 EUR |
+
+> These ship in two pin orders that differ by VCC and GND. Read the module's own silk, not the product page.
+
+### 2 x Tact 6x6 H30
+
+Tact switch 6 x 6 mm, through hole, 30 mm plunger
+
+| Platform | Search term |
+|---|---|
+| amazon | `tact switch 6x6x30mm through hole long plunger` |
+| ebay | `6x6x30 tactile push button switch THT` |
+| aliexpress | `6*6*30mm tact switch 4 pin long stem` |
+
+| Platform | Offer | Price |
+|---|---|---|
+
+> The plunger length is the only thing that varies on this land - 5, 7, 9, 13, 17, 25 and 30 mm all use the same 6 x 6 footprint. 30 mm because the encoder shaft already stands 20 mm off the board, so anything shorter disappears behind the same front panel. Goes straight to GND, IO3 and IO46 pull up internally.
+
+### 1 x USR-ES1 W5500
+
+W5500 Ethernet, SPI, 3.3 V
+
+| Platform | Search term |
+|---|---|
+| amazon | `USR-ES1 W5500 SPI Ethernet module` |
+| ebay | `USR-ES1 W5500 SPI to LAN Ethernet` |
+| aliexpress | `USR-ES1 W5500 ethernet module SPI` |
+
+| Platform | Offer | Price |
+|---|---|---|
+| amazon | [TECNOIOT USR-ES1 W5500 (amazon.de)](https://www.amazon.de/USR-ES1-W5500-Chip-Ethernet-Converter/dp/B07RGLN436) | approx. 9-12 EUR |
+| amazon | [DEVMO USR-ES1 W5500](https://www.amazon.com/DEVMO-USR-ES1-W5500-Ethernet-Converter/dp/B07T4YHP7Q) | approx. 8-11 EUR |
+| aliexpress | [USR-ES1 W5500 SPI zu LAN](https://de.aliexpress.com/item/1005006061643080.html) | approx. 4-6 EUR |
+| aliexpress | [USR-ES1 W5500, 1-5 pcs](https://de.aliexpress.com/item/1005001430749467.html) | approx. 4-7 EUR |
+| ebay | [USR-ES1 W5500 Ethernet module](https://www.ebay.de/sch/i.html?_nkw=USR-ES1+W5500) | approx. 6-9 EUR |
+
+> Two rows of 6 pins, 20.32 mm apart. Listings describing '8 pins in a single row' are a different module. The RJ45 overhangs the board by 2.5 mm.
+
