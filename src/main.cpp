@@ -951,6 +951,12 @@ static Adafruit_GFX* gfx        = nullptr;   // draw target (canvas for colour, 
 static Adafruit_GFX* dispDev    = nullptr;   // physical panel
 static GFXcanvas16*  dispCanvas = nullptr;   // off-screen buffer for the colour panel
 static bool          dispReady  = false;
+// Result of the I2C probe, so a dead panel is a fact instead of a guess. 0 = nothing
+// answered on either address. Reported in /info.json: a display that is configured but
+// not detected is otherwise indistinguishable from a wrong driver or a broken panel,
+// and the console line saying so goes to a UART nobody has a cable on.
+static uint8_t       dispI2cAddr = 0;
+static uint32_t      dispI2cHz   = 0;   // bus clock the panel actually accepted (0 = none)
 
 // Foreground "on" colour. Mono drivers want the 1-bit WHITE constant (==1);
 // the colour panel wants RGB565 white. Passing 0xFFFF to a mono driver draws
@@ -1007,12 +1013,27 @@ static void initDisplay() {
         // Mono OLED over I2C — probe 0x3C then 0x3D; bail if no panel answers.
         if (cfg.dispSda >= 0 && cfg.dispScl >= 0) Wire.begin(cfg.dispSda, cfg.dispScl);
         else                                      Wire.begin();
-        Wire.setClock(400000);
+        // Probe at 100 kHz, not at the 400 kHz the driver would like. Whether a bus manages
+        // 400 kHz depends on its pull-ups and its capacitance, and a module on a header with a
+        // bit of cable often does not: the panel then fails to ACK and the probe concludes
+        // there is no display at all. That is not a hypothetical, it is what the LuxDMX carrier
+        // does with a 0.96" module on the display header -- /i2cscan (100 kHz) found 0x3C while
+        // this probe (400 kHz) found nothing. Ask slowly first, then find out if it can go fast.
+        Wire.setClock(100000);
+        delay(50);              // a freshly powered SSD1306 needs a moment before it answers
         uint8_t addr = 0;
         Wire.beginTransmission(0x3C);
         if (Wire.endTransmission() == 0) addr = 0x3C;
         else { Wire.beginTransmission(0x3D); if (Wire.endTransmission() == 0) addr = 0x3D; }
+        dispI2cAddr = addr;
         if (!addr) { Serial.println("[DISP] no I2C OLED found (0x3C/0x3D)"); return; }
+        // Try to move up: a fast bus keeps the redraw off the DMX task's back. Verify with one
+        // transaction and fall back rather than assume, so a marginal bus degrades to a slower
+        // screen instead of a blank one.
+        Wire.setClock(400000);
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() != 0) { Wire.setClock(100000); dispI2cHz = 100000; }
+        else                             { dispI2cHz = 400000; }
         if (cfg.dispType == 3) {
             Adafruit_SH1106G* d = new Adafruit_SH1106G(128, 64, &Wire, -1);
             if (!d->begin(addr, true)) { delete d; Serial.println("[DISP] SH1106 init failed"); return; }
@@ -2508,6 +2529,60 @@ static const char MCU_ID[] = "esp32s3";
 static const char MCU_ID[] = "esp32";
 #endif
 
+// Scan the display header's I2C bus and say what is on it.
+//
+// initDisplay() only ever asks 0x3C and 0x3D, so "no OLED found" cannot tell a dead bus from a
+// panel sitting at an unexpected address, and a black screen leaves the user with nothing to go
+// on. This walks the whole 7-bit range at 100 kHz (gentler than the 400 kHz the driver runs at,
+// so a bus with weak pull-ups still answers) and reports every address that ACKs, along with
+// the pins it used. An empty list means the wiring or the panel's supply, not the driver.
+//
+// It also reports `pullup`, which is the more useful of the two answers. Every I2C module
+// carries pull-up resistors (a few kilohm) and they only work when the module has power, so:
+// engage the pin's INTERNAL pull-DOWN (~45 k) and read. An external pull-up wins that divider
+// and the line still reads high; with nothing alive on the bus the line follows the pulldown
+// and reads low. Without this you cannot tell a dead bus from a live one, because a floating
+// bus does not scan as "empty" -- it picks up noise and ACKs a random 40-odd addresses, which
+// looks like a bus full of devices.
+static void handleI2cScan(AsyncWebServerRequest* req) {
+    String j = "{\"sda\":";  j += cfg.dispSda;
+    j += ",\"scl\":";        j += cfg.dispScl;
+    bool puSda = false, puScl = false, flSda = false, flScl = false;
+    if (cfg.dispSda >= 0 && cfg.dispScl >= 0) {
+        // Hand the pins back from the I2C peripheral first. After initDisplay() they are
+        // attached to it through the GPIO matrix and driven open-drain, and reading them in
+        // that state measures the peripheral rather than the bus.
+        Wire.end();
+        delay(2);
+        pinMode(cfg.dispSda, INPUT);          // no internal pull: who holds the line?
+        pinMode(cfg.dispScl, INPUT);
+        delay(2);
+        flSda = digitalRead(cfg.dispSda);
+        flScl = digitalRead(cfg.dispScl);
+        pinMode(cfg.dispSda, INPUT_PULLDOWN); // ~45 k down; an external pull-up wins this
+        pinMode(cfg.dispScl, INPUT_PULLDOWN);
+        delay(2);
+        puSda = digitalRead(cfg.dispSda);
+        puScl = digitalRead(cfg.dispScl);
+    }
+    j += ",\"idle\":{\"sda\":";   j += flSda ? "true" : "false";
+    j += ",\"scl\":";             j += flScl ? "true" : "false"; j += "}";
+    j += ",\"pullup\":{\"sda\":"; j += puSda ? "true" : "false";
+    j += ",\"scl\":";             j += puScl ? "true" : "false"; j += "}";
+    j += ",\"found\":[";
+    if (cfg.dispSda >= 0 && cfg.dispScl >= 0) Wire.begin(cfg.dispSda, cfg.dispScl);
+    else                                      Wire.begin();
+    Wire.setClock(100000);
+    int n = 0;
+    for (uint8_t a = 0x08; a <= 0x77; a++) {
+        Wire.beginTransmission(a);
+        if (Wire.endTransmission() == 0) { if (n++) j += ','; j += a; }
+    }
+    Wire.setClock(400000);          // leave the bus as the display driver expects it
+    j += "],\"count\":"; j += n; j += "}";
+    sendJsonSafe(req, j);
+}
+
 static void handleInfoJson(AsyncWebServerRequest* req) {
     String j = "{";
     j += "\"ssid\":\"";     j += netSSID();              j += "\",";
@@ -2555,6 +2630,9 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispSda\":";    j += cfg.dispSda;            j += ",";
     j += "\"dispScl\":";    j += cfg.dispScl;            j += ",";
     j += "\"dispRot\":";    j += cfg.dispRot;            j += ",";
+    j += "\"dispAddr\":";   j += dispI2cAddr;            j += ",";   // 0 = kein Panel gefunden
+    j += "\"dispReady\":";  j += dispReady ? "true" : "false"; j += ",";
+    j += "\"dispHz\":";    j += dispI2cHz;              j += ",";
     j += "\"dispCs\":";     j += cfg.dispCs;             j += ",";
     j += "\"dispDc\":";     j += cfg.dispDc;             j += ",";
     j += "\"dispRst\":";    j += cfg.dispRst;            j += ",";
@@ -3985,6 +4063,7 @@ enum { CTL_ID_UNI_A = 1, CTL_ID_UNI_B = 2, CTL_ID_PROTO = 3, CTL_ID_EXIT = 9 };
 static bool        ctlEnabled = false;   // any control wired -> input task runs
 static bool        ctlUseMenu = false;   // an ENTER-capable input exists -> full menu (else direct nudge)
 static InputMapper ctlMapper;
+
 static Menu        ctlMenu;
 
 // Direct fallback (no ENTER-capable input, or no display): rotation just nudges
@@ -4993,6 +5072,7 @@ void setup() {
     http.on("/rdm",               HTTP_GET,  handleRdmPage);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
+    http.on("/i2cscan",           HTTP_GET,  handleI2cScan);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
     http.onNotFound([](AsyncWebServerRequest* req) {
         // While the setup portal is up, send every unknown URL (incl. the OS captive-portal

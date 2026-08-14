@@ -1952,6 +1952,12 @@ function buildBoards(){
       {ref:'PIX3', name:'Pixel 3 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:40},{pin:3,silk:'GND'}]},
       {ref:'PIX4', name:'Pixel 4 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:47},{pin:3,silk:'GND'}]},
       {ref:'PIX5', name:'Pixel 5 (to strip)', pins:[{pin:1,silk:'V+ 12/24V'},{pin:2,silk:'DATA',gpio:48},{pin:3,silk:'GND'}]},
+      // OPEN: the pad order in hardware-carrier/luxdmx-carrier.kicad_pcb is pad 1 GND, 2 +3V3,
+      // 3 I2C_SCL, 4 I2C_SDA, and a measurement on the first-revision board put SCL on GPIO 1
+      // and SDA on GPIO 2, i.e. the other way round from the silk and from the values below.
+      // Not corrected yet because the only panel to hand is dead (powered, its pull-ups work,
+      // nothing ACKs on any address), so nothing can confirm which reading is right. Settle it
+      // with a working display and GET /i2cscan: exactly one hit at 0x3C is the answer.
       {ref:'DISP', name:'Display header', pins:[
         {pin:1,silk:'SDA',gpio:1},{pin:2,silk:'SCL',gpio:2},{pin:3,silk:'3V3'},{pin:4,silk:'GND'} ]},
       {ref:'ENC', name:'Encoder header (KY-040)', pins:[

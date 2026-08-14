@@ -730,6 +730,7 @@ a blocking error can't hide behind a fold.
 | `/reboot` | POST | Restart the device, changing nothing. **POST only** — a GET would let a link prefetch or a crawler drop the DMX output of a live rig. Also in the UI: **`/config` → Device → Restart device** |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
+| `/i2cscan` | GET | Scans the display header's I2C bus on the configured pins: idle line levels, whether an external pull-up is present, and every address that answers. Tells a dead panel from a wiring fault when the screen stays black, see [docs/display.md](docs/display.md) |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
 | `/labels.json` | GET | Channel labels object |

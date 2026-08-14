@@ -93,6 +93,10 @@ try {
       for (const [k, v] of sets) {
         const el = document.getElementsByName(k)[0];
         if (!el) { out[k] = 'FEHLT'; continue; }
+        // Fields a board pins in copper are rendered disabled, and a disabled field is not
+        // submitted at all: setting one looks like it worked and then changes nothing on the
+        // device. Un-disable it so the value actually rides along.
+        if (el.disabled) el.disabled = false;
         // Enables are checkboxes: writing .value on one silently does nothing, which reads
         // exactly like a successful set right up until the device ignores it.
         if (el.type === 'checkbox') el.checked = (v === '1' || v === 'true' || v === 'on');
