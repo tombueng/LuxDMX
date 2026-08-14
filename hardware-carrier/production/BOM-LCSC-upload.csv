@@ -1,0 +1,11 @@
+LCSC Part Number,Manufacturer Part Number,Quantity,Designator,Description
+C24497,CL31B104KBCNNNC,2,100nF,Capacitor 100nF 50V X7R 1206
+C159757,CL31A226MQHNNNE,1,22uF 3V3 bulk,Capacitor 22uF 6.3V X5R 1206
+C10749,KM108M035J20RR0VH2FP0,1,1000uF 35V,"Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch"
+C208489,MF-R500,1,MF-R 30V,"Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch"
+C17902,1206W4F1002T5E,5,10k ETH_CS pu / 10k ETH_RST pu / 10k dir,Resistor 10k 1206 1%
+,1206W4F1200T5E,3,120R term,Resistor 120R 1206 1%
+C25374,1206W4J0331T5E,6,330R bias+ / 330R bias-,Resistor 330R 1206 5% (fail-safe bias)
+C474952,KF128-5.08-2P-AA,1,12-24V IN 24A,"Screw terminal, 2 pole, 5.08 mm pitch, 24 A"
+C474953,KF128-5.08-3P-AA,5,PIXn V+/DATA/GND,"Screw terminal, 3 pole, 5.08 mm pitch"
+C353317,SMF12CA,6,TVS bidir,"TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W"
