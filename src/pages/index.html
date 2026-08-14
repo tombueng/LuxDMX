@@ -57,6 +57,12 @@ body { background: var(--gh-bg); animation:lxfade .16s ease-out; }
 .card-header { background: #1c2128; border-color: var(--gh-border); font-size: 0.85rem; }
 
 
+#pix-grid { display:grid; gap:2px; }
+#pix-grid .px {
+  aspect-ratio:1/1; border-radius:2px; background:#111; min-width:4px;
+  outline:1px solid rgba(255,255,255,.06); outline-offset:-1px;
+}
+#pix-tabs .nav-link { padding:.15rem .5rem; font-size:.8rem; }
 #grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, 42px);
@@ -218,6 +224,19 @@ footer a:hover { color: var(--gh-text); }
     </div>
   </div>
 
+  <!-- Pixel ports. Hidden entirely unless a port is enabled, so a DMX-only box is unchanged. -->
+  <div class="card mb-3" id="pix-card" style="display:none">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <span>Pixel output</span>
+      <span class="small" id="pix-power"></span>
+    </div>
+    <div class="card-body p-2">
+      <ul class="nav nav-pills nav-fill mb-2" id="pix-tabs"></ul>
+      <div id="pix-meta" class="small text-secondary mb-2"></div>
+      <div id="pix-grid"></div>
+    </div>
+  </div>
+
   <!-- Active Senders -->
   <div class="card mb-3">
     <div class="card-header">Active Senders</div>
@@ -352,6 +371,120 @@ const spark = new Uint8Array(SPARK_LEN);
 let sparkIdx = 0, sparkFull = false, sparkTimer = null;
 
 // Build 512-cell grid
+// ---- Pixel ports ----------------------------------------------------------
+// A per-port live view, on the same idea as the DMX grid above but organised by PORT rather
+// than by universe: a five-port rig can span thirty universes and nobody thinks in universes
+// while looking at a strip.
+//
+// The device does the decimation. The browser tells it how many cells it is drawing and gets
+// back exactly that many, so the payload is a few hundred bytes whatever the strip length --
+// 5 ports x 1000 px of raw frame at this refresh rate would be hundreds of kB/s, which is
+// absurd on a box also routing a thousand packets a second.
+let pixPorts = [], pixSel = 0, pixCells = 0;
+
+function pixFmtA(ma){ return (ma / 1000).toFixed(2) + ' A'; }
+
+async function pixRefreshConfig(){
+  let d;
+  try { d = await (await fetch('/pixels.json')).json(); } catch { return; }
+  pixPorts = (d.ports || []).filter(p => p.en);
+  const card = document.getElementById('pix-card');
+  if (!pixPorts.length){ card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  // Power: live against the all-white worst case, which is the number that tells you your
+  // headroom BEFORE somebody pushes a white cue rather than after.
+  const rail = d.railMa || 0;
+  const over = rail > 0 && d.worstMa > rail;
+  document.getElementById('pix-power').innerHTML =
+    '<span class="' + (d.ma > (rail || 1e9) ? 'text-danger' : 'text-secondary') + '">now ' +
+    pixFmtA(d.ma) + '</span>' +
+    ' &middot; all-white ' + '<span class="' + (over ? 'text-warning' : 'text-secondary') + '">' +
+    pixFmtA(d.worstMa) + '</span>' +
+    (rail ? (' &middot; rail ' + pixFmtA(rail)) : '') +
+    ' &middot; <span class="text-secondary">' + (d.backend || '?') + '</span>';
+
+  const tabs = document.getElementById('pix-tabs');
+  if (tabs.childElementCount !== pixPorts.length){
+    tabs.innerHTML = '';
+    pixPorts.forEach((p, i) => {
+      const li = document.createElement('li'); li.className = 'nav-item';
+      const a = document.createElement('a');
+      a.className = 'nav-link' + (i === pixSel ? ' active' : '');
+      a.href = '#'; a.textContent = 'Port ' + (p.idx != null ? p.idx + 1 : i + 1);
+      a.addEventListener('click', (e) => { e.preventDefault(); pixSel = i; pixBuildGrid(); pixRefreshConfig(); });
+      li.appendChild(a); tabs.appendChild(li);
+    });
+  }
+  [...tabs.querySelectorAll('.nav-link')].forEach((a, i) => a.classList.toggle('active', i === pixSel));
+
+  const p = pixPorts[Math.min(pixSel, pixPorts.length - 1)];
+  const span = p.spans > 1 ? ('universes ' + p.uni + '-' + (p.uni + p.spans - 1)) : ('universe ' + p.uni);
+  document.getElementById('pix-meta').textContent =
+    p.count + ' px, ' + span + ', ch ' + p.start + ' - in ' + p.inFps.toFixed(1) +
+    ' fps, out ' + p.outFps.toFixed(1) + ' fps, max ' + p.maxFps + ' fps' +
+    (p.scale < 256 ? (' - POWER CAP ACTIVE, scaled to ' + Math.round(p.scale * 100 / 256) + '%') : '') +
+    (p.lost ? ' - no source' : '') +
+    (p.partials ? (' - ' + p.partials + ' partial latch(es)') : '');
+  pixBuildGrid();
+}
+
+// The grid is the port's configured rows/cols, not auto-fill: a matrix layout is a property
+// of the installation, so guessing it would be wrong more often than right.
+function pixBuildGrid(){
+  const p = pixPorts[Math.min(pixSel, pixPorts.length - 1)];
+  if (!p) return;
+  const cols = p.viewCols > 0 ? p.viewCols : Math.min(p.count, 64);
+  const rows = p.viewRows > 0 ? p.viewRows : Math.ceil(p.count / cols);
+  const cells = Math.max(1, Math.min(cols * rows, p.count));
+  const g = document.getElementById('pix-grid');
+  if (pixCells !== cells || g.dataset.cols !== String(cols)){
+    g.dataset.cols = String(cols);
+    g.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(4px, 1fr))';
+    g.innerHTML = '';
+    for (let i = 0; i < cells; i++){
+      const d = document.createElement('div');
+      d.className = 'px'; d.id = 'px' + i;
+      g.appendChild(d);
+    }
+    pixCells = cells;
+  }
+}
+
+async function pixRefreshFrame(){
+  const p = pixPorts[Math.min(pixSel, pixPorts.length - 1)];
+  if (!p || !pixCells) return;
+  const portIdx = (p.idx != null ? p.idx : pixSel);
+  let f;
+  try { f = await (await fetch('/pixels/frame?port=' + portIdx + '&cells=' + pixCells)).json(); }
+  catch { return; }
+  if (!f.px) return;
+  const bpp = f.bpp || 3, step = bpp * 2;
+  for (let i = 0; i < pixCells; i++){
+    const el = document.getElementById('px' + i);
+    if (!el) continue;
+    const o = i * step;
+    const r = parseInt(f.px.substr(o, 2), 16) || 0;
+    const gg = parseInt(f.px.substr(o + 2, 2), 16) || 0;
+    const b = parseInt(f.px.substr(o + 4, 2), 16) || 0;
+    // RGBW: fold W into all three so a white-only pixel is not drawn black.
+    const w = bpp === 4 ? (parseInt(f.px.substr(o + 6, 2), 16) || 0) : 0;
+    el.style.background = 'rgb(' + Math.min(255, r + w) + ',' + Math.min(255, gg + w) + ',' + Math.min(255, b + w) + ')';
+  }
+}
+
+// Nur pollen, wenn der Tab sichtbar ist und Pixel-Ports existieren. Jede Antwort belegt
+// Heap auf dem Gerät, und 5 Requests/s haben einen ESP32 mit offener Weboberflaeche
+// zuverlaessig leergeraeumt (minFree 1.6 kB) -- das ist kein Tempo, das man "sicherheitshalber"
+// faehrt. 1 Hz reicht fuer eine Live-Ansicht voellig.
+function pixVisible(){
+  return document.visibilityState === 'visible' &&
+         document.getElementById('pix-card').style.display !== 'none';
+}
+pixRefreshConfig();
+setInterval(function(){ if (document.visibilityState === 'visible') pixRefreshConfig(); }, 5000);
+setInterval(function(){ if (pixVisible()) pixRefreshFrame(); }, 1000);
+
 const grid = document.getElementById('grid');
 for (let i = 1; i <= 512; i++) {
   const el = document.createElement('div');
