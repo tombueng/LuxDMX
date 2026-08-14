@@ -51,9 +51,12 @@ function configForm(snap, o0Overrides = {}) {
   if (snap.useEthernet)   f.useeth   = '1';
   if (snap.ethW5500)      f.ethon    = '1';
   if (snap.artnetRdm)     f.artrdm   = '1';
+  if (snap.ipProg)        f.ipprog   = '1';
+  if (snap.autoUpdate)    f.autoupd  = '1';
   if (snap.encReverse)    f.encrev   = '1';
   if (snap.btnActiveHigh) f.btnah    = '1';
-  const outs = [{ ...snap.outputs[0], ...o0Overrides }, snap.outputs[1]];
+  // Every output, not a fixed pair: an omitted o<i>_en reads as "disabled" (checkbox form).
+  const outs = snap.outputs.map((o, i) => (i === 0 ? { ...o, ...o0Overrides } : o));
   outs.forEach((o, i) => {
     if (o.en) f[`o${i}_en`] = '1';              // omitted key == disabled
     f[`o${i}_uni`]   = String(o.uni);

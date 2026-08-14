@@ -1,0 +1,34 @@
+# What belongs in git: the design source, the pipeline that turns it into copper, the gates
+# that check it, and the fab output. Same line hardware/ draws for the other board.
+#
+# What does not: scratch, editor history, per-user KiCad state, third-party datasheets and
+# product photos, and any 3D model this project did not make.
+
+# per-user KiCad UI state, not design
+*.kicad_prl
+*-backups/
+_autosave-*
+
+# VS Code local history
+.history/
+
+# working copies of the board from the routing sessions, plus their logs. The board is the
+# artifact; these are the road to it.
+backup/
+*.before-rework
+
+# vendor PDFs and product photos: someone else's copyright, and nothing here derives from
+# them automatically. modules.json carries the numbers that were read out of them.
+datasheets/
+img/
+
+__pycache__/
+*.pyc
+
+# 3D models. The .wrl files and the two STEPs exported by KiCad from modules/*.kicad_pcb are
+# ours and are tracked. These two are not:
+#   esp32-s3-devkitc1-yd.step   GrabCAD Community Library, non-commercial terms (see README)
+#   oled-1v3-128x64.step        third party, licence never established (see README)
+# They change how the renders look and nothing about the board.
+3dmodels/esp32-s3-devkitc1-yd.step
+3dmodels/oled-1v3-128x64.step

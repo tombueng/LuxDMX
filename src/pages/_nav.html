@@ -37,6 +37,9 @@ html { scrollbar-gutter: stable; }
     <div class="nav-stat" style="width:3.8rem"><span class="ns-label">Heap</span><span class="ns-val" id="heap">&middot;</span></div>
     <div class="nav-stat" style="width:5rem"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">&middot;</span></div>
     <div class="nav-stat" style="width:3rem"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">&middot;</span></div>
+    <div class="nav-stat" style="width:4.2rem" id="ns-pixma" hidden><span class="ns-label">Pixels</span><span class="ns-val" id="pixma">&middot;</span></div>
+    <div class="nav-stat" style="width:4rem" id="ns-pixfps" hidden><span class="ns-label">Pix FPS</span><span class="ns-val" id="pixfps">&middot;</span></div>
+    <div class="nav-stat" style="width:4.4rem" id="ns-pixuni" hidden><span class="ns-label">Universes</span><span class="ns-val" id="pixuni">&middot;</span></div>
     <div class="nav-stat" style="width:2.6rem"><span class="ns-label">Fixtures</span><span class="ns-val" id="nfix">&middot;</span></div>
     <div class="nav-stat" style="width:4rem"><span class="ns-label">RDM tx</span><span class="ns-val" id="rdm-tx">&middot;</span></div>
     <div class="nav-stat" style="width:4rem"><span class="ns-label">RDM rx</span><span class="ns-val" id="rdm-rx">&middot;</span></div>
@@ -46,6 +49,43 @@ html { scrollbar-gutter: stable; }
     <a href="/rdm" data-tab="/rdm" class="btn btn-outline-secondary btn-sm">RDM</a>
     <a href="/config" data-tab="/config" class="btn btn-outline-secondary btn-sm">Settings</a>
   </div>
+<script>
+// Pixel stats in the bar, polled with the rest. The bar is already full, so this ADAPTS
+// rather than grows: nothing pixel-related is shown on a DMX-only box, and on a pixel-only
+// box the DMX transmit-style chip hides instead.
+(function(){
+  function show(id, on){ var e = document.getElementById(id); if (e) e.hidden = !on; }
+  async function pixNav(){
+    var d;
+    try { d = await (await fetch('/pixels.json')).json(); } catch { return; }
+    var on = (d.ports || []).filter(function(p){ return p.en; });
+    show('ns-pixma', on.length); show('ns-pixfps', on.length); show('ns-pixuni', on.length);
+    if (!on.length) return;
+    var ma = document.getElementById('pixma');
+    if (ma){
+      ma.textContent = (d.ma / 1000).toFixed(2) + ' A';
+      var rail = d.railMa || 0;
+      ma.className = 'ns-val' + (rail && d.ma > rail ? ' text-danger'
+                    : (rail && d.worstMa > rail ? ' text-warning' : ''));
+    }
+    var f = document.getElementById('pixfps');
+    if (f) f.textContent = Math.max.apply(null, on.map(function(p){ return p.outFps; })).toFixed(1);
+    // Universes arriving vs expected: a missing universe is then visible from any page
+    // without opening the settings.
+    var want = on.reduce(function(a2, p){ return a2 + (p.spans || 0); }, 0);
+    var got  = on.reduce(function(a2, p){ return a2 + (p.lost ? 0 : (p.spans || 0)); }, 0);
+    var u = document.getElementById('pixuni');
+    if (u){ u.textContent = got + '/' + want; u.className = 'ns-val' + (got < want ? ' text-warning' : ''); }
+    // (Ob DMX-Ausgaenge aktiv sind, stand frueher aus einem zusaetzlichen /info.json-Fetch
+    // hier -- alle 2 s, auf jeder Seite. Das war den Heap nicht wert; die Navbar bekommt
+    // ihre Zahlen ohnehin ueber den WebSocket.)
+  }
+  // 6 s statt 2 s, und nur bei sichtbarem Tab: die Navbar ist eine Statusanzeige,
+  // kein Messgeraet.
+  pixNav();
+  setInterval(function(){ if (document.visibilityState === 'visible') pixNav(); }, 6000);
+})();
+</script>
 </nav>
 <script>
 window.LuxNav = (function(){

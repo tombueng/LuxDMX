@@ -42,23 +42,44 @@ struct CfgField {
     uint8_t            enumCount;
 };
 
-// A per-output field, expanded by the engine over outputs[0..MAX_OUTPUTS-1]:
-// the real NVS/web key becomes "o<i>_<suffix>", and on load output 0 falls back
-// to legacyKey0 (the old single-universe keys) so OTA never loses a config.
-struct CfgOutputField {
-    const char*        suffix;     // -> "o<i>_<suffix>"   (e.g. "tx")
-    const char*        jsonKey;    // key inside outputs[i] in /info.json (e.g. "tx")
+// A field of an ARRAY element, expanded by the engine over that array's entries:
+// the real NVS/web key becomes "<prefix><i>_<suffix>" (e.g. "o0_tx", "p2_count").
+// On load, element 0 falls back to legacyKey0 (the old single-universe keys) so an
+// OTA from a pre-array build never loses a config.
+struct CfgArrayField {
+    const char*        suffix;     // -> "<prefix><i>_<suffix>"   (e.g. "tx")
+    const char*        jsonKey;    // key inside the element's object in /info.json
     CfgKind            kind;
-    uint16_t           offset;     // offsetof(DmxOutput, member)
-    const char*        legacyKey0; // output-0 legacy NVS fallback (nullptr if none)
+    uint16_t           offset;     // offsetof(DmxOutput / PixelPort, member)
+    const char*        legacyKey0; // element-0 legacy NVS fallback (nullptr if none)
     int32_t            min, max;
     const char*        label;
     uint16_t           flags;
     const char* const* enumLabels;
     uint8_t            enumCount;
 };
+// The original name, kept so the schema's row-builder macros and every existing
+// declaration read unchanged. Outputs were simply the first array of this kind.
+using CfgOutputField = CfgArrayField;
+
+// One entry per array in Config. The engine walks this table instead of hard-coding
+// `cfg.outputs[i]`, so adding an array (pixels[]) is one table row rather than six
+// edits scattered through load/save/dump/neutral/resolve.
+struct CfgArray {
+    char                 prefix;      // key prefix: 'o' = DMX outputs, 'p' = pixel ports
+    uint8_t              count;       // MAX_OUTPUTS / MAX_PIXEL_PORTS
+    uint16_t             baseOffset;  // offsetof(Config, outputs)
+    uint16_t             stride;      // sizeof(DmxOutput)
+    const CfgArrayField* fields;
+    size_t               fieldCount;
+    const char*          name;        // for messages ("output", "pixel port")
+};
 
 extern const CfgField       CONFIG_FIELDS[];
 extern const size_t         CONFIG_FIELD_COUNT;
 extern const CfgOutputField OUTPUT_FIELDS[];
 extern const size_t         OUTPUT_FIELD_COUNT;
+extern const CfgArrayField  PIXEL_FIELDS[];
+extern const size_t         PIXEL_FIELD_COUNT;
+extern const CfgArray       CONFIG_ARRAYS[];
+extern const size_t         CONFIG_ARRAY_COUNT;

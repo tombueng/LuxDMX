@@ -257,6 +257,7 @@
       }
     ]
   },
+  "pixels": { "ports": 0, "why": "no level shifter and no pixel connectors on this board" },
   "_source": "generated from hardware/scripts/luxdmx.py",
   "hardwired": [
     { "field": "o0_tx",   "gpio": 17, "label": "DMX A · TX → DI" },

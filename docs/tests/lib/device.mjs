@@ -40,8 +40,23 @@ export function configForm(snapshot, o1Overrides = {}) {
     subnet: snapshot.subnet || '',
     dns: snapshot.dns || '',
   };
-  if (snapshot.staticIp) f.staticip = '1';
-  const outs = [snapshot.outputs[0], { ...snapshot.outputs[1], ...o1Overrides }];
+  // EVERY boolean, not just staticip. /config is a checkbox form: a key that is absent from the
+  // body reads as "unchecked" and the field is written false. Omitting `useeth` therefore takes a
+  // wired device off Ethernet and strands it in its setup AP on 192.168.4.1, with no way back over
+  // the network -- which on a bench without a serial cable means a physical trip to the device.
+  // `output-rate` and `signal-loss` already carried these; this helper (16 specs) did not.
+  if (snapshot.staticIp)      f.staticip = '1';
+  if (snapshot.useEthernet)   f.useeth   = '1';
+  if (snapshot.ethW5500)      f.ethon    = '1';
+  if (snapshot.artnetRdm)     f.artrdm   = '1';
+  if (snapshot.ipProg)        f.ipprog   = '1';
+  if (snapshot.autoUpdate)    f.autoupd  = '1';
+  if (snapshot.encReverse)    f.encrev   = '1';
+  if (snapshot.btnActiveHigh) f.btnah    = '1';
+  // Every output the device reports, not a fixed pair: /config is a checkbox form, so an
+  // omitted o<i>_en reads as "disabled" and a short list would silently switch off any
+  // output past the end of it.
+  const outs = snapshot.outputs.map((o, i) => (i === 1 ? { ...o, ...o1Overrides } : o));
   outs.forEach((o, i) => {
     if (o.en) f[`o${i}_en`] = '1';     // omitted key == disabled
     f[`o${i}_uni`]  = String(o.uni);

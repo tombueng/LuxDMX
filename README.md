@@ -78,7 +78,8 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **mDNS + DHCP hostname** | Reachable as `dmx-gateway.local` via mDNS, *and* the device sends its hostname over DHCP (option 12) so your router registers it by plain name. Clients without mDNS (e.g. Windows) can then reach it as `dmx-gateway` / `dmx-gateway.fritz.box`. Hostname configurable |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
 | **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v6 board) — one status language: green = up (stays on; slow blink = DMX coming in), blue = RDM/identify **added on top of green** (both LEDs on the panel, cyan on a single RGB LED), orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
-| **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
+| **Up to 3 DMX outputs** | Three independent universes, each its own RS485 transceiver (the same universe on several = splitter). All three are RDM-capable |
+| **Pixel output (WS281x)** | Drive addressable LED strip from Art-Net or sACN alongside DMX: up to 5 ports, multi-universe per port, WS2812/2815/2811 and SK6812 RGBW, colour order, brightness, gamma, per-port power cap with a live and all-white estimate, and ArtSync / E1.31 sync. Nothing is allocated for a port that is off. See [docs/pixels.md](docs/pixels.md) |
 | **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
 | **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
 | **Remote IP config (ArtIpProg)** | A controller can read and set the node's IP / mask / gateway (or switch it to DHCP) over the network with Art-Net `ArtIpProg`, so a box that landed on an unreachable address is recoverable without the BOOT button or a serial cable. **Off by default** (Art-Net has no auth, so on = anyone on the wire can renumber it); the new address applies on the next boot. See [Remote IP config over Art-Net](#remote-ip-config-over-art-net-artipprog-off-by-default) |
@@ -729,6 +730,7 @@ a blocking error can't hide behind a fold.
 | `/reboot` | POST | Restart the device, changing nothing. **POST only** — a GET would let a link prefetch or a crawler drop the DMX output of a live rig. Also in the UI: **`/config` → Device → Restart device** |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
+| `/i2cscan` | GET | Scans the display header's I2C bus on the configured pins: idle line levels, whether an external pull-up is present, and every address that answers. Tells a dead panel from a wiring fault when the screen stays black, see [docs/display.md](docs/display.md) |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
 | `/labels.json` | GET | Channel labels object |

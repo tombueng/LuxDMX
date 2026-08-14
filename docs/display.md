@@ -317,3 +317,42 @@ cases + a larger-font layout. Out of scope for issue #5's first cut.
 
 **Remaining:** on-hardware bring-up of the mono panels and the colour/SPI path; optional §7 TFT
 support (verify colour/SPI on an existing TFT instead of buying an SSD1351).
+
+## 10. When the screen stays black
+
+A mono panel that shows nothing gives you no information by itself: a wrong driver type, a
+swapped SDA/SCL, an unpowered module and a dead controller all look identical. Two things make
+it answerable without a scope.
+
+`/info.json` reports what the probe at boot found:
+
+| field | meaning |
+|---|---|
+| `dispAddr` | the I2C address the panel answered on, `0` if nothing did |
+| `dispReady` | the driver came up and the screen is being written |
+
+`GET /i2cscan` looks at the bus itself, on the pins currently configured:
+
+```json
+{"sda":2,"scl":1,
+ "idle":{"sda":true,"scl":true},     // levels with no internal pull: who holds the lines?
+ "pullup":{"sda":true,"scl":true},   // still high against an internal pulldown -> external pull-up
+ "found":[60],"count":1}             // every address that ACKed (60 = 0x3C)
+```
+
+Read it like this:
+
+* **`count` is 1 and `found` is `[60]` or `[61]`** — the panel is there. A black screen now means
+  the wrong `dispType` (a 1.3" module is usually an SH1106, a 0.96" one an SSD1306).
+* **`pullup` false on both lines** — nothing alive is pulling the bus up. Either the module has no
+  supply or it is not connected. Note that the LuxDMX carrier has no pull-ups of its own, so the
+  only ones on that bus are the module's, and they only work when it is powered.
+* **`pullup` true on both, `count` 0** — the module is connected and powered, its resistors are
+  doing their job, and the controller answers nothing. That is a dead panel. This is exactly what
+  a display killed by reverse polarity looks like.
+* **`count` around 40, with a different set of addresses each time you ask** — you are reading a
+  floating bus and the ACK detection is picking up noise. Check `pullup` instead; that number is
+  not a list of devices.
+
+If `count` is 1 but the pins are not the ones you expected, believe the scan: it is measuring the
+bus, not the schematic.

@@ -40,9 +40,11 @@ static void checkBoard(const char* name) {
     int  o0tx = 17, o0rx = 16;
     bool useEth = false; int wiredPhy = 0;
     bool o1en = false; int o1tx = -1, o1rx = -1, o1rts = -1;
+    bool o2en = false; int o2tx = -1, o2rx = -1, o2rts = -1;
     int  ledR = -1, ledG = -1, ledY = -1, ledB = -1, ledW = -1;
     int  dispCs = -1, dispDc = -1, dispRst = -1, dispSck = -1, dispMosi = -1;
     int  o0rts = -1;
+    int  encA = -1, encB = -1, encSw = -1;
 
     std::string b = name;
     if (b == "esp32s3dev") { ledPin = 48; ledType = 2; dispSda = 8; dispScl = 9; }
@@ -53,6 +55,17 @@ static void checkBoard(const char* name) {
         o1en = true; o1tx = 16; o1rx = 21; o1rts = 47;
         ethCs = 10; ethSck = 12; ethMosi = 11; ethMiso = 13; ethInt = 14; ethRst = 9;
         dispSda = 4; dispScl = 5; dispSck = 39; dispMosi = 40; dispCs = 41; dispDc = 42; dispRst = 38;
+    }
+    else if (b == "luxdmx_carrier") {
+        // Status LED off on purpose: the module's own WS2812 sits on IO48, which is pixel
+        // port 5 on this board (see PIXEL_PLAN / templates/luxdmx_carrier.ini).
+        ledType = 0; ledPin = -1;
+        o0tx = 17; o0rx = 18; o0rts = 16;
+        o1tx = 15; o1rx = 7;  o1rts = 6;   // ports 2 and 3 are wired but stay disabled:
+        o2tx = 5;  o2rx = 4;  o2rts = 8;   // a fresh board has no transceiver modules on it
+        ethCs = 10; ethSck = 12; ethMosi = 11; ethMiso = 13; ethInt = 14; ethRst = 9;
+        dispSda = 1; dispScl = 2;
+        encA = 42; encB = 41; encSw = 21;
     }
 
     char m[64];
@@ -75,10 +88,15 @@ static void checkBoard(const char* name) {
     EQ(cfg.outputs[0].enabled, true); EQ(cfg.outputs[0].universe, 0); EQ(cfg.outputs[0].port, 1);
     EQ(cfg.outputs[0].txPin, o0tx); EQ(cfg.outputs[0].rxPin, o0rx); EQ(cfg.outputs[0].rtsPin, o0rts);
     EQ(cfg.outputs[0].mergeMode, 0); EQ(cfg.outputs[0].lossMode, 0);
+    EQ(cfg.encA, encA); EQ(cfg.encB, encB); EQ(cfg.encSw, encSw);
     // output 1
     EQ(cfg.outputs[1].enabled, o1en); EQ(cfg.outputs[1].universe, 1); EQ(cfg.outputs[1].port, 2);
     EQ(cfg.outputs[1].txPin, o1tx); EQ(cfg.outputs[1].rxPin, o1rx); EQ(cfg.outputs[1].rtsPin, o1rts);
     EQ(cfg.outputs[1].mergeMode, 0); EQ(cfg.outputs[1].lossMode, 0);
+    // output 2 (the third DMX port; _base gives it uni=2 / port=3, boards fill in pins)
+    EQ(cfg.outputs[2].enabled, o2en); EQ(cfg.outputs[2].universe, 2); EQ(cfg.outputs[2].port, 3);
+    EQ(cfg.outputs[2].txPin, o2tx); EQ(cfg.outputs[2].rxPin, o2rx); EQ(cfg.outputs[2].rtsPin, o2rts);
+    EQ(cfg.outputs[2].mergeMode, 0); EQ(cfg.outputs[2].lossMode, 0);
     #undef EQ
 }
 
@@ -157,6 +175,35 @@ int main() {
     checkBoard("esp32s3dev");
     checkBoard("wt32eth01");
     checkBoard("luxdmx_v6");
+    checkBoard("luxdmx_carrier");
+
+    // 6b) pixels[] — the engine's SECOND array. Proves CONFIG_ARRAYS is walked for
+    // neutral, template, key resolution, dump and NVS, not just outputs[].
+    cfgcore::resetTo("luxdmx_carrier", err);
+    CHECK(cfg.pixels[0].pin == 38 && cfg.pixels[4].pin == 48, "pixels: carrier pins from template");
+    CHECK(!cfg.pixels[0].enabled,                  "pixels: disabled until asked for");
+    CHECK(cfg.pixels[0].universe == 0 && cfg.pixels[3].universe == 3, "pixels: universes chained");
+    CHECK(cfg.pixels[2].mAPerCh == 570,            "pixels: carrier defaults to 12V WS2815 current");
+    // These four must NOT land on their schema minimum, or a freshly enabled strip is
+    // black, reports no power draw and has no gamma. _base carries them for every port.
+    CHECK(cfg.pixels[1].bright == 255,             "pixels: brightness defaults to full");
+    CHECK(cfg.pixels[1].gamma == 220,              "pixels: gamma defaults to 2.2");
+    CHECK(cfg.pixels[1].quiesMa == 100,            "pixels: idle current default");
+    CHECK(cfg.pixels[1].count == 170,              "pixels: one universe's worth by default");
+    CHECK(cfg.railMa == 9200,                      "pixels: rail rating default (2-layer)");
+    // A board with no pixel hardware still gets a coherent (all-off, pin-less) array.
+    cfgcore::resetTo("luxdmx_v6", err);
+    CHECK(cfg.pixels[0].pin == -1 && !cfg.pixels[0].enabled, "pixels: v6 has none, stays neutral");
+    // key resolution / clamping / dump on the second array
+    CHECK(cfgcore::setValue("p2_count", "300", err), "pixels: set p2_count");
+    CHECK(cfg.pixels[2].count == 300,               "pixels: p2_count applied");
+    cfgcore::setValue("p2_count", "99999", err);
+    CHECK(cfg.pixels[2].count == 4096,              "pixels: p2_count clamps to max");
+    CHECK(!cfgcore::setValue("p9_count", "1", err), "pixels: index past the array is unknown");
+    CHECK(!cfgcore::setValue("p0_bogus", "1", err), "pixels: unknown suffix is rejected");
+    String pd; cfgcore::dump(pd, false);
+    CHECK(hasS(pd, "p0_pin="),                      "pixels: dump carries the pixel array");
+    CHECK(hasS(pd, "railma="),                      "pixels: dump carries railMa");
 
     // 7) serial console grammar (cfgserial::execute), all schema-driven
     using cfgserial::execute;

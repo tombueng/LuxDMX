@@ -113,9 +113,11 @@
 #include <Update.h>
 #include <ArtnetWifi.h>
 #include "rdm_types.h"                  // RDM E1.20 types and constants (ours, see the header)
+#include "pixel_map.h"                  // universe -> pixel mapping (pure, host-tested)
 #include "dmx_rmt.h"
 static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64 hard-zero path)
 #include "rdm_rmt.h"                    // RDM controller on RMT-TX + UART-RX
+#include "pixel.h"                      // WS281x pixel engine (framebuffers, latch, power)
 
 // Auto-generated asset headers (produced by extra_scripts.py before each build)
 #include "generated/version.h"
@@ -290,8 +292,8 @@ static const char* PREF_NS = "dmxgw";
 static const char* AP_SSID = "LuxDMX-setup";
 
 // WiFi interface mode (cfg.wifiMode)
-static constexpr int NET_WIFI_STA = 0;        // station / client (join an existing router)
-static constexpr int NET_WIFI_AP  = 1;        // standalone access point (no router needed)
+// (values live in include/config_enums.h — the schema and main.cpp must agree on them,
+// so there is one definition rather than two that can drift)
 
 // Link-loss policy (cfg.linkLossMode): what to do when wired Ethernet is selected but
 // the link is down. RETRY is the show-safe default (no AP ever); the AP modes never open
@@ -313,9 +315,8 @@ static constexpr int MAX_SENDERS = 8;
 
 // Source-merge engine (issue #10) -------------------------------------------
 // Per-output merge mode (DmxOutput.mergeMode) for two+ sources on one universe.
-static constexpr int MERGE_OFF = 0;   // most recent source wins (legacy behaviour)
-static constexpr int MERGE_HTP = 1;   // highest takes precedence (per-channel max)
-static constexpr int MERGE_LTP = 2;   // latest source wins (whole-frame arbitration)
+// MERGE_OFF (most recent source wins) / MERGE_HTP (per-channel max) / MERGE_LTP
+// (latest source wins) are defined in include/config_enums.h, shared with the schema.
 // A source that goes silent for this long stops contributing to the merge.
 // Must comfortably outlast a console's KEEP-ALIVE interval, not just its streaming rate: on a
 // static look both E1.31 (mandated, sec 6.6.2: "a single keep-alive packet ... at intervals of
@@ -334,9 +335,9 @@ static constexpr uint8_t  DEFAULT_PRIORITY  = 100;
 // every source on its universe has been silent past SOURCE_TIMEOUT_MS. DMX512 is
 // a continuously-refreshed stream, so HOLD and ZERO keep transmitting at the
 // normal rate; only STOP actually idles the line.
-static constexpr int LOSS_HOLD = 0;   // keep refreshing the last frame (failsafe, default)
-static constexpr int LOSS_ZERO = 1;   // blackout: drive all channels to 0, keep transmitting
-static constexpr int LOSS_STOP = 2;   // stop transmitting, so fixtures run their own DMX-loss failsafe
+// LOSS_HOLD (keep refreshing the last frame, failsafe default) / LOSS_ZERO (blackout,
+// still transmitting) / LOSS_STOP (idle the line so fixtures run their own failsafe) are
+// defined in include/config_enums.h, shared with the schema.
 
 // Source state codes: WS frame byte 13 + LED/display. Keep in sync with the
 // matching values documented in src/pages/index.html.
@@ -357,6 +358,149 @@ struct Sender {
     uint8_t  data[512]; // last frame from this source, for the merge engine
 };
 static Sender senders[MAX_SENDERS] = {};
+
+// ---------------------------------------------------------------------------
+// Source index — "who is sending what", WITHOUT the payload.
+// ---------------------------------------------------------------------------
+// `senders[]` above carries a 512-byte frame per entry because the merge engine has to
+// hold every contributor's current values at once to take a per-channel maximum. That is
+// the right structure for DMX, where a handful of universes are in play, and the wrong one
+// the moment pixels arrive: one media server feeding a 5-port strip is 30+ universes, and
+// at 530 bytes an entry that table would be bigger than the pixel framebuffers it feeds.
+//
+// So the two jobs are split. Pixels never merge (two servers on one pixel universe is a
+// misconfiguration, not a feature), so a pixel packet is written straight through to its
+// framebuffer and forgotten -- nothing to cache. What we still want for EVERY source,
+// pixel or DMX, is the cheap part: who, which universe, how fast, how long ago. That is
+// this table, at ~28 bytes an entry, and it is what conflict detection, the sender list
+// and the "seen on the wire" panel actually read.
+//
+// `senders[]` is now only fed for universes that reach a DMX output, so it stays exactly
+// as small and as correct as it is today.
+static constexpr int MAX_SEEN = 48;
+struct SrcSeen {
+    uint32_t ip;         // 0 = empty slot
+    uint32_t lastMs;
+    uint32_t winMs;      // fps window start
+    float    fps;
+    int16_t  universe;
+    uint16_t winCnt;
+    uint16_t dataLen;
+    uint8_t  proto;      // 0 = Art-Net, 1 = sACN
+    uint8_t  priority;
+};
+static SrcSeen g_seen[MAX_SEEN] = {};
+
+// Record one packet against (ip, proto, universe). Evicts the least-recently-seen entry
+// when full, so a node that is renumbered or a source that goes away ages out on its own.
+static void srcSeenUpdate(uint32_t ip, uint8_t proto, int16_t universe,
+                          uint8_t priority, uint16_t length) {
+    const uint32_t now = millis();
+    int slot = -1, free_ = -1, oldest = 0;
+    for (int i = 0; i < MAX_SEEN; i++) {
+        SrcSeen& s = g_seen[i];
+        if (s.ip == ip && s.proto == proto && s.universe == universe) { slot = i; break; }
+        if (s.ip == 0 && free_ < 0) free_ = i;
+        if (s.ip && s.lastMs < g_seen[oldest].lastMs) oldest = i;
+    }
+    if (slot < 0) {
+        slot = free_ >= 0 ? free_ : oldest;
+        SrcSeen& n = g_seen[slot];
+        n.ip = ip; n.proto = proto; n.universe = universe;
+        n.winMs = now; n.winCnt = 0; n.fps = 0.0f;
+    }
+    SrcSeen& s = g_seen[slot];
+    s.lastMs = now; s.priority = priority; s.dataLen = length;
+    s.winCnt++;
+    if (now - s.winMs >= 1000) {
+        s.fps = (float)s.winCnt * 1000.0f / (float)(now - s.winMs);
+        s.winCnt = 0; s.winMs = now;
+    }
+}
+
+// Live sources on a universe, counted from the index (so it is right for pixel universes
+// too, which never reach senders[]).
+static int seenOnUniverse(int universe, uint32_t windowMs) {
+    const uint32_t now = millis();
+    int n = 0;
+    for (int i = 0; i < MAX_SEEN; i++)
+        if (g_seen[i].ip && g_seen[i].universe == universe && now - g_seen[i].lastMs < windowMs) n++;
+    return n;
+}
+
+// ---------------------------------------------------------------------------
+// Universe sinks — who consumes a universe, and which slice of it
+// ---------------------------------------------------------------------------
+// A DMX output takes a whole universe into its 513-byte buffer. A pixel port takes a
+// SLICE: port 1 might read channels 1..510 of universe 0 into framebuffer bytes 0..509,
+// then all of universe 1, and so on. Both are the same shape, so routeFrame() walks one
+// table instead of special-casing.
+//
+// The table also expresses things the old universe==universe test could not: one universe
+// feeding several pixel ports at different start channels (three 50-pixel ports out of a
+// single universe), or a universe reaching a DMX output and a pixel port at once.
+//
+// Rebuilt whenever config is applied. Sized for the worst case rather than allocated:
+// MAX_OUTPUTS sinks plus, per pixel port, one per universe it spans.
+static constexpr uint8_t SINK_DMX = 0;
+static constexpr uint8_t SINK_PIX = 1;
+struct UniSink {
+    int16_t  universe;
+    uint8_t  kind;      // SINK_DMX / SINK_PIX
+    uint8_t  idx;       // which output / which pixel port
+    uint16_t srcOff;    // offset inside the 512-channel universe
+    uint16_t dstOff;    // offset inside the target buffer
+    uint16_t len;       // channels this sink takes from this universe
+    uint8_t  uniSlot;   // 0-based index of this universe within the port's span (latch mask bit)
+};
+// Worst case: every pixel port spans its maximum universe count. 4096 px x 4 ch / 510 = 33.
+// Kept static (about 2 KB) rather than allocated: it is read on the network task and
+// rebuilt on the web task, and a fixed array means a rebuild can never hand the reader a
+// freed pointer. Cheap insurance against a whole class of race.
+static constexpr int MAX_SINKS = MAX_OUTPUTS + MAX_PIXEL_PORTS * 34;
+static UniSink g_sinks[MAX_SINKS];
+static volatile int g_sinkN = 0;
+
+// Rebuild the routing table from the live config. Writes the entries first and only then
+// publishes the count, so a reader on the other core either sees the old table or the whole
+// new one, never a half-written row.
+static void rebuildSinks() {
+    UniSink tmp[MAX_SINKS];
+    int n = 0;
+
+    for (int i = 0; i < MAX_OUTPUTS && n < MAX_SINKS; i++) {
+        if (!cfg.outputs[i].enabled) continue;
+        tmp[n++] = { (int16_t)cfg.outputs[i].universe, SINK_DMX, (uint8_t)i, 0, 0, 512, 0 };
+    }
+    for (int p = 0; p < MAX_PIXEL_PORTS; p++) {
+        const PixelPort& c = cfg.pixels[p];
+        if (!c.enabled || c.pin < 0 || c.count <= 0) continue;
+        PixSlice sl[64];
+        const int ns = pixBuildSlices(c.chip, c.uniMode, c.count, c.startCh, sl, 64);
+        for (int s = 0; s < ns && n < MAX_SINKS; s++)
+            tmp[n++] = { (int16_t)(c.universe + sl[s].uniSlot), SINK_PIX, (uint8_t)p,
+                         sl[s].srcOff, sl[s].dstOff, sl[s].len, (uint8_t)sl[s].uniSlot };
+    }
+
+    // Publish: drop the count to zero, fill, then republish. A reader that captured the old
+    // count before this can still be walking, so every consumer must treat a row as untrusted
+    // (pixelWriteSlice bounds-checks its port index for exactly this reason).
+    g_sinkN = 0;
+    __sync_synchronize();
+    memcpy(g_sinks, tmp, sizeof(UniSink) * n);
+    __sync_synchronize();
+    g_sinkN = n;
+    Serial.printf("[SINK] %d universe sink(s)\n", n);
+}
+
+// Does any DMX output consume this universe? Only those universes go through the 512-byte
+// frame cache; a pixel universe is written straight through and never cached.
+static bool universeFeedsDmx(int universe) {
+    const int n = g_sinkN;
+    for (int i = 0; i < n; i++)
+        if (g_sinks[i].kind == SINK_DMX && g_sinks[i].universe == universe) return true;
+    return false;
+}
 
 // ---------------------------------------------------------------------------
 // Change log
@@ -460,7 +604,6 @@ static bool rdmAllocTables();   // fwd decl: allocates the RDM tables; loadConfi
 AsyncWebServer    http(80);
 AsyncWebSocket    ws("/ws");
 ArtnetWifi        artnet;
-static WiFiUDP   sacnUdp[MAX_OUTPUTS];   // one multicast socket per output universe
 static Adafruit_NeoPixel neoPixel(1, 0, NEO_GRB + NEO_KHZ800);
 
 // ---------------------------------------------------------------------------
@@ -532,7 +675,11 @@ static float    outTxFps[MAX_OUTPUTS]       = {0.0f};
 // True while no live source feeds this output's universe. Drives the per-output
 // signal-loss policy (LOSS_*). Starts true: a freshly booted node has no source
 // yet, so a STOP-configured output stays dark until one appears.
-static bool     outSrcLost[MAX_OUTPUTS]     = {true, true};
+static bool     outSrcLost[MAX_OUTPUTS]     = {true, true, true};
+// A missing entry would default to false, i.e. "a source is feeding this output" on a freshly
+// booted node, which is exactly backwards and would let a STOP-configured output clock out a
+// blank frame before anything has ever been received. Fail the build instead of rotting quietly.
+static_assert(MAX_OUTPUTS == 3, "outSrcLost's initialiser must list every output");
 static float    jitterMs     = 0.0f;
 static uint32_t prevFrameMs  = 0;
 static uint32_t startMs      = 0;
@@ -559,6 +706,10 @@ static uint16_t identifyCh      = 0;       // 1-512, 0 = inactive
 static uint32_t identifyUntil   = 0;
 static uint32_t pendingRebootAt = 0;       // 0 = none; loop() reboots when due
 static bool     pendingWifiReset = false;  // clear WiFi creds before reboot
+// Set from the web task when config changes; loop() does the actual work (rebuild the
+// sink table, re-allocate pixel buffers, re-join sACN groups) so the HTTP response is
+// never left waiting on a driver re-init.
+static volatile bool g_pixApply = false;
 
 // WS binary frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1)
 // (srcStatus: 0=normal 1=conflict 2=merging)
@@ -603,6 +754,54 @@ static void sanitizeOutputs() {
     for (int i = 0; i < MAX_OUTPUTS; i++)
         if (cfg.outputs[i].enabled && cfg.outputs[i].txPin < 0)
             cfg.outputs[i].enabled = false;
+}
+
+// The same rule for pixel ports: enabled with no data pin, or no pixels, can't drive
+// anything, and an enabled-but-impossible port would just allocate a buffer nothing reads.
+// Also refuse a data pin that the status LED already owns -- on the carrier the module's
+// own WS2812 sits on IO48, which is pixel port 5, and two drivers on one pin is the one
+// combination that genuinely breaks (the LED's writes land inside the pixel stream).
+static void sanitizePixels() {
+    for (int i = 0; i < MAX_PIXEL_PORTS; i++) {
+        PixelPort& p = cfg.pixels[i];
+        if (!p.enabled) continue;
+        if (p.pin < 0 || p.count <= 0) { p.enabled = false; continue; }
+        if (cfg.ledType != 0 && cfg.ledPin == p.pin) {
+            Serial.printf("[PIX] port %d disabled: pin %d is the status LED\n", i + 1, p.pin);
+            p.enabled = false; continue;
+        }
+        for (int j = 0; j < i; j++)
+            if (cfg.pixels[j].enabled && cfg.pixels[j].pin == p.pin) { p.enabled = false; break; }
+        if (!p.enabled) continue;
+        // Refuse a pin another subsystem owns. A pixel port drives its pin hard from an RMT
+        // channel, so landing it on (say) the W5500's MISO takes Ethernet off the bus
+        // entirely and the board looks bricked -- the chip ID just reads back 0x00 and the
+        // driver refuses to install, with nothing on screen to say why.
+        struct { int pin; const char* what; } claimed[] = {
+            { cfg.ethCs,   "W5500 CS"   }, { cfg.ethSck,  "W5500 SCK"  },
+            { cfg.ethMosi, "W5500 MOSI" }, { cfg.ethMiso, "W5500 MISO" },
+            { cfg.ethInt,  "W5500 INT"  }, { cfg.ethRst,  "W5500 RST"  },
+            { cfg.dispSda, "display SDA" }, { cfg.dispScl, "display SCL" },
+            { cfg.encA,    "encoder A"  }, { cfg.encB,    "encoder B"  },
+            { cfg.encSw,   "encoder SW" },
+        };
+        for (auto& c : claimed)
+            if (c.pin >= 0 && c.pin == p.pin) {
+                Serial.printf("[PIX] port %d disabled: pin %d is the %s\n", i + 1, p.pin, c.what);
+                p.enabled = false; break;
+            }
+        if (!p.enabled) continue;
+        for (int o = 0; o < MAX_OUTPUTS && p.enabled; o++) {
+            if (!cfg.outputs[o].enabled) continue;
+            const int dmx[3] = { cfg.outputs[o].txPin, cfg.outputs[o].rxPin, cfg.outputs[o].rtsPin };
+            for (int k = 0; k < 3; k++)
+                if (dmx[k] >= 0 && dmx[k] == p.pin) {
+                    Serial.printf("[PIX] port %d disabled: pin %d belongs to DMX output %c\n",
+                                  i + 1, p.pin, (char)('A' + o));
+                    p.enabled = false; break;
+                }
+        }
+    }
 }
 
 // Config load/save are now driven by the schema engine (src/config/). The engine
@@ -752,6 +951,12 @@ static Adafruit_GFX* gfx        = nullptr;   // draw target (canvas for colour, 
 static Adafruit_GFX* dispDev    = nullptr;   // physical panel
 static GFXcanvas16*  dispCanvas = nullptr;   // off-screen buffer for the colour panel
 static bool          dispReady  = false;
+// Result of the I2C probe, so a dead panel is a fact instead of a guess. 0 = nothing
+// answered on either address. Reported in /info.json: a display that is configured but
+// not detected is otherwise indistinguishable from a wrong driver or a broken panel,
+// and the console line saying so goes to a UART nobody has a cable on.
+static uint8_t       dispI2cAddr = 0;
+static uint32_t      dispI2cHz   = 0;   // bus clock the panel actually accepted (0 = none)
 
 // Foreground "on" colour. Mono drivers want the 1-bit WHITE constant (==1);
 // the colour panel wants RGB565 white. Passing 0xFFFF to a mono driver draws
@@ -808,12 +1013,27 @@ static void initDisplay() {
         // Mono OLED over I2C — probe 0x3C then 0x3D; bail if no panel answers.
         if (cfg.dispSda >= 0 && cfg.dispScl >= 0) Wire.begin(cfg.dispSda, cfg.dispScl);
         else                                      Wire.begin();
-        Wire.setClock(400000);
+        // Probe at 100 kHz, not at the 400 kHz the driver would like. Whether a bus manages
+        // 400 kHz depends on its pull-ups and its capacitance, and a module on a header with a
+        // bit of cable often does not: the panel then fails to ACK and the probe concludes
+        // there is no display at all. That is not a hypothetical, it is what the LuxDMX carrier
+        // does with a 0.96" module on the display header -- /i2cscan (100 kHz) found 0x3C while
+        // this probe (400 kHz) found nothing. Ask slowly first, then find out if it can go fast.
+        Wire.setClock(100000);
+        delay(50);              // a freshly powered SSD1306 needs a moment before it answers
         uint8_t addr = 0;
         Wire.beginTransmission(0x3C);
         if (Wire.endTransmission() == 0) addr = 0x3C;
         else { Wire.beginTransmission(0x3D); if (Wire.endTransmission() == 0) addr = 0x3D; }
+        dispI2cAddr = addr;
         if (!addr) { Serial.println("[DISP] no I2C OLED found (0x3C/0x3D)"); return; }
+        // Try to move up: a fast bus keeps the redraw off the DMX task's back. Verify with one
+        // transaction and fall back rather than assume, so a marginal bus degrades to a slower
+        // screen instead of a blank one.
+        Wire.setClock(400000);
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() != 0) { Wire.setClock(100000); dispI2cHz = 100000; }
+        else                             { dispI2cHz = 400000; }
         if (cfg.dispType == 3) {
             Adafruit_SH1106G* d = new Adafruit_SH1106G(128, 64, &Wire, -1);
             if (!d->begin(addr, true)) { delete d; Serial.println("[DISP] SH1106 init failed"); return; }
@@ -1288,8 +1508,21 @@ static bool rdmAllocTables() {
     // firmware got big enough and silently fell back to the 16-device cap (found 16 instead
     // of 64 fixtures). The chip model is footprint-independent: classic ESP32 (~300 KB, tight
     // once WiFi+web+DMX are up) keeps the small table; every S3-class part gets the full cap.
+    // Kann diese Kiste ueberhaupt RDM? RDM braucht einen Transceiver mit Richtungs-Pin; ein
+    // Ausgang ohne rts kann nur senden, und ohne aktivierten Ausgang gibt es gar keinen Bus.
+    // Ein reiner Pixel-Node hat also niemals RDM -- und hat trotzdem bis hierher die volle
+    // Tabelle alloziert: 45 KB internes RAM fuer eine Funktion, die nicht existiert.
+    bool rdmPossible = false;
+    for (int i = 0; i < MAX_OUTPUTS; i++)
+        if (cfg.outputs[i].enabled && cfg.outputs[i].rtsPin >= 0) { rdmPossible = true; break; }
+
     int cap; const char* how;
-    if      (cfg.rdmMaxDev > 0)         { cap = cfg.rdmMaxDev; how = "manual"; }
+    // Bewusst cap=1 statt "gar nicht allozieren": die Tabellen werden an vielen Stellen ohne
+    // Null-Pruefung indiziert (die Zugriffe haengen an rdmCount/rdmAvailable, nicht am Zeiger).
+    // Eine Minimaltabelle haelt jeden Zeiger gueltig und kostet ~700 B statt 45 KB -- derselbe
+    // Gewinn, ohne eine neue Klasse von Null-Deref-Fehlern aufzumachen.
+    if      (!rdmPossible)              { cap = 1;             how = "kein RDM-faehiger Ausgang"; }
+    else if (cfg.rdmMaxDev > 0)         { cap = cfg.rdmMaxDev; how = "manual"; }
     else if (psram)                    { cap = RDM_HW_MAX;    how = "auto/psram"; }
     else if (chip.model != CHIP_ESP32) { cap = RDM_HW_MAX;    how = "auto/s3"; }    // S3 & other large-SRAM parts
     else                               { cap = 16;            how = "auto/esp32"; } // classic ESP32 (~300 KB)
@@ -1433,16 +1666,11 @@ static uint8_t activeSenderCount() {
     return n;
 }
 
-// Count live sources (seen within windowMs) currently feeding `universe`.
+// Count live sources (seen within windowMs) currently feeding `universe`. Reads the source
+// index, not the frame cache, so it is equally right for a pixel universe (which is written
+// straight through and never cached).
 static int sourcesOnUniverse(int universe, uint32_t windowMs) {
-    uint32_t now = millis();
-    int n = 0;
-    for (int i = 0; i < MAX_SENDERS; i++) {
-        const Sender& s = senders[i];
-        if (s.ip == 0 || s.universe != universe) continue;
-        if (now - s.lastMs < windowMs) n++;
-    }
-    return n;
+    return seenOnUniverse(universe, windowMs);
 }
 
 // A real conflict = 2+ live sources on an enabled output's universe while that
@@ -1841,10 +2069,31 @@ static void mergeOutput(int outIdx) {
 static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
                        uint32_t senderIp, uint8_t proto, uint8_t priority) {
     uint32_t now = millis();
-    // Cache this source's frame first so the merge engine sees current data.
-    updateSender(senderIp, proto, (int16_t)artUniverse, priority, data, length);
+    // Always record WHO sent WHAT: cheap, and it is what conflict detection, the sender
+    // list and the "seen on the wire" panel read. The 512-byte payload cache below is a
+    // separate, much more expensive thing and only DMX universes need it.
+    srcSeenUpdate(senderIp, proto, (int16_t)artUniverse, priority, length);
+
+    // Fan out to every sink on this universe. A DMX output takes the whole frame through
+    // the merge engine; a pixel port takes its slice straight into its framebuffer.
+    const int nsink = g_sinkN;
+    bool feedsDmx = false;
+    for (int s = 0; s < nsink; s++)
+        if (g_sinks[s].kind == SINK_DMX && g_sinks[s].universe == artUniverse) { feedsDmx = true; break; }
+
+    // Only cache the payload when a DMX output actually needs it for merging. This is the
+    // whole reason a 30-universe pixel rig costs nothing here: pixel data is copied once,
+    // into the framebuffer, and never held.
+    if (feedsDmx) updateSender(senderIp, proto, (int16_t)artUniverse, priority, data, length);
 
     bool matched = false;
+    for (int s = 0; s < nsink; s++) {
+        const UniSink& sk = g_sinks[s];
+        if (sk.universe != artUniverse || sk.kind != SINK_PIX) continue;
+        pixelWriteSlice(sk.idx, sk.uniSlot, data, sk.srcOff, sk.dstOff, sk.len, length);
+        matched = true;   // a pixel-only node still wants the fps / WS stats below
+    }
+
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         if (!cfg.outputs[i].enabled || cfg.outputs[i].universe != artUniverse) continue;
         mergeOutput(i);
@@ -1909,71 +2158,114 @@ static constexpr int SACN_UNIVERSE_OFF  = 113;
 static constexpr int SACN_STARTCODE_OFF = 125;
 static constexpr int SACN_DATA_OFF      = 126;
 static constexpr int SACN_MIN_LEN       = 638;
+// How many multicast groups we will join. lwIP holds one membership record per group
+// per netif, so this is a memory choice rather than a hard limit; 48 covers five pixel
+// ports of ~1000 pixels plus the DMX outputs. Beyond it, unicast sACN still works and
+// startSacn() logs exactly how many were left out.
+static constexpr int SACN_MAX_JOINS     = 48;
 
 static const uint8_t ACN_PACKET_ID[12] = {
     0x41, 0x53, 0x43, 0x2d, 0x45, 0x31, 0x2e, 0x31,
     0x37, 0x00, 0x00, 0x00
 };
 
+// ONE raw lwIP socket on 5568, joined to the multicast group of every universe anything
+// consumes. It used to be one WiFiUDP per DMX output with one group each, which was fine for
+// two universes and does not survive pixels: a five-port strip can span thirty of them and
+// there is no such thing as thirty sockets here.
+//
+// The same shape the Art-Net path already uses (artnet_rdm.h), and it fixes a second thing
+// for free: with several sockets sharing 5568 via SO_REUSEADDR, lwIP hands a UNICAST sACN
+// packet to exactly one of them, often not the one whose group matches. Routing by the
+// packet's own universe through the sink table makes that irrelevant.
+static int      g_sacnSock = -1;
+static uint16_t g_sacnJoined[SACN_MAX_JOINS];
+static int      g_sacnJoinN = 0;
+
+static void sacnLeaveAll() {
+    if (g_sacnSock < 0) return;
+    for (int i = 0; i < g_sacnJoinN; i++) {
+        struct ip_mreq mr = {};
+        mr.imr_multiaddr.s_addr = htonl(0xEFFF0000UL | g_sacnJoined[i]);   // 239.255.x.y
+        mr.imr_interface.s_addr = htonl(INADDR_ANY);
+        lwip_setsockopt(g_sacnSock, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mr, sizeof(mr));
+    }
+    g_sacnJoinN = 0;
+}
+
 static void startSacn() {
-    // One multicast socket per enabled output, each joined to its universe's
-    // group (sACN universe = Art-Net universe + 1). Sockets share port 5568
-    // (WiFiUDP sets SO_REUSEADDR); lwip delivers each group to its joiner.
-    for (int i = 0; i < MAX_OUTPUTS; i++) {
-        sacnUdp[i].stop();
-        if (!cfg.outputs[i].enabled) continue;
-        uint16_t sacnUniverse = (uint16_t)(cfg.outputs[i].universe + 1);
-        uint8_t  univHigh     = (uint8_t)((sacnUniverse >> 8) & 0xFF);
-        uint8_t  univLow      = (uint8_t)(sacnUniverse & 0xFF);
-        IPAddress mcast(239, 255, univHigh, univLow);
-        sacnUdp[i].beginMulticast(mcast, 5568);
-        Serial.printf("[sACN] out%d universe %u  multicast 239.255.%u.%u:5568\n",
-                      i, sacnUniverse, univHigh, univLow);
+    if (g_sacnSock < 0) {
+        g_sacnSock = lwip_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (g_sacnSock < 0) { Serial.println("[sACN] socket() failed"); return; }
+        int one = 1;
+        lwip_setsockopt(g_sacnSock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+        struct sockaddr_in a = {};
+        a.sin_family = AF_INET; a.sin_port = htons(5568); a.sin_addr.s_addr = htonl(INADDR_ANY);
+        if (lwip_bind(g_sacnSock, (struct sockaddr*)&a, sizeof(a)) < 0) {
+            Serial.println("[sACN] bind(5568) failed");
+            lwip_close(g_sacnSock); g_sacnSock = -1; return;
+        }
+        int fl = lwip_fcntl(g_sacnSock, F_GETFL, 0);
+        lwip_fcntl(g_sacnSock, F_SETFL, fl | O_NONBLOCK);
     }
+    sacnLeaveAll();
+
+    // Join the group of every universe the sink table consumes, de-duplicated. sACN universe
+    // = our universe + 1 (E1.31 numbers from 1, Art-Net from 0).
+    const int n = g_sinkN;
+    int truncated = 0;
+    for (int s = 0; s < n; s++) {
+        const uint16_t su = (uint16_t)(g_sinks[s].universe + 1);
+        bool dup = false;
+        for (int j = 0; j < g_sacnJoinN; j++) if (g_sacnJoined[j] == su) { dup = true; break; }
+        if (dup) continue;
+        if (g_sacnJoinN >= SACN_MAX_JOINS) { truncated++; continue; }
+        struct ip_mreq mr = {};
+        mr.imr_multiaddr.s_addr = htonl(0xEFFF0000UL | su);
+        mr.imr_interface.s_addr = htonl(INADDR_ANY);
+        if (lwip_setsockopt(g_sacnSock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mr, sizeof(mr)) == 0)
+            g_sacnJoined[g_sacnJoinN++] = su;
+    }
+    Serial.printf("[sACN] one socket on :5568, %d multicast group(s) joined\n", g_sacnJoinN);
+    // Never truncate silently: a universe we did not join simply never arrives over
+    // multicast, which looks exactly like a cabling fault from the outside.
+    if (truncated)
+        Serial.printf("[sACN] WARNING: %d universe(s) beyond the %d-group cap were NOT joined "
+                      "-- use unicast sACN for those\n", truncated, SACN_MAX_JOINS);
 }
 
-// Validate + dispatch one sACN socket's pending packets to its output.
-static void readSacnSocket(int outIdx) {
-    WiFiUDP& udp = sacnUdp[outIdx];
-    // Drain all packets buffered since the last call (catches up after any gap)
-    for (int guard = 0; guard < 16; guard++) {
-        int pktLen = udp.parsePacket();
-        if (pktLen <= 0) return;                          // nothing pending
-        // A runt packet (stray multicast, IGMP artefact, port scan) must still be CONSUMED, else it
-        // lingers in the socket and every subsequent parsePacket() re-logs a NetworkUdp error -> flood.
-        if (pktLen < SACN_MIN_LEN) { udp.read(sacnBuf, sizeof(sacnBuf)); continue; }
-        uint32_t senderIp = (uint32_t)udp.remoteIP();
-        int n = udp.read(sacnBuf, sizeof(sacnBuf));
-        if (n < SACN_MIN_LEN) continue;
-        if (memcmp(sacnBuf + SACN_ACN_ID_OFF, ACN_PACKET_ID, 12) != 0) continue;
-        uint32_t rootVec = ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF    ] << 24)
-                         | ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 1] << 16)
-                         | ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 2] <<  8)
-                         |  (uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 3];
-        if (rootVec != 0x00000004u) continue;
-        uint32_t frameVec = ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF    ] << 24)
-                          | ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 1] << 16)
-                          | ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 2] <<  8)
-                          |  (uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 3];
-        if (frameVec != 0x00000002u) continue;
-        uint16_t universe = ((uint16_t)sacnBuf[SACN_UNIVERSE_OFF] << 8)
-                           | sacnBuf[SACN_UNIVERSE_OFF + 1];
-        // Do NOT reject by this socket's output universe. All the per-output sACN sockets share
-        // port 5568 (SO_REUSEADDR), and lwIP hands a UNICAST sACN packet to just one of them --
-        // often not the socket whose multicast group matches. Rejecting here dropped unicast sACN
-        // whenever >1 output was enabled (uni-1 landing on the uni-2 socket, etc.). Route by the
-        // packet's own universe instead: routeFrame() maps universe -> the matching output(s), and
-        // ignores a universe no output listens to. Multicast still works (each group -> its joiner).
-        if (sacnBuf[SACN_STARTCODE_OFF] != 0x00) continue;
-        uint8_t priority = sacnBuf[SACN_PRIORITY_OFF];
-        routeFrame((int)universe - 1, sacnBuf + SACN_DATA_OFF, 512, senderIp, 1, priority);
-    }
-}
-
+// Drain the shared sACN socket. Every packet is routed by ITS OWN universe through the sink
+// table, so multicast and unicast behave identically and a universe reaching several
+// consumers (three pixel ports sharing one universe at different start channels) just works.
 static void readSacn() {
-    for (int i = 0; i < MAX_OUTPUTS; i++)
-        if (cfg.outputs[i].enabled) readSacnSocket(i);
+    if (g_sacnSock < 0) return;
+    for (int guard = 0; guard < 32; guard++) {
+        struct sockaddr_in src; socklen_t sl = sizeof(src);
+        int n = lwip_recvfrom(g_sacnSock, sacnBuf, sizeof(sacnBuf), 0, (struct sockaddr*)&src, &sl);
+        if (n <= 0) return;
+        if (n < SACN_MIN_LEN) continue;                       // runt: consumed, ignored
+        if (memcmp(sacnBuf + SACN_ACN_ID_OFF, ACN_PACKET_ID, 12) != 0) continue;
+        const uint32_t rootVec = ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF    ] << 24)
+                               | ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 1] << 16)
+                               | ((uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 2] <<  8)
+                               |  (uint32_t)sacnBuf[SACN_ROOT_VEC_OFF + 3];
+        // E1.31 universe SYNCHRONIZATION packet: the sACN equivalent of ArtSync. Same job,
+        // same handling -- latch every pixel port at once instead of waiting out the timeout.
+        if (rootVec == 0x00000008u) { g_pixSyncSeq++; continue; }
+        if (rootVec != 0x00000004u) continue;
+        const uint32_t frameVec = ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF    ] << 24)
+                                | ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 1] << 16)
+                                | ((uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 2] <<  8)
+                                |  (uint32_t)sacnBuf[SACN_FRAME_VEC_OFF + 3];
+        if (frameVec != 0x00000002u) continue;
+        if (sacnBuf[SACN_STARTCODE_OFF] != 0x00) continue;
+        const uint16_t universe = ((uint16_t)sacnBuf[SACN_UNIVERSE_OFF] << 8)
+                                 | sacnBuf[SACN_UNIVERSE_OFF + 1];
+        routeFrame((int)universe - 1, sacnBuf + SACN_DATA_OFF, 512,
+                   (uint32_t)src.sin_addr.s_addr, 1, sacnBuf[SACN_PRIORITY_OFF]);
+    }
 }
+
 
 // ---------------------------------------------------------------------------
 // HTTP handlers
@@ -2101,6 +2393,89 @@ static String logJson() {
     return j;
 }
 
+// Pixel state. Config plus what the engine is actually doing: the universe range each port
+// consumes, the power estimate against its cap and the board rail, and -- the part that makes
+// the mapping testable over the network at all -- a readback of the framebuffer. Without that
+// readback, proving "universe 4 channel 151 lands on port 2 pixel 1" needs a logic analyzer.
+static String pixelsJson() {
+    String j = "{\"railMa\":"; j += cfg.railMa;
+    j += ",\"backend\":\""; j += pixOutBackendName(); j += "\"";
+    uint32_t totalMa = 0, totalWorst = 0;
+    for (int p = 0; p < MAX_PIXEL_PORTS; p++) if (g_pix[p].fb) { totalMa += g_pix[p].estMa; totalWorst += g_pix[p].worstMa; }
+    j += ",\"ma\":"; j += totalMa;
+    j += ",\"worstMa\":"; j += totalWorst;
+    j += ",\"ports\":[";
+    for (int p = 0; p < MAX_PIXEL_PORTS; p++) {
+        const PixelPort& c = cfg.pixels[p];
+        const PixPortRt& rt = g_pix[p];
+        if (p) j += ",";
+        char buf[560];
+        snprintf(buf, sizeof(buf),
+            "{\"idx\":%d,\"en\":%s,\"pin\":%d,\"count\":%d,\"chip\":%d,\"order\":%d,\"uni\":%d,\"start\":%d,"
+            "\"uniMode\":%d,\"latch\":%d,\"fpsCap\":%d,\"bright\":%d,\"gamma\":%d,\"maxMa\":%d,"
+            "\"spans\":%d,\"inFps\":%.1f,\"outFps\":%.1f,\"latches\":%lu,\"partials\":%lu,"
+            "\"ma\":%lu,\"worstMa\":%lu,\"scale\":%d,\"lost\":%s,\"maxFps\":%d,"
+            "\"viewCols\":%d,\"viewRows\":%d",
+            p, c.enabled ? "true" : "false", c.pin, c.count, c.chip, c.order, c.universe, c.startCh,
+            c.uniMode, c.latch, c.fpsCap, c.bright, c.gamma, c.maxMa,
+            (int)rt.slots, rt.inFps, rt.outFps,
+            (unsigned long)rt.latches, (unsigned long)rt.partials,
+            (unsigned long)rt.estMa, (unsigned long)rt.worstMa, (int)rt.scale,
+            rt.srcLost ? "true" : "false", pixMaxFps(c.chip, c.count),
+            c.viewCols, c.viewRows);
+        j += buf;
+        j += "}";
+    }
+    j += "]}";
+    return j;
+}
+static void handlePixelsJson(AsyncWebServerRequest* req) { sendJsonSafe(req, pixelsJson()); }
+
+// Framebuffer readback for one port, hex, optionally decimated to `cells` entries. The live
+// view asks for exactly the grid it draws (see docs/pixels.md), so the device sends a few
+// hundred bytes whatever the strip length -- 5 ports x 1000 px of raw frame at 25 Hz would
+// be 375 kB/s to a browser, which is absurd on a box also routing 1000 packets a second.
+static void handlePixelFrame(AsyncWebServerRequest* req) {
+    int port = 0, cells = 0;
+    String s;
+    if (argStr(req, "port", s))  port  = s.toInt();
+    if (argStr(req, "cells", s)) cells = s.toInt();
+    // This runs on the AsyncTCP web task and reads the framebuffer directly, so it is a THIRD
+    // reader alongside the push task and the network task -- and the one most likely to be
+    // mid-read when a config is applied, because a client naturally polls the frame right
+    // after changing something. Join the same handshake or a config apply frees the buffer
+    // under it.
+    // Immer dieselbe Form zurueckgeben, auch im Fehlerfall: ein leeres Array, wo sonst ein
+    // Hex-String steht, ist fuer jeden Aufrufer ein Typwechsel mitten im Betrieb.
+    static const char* EMPTY = "{\"bpp\":0,\"count\":0,\"cells\":0,\"px\":\"\"}";
+    if (port < 0 || port >= MAX_PIXEL_PORTS || !pixReadEnter()) { sendJsonSafe(req, EMPTY); return; }
+    if (!g_pix[port].fb) { pixReadExit(); sendJsonSafe(req, EMPTY); return; }
+    const PixPortRt& rt = g_pix[port];
+    const int bpp = pixBpp(port);
+    const int n   = cfg.pixels[port].count;
+    if (cells <= 0 || cells > n) cells = n;
+    String j = "{\"bpp\":"; j += bpp; j += ",\"count\":"; j += n; j += ",\"cells\":"; j += cells;
+    j += ",\"px\":\"";
+    // Per-channel MAX over the pixels a cell covers, not an average: max keeps a single lit
+    // pixel in a long strip visible, average washes it out and a running chase disappears.
+    for (int c = 0; c < cells; c++) {
+        const int lo = (int)((int64_t)c * n / cells);
+        int hi = (int)((int64_t)(c + 1) * n / cells);
+        if (hi <= lo) hi = lo + 1;
+        for (int ch = 0; ch < bpp; ch++) {
+            uint8_t m = 0;
+            for (int i = lo; i < hi && i < n; i++) {
+                const size_t idx = (size_t)i * bpp + ch;
+                if (idx < rt.fbLen && rt.fb[idx] > m) m = rt.fb[idx];
+            }
+            char hx[3]; snprintf(hx, sizeof(hx), "%02x", m); j += hx;
+        }
+    }
+    j += "\"}";
+    pixReadExit();
+    sendJsonSafe(req, j);
+}
+
 static void handleSendersJson(AsyncWebServerRequest* req) { sendJsonSafe(req, sendersJson()); }
 static void handleLogJson(AsyncWebServerRequest* req)     { sendJsonSafe(req, logJson()); }
 
@@ -2172,6 +2547,60 @@ static const char MCU_ID[] = "esp32s3";
 static const char MCU_ID[] = "esp32";
 #endif
 
+// Scan the display header's I2C bus and say what is on it.
+//
+// initDisplay() only ever asks 0x3C and 0x3D, so "no OLED found" cannot tell a dead bus from a
+// panel sitting at an unexpected address, and a black screen leaves the user with nothing to go
+// on. This walks the whole 7-bit range at 100 kHz (gentler than the 400 kHz the driver runs at,
+// so a bus with weak pull-ups still answers) and reports every address that ACKs, along with
+// the pins it used. An empty list means the wiring or the panel's supply, not the driver.
+//
+// It also reports `pullup`, which is the more useful of the two answers. Every I2C module
+// carries pull-up resistors (a few kilohm) and they only work when the module has power, so:
+// engage the pin's INTERNAL pull-DOWN (~45 k) and read. An external pull-up wins that divider
+// and the line still reads high; with nothing alive on the bus the line follows the pulldown
+// and reads low. Without this you cannot tell a dead bus from a live one, because a floating
+// bus does not scan as "empty" -- it picks up noise and ACKs a random 40-odd addresses, which
+// looks like a bus full of devices.
+static void handleI2cScan(AsyncWebServerRequest* req) {
+    String j = "{\"sda\":";  j += cfg.dispSda;
+    j += ",\"scl\":";        j += cfg.dispScl;
+    bool puSda = false, puScl = false, flSda = false, flScl = false;
+    if (cfg.dispSda >= 0 && cfg.dispScl >= 0) {
+        // Hand the pins back from the I2C peripheral first. After initDisplay() they are
+        // attached to it through the GPIO matrix and driven open-drain, and reading them in
+        // that state measures the peripheral rather than the bus.
+        Wire.end();
+        delay(2);
+        pinMode(cfg.dispSda, INPUT);          // no internal pull: who holds the line?
+        pinMode(cfg.dispScl, INPUT);
+        delay(2);
+        flSda = digitalRead(cfg.dispSda);
+        flScl = digitalRead(cfg.dispScl);
+        pinMode(cfg.dispSda, INPUT_PULLDOWN); // ~45 k down; an external pull-up wins this
+        pinMode(cfg.dispScl, INPUT_PULLDOWN);
+        delay(2);
+        puSda = digitalRead(cfg.dispSda);
+        puScl = digitalRead(cfg.dispScl);
+    }
+    j += ",\"idle\":{\"sda\":";   j += flSda ? "true" : "false";
+    j += ",\"scl\":";             j += flScl ? "true" : "false"; j += "}";
+    j += ",\"pullup\":{\"sda\":"; j += puSda ? "true" : "false";
+    j += ",\"scl\":";             j += puScl ? "true" : "false"; j += "}";
+    j += ",\"found\":[";
+    if (cfg.dispSda >= 0 && cfg.dispScl >= 0) Wire.begin(cfg.dispSda, cfg.dispScl);
+    else                                      Wire.begin();
+    Wire.setClock(100000);
+    int n = 0;
+    for (uint8_t a = 0x08; a <= 0x77; a++) {
+        Wire.beginTransmission(a);
+        if (Wire.endTransmission() == 0) { if (n++) j += ','; j += a; }
+    }
+    Wire.setClock(400000);          // leave the bus as the display driver expects it
+    j += "],\"count\":"; j += n; j += "}";
+    sendJsonSafe(req, j);
+}
+
 static void handleInfoJson(AsyncWebServerRequest* req) {
     String j = "{";
     j += "\"ssid\":\"";     j += netSSID();              j += "\",";
@@ -2219,6 +2648,9 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispSda\":";    j += cfg.dispSda;            j += ",";
     j += "\"dispScl\":";    j += cfg.dispScl;            j += ",";
     j += "\"dispRot\":";    j += cfg.dispRot;            j += ",";
+    j += "\"dispAddr\":";   j += dispI2cAddr;            j += ",";   // 0 = kein Panel gefunden
+    j += "\"dispReady\":";  j += dispReady ? "true" : "false"; j += ",";
+    j += "\"dispHz\":";    j += dispI2cHz;              j += ",";
     j += "\"dispCs\":";     j += cfg.dispCs;             j += ",";
     j += "\"dispDc\":";     j += cfg.dispDc;             j += ",";
     j += "\"dispRst\":";    j += cfg.dispRst;            j += ",";
@@ -2327,6 +2759,14 @@ static void handleDmxJson(AsyncWebServerRequest* req) {
     s->head += "],\"rssi\":";  s->head += netRSSI();
     s->head += ",\"up\":\"";   s->head += uptimeStr();
     s->head += "\",\"heap\":"; s->head += ESP.getFreeHeap();
+    // Speicher-Diagnose. Ohne die sieht man von aussen nur "heap" und weiss nicht, ob das
+    // knapp ist, ob PSRAM ueberhaupt laeuft und wie tief es unter Last schon war. Genau diese
+    // drei Zahlen braucht man, wenn eine Kiste unter Last aufhoert zu antworten.
+    s->head += ",\"heapMin\":";   s->head += (uint32_t)ESP.getMinFreeHeap();
+    s->head += ",\"heapBlock\":"; s->head += (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    s->head += ",\"psram\":";     s->head += (uint32_t)heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+    s->head += ",\"psramFree\":"; s->head += (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    s->head += ",\"rdmCap\":";    s->head += g_rdmMaxDev;
     s->head += ",\"manual\":"; s->head += manualMode ? "true" : "false";
     // Frames we refused to transmit because no torn-free snapshot was available. Must stay 0.
     s->head += ",\"tornSkips\":"; s->head += dmxTornSkips;
@@ -2618,30 +3058,69 @@ static void applyLiveConfig(bool universeOrProtocolChanged) {
     // the input/menu code all read cfg on every use, so the new value is already in effect. Only
     // the sACN sockets hold state derived from config -- they are bound per universe (multicast
     // group 239.255.x.y) and only opened at all for the sACN protocols.
-    if (universeOrProtocolChanged) startSacn();
+    (void)universeOrProtocolChanged;
+    // The pixel side genuinely does hold derived state: the routing table (which universe
+    // reaches which port at which offset) and the framebuffers. Both are rebuilt here, which
+    // is what lets every pixel field be CFG_LIVE right down to the data pin -- pixelApply()
+    // builds the new buffers before freeing the old, so a config too big to allocate is
+    // refused and the running strip keeps going.
+    // Deferred to the loop task rather than done here. applyLiveConfig() runs on the
+    // AsyncTCP web task with an HTTP response still pending, and rebuilding pixel buffers +
+    // re-initialising the RMT driver there is enough work to stall it -- which shows up at
+    // the client as an ECONNRESET on an otherwise successful POST. The sACN re-join already
+    // used this pattern (g_sacnRejoin) for the same reason.
+    g_pixApply = true;
 }
 
 // Snapshot every schema field's current value, so a save can tell what actually CHANGED rather than
 // assuming the worst and rebooting unconditionally. Keys are the canonical schema keys, so this
 // covers per-output fields too.
+// Snapshot fuer "was hat sich beim Speichern wirklich geaendert?".
+//
+// Frueher lagen hier ZWEI Arrays aus String-Objekten (Key und Wert). Mit dem Pixel-Array ist
+// die Schema-Groesse ueber 200 Schluessel gewachsen, also ~500 String-Objekte -- jedes mit
+// eigener Heap-Allokation, angelegt beim ersten /config-POST und danach dauerhaft belegt. Auf
+// einer Kiste, die unter Last ohnehin knapp ist, ist das eine sinnlose Dauerlast.
+//
+// Gebraucht wird aber nur die Antwort "gleich oder nicht". Dafuer genuegen zwei 32-Bit-Hashes
+// pro Feld: 8 Byte statt eines String-Paars, kein Heap, keine Fragmentierung. Eine Kollision
+// haette als einzige Folge, dass ein Reboot-Hinweis faelschlich unterbleibt oder erscheint --
+// bei ~250 Schluesseln und 32 Bit ist das vernachlaessigbar, aber es sei gesagt.
+static constexpr int CFG_SNAP_MAX = 80 + MAX_OUTPUTS * 16 + MAX_PIXEL_PORTS * 24;
+static inline uint32_t cfgHash(const char* p) {          // FNV-1a
+    uint32_t h = 2166136261u;
+    while (*p) { h ^= (uint8_t)*p++; h *= 16777619u; }
+    return h;
+}
 struct CfgSnapshot {
-    String keys[96];
-    String vals[96];
-    int    n = 0;
+    uint32_t keys[CFG_SNAP_MAX];
+    uint32_t vals[CFG_SNAP_MAX];
+    int      n = 0;
+    void add(const char* key) {
+        if (n >= CFG_SNAP_MAX) return;
+        String v;
+        if (!cfgcore::getValue(key, v)) return;
+        keys[n] = cfgHash(key); vals[n] = cfgHash(v.c_str()); n++;
+    }
     void take() {
         n = 0;
-        for (size_t k = 0; k < CONFIG_FIELD_COUNT && n < 96; k++) {
-            String v;
-            if (cfgcore::getValue(CONFIG_FIELDS[k].key, v)) { keys[n] = CONFIG_FIELDS[k].key; vals[n++] = v; }
+        for (size_t k = 0; k < CONFIG_FIELD_COUNT; k++) add(CONFIG_FIELDS[k].key);
+        // Jedes Array der Schema-Registry, damit outputs[] und pixels[] beide abgedeckt sind
+        // und ein kuenftiges Array hier keine Aenderung braucht.
+        for (size_t ai = 0; ai < CONFIG_ARRAY_COUNT; ai++) {
+            const CfgArray& A = CONFIG_ARRAYS[ai];
+            for (int i = 0; i < (int)A.count; i++)
+                for (size_t k = 0; k < A.fieldCount; k++) {
+                    char kb[32];
+                    snprintf(kb, sizeof(kb), "%c%d_%s", A.prefix, i, A.fields[k].suffix);
+                    add(kb);
+                }
         }
-        for (int i = 0; i < MAX_OUTPUTS; i++)
-            for (size_t k = 0; k < OUTPUT_FIELD_COUNT && n < 96; k++) {
-                String key = okey(i, OUTPUT_FIELDS[k].suffix), v;
-                if (cfgcore::getValue(key, v)) { keys[n] = key; vals[n++] = v; }
-            }
     }
-    bool changed(const String& key, String& oldVal) const {
-        for (int i = 0; i < n; i++) if (keys[i] == key) { oldVal = vals[i]; return true; }
+    // true, wenn der Schluessel bekannt war UND sich sein Wert geaendert hat.
+    bool changedFrom(const char* key, const String& now) const {
+        const uint32_t kh = cfgHash(key), vh = cfgHash(now.c_str());
+        for (int i = 0; i < n; i++) if (keys[i] == kh) return vals[i] != vh;
         return false;
     }
 };
@@ -2685,8 +3164,21 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
         // forever. Only on a real change: re-saving an unrelated setting must not steal the label.
         if (cfg.outputs[i].txStyle != styleWas) cfg.outputs[i].txStyleSrc = TXSRC_LOCAL;
     }
+    // Pixel ports, same checkbox semantics as the outputs above.
+    for (int i = 0; i < MAX_PIXEL_PORTS; i++)
+        for (size_t k = 0; k < PIXEL_FIELD_COUNT; k++) {
+            const CfgArrayField& f = PIXEL_FIELDS[k];
+            if (f.flags & CFG_NOWEB) continue;
+            char kb[32]; snprintf(kb, sizeof(kb), "p%d_%s", i, f.suffix);
+            String key(kb);
+            if (f.kind == CfgKind::Bool)
+                cfgcore::setValue(key, formChecked(req, key) ? "1" : "0", e);
+            else if (argStr(req, key.c_str(), s))
+                cfgcore::setValue(key, s, e);
+        }
     cfg.apFallback = (cfg.linkLossMode == WIRED_FB_AP);   // keep the legacy mirror in sync
     sanitizeOutputs();   // never persist an enabled output with no TX pin
+    sanitizePixels();    // and never an enabled pixel port with no data pin
 
     // Which REBOOT-flagged fields actually changed? Only those force a restart. Collect their
     // human labels so the UI can tell the user *why* instead of just rebooting on them.
@@ -2695,9 +3187,9 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     bool   netTouched = false;
     for (size_t k = 0; k < CONFIG_FIELD_COUNT; k++) {
         const CfgField& f = CONFIG_FIELDS[k];
-        String now, was;
+        String now;
         if (!cfgcore::getValue(f.key, now)) continue;
-        if (!before.changed(f.key, was) || was == now) continue;
+        if (!before.changedFrom(f.key, now)) continue;
         if (!strcmp(f.key, "protocol")) netTouched = true;
         if (f.flags & CFG_REBOOT) {
             if (nReboot++ < 8) { if (needReboot.length()) needReboot += ", "; needReboot += f.label; }
@@ -2706,9 +3198,9 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     for (int i = 0; i < MAX_OUTPUTS; i++)
         for (size_t k = 0; k < OUTPUT_FIELD_COUNT; k++) {
             const CfgOutputField& f = OUTPUT_FIELDS[k];
-            String key = okey(i, f.suffix), now, was;
+            String key = okey(i, f.suffix), now;
             if (!cfgcore::getValue(key, now)) continue;
-            if (!before.changed(key, was) || was == now) continue;
+            if (!before.changedFrom(key.c_str(), now)) continue;
             if (!strcmp(f.suffix, "uni")) netTouched = true;
             if (f.flags & CFG_REBOOT) {
                 if (nReboot++ < 8) {
@@ -3364,12 +3856,17 @@ static void initDmx() {
             continue;
         }
 
-        // Two outputs cannot share a UART port; skip the colliding one.
+        // Two outputs cannot share a TX GPIO: each one binds its own RMT channel to that pin
+        // and the second bind would fight the first. This used to guard cfg.outputs[].port
+        // instead, which is a leftover from the esp_dmx era and no longer selects anything --
+        // TX runs on RMT and RDM's RX UART is assigned by line (rdm_rmt.h), not by that field.
+        // Guarding it would have silently skipped a correctly-wired third output whose port
+        // number happened to match another's.
         bool dup = false;
         for (int j = 0; j < i; j++)
-            if (outReady[j] && cfg.outputs[j].port == cfg.outputs[i].port) dup = true;
+            if (outReady[j] && cfg.outputs[j].txPin == cfg.outputs[i].txPin) dup = true;
         if (dup) {
-            Serial.printf("[DMX] out%d skipped: port %d already in use\n", i, cfg.outputs[i].port);
+            Serial.printf("[DMX] out%d skipped: TX pin %d already in use\n", i, cfg.outputs[i].txPin);
             continue;
         }
 
@@ -3426,6 +3923,34 @@ static void dmxInitGuardBegin() {
 static void dmxInitGuardEnd() {
     prefs.begin(PREF_NS, false);
     prefs.putInt("dmxcrash", 0);             // init survived — clear the counter
+    prefs.end();
+}
+
+// ---------------------------------------------------------------------------
+// The same safe-boot guard around pixel init
+// ---------------------------------------------------------------------------
+// Pixel init allocates buffers and binds a peripheral from persisted numbers, which is
+// exactly the class of thing that can panic inside a driver on a bad config -- and a panic
+// in setup() is an uncatchable boot loop. The DMX side has had this guard since a bad pin
+// could brick a box; the pixel side needs it just as much, and MORE on a board with no
+// serial header, where a boot loop otherwise means a physical BOOT-button factory reset.
+//
+// The counter is committed BEFORE the hardware is touched and cleared only once init has
+// returned, so it survives the reboot it exists to detect.
+static void pixInitGuardBegin() {
+    prefs.begin(PREF_NS, false);
+    int crashes = prefs.getInt("pixcrash", 0);
+    prefs.putInt("pixcrash", crashes + 1);
+    prefs.end();
+    if (crashes >= 2) {
+        for (int i = 0; i < MAX_PIXEL_PORTS; i++) cfg.pixels[i].enabled = false;
+        Serial.printf("[SAFE] %d pixel-init crashes - all pixel ports disabled\n", crashes);
+        saveConfig();
+    }
+}
+static void pixInitGuardEnd() {
+    prefs.begin(PREF_NS, false);
+    prefs.putInt("pixcrash", 0);
     prefs.end();
 }
 
@@ -3556,6 +4081,7 @@ enum { CTL_ID_UNI_A = 1, CTL_ID_UNI_B = 2, CTL_ID_PROTO = 3, CTL_ID_EXIT = 9 };
 static bool        ctlEnabled = false;   // any control wired -> input task runs
 static bool        ctlUseMenu = false;   // an ENTER-capable input exists -> full menu (else direct nudge)
 static InputMapper ctlMapper;
+
 static Menu        ctlMenu;
 
 // Direct fallback (no ENTER-capable input, or no display): rotation just nudges
@@ -4455,6 +4981,11 @@ void setup() {
     Serial.println("\n[BOOT] LuxDMX — Art-Net / sACN DMX Gateway");
 
     loadConfig();   // also allocates the RDM tables (rdmAllocTables) before rdmLoadPoll uses them
+    // Auch OHNE PSRAM ausgeben: dass die Zeile fehlt, war bisher die einzige Anzeige dafuer,
+    // dass ein R8-Modul ohne PSRAM laeuft -- und eine fehlende Zeile uebersieht man.
+    if (!heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
+        Serial.printf("[MEM] KEIN PSRAM aktiv; internes Heap %u KB frei\n",
+            (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
     if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
         Serial.printf("[MEM] PSRAM %u KB total / %u KB free; internal heap %u KB free\n",
             (unsigned)(heap_caps_get_total_size(MALLOC_CAP_SPIRAM) / 1024),
@@ -4519,7 +5050,6 @@ void setup() {
     // The Art-Net RDM bridge owns the 6454 socket (Art-Net DMX + ArtPoll/ArtTod*/ArtRdm)
     // and does incremental, bus-friendly RDM discovery. Replaces artnet.begin() here.
     artRdmInit();
-    if (cfg.protocol != 0) startSacn();
 
     http.on("/logo.webp",         HTTP_GET,  handleLogo);
     http.on("/favicon.png",       HTTP_GET,  handleFavicon);
@@ -4528,6 +5058,8 @@ void setup() {
     http.on("/",                  HTTP_GET,  handleRoot);
     http.on("/dmx.json",          HTTP_GET,  handleDmxJson);
     http.on("/senders.json",      HTTP_GET,  handleSendersJson);
+    http.on("/pixels.json",       HTTP_GET,  handlePixelsJson);
+    http.on("/pixels/frame",      HTTP_GET,  handlePixelFrame);
     http.on("/log.json",          HTTP_GET,  handleLogJson);
     http.on("/config",            HTTP_GET,  handleConfigGet);
     http.on("/config",            HTTP_POST, handleConfigPost);
@@ -4558,6 +5090,7 @@ void setup() {
     http.on("/rdm",               HTTP_GET,  handleRdmPage);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
+    http.on("/i2cscan",           HTTP_GET,  handleI2cScan);
     http.on("/autoupdate",        HTTP_POST, handleAutoUpdatePost);
     http.onNotFound([](AsyncWebServerRequest* req) {
         // While the setup portal is up, send every unknown URL (incl. the OS captive-portal
@@ -4590,6 +5123,22 @@ void setup() {
     //   nothing on core 1 can disturb the DMX task's frame pacing -> rock-solid frames.
     xTaskCreatePinnedToCore(dmxTxTask, "dmxtx", 4096, nullptr, 19, &g_dmxTask, 1);
     xTaskCreatePinnedToCore(netRxTask, "netrx", 8192, nullptr, 5,  nullptr,   0);
+
+    // Routing table + pixel framebuffers. Must come after the config is loaded and after the
+    // DMX outputs have claimed their RMT channels, because the pixel backend picks itself
+    // from what is left: on a 3-output S3 that is nothing, on a DMX-less classic ESP32 it is
+    // all eight channels. pixelApply() starts its own push task only if a port is enabled.
+    pixInitGuardBegin();   // recover automatically if a bad pixel config panics init
+    rebuildSinks();
+    {
+        String perr;
+        if (!pixelApply(perr)) Serial.printf("[PIX] not started: %s\n", perr.c_str());
+    }
+    pixInitGuardEnd();
+    // Multicast joins come from the sink table, so this has to follow rebuildSinks(). It used
+    // to run earlier in setup(), which was harmless while a join was derived from
+    // cfg.outputs[] directly and is not any more.
+    if (cfg.protocol != 0) startSacn();
 
     // Survive a network flood without resetting. Under heavy inbound traffic (e.g. an Art-Net
     // storm on the wired link) the lwIP task pegs core 0, so core 0's idle task can't feed the
@@ -4631,6 +5180,15 @@ static void netRxTask(void*) {
         // groups here, where this task owns the sockets (issue #24). Art-Net needs
         // nothing: routeFrame() already dispatches by each packet's own universe.
         if (g_sacnRejoin) { g_sacnRejoin = false; if (cfg.protocol != 0) startSacn(); }
+        // Routing table + pixel buffers + multicast joins, off the web task. Order matters:
+        // the groups we join are derived from the sink table, so that has to be rebuilt first.
+        if (g_pixApply) {
+            g_pixApply = false;
+            rebuildSinks();
+            String perr;
+            if (!pixelApply(perr)) Serial.printf("[PIX] config not applied: %s\n", perr.c_str());
+            if (cfg.protocol != 0) startSacn();
+        }
         if (netConnected()) {
             // Art-Net on our own 6454 socket: ArtDmx -> routeFrame, and the RDM opcodes
             // (ArtPoll/ArtTodRequest/ArtTodControl/ArtRdm) queued to the DMX task. Then flush

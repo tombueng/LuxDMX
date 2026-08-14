@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "LuxDMXCarrier")(type "KiCad")(uri "${KIPRJMOD}/footprints/LuxDMXCarrier.pretty")(options "")(descr "Carrier modules, generated from modules.json"))
+  (lib (name "LuxDMXCarrierCustom")(type "KiCad")(uri "${KIPRJMOD}/footprints/LuxDMXCarrierCustom.pretty")(options "")(descr "Hand-picked lands: polyfuse, universal chip and TVS, terminals, EC11 encoder, 6 mm tact switch"))
+)

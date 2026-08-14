@@ -7,7 +7,7 @@ fetches it from `https://luxdmx.org/web/boards/`.
 
 ## How it is used
 
-The five **core boards** (`luxdmx_v6`, `esp32s3-devkitc-1`, `esp32-devkitc`,
+The six **core boards** (`luxdmx_v6`, `luxdmx_carrier`, `esp32s3-devkitc-1`, `esp32-devkitc`,
 `esp32-devkit-v1`, `xiao-esp32s3`) are also baked into the firmware
 (`src/pages/config.html`) so the picker works fully offline on an isolated stage LAN.
 This catalog:
@@ -43,6 +43,9 @@ reached, the page degrades silently to the built-in boards plus manual GPIO entr
     "dispType": 1, "dispsda": 8, "dispscl": 9,
     "outputs": [ { "en": true, "uni": 0, "port": 1, "tx": 17, "rx": 18, "rts": -1 } ]
   },
+  "pixels": {                       // OPTIONAL, see below
+    "ports": 5, "pins": [38, 39, 40, 47, 48], "buffered": true
+  },
   "phys": {                         // OPTIONAL curated physical header (issue #17)
     "usb": "bottom",                // which edge the USB connector is on: top|bottom|left|right
     "pins": [                       // EVERY physical pin in its real row, both sides
@@ -54,6 +57,26 @@ reached, the page degrades silently to the built-in boards plus manual GPIO entr
   }
 }
 ```
+
+### Pixel hardware (`pixels`) — optional
+
+Says whether the board wires WS281x pixel outputs, and on which pins.
+
+| field | meaning |
+|---|---|
+| `ports` | how many pixel outputs the board provides. `0` = this board has none |
+| `pins[]` | the data GPIO per port, in port order (omit when `ports` is 0) |
+| `buffered` | `true` if a level shifter drives the data lines to 5 V |
+| `note` / `why` | free text the UI shows: a caveat when `ports > 0`, the reason when it is `0` |
+
+Three states, deliberately distinct:
+
+- **block present, `ports > 0`** — the board has pixel hardware, the UI offers that many ports
+  and locks their pins.
+- **block present, `ports: 0`** — the board is known *not* to have any. The UI greys the
+  section out and shows `why`, rather than silently hiding it.
+- **block absent** — unknown board (a bare DevKit, a home-made wiring). The UI allows manual
+  pixel config, so nobody is locked out by a descriptor that simply predates the feature.
 
 ### Physical header (`phys`) — optional
 

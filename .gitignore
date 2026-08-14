@@ -1,6 +1,9 @@
 .pio/
 src/generated/
 docs/node_modules/
+# ...and as a plain entry too: in a git worktree the practical way to get the test deps
+# is a symlink to the main checkout's, and a trailing-slash pattern does not match one.
+docs/node_modules
 docs/video-raw/
 docs/demo.mp4
 docs/test-results/

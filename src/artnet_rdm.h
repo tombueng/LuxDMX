@@ -36,6 +36,7 @@ static constexpr uint16_t ARTNET_OP_TODREQUEST = 0x8000;
 static constexpr uint16_t ARTNET_OP_TODDATA    = 0x8100;
 static constexpr uint16_t ARTNET_OP_TODCONTROL = 0x8200;
 static constexpr uint16_t ARTNET_OP_RDM        = 0x8300;
+static constexpr uint16_t ARTNET_OP_SYNC       = 0x5200;   // latch every pixel port at once
 static constexpr uint16_t ARTNET_OP_ADDRESS    = 0x6000;
 static constexpr uint16_t ARTNET_OP_IPPROG     = 0xf800;   // remote IP programming (issue #110)
 static constexpr uint16_t ARTNET_OP_IPPROGREPLY= 0xf900;
@@ -116,6 +117,7 @@ static void artAddSub(uint32_t ip) {
 
 // ---- stats (for /rdm.json + web UI) ---------------------------------------
 static volatile uint32_t g_artTodReqs = 0, g_artRdmReqs = 0, g_artFlushes = 0, g_artPolls = 0;
+static volatile uint32_t g_artSyncs = 0;   // ArtSync packets honoured (pixel latch trigger)
 static volatile bool     g_artDiscovering = false;
 // Live discovery progress for the RDM tab's "scanning" display. Written by the core-1
 // discovery step, read by /rdm.json on core 0. stage: 0=idle 1=search 2=enrich 3=publish;
@@ -496,7 +498,17 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
         artEnqueueReq(r);
         return;
     }
-    default: return;   // ArtSync, ArtTodData, ArtRdmSub etc. -> not our concern as a node
+    case ARTNET_OP_SYNC: {
+        // A controller sends this after the last universe of a frame. It is the difference
+        // between a clean multi-universe strip and a torn one: without it a port spanning six
+        // universes has no way to know the frame is finished except by waiting, and waiting
+        // costs latency on every frame. Cheap to honour -- bump a counter, the pixel task
+        // latches on the next tick. Costs nothing on a DMX-only node.
+        g_artSyncs++;
+        g_pixSyncSeq++;
+        return;
+    }
+    default: return;   // ArtTodData, ArtRdmSub etc. -> not our concern as a node
     }
 }
 

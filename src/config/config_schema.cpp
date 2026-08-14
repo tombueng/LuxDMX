@@ -154,6 +154,11 @@ const CfgField CONFIG_FIELDS[] = {
     BFIELD_L("artrdm", "artnetRdm", artnetRdm, "RDM over Art-Net", "RDM", CFG_NONE),
     IFIELD("rdmmaxdev", "rdmMaxDev", rdmMaxDev, 0, 64, "RDM device limit (0 = auto)", "RDM"),
 
+    // --- Pixels -------------------------------------------------------------
+    // What the board's power pour can carry, so the pixel budget has a ceiling to show
+    // against. Informational only: the firmware limits per port (p<i>_maxma), never on this.
+    IFIELD_L("railma", "railMa", railMa, 0, 60000, "Pixel rail rating (mA)", "Pixels"),
+
     // --- Updates (own route, not the /config form) -------------------------
     BFIELD("autoupd", "autoUpdate", autoUpdate, "Auto-update firmware", "Updates", CFG_NOWEB),
 };
@@ -183,7 +188,11 @@ const size_t CONFIG_FIELD_COUNT = ARRSZ(CONFIG_FIELDS);
 const CfgOutputField OUTPUT_FIELDS[] = {
     OBOOL("en",    "en",    enabled,   nullptr,             "Enabled"),
     OINT_L("uni",   "uni",   universe,  "universe", 0, 32767, "Universe"),
-    OINT ("port",  "port",  port,      "dmxport",  1,  2,   "UART port"),
+    // Legacy from the esp_dmx era: TX now runs on RMT and RDM's RX UART is assigned per line
+    // (rdm_rmt.h), so nothing reads this to pick a peripheral any more. Kept because it is part
+    // of the persisted config and the /info.json shape; the range follows MAX_OUTPUTS so a
+    // third output can hold a distinct value.
+    OINT ("port",  "port",  port,      "dmxport",  1,  MAX_OUTPUTS, "UART port (legacy)"),
     OINT ("tx",    "tx",    txPin,     "dmxtx",   -1, 48,   "TX pin"),
     OINT ("rx",    "rx",    rxPin,     "dmxrx",   -1, 48,   "RX pin"),
     OINT ("rts",   "rts",   rtsPin,    "dmxrts",  -1, 48,   "RTS / DE-RE pin"),
@@ -194,3 +203,63 @@ const CfgOutputField OUTPUT_FIELDS[] = {
     OENUM_RO("stylesrc", "styleSrc", txStyleSrc, "Transmit style set by", ENUM_TXSRC),
 };
 const size_t OUTPUT_FIELD_COUNT = ARRSZ(OUTPUT_FIELDS);
+
+// ---- pixel ports -----------------------------------------------------------
+// Same row builders, a different struct. Everything here is CFG_LIVE: applying a
+// pixel config rebuilds buffers and re-inits the driver in place (build-then-swap,
+// see pixel.h), so nothing about a strip needs a reboot -- not even the data pin.
+#define POINT(key, json, member, mn, mx, label) \
+    { key, json, CfgKind::Int,  offsetof(PixelPort, member), nullptr, mn, mx, label, CFG_LIVE, nullptr, 0 }
+#define PBOOL(key, json, member, label) \
+    { key, json, CfgKind::Bool, offsetof(PixelPort, member), nullptr, 0, 1, label, CFG_LIVE, nullptr, 0 }
+#define PENUM(key, json, member, label, labels) \
+    { key, json, CfgKind::Enum, offsetof(PixelPort, member), nullptr, 0, (int32_t)ARRSZ(labels) - 1, \
+      label, CFG_LIVE, labels, (uint8_t)ARRSZ(labels) }
+
+static const char* const ENUM_PIXCHIP[]  = {"WS2812 / WS2815 (800 kHz, RGB)",
+                                            "WS2811 (400 kHz, RGB)",
+                                            "SK6812 / WS2814 (800 kHz, RGBW)"};
+static const char* const ENUM_PIXORDER[] = {"GRB", "RGB", "BRG", "RBG", "GBR", "BGR",
+                                            "GRBW", "RGBW"};
+static const char* const ENUM_PIXLATCH[] = {"On complete (follow the source)",
+                                            "On sync (ArtSync / E1.31)",
+                                            "Free-run at a fixed rate"};
+static const char* const ENUM_PIXUNI[]   = {"Whole pixels per universe",
+                                            "Packed across universes (512)"};
+
+const CfgArrayField PIXEL_FIELDS[] = {
+    PBOOL ("en",     "en",     enabled,             "Enabled"),
+    POINT ("pin",    "pin",    pin,      -1, 48,    "Data pin"),
+    // The ceiling is the wire, not us: 2040 px is 61 ms a frame = 16 fps. The UI shows the
+    // resulting rate live so the number means something while you type it.
+    POINT ("count",  "count",  count,     0, 4096,  "Pixels"),
+    PENUM ("chip",   "chip",   chip,                "LED chip",      ENUM_PIXCHIP),
+    PENUM ("order",  "order",  order,               "Colour order",  ENUM_PIXORDER),
+    POINT ("uni",    "uni",    universe,  0, 32767, "First universe"),
+    POINT ("start",  "start",  startCh,   1, 512,   "Start channel"),
+    PENUM ("unimode","uniMode",uniMode,             "Universe packing", ENUM_PIXUNI),
+    PENUM ("latch",  "latch",  latch,               "Latch policy",  ENUM_PIXLATCH),
+    POINT ("fpscap", "fpsCap", fpsCap,    0, 200,   "Max output rate"),
+    POINT ("bright", "bright", bright,    0, 255,   "Brightness"),
+    POINT ("gamma",  "gamma",  gamma,     0, 400,   "Gamma x100 (0 = off)"),
+    POINT ("maxma",  "maxMa",  maxMa,     0, 60000, "Power cap (mA, 0 = off)"),
+    POINT ("machan", "mAPerCh",mAPerCh,   0, 10000, "mA per channel at 255, x100"),
+    POINT ("quiesma","quiesMa",quiesMa,   0, 10000, "Idle mA per pixel, x100"),
+    POINT ("loss",   "loss",   lossMode,  LOSS_HOLD, LOSS_ZERO, "Signal-loss policy"),
+    PBOOL ("statid", "statusIdle", statusIdle,      "Show status colour when idle"),
+    POINT ("vcols",  "viewCols", viewCols, 0, 512,  "Live view columns"),
+    POINT ("vrows",  "viewRows", viewRows, 0, 512,  "Live view rows"),
+    PBOOL ("vserp",  "viewSerp", viewSerp,          "Live view serpentine"),
+};
+const size_t PIXEL_FIELD_COUNT = ARRSZ(PIXEL_FIELDS);
+
+// ---- the array registry ----------------------------------------------------
+// Adding an array to Config is one row here; the engine (config_core.cpp) walks this
+// for neutral / template / NVS load / save / dump / key resolution.
+const CfgArray CONFIG_ARRAYS[] = {
+    { 'o', (uint8_t)MAX_OUTPUTS,     (uint16_t)offsetof(Config, outputs), (uint16_t)sizeof(DmxOutput),
+      OUTPUT_FIELDS, ARRSZ(OUTPUT_FIELDS), "output" },
+    { 'p', (uint8_t)MAX_PIXEL_PORTS, (uint16_t)offsetof(Config, pixels),  (uint16_t)sizeof(PixelPort),
+      PIXEL_FIELDS,  ARRSZ(PIXEL_FIELDS),  "pixel port" },
+};
+const size_t CONFIG_ARRAY_COUNT = ARRSZ(CONFIG_ARRAYS);
