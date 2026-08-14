@@ -60,6 +60,12 @@ struct EncDetent {
     int16_t accum     = 0;
     uint8_t perDetent = 4;      // quadrature edges per emitted step (1/2/4)
     bool    reverse   = false;
+    // Diagnostics, so "one click gives two steps" is measurable instead of a guess. `edges`
+    // counts valid quadrature transitions, `steps` counts the detents emitted from them. Turn
+    // the knob a known number of clicks and edges/clicks IS the encoder's edges-per-detent,
+    // which is exactly what perDetent has to be set to. Free to keep: two counters.
+    uint32_t edges    = 0;
+    uint32_t steps    = 0;
 
     EncDetent() {}
     EncDetent(uint8_t transitionsPerDetent, bool rev = false)
@@ -71,12 +77,13 @@ struct EncDetent {
         if (prevAB == 0xFF) { prevAB = cur; return 0; }   // seed only
         if (cur == prevAB) return 0;                       // no edge
         int8_t s = encStep(prevAB, cur);
+        if (s) edges++;                                    // a real transition, not bounce
         if (reverse) s = (int8_t)-s;
         accum  += s;
         prevAB  = cur;
         int16_t step = (int16_t)perDetent;
-        if (accum >= step)  { accum -= step; return +1; }
-        if (accum <= -step) { accum += step; return -1; }
+        if (accum >= step)  { accum -= step; steps++; return +1; }
+        if (accum <= -step) { accum += step; steps++; return -1; }
         return 0;
     }
 };
