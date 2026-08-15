@@ -193,6 +193,12 @@ static bool pixelApply(String& err) {
         rt.wantMask = rt.slots >= 64 ? ~0ULL : ((1ULL << rt.slots) - 1ULL);
         pixBuildGamma(rt.gtab, c.gamma, c.bright);
         rt.worstMa = pixWorstCaseMa(c.count, pixBytesPerPixel(c.chip), c.mAPerCh, c.quiesMa);
+        // Re-render what the port is already holding. Brightness, gamma, colour order and the
+        // power cap all change how the SAME framebuffer looks, and a WS281x strip keeps showing
+        // its last frame until it is given a new one -- so without this, moving the brightness
+        // slider changes nothing on a strip whose source has gone quiet, and the setting looks
+        // broken. Costs one frame.
+        rt.dirty = true;
         g_pixAnyEnabled = true;
         ports[n].pin = c.pin; ports[n].count = c.count;
         ports[n].chip = c.chip; ports[n].order = c.order;
@@ -200,10 +206,14 @@ static bool pixelApply(String& err) {
     }
 
     pixOutEnd();
-    const bool backendOk = (n == 0) || (pixOutBegin(ports, n) != PIXBK_NONE);
+    const PixBackend want = (cfg.pixBackend == 1) ? PIXBK_RMT
+                          : (cfg.pixBackend == 2) ? PIXBK_LCD : PIXBK_NONE;
+    const bool backendOk = (n == 0) || (pixOutBegin(ports, n, want) != PIXBK_NONE);
     pixelPauseEnd();
     if (!backendOk) {
-        err = "no pixel backend available: out of RMT channels for this many ports";
+        err = (cfg.pixBackend == 0)
+            ? "no pixel backend available: out of RMT channels for this many ports"
+            : "the pixel driver you forced cannot serve this many ports on this chip";
         return false;      // buffers stay, the driver simply is not running
     }
     if (n > 0) Serial.printf("[PIX] %d port(s) on the %s backend\n", n, pixOutBackendName());

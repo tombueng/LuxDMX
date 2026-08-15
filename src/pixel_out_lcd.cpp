@@ -16,13 +16,17 @@
 // one byte per slot drives every port at once, 24 bits x 3 slots = 72 bytes per pixel TOTAL,
 // however many ports there are. A sixth or seventh port is free in both time and memory.
 //
-// Why this exists at all: RMT has only 4 TX channels on an S3 and one lane takes two of them
-// (the DMA channel borrows its neighbour's memory block), so from the 4th pixel port on RMT
-// cannot serve the board however the rest of it is configured. DMX does not
-// compete for them -- it is a UART peripheral, and 3 DMX outputs plus one pixel port still
-// selects RMT on the bench. This backend uses no RMT channel and ~0 CPU for the transmission,
-// and since every port rides the same expanded frame it is also the cheaper option in RAM
-// once there are several of them.
+// Why this exists at all: an S3 has 4 RMT TX channels and they are shared with DMX TX and the
+// status LED, so a board with three DMX outputs has one left for pixels and a board with five
+// pixel ports has run out whatever else it does. This backend uses no RMT channel and ~0 CPU
+// for the transmission, and since every port rides the same expanded frame it gets cheaper in
+// RAM the more ports there are.
+//
+// It is also the fix for a problem RMT has and this one cannot: an RMT lane without a DMA
+// channel is refilled from an ISR, and a late refill under load stretches the bit being clocked
+// at fixed offsets in the stream, so the same few LEDs flicker every frame. There is no refill
+// here. That is why forcing this backend (cfg.pixBackend) is worth having on a board with the
+// PSRAM to pay for it, even when RMT would technically fit.
 //
 // STATUS: the data path is proven on the carrier -- 5 ports at 30 px, Art-Net on 5 universes,
 // 39.6 fps in and ~39 fps out per port, 318 latches, 0 partials, DMX output 1 unaffected.

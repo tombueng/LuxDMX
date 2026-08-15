@@ -6,11 +6,14 @@
 // CPU cost is the colour-order permutation into a small staging buffer, and the RAM cost is
 // roughly three bytes a pixel plus a few hundred bytes of channel state.
 //
-// That frugality is the point: this is the backend for the boards that cannot spare
-// anything. A WROOM-32 has all 8 RMT TX channels and can drive 8 strips of several hundred
-// pixels inside a few KB of heap. DMX does not compete for them -- it is a UART peripheral --
-// so what decides RMT-vs-LCD is simply how many pixel ports are asked for. Measured on an S3
-// that is THREE (see the block-borrowing note below); the carrier's 4th port tips it over.
+// That frugality is the point: this is the backend for the boards that cannot spare anything.
+// A WROOM-32 has 8 RMT TX channels and can drive several strips of hundreds of pixels inside a
+// few KB of heap.
+//
+// The channels are shared, though. DMX TX runs on RMT as well (dmx_rmt.h) and so does a WS2812
+// status LED, so the budget is `DMX outputs + pixel ports + status LED <= TX channels`: 4 on an
+// S3, 8 on a classic ESP32. Measured on the carrier: 1 DMX + 3 ports fits, 1 DMX + 4 does not,
+// 3 DMX + 1 fits, 3 DMX + 2 does not.
 #include "pixel_out.h"
 #include "config_enums.h"
 #include "pixel_map.h"
@@ -29,6 +32,7 @@ namespace {
 
 struct Lane {
     volatile bool        sending = false;   // set on transmit, cleared by the done callback
+    bool                 dma     = false;   // got a DMA channel, or fell back to one memory block
     rmt_channel_handle_t chan = nullptr;
     rmt_encoder_handle_t enc  = nullptr;
     uint8_t*             stage = nullptr;   // colour-ordered copy handed to the encoder
@@ -100,9 +104,16 @@ bool laneUp(Lane& L, const PixOutPort& p) {
 #if SOC_RMT_SUPPORT_DMA
     cc.flags.with_dma    = true;
     cc.mem_block_symbols = 1024;
+    L.dma = true;
     if (rmt_new_tx_channel(&cc, &L.chan) != ESP_OK) {
+        // No DMA channel to be had. The fallback works, but it refills the channel's 64-symbol
+        // memory from an ISR, and a late refill stretches whichever bit was being clocked at
+        // that moment. Because the refill boundaries sit at fixed offsets in the stream, the
+        // SAME pixels glitch every time -- which is what a user sees as "these three LEDs keep
+        // blinking". Worth reporting, hence Lane::dma.
         cc.flags.with_dma    = false;
         cc.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
+        L.dma = false;
         if (rmt_new_tx_channel(&cc, &L.chan) != ESP_OK) { laneDown(L); return false; }
     }
 #else
@@ -126,14 +137,20 @@ bool laneUp(Lane& L, const PixOutPort& p) {
 
 
 // Try RMT first: it is the cheaper backend and the only one a classic ESP32 has. If it cannot
-// serve every requested port -- on an S3 that means from the 4th on, one fewer again with a
-// WS2812 status LED -- fall back to LCD_CAM, which uses no RMT channel at all and clocks every
+// serve every requested port -- because DMX outputs, other ports and the status LED have taken
+// the channels -- fall back to LCD_CAM, which uses no RMT channel at all and clocks every
 // lane together. Partial success is deliberately not an option: running 2 of 5 ports would look
 // like a wiring fault rather than a configuration limit.
-PixBackend pixOutBegin(const PixOutPort* ports, int n) {
+PixBackend pixOutBegin(const PixOutPort* ports, int n, PixBackend want) {
     pixOutEnd();
     if (n <= 0) return PIXBK_NONE;
     if (n > (int)(sizeof(g_lane) / sizeof(g_lane[0]))) n = sizeof(g_lane) / sizeof(g_lane[0]);
+
+    if (want == PIXBK_LCD) {          // forced: do not quietly fall back to RMT
+        if (pixLcdBegin(ports, n) == PIXBK_LCD) { g_backend = PIXBK_LCD; return g_backend; }
+        Serial.println("[PIX] LCD_CAM forced but unavailable on this chip");
+        return PIXBK_NONE;
+    }
 
     bool rmtOk = true;
     for (int i = 0; i < n && rmtOk; i++)
@@ -147,6 +164,10 @@ PixBackend pixOutBegin(const PixOutPort* ports, int n) {
     }
     for (int j = 0; j < n; j++) laneDown(g_lane[j]);
     g_laneN = 0;
+    if (want == PIXBK_RMT) {          // forced: say so instead of switching behind the user's back
+        Serial.printf("[PIX] RMT forced but cannot serve %d port(s)\n", n);
+        return PIXBK_NONE;
+    }
 
     Serial.printf("[PIX] RMT cannot serve %d port(s) (only %d TX channels on this chip, minus "
                   "a WS2812 status LED) - trying LCD_CAM\n", n, SOC_RMT_TX_CANDIDATES_PER_GROUP);
@@ -162,6 +183,14 @@ void pixOutEnd() {
 }
 
 PixBackend pixOutBackend()     { return g_backend; }
+
+// True only if EVERY active RMT lane got a DMA channel. False means at least one lane is
+// refilled from an ISR and can glitch at fixed positions under load.
+bool pixOutRmtDma() {
+    if (g_backend != PIXBK_RMT) return false;
+    for (int i = 0; i < g_laneN; i++) if (g_lane[i].up && !g_lane[i].dma) return false;
+    return g_laneN > 0;
+}
 const char* pixOutBackendName(){
     return g_backend == PIXBK_RMT ? "rmt" : g_backend == PIXBK_LCD ? "lcd" : "none";
 }
