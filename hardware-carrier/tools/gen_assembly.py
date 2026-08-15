@@ -99,6 +99,17 @@ RULES = {
     "EXP 3V3/GND/47/48/43/44": ("Other", "optional",
                                 "Brings out 3V3, GND, the two UART-bridge pins and the "
                                 "**unbuffered** pixel signals 4 and 5."),
+    "330R pixel": ("Pixels", "you use that pixel port",
+                   "Series damping at the buffer output, one per port. Fit it before you "
+                   "blame the strip: without it the 3-5 ns edge rings on a metre of wire. "
+                   "220R to 470R all work, the board says 330R."),
+    "1uF": ("Network", "W5500 fitted",
+            "Middle of the three. 100nF / 1uF / 22uF in ascending order away from the pin, "
+            "because the rail had a factor of 220 between its only two values."),
+    "22uF W5500": ("Network", "W5500 fitted",
+                   "Local bulk under the module, 2.5 mm from its 3V3 pin. The regulator is "
+                   "62 mm and 62 nH away on the dev board, so this is what holds the rail up "
+                   "when the PHY steps its load; the other bulk is too far off to help."),
     "22uF 3V3 bulk": ("Other", "recommended",
                       "Holds up the 3V3 rail when three transceivers key at once."),
     "100nF": (None, None, None),        # decided by position, see below

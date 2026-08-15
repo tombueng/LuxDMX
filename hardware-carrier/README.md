@@ -119,19 +119,30 @@ is a safety limit, it is a choice.
 | Pixel rail, fuse to the outputs | 7.2 A | **9.8 A** | 170 - 235 W | about 2 A |
 | Pixel rail, input to the fuse | 7.3 A | 9.9 A | | |
 | Every single output, on its own | 7.2 A | 9.8 A | | |
-| GND back from each output | 3.9 A | 5.3 A | | |
-| GND overall | 48.9 A | 66.3 A | | |
+| GND back from each output | 7.4 A | 10.1 A | | |
+| GND overall | 46.3 A | 62.8 A | | |
 
 Two GND figures, because they answer different questions. The overall one is the pour, and
 the same caveat applies to it as to any plane: it is the narrowest cross-section of a lot of
 copper, not a wire of that width.
 
-The per-output one is a real track. Each pixel terminal's GND pad gets a 2.0 mm run of its
-own, laid before the router and going straight up on the front, and that is deliberate. On
-one build the pour left Pixel1's GND on a 17 mm2 island with no way off it on either layer -
-the return path of an output whose V+ is sized for 10 A, sitting on nothing, and DRC
-mentioning it only as two zones being unconnected. The pour is still there and still carries
-most of it; the 2.0 mm is what is guaranteed.
+The per-output one is a real track. Each pixel terminal's GND pad gets a 4.8 mm run of its
+own, laid before the router and going straight up on the front, so the return of an output
+matches its feed. Both of those numbers were once wrong. The pour was the return path to
+begin with, and on one build it left Pixel1's GND on a 17 mm2 island with no way off it on
+either layer - an output whose V+ is sized for 10 A, with its return sitting on nothing, and
+DRC mentioning it only as two zones being unconnected. The track fixed that but went down at
+2.0 mm, because it had been hung off the same cap as the spurs to the bulk capacitor and the
+buck; 5.3 A against 9.8 on the plus side, and not even a geometric limit - 6.8 mm fits there.
+Thanks to mdethmers on the forum for pushing on exactly this. The pour is still there and
+still carries most of it; the 4.8 mm is what is guaranteed.
+
+What two layers cannot give you is a return that runs directly underneath the feed. The
+supply bus is on the back along the terminal row, and a mirror of it on the front would seal
+the row off on both layers: the five data lines come down from the buffer and have to cross
+that line, and crossing one bus is unavoidable while crossing two costs every one of them a
+pair of vias through a slot in both references. So the loop between out and back is as wide
+as the terminal pitch, 10.2 mm, and that is the price of the second layer not existing.
 
 Two things on that rail are deliberately thin. The bulk capacitor and the buck module hang
 off 2.0 mm spurs, 5.3 A, because one sees ripple and the other draws about an amp; neither is
@@ -146,6 +157,36 @@ draws about 5 A at full white, so plan on two such runs. Beyond that, inject pow
 strip instead of pulling it through the
 carrier.
 
+## Pixel data lines
+
+Each of the five data lines has a 330 R in series at the buffer, and that is not optional
+politeness. The 74AHCT541 switches in 3 to 5 ns into whatever length of unterminated wire you
+screw onto the terminal; that edge rings, overshoots into the first LED's input and radiates
+on the way out. 330 R overdamps it on purpose: a bit is 300 ns at 800 kHz, so a slower edge
+costs nothing, and the same resistor limits the current if a data pin meets 5 V or GND. It is
+the same part as the RS-485 fail-safe bias, so it adds no line to the order. 220 R to 470 R
+all work.
+
+The return path is the part two layers cannot fully solve, and here is what it measures over
+the 341 mm of data line on the board:
+
+| | |
+|---|---:|
+| ground directly opposite, on the other layer | 60 % |
+| none opposite, but ground alongside within 1.5 mm | 31 % |
+| no ground within reach | **9 %** |
+
+The middle case is fine on two layers, the return simply runs beside the track instead of
+under it. The last 9 % is 29 mm spread over five lines, in short pieces where each line
+crosses the supply bus, plus one 8.5 mm stretch on the back under the ESP module where other
+tracks have cut the pour up.
+
+Stitching vias do not fix that: a via ties the two layers together, it does not create copper
+where the pour has been squeezed out. On two layers at this density, 91 % of the run having a
+usable return is what comes out. The remaining 9 % is the honest argument for a fourth layer,
+not for more vias, and for a DIY node with a few metres of strip it does not matter - which is
+also why the series resistors are the measure that actually earns its place here.
+
 ## Before you power it
 
 **One 5 V source at a time.** USB, the 5 V header and the buck share a rail with no ORing
@@ -157,40 +198,31 @@ arbitrary, and 12 V on that rail takes out the ESP32, the W5500 and the display.
 **Fit the 120 R terminator only at the end of a bus.** Check the RS-485 module first, most
 carry 120 R and bias already; a second one puts 60 R on the bus.
 
+**The W5500 has its own decoupling, and it is worth fitting.** Three lands sit under the
+module on the back, 100 nF / 1 uF / 22 uF in ascending order away from its 3V3 pin. The whole
+board runs off the dev module's 800 mA regulator, which is enough on current - 269 mA for a
+fully populated carrier, and the two heavy loads do not coincide, since a board using the
+W5500 has WiFi off - but that rail reaches the module through 62 mm of 0.60 mm track, about
+62 nH. DC is a non-issue at 6.6 mV; a 50 mA step in 10 ns is not, and the far-end bulk is
+54 mm away.
+
 **Check the OLED module's pin order against its own silk.** The 1.3" boards ship with VCC and
 GND in either order.
 
 **Polyfuse or solder bridge, never both.** The bridge is a pad pair on the back inside the
 polyfuse footprint.
 
-## What is in this directory
-
-| | |
-|---|---|
-| `luxdmx-carrier.kicad_pcb` | the board. There is no schematic to go with it: the nets live in the board file, and `modules.json` is the mechanical source of truth |
-| `modules.json` | every module's measured geometry, with a `confidence` field. Footprints are generated from it and `tools/validate_module_footprints.py` refuses anything that is not |
-| `footprints/` | `LuxDMXCarrier.pretty` is generated from `modules.json`; `LuxDMXCarrierCustom.pretty` holds the hand-picked lands (polyfuse, universal chip and TVS, terminals, EC11, tact switch) |
-| `modules/` | one small board per module, used to derive its footprint and to export its 3D model |
-| `tools/` | the pipeline. `produce.sh` runs the whole thing: strip copper, lay the supply tree, autoroute, finish what the router leaves, pour, stitch, DRC |
-| `production/` | what you send to a fab, plus the renders |
-
-To rebuild the copper from the placement: `bash tools/produce.sh 4.8`, then
-`python tools/gen_gerbers.py`, which refuses to write anything if DRC is not clean.
-
 ## Credits
 
-Two 3D models used in the renders are other people's work and are **not** in this repository.
-KiCad will draw the board without them.
+One 3D model in the renders comes from the GrabCAD Community Library, used under GrabCAD's
+non-commercial sharing terms: the ESP32-S3 dev board,
+[YD-ESP32-S3](https://grabcad.com/library/yd-esp32-s3-1). The model file itself is not part
+of this repository. Selling boards built from this design would make that use commercial,
+which needs the original designer's explicit permission.
 
-* `3dmodels/esp32-s3-devkitc1-yd.step`, the ESP32-S3 dev board, from the GrabCAD Community
-  Library under GrabCAD's non-commercial sharing terms:
-  [YD-ESP32-S3](https://grabcad.com/library/yd-esp32-s3-1). Selling boards built from this
-  design would make that use commercial, which needs the original designer's permission.
-* `3dmodels/oled-1v3-128x64.step`, the OLED module, third party, licence never established.
+The OLED module model is a third-party one whose licence has not been established. It is not
+part of this repository either, and it only affects how the renders look, not the board.
 
-The 3D models that are here are ours: the `.wrl` files are written by
-`tools/gen_3d_parts.py`, `gen_3d_models.py` and `gen_oled_screen.py`, and the two remaining
-`.step` files were exported by KiCad from the little boards in `modules/`. Everything else in
-the renders comes from KiCad's own libraries.
+Everything else in the renders is drawn from KiCad's own libraries.
 
 Hobby project, no certification claimed.

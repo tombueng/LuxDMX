@@ -44,9 +44,11 @@ Almost nothing here is mandatory.
 
 | Part | Side | Fit it when | Note |
 |---|---|---|---|
-| `100nF` | back | W5500 fitted | Decoupling right at the module. |
+| `100nF W5500` | back | W5500 fitted | Decoupling right at the module. |
 | `10k ETH_CS pu` | back | W5500 fitted | Holds CS high while the GPIOs are still floating out of reset. |
 | `10k ETH_RST pu` | back | W5500 fitted | Same for RST, otherwise the W5500 resets itself during boot. |
+| `1uF W5500` | back | W5500 fitted | Middle of the three. 100nF / 1uF / 22uF in ascending order away from the pin, because the rail had a factor of 220 between its only two values. |
+| `22uF W5500` | back | W5500 fitted | Local bulk under the module, 2.5 mm from its 3V3 pin. The regulator is 62 mm and 62 nH away on the dev board, so this is what holds the rail up when the PHY steps its load; the other bulk is too far off to help. |
 | `W5500 Ethernet Module` | front | you want wired Ethernet | Leave it out and everything runs over WiFi. |
 
 ## DMX port 1
@@ -105,11 +107,22 @@ Almost nothing here is mandatory.
 | `22uF 3V3 bulk` | back | recommended | Holds up the 3V3 rail when three transceivers key at once. |
 | `EXP 3V3/GND/47/48/43/44` | front | optional | Brings out 3V3, GND, the two UART-bridge pins and the **unbuffered** pixel signals 4 and 5. |
 
+## Pixels
+
+| Part | Side | Fit it when | Note |
+|---|---|---|---|
+| `330R PIX1` | back | you use that pixel port | Series damping at the buffer output, one per port. Fit it before you blame the strip: without it the 3-5 ns edge rings on a metre of wire. 220R to 470R all work, the board says 330R. |
+| `330R PIX2` | back | you use that pixel port | Series damping at the buffer output, one per port. Fit it before you blame the strip: without it the 3-5 ns edge rings on a metre of wire. 220R to 470R all work, the board says 330R. |
+| `330R PIX3` | back | you use that pixel port | Series damping at the buffer output, one per port. Fit it before you blame the strip: without it the 3-5 ns edge rings on a metre of wire. 220R to 470R all work, the board says 330R. |
+| `330R PIX4` | back | you use that pixel port | Series damping at the buffer output, one per port. Fit it before you blame the strip: without it the 3-5 ns edge rings on a metre of wire. 220R to 470R all work, the board says 330R. |
+| `330R PIX5` | back | you use that pixel port | Series damping at the buffer output, one per port. Fit it before you blame the strip: without it the 3-5 ns edge rings on a metre of wire. 220R to 470R all work, the board says 330R. |
+
 ## Shopping list, everything fitted
 
 | Qty | Part | Side | only needed when |
 |---:|---|---|---|
 | 6 | TVS bidir | back | any DMX port leaves the enclosure |
+| 5 | 330R pixel | back | you use that pixel port |
 | 5 | PIXn V+/DATA/GND | front | any pixel port is used |
 | 3 | 10k dir | back | any DMX port is used |
 | 3 | 120R term | back | any DMX port sits at the **end** of the bus |
@@ -124,7 +137,9 @@ Almost nothing here is mandatory.
 | 1 | 10k ETH_RST pu | back | W5500 fitted |
 | 1 | 12-24V -> 5V buck | back | supplied from 12/24 V **and** neither 5V-IN nor USB connected |
 | 1 | 12-24V IN 24A | front | pixel ports are used |
+| 1 | 1uF | back | W5500 fitted |
 | 1 | 22uF 3V3 bulk | back | recommended |
+| 1 | 22uF W5500 | back | W5500 fitted |
 | 1 | 5V in | front | 5 V comes from outside |
 | 1 | 74AHCT541 pixel buffer | back | **at least one** pixel port is used |
 | 1 | Blade fuse holder, alternative to the polyfuse | front | you would rather replace a blown fuse than wait for a polyfuse to cool |
