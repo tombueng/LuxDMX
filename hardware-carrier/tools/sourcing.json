@@ -1,6 +1,6 @@
 {
   "_comment": "Sourcing per part. gen_bom.py marries this with the board. LCSC stock is from the date below and must be re-checked before ordering; marketplace links rot within months, the search terms do not.",
-  "_checked": "2026-08-14",
+  "_checked": "2026-08-16",
   "parts": {
     "120R term": {
       "desc": "Resistor 120R 1206 1%",
@@ -344,6 +344,26 @@
     },
     "330R bias-": {
       "same_as": "330R bias+"
+    },
+    "22uF W5500": {
+      "same_as": "22uF 3V3 bulk",
+      "note": "Local bulk right under the W5500 module, 2.5 mm from its 3V3 pin. The rail reaches that module through 62 mm of 0.60 mm track from the dev board's regulator, which is about 62 nH: a 50 mA step in 10 ns pulls 0.31 V out of the pin, and the 22 uF that was supposed to catch it sits 54 mm away at the other end of the board. DC was never the problem, that path drops 6.6 mV at 132 mA. Optional, like everything else here, but fit it if you use Ethernet."
+    },
+    "1uF": {
+      "desc": "Capacitor 1uF 50V X7R 1206",
+      "source": "LCSC",
+      "mpn": "CL31B105KBHNNNE",
+      "vendor": "Samsung",
+      "lcsc": "C1848",
+      "url": "https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html",
+      "stock": 703670,
+      "price_eur": 0.06,
+      "qty": 1,
+      "note": "The middle rung of the W5500's decoupling. Same Samsung series and package as the 100nF, so one reel family covers both. It closes a factor-220 gap: the rail had 100nF and 22uF and nothing between them."
+    },
+    "330R pixel": {
+      "same_as": "330R bias+",
+      "note": "Series damping in each pixel data line, right at the buffer. The 74AHCT541 switches in 3-5 ns into whatever length of unterminated wire you hang on the terminal, and that edge rings, overshoots into the first LED's input and radiates on the way. 330R overdamps it deliberately: at 800 kHz a bit is 300 ns, so a slower edge costs nothing, and it also limits the current if someone shorts the data pin to 5 V or GND. Same part as the RS-485 fail-safe bias, so no extra line on the order."
     }
   },
   "modules": {

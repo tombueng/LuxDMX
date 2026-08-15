@@ -6,6 +6,8 @@
 
 # per-user KiCad UI state, not design
 *.kicad_prl
+# lock files, present whenever the board is open in KiCad
+~*.lck
 *-backups/
 _autosave-*
 
