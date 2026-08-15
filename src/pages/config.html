@@ -605,6 +605,20 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
         </button>
       </div>
       <div id="pixels-note" class="form-text mb-2"></div>
+      <!-- Which peripheral clocks the ports. "Automatic" is right nearly everywhere; the
+           override earns its keep on a board with PSRAM whose RMT lane did not get a DMA
+           channel, because that lane is refilled from an ISR and flickers under load. -->
+      <div class="row g-2 align-items-center mb-3">
+        <div class="col-auto"><label class="col-form-label" for="pix-bk">Pixel driver</label></div>
+        <div class="col-auto">
+          <select class="form-select" id="pix-bk" name="pixbk" style="max-width:320px">
+            <option value="0">automatic</option>
+            <option value="1">RMT (one channel per port)</option>
+            <option value="2">LCD_CAM (parallel, ESP32-S3 only)</option>
+          </select>
+        </div>
+        <div class="col"><span class="form-text" id="pix-bk-note"></span></div>
+      </div>
       <div id="pixels-container"></div>
       <div id="pix-plan" class="form-text"></div>
     </div>
@@ -1304,6 +1318,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('net-sn').value  = d.subnet || '';
   $('net-dns').value = d.dns || '';
   $('led-type').value = d.ledType;
+  if ($('pix-bk')) $('pix-bk').value = (d.pixBackend != null ? d.pixBackend : 0);
   $('led-pin').value  = d.ledPin;
   $('led-r').value = d.ledR !== undefined ? d.ledR : -1;
   $('led-g').value = d.ledG !== undefined ? d.ledG : -1;

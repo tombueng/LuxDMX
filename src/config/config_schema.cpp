@@ -12,6 +12,8 @@
 #define ARRSZ(a) (sizeof(a) / sizeof((a)[0]))
 
 // ---- enum value labels (for menus + UI hints; order == stored int value) ----
+static const char* const ENUM_PIXBK[]   = {"automatic", "RMT (one channel per port)",
+                                           "LCD_CAM (parallel, DMA only)"};
 static const char* const ENUM_PROTOCOL[] = {"Art-Net", "sACN", "Art-Net + sACN"};
 static const char* const ENUM_LEDTYPE[]  = {"off", "plain GPIO", "WS2812 RGB", "5-LED panel"};
 static const char* const ENUM_DISPTYPE[] = {"off", "SSD1306 128x64", "SSD1306 128x32", "SH1106", "SSD1351 colour"};
@@ -158,6 +160,7 @@ const CfgField CONFIG_FIELDS[] = {
     // What the board's power pour can carry, so the pixel budget has a ceiling to show
     // against. Informational only: the firmware limits per port (p<i>_maxma), never on this.
     IFIELD_L("railma", "railMa", railMa, 0, 60000, "Pixel rail rating (mA)", "Pixels"),
+    EFIELD_L("pixbk",  "pixBackend", pixBackend, "Pixel driver", "Pixels", ENUM_PIXBK),
 
     // --- Updates (own route, not the /config form) -------------------------
     BFIELD("autoupd", "autoUpdate", autoUpdate, "Auto-update firmware", "Updates", CFG_NOWEB),

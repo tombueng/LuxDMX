@@ -2382,6 +2382,12 @@ static String logJson() {
 static String pixelsJson() {
     String j = "{\"railMa\":"; j += cfg.railMa;
     j += ",\"backend\":\""; j += pixOutBackendName(); j += "\"";
+    // Whether the RMT lanes got DMA or the ISR-refilled fallback: the fallback glitches at
+    // fixed positions in the stream under load, which looks like "the same few LEDs keep
+    // blinking" and is otherwise indistinguishable from bad wiring.
+    j += ",\"rmtDma\":"; j += pixOutRmtDma() ? "true" : "false";
+    j += ",\"rmtMax\":";  j += (int)SOC_RMT_TX_CANDIDATES_PER_GROUP;   // shared with DMX TX + status LED
+    j += ",\"pixbk\":";   j += cfg.pixBackend;
     uint32_t totalMa = 0, totalWorst = 0;
     for (int p = 0; p < MAX_PIXEL_PORTS; p++) if (g_pix[p].fb) { totalMa += g_pix[p].estMa; totalWorst += g_pix[p].worstMa; }
     j += ",\"ma\":"; j += totalMa;
@@ -2633,6 +2639,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispAddr\":";   j += dispI2cAddr;            j += ",";   // 0 = kein Panel gefunden
     j += "\"dispReady\":";  j += dispReady ? "true" : "false"; j += ",";
     j += "\"dispHz\":";    j += dispI2cHz;              j += ",";
+    j += "\"pixBackend\":"; j += cfg.pixBackend;         j += ",";   // 0 auto, 1 RMT, 2 LCD_CAM
     j += "\"dispCs\":";     j += cfg.dispCs;             j += ",";
     j += "\"dispDc\":";     j += cfg.dispDc;             j += ",";
     j += "\"dispRst\":";    j += cfg.dispRst;            j += ",";

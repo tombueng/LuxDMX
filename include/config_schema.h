@@ -80,6 +80,11 @@ struct Config {
     // against. Conservative default is the carrier's 2-layer figure; a 4-layer build sets
     // 15400. Purely informational, the firmware never limits on it (that is maxMa per port).
     int       railMa;
+    // Which driver clocks the pixel ports: 0 = pick one, 1 = force RMT, 2 = force LCD_CAM.
+    // Forcing exists because the automatic choice is about how many ports fit, and that is not
+    // the only reason to prefer one: an RMT lane that did not get a DMA channel is refilled
+    // from an ISR and glitches at fixed positions under load, while LCD_CAM is pure GDMA.
+    int       pixBackend;
     int       dispType;
     int       dispSda, dispScl, dispRot, dispCs, dispDc, dispRst, dispSck, dispMosi;
     // On-unit controls (issue #24): optional rotary encoder + up to 4 buttons that
