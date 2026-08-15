@@ -410,7 +410,12 @@ def stage_lay(want, floor):
         for x, y in gp:
             up = ybus - 3.0 if wbus >= floor else top - 6.0
             w = span(here, (min(ex) + 0.5, max(ex) - 0.5), "GND", up, y, x, False)
-            w = math.floor(min(w, SPUR) * 10) / 10
+            # As wide as the feed, not as wide as a spur. These were capped at SPUR, which is
+            # the 2.0 mm the bulk cap and the buck get, and that was thoughtless: the return of
+            # a pixel output carries exactly what its V+ carries. It made the ground the limit
+            # of the whole rail, 5.3 A against 9.8 on the plus side, and it was not even a
+            # geometric limit - measuring here says 6.8 mm fits.
+            w = math.floor(min(w, want) * 10) / 10
             if w >= 0.5:
                 lay("GND", x, y, x, up, w, f"GND-Ausgang x={x:.0f}")
             else:

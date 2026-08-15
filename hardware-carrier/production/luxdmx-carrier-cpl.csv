@@ -1,29 +1,36 @@
 Ref,Val,Package,PosX,PosY,Rot,Side
+"1uF W5500","1uF","chip-universal",100.200000,-68.500000,180.000000,bottom
 "5V Buck Converter","12-24V -> 5V buck","buck-module-universal",169.500000,-100.000000,180.000000,bottom
 "10k ETH_CS pu","10k ETH_CS pu","chip-universal",108.450000,-71.500000,180.000000,bottom
 "10k ETH_RST pu","10k ETH_RST pu","chip-universal",108.450000,-66.000000,180.000000,bottom
+"10k dir","10k dir","chip-universal",128.550000,-65.500000,180.000000,bottom
 "10k dir","10k dir","chip-universal",175.550000,-65.500000,180.000000,bottom
 "10k dir","10k dir","chip-universal",152.050000,-65.500000,180.000000,bottom
-"10k dir","10k dir","chip-universal",128.550000,-65.500000,180.000000,bottom
 "22uF 3V3 bulk","22uF 3V3 bulk","chip-universal",138.242500,-94.900000,180.000000,bottom
-"74AHCT541 pixel buffer","74AHCT541 pixel buffer","SOIC-20W_7.5x12.8mm_P1.27mm",104.285000,-95.150000,90.000000,bottom
-"100nF","100nF","chip-universal",97.937500,-66.000000,180.000000,bottom
+"22uF W5500","22uF W5500","chip-universal",100.200000,-73.500000,180.000000,bottom
+"74AHCT541 pixel buffer","74AHCT541 pixel buffer","SOIC-20W_7.5x12.8mm_P1.27mm",104.285000,-95.150000,0.000000,bottom
 "100nF","100nF","chip-universal",138.242500,-89.400000,180.000000,bottom
-"120R term","120R term","chip-universal",154.500000,-72.500000,-90.000000,bottom
+"100nF W5500","100nF","chip-universal",100.200000,-63.500000,180.000000,bottom
 "120R term","120R term","chip-universal",131.000000,-72.500000,-90.000000,bottom
+"120R term","120R term","chip-universal",154.500000,-72.500000,-90.000000,bottom
 "120R term","120R term","chip-universal",178.000000,-72.500000,-90.000000,bottom
-"330R bias+","330R bias+","chip-universal",173.047500,-70.950000,-90.000000,bottom
+"330R PIX1","330R pixel","chip-universal",116.200000,-102.000000,180.000000,bottom
+"330R PIX2","330R pixel","chip-universal",124.200000,-98.500000,180.000000,bottom
+"330R PIX3","330R pixel","chip-universal",116.200000,-95.000000,180.000000,bottom
+"330R PIX4","330R pixel","chip-universal",124.200000,-91.500000,180.000000,bottom
+"330R PIX5","330R pixel","chip-universal",116.200000,-88.500000,180.000000,bottom
 "330R bias+","330R bias+","chip-universal",149.547500,-70.950000,-90.000000,bottom
+"330R bias+","330R bias+","chip-universal",173.047500,-70.950000,-90.000000,bottom
 "330R bias+","330R bias+","chip-universal",126.047500,-70.950000,-90.000000,bottom
-"330R bias-","330R bias-","chip-universal",173.000000,-78.050000,-90.000000,bottom
-"330R bias-","330R bias-","chip-universal",126.000000,-78.050000,-90.000000,bottom
 "330R bias-","330R bias-","chip-universal",149.500000,-78.050000,-90.000000,bottom
+"330R bias-","330R bias-","chip-universal",126.000000,-78.050000,-90.000000,bottom
+"330R bias-","330R bias-","chip-universal",173.000000,-78.050000,-90.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",120.000000,-60.000000,180.000000,bottom
 "TVS bidir","TVS bidir","chip-universal-tvs",143.500000,-60.000000,180.000000,bottom
 "TVS bidir","TVS bidir","chip-universal-tvs",160.487500,-60.000000,180.000000,bottom
-"TVS bidir","TVS bidir","chip-universal-tvs",136.987500,-60.000000,180.000000,bottom
 "TVS bidir","TVS bidir","chip-universal-tvs",183.987500,-60.000000,180.000000,bottom
+"TVS bidir","TVS bidir","chip-universal-tvs",136.987500,-60.000000,180.000000,bottom
 "TVS bidir","TVS bidir","chip-universal-tvs",167.000000,-60.000000,180.000000,bottom
-"TVS bidir","TVS bidir","chip-universal-tvs",120.000000,-60.000000,180.000000,bottom
 "5V IN","5V in","PinHeader_1x02_P2.54mm_Vertical",189.000000,-60.775000,180.000000,top
 "12-24V IN","12-24V IN 24A","terminal-1x02-P5.08-bigpad",94.240000,-131.050000,0.000000,top
 "1000uF 35V","1000uF 35V","CP_Radial_D13.0mm_P5.00mm",124.000000,-119.000000,90.000000,top
