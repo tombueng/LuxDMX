@@ -135,29 +135,46 @@ cue rather than after.
 
 ## Backends
 
-The driver is picked at runtime from how many ports you ask for and how many RMT TX channels
-the chip has. **DMX does not enter into it**: DMX output is a UART peripheral, so enabling all
-three outputs costs zero RMT channels. What consumes them is one per pixel port, plus one more
-if the status LED is a WS2812.
+The driver is picked at runtime, and the thing that decides it is a shared budget of RMT
+transmit channels. **DMX competes for them**: DMX output is clocked on RMT too (`dmx_rmt.h`, so
+the break comes out of hardware and a late ISR cannot malform it), and a WS2812 status LED takes
+one as well. So:
 
-| board | ports asked for | backend | cost |
-|---|---:|---|---|
-| ESP32-S3 | up to 3 | RMT (4 TX channels) | ~3 B/pixel |
-| ESP32-S3 | 4 or more (the carrier, full) | **LCD_CAM** | 72 B/pixel x2, shared by all ports |
-| classic ESP32 | more, it has 8 TX channels | RMT | ~3 B/pixel |
+> enabled DMX outputs + RMT pixel ports + WS2812 status LED ≤ TX channels
 
-RMT is tried first and LCD_CAM is the fallback, so the choice is automatic and reported in
-`/pixels.json` as `backend`. Measured on the carrier (status LED off, one DMX output running):
-1, 2 and 3 ports give `"backend":"rmt"`; the 4th switches it to `"backend":"lcd"`.
+which is **4 on an ESP32-S3** and **8 on a classic ESP32**. Ask for more pixel ports than the
+budget allows and they all move to LCD_CAM together; partial service is deliberately not an
+option, because two of five ports working looks like a wiring fault rather than a limit.
 
-Three rather than four, because the first lane asks for a DMA channel and its larger symbol
-buffer borrows the neighbouring channel's memory block — so it costs two of the four slots and
-two more lanes fit in the rest. A WS2812 status LED takes another one.
+Measured on the carrier, both sides of the same rule:
 
-Note the inversion: the *low-end* board is the one with RMT channels to spare. A WROOM-32
-makes a genuinely good multi-port pixel node in a few KB of heap, while an S3 runs out of
-channels at the 4th port and needs the parallel path — which is then also the cheaper one,
-since all ports share a single expanded frame.
+| enabled | backend |
+|---|---|
+| 1 DMX + 1, 2 or 3 pixel ports | `rmt` |
+| 1 DMX + 4 pixel ports | `lcd` |
+| 3 DMX + 1 pixel port | `rmt` |
+| 3 DMX + 2 pixel ports | `lcd` |
+
+`/pixels.json` reports `backend`, `rmtMax` (the chip's TX channels) and `rmtDma`.
+
+**`rmtDma` is worth watching.** One channel per chip can be driven by DMA, and DMX takes it
+first. A pixel lane that misses out has its 64-symbol channel memory refilled from an ISR, and
+under load a late refill stretches whichever bit was being clocked. The refill boundaries sit at
+fixed offsets in the stream, so it is always the **same** LEDs that flicker — which reads as a
+wiring or power fault and is neither. If you see `"rmtDma":false` and a strip with a few
+misbehaving pixels, that is the explanation.
+
+### Forcing a driver
+
+`pixbk` (Pixel driver in `/config`) overrides the automatic choice: `0` automatic, `1` RMT,
+`2` LCD_CAM. A forced driver that cannot be provided fails with a message rather than quietly
+using the other one.
+
+Forcing LCD_CAM is the fix for the flicker above, and it is what the `luxdmx_carrier` template
+ships with: that board is an S3 with 8 MB of PSRAM and one LED chip type, so every reason to
+prefer RMT falls away. Leave it on automatic anywhere else — on a board without PSRAM the
+expanded frame is expensive, and on a classic ESP32 LCD_CAM does not exist at all (the backend
+compiles to a stub that reports "not available", so nothing breaks, it just cannot be forced).
 
 **LCD_CAM** clocks every lane together off the S3's parallel-LCD peripheral at 2.4 MHz with
 GDMA, so it costs no RMT channel and ~0 CPU for the transmission. Each WS281x bit becomes three
