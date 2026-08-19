@@ -392,6 +392,11 @@ static bool g_useEth = false;
 static bool g_apMode = false;
 static bool g_apWiredFallback = false;   // in the AP only because the wired link dropped (return to Eth when it's back)
 static bool g_ethFallback     = false;   // wired Ethernet configured but running on the WiFi/AP fallback (status LED = orange)
+// W5500 wedged-link recovery state (defined here, before handleInfoJson uses the counters; the
+// SPI-Eth re-init path that drives them lives further down under HAS_ETH_SPI).
+static volatile bool s_ethReinit = false;          // ethUpTask tears down the old driver first (recovery re-init)
+static volatile uint32_t g_ethRecoverAttempts = 0; // W5500 wedged-link re-init attempts (exposed in /info.json)
+static volatile uint32_t g_ethRecoveries      = 0; // re-inits that actually brought the link back
 
 // First-run setup portal (replaces the old WiFiManager config portal). Brought up only
 // when there are no stored STA credentials, or when BOOT is held at power-on. While it's
@@ -2325,6 +2330,10 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ethW5500\":";  j += cfg.ethW5500 ? "true" : "false"; j += ",";   // module enabled (opt-in)
     j += "\"useEthernet\":"; j += cfg.useEthernet ? "true" : "false"; j += ",";
     j += "\"ethFallback\":"; j += g_ethFallback ? "true" : "false"; j += ",";   // wired configured but running on WiFi/AP fallback (status LED = orange)
+#if defined(HAS_ETH_SPI)
+    j += "\"ethRecoverAttempts\":"; j += (unsigned)g_ethRecoverAttempts; j += ",";   // W5500 wedged-link re-inits tried
+    j += "\"ethRecoveries\":";      j += (unsigned)g_ethRecoveries;      j += ",";   // re-inits that brought the link back
+#endif
 #if defined(HAS_WIRED_ETH)
     j += "\"hasEth\":true,";   // board has wired Ethernet → show the WiFi/Ethernet selector
 #else
@@ -4230,6 +4239,10 @@ static void ethUpTask(void *arg) {
     // cannot undo that with its own ~100us pulse (see w5500HardReset). DM9051 keeps the
     // driver's reset handling -- this is a W5500 erratum, not a shared one.
     const bool isW5500 = (phy == ETH_PHY_W5500);
+    // Recovery re-init: tear the wedged driver down first so ETH.begin() re-installs cleanly
+    // (esp_eth_stop + del glue + driver uninstall). A fresh begin() then re-negotiates the link,
+    // which is what clears the SPI RX-RSR wedge (a bare RSTn pulse on its own does not).
+    if (s_ethReinit) { ETH.end(); delay(10); }
     if (isW5500) w5500HardReset();
     ETH.begin(phy, ETH_W5500_ADDR, cfg.ethCs, cfg.ethInt,
               isW5500 ? -1 : cfg.ethRst,
@@ -4250,6 +4263,36 @@ static void startEthSpi() {
     uint32_t t0 = millis();
     while (!s_ethUpDone && millis() - t0 < 30000) delay(20);
     if (!s_ethUpDone) Serial.println("[ETH] core-0 bring-up still running after 30s");
+}
+
+// Re-initialise a wedged W5500 on core 0 (SPI-Eth bring-up is core-0-affine — see ethUpTask): tear
+// the driver down, hard-reset the chip, begin again. Returns whether the link came back.
+//
+// Recovers the SPI RX-RSR erratum: the W5500 can come up (or come back after sustained RX, e.g.
+// right after an OTA) reporting no link though the cable is fine. A plain reboot doesn't clear it,
+// but a full re-init re-negotiates the link and does. Reuses the exact bring-up path (ethUpTask)
+// with s_ethReinit set so it drops the old driver first. Blocks the caller up to 30 s while the
+// core-0 task runs, but yields throughout, so the DMX task (core 1) keeps clocking meanwhile.
+static bool ethReinit() {
+    if (cfg.wiredPhy != WIRED_PHY_SPI) return false;   // RMII wedges differently; not handled here
+    g_ethRecoverAttempts++;
+    Serial.printf("[ETH] wired link down — re-initialising the W5500 (attempt %u)\n",
+                  (unsigned)g_ethRecoverAttempts);
+    s_ethReinit = true;
+    s_ethUpDone = false;
+    xTaskCreatePinnedToCore(ethUpTask, "ethre", 8192, NULL, 5, NULL, 0);
+    uint32_t t0 = millis();
+    while (!s_ethUpDone && millis() - t0 < 30000) delay(20);
+    s_ethReinit = false;
+    const bool ok = netConnected();
+    if (ok) {
+        g_ethRecoveries++;
+        Serial.printf("[ETH] W5500 re-init restored the link (%u total recoveries)\n",
+                      (unsigned)g_ethRecoveries);
+    } else {
+        Serial.println("[ETH] W5500 re-init did not restore the link");
+    }
+    return ok;
 }
 #endif
 
@@ -4572,6 +4615,14 @@ void setup() {
 #if defined(HAS_WIRED_ETH)
     if (g_useEth) {
         startWiredEth();
+#if defined(HAS_ETH_SPI)
+        // The W5500 sometimes comes up wedged (no link though the cable is good — the SPI RX-RSR
+        // erratum, seen after heavy RX such as an OTA). One re-init here clears it; if the cable is
+        // simply not plugged in, the re-init is harmless and we fall through to the policy. Only one
+        // attempt at boot so an unplugged box isn't held off its WiFi/AP fallback for long; the
+        // runtime watchdog keeps retrying if it's still down later.
+        if (!netConnected() && cfg.wiredPhy == WIRED_PHY_SPI) ethReinit();
+#endif
         if (!netConnected()) {
             Serial.printf("[NET] wired Ethernet has no link (link-loss policy %d)\n", cfg.linkLossMode);
             applyWiredLinkLoss(true /*atBoot*/);
@@ -4839,15 +4890,36 @@ void loop() {
     if (g_useEth) {
         static bool wiredUp = false;
         static uint32_t wiredDownAt = 0;
-        if (netConnected()) { wiredUp = true; wiredDownAt = 0; }
-        else if (wiredUp) {
-            if (!wiredDownAt) wiredDownAt = now;
-            else if (now - wiredDownAt > WIRED_GRACE_MS) {
-                wiredDownAt = now;                 // re-arm; RETRY just keeps waiting (lwIP recovers)
-                if (cfg.linkLossMode != WIRED_FB_RETRY) {
-                    Serial.printf("[NET] wired link down >%lus, applying policy %d\n",
-                        (unsigned long)(WIRED_GRACE_MS / 1000), cfg.linkLossMode);
-                    applyWiredLinkLoss(false /*runtime*/);
+        static uint32_t reinitBackoff = 0;   // grows after each failed re-init so a long outage (cable
+                                             // left out) doesn't thrash end/begin every few seconds
+        if (netConnected()) { wiredUp = true; wiredDownAt = 0; reinitBackoff = 0; }
+        else {
+            // Down covers two cases: a mid-run cable/link drop (wiredUp was true) and a boot that
+            // never linked at all (wiredUp false — the W5500 came up wedged, which the old
+            // `else if (wiredUp)` gate ignored, so a boot-time wedge stayed stranded forever).
+            if (!wiredDownAt) { wiredDownAt = now; reinitBackoff = WIRED_GRACE_MS; }
+            else if (now - wiredDownAt > reinitBackoff) {
+                bool recovered = false;
+#if defined(HAS_ETH_SPI)
+                // Try to un-wedge the W5500 in place first (end + hard reset + begin). If the link
+                // comes back we're done: no reboot, no fallback, DMX never stopped.
+                if (cfg.wiredPhy == WIRED_PHY_SPI) recovered = ethReinit();
+#endif
+                wiredDownAt = now;                 // re-arm from the END of the attempt
+                if (recovered) { wiredUp = true; reinitBackoff = 0; }
+                else {
+                    // Back off: 12s, 24s, 48s, … capped at 5 min. Fast first attempt to catch a wedge,
+                    // then rare enough that an unplugged box isn't re-initing forever.
+                    reinitBackoff = reinitBackoff < 300000 ? reinitBackoff * 2 : 300000;
+                    if (wiredUp && cfg.linkLossMode != WIRED_FB_RETRY) {
+                        // A genuine mid-run drop a re-init couldn't fix -> apply the configured policy.
+                        // Not applied for a boot that never linked (setup() already ran the atBoot
+                        // policy), and RETRY still just keeps waiting/re-initing (lwIP recovers a real
+                        // cable on its own too).
+                        Serial.printf("[NET] wired link down >%lus, applying policy %d\n",
+                            (unsigned long)(WIRED_GRACE_MS / 1000), cfg.linkLossMode);
+                        applyWiredLinkLoss(false /*runtime*/);
+                    }
                 }
             }
         }

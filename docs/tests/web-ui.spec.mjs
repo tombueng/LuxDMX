@@ -131,6 +131,14 @@ test.describe('Web UI + REST', () => {
         expect(d, `info.json missing "${k}"`).toHaveProperty(k);
         expect(typeof d[k]).toBe('number');
       }
+      // W5500 wedged-link recovery counters (a wedge is rare + load-triggered, so on a healthy
+      // device these read 0). The recovery behaviour itself is validated on the HIL rig, since it
+      // needs the switch to cut the link — see the note below. Here we only pin the shape.
+      for (const k of ['ethRecoverAttempts', 'ethRecoveries']) {
+        expect(d, `info.json missing "${k}"`).toHaveProperty(k);
+        expect(typeof d[k], k).toBe('number');
+        expect(d[k], k).toBeGreaterThanOrEqual(0);
+      }
     }
     if (d.ethRmii) {   // classic ESP32: RMII PHY family + wiring is configurable
       for (const k of ['rmiiPhy', 'rmiiAddr', 'rmiiMdc', 'rmiiMdio', 'rmiiPwr', 'rmiiClk']) {
