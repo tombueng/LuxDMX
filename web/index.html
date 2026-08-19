@@ -138,9 +138,25 @@
         </esp-web-install-button>
       </div>
 
+      <div class="card" style="grid-column:1/-1">
+        <h3>Which S3 image, and switching later</h3>
+        <p><b>Read the suffix on the module's own label.</b> <code>R8</code> is 8&nbsp;MB octal PSRAM and
+           has its own image below. <code>R2</code> is 2&nbsp;MB quad, and there is no image for it yet:
+           quad and octal are a build-time choice on the ESP32-S3, so an R2 module runs the plain image
+           and leaves its PSRAM unused. Nothing breaks, there is just nothing gained.</p>
+        <p><b>Changing between them needs USB.</b> PSRAM is brought up by the bootloader, and an
+           over-the-air update replaces only the application &mdash; so a device moved from one variant to
+           the other over OTA keeps the PSRAM setup it booted with, silently and with no error at all.
+           Flash once over USB and OTA works normally again afterwards.</p>
+        <p>Not sure which you have? The plain ESP32-S3 image runs on every S3. Afterwards check
+           <code>/dmx.json</code>: <code>psram</code> is how many bytes were actually found.</p>
+      </div>
+
       <div class="card">
         <h3>ESP32-S3 (DevKitC-1)</h3>
-        <p>ESP32-S3 DevKitC-1. WiFi build. Use the <b>USB-UART</b> port, not the native USB port.</p>
+        <p>ESP32-S3 DevKitC-1. WiFi build, and the right choice for every S3 except the ones with
+           8&nbsp;MB octal PSRAM. A module with 2&nbsp;MB <b>quad</b> PSRAM (the <b>R2</b> suffix) runs this
+           image fine, it just will not use the PSRAM. Use the <b>USB-UART</b> port, not the native USB port.</p>
         <esp-web-install-button manifest="manifest-esp32s3.json">
           <button class="flash-btn" slot="activate">Flash ESP32-S3</button>
           <span slot="unsupported" class="unsupported">Web Serial not supported. Use desktop <b>Chrome</b> or <b>Edge</b>.</span>
@@ -149,8 +165,12 @@
       </div>
 
       <div class="card">
-        <h3>ESP32-S3 + PSRAM</h3>
-        <p>ESP32-S3 with 8&nbsp;MB PSRAM (WROOM-1-N8R8 / N16R8). The RDM tables and WiFi buffers live in PSRAM, so the internal heap stays wide open. Use the <b>USB-UART</b> port, not the native USB port.</p>
+        <h3>ESP32-S3 + 8&nbsp;MB octal PSRAM</h3>
+        <p>Only for modules with <b>8&nbsp;MB octal PSRAM</b> &mdash; the <b>R8</b> suffix (WROOM-1-N8R8,
+           N16R8). Octal and quad are fixed when the firmware is built, so this image and the one above
+           are not interchangeable. The RDM tables, the WiFi buffers and the pixel framebuffers move to
+           PSRAM and the internal heap stays wide open (measured: 8&nbsp;MB found, 121&nbsp;KB internal
+           heap free against 57&nbsp;KB without). Use the <b>USB-UART</b> port.</p>
         <esp-web-install-button manifest="manifest-esp32s3-psram.json">
           <button class="flash-btn" slot="activate">Flash ESP32-S3 + PSRAM</button>
           <span slot="unsupported" class="unsupported">Web Serial not supported. Use desktop <b>Chrome</b> or <b>Edge</b>.</span>
