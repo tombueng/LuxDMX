@@ -655,6 +655,7 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
                 <option value="1">Delta (follow the input)</option>
               </select>
               <div class="form-text out-style-note">Continuous clocks DMX at the fixed rate below, whatever the console does. Delta sends one DMX frame per received packet, so the wire follows your console exactly and nothing gets repeated.</div>
+              <div class="form-text out-beat-warn" style="display:none;color:#ffaa1c;font-weight:500">&#9888; This source keeps changing at a rate that doesn't match this output's fixed rate, so frames repeat or drop &mdash; the &ldquo;only 33 fps&rdquo; stutter. Switch to <strong>Delta</strong> for smooth output.</div>
             </div>
             <div class="col-sm-6">
               <label class="form-label text-secondary small mb-1">DMX output rate</label>
@@ -2389,6 +2390,17 @@ function initBoards(){
   s.onclose=function(){ setTimeout(c,2000); };
   s.onmessage=function(e){ if(window.LuxNav) LuxNav.stats(e.data); }; }catch(_){ setTimeout(c,2000); } }
   c(); })();
+// Live per-output beat warning at the Transmit style dropdown: bit2 of the WS style byte (set by
+// the firmware's beatRisk()) means this Continuous output is free-running against a source at a
+// different change rate, so frames repeat/drop. Mirror it onto the card's .out-beat-warn so the
+// nudge sits right where you fix it. Hidden the moment you switch to Delta (bit0) or the source matches.
+(function(){ setInterval(function(){
+  var st = (window.LuxNav && LuxNav.style && LuxNav.style()) || [];
+  document.querySelectorAll('.out-card').forEach(function(card, i){
+    var w = card.querySelector('.out-beat-warn'); if(!w) return;
+    w.style.display = (st[i] & 4) ? '' : 'none';
+  });
+}, 1000); })();
 </script>
 </body>
 </html>

@@ -110,6 +110,33 @@ async function measureBurst(request, uni, changeHz, repeat, ms) {
   return { inFps: d.fps, outFps: d.outfps[0] };
 }
 
+// Drive a MagicQ-style burst (changeHz unique changes/s, each sent `repeat` times) while polling
+// /info.json every second, so the firmware's change-rate window keeps closing the way it does under
+// a real browser on the WS. Returns the beat flag + detected change rate from the last poll.
+async function watchBeat(request, uni, changeHz, repeat, ms) {
+  const sender = new UdpSender(host);
+  const data = Buffer.alloc(512);
+  const period = 1000 / changeHz;
+  let last = { beat: false, chgHz: 0 };
+  try {
+    const end = Date.now() + ms;
+    let i = 0, seq = 0, nextPoll = Date.now() + 1000;
+    while (Date.now() < end) {
+      data[0] = i & 0xff; data[1] = (i >> 8) & 0xff;               // the value that actually changes
+      for (let r = 0; r < repeat; r++)
+        await sender.send(ART_PORT, artDmxPacket(uni, data, seq++));
+      i++;
+      if (Date.now() >= nextPoll) {
+        const d = await info(request);
+        last = { beat: d.outputs[0].beat, chgHz: d.outputs[0].chgHz };
+        nextPoll = Date.now() + 1000;
+      }
+      await sleep(Math.max(1, Math.round(period)));
+    }
+  } finally { sender.close(); }
+  return last;
+}
+
 test.describe('DMX output rate + transmit style — shape (always)', () => {
   test('/info.json exposes rate, style and styleSrc per output', async ({ request }) => {
     const d = await info(request);
@@ -152,6 +179,15 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
     expect(title, 'the tooltip spells it out').toMatch(/continuous \(free-run\)|delta \(follows the input\)/);
     // A style pushed by a controller must be distinguishable from one chosen here.
     expect(title).toMatch(/set (here|over Art-Net)/);
+  });
+
+  test('/info.json exposes the per-output beat warning (beat + change rate)', async ({ request }) => {
+    const d = await info(request);
+    for (const [i, o] of d.outputs.entries()) {
+      expect(typeof o.beat, `out${i} beat is a boolean`).toBe('boolean');
+      expect(typeof o.chgHz, `out${i} chgHz is a number`).toBe('number');
+      expect(o.chgHz, `out${i} chgHz >= 0`).toBeGreaterThanOrEqual(0);
+    }
   });
 
   test('ArtPollReply RefreshRate matches the configured rate', async ({ request }) => {
@@ -238,6 +274,38 @@ test.describe('DMX output rate + transmit style — behaviour (LUXDMX_WRITE=1)',
     expect(res.inFps, `device really sees the burst (~100 packets/s), got ${res.inFps}`).toBeGreaterThan(80);
     expect(res.outFps, `delta tracks the ~33 Hz change rate, not the packets, got ${res.outFps}`).toBeGreaterThan(30);
     expect(res.outFps, `delta does not clock the duplicates out, got ${res.outFps}`).toBeLessThan(38);
+  });
+
+  test('a Continuous output beating a mismatched source raises the warning; Delta clears it', async ({ request }) => {
+    skipUnlessWrite();
+    test.setTimeout(120_000);
+    const uni = before.outputs[0].uni;
+
+    // Continuous at 40 fps fed a MagicQ-shaped 33.3 fps source (each change sent x3): the output
+    // free-runs at 40 against 33 real changes, so it beats. The warning must fire, and it must read
+    // the *change* rate (~33), not the ~100 packets/s.
+    await request.post('/config', { form: configForm(before, { rate: 0, style: CONTINUOUS }) });
+    await waitForState(request, (d) => d.outputs[0].style === CONTINUOUS && d.outputs[0].rate === 0);
+    const cont = await watchBeat(request, uni, 33.3, 3, 9000);
+    expect(cont.beat, `continuous vs a 33 fps source must warn (chgHz ${cont.chgHz})`).toBe(true);
+    expect(Math.abs(cont.chgHz - 33), `detected change rate ~33, got ${cont.chgHz}`).toBeLessThan(6);
+
+    // Same source in Delta: it follows the input, so there is no beat and no warning.
+    await request.post('/config', { form: configForm(before, { rate: 0, style: DELTA }) });
+    await waitForState(request, (d) => d.outputs[0].style === DELTA);
+    const delta = await watchBeat(request, uni, 33.3, 3, 9000);
+    expect(delta.beat, 'delta follows the source, so it never beats or warns').toBe(false);
+  });
+
+  test('a Continuous output whose rate matches its source does not warn', async ({ request }) => {
+    skipUnlessWrite();
+    test.setTimeout(120_000);
+    const uni = before.outputs[0].uni;
+    // Output at 33.3 fps, source at 33.3 fps: the rates line up, so no beat and no false alarm.
+    await request.post('/config', { form: configForm(before, { rate: 2, style: CONTINUOUS }) });
+    await waitForState(request, (d) => d.outputs[0].rate === 2 && d.outputs[0].style === CONTINUOUS);
+    const m = await watchBeat(request, uni, 33.3, 3, 9000);
+    expect(m.beat, `matched rates must not warn (chgHz ${m.chgHz})`).toBe(false);
   });
 
   test('a quiet source in Delta falls back to free-running (the line never stops)', async ({ request }) => {
