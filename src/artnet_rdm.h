@@ -584,9 +584,13 @@ static int rdmLineForUniverse(uint16_t uni) {
 static void artSendCurrentTod(uint32_t ip, uint16_t pa) {
     static uint8_t pkt[28 + RDM_HW_MAX * 6];
     rdm_uid_t uids[RDM_HW_MAX];
-    int nu = 0;                                    // only the fixtures on this universe
-    for (int i = 0; i < rdmCount; i++)
-        if ((uint16_t)rdmDevices[i].universe == pa) uids[nu++] = rdmDevices[i].uid;
+    // Only the fixtures on this universe, matched by the LINE that currently serves it -- so a
+    // renumbered output answers for its new universe without needing a re-scan or a reboot.
+    const int line = rdmLineForUniverse(pa);
+    int nu = 0;
+    if (line >= 0)
+        for (int i = 0; i < rdmCount; i++)
+            if (rdmDevices[i].rdmLine == (uint8_t)line) uids[nu++] = rdmDevices[i].uid;
     int len = buildArtTodData(pkt, pa, uids, nu);
     ArtRdmResp r; r.ip = ip; r.len = len; memcpy(r.data, pkt, len);
     if (g_artRespQ) xQueueSend(g_artRespQ, &r, 0);
@@ -602,7 +606,7 @@ static void artPushTodToSubs() {
         uint16_t pa = (uint16_t)cfg.outputs[o].universe;
         int nu = 0;
         for (int i = 0; i < rdmCount; i++)
-            if (rdmDevices[i].universe == pa) uids[nu++] = rdmDevices[i].uid;
+            if (rdmDevices[i].rdmLine == (uint8_t)L) uids[nu++] = rdmDevices[i].uid;
         int len = buildArtTodData(pkt, pa, uids, nu);
         for (int s = 0; s < ART_MAX_SUBS; s++) {
             if (!g_artSubs[s]) continue;
@@ -721,13 +725,19 @@ static bool artDiscStep() {
     case AD_PUBLISH: {
         int outIdx = rdmOutForLine[g_adLine];
         uint16_t uni = (outIdx >= 0) ? cfg.outputs[outIdx].universe : 0;
-        // Replace only THIS line's fixtures in the shared table; keep the other lines' fixtures.
+        // Replace only THIS line's fixtures in the shared table; keep the other lines'. Keyed on the
+        // line, not on the universe: a renumbered output used to leave its old fixtures behind as
+        // orphans that nothing matched any more, and they kept occupying the device cap so the
+        // fresh scan had no room. Entries whose line no longer reaches an enabled output go too.
         int keep = 0;
-        for (int i = 0; i < rdmCount; i++)
-            if (rdmDevices[i].universe != uni) rdmDevices[keep++] = rdmDevices[i];
+        for (int i = 0; i < rdmCount; i++) {
+            if (rdmDevices[i].rdmLine == (uint8_t)g_adLine) continue;              // replaced below
+            if (rdmDevUniverse(rdmDevices[i]) == RDM_UNI_GONE) continue;           // orphan, drop it
+            if (keep != i) rdmDevices[keep] = rdmDevices[i];
+            keep++;
+        }
         rdmCount = keep;
         for (int i = 0; i < g_adTabN && rdmCount < g_rdmMaxDev; i++) {
-            g_adTab[i].universe = uni;
             g_adTab[i].rdmLine  = (uint8_t)g_adLine;
             rdmDevices[rdmCount++] = g_adTab[i];
         }

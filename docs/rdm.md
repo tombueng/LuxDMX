@@ -165,6 +165,21 @@ variants (`…1/2/3`) are treated the same as `…0`. Handled commands:
 - Universe / port-name programming from `ArtAddress` is **not** handled yet (changing a universe would
   desync the boot-time RDM line mapping); set those on the device's own web config instead.
 
+### Renumbering an output
+
+Change an output's universe in `/config` and the fixtures already discovered on it come along:
+the Table of Devices answers under the new port-address straight away, with no re-scan and no
+reboot. A discovered fixture's universe is derived from the RDM line it answered on (the physical
+transceiver), never stored per fixture, so there is nothing that can go stale. Fixtures whose line
+no longer reaches an enabled output are dropped at the next discovery instead of sitting in the
+table forever.
+
+Before this, the universe was copied into each device record at scan time. After a renumber the
+node kept answering `ArtTodRequest` for the *old* universe, so a console asking about the new one
+got an empty TOD, and the orphaned records still counted against the 64-device cap, which left a
+fresh discovery with nowhere to land. Only a reboot cleared it. Regression test:
+`docs/tests/artnet-rdm.spec.mjs` ("the TOD follows a renumbered output").
+
 ### Interop notes
 
 - `ArtRdm` is unicast per Art-Net 4. `ArtPoll` is received on both the subnet-directed broadcast and
