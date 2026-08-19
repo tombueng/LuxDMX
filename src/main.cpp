@@ -518,6 +518,14 @@ static float    fps          = 0.0f;
 static uint32_t inFrameCnt[MAX_OUTPUTS] = {0};
 static uint32_t inWinMs[MAX_OUTPUTS]    = {0};
 static float    inFpsOut[MAX_OUTPUTS]   = {0.0f};
+// Per-output CONTENT-change rate (Hz): how often the merged frame actually changes, counted where
+// outInSeq bumps in routeFrame. Unlike inFpsOut (raw packet rate) this is the console's real engine
+// rate -- MagicQ/MADRIX at 33.3 fps send each change 3x, so packets read ~100/s but changes ~33/s.
+// Drives the beat warning: a Continuous output free-running at a rate different from this repeats or
+// drops frames (issue #93).
+static uint32_t chgFrameCnt[MAX_OUTPUTS] = {0};
+static uint32_t chgWinMs[MAX_OUTPUTS]    = {0};
+static float    chgRate[MAX_OUTPUTS]     = {0.0f};
 // Per-output frame rate (one universe each). The aggregate `fps` above stays the
 // sum of all inputs for the WS/web UI; these drive the per-universe display.
 static uint32_t outFrameCount[MAX_OUTPUTS]  = {0};
@@ -1550,6 +1558,32 @@ static float inFpsLive(int i) {
     return inFpsOut[i];
 }
 
+// Per-output content-change rate (Hz), same self-closing 1 s window as inFpsLive.
+static float chgRateLive(int i) {
+    if (i < 0 || i >= MAX_OUTPUTS) return 0.0f;
+    const uint32_t now = millis();
+    if (now - chgWinMs[i] >= 1000) {
+        chgRate[i]     = (float)chgFrameCnt[i] * 1000.0f / (float)(now - chgWinMs[i]);
+        chgFrameCnt[i] = 0;
+        chgWinMs[i]    = now;
+    }
+    return chgRate[i];
+}
+
+// A Continuous output free-running at a fixed rate that differs from the console's real change rate
+// repeats or drops frames -- the "only 33 fps" beat of issue #93. Warn when a live, actively-changing
+// source's rate is meaningfully off the fixed output rate. Delta follows the source, so it never
+// beats and never warns. The <5 Hz floor keeps a static look (0 changes) from tripping it.
+static bool beatRisk(int i) {
+    if (i < 0 || i >= MAX_OUTPUTS || !outReady[i]) return false;
+    if (dmxIsDelta(i)) return false;
+    const float cr = chgRateLive(i);
+    if (cr < 5.0f) return false;
+    const float outHz = (float)dmxRateHz(i);
+    const float d = cr > outHz ? cr - outHz : outHz - cr;
+    return d >= 3.0f;
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket push (binary, WS_FRAME_LEN bytes)
 // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
@@ -1604,11 +1638,13 @@ static void wsPush() {
         wsBuf[528 + 2 * MAX_OUTPUTS + 2 * i + 1] = inI & 0xFF;
     }
     // Per-output transmit style: bit0 = delta (clear = continuous), bit1 = the style was set by a
-    // controller over Art-Net rather than in our UI.
+    // controller over Art-Net rather than in our UI, bit2 = beat risk (Continuous vs a source whose
+    // change rate differs from the output rate -- issue #93).
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         uint8_t st = 0;
         if (dmxIsDelta(i))                                     st |= 0x01;
         if (cfg.outputs[i].txStyleSrc == TXSRC_ARTNET)          st |= 0x02;
+        if (beatRisk(i))                                        st |= 0x04;
         wsBuf[528 + 4 * MAX_OUTPUTS + i] = st;
     }
     // Fixed tail: fixtures(2) rdmTx(4) rdmRx(4)
@@ -1859,6 +1895,7 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
         if (memcmp(dmxBuf[i], outDeltaShadow[i], DMX_PACKET_SIZE) != 0) {
             memcpy(outDeltaShadow[i], dmxBuf[i], DMX_PACKET_SIZE);
             outInSeq[i]++;
+            chgFrameCnt[i]++;   // real content change -- feeds the change-rate / beat warning
         }
         outFrameCount[i]++;
         if (now - outLastFrameMs[i] >= 1000) {
@@ -2212,6 +2249,8 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
         j += ",\"rate\":";  j += o.txRate;       // index into DMX_RATE_MS (issue #93)
         j += ",\"style\":"; j += o.txStyle;      // 0 = continuous, 1 = delta
         j += ",\"styleSrc\":"; j += o.txStyleSrc;   // 0 = set here, 1 = set by a console over Art-Net
+        j += ",\"beat\":"; j += beatRisk(i) ? "true" : "false";  // Continuous beating a mismatched source (#93)
+        j += ",\"chgHz\":"; j += (int)(chgRateLive(i) + 0.5f);   // the source's real change rate (0 = static/none)
         j += "}";
     }
     j += "],";

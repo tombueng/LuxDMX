@@ -52,7 +52,7 @@ window.LuxNav = (function(){
   var NAVIDS=['fps','infps','txstyle','rssi','net-label','heap','uptime','jitter','nav-sub','nfix','rdm-tx','rdm-rx'];
   var NAV_TAIL=10;   // fixed tail on the /ws frame: fixtures(2) rdmTx(4) rdmRx(4). Before it sit the
                      // per-output blocks: output fps(2), input fps(2), transmit style(1) = 5 bytes.
-  var PER_OUT=5;
+  var PER_OUT=5, lastStyle=[];
   function fmtK(n){ return n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e4 ? (n/1e3).toFixed(0)+'k' : String(n); }
   function saveNav(){ try{ var o={}; NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=[e.innerHTML,e.style.color||'']; }); sessionStorage.setItem('luxnav',JSON.stringify(o)); }catch(_){} }
   function paintNav(){ try{ var o=JSON.parse(sessionStorage.getItem('luxnav')||'{}'); NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e&&o[id]){ e.innerHTML=o[id][0]; if(o[id][1]) e.style.color=o[id][1]; } }); }catch(_){} }
@@ -66,19 +66,22 @@ window.LuxNav = (function(){
       inp.push((v.getUint16(528+2*n+2*oi)/10).toFixed(1));
       sty.push(v.getUint8(528+4*n+oi));
     }
+    lastStyle=sty;   // exposed via LuxNav.style() so the config page can flag a per-output beat risk
     document.getElementById('fps').textContent   = out.length ? out.join(' · ') : (v.getUint16(0)/10).toFixed(1);
     document.getElementById('infps').textContent = inp.length ? inp.join(' · ') : '0.0';
     // Transmit style per output: D = delta (following the console), C = continuous (free-running).
-    // A dot marks a style a controller pushed over Art-Net, so a mode you did not pick is visible
-    // at a glance instead of looking like your own setting.
+    // A dot marks a style a controller pushed over Art-Net; a ⚠ marks a beat risk (Continuous
+    // free-running against a source at a different rate, so frames repeat/drop -- issue #93).
     var se=document.getElementById('txstyle');
     if(se){
       if(sty.length){
-        se.textContent = sty.map(function(b){ return (b&1?'D':'C') + (b&2?'·':''); }).join(' ');
+        se.textContent = sty.map(function(b){ return (b&1?'D':'C') + (b&4?'⚠':'') + (b&2?'·':''); }).join(' ');
         se.title = sty.map(function(b,i){
           return 'Output ' + String.fromCharCode(65+i) + ': ' + (b&1?'delta (follows the input)':'continuous (free-run)')
-               + (b&2?', set over Art-Net':', set here'); }).join(String.fromCharCode(10));
-        se.style.color = sty.some(function(b){ return b&2; }) ? 'var(--lux-cyan)' : '';
+               + (b&2?', set over Art-Net':', set here')
+               + (b&4?' — beats against the source rate; switch to Delta for smooth output':''); }).join(String.fromCharCode(10));
+        se.style.color = sty.some(function(b){ return b&4; }) ? '#ffaa1c'
+                       : sty.some(function(b){ return b&2; }) ? 'var(--lux-cyan)' : '';
       } else { se.textContent='·'; se.title=''; }
     }
     var rssi=v.getInt16(2), heap=v.getUint32(4), upS=v.getUint32(8);
@@ -106,6 +109,6 @@ window.LuxNav = (function(){
     document.getElementById('nav-sub').innerHTML=(d.hostname||'')+'.local &nbsp;&middot;&nbsp; '+(d.ip||'')+' &nbsp;&middot;&nbsp; v'+(d.version||'');
     saveNav();
   }).catch(function(){});
-  return { stats:stats };
+  return { stats:stats, style:function(){ return lastStyle; } };
 })();
 </script>

@@ -853,6 +853,14 @@ The navbar carries it too: a `C` or `D` per output (continuous or delta), with a
 controller pushed over Art-Net, and the full wording in the tooltip. So you can see at a glance
 whether a port is free-running or following the console, without opening `/config`.
 
+**Beat warning.** You don't have to spot the mismatch yourself. When a Continuous output is
+free-running against a source whose real change rate is off the output rate (e.g. a 33 fps MagicQ
+engine into a fixed 40 fps output), the navbar marks that output's style with a **⚠** and the
+`/config` page shows a live nudge right under its **Transmit style** dropdown, suggesting Delta. It
+tracks the console's *change* rate, not the raw packet rate, so a source that sends each frame three
+times still reads as ~33, and it clears the instant you switch to Delta or the two rates line up. A
+static look never trips it, and neither does a console already running at the output rate.
+
 A console can select the style remotely with Art-Net `ArtAddress` (`AcStyleDelta` / `AcStyleConst`).
 When that happens the `/config` page labels the setting **set over Art-Net** instead of *set here*,
 so a mode you did not pick doesn't look like your own doing. Changing it in the web UI takes it back.
