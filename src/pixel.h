@@ -208,7 +208,22 @@ static bool pixelApply(String& err) {
     pixOutEnd();
     const PixBackend want = (cfg.pixBackend == 1) ? PIXBK_RMT
                           : (cfg.pixBackend == 2) ? PIXBK_LCD : PIXBK_NONE;
-    const bool backendOk = (n == 0) || (pixOutBegin(ports, n, want) != PIXBK_NONE);
+    bool backendOk;
+    if (n == 0) {
+        backendOk = true;
+    } else if (want == PIXBK_NONE && pixLcdPreferred()) {
+        // Automatic, on a box with PSRAM: take LCD_CAM even though RMT would fit. RMT's only
+        // advantage is that it is cheap in RAM, and that stops mattering with megabytes of
+        // external RAM to spend -- while its disadvantage does not: a lane that misses the one
+        // DMA channel (DMX takes it first) is refilled from an ISR and glitches the same few
+        // LEDs under load. That cost a night of bench time to find, and nothing in the UI hinted
+        // at it. Fall through to the normal RMT-first path if LCD_CAM cannot serve these ports,
+        // e.g. because they are not all the same LED chip.
+        backendOk = (pixOutBegin(ports, n, PIXBK_LCD) != PIXBK_NONE)
+                 || (pixOutBegin(ports, n, PIXBK_NONE) != PIXBK_NONE);
+    } else {
+        backendOk = (pixOutBegin(ports, n, want) != PIXBK_NONE);
+    }
     pixelPauseEnd();
     if (!backendOk) {
         err = (cfg.pixBackend == 0)

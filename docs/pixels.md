@@ -135,8 +135,9 @@ cue rather than after.
 
 ## Backends
 
-The driver is picked at runtime, and the thing that decides it is a shared budget of RMT
-transmit channels. **DMX competes for them**: DMX output is clocked on RMT too (`dmx_rmt.h`, so
+The driver is picked at runtime. On a board with PSRAM that choice is short (LCD_CAM, see
+[What "automatic" does](#what-automatic-does) below); everywhere else it comes down to a shared
+budget of RMT transmit channels. **DMX competes for them**: DMX output is clocked on RMT too (`dmx_rmt.h`, so
 the break comes out of hardware and a late ISR cannot malform it), and a WS2812 status LED takes
 one as well. So:
 
@@ -146,7 +147,7 @@ which is **4 on an ESP32-S3** and **8 on a classic ESP32**. Ask for more pixel p
 budget allows and they all move to LCD_CAM together; partial service is deliberately not an
 option, because two of five ports working looks like a wiring fault rather than a limit.
 
-Measured on the carrier, both sides of the same rule:
+Measured on the carrier with RMT selected, both sides of the same rule:
 
 | enabled | backend |
 |---|---|
@@ -164,17 +165,28 @@ fixed offsets in the stream, so it is always the **same** LEDs that flicker — 
 wiring or power fault and is neither. If you see `"rmtDma":false` and a strip with a few
 misbehaving pixels, that is the explanation.
 
-### Forcing a driver
+### What "automatic" does
 
-`pixbk` (Pixel driver in `/config`) overrides the automatic choice: `0` automatic, `1` RMT,
-`2` LCD_CAM. A forced driver that cannot be provided fails with a message rather than quietly
-using the other one.
+`pixbk` (Pixel driver in `/config`): `0` automatic, `1` RMT, `2` LCD_CAM.
 
-Forcing LCD_CAM is the fix for the flicker above, and it is what the `luxdmx_carrier` template
-ships with: that board is an S3 with 8 MB of PSRAM and one LED chip type, so every reason to
-prefer RMT falls away. Leave it on automatic anywhere else — on a board without PSRAM the
-expanded frame is expensive, and on a classic ESP32 LCD_CAM does not exist at all (the backend
-compiles to a stub that reports "not available", so nothing breaks, it just cannot be forced).
+Automatic is not simply "RMT until it runs out". It asks one question first: **does this board
+have PSRAM?**
+
+* **PSRAM present** (and the chip has LCD_CAM, so: an ESP32-S3) → **LCD_CAM**, even when RMT
+  would fit. RMT's single advantage is that it is cheap in RAM, and that stops being an
+  argument the moment there are megabytes of external RAM to spend — while its drawback stays:
+  a lane that misses the one DMA channel glitches the same few LEDs under load. If LCD_CAM
+  cannot serve the ports (they are not all the same LED chip), it falls back to the RMT-first
+  path rather than failing.
+* **No PSRAM**, or no LCD_CAM on the chip → **RMT**, and LCD_CAM only when the channels run
+  out. The expanded frame is 72 bytes per pixel and that is real money on an internal heap.
+
+So on the carrier you get LCD_CAM without configuring anything, which is why its template no
+longer forces it.
+
+Forcing is still there for when you disagree, or to compare the two on the same hardware. A
+forced driver that cannot be provided fails with a message rather than quietly using the other
+one — on a classic ESP32, LCD_CAM compiles to a stub that says "not available".
 
 **LCD_CAM** clocks every lane together off the S3's parallel-LCD peripheral at 2.4 MHz with
 GDMA, so it costs no RMT channel and ~0 CPU for the transmission. Each WS281x bit becomes three

@@ -190,9 +190,14 @@ void pixLcdPush(const uint8_t* const* bufs, const uint16_t* counts) {
     g_cur ^= 1;
 }
 
+bool pixLcdPreferred() {
+    return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+}
+
 #else   // no LCD_CAM on this chip (classic ESP32): the RMT backend is the only one
 
 PixBackend pixLcdBegin(const PixOutPort*, int) { return PIXBK_NONE; }
+bool       pixLcdPreferred() { return false; }
 void       pixLcdEnd() {}
 bool       pixLcdBusy() { return false; }
 void       pixLcdPush(const uint8_t* const*, const uint16_t*) {}

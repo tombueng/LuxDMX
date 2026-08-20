@@ -82,3 +82,11 @@ const char* pixOutBackendName();
 
 // RMT only: did every lane get a DMA channel? False = ISR-refilled, can glitch under load.
 bool pixOutRmtDma();
+
+// Should the automatic choice prefer LCD_CAM on this box? True when the chip has the peripheral
+// AND there is PSRAM to hold the expanded frame. Both conditions matter: the only reason to
+// prefer RMT is that LCD_CAM costs 72 bytes per pixel doubled, and that argument disappears the
+// moment there are megabytes of external RAM to spend. On a board with PSRAM, LCD_CAM is simply
+// the better driver -- no refill ISR, so none of the fixed-offset flicker an RMT lane without a
+// DMA channel produces.
+bool pixLcdPreferred();
