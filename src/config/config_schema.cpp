@@ -12,7 +12,8 @@
 #define ARRSZ(a) (sizeof(a) / sizeof((a)[0]))
 
 // ---- enum value labels (for menus + UI hints; order == stored int value) ----
-static const char* const ENUM_PIXBK[]   = {"automatic", "RMT (one channel per port)",
+static const char* const ENUM_PIXBK[]   = {"automatic (LCD_CAM when the board has PSRAM)",
+                                           "RMT (one channel per port)",
                                            "LCD_CAM (parallel, DMA only)"};
 static const char* const ENUM_PROTOCOL[] = {"Art-Net", "sACN", "Art-Net + sACN"};
 static const char* const ENUM_LEDTYPE[]  = {"off", "plain GPIO", "WS2812 RGB", "5-LED panel"};
