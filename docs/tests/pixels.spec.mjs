@@ -278,10 +278,10 @@ test.describe('Pixel output — mapping on a live device (LUXDMX_WRITE=1)', () =
   });
 });
 
-// Which peripheral ends up driving the strips is decided at runtime from a budget that pixels
-// SHARE with DMX: DMX TX is clocked on RMT too, and so is a WS2812 status LED. So the rule is
-// `DMX outputs + pixel ports + status LED <= TX channels`, and a test that hard-codes "3 ports
-// fit" only holds for one particular DMX configuration. Derive it instead.
+// Which peripheral ends up driving the strips is decided at runtime, and from two things: a
+// budget that pixels SHARE with DMX (DMX TX is clocked on RMT too, as is a WS2812 status LED),
+// and whether the board has PSRAM at all -- because with PSRAM the automatic choice takes
+// LCD_CAM outright rather than waiting for RMT to run out.
 test.describe('Pixel output — backend selection (LUXDMX_WRITE=1)', () => {
   let restore = null;
 
@@ -290,6 +290,9 @@ test.describe('Pixel output — backend selection (LUXDMX_WRITE=1)', () => {
     for (let i = 0; i < n; i++) { f[`p${i}_en`] = 1; f[`p${i}_count`] = 16; }
     return f;
   };
+  // Pixel ports that RMT could still serve here, after DMX and the status LED have taken theirs.
+  const rmtBudget = (px, info) =>
+    (px.rmtMax || 0) - (info.outputs || []).filter((o) => o.en).length - (info.ledType === 2 ? 1 : 0);
 
   test.beforeAll(async () => {
     if (!WRITE) return;
@@ -304,59 +307,75 @@ test.describe('Pixel output — backend selection (LUXDMX_WRITE=1)', () => {
     await postConfig(f, { pixelsOff: true });
   });
 
-  test('the RMT channel budget is shared with DMX, and running out switches to LCD_CAM', async () => {
+  test('with RMT chosen, the channel budget is the one shared with DMX', async () => {
     skipUnlessWrite();
     const px0 = await pixels();
     const info0 = await getJson(base + '/info.json');
-    const dmx = (info0.outputs || []).filter((o) => o.en).length;
-    const led = info0.ledType === 2 ? 1 : 0;          // a WS2812 status LED takes a channel too
-    const budget = (px0.rmtMax || 0) - dmx - led;     // pixel ports that can still be served by RMT
-
     test.skip(!px0.rmtMax, 'firmware does not report rmtMax');
-    test.skip(budget < 1 || budget + 1 > px0.ports.length,
-      `budget ${budget} of ${px0.rmtMax} channels does not leave a testable step on this board`);
-    const dmxJson = await getJson(base + '/dmx.json');
-    test.skip(!dmxJson.psram && dmxJson.heapBlock < 24000,
-      `not enough headroom without PSRAM (largest block ${dmxJson.heapBlock} B)`);
+    const budget = rmtBudget(px0, info0);
+    test.skip(budget < 1 || budget > px0.ports.length, `no testable budget here (${budget})`);
 
-    // Exactly the budget still fits in RMT...
-    await postConfig({ ...on(budget), pixbk: 0 }, { pixelsOff: true });
+    // Forced, so this asserts the budget itself rather than whatever the automatic rule prefers.
+    await postConfig({ ...on(budget), pixbk: 1 }, { pixelsOff: true });
     const fit = await pixels();
     expect(fit.ports.filter((p) => p.en).length, 'ports enabled').toBe(budget);
-    expect(fit.backend, `${dmx} DMX + ${budget} ports fits ${px0.rmtMax} channels`).toBe('rmt');
+    expect(fit.backend, `${budget} ports fit the channels left over from DMX`).toBe('rmt');
+  });
 
-    // ...and one more does not. Partial service is not an option: every port moves together.
+  test('automatic takes LCD_CAM when the board has PSRAM, RMT when it does not', async () => {
+    skipUnlessWrite();
+    const px0 = await pixels();
+    const dmx = await getJson(base + '/dmx.json');
+    const info0 = await getJson(base + '/info.json');
+    test.skip(!px0.rmtMax, 'firmware does not report rmtMax');
+    test.skip(rmtBudget(px0, info0) < 1, 'no RMT channel free, so the choice is not the automatic one');
+
+    // One port always fits RMT, so whatever comes back IS the automatic preference.
+    await postConfig({ ...on(1), pixbk: 0 }, { pixelsOff: true });
+    const auto = await pixels();
+    const want = (dmx.psram > 0 && (info0.mcu || '') === 'esp32s3') ? 'lcd' : 'rmt';
+    expect(auto.backend, `psram=${dmx.psram || 0} on ${info0.mcu} means the automatic driver is ${want}`)
+      .toBe(want);
+  });
+
+  test('past the budget, pixel ports move to LCD_CAM together', async () => {
+    skipUnlessWrite();
+    const px0 = await pixels();
+    const dmx = await getJson(base + '/dmx.json');
+    const info0 = await getJson(base + '/info.json');
+    test.skip(!px0.rmtMax, 'firmware does not report rmtMax');
+    // On a PSRAM board the automatic choice is LCD_CAM anyway, so this proves nothing there.
+    test.skip(dmx.psram > 0, 'board has PSRAM: automatic is LCD_CAM regardless of the budget');
+    const budget = rmtBudget(px0, info0);
+    test.skip(budget + 1 > px0.ports.length, 'not enough ports to exceed the budget');
+    test.skip(!dmx.psram && dmx.heapBlock < 24000,
+      `not enough headroom without PSRAM (largest block ${dmx.heapBlock} B)`);
+
     await postConfig({ ...on(budget + 1), pixbk: 0 }, { pixelsOff: true });
     const over = await pixels();
     expect(over.ports.filter((p) => p.en).length, 'ports enabled').toBe(budget + 1);
-    expect(over.backend, 'one port past the budget falls back to the parallel backend').toBe('lcd');
-
-    // ...and it must actually clock frames, not just claim the ports.
-    const s = new UdpSender(host);
-    const data = Buffer.alloc(512).fill(0x40);
-    for (let n = 0; n < 40; n++) {
-      for (const p of over.ports.filter((q) => q.en)) await s.send(ART_PORT, artDmxPacket(p.uni, data, n));
-      await sleep(25);
-    }
-    s.close();
-    for (const p of (await pixels()).ports.filter((q) => q.en))
-      expect(p.latches, `port ${p.idx + 1} pushed frames`).toBeGreaterThan(0);
+    expect(over.backend, 'one port past the budget switches every port to the parallel backend').toBe('lcd');
   });
 
-  test('forcing LCD_CAM overrides a choice that would otherwise be RMT', async () => {
+  test('both drivers can be forced, and the forced one actually clocks frames', async () => {
     skipUnlessWrite();
     const px0 = await pixels();
-    test.skip(!px0.rmtMax, 'firmware does not report rmtMax');
     const info0 = await getJson(base + '/info.json');
     test.skip((info0.mcu || '') !== 'esp32s3', 'LCD_CAM only exists on the ESP32-S3');
+    test.skip(rmtBudget(px0, info0) < 1, 'no RMT channel free to force RMT onto');
 
-    // One port on its own always fits RMT, so anything but "rmt" here is the override working.
-    await postConfig({ ...on(1), pixbk: 0 }, { pixelsOff: true });
-    expect((await pixels()).backend, 'a single port would pick RMT').toBe('rmt');
+    for (const [pixbk, want] of [[1, 'rmt'], [2, 'lcd']]) {
+      await postConfig({ ...on(1), pixbk }, { pixelsOff: true });
+      const now = await pixels();
+      expect(now.backend, `pixbk=${pixbk} forces ${want}`).toBe(want);
+      expect(now.pixbk, 'the setting is reported back').toBe(pixbk);
 
-    await postConfig({ ...on(1), pixbk: 2 }, { pixelsOff: true });
-    const forced = await pixels();
-    expect(forced.backend, 'pixbk=2 forces the parallel backend').toBe('lcd');
-    expect(forced.pixbk, 'the setting is reported back').toBe(2);
+      const s = new UdpSender(host);
+      const data = Buffer.alloc(512).fill(0x40);
+      const before = (await pixels()).ports[0].latches;
+      for (let n = 0; n < 30; n++) { await s.send(ART_PORT, artDmxPacket(now.ports[0].uni, data, n)); await sleep(25); }
+      s.close();
+      expect((await pixels()).ports[0].latches, `${want} pushed frames`).toBeGreaterThan(before);
+    }
   });
 });
