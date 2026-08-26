@@ -32,6 +32,7 @@ async function waitForState(request, pred, ms = 45_000) {
 function fullForm(info, flips = {}) {
   const f = {
     hostname: info.hostname,
+    artshort: info.artShort || '', artlong: info.artLong || '',   // Art-Net node names (issue #129)
     otapw: info.otapw,
     protocol: String(info.protocol),
     ledtype: String(info.ledType), ledpin: String(info.ledPin),
@@ -133,6 +134,10 @@ test('every web-form option round-trips through /config', async ({ request }) =>
     ['btn2act',  '2', (d) => d.btn2Act],
     ['btnah',  true,  (d) => d.btnActiveHigh],
     ['ctlunimax','31',(d) => d.ctlUniMax],
+    // Art-Net node names (issue #129). Not CFG_KEEPNE, so unlike the hostname a blank field really
+    // clears them -- which is why they are safe to exercise here and get restored below.
+    ['artshort', 'rig short', (d) => d.artShort],
+    ['artlong',  'rig long name', (d) => d.artLong],
   ];
 
   // /info.json only echoes the RMII pin fields on a chip with an internal EMAC

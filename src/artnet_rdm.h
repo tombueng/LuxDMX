@@ -133,6 +133,22 @@ static inline void wrU16LE(uint8_t* p, uint16_t v) { p[0] = v & 0xff; p[1] = v >
 // so they can never disagree. cfg.staticIp set = a fixed address, so DHCP is off (issue #110).
 static inline bool artIpIsDhcp() { return !cfg.staticIp; }
 
+// ---- node names (ArtPollReply ShortName / LongName) ------------------------
+// Every LuxDMX used to answer with the same two hard-coded strings, so a rig with three of them
+// showed three identical rows in MagicQ's Network Manager and you could not tell which was which.
+// Serve the configured names instead, falling back to the hostname (already unique per box) and
+// only then to the product name. Settable in /config -> Device, or remotely with ArtAddress.
+static const char* artShortName() {
+    if (cfg.artShortName.length()) return cfg.artShortName.c_str();
+    if (cfg.hostname.length())     return cfg.hostname.c_str();
+    return "LuxDMX";
+}
+static const char* artLongName() {
+    if (cfg.artLongName.length())  return cfg.artLongName.c_str();
+    if (cfg.hostname.length())     return cfg.hostname.c_str();
+    return "LuxDMX Art-Net / sACN DMX gateway";
+}
+
 // ArtPollReply (239 bytes) for ONE output port. Art-Net wants a separate reply per port, each with
 // its own Net/Sub-Net switches and a unique BindIndex, because a single reply carries only one
 // Net/Sub-Net and so can't describe ports on different sub-nets. The universe is the full 15-bit
@@ -153,8 +169,8 @@ static int buildArtPollReply(uint8_t* b, int outIdx, int bindIndex) {
     bool rdmNode = g_artRdmEnabled && rdmRmtLineCount() > 0;
     b[23] = 0xd0 | (rdmNode ? 0x02 : 0x00);    // Status1: indicators normal + bit1 = RDM capable
     b[24] = 0x58; b[25] = 0x4C;               // EstaMan (lo,hi) = 0x4C58 'LX'
-    strlcpy((char*)(b + 26), "LuxDMX", 18);    // ShortName
-    strlcpy((char*)(b + 44), "LuxDMX Art-Net / sACN DMX gateway", 64);  // LongName
+    strlcpy((char*)(b + 26), artShortName(), 18);   // ShortName (18 incl. NUL)
+    strlcpy((char*)(b + 44), artLongName(),  64);   // LongName  (64 incl. NUL)
     strlcpy((char*)(b + 108), "#0001 [0] OK", 64);   // NodeReport
     // one output port
     b[173] = 1;                                // NumPortsLo = 1
@@ -341,6 +357,25 @@ static int artOutForBindIndex(uint8_t bind) {
     return -1;
 }
 
+// Copy one Art-Net name field (NUL-padded, fixed width) out of an ArtAddress into a config string.
+// The names have no "bit 7 = program me" convention the way the address fields do, so an empty or
+// all-blank field is how a console says "leave this alone" -- a controller that only wants to move a
+// universe must not blank the label on its way past. Returns true only when the value really changed.
+// Non-printable bytes are dropped: this string ends up in /info.json and the web UI.
+static bool artTakeName(String& dst, const uint8_t* src, int cap) {
+    char buf[65];
+    int  n = 0;
+    for (int i = 0; i < cap - 1 && src[i]; i++) {
+        uint8_t c = src[i];
+        if (c >= 0x20 && c < 0x7f) buf[n++] = (char)c;
+    }
+    while (n > 0 && buf[n - 1] == ' ') n--;            // consoles pad the field with spaces
+    buf[n] = '\0';
+    if (n == 0 || dst == buf) return false;
+    dst = buf;
+    return true;
+}
+
 // Unicast one ArtPollReply per enabled output (each with its own BindIndex + universe) back to `ip`.
 // Used to answer both ArtPoll and ArtAddress (the spec requires ArtAddress to be confirmed with an
 // ArtPollReply, which is also how a console reads back the change it just made).
@@ -378,14 +413,57 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
         return;
     }
     case ARTNET_OP_ADDRESS: {
-        // Remote port configuration (DMX-Workshop's "Configure Port" dialog). Command @ byte 106,
-        // BindIndex @ byte 13 selects the port. We honour merge mode + background queue policy +
-        // output-clear here; universe/port-name programming is intentionally not handled yet.
+        // Remote node/port configuration: MagicQ's Network Manager, DMX-Workshop's "Configure Port"
+        // dialog, and friends (issue #129). One packet can carry several independent things, so all
+        // of them are processed before the reply: the node names (ShortName @14, LongName @32), this
+        // port's address (NetSwitch @12, SubSwitch @104, SwOut @100), and a Command @106. BindIndex
+        // @13 picks which output the port fields apply to.
+        //
+        // NOTE, and it is deliberate: this is NOT gated behind a config flag the way ArtIpProg is.
+        // Art-Net has no authentication, so anyone on the show network can rename the node and move
+        // its universes. That is the same exposure the merge-mode and transmit-style commands below
+        // have had all along, and a console being able to configure the node is the whole point of
+        // the feature. Keep the node off untrusted networks; do not add a switch here.
         if (n < 107) return;
         uint8_t bindIndex = p[13];
         uint8_t cmd       = p[106];
         int out = artOutForBindIndex(bindIndex ? bindIndex : 1);
         uint8_t hi = cmd & 0xf0;
+        bool    dirty = false;
+
+        // --- node names -----------------------------------------------------
+        if (artTakeName(cfg.artShortName, p + 14, 18)) {
+            dirty = true;
+            Serial.printf("[ART-ADDR] ShortName = \"%s\"\n", cfg.artShortName.c_str());
+        }
+        if (artTakeName(cfg.artLongName, p + 32, 64)) {
+            dirty = true;
+            Serial.printf("[ART-ADDR] LongName = \"%s\"\n", cfg.artLongName.c_str());
+        }
+
+        // --- this port's 15-bit port-address --------------------------------
+        // Art-Net's programming convention: NetSwitch / SubSwitch / SwOut are only applied when
+        // bit 7 of the byte is set (to program 0x07 a console sends 0x87); bit 7 clear means "leave
+        // unchanged". Skipping that check would zero the universe on every unrelated ArtAddress --
+        // a console flipping the merge mode would silently move the port to universe 0.
+        // SwOut is an array of four, one per physical port of a 4-port node; BindIndex already
+        // selected the port, so only SwOut[0] belongs to it. The field widths (7 bits of Net, 4 of
+        // Sub, 4 of SwOut) bound the result to 0..32767, which is exactly the schema range of `uni`.
+        if (out >= 0) {
+            uint16_t was = (uint16_t)cfg.outputs[out].universe, uni = was;
+            if (p[12]  & 0x80) uni = (uint16_t)((uni & 0x00ff) | ((uint16_t)(p[12]  & 0x7f) << 8));
+            if (p[104] & 0x80) uni = (uint16_t)((uni & 0xff0f) | ((uint16_t)(p[104] & 0x0f) << 4));
+            if (p[100] & 0x80) uni = (uint16_t)((uni & 0xfff0) |  (uint16_t)(p[100] & 0x0f));
+            if (uni != was) {
+                cfg.outputs[out].universe = (int)uni;
+                dirty = true;
+                // Art-Net needs nothing (routeFrame dispatches on each packet's own universe), but
+                // sACN listens on a per-universe multicast group. Only netRxTask may touch the
+                // sockets, so raise the flag it drains rather than re-joining from here.
+                if (cfg.protocol != 0) g_sacnRejoin = true;
+                Serial.printf("[ART-ADDR] out%d universe %u -> %u (bind %u)\n", out, was, uni, bindIndex);
+            }
+        }
         if (cmd >= AC_BQP0) {                                  // 0xe0..0xef: background queue policy 0..15
             g_bqPolicy = cmd - AC_BQP0;
             g_bqDirty  = true;
@@ -411,10 +489,20 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
                 Serial.printf("[ART-ADDR] out%d mergeMode = %d (bind %u)\n",
                               out, cfg.outputs[out].mergeMode, bindIndex);
             }
+        } else if (hi == AC_CLEAR_OP0) {
+            // AcClearOp: zero this port's frame buffer. Not persisted (it is a live action, not a
+            // setting) and not a blackout: a source that keeps streaming refills the buffer on its
+            // very next frame, which is what the spec describes. Same seqlock the merge engine uses,
+            // and we are on core 0 here just like it is, so there is no new writer.
+            if (out >= 0) {
+                dmxWriteBegin(out); memset(&dmxBuf[out][1], 0, 512); dmxWriteEnd(out);
+                Serial.printf("[ART-ADDR] out%d output cleared (bind %u)\n", out, bindIndex);
+            }
         }
-        // (AcClearOp / universe / port-name programming intentionally not handled yet.)
+        if (dirty) g_artCfgDirty = true;   // loop() persists via saveConfig()
         // Every ArtAddress must be answered with an ArtPollReply (spec) -- also how the console reads
-        // back the applied value and repaints its dialog.
+        // back what was applied and repaints its dialog. Built after the changes above, so a console
+        // that just renamed the node or moved a universe sees the new value in the same exchange.
         artSendPollReplies(ip);
         return;
     }

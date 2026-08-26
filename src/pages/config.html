@@ -686,6 +686,21 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
           <div class="form-text" id="dev-host-url"></div>
         </div>
         <div class="mb-3">
+          <label class="form-label text-secondary small mb-1">Art-Net node name (short)</label>
+          <input class="form-control" type="text" name="artshort" id="dev-artshort" maxlength="17" value="">
+          <div class="form-text">
+            What a console lists this box as (Art-Net ShortName, 17 characters). Leave empty to use
+            the hostname. A console can also set this over the network.
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-secondary small mb-1">Art-Net node name (long)</label>
+          <input class="form-control" type="text" name="artlong" id="dev-artlong" maxlength="63" value="">
+          <div class="form-text">
+            The longer description shown next to it (Art-Net LongName, 63 characters). Empty = hostname.
+          </div>
+        </div>
+        <div class="mb-3">
           <label class="form-label text-secondary small mb-1">OTA Password</label>
           <input class="form-control" type="text" name="otapw" id="dev-otapw" maxlength="32" value="">
           <div class="form-text text-secondary small">
@@ -1043,6 +1058,11 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   if (ETH_SPI || ETH_RMII)  $('w5500-card').style.display = '';    // build has a wired PHY -> show the card
   updWired();                                                      // map selection -> hidden fields + visibility
   $('dev-host').value = d.hostname || '';
+  $('dev-artshort').value = d.artShort || '';
+  $('dev-artlong').value  = d.artLong  || '';
+  // Empty means "use the hostname" -- show that as the placeholder so the field doesn't look unset.
+  $('dev-artshort').placeholder = d.hostname || 'LuxDMX';
+  $('dev-artlong').placeholder  = d.hostname || 'LuxDMX Art-Net / sACN DMX gateway';
   $('dev-otapw').value = d.otapw || '';
   $('auto-update-sw').checked = !!d.autoUpdate;
   updNetMode(); updLedPin(); updDispPins(); updHostUrl(); updSummaries();

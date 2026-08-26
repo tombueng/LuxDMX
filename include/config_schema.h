@@ -30,6 +30,13 @@ struct DmxOutput {
 
 struct Config {
     String    hostname;
+    // Node names a console sees in its Art-Net node list (ArtPollReply ShortName / LongName,
+    // programmable from the console with ArtAddress, issue #129). Kept apart from `hostname`
+    // on purpose: hostname drives mDNS and the DHCP client name and needs a reboot, while
+    // these are a pure label. Empty = fall back to the hostname, so two boxes on the same
+    // wire are still told apart without setting anything.
+    String    artShortName;   // <= 17 chars on the wire (18 with the NUL)
+    String    artLongName;    // <= 63 chars on the wire (64 with the NUL)
     String    otaPassword;
     // Board the USER picked in /config's board selector. Purely a UI/pin-map choice, the
     // firmware itself never acts on it, but it has to be persisted, because the board a

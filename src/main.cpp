@@ -1298,6 +1298,12 @@ static void rdmSavePoll() {
     prefs.end();
 }
 
+// A universe changed while running (the on-unit controls menu, issue #24, or a console
+// programming it over Art-Net with ArtAddress, issue #129). sACN listens on a per-universe
+// multicast group and only netRxTask may touch the sockets, so both paths raise this and let
+// that task re-join. Declared here because artnet_rdm.h below sets it too.
+static volatile bool     g_sacnRejoin  = false;
+
 // Art-Net 4 RDM bridge (ArtPoll/ArtTod*/ArtRdm). Uses rdm_rmt.h's raw relay + discovery
 // primitives and the RdmDevice table / rdmDevices[] declared above. See docs/rdm.md.
 #include "artnet_rdm.h"
@@ -2234,6 +2240,10 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"ssid\":\"";     j += netSSID();              j += "\",";
     j += "\"ip\":\"";       j += netLocalIP().toString(); j += "\",";
     j += "\"hostname\":\""; j += cfg.hostname;           j += "\",";
+    // Art-Net node names (issue #129). Empty = the reply falls back to the hostname; the /config
+    // page shows that fallback as the placeholder rather than pretending the field is set.
+    j += "\"artShort\":\""; j += jsonEsc(cfg.artShortName); j += "\",";
+    j += "\"artLong\":\"";  j += jsonEsc(cfg.artLongName);  j += "\",";
     j += "\"version\":\"";  j += FIRMWARE_VERSION;       j += "\",";
     j += "\"otapw\":\"";    j += cfg.otaPassword;        j += "\",";
     j += "\"universe\":";   j += cfg.outputs[0].universe; j += ",";   // legacy/back-compat
@@ -3665,7 +3675,6 @@ static volatile int      ctlDirectUni     = 0;
 
 static volatile uint32_t ctlFlashUntil = 0;      // brief SAVED/REBOOT banner deadline
 static char              ctlFlashMsg[10] = "SAVED";
-static volatile bool     g_sacnRejoin  = false;  // ask netRxTask (the socket owner) to re-join sACN
 
 // The display shows the controls overlay/menu whenever it's open, being edited, or
 // a just-committed banner is still up.
