@@ -145,10 +145,42 @@ peripheral, `dmx_rmt.h`, so it is hardware-timed and never corrupts even while R
 
 ### Remote configuration over Art-Net (`ArtAddress`)
 
-A console's port-config dialog (e.g. DMX-Workshop's *Configure Port*) reaches the node with an
-`ArtAddress` (OpCode `0x6000`); the node applies the change and confirms with an `ArtPollReply`.
-Art-Net 4 addresses the target port by the `BindIndex` field, so the deprecated per-port command
-variants (`…1/2/3`) are treated the same as `…0`. Handled commands:
+A console's node/port config window (MagicQ's *Network Manager*, DMX-Workshop's *Configure Port*)
+reaches the node with an `ArtAddress` (OpCode `0x6000`); the node applies the change and confirms
+with an `ArtPollReply`. Art-Net 4 addresses the target port by the `BindIndex` field, so the
+deprecated per-port command variants (`…1/2/3`) are treated the same as `…0`.
+
+One packet carries the node names, the port address and a command all at once, and all three are
+processed before the reply goes out, so a console reads back everything it just set in the same
+exchange.
+
+**No authentication.** Art-Net has none, and unlike `ArtIpProg` (issue #110) this is **not** behind a
+config flag: anyone who can send a UDP packet to the node can rename it and move its universes. That
+is the same exposure the merge / transmit-style commands below always had, and being configurable
+from the console is the point of the feature. Do not add a switch for it.
+
+Handled fields:
+
+- **Node names**: `ShortName` (@14, 18 bytes) and `LongName` (@32, 64 bytes), stored as `artshort` /
+  `artlong` and served straight back in `ArtPollReply`. Unlike the address fields these have no
+  "bit 7 = program me" convention, so an empty (all-zero or all-blank) field means *leave it alone* --
+  otherwise a console that only wanted to move a universe would wipe the label on its way past.
+  They are deliberately **not** `cfg.hostname`: that one drives mDNS and the DHCP client name and
+  needs a reboot, while these are a pure display label. Empty falls back to the hostname, so a rack
+  of LuxDMX boxes is distinguishable without configuring anything (they all used to answer "LuxDMX").
+- **Port address**: `NetSwitch` (@12, bits 8..14), `SubSwitch` (@104, bits 4..7) and `SwOut[0]`
+  (@100, bits 0..3) compose the 15-bit port-address, i.e. that output's universe. Each byte is only
+  applied when **bit 7 is set** (to program `0x07` a console sends `0x87`); bit 7 clear means "leave
+  unchanged", and skipping that check would zero the universe on every unrelated `ArtAddress`.
+  `SwOut` is an array of four for a 4-port node -- `BindIndex` already picked the port, so only
+  `SwOut[0]` is ours. Applied **live**: Art-Net re-routes by the packet's own universe anyway, and
+  sACN's per-universe multicast group is re-joined by `netRxTask` (the socket owner). Persisted to
+  NVS. The same universe on two outputs is allowed on purpose -- that is the passive-splitter setup.
+- **Output clear**: `AcClearOp0` (0x90) zeroes that port's frame buffer through the same seqlock the
+  merge engine uses. Not persisted and not a blackout latch: a source that keeps streaming refills
+  the buffer on its next frame, which is what the spec describes.
+
+Handled commands:
 
 - **Merge mode**: `AcMergeHtp0` (0x50) → HTP, `AcMergeLtp0` (0x10) → LTP, `AcCancelMerge` (0x01) →
   off. Maps straight onto that output's `mergeMode`, applied **live** (merge reads it per frame, no
@@ -162,12 +194,11 @@ variants (`…1/2/3`) are treated the same as `…0`. Handled commands:
   and caches the highest-severity result per device, surfaced in `/rdm.json` (`stType` / `stId` /
   `stCount`) and as a badge on the RDM tab. Also settable locally: the **Health poll** selector on the
   RDM tab, or `GET /rdm/bqp?p=N`.
-- Universe / port-name programming from `ArtAddress` is **not** handled yet (changing a universe would
-  desync the boot-time RDM line mapping); set those on the device's own web config instead.
 
 ### Renumbering an output
 
-Change an output's universe in `/config` and the fixtures already discovered on it come along:
+Change an output's universe in `/config` (or from a console with `ArtAddress`) and the fixtures
+already discovered on it come along:
 the Table of Devices answers under the new port-address straight away, with no re-scan and no
 reboot. A discovered fixture's universe is derived from the RDM line it answered on (the physical
 transceiver), never stored per fixture, so there is nothing that can go stale. Fixtures whose line

@@ -58,6 +58,11 @@ static const char* const ENUM_TXSRC[]   = {"set here", "set over Art-Net"};
 const CfgField CONFIG_FIELDS[] = {
     // --- Identity / general -------------------------------------------------
     SFIELD("hostname", "hostname", hostname,    "Hostname",       "Identity", CFG_KEEPNE),
+    // What a console shows in its node list (ArtPollReply ShortName / LongName, issue #129).
+    // LIVE: the reply is built from config on every ArtPoll, nothing to re-init. Blank is a real
+    // value here (it means "use the hostname"), so no CFG_KEEPNE -- clearing the field must work.
+    SFIELD_L("artshort", "artShort", artShortName, "Art-Net short name", "Identity", CFG_NONE),
+    SFIELD_L("artlong",  "artLong",  artLongName,  "Art-Net long name",  "Identity", CFG_NONE),
     // The /config board selector's choice ("luxdmx_v6", "custom", a catalog id, ...). UI state,
     // not something the firmware reads, but it must survive a reboot/OTA, since the board a
     // build reports is compile-time and a v6 runs the generic esp32s3dev build.

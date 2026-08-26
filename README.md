@@ -81,6 +81,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Up to 2 DMX outputs** | Two independent universes, each its own UART + RS485 transceiver (same universe on both = splitter) |
 | **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
 | **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
+| **Remote node config (ArtAddress)** | Configure the node from the console's own network window (MagicQ Network Manager, DMX-Workshop, ...): rename it and move each output to a different universe, saved to NVS so it survives a reboot. On by default and **unauthenticated**, like every other Art-Net command. See [Remote node config over Art-Net](#remote-node-config-over-art-net-artaddress) |
 | **Remote IP config (ArtIpProg)** | A controller can read and set the node's IP / mask / gateway (or switch it to DHCP) over the network with Art-Net `ArtIpProg`, so a box that landed on an unreachable address is recoverable without the BOOT button or a serial cable. **Off by default** (Art-Net has no auth, so on = anyone on the wire can renumber it); the new address applies on the next boot. See [Remote IP config over Art-Net](#remote-ip-config-over-art-net-artipprog-off-by-default) |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
 | **On-unit controls** | Optional rotary encoder and/or up to 4 buttons drive a small on-display menu to set the universe (and protocol) without a phone or PC, and the choice persists. Works with any mix of inputs — encoder-only, one button, or the lot. See [docs/controls.md](docs/controls.md) |
@@ -648,6 +649,38 @@ A programmed address is **stored and applied on the next reboot**, not slammed o
 interface, so a controller can't knock a live node off the wire mid-frame. The reply confirms what was
 stored, and the change takes effect cleanly at the next boot.
 
+#### Remote node config over Art-Net (ArtAddress)
+
+Consoles expect to configure an Art-Net node without leaving the console. LuxDMX answers
+**ArtAddress** (opcode `0x6000`), so from MagicQ's *Network Manager* (or DMX-Workshop, OLA,
+grandMA3, ...) you can:
+
+- **Rename the node.** The short and long names a console lists it under. They are stored separately
+  from the hostname on purpose: the hostname drives mDNS and the DHCP client name and needs a reboot,
+  while these are just a label. Set them locally too, in **`/config` → Device**.
+- **Move an output to another universe.** The console programs `NetSwitch` / `SubSwitch` / `SwOut`,
+  which together make the 15-bit port-address; `BindIndex` picks which output. It applies **live** (no
+  reboot, and sACN re-joins the new multicast group by itself) and is written to NVS.
+- **Set the merge mode** (`AcMergeHtp` / `AcMergeLtp` / `AcCancelMerge`), the **transmit style**
+  (`AcStyleDelta` / `AcStyleConst`) and the **BackgroundQueuePolicy** (`AcBqp0`…`AcBqp15`), all of
+  which have been there since the RDM gateway landed.
+- **Clear an output** (`AcClearOp`): zeroes that port's frame buffer. It is not a blackout latch, a
+  source that keeps streaming refills it on the next frame.
+
+Every ArtAddress is answered with an **ArtPollReply**, which is how the console reads back what
+actually got applied.
+
+Until a name is set, the node advertises its **hostname**, so several LuxDMX boxes on one network are
+told apart out of the box. (They all used to answer "LuxDMX", which made a rack of them useless to
+pick from in a node list.)
+
+> **This is unauthenticated, and it is on.** Art-Net has no auth, no rate limit and no notion of who
+> owns a node, so anyone who can send a UDP packet to the device can rename it or move its universes.
+> There is deliberately no switch to turn it off: the same is already true of every other Art-Net
+> command the node accepts, and being configurable from the console is the entire point. Treat a show
+> network as the trust boundary. (`ArtIpProg` above is the exception, and stays off by default,
+> because a bad address is the one change that can make the device unreachable.)
+
 ### 2. Status Page
 
 Open `http://dmx-gateway.local` (mDNS), or `http://dmx-gateway/` if your router resolves DHCP hostnames (handy on Windows, which has no mDNS), or the IP shown in serial monitor at 115200 baud:
@@ -1161,6 +1194,8 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Protocol | `Both (Art-Net + sACN)` | Web `/config` |
 | Static IP / gateway / subnet / DNS | DHCP | Web `/config` (Network) |
 | Art-Net remote IP config (`ipprog`) | **off** | Web `/config` (Network) |
+| Art-Net node name, short (`artshort`) | — (falls back to the hostname) | Web `/config` (Device), or a console via `ArtAddress` |
+| Art-Net node name, long (`artlong`) | — (falls back to the hostname) | Web `/config` (Device), or a console via `ArtAddress` |
 | Auto-update | off | Web `/config` (Firmware) |
 | RDM over Art-Net (`artrdm`) | on | Web `/config` (RDM) |
 | RDM device limit (`rdmmaxdev`) | `0` (auto: **64** on ESP32-S3 / PSRAM, **16** on the classic ESP32) | Web `/config` (RDM) |
@@ -1168,7 +1203,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Hostname | `dmx-gateway` | Web `/config` |
 | OTA Password (IDE `espota` only) | `dmxota` | Web `/config` |
 | LED type / GPIO pin | board default | Web `/config` (Status LED) |
-| Per-output: enabled / universe / UART port / TX / RX / RTS | A on (uni 0, UART1, TX=17, RX=16, RTS=−1); B off | Web `/config` (DMX Outputs) |
+| Per-output: enabled / universe / UART port / TX / RX / RTS | A on (uni 0, UART1, TX=17, RX=16, RTS=−1); B off | Web `/config` (DMX Outputs); the universe also from a console via `ArtAddress` |
 | Display type / pins | off | Web `/config` (Display) |
 | WiFi credentials | — | Setup portal, Web `/config` (Network), or `/reset` |
 

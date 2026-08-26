@@ -39,6 +39,10 @@ export function configForm(snapshot, overrides = {}, outIdx = 1) {
   const f = {
     protocol: String(snapshot.protocol),
     hostname: snapshot.hostname,
+    // Art-Net node names (issue #129). Not CFG_KEEPNE, so an empty string really clears them --
+    // which is what makes this helper a faithful round-trip either way.
+    artshort: snapshot.artShort || '',
+    artlong: snapshot.artLong || '',
     otapw: snapshot.otapw,
     ledtype: String(snapshot.ledType),
     ledpin: String(snapshot.ledPin),
