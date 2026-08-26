@@ -16,9 +16,9 @@
 // reboot, then restore. afterAll re-POSTs the whole /config form rebuilt from the opening snapshot,
 // so a run leaves the device exactly as it found it.
 import { test, expect } from '@playwright/test';
-import { deviceHost, sleep } from './lib/net.mjs';
+import { deviceHost, sleep, e131Packet, streamFor, prepInput, UdpSender, SACN_PORT } from './lib/net.mjs';
 import { ArtRdmClient, uniParts, AC_CANCEL_MERGE } from './lib/artrdm.mjs';
-import { info, configForm, pollFor, waitForState } from './lib/device.mjs';
+import { info, dmx, configForm, pollFor, waitForState } from './lib/device.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 const AC_NONE = 0x00;   // "no command"; the packet is only carrying fields
@@ -143,10 +143,23 @@ test.describe('ArtAddress programming', () => {
   test('the universe programmed over the wire is the one the node actually listens on', async ({ request }) => {
     const d = await info(request);
     const uni = d.outputs[0].uni;
-    // ArtPollReply is the console's read-back, so it has to agree with the running config, and the
-    // sACN side has re-joined the group for uni+1 (asserted on the wire by sacn.spec.mjs; here we
-    // pin the contract that the reply and /info.json never disagree after a remote change).
+    // ArtPollReply is the console's read-back, so it has to agree with the running config.
     const r = await c.poll();
     expect(r.universe, 'ArtPollReply and /info.json agree after a remote change').toBe(uni);
+
+    // And the input side follows: sACN on the NEW universe (Art-Net universe + 1) drives the output.
+    // Sent unicast, like the whole suite does -- see the note in docs/tests/README.md. That means
+    // this proves the routing followed the change, NOT that the multicast group was re-joined:
+    // multicast does not reach the DUT across this bench, so the beginMulticast() call the rejoin
+    // flag triggers is only observable on the device's serial log ("[sACN] out0 universe ...").
+    await prepInput(host);
+    const sender = new UdpSender(host);
+    const data = Buffer.alloc(512, 0); data[0] = 173; data[1] = 42;
+    try {
+      await streamFor(sender, SACN_PORT, (seq) => e131Packet(uni + 1, data, seq), { ms: 1200, hz: 40 });
+    } finally { sender.close(); }
+    const got = await pollFor(() => dmx(request), (x) => x.ch[0] === 173, { ms: 5000 });
+    expect(got.ch[0], `sACN universe ${uni + 1} reaches the remotely programmed output`).toBe(173);
+    expect(got.ch[1]).toBe(42);
   });
 });
