@@ -989,6 +989,11 @@ function updHostUrl(){ $('dev-host-url').textContent = 'http://' + $('dev-host')
 
 // Populate every field from /info.json (page itself is served statically)
 fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
+  // A response that parses but isn't this device's config (a half-booted device, an error body,
+  // a captive portal) must NOT be treated as settings. Without this the page happily rendered
+  // invented pins with Save still enabled, and saving wrote them over a working setup -- the
+  // same "output A on GPIO17, output B off" the catch below already guards against (issue #132).
+  if (!d || typeof d !== 'object' || !Array.isArray(d.outputs)) throw new Error('incomplete /info.json');
   CURRENT = d.version || '';
   $('cur-ver').textContent = 'v' + CURRENT;
   $('proto-sel').value = d.protocol;
@@ -1011,7 +1016,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('led-y').value = d.ledY !== undefined ? d.ledY : -1;
   $('led-b').value = d.ledB !== undefined ? d.ledB : -1;
   $('led-w').value = d.ledW !== undefined ? d.ledW : -1;
-  buildOutputs(d.outputs || [{en:true, uni:d.universe||0, port:1, tx:17, rx:16, rts:-1}]);
+  buildOutputs(d.outputs);
   $('disp-type').value = d.dispType !== undefined ? d.dispType : 0;
   $('disp-sda').value  = d.dispSda  !== undefined ? d.dispSda  : 21;
   $('disp-scl').value  = d.dispScl  !== undefined ? d.dispScl  : 22;
@@ -1071,7 +1076,8 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   initBoards();
   loadVersions();
 }).catch(function(){
-  // Could not read the device's current settings. Render the skeleton so the page isn't blank,
+  // Could not read the device's current settings -- no answer, or an answer that wasn't the
+  // config (see the guard above). Render the skeleton so the page isn't blank,
   // but do NOT let it be saved: these are hardcoded placeholders, not this device's config, and
   // saving them would overwrite a perfectly good setup with defaults. Seen for real when the page
   // was opened while the device was still rebooting -- it silently offered "output A on GPIO17,
