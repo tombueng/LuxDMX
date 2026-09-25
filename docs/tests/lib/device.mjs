@@ -71,7 +71,60 @@ export function configForm(snapshot, overrides = {}, outIdx = 1) {
     f[`o${i}_rate`]  = String(o.rate ?? 0);
     f[`o${i}_style`] = String(o.style ?? 0);
   });
+  Object.assign(f, pixelFormFields(snapshot.pixels));
   return f;
+}
+
+// The p<i>_* half of a /config body. The pixel ports are not in /info.json (deliberately: it
+// gets polled, and a strip's settings are not status) but they ARE in the same form, and
+// handleConfigPost drives p<i>_en, p<i>_statid and p<i>_vserp from checkbox PRESENCE like
+// every other bool. Leave them out and the save switches all five ports off -- and the usual
+// "post the snapshot back" cleanup posts the same gap a second time, so nothing comes back.
+// Build the snapshot with configSnapshot() and this fills itself in; pass a snapshot without
+// `pixels` and it writes nothing, which is only safe on a device that has no pixel ports set up.
+export function pixelFormFields(ports) {
+  const f = {};
+  (ports || []).forEach((p, i) => {
+    if (p.en)       f[`p${i}_en`]     = '1';   // omitted key == disabled
+    if (p.statusIdle) f[`p${i}_statid`] = '1';
+    if (p.viewSerp) f[`p${i}_vserp`]  = '1';
+    f[`p${i}_pin`]     = String(p.pin);
+    f[`p${i}_count`]   = String(p.count);
+    f[`p${i}_chip`]    = String(p.chip);
+    f[`p${i}_order`]   = String(p.order);
+    f[`p${i}_uni`]     = String(p.uni);
+    f[`p${i}_start`]   = String(p.start);
+    f[`p${i}_unimode`] = String(p.uniMode);
+    f[`p${i}_latch`]   = String(p.latch);
+    f[`p${i}_fpscap`]  = String(p.fpsCap);
+    f[`p${i}_bright`]  = String(p.bright);
+    f[`p${i}_gamma`]   = String(p.gamma);
+    f[`p${i}_maxma`]   = String(p.maxMa);
+    f[`p${i}_machan`]  = String(p.mAPerCh);
+    f[`p${i}_quiesma`] = String(p.quiesMa);
+    f[`p${i}_loss`]    = String(p.loss);
+    f[`p${i}_vcols`]   = String(p.viewCols);
+    f[`p${i}_vrows`]   = String(p.viewRows);
+  });
+  return f;
+}
+
+// The pixel ports, or [] on a device (or a firmware) that has none.
+export async function pixelPorts(request) {
+  try {
+    const r = await request.get('/pixels.json');
+    if (!r.ok()) return [];
+    const j = await r.json();
+    return Array.isArray(j.ports) ? j.ports : [];
+  } catch { return []; }
+}
+
+// The snapshot a /config POST has to be built from: /info.json plus the pixel ports. Use this
+// instead of info() anywhere the result is going to be turned into a form body.
+export async function configSnapshot(request) {
+  const d = await info(request);
+  d.pixels = await pixelPorts(request);
+  return d;
 }
 
 // Poll /info.json across a reboot until `pred(info)` holds on TWO consecutive

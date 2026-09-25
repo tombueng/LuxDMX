@@ -18,7 +18,7 @@
 import { test, expect } from '@playwright/test';
 import { deviceHost, sleep, e131Packet, streamFor, prepInput, UdpSender, SACN_PORT } from './lib/net.mjs';
 import { ArtRdmClient, uniParts, AC_CANCEL_MERGE } from './lib/artrdm.mjs';
-import { info, dmx, configForm, pollFor, waitForState } from './lib/device.mjs';
+import { info, dmx, configForm, pollFor, waitForState, configSnapshot } from './lib/device.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 const AC_NONE = 0x00;   // "no command"; the packet is only carrying fields
@@ -74,7 +74,7 @@ test.describe('ArtAddress programming', () => {
   test.skip(!WRITE, 'set LUXDMX_WRITE=1 to run the config-mutating ArtAddress tests');
 
   let snap;
-  test.beforeAll(async ({ request }) => { snap = await info(request); });
+  test.beforeAll(async ({ request }) => { snap = await configSnapshot(request); });
 
   // Put everything back exactly as it was. One POST of the complete /config form rebuilt from the
   // opening snapshot restores the names AND every output's universe, and leaves the rest untouched.

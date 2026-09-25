@@ -9,7 +9,7 @@ import {
   deviceHost, UdpSender, streamFor, artDmxPacket, e131Packet, prepInput,
   wsFirstBinary, ART_PORT, SACN_PORT,
 } from './lib/net.mjs';
-import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
+import { info, dmx, pollFor, waitForState, pixelFormFields, configSnapshot } from './lib/device.mjs';
 
 let host;
 test.beforeAll(async () => { host = await deviceHost(); });
@@ -55,13 +55,16 @@ function configForm(snap, o0Overrides = {}) {
     f[`o${i}_rts`]   = String(o.rts);
     f[`o${i}_merge`] = String(o.merge ?? 0);
   });
+  // The pixel ports are in this form too, and p<i>_en is a checkbox like every other bool:
+  // leave them out and the save switches all five off. See pixelFormFields().
+  Object.assign(f, pixelFormFields(snap.pixels));
   return f;
 }
 
 test.describe('Source merging (issue #10)', () => {
   // ── shape + UI (read-only) ────────────────────────────────────────────────
   test('/info.json exposes a numeric merge mode per output', async ({ request }) => {
-    const d = await info(request);
+    const d = await configSnapshot(request);
     for (const o of d.outputs) {
       expect(o, 'output missing "merge"').toHaveProperty('merge');
       expect(typeof o.merge, 'merge is a number').toBe('number');
@@ -82,7 +85,7 @@ test.describe('Source merging (issue #10)', () => {
   // unmanaged clash → the WS frame must report conflict (srcStatus 1). Default
   // merge mode is Off, so this needs no config change.
   test('two sources with merging off report the conflict status', async ({ request }) => {
-    const before = await info(request);
+    const before = await configSnapshot(request);
     test.skip(before.outputs[0].merge !== 0, 'output A is not in Off merge mode');
     const art = before.outputs[0].uni, sacn = art + 1;
     await prepInput(host);
@@ -104,7 +107,7 @@ test.describe('Source merging (issue #10)', () => {
     test.skip(process.env.LUXDMX_WRITE !== '1',
       'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device twice)');
     test.setTimeout(120_000);   // two reboots
-    const before = await info(request);
+    const before = await configSnapshot(request);
     const art = before.outputs[0].uni, sacn = art + 1;
     try {
       await request.post('/config', { form: configForm(before, { merge: 1 }) });
@@ -161,7 +164,7 @@ test.describe('Source merging (issue #10)', () => {
     test.skip(process.env.LUXDMX_WRITE !== '1',
       'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device twice)');
     test.setTimeout(120_000);   // two reboots
-    const before = await info(request);
+    const before = await configSnapshot(request);
     const art = before.outputs[0].uni, sacn = art + 1;
     try {
       await request.post('/config', { form: configForm(before, { merge: 1 }) });
@@ -194,7 +197,7 @@ test.describe('Source merging (issue #10)', () => {
     test.skip(process.env.LUXDMX_WRITE !== '1',
       'set LUXDMX_WRITE=1 to run device-mutating tests (reboots the device twice)');
     test.setTimeout(120_000);   // two reboots
-    const before = await info(request);
+    const before = await configSnapshot(request);
     try {
       await request.post('/config', { form: configForm(before, { merge: 2 }) });
       const mid = await waitForState(request, (d) => d.outputs[0].merge === 2);

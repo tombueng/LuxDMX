@@ -7,6 +7,7 @@
 //
 // Mutating + reboots the device, opt-in via LUXDMX_WRITE=1.
 import { test, expect, request as pwRequest } from '@playwright/test';
+import { pixelFormFields, pixelPorts } from './lib/device.mjs';
 
 // Return only after `pred` holds on TWO consecutive reads, so the device is
 // solidly back up (not mid-reboot) before the next test runs against it.
@@ -71,6 +72,9 @@ function fullForm(info, flips = {}) {
     f[`o${i}_rts`] = String(o.rts); f[`o${i}_merge`] = String(o.merge);
     f[`o${i}_loss`] = String(o.loss);
   });
+  // The pixel ports are in this form too, and p<i>_en is a checkbox like every other bool:
+  // leave them out and the save switches all five off. See pixelFormFields().
+  Object.assign(f, pixelFormFields(info.pixels));
   // apply overrides; a null value deletes the key (turns a checkbox off)
   for (const [k, v] of Object.entries(flips)) { if (v === null) delete f[k]; else f[k] = v; }
   return f;
@@ -82,6 +86,10 @@ test('every web-form option round-trips through /config', async ({ request }) =>
   test.setTimeout(180_000);
 
   const before = await (await request.get('/info.json')).json();
+  // The pixel ports are not in /info.json but they are in this form, and their `en` is a
+  // checkbox: a body without them switches every port off, and the restore at the end of
+  // this test would post the same gap again rather than putting them back.
+  before.pixels = await pixelPorts(request);
 
   // form key -> [test value, getter(info) for read-back]. Connectivity + secret +
   // display-enable fields are intentionally excluded (see file header).

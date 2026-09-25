@@ -16,7 +16,7 @@ import {
   deviceHost, UdpSender, streamFor, artDmxPacket, e131Packet, prepInput, sleep,
   ART_PORT, SACN_PORT,
 } from './lib/net.mjs';
-import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
+import { info, dmx, pollFor, waitForState, pixelFormFields, configSnapshot } from './lib/device.mjs';
 
 const HOLD = 0, BLACKOUT = 1, STOP = 2;
 const SOURCE_TIMEOUT_MS = 4000;                 // matches firmware SOURCE_TIMEOUT_MS
@@ -65,6 +65,9 @@ function configForm(snap, o0Overrides = {}) {
     f[`o${i}_rate`]  = String(o.rate ?? 0);
     f[`o${i}_style`] = String(o.style ?? 0);
   });
+  // The pixel ports are in this form too, and p<i>_en is a checkbox like every other bool:
+  // leave them out and the save switches all five off. See pixelFormFields().
+  Object.assign(f, pixelFormFields(snap.pixels));
   return f;
 }
 
@@ -108,7 +111,7 @@ function skipUnlessWrite() {
 test.describe('Signal-loss policy', () => {
   // ── shape + UI (read-only) ───────────────────────────────────────────────
   test('/info.json exposes a numeric loss mode per output', async ({ request }) => {
-    const d = await info(request);
+    const d = await configSnapshot(request);
     for (const o of d.outputs) {
       expect(o, 'output missing "loss"').toHaveProperty('loss');
       expect(typeof o.loss, 'loss is a number').toBe('number');
@@ -129,7 +132,7 @@ test.describe('Signal-loss policy', () => {
   test('HOLD keeps the last frame after the source stops (Art-Net + sACN)', async ({ request }) => {
     skipUnlessWrite();
     test.setTimeout(150_000);
-    const before = await info(request);
+    const before = await configSnapshot(request);
     try {
       await setLoss(request, before, HOLD);
       for (const [proto, pat] of PROTOS) {
@@ -144,7 +147,7 @@ test.describe('Signal-loss policy', () => {
   test('BLACKOUT zeros the whole output after the source stops (Art-Net + sACN)', async ({ request }) => {
     skipUnlessWrite();
     test.setTimeout(150_000);
-    const before = await info(request);
+    const before = await configSnapshot(request);
     try {
       await setLoss(request, before, BLACKOUT);
       for (const [proto, pat] of PROTOS) {
@@ -158,7 +161,7 @@ test.describe('Signal-loss policy', () => {
   test('STOP holds the buffer (not blackout) after the source stops (Art-Net + sACN)', async ({ request }) => {
     skipUnlessWrite();
     test.setTimeout(150_000);
-    const before = await info(request);
+    const before = await configSnapshot(request);
     try {
       await setLoss(request, before, STOP);
       for (const [proto, pat] of PROTOS) {
@@ -174,10 +177,10 @@ test.describe('Signal-loss policy', () => {
   test('loss mode persists across a reboot', async ({ request }) => {
     skipUnlessWrite();
     test.setTimeout(120_000);
-    const before = await info(request);
+    const before = await configSnapshot(request);
     try {
       await setLoss(request, before, STOP);
-      const mid = await info(request);
+      const mid = await configSnapshot(request);
       expect(mid.outputs[0].loss, 'STOP survived the save + reboot').toBe(STOP);
     } finally { await restore(request, before); }
   });

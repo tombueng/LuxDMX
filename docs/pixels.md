@@ -360,7 +360,7 @@ enabled, and the DMX transmit-style chip hides on a pixel-only box.
 
 | endpoint | what |
 |---|---|
-| `GET /pixels.json` | every port's config plus live state: universe span, in/out fps, latch and partial counters, mA live and worst case, the power-cap scale in use, and which backend is running |
+| `GET /pixels.json` | every port's config plus live state: universe span, in/out fps, latch and partial counters, mA live and worst case, the power-cap scale in use, and which backend is running. **Every** configurable field is in there, including the three bools (`en`, `statusIdle`, `viewSerp`) and the current model (`mAPerCh`, `quiesMa`, `loss`) -- this is the only endpoint that carries them, and `/config` is a checkbox form, so anything rebuilding a form body has to read them from here or the save writes the bools false |
 | `GET /pixels/frame?port=N&cells=M` | framebuffer readback, hex, decimated to `M` cells by per-channel maximum |
 
 The readback is what makes the mapping testable over the network instead of needing a logic

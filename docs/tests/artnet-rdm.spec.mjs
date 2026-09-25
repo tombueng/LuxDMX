@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
 import { deviceHost, sleep, artDmxPacket, UdpSender, ART_PORT } from './lib/net.mjs';
 import { ArtRdmClient, parseUidStr, CC_GET, PID_DEVICE_INFO,
          AC_MERGE_HTP0, AC_MERGE_LTP0, AC_CANCEL_MERGE, AC_BQP0 } from './lib/artrdm.mjs';
-import { info, dmx, configForm, pollFor } from './lib/device.mjs';
+import { info, dmx, configForm, pollFor, configSnapshot } from './lib/device.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 
@@ -213,7 +213,7 @@ test.describe('Art-Net RDM universe renumber (LUXDMX_WRITE=1)', () => {
   test.afterAll(async () => { await c?.close(); });
 
   test('the TOD follows a renumbered output, with no re-scan and no reboot', async ({ request }) => {
-    const before = await info(request);
+    const before = await configSnapshot(request);
     let state = await rdmState(request);
 
     // Needs fixtures on the bus to say anything. Scan once if nothing has been discovered yet.

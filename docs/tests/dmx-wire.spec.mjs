@@ -12,7 +12,7 @@ import { test, expect } from '@playwright/test';
 import {
   deviceHost, prepInput, sleep, UdpSender, artDmxPacket, e131Packet, ART_PORT, SACN_PORT,
 } from './lib/net.mjs';
-import { info, dmx, waitForState } from './lib/device.mjs';
+import { dmx, waitForState, pixelFormFields, configSnapshot } from './lib/device.mjs';
 import {
   analyzerUp, NO_ANALYZER, anDmx, anMetrics, anReset, frameValues, wireHz, waitForWire,
   probeWiredOutput, driveArtnet,
@@ -30,7 +30,7 @@ test.beforeAll(async ({ request }) => {
   host = await deviceHost();
   up = await analyzerUp();
   if (!up) return;
-  snap = await info(request);
+  snap = await configSnapshot(request);
   await prepInput(host);
   out = await probeWiredOutput(host, snap);          // which output is the analyzer listening to?
   uni = out >= 0 ? snap.outputs[out].uni : -1;
@@ -75,6 +75,9 @@ function configForm(s, overrides = {}) {
     f[`o${i}_rate`]  = String(o.rate ?? 0);
     f[`o${i}_style`] = String(o.style ?? 0);
   });
+  // The pixel ports are in this form too, and p<i>_en is a checkbox like every other bool:
+  // leave them out and the save switches all five off. See pixelFormFields().
+  Object.assign(f, pixelFormFields(s.pixels));
   return f;
 }
 async function setOutput(request, overrides, pred) {
