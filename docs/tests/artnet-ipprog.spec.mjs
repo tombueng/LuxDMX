@@ -13,7 +13,7 @@
 // The DHCP-switch-and-actually-reboot case is deliberately left to the rig with the Pi witness.
 import { test, expect } from '@playwright/test';
 import { deviceHost, artPollPacket, artIpProgPacket, artNetRequestReply, readIp4 } from './lib/net.mjs';
-import { info, pollFor } from './lib/device.mjs';
+import { info, pollFor, pixelFormFields, configSnapshot } from './lib/device.mjs';
 
 const OP_POLLREPLY    = 0x2100;
 const OP_IPPROGREPLY  = 0xf900;
@@ -37,6 +37,9 @@ function ipprogForm(d, flips = {}) {
   if (d.encReverse)    f.encrev   = '1';
   if (d.btnActiveHigh) f.btnah    = '1';
   d.outputs.forEach((o, i) => { if (o.en) f[`o${i}_en`] = '1'; });  // output enables are checkboxes too
+  // The pixel ports are in this form too, and p<i>_en is a checkbox like every other bool:
+  // leave them out and the save switches all five off. See pixelFormFields().
+  Object.assign(f, pixelFormFields(d.pixels));
   for (const [k, v] of Object.entries(flips)) { if (v === null) delete f[k]; else f[k] = v; }
   return f;
 }
@@ -44,7 +47,7 @@ function ipprogForm(d, flips = {}) {
 // ── read-only (always run) ──────────────────────────────────────────────────
 
 test('ArtPollReply Status2 sets the web-config bit and tracks the real DHCP state', async ({ request }) => {
-  const d = await info(request);
+  const d = await configSnapshot(request);
   const reply = await artNetRequestReply(host, artPollPacket(), { wantOp: OP_POLLREPLY, timeoutMs: 3000 });
   expect(reply, 'device must answer ArtPoll').toBeTruthy();
   const status2 = reply[212];
@@ -56,7 +59,7 @@ test('ArtPollReply Status2 sets the web-config bit and tracks the real DHCP stat
 });
 
 test('ArtIpProg gets no reply when the feature is off (spec opt-out)', async ({ request }) => {
-  const d = await info(request);
+  const d = await configSnapshot(request);
   test.skip(d.ipProg === true, 'ipProg is enabled on the device; the off-path is exercised by the mutating suite');
   const reply = await artNetRequestReply(host, artIpProgPacket(0x00), { wantOp: OP_IPPROGREPLY, timeoutMs: 1500 });
   expect(reply, 'a node with ArtIpProg off must not reply to ArtIpProg').toBeNull();
@@ -69,7 +72,7 @@ test.describe('ArtIpProg enabled', () => {
 
   let snap;
   test.beforeAll(async ({ request }) => {
-    snap = await info(request);
+    snap = await configSnapshot(request);
     // Turn the feature on. ipprog is a LIVE key, so this applies without a reboot; the minimal-safe
     // form keeps every other setting (Ethernet, RDM, ...) intact.
     await request.post('/config', { form: ipprogForm(snap, { ipprog: '1' }) });
@@ -80,13 +83,13 @@ test.describe('ArtIpProg enabled', () => {
     // Restore the network config the way it shipped (DHCP, empty IP/gw, /24 mask) via an ArtIpProg
     // factory-default (reboot-free), then put the feature flag back where it started.
     await artNetRequestReply(host, artIpProgPacket(0x88), { wantOp: OP_IPPROGREPLY, timeoutMs: 1500 }); // enable | default
-    const cur = await pollFor(() => info(request), (x) => x.staticIp === false && (x.sip || '') === '', { ms: 10000 });
+    const cur = await pollFor(() => configSnapshot(request), (x) => x.staticIp === false && (x.sip || '') === '', { ms: 10000 });
     await request.post('/config', { form: ipprogForm(cur, { ipprog: snap.ipProg ? '1' : null }) });
     await pollFor(() => info(request), (x) => x.ipProg === (snap.ipProg === true), { ms: 10000 });
   });
 
   test('enquiry returns a well-formed 34-byte reply with the current IP/mask/gateway', async ({ request }) => {
-    const d = await info(request);
+    const d = await configSnapshot(request);
     const reply = await artNetRequestReply(host, artIpProgPacket(0x00), { wantOp: OP_IPPROGREPLY, timeoutMs: 2000 });
     expect(reply, 'ipProg on -> enquiry gets a reply').toBeTruthy();
     expect(reply.length, 'ArtIpProgReply is 34 bytes').toBe(34);
@@ -96,13 +99,13 @@ test.describe('ArtIpProg enabled', () => {
     expect(readIp4(reply, 20), 'ProgSm = the current mask').toBe(d.subnet || '255.255.255.0');
     expect(reply[26] & 0x40, 'Status bit6 = DHCP state').toBe(d.staticIp ? 0 : 0x40);
     // an enquiry (Command bit7 clear) must not change anything
-    const after = await info(request);
+    const after = await configSnapshot(request);
     expect(after.staticIp).toBe(d.staticIp);
     expect(after.sip).toBe(d.sip);
   });
 
   test('programming a static IP is stored, reads back, and flips the DHCP bit', async ({ request }) => {
-    const before = await info(request);
+    const before = await configSnapshot(request);
     const ip = before.ip;                       // the device's OWN current IP -> safe even on a reboot
     const sm = before.subnet || '255.255.255.0';
     // Command = enable | program-IP | program-mask (0x86). An explicit IP means static mode.

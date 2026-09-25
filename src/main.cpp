@@ -2505,20 +2505,26 @@ static String pixelsJson() {
         const PixelPort& c = cfg.pixels[p];
         const PixPortRt& rt = g_pix[p];
         if (p) j += ",";
-        char buf[560];
+        // Every configurable field, not just the ones the live view draws. /config is a checkbox
+        // form: a client that rebuilds the body has to send p<i>_en, p<i>_statid and p<i>_vserp
+        // back or the save writes them false. This is the only endpoint that carries them, so
+        // leaving any of them out here makes a faithful round-trip impossible.
+        char buf[680];
         snprintf(buf, sizeof(buf),
             "{\"idx\":%d,\"en\":%s,\"pin\":%d,\"count\":%d,\"chip\":%d,\"order\":%d,\"uni\":%d,\"start\":%d,"
             "\"uniMode\":%d,\"latch\":%d,\"fpsCap\":%d,\"bright\":%d,\"gamma\":%d,\"maxMa\":%d,"
+            "\"mAPerCh\":%d,\"quiesMa\":%d,\"loss\":%d,\"statusIdle\":%s,"
             "\"spans\":%d,\"inFps\":%.1f,\"outFps\":%.1f,\"latches\":%lu,\"partials\":%lu,"
             "\"ma\":%lu,\"worstMa\":%lu,\"scale\":%d,\"lost\":%s,\"maxFps\":%d,"
-            "\"viewCols\":%d,\"viewRows\":%d",
+            "\"viewCols\":%d,\"viewRows\":%d,\"viewSerp\":%s",
             p, c.enabled ? "true" : "false", c.pin, c.count, c.chip, c.order, c.universe, c.startCh,
             c.uniMode, c.latch, c.fpsCap, c.bright, c.gamma, c.maxMa,
+            c.mAPerCh, c.quiesMa, c.lossMode, c.statusIdle ? "true" : "false",
             (int)rt.slots, rt.inFps, rt.outFps,
             (unsigned long)rt.latches, (unsigned long)rt.partials,
             (unsigned long)rt.estMa, (unsigned long)rt.worstMa, (int)rt.scale,
             rt.srcLost ? "true" : "false", pixMaxFps(c.chip, c.count),
-            c.viewCols, c.viewRows);
+            c.viewCols, c.viewRows, c.viewSerp ? "true" : "false");
         j += buf;
         j += "}";
     }

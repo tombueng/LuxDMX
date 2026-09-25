@@ -4,13 +4,18 @@
 // The default tests are read-only (safe to run any time). The config round-trip
 // test mutates + reboots the device and is opt-in via LUXDMX_WRITE=1.
 import { test, expect } from '@playwright/test';
+import { pixelFormFields, pixelPorts } from './lib/device.mjs';
 
 const OUT_KEYS = ['en', 'uni', 'port', 'tx', 'rx', 'rts'];
 
 async function getInfo(request) {
   const res = await request.get('/info.json');
   expect(res.ok(), 'GET /info.json should succeed').toBeTruthy();
-  return res.json();
+  const d = await res.json();
+  // The pixel ports ride along: this snapshot gets turned into a /config body, and that form
+  // writes p<i>_en from checkbox presence like every other bool.
+  d.pixels = await pixelPorts(request);
+  return d;
 }
 
 // Poll /info.json across a reboot until `pred(info)` holds (or time out).
@@ -61,6 +66,9 @@ function configForm(info, o1Overrides = {}) {
     f[`o${i}_rx`]   = String(o.rx);
     f[`o${i}_rts`]  = String(o.rts);
   });
+  // The pixel ports are in this form too, and p<i>_en is a checkbox like every other bool:
+  // leave them out and the save switches all five off. See pixelFormFields().
+  Object.assign(f, pixelFormFields(info.pixels));
   return f;
 }
 

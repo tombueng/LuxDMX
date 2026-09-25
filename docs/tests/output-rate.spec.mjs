@@ -14,7 +14,7 @@
 // and lives on the bench rig, not here.
 import { test, expect } from '@playwright/test';
 import { deviceHost, UdpSender, streamFor, artDmxPacket, prepInput, sleep, ART_PORT } from './lib/net.mjs';
-import { info, dmx, pollFor, waitForState } from './lib/device.mjs';
+import { info, dmx, pollFor, waitForState, pixelFormFields, configSnapshot } from './lib/device.mjs';
 import { ArtRdmClient } from './lib/artrdm.mjs';
 import { openConfig } from './lib/ui.mjs';
 
@@ -69,6 +69,9 @@ function configForm(snap, o0Overrides = {}) {
     f[`o${i}_rate`]  = String(o.rate ?? 0);
     f[`o${i}_style`] = String(o.style ?? 0);
   });
+  // The pixel ports are in this form too, and p<i>_en is a checkbox like every other bool:
+  // leave them out and the save switches all five off. See pixelFormFields().
+  Object.assign(f, pixelFormFields(snap.pixels));
   return f;
 }
 
@@ -130,7 +133,7 @@ async function watchBeat(request, uni, changeHz, repeat, ms) {
         await sender.send(ART_PORT, artDmxPacket(uni, data, seq++));
       i++;
       if (Date.now() >= nextPoll) {
-        const d = await info(request);
+        const d = await configSnapshot(request);
         last = { beat: d.outputs[0].beat, chgHz: d.outputs[0].chgHz };
         nextPoll = Date.now() + 1000;
       }
@@ -142,7 +145,7 @@ async function watchBeat(request, uni, changeHz, repeat, ms) {
 
 test.describe('DMX output rate + transmit style — shape (always)', () => {
   test('/info.json exposes rate, style and styleSrc per output', async ({ request }) => {
-    const d = await info(request);
+    const d = await configSnapshot(request);
     for (const [i, o] of d.outputs.entries()) {
       expect(typeof o.rate, `out${i} rate`).toBe('number');
       expect(o.rate, `out${i} rate in range`).toBeGreaterThanOrEqual(0);
@@ -164,7 +167,7 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
   });
 
   test('the navbar shows the transmit style, and marks one set over Art-Net', async ({ page, request }) => {
-    const d = await info(request);
+    const d = await configSnapshot(request);
     await page.goto('/');
     // The /ws frame is only pushed when input arrives, so drive something first.
     const sender = new UdpSender(host);
@@ -185,7 +188,7 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
   });
 
   test('/info.json exposes the per-output beat warning (beat + change rate)', async ({ request }) => {
-    const d = await info(request);
+    const d = await configSnapshot(request);
     for (const [i, o] of d.outputs.entries()) {
       expect(typeof o.beat, `out${i} beat is a boolean`).toBe('boolean');
       expect(typeof o.chgHz, `out${i} chgHz is a number`).toBe('number');
@@ -194,7 +197,7 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
   });
 
   test('ArtPollReply RefreshRate matches the configured rate', async ({ request }) => {
-    const d = await info(request);
+    const d = await configSnapshot(request);
     const c = new ArtRdmClient(host);
     await c.ready;
     try {
@@ -214,7 +217,7 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
 
 test.describe('DMX output rate + transmit style — behaviour (LUXDMX_WRITE=1)', () => {
   let before;
-  test.beforeAll(async ({ request }) => { before = await info(request); });
+  test.beforeAll(async ({ request }) => { before = await configSnapshot(request); });
   test.afterAll(async ({ request }) => {
     if (!WRITE || !before) return;
     await request.post('/config', { form: configForm(before) });
