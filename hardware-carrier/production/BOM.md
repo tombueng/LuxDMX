@@ -14,7 +14,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 703670 | 0.06 | 0.06 |
 | 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 23.140 | 0.129 | 0.26 |
 | 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch | `KM108M035J20RR0VH2FP0` | [C10749](https://www.lcsc.com/product-detail/C10749.html) | 48.810 | 0.171 | 0.17 |
-| 1 | 74AHCT541 pixel buffer | Octal buffer 74HCT541, PDIP-20, 300 mil | `SN74HCT541N` | - | marketplace | 1.5 | 1.5 |
+| 1 | 74AHCT541 pixel buffer | Octal buffer 74HCT541, SO-20 300 mil (SOIC-20W land) | `74HCT541D,653` | [C547781](https://www.lcsc.com/product-detail/Buffers-Drivers_Nexperia_C547781.html) | 16712 | 0.42 | 0.42 |
 | 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 644 | 0.419 | 0.42 |
 | 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 204.500 | 0.018 | 0.09 |
 | 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | - | ? | 0.004 | 0.01 |
@@ -23,7 +23,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 16.545 | 0.175 | 0.88 |
 | 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
 
-**Small parts total: about 3.88 EUR**
+**Small parts total: about 2.80 EUR**
 
 Deliberately not listed:
 
@@ -36,13 +36,11 @@ Deliberately not listed:
 - **100nF**: 1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR. Over a million in stock.
 - **1uF**: The middle rung of the W5500's decoupling. Same Samsung series and package as the 100nF, so one reel family covers both. It closes a factor-220 gap: the rail had 100nF and 22uF and nothing between them.
 - **22uF 3V3 bulk / 22uF W5500**: Half the price of the 25 V part (C12891, 0.24 EUR) for the same job. 6.3 V on a 3.3 V rail is roughly a factor of two margin, normal for X5R. Worth knowing: ceramics lose capacitance under DC bias, a 6.3 V part at 3.3 V keeps about half, so 11 to 13 uF rather than 22. Ample for holding up the rail when three transceivers key at once. For the full 22 uF take C12891 (25 V, keeps about 85 %) and pay 12 cents more.
-- **74AHCT541 pixel buffer**: AHCT or HCT, both have TTL input thresholds (VIH 2.0 V) and therefore switch reliably from the 3.3 V of the ESP32. The only difference is propagation delay, roughly 6 against 14 ns, irrelevant at 1250 ns per WS281x bit. LCSC does not stock the AHCT part in DIP, hence the marketplace sources. Which other types work and which do not is below.
-  - ebay: [SN74HCT541N, DIP-20, Texas](https://www.ebay.com/itm/334274626871) - approx. 1-2 EUR ea
-  - ebay: [5 x SN74HCT541N DIP-20](https://www.ebay.com/itm/392631683671) - approx. 5-8 EUR / 5 pcs
-  - ebay: [100 x SN74HCT541N DIP-20](https://www.ebay.com/itm/235008609678) - volume price
-  - amazon: [TI SN74HCT541N, DIP-20](https://www.amazon.com/INSTRUMENTS-SN74HCT541N-INVERTING-BUFFER-DIP-20/dp/B00LQQBFTC) - approx. 2-4 EUR ea
-  - distributor: [Schukat SN74HCT541N](https://shop.schukat.com/Texas-Instruments/SN74HCT541N/p/37554) - stocked
-- **MF-R 30V**: The largest that fits the current placement: body 17.4 x 3.0 mm, 3.8 mm clear of the 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series but its body is 24.2 mm and would come within 0.40 mm of the can; both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.
+- **74AHCT541 pixel buffer**: Two things decide this part, and neither is the number 541.
+1) The T. HCT, AHCT and ACT have TTL input thresholds (VIH 2.0 V), so 3.3 V from the S3 switches them reliably on a 5 V supply. HC, AHC and AC do not: their threshold is 0.7 x VCC = 3.5 V.
+2) The package. The land is SOIC-20W: 1.27 mm pitch, rows 10.10 mm apart, copper from 3.63 to 6.47 mm off the axis, pads reaching 1.32 mm past the lead tip so an iron fits. Only the 1.27 mm parts land on it - TI calls that DW, Nexperia calls it D.
+Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x bit.
+- **MF-R 30V**: The largest that fits the current placement: body 17.4 x 3.0 mm, 3.8 mm clear of the 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series but its body is 24.2 mm and would come within 0.40 mm of the can; both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.  Two numbers decide a replacement and neither is the current: the voltage (30 V, not 16) and the lead pitch (5.08 or 10.2 mm, nothing else). The table below is what has been checked so far.
 - **120R term**: Same series as the verified 10k. The C number could not be confirmed by search, look up the manufacturer part number on LCSC.
 - **330R bias+ / 330R bias- / 330R pixel**: Fail-safe bias on a 3.3 V bus needs more than 200 mV idle differential. With two terminators (60 R, the normal case once this board is the controller at one end) 330 R gives 275 mV, 470 R only 198 mV. Anything from 270 R to 430 R works, see the table. Bus loading 4.6 mA, which no RS-485 driver cares about, and 5 % tolerance is irrelevant for a bias resistor. The land takes anything from 0402 to 1206: copper runs 0.30 to 2.30 mm off centre, so every end cap lands on it, an 0402's at 0.25 to 0.50 as much as a 1206's at 1.10 to 1.60. The 390R that only exists in 0805 therefore goes in without any trickery.
   - lcsc: [390R exists only in 0805 (C17655) and fits the 1206 land by hand if needed](https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount-UniOhm_390R-3900-1_C17655.html) - 0.004 USD
@@ -55,24 +53,50 @@ Deliberately not listed:
 
 **Works**
 
-| Type | Family | Delay / catch | Why |
+| Type | Family | Package | Note |
 |---|---|---|---|
-| `SN74AHCT541N / CD74AHCT541E` | AHCT | ~6 ns | First choice. TTL thresholds (VIH 2.0 V), fastest of the usable ones. |
-| `SN74HCT541N / CD74HCT541E` | HCT | ~14 ns | Ample. A WS281x bit lasts 1250 ns. |
-| `CD74ACT541E / SN74ACT541N` | ACT | ~7 ns | ACT also has TTL thresholds. Stronger outputs, more supply noise. |
-| `74HCT541N (Nexperia/NXP)` | HCT | ~14 ns | Same part, different maker. |
+| `74HCT541D,653 (Nexperia)` | HCT | D = SO-20 300 mil | LCSC C547781, in stock, about 0.42 EUR. What this BOM names. |
+| `74AHCT541D,118 (Nexperia)` | AHCT | D = SO-20 300 mil | Same land, faster. LCSC C554678, out of stock when last checked. |
+| `SN74AHCT541DW / DWR (TI)` | AHCT | DW = SOIC-20 300 mil | Same land. R is tape and reel, otherwise identical. |
+| `SN74HCT541DW / DWR (TI)` | HCT | DW = SOIC-20 300 mil | Same land. |
+| `CD74ACT541M (TI)` | ACT | M = SOIC-20 300 mil | ACT has TTL thresholds too. Stronger drive, noisier supply. |
 
 **Does not work**
 
-| Type | Family | Delay / catch | Why |
+| Type | Why |
+|---|---|
+| `74HC541, 74AHC541, 74AC541 (no T)` | CMOS input thresholds: VIH = 0.7 x VCC = 3.5 V at 5 V. The S3 puts out 3.3 V, so it switches on a good day. One letter, and the whole point of the part. |
+| `74HCT540, 74AHCT540` | Inverting. Identical pinout, and the strip sees the opposite of what you sent. |
+| `74HCT244, 74AHCT244` | Different pinout: inputs and outputs alternate instead of facing each other. Not a drop-in. |
+| `...541PW (TSSOP)` | 0.65 mm pitch. Wrong by half - and it is what LCSC stocks in quantity, which makes it the easy mistake. |
+| `...541DB (SSOP)` | 0.65 mm pitch, land 7.2 mm across against our 10.10 mm rows. |
+| `...541DGS (VSSOP)` | 0.5 mm pitch. Three of its legs would share one of our pads. |
+| `...541RKS (VQFN)` | Leadless. Pads underneath the body, nothing to solder to a gull-wing land. |
+| `SN74AHCT541NS (SO-20 narrow)` | 5.3 mm body. Its feet come down at the very inner edge of the pad at best. Not a fit to rely on. |
+| `SN74AHCT541N, CD74AHCT541E (PDIP)` | 2.54 mm through hole. That was the land until this board went SMD. |
+| `74LVC541A` | 1.65 to 3.6 V. It cannot put out 5 V, which is the entire reason the buffer is there. |
+
+### What may go in the MF-R 30V position, and what may not
+
+**Works**
+
+| Type | Volt / hold / trip | Pitch | Note |
 |---|---|---|---|
-| `SN74HC541N, CD74HC541E` | HC | Schwellen | HC has CMOS thresholds: VIH = 0.7 x VCC = 3.5 V at a 5 V supply. The 3.3 V from the ESP32 will not switch it reliably. The name differs by one letter. |
-| `CD74AC541E, SN74AC541N` | AC | Schwellen | AC also has CMOS thresholds. Same problem as HC. |
-| `74HCT540, 74AHCT540, CD74HCT540E` | x40 | invertierend | Same pinout, but the outputs are inverted. The strip then sees the opposite of the data. Only usable if the firmware inverts. |
-| `74HCT244, 74AHCT244` | x44 | Pinbelegung | Same package, but inputs and outputs are interleaved instead of side against side. Not a drop-in. |
-| `74LVC541A, 74LVC541` | LVC | Spannung | 1.65 to 3.6 V only. Cannot output 5 V, which is the whole point here. |
-| `SN74LS541N` | LS | veraltet | The thresholds are right, but the inputs sink 0.4 mA, quiescent current is many times higher, and the part is obsolete. It works, but there is no reason. |
-| `SN74AHCT541D / PW / DW / NS` | AHCT | Gehaeuse | SO-20, TSSOP, SOIC. All surface mount, will not fit the DIP-20 land. |
+| `Bourns MF-R500` | 30 V / 5 A / 10 A | 10.2 mm | What the BOM names. TME symbol MFR500-BOU. |
+| `ECE RB500-30` | 30 V / 5 A / 10 A / 40 A max | 10.2 mm | Every figure checked and every one matches the MF-R500, including 10..50 mOhm. Body 14 x 17.3 x 3 mm. Careful reading TME's 'Groesse B = 24.9 mm': that is the height WITH the 7.6 mm leads, not the body, and taking it for the body would rule out a part that fits. |
+| `Littelfuse RUEF500` | 30 V / 5 A / 10 A | 10.16 mm | The usual twin of the MF-R500. |
+| `Littelfuse 30R500UF` | 30 V / 5 A | radial | Same class, POLY-FUSE 30R series. |
+| `Eaton PTR030V0500` | 30 V / 5 A / 40 A max | CHECK | Numbers match exactly; the datasheet would not load, so confirm the pitch. |
+| `Bel Fuse 0ZRB0500FF1A` | 30 V / 5 A / 10 A / 40 A max | CHECK | Matches the MF-R500 figure for figure. Pitch unconfirmed - TME lists it as 'Ausgangsraster'. |
+| `Bourns MF-R110 .. MF-R400` | 30 V / up to 4 A | 5.08 mm | The smaller half of the family, on the middle hole. Right if 4 A is enough. |
+
+**Does not work**
+
+| Type | Why |
+|---|---|
+| `Anything rated 16 V: Bourns MF-RHT and MF-RG, Eaton PTR016V*, ECE RG500-16` | Vmax on a PPTC is what it has to hold off AFTER it trips, when the full supply stands across it. This rail is 12/24 V. At 12 V they are fine; at 24 V they are outside their rating at the exact moment they are supposed to work. |
+| `Bourns MF-R900 and other 24 mm bodies` | The disc stands upright and a 24.2 mm one clears the 1000 uF can by 0.40 mm. 17.4 mm (MF-R500) is proven to fit. |
+| `Any lead pitch other than 5.08 or 10.2 mm` | The land has three holes on exactly those two pitches, because Bourns changes pitch in the middle of the family. 7.5 or 10.0 mm will not drop in. |
 
 ### What may go in the 330R bias+ / 330R bias- / 330R pixel position, and what may not
 
@@ -115,18 +139,18 @@ DC-DC step-down to 5 V, adjustable, 1 A or more
 
 ### 1 x Blade fuse holder, alternative to the polyfuse
 
-Blade fuse holder, ATO/ATC mini, PCB mount, 10.2 mm pitch
+Fuse holder, MINI blade (ATM), PCB vertical, Keystone 3568
 
 | Platform | Search term |
 |---|---|
-| amazon | `mini blade fuse holder PCB mount ATO ATC` |
-| ebay | `PCB mount mini blade fuse holder 10.2mm` |
-| aliexpress | `ATO mini blade fuse holder PCB through hole` |
+| tme | `Keystone 3568 mini blade fuse holder` |
+| amazon | `Keystone 3568 mini blade fuse holder PCB` |
+| ebay | `mini blade fuse holder PCB vertical ATM` |
 
 | Platform | Offer | Price |
 |---|---|---|
 
-> Alternative to the polyfuse, not fitted alongside it. Same two nets, its own two holes. A blade fuse blows once and is replaced; the polyfuse resets itself but runs warm and drops voltage while it holds.
+> The land is KiCad's Fuseholder_Blade_Mini_Keystone_3568: four 1.78 mm holes, pairs 3.40 mm apart and 9.92 mm between the pairs. It takes MINI blade fuses - Bussmann ATM, Littelfuse 297/997, APM - and NOT the regular ATO/ATC size, which is nearly twice as wide. This entry used to say 'ATO/ATC mini, 10.2 mm pitch' and was wrong on both counts. The holder itself is rated 30 A, far above anything this board can carry; the fuse you put in it is what matters, and the copper gives out at 9.8 A. Alternative to the polyfuse, never fitted alongside it: a blade fuse blows once and is replaced, the polyfuse resets itself but runs warm and drops voltage while it holds.
 
 ### 1 x EC11
 

@@ -36,8 +36,10 @@ feed the strip from its own supply, which is what you would do at that current a
 [`production/BOM-LCSC-upload.csv`](production/) can be dropped straight into
 <https://www.lcsc.com/bom>. Also as `.csv` and `.xlsx`.
 
-The 74HCT541 buffer and the TVS diodes are not stocked at LCSC; the BOM lists marketplace
-sources and search terms for those, and for all six modules.
+The TVS diodes are not stocked at LCSC; the BOM lists marketplace sources and search terms for
+those and for all six modules. The buffer is: `74HCT541D` in SO-20 300 mil, which is the land
+on this board. Watch the suffix - the part LCSC stocks most of is `PW`, and that is TSSOP at
+0.65 mm pitch. BOM.md has the full table of what fits and what does not.
 
 ## Assembly
 
