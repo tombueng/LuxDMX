@@ -80,6 +80,25 @@ LUXDMX_ANALYZER=192.168.178.105 LUXDMX_WRITE=1 npm test
   reports ~2.9% torn frames that are the instrument, not the gateway — which is exactly the
   failure the torn-frame test is looking for.
 
+### Driving pixels by hand
+
+`tools/` also holds a few players that are not tests. They send real Art-Net at a live device
+and leave you to look at the strip, which is the only way to judge a thing like colour order or
+whether a gamma curve looks right. Handy when a spec says "pass" and the strip still looks wrong.
+
+| Tool | What it does |
+|---|---|
+| `pixel_drive.mjs` | Drives the ports and reports what the device says came out. The closest one to a test |
+| `pixel_show.mjs` | Patterns a human can judge at a glance |
+| `pixel_fx.mjs` | Effect player for one port |
+| `pixel_matrix.mjs` | Same for a 2D matrix, with the power budget as an input rather than an afterthought: it works out the current from the pixel count and the pixels it is about to light, so a USB-powered 16x16 does not brown out mid-effect |
+| `pixel_ruler.mjs` | Blocks of ten in distinct colours, so you can count the strip |
+| `pixel_tail.mjs` | Walks one lit pixel through the tail, to find the last physical LED |
+
+Watch the brightness chain when nothing lights up: the port's own `bright`, the firmware's
+`maxma` current cap and whatever budget the tool applies all multiply. Three sensible-looking
+numbers can leave you with a strip that draws 250 mA idle and shows nothing.
+
 ### Standalone config-UI tests (no device, no Playwright runner)
 
 These behaviour tests drive the real `src/pages/config.html` in a headless browser against a stub
