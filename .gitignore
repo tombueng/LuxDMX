@@ -43,3 +43,6 @@ __pycache__/
 
 # native test build artifacts
 build/
+
+# local build logs
+.buildlogs/
