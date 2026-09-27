@@ -80,6 +80,29 @@ function fullForm(info, flips = {}) {
   return f;
 }
 
+// Pins this chip may be handed for a test write. Deliberately conservative: BOOT, the USB
+// D-/D+ pair, the SPI flash range, UART0 and the octal-PSRAM pins are all left out. "The config
+// stored it" is not worth a board that needs a serial cable to come back.
+function safePins(info) {
+  // S3: 22-25 do not exist, 19/20 are USB, 26-37 belong to the SPI flash and (on an R8 part)
+  // the octal PSRAM, 43/44 are UART0, 0/45/46 are strapping pins. What is left is small, and on
+  // a board that uses all of it there is nothing safe to write -- which is the right answer, not
+  // a reason to widen the list.
+  if ((info.chip || '').includes('S3'))
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21,
+            38, 39, 40, 41, 42, 47, 48];
+  return [4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+}
+
+// Every key in the list below whose value is a GPIO number rather than a mode or an id.
+const PIN_KEYS = new Set([
+  'ledpin', 'ledr', 'ledg', 'ledy', 'ledb', 'ledw',
+  'dispsda', 'dispscl', 'dispcs', 'dispdc', 'disprst', 'dispsck', 'dispmosi',
+  'rmiimdc', 'rmiimdio', 'rmiipwr',
+  'o0_tx', 'o0_rx', 'o0_rts', 'o1_tx', 'o1_rx', 'o1_rts',
+  'enca', 'encb', 'encsw', 'btn1pin', 'btn2pin',
+]);
+
 test('every web-form option round-trips through /config', async ({ request }) => {
   test.skip(process.env.LUXDMX_WRITE !== '1',
     'set LUXDMX_WRITE=1 to run this device-mutating test (reboots the device twice)');
@@ -90,6 +113,23 @@ test('every web-form option round-trips through /config', async ({ request }) =>
   // checkbox: a body without them switches every port off, and the restore at the end of
   // this test would post the same gap again rather than putting them back.
   before.pixels = await pixelPorts(request);
+
+  // Which pins this board is already using. A pin-valued field in the list below is a real
+  // GPIO the firmware will drive once its subsystem is on, so a value picked for a DevKit can
+  // be a wrecking ball somewhere else: `ledpin: '13'` took the LuxDMX carrier off the network,
+  // because 13 is the W5500 MISO there. The LED writer drove the SPI line, the link never came
+  // up, the task watchdog rebooted the box (`rst:0x8 TG1WDT_SYS_RST`), and the restore at the
+  // end of this test could not reach the device to undo it. USB never finished enumerating
+  // either, so from the outside it looked like a dying power supply rather than a bad pin.
+  const busy = new Set();
+  for (const k of ['ethCs', 'ethSck', 'ethMosi', 'ethMiso', 'ethInt', 'ethRst',
+                   'dispSda', 'dispScl', 'encA', 'encB', 'encSw'])
+    if (typeof before[k] === 'number' && before[k] >= 0) busy.add(before[k]);
+  for (const o of before.outputs || []) for (const k of ['tx', 'rx', 'rts'])
+    if (o[k] >= 0) busy.add(o[k]);
+  for (const p of before.pixels || []) if (p.pin >= 0) busy.add(p.pin);
+  for (const k of ['btn1Pin', 'btn2Pin', 'btn3Pin', 'btn4Pin'])
+    if (typeof before[k] === 'number' && before[k] >= 0) busy.add(before[k]);
 
   // form key -> [test value, getter(info) for read-back]. Connectivity + secret +
   // display-enable fields are intentionally excluded (see file header).
@@ -155,15 +195,40 @@ test('every web-form option round-trips through /config', async ({ request }) =>
   // skip them here when the device says it has no RMII (verify those via serial dump).
   const active = checks.filter(([k]) => before.ethRmii || !k.startsWith('rmii'));
 
+  // Pin-valued fields get their value from THIS board, not from a constant. The list above was
+  // written in the classic-ESP32 pin space: 20/21/22 for output A, 23/24/25 for output B,
+  // 35/36/37 for the encoder, 19 for a button, 13 for the status LED. On an ESP32-S3 several of
+  // those are impossible (22-25 do not exist, 19/20 are USB D-/D+, 35/36/37 are the octal PSRAM
+  // on an R8 part) and the rest collide with whatever the board actually wires there. A fully
+  // populated board may have almost no spare GPIO left, in which case those fields simply are
+  // not round-trip testable live and get reported as skipped rather than written anyway.
+  const pool = safePins(before).filter((p) => !busy.has(p));
+  const pinSkips = [];
+  const resolved = [];
+  for (const [k, v, get] of active) {
+    if (!PIN_KEYS.has(k)) { resolved.push([k, v, get]); continue; }
+    const pin = pool.shift();
+    if (pin === undefined) { pinSkips.push(k); continue; }
+    resolved.push([k, String(pin), get]);
+  }
+  if (pinSkips.length)
+    console.log(`config-roundtrip: no spare GPIO on this board for ${pinSkips.join(', ')}`);
+
   const flips = {};
-  for (const [k, v] of active) flips[k] = (v === true) ? '1' : String(v);
+  for (const [k, v] of resolved) flips[k] = (v === true) ? '1' : String(v);
+
+  // The sentinel the restore waits on has to be one of the values actually written.
+  const ledFlip = resolved.find(([k]) => k === 'ledpin');
+  const settled = ledFlip
+    ? (d) => d.ledPin === Number(ledFlip[1]) && d.outputs[1].en === true
+    : (d) => d.outputs[1].en === true;
 
   try {
     await request.post('/config', { form: fullForm(before, flips) });
-    const after = await waitForState(request, (d) => d.ledPin === 13 && d.outputs[1].en === true);
+    const after = await waitForState(request, settled);
 
     const fails = [];
-    for (const [k, v, get] of active) {
+    for (const [k, v, get] of resolved) {
       const want = (v === true) ? true : Number.isNaN(Number(v)) ? v : Number(v);
       const got = get(after);
       if (got !== want) fails.push(`${k}: expected ${want}, got ${got}`);
