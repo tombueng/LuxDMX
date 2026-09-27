@@ -54,7 +54,11 @@ async function postConfig(changes, { pixelsOff = false } = {}) {
   bool('ipprog', d.ipProg);       bool('encrev', d.encReverse);
   bool('btnah', d.btnActiveHigh);
   d.outputs.forEach((o, i) => bool(`o${i}_en`, o.en));
-  if (!pixelsOff) px.ports.forEach((p, i) => bool(`p${i}_en`, p.en));
+  if (!pixelsOff) px.ports.forEach((p, i) => {
+    bool(`p${i}_en`, p.en);
+    bool(`p${i}_statid`, p.statusIdle);   // all three pixel bools, same checkbox rule
+    bool(`p${i}_vserp`, p.viewSerp);
+  });
   for (const [k, v] of Object.entries(changes)) f.set(k, String(v));
   // The POST needs the same tolerance as the reads: a save that lands while the previous one
   // is still re-initialising gets its connection reset mid-response. The write itself is
@@ -155,16 +159,27 @@ test.describe('Pixel output — mapping on a live device (LUXDMX_WRITE=1)', () =
   test.beforeAll(async () => {
     if (!WRITE) return;
     const px = await pixels();
-    restore = px.ports[0];
+    // Every port's bools, not just port 0's. The restore below passes pixelsOff so postConfig
+    // does not read them back from the state this test changed, which means anything not listed
+    // is written false -- and deriving that from port 0's `en` alone switched off every other
+    // port on a board where port 0 happens to be the disabled one.
+    restore = { p0: px.ports[0], bools: px.ports.map((p) => [p.en, p.statusIdle, p.viewSerp]) };
   });
   test.afterAll(async () => {
     if (!WRITE || !restore) return;
-    await postConfig({
-      p0_pin: restore.pin, p0_count: restore.count, p0_uni: restore.uni,
-      p0_start: restore.start, p0_chip: restore.chip, p0_order: restore.order,
-      p0_gamma: restore.gamma, p0_bright: restore.bright, p0_maxma: restore.maxMa,
-      p0_unimode: restore.uniMode, p0_latch: restore.latch,
-    }, { pixelsOff: !restore.en });
+    const p0 = restore.p0;
+    const f = {
+      p0_pin: p0.pin, p0_count: p0.count, p0_uni: p0.uni,
+      p0_start: p0.start, p0_chip: p0.chip, p0_order: p0.order,
+      p0_gamma: p0.gamma, p0_bright: p0.bright, p0_maxma: p0.maxMa,
+      p0_unimode: p0.uniMode, p0_latch: p0.latch,
+    };
+    restore.bools.forEach(([en, statid, vserp], i) => {
+      if (en)     f[`p${i}_en`]     = 1;
+      if (statid) f[`p${i}_statid`] = 1;
+      if (vserp)  f[`p${i}_vserp`]  = 1;
+    });
+    await postConfig(f, { pixelsOff: true });
   });
 
   test('Art-Net lands on the right pixel, byte for byte', async () => {
@@ -295,12 +310,19 @@ test.describe('Pixel output — backend selection (LUXDMX_WRITE=1)', () => {
     if (!WRITE) return;
     const px = await pixels();
     const d  = await getJson(base + '/info.json');
-    restore = { ports: px.ports.map((p) => ({ en: p.en, count: p.count })), pixbk: d.pixBackend || 0 };
+    restore = { ports: px.ports.map((p) => ({ en: p.en, count: p.count,
+                                             statid: p.statusIdle, vserp: p.viewSerp })),
+                pixbk: d.pixBackend || 0 };
   });
   test.afterAll(async () => {
     if (!WRITE || !restore) return;
     const f = { pixbk: restore.pixbk };
-    restore.ports.forEach((p, i) => { if (p.en) f[`p${i}_en`] = 1; f[`p${i}_count`] = p.count; });
+    restore.ports.forEach((p, i) => {
+      if (p.en)     f[`p${i}_en`]     = 1;
+      if (p.statid) f[`p${i}_statid`] = 1;
+      if (p.vserp)  f[`p${i}_vserp`]  = 1;
+      f[`p${i}_count`] = p.count;
+    });
     await postConfig(f, { pixelsOff: true });
   });
 
