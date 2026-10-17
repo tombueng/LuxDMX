@@ -7,6 +7,7 @@
 import { test, expect } from '@playwright/test';
 import { info, waitForState } from './lib/device.mjs';
 import { UdpSender, artDmxPacket, e131Packet, sleep, ART_PORT, SACN_PORT, deviceHost } from './lib/net.mjs';
+import { openConfig } from './lib/ui.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 const skipUnlessWrite = () => test.skip(!WRITE, 'device-mutating: set LUXDMX_WRITE=1 to run');
@@ -138,7 +139,8 @@ test.describe('Pixel output — shape and arithmetic', () => {
   });
 
   test('the planner states the universe span and the next free universe', async ({ page }) => {
-    await page.goto('/config');
+    // Unfold first: the pixel cards fold like every other section, and a folded field can't be typed into.
+    await openConfig(page);
     await page.waitForFunction(() => document.querySelectorAll('.pix-card').length > 0,
                                null, { timeout: 10000 });
     // 400 RGB pixels is 1200 channels = three universes. The user should never have to work
