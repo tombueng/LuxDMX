@@ -13,9 +13,11 @@
 //   * the selector actually SUBMITS (name="board"), so Save persists the choice
 //   * boardSel="custom" stays custom instead of snapping to the detected board
 //   * no boardSel (fresh device / older config) still falls back to detection
-//   * a saved board that no longer exists degrades to detection instead of wedging the page
+//   * a saved board this page can't show (offline catalog, unknown id) is KEPT, not replaced by the
+//     detected one on the next Save, and the page still works
 //
 // Run:  node docs/tests/board-persist.mjs     (from the repo root)
+//       CHROME=/path/to/chrome node docs/tests/board-persist.mjs   (when playwright's own browser is missing)
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,7 +74,7 @@ function postedField(body, name) {
 }
 
 const port = await new Promise((r) => server.listen(0, () => r(server.address().port)));
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 let fails = 0;
 
 // Load /config and wait until the board <select> has been populated + pointed somewhere.
@@ -119,19 +121,31 @@ try {
   const sel4 = await page.evaluate(() => document.getElementById('board-sel').value);
   fails += check('no boardSel falls back to the detected board', sel4 === 'esp32s3-devkitc-1');
 
-  // ---- 5. a stale saved board degrades gracefully ------------------------------------
-  // Boards that no longer exist in the catalog (an id from an older firmware, a typo written
-  // over the serial console) must not wedge the page: the selector falls back to the detected
-  // board and the form stays usable. Losing the stale pick is fine, breaking /config is not.
+  // ---- 5. a saved board this page can't show is kept ---------------------------------
+  // An id this firmware doesn't know (one from another firmware, a catalog board while the
+  // browser is offline -- luxdmx.org is blocked above -- or a typo over the serial console) must
+  // not wedge the page, AND must not be quietly replaced: the selector used to sit on the
+  // detected board and the next Save wrote that over the pick. Now it stays selected under a
+  // placeholder, behaves like Custom (no copper locks), and Save sends it back unchanged.
   info = { ...BASE, boardSel: 'luxdmx_v5' };
   await open(page);
-  const r5 = await page.evaluate(() => ({
-    sel: document.getElementById('board-sel').value,
-    o0tx: (() => { const e = document.getElementsByName('o0_tx')[0]; return e ? e.value : null; })(),
-    saveEnabled: (() => { const e = document.getElementById('save-btn'); return e ? !e.disabled : false; })(),
-  }));
-  fails += check('an unknown saved board falls back to the detected one', r5.sel === 'esp32s3-devkitc-1');
-  fails += check('the form still works after a stale board pick', r5.o0tx !== null && r5.saveEnabled);
+  const r5 = await page.evaluate(() => {
+    const sel = document.getElementById('board-sel');
+    return {
+      sel: sel.value,
+      label: sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '',
+      o0tx: (() => { const e = document.getElementsByName('o0_tx')[0]; return e ? { v: e.value, disabled: e.disabled } : null; })(),
+      saveEnabled: (() => { const e = document.getElementById('save-btn'); return e ? !e.disabled : false; })(),
+    };
+  });
+  fails += check('an unknown saved board stays selected', r5.sel === 'luxdmx_v5');
+  fails += check('...and says it is not in this firmware', /not in this firmware/.test(r5.label));
+  fails += check('...with no copper locks (like Custom)', !!r5.o0tx && !r5.o0tx.disabled);
+  fails += check('the form still works with it', r5.o0tx !== null && r5.saveEnabled);
+  posted = null;
+  await page.click('#save-btn');
+  await page.waitForFunction(() => document.body && document.body.textContent.indexOf('saved') >= 0, { timeout: 8000 });
+  fails += check('Save writes the saved board back, not the detected one', postedField(posted, 'board') === 'luxdmx_v5');
 } finally {
   await browser.close();
   server.close();
