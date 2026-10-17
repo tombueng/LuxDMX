@@ -444,8 +444,16 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
               <option value="0">Normal</option>
               <option value="1">Flipped 180&deg;</option>
             </select>
+            <div class="form-text">Applied after reboot.</div>
           </div>
-          <div class="form-text mt-2">Applied after reboot.</div>
+          <div class="mt-3">
+            <label class="form-label text-secondary small mb-1" for="disp-timeout">Screen off after (seconds)</label>
+            <input class="form-control" type="number" name="disptimeout" id="disp-timeout" min="0" max="86400" step="1" value="20">
+            <div class="form-text">
+              OLEDs burn in, so the panel goes dark after this long without a button or encoder input.
+              The first press only wakes it up. <code>0</code> keeps it on all the time. Applied right away.
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1021,6 +1029,7 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('disp-sda').value  = d.dispSda  !== undefined ? d.dispSda  : 21;
   $('disp-scl').value  = d.dispScl  !== undefined ? d.dispScl  : 22;
   $('disp-rot').value  = d.dispRot  !== undefined ? d.dispRot  : 0;
+  $('disp-timeout').value = d.dispTimeout !== undefined ? d.dispTimeout : 20;
   $('disp-cs').value   = d.dispCs   !== undefined ? d.dispCs   : -1;
   $('disp-dc').value   = d.dispDc   !== undefined ? d.dispDc   : -1;
   $('disp-rst').value  = d.dispRst  !== undefined ? d.dispRst  : -1;

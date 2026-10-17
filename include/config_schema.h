@@ -52,6 +52,7 @@ struct Config {
     DmxOutput outputs[MAX_OUTPUTS];
     int       dispType;
     int       dispSda, dispScl, dispRot, dispCs, dispDc, dispRst, dispSck, dispMosi;
+    int       dispTimeout;         // seconds without control input before the panel goes dark (0 = never, issue #134)
     // On-unit controls (issue #24): optional rotary encoder + up to 4 buttons that
     // drive a small menu on the display. Every pin -1 = unset; the whole subsystem
     // stays off (and costs nothing) unless something is wired. See input_map.h.

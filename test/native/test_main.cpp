@@ -64,6 +64,7 @@ static void checkBoard(const char* name) {
     EQ(cfg.ledR, ledR); EQ(cfg.ledG, ledG); EQ(cfg.ledY, ledY); EQ(cfg.ledB, ledB); EQ(cfg.ledW, ledW);
     EQ(cfg.dispType, dispType); EQ(cfg.dispSda, dispSda); EQ(cfg.dispScl, dispScl); EQ(cfg.dispRot, 0);
     EQ(cfg.dispCs, dispCs); EQ(cfg.dispDc, dispDc); EQ(cfg.dispRst, dispRst); EQ(cfg.dispSck, dispSck); EQ(cfg.dispMosi, dispMosi);
+    EQ(cfg.dispTimeout, 20);   // screen timeout, every board via _base (issue #134)
     EQ(cfg.ethCs, ethCs); EQ(cfg.ethSck, ethSck); EQ(cfg.ethMosi, ethMosi);
     EQ(cfg.ethMiso, ethMiso); EQ(cfg.ethInt, ethInt); EQ(cfg.ethRst, ethRst); EQ(cfg.ethFreqMhz, 20);
     EQ(cfg.ethW5500, false); EQ(cfg.wiredPhy, wiredPhy); EQ(cfg.useEthernet, useEth);
@@ -99,6 +100,7 @@ int main() {
     CHECK(cfg.outputs[1].universe == 1,       "extends: _base o1_uni=1");
     CHECK(cfg.ledPin == 2,                     "luxdmx: ledPin=2 (base default, unused at type 3)");
     CHECK(cfg.dispRot == 0,                    "neutral: dispRot=0 (min)");
+    CHECK(cfg.dispTimeout == 20,               "base: disptimeout=20 (issue #134)");
     CHECK(cfg.ethFreqMhz == 20,                "base: ethFreq=20");
     CHECK(cfg.outputs[0].mergeMode == 0,       "neutral: merge=OFF");
 

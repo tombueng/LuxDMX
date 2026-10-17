@@ -41,6 +41,7 @@ function fullForm(info, flips = {}) {
     disptype: String(info.dispType), dispsda: String(info.dispSda), dispscl: String(info.dispScl),
     disprot: String(info.dispRot), dispcs: String(info.dispCs), dispdc: String(info.dispDc),
     disprst: String(info.dispRst), dispsck: String(info.dispSck), dispmosi: String(info.dispMosi),
+    disptimeout: String(info.dispTimeout ?? 20),   // screen timeout (issue #134)
     ethcs: String(info.ethCs), ethsck: String(info.ethSck), ethmosi: String(info.ethMosi),
     ethmiso: String(info.ethMiso), ethint: String(info.ethInt), ethrst: String(info.ethRst),
     ethfreq: String(info.ethFreq), wiredphy: String(info.wiredPhy),
@@ -101,6 +102,7 @@ test('every web-form option round-trips through /config', async ({ request }) =>
     ['disprst', '37', (d) => d.dispRst],
     ['dispsck', '38', (d) => d.dispSck],
     ['dispmosi','39', (d) => d.dispMosi],
+    ['disptimeout', '45', (d) => d.dispTimeout],
     ['rmiiphy',  '2', (d) => d.rmiiPhy],
     ['rmiiaddr', '7', (d) => d.rmiiAddr],
     ['rmiimdc', '26', (d) => d.rmiiMdc],
