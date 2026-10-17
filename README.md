@@ -617,17 +617,45 @@ Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a r
 
 - **Interface** (boards with wired Ethernet — WT32-ETH01, v3, or **any board with a W5500 / DM9051 SPI module** picked under *Wired Ethernet*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first pick the SPI chip (W5500 or DM9051) under *Wired Ethernet* and set its pins, then enable "Use wired Ethernet".
 - **WiFi mode:**
-  - **Client (STA)** — join your existing 2.4 GHz network (the default; set the SSID + password via the setup portal above, or right here in **`/config` → Network**).
+  - **Client (STA)** — join your existing 2.4 GHz network (the default; set the SSID + password via the setup portal above, or right here in **`/config` → Network**). You can save **up to four networks**, see [Several WiFi networks](#several-wifi-networks) below.
   - **Standalone AP** — LuxDMX hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
 - **Wired link-loss policy** (boards on wired Ethernet), for when *the wired Ethernet link is down*:
   - **Keep retrying the wired link** (default): never opens a hotspot, reconnects on its own when the cable is back. Best on a show.
   - **Standalone WiFi AP**: the device becomes its own network (needs an **AP password**; it refuses to open an *unsecured* AP).
   - **Reboot and retry**: power-cycle to re-attempt the link.
-  - **Join WiFi**: fall back to the saved WiFi network (STA) when there is no wired link — handy for a board that is sometimes wired and sometimes not. Needs stored WiFi credentials; a link drop while running reboots (a clean boot then joins WiFi), and the next boot prefers wired again if the cable is back. It only ever joins the *already-saved* network, so a dropped link can't move the device somewhere new.
+  - **Join WiFi**: fall back to the saved WiFi networks (STA) when there is no wired link — handy for a board that is sometimes wired and sometimes not. Needs stored WiFi credentials; a link drop while running reboots (a clean boot then joins WiFi), and the next boot prefers wired again if the cable is back. It only ever joins *already-saved* networks, so a dropped link can't move the device somewhere new.
 
   A runtime watchdog applies the policy even if the cable is pulled while running (the old fallback only ran at boot, so a mid-show unplug used to strand the device). There is **no automatic WiFi setup portal** on link loss, on purpose: that would let anyone who can drop the link force the device onto their own WiFi. To move the device to a new WiFi, hold the **BOOT button** at power-up for the setup portal (physical access required).
 
   On the W5500 (SPI Ethernet) the watchdog first tries to **recover the link in place** before falling back: the chip can occasionally come up (or come back after heavy traffic like an OTA) reporting no link even though the cable is fine, and a plain reboot doesn't clear it. A full re-initialise (tear the driver down, hard-reset the chip, bring it back up) re-negotiates the link and clears it, without a reboot and without DMX ever stopping. This runs both at boot and from the runtime watchdog, so a wedged link recovers on its own; `/info.json` exposes `ethRecoverAttempts` and `ethRecoveries` so you can see it happen.
+
+#### Several WiFi networks
+
+The same box at home, at a venue and on your phone's hotspot doesn't need reconfiguring each time.
+**`/config` → Network** keeps a list of up to **four** networks, tried in the order shown:
+
+1. On boot it scans and joins the **highest one on the list that's on the air**. Order beats signal
+   strength: a weak home WiFi at the top still wins over a strong hotspot further down. Signal only
+   picks between access points of the *same* network (a mesh), as it always did.
+2. If that one doesn't work (wrong password, gone between scan and join), the next one gets its go.
+   A network the scan can't see, like a hidden SSID, is tried blind after the visible ones.
+3. If the network drops while running, the device first tries to get it back. After **30 s** without
+   it, it scans again and moves to the best saved network that is there.
+4. Once connected it **stays put**. It doesn't hop back up the list when a better network appears,
+   because that would drop DMX mid-show. A restart (or losing the current one) picks again.
+
+Use the ▲ / ▼ buttons to change the order. Passwords are never shown on the page; leave a password
+field blank to keep the stored one, and it moves with its network when you reorder. Empty a name to
+remove that network. The first slot is the one the setup portal fills, and **Reset WiFi** forgets all
+four. `/info.json` lists the names (`wifiSsid` … `wifiSsid4`), which slots have a password stored
+(`wifiPskSet`) and which one is in use right now (`wifiSlot`, 0-based, `-1` when not on WiFi), never
+the passwords. In the config they are `wifissid` / `wifipsk` and `wifissid2..4` / `wifipsk2..4`.
+Changing networks 2 to 4 saves without a restart, they're only read at the next join. Changing the
+first one (typing over it, or moving another network to the top) restarts the device so it joins
+in the new order.
+
+With only one network saved, boot waits up to 30 s for it like before; with several, each gets 15 s
+so a missing one doesn't stall the start. If none of them works, the device opens the setup portal.
 
 **Using AP mode with an iPad / console app** (Luminair, Photon, etc.): set WiFi mode to Standalone AP and reboot, join the `dmx-gateway` network, then point the app's Art-Net output at **`192.168.4.1`** (or broadcast `192.168.4.255`).
 
@@ -1234,7 +1262,7 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | LED type / GPIO pin | board default | Web `/config` (Status LED) |
 | Per-output: enabled / universe / UART port / TX / RX / RTS | A on (uni 0, UART1, TX=17, RX=16, RTS=−1); B off | Web `/config` (DMX Outputs); the universe also from a console via `ArtAddress` |
 | Display type / pins | off | Web `/config` (Display) |
-| WiFi credentials | — | Setup portal, Web `/config` (Network), or `/reset` |
+| WiFi credentials (up to 4 networks, in priority order) | — | Setup portal (first one), Web `/config` (Network), or `/reset` (forgets all) |
 
 ### Backup and restore
 

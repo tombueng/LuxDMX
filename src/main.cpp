@@ -119,6 +119,7 @@
 static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64 hard-zero path)
 #include "rdm_rmt.h"                    // RDM controller on RMT-TX + UART-RX
 #include "pixel.h"                      // WS281x pixel engine (framebuffers, latch, power)
+#include "wifi_pick.h"                  // which saved WiFi network to join (issue #120, host-tested)
 
 // Auto-generated asset headers (produced by extra_scripts.py before each build)
 #include "generated/version.h"
@@ -2717,6 +2718,43 @@ static void handleRoot(AsyncWebServerRequest* req) {
     req->send(r);
 }
 
+// ---------------------------------------------------------------------------
+// Saved WiFi networks (issue #120)
+// ---------------------------------------------------------------------------
+// Up to four, in priority order: cfg.wifiSsid (what the setup portal stores) then wifiSsid2..4.
+// The pick itself is in wifi_pick.h. Kept gap-free (wifiCompact), so "slot 1 is empty" still
+// means "no WiFi saved at all", which the setup portal, /reset and the wired fallback rely on.
+static int g_wifiSlot = -1;   // the saved network we're on, 0..3; -1 = none / not a WiFi client
+static String& wifiSsidAt(int s) {
+    return s == 0 ? cfg.wifiSsid : s == 1 ? cfg.wifiSsid2 : s == 2 ? cfg.wifiSsid3 : cfg.wifiSsid4;
+}
+static String& wifiPskAt(int s) {
+    return s == 0 ? cfg.wifiPsk : s == 1 ? cfg.wifiPsk2 : s == 2 ? cfg.wifiPsk3 : cfg.wifiPsk4;
+}
+static int wifiSavedCount() {
+    int n = 0;
+    for (int s = 0; s < WIFI_SLOTS; s++) if (wifiSsidAt(s).length()) n++;
+    return n;
+}
+// Close the gaps: a network removed from the middle (or moved to the top as an empty row) must
+// not leave slot 1 empty while others are set. A slot without an SSID also drops its password,
+// so a network typed into it later starts clean. Returns true if anything moved.
+static bool wifiCompact() {
+    bool moved = false;
+    for (int s = 0; s < WIFI_SLOTS; s++) if (!wifiSsidAt(s).length()) wifiPskAt(s) = "";
+    for (int s = 0; s < WIFI_SLOTS; s++) {
+        if (wifiSsidAt(s).length()) continue;
+        for (int t = s + 1; t < WIFI_SLOTS; t++) {
+            if (!wifiSsidAt(t).length()) continue;
+            wifiSsidAt(s) = wifiSsidAt(t); wifiPskAt(s) = wifiPskAt(t);
+            wifiSsidAt(t) = "";            wifiPskAt(t) = "";
+            moved = true;
+            break;
+        }
+    }
+    return moved;
+}
+
 // Compile-time board identity. Lets the /config pin-picker auto-select the right
 // board diagram and apply the correct strapping / flash / Ethernet-reserved rules
 // (issue #12). BOARD_ID matches a descriptor id in web/boards/; MCU_ID is the family.
@@ -2919,6 +2957,14 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
 #endif
     j += "\"wifiMode\":";   j += cfg.wifiMode;           j += ",";
     j += "\"wifiSsid\":\""; j += jsonEsc(cfg.wifiSsid);  j += "\",";   // password is never exposed
+    // Saved networks 2..4 (issue #120): SSIDs only. wifiPskSet says which slots have a password
+    // stored, so the page can say "saved" without ever seeing it. wifiSlot = the one we're on.
+    j += "\"wifiSsid2\":\""; j += jsonEsc(cfg.wifiSsid2); j += "\",";
+    j += "\"wifiSsid3\":\""; j += jsonEsc(cfg.wifiSsid3); j += "\",";
+    j += "\"wifiSsid4\":\""; j += jsonEsc(cfg.wifiSsid4); j += "\",";
+    j += "\"wifiPskSet\":[";
+    for (int k = 0; k < WIFI_SLOTS; k++) { if (k) j += ","; j += wifiPskAt(k).length() ? "true" : "false"; }
+    j += "],\"wifiSlot\":"; j += (!g_useEth && !g_apMode && WiFi.status() == WL_CONNECTED) ? g_wifiSlot : -1; j += ",";
     j += "\"apFallback\":"; j += cfg.apFallback ? "true" : "false"; j += ",";
     j += "\"linkLossMode\":"; j += cfg.linkLossMode;          j += ",";   // WIRED_FB_*
     j += "\"apPassword\":\""; j += cfg.apPassword;       j += "\",";
@@ -3355,6 +3401,20 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
     // schema range inside setValue); hostname/otapw (CFG_KEEPNE) ignore a blank
     // field so they can't be wiped; CFG_NOWEB fields (autoUpdate) have their own
     // route and are skipped here.
+    //
+    // Saved WiFi networks moved up or down on the page (issue #120). The page never sees a stored
+    // password, so it sends the new order (wifiorder=row0slot,row1slot,...) and each SSID +
+    // password pair moves first. The fields below then apply on top, and a blank password field
+    // keeps the password that moved into that slot with its network.
+    if (argStr(req, "wifiorder", s)) {
+        int order[WIFI_SLOTS], k = 0, from = 0;
+        for (int i = 0; i <= (int)s.length() && k < WIFI_SLOTS; i++)
+            if (i == (int)s.length() || s[i] == ',') { order[k++] = s.substring(from, i).toInt(); from = i + 1; }
+        String ss[WIFI_SLOTS], pp[WIFI_SLOTS];
+        for (int i = 0; i < WIFI_SLOTS; i++) { ss[i] = wifiSsidAt(i); pp[i] = wifiPskAt(i); }
+        if (k == WIFI_SLOTS && wifiReorder(ss, pp, order))   // anything but a clean permutation: ignored
+            for (int i = 0; i < WIFI_SLOTS; i++) { wifiSsidAt(i) = ss[i]; wifiPskAt(i) = pp[i]; }
+    }
     for (size_t k = 0; k < CONFIG_FIELD_COUNT; k++) {
         const CfgField& f = CONFIG_FIELDS[k];
         if (f.flags & CFG_NOWEB) continue;
@@ -3430,6 +3490,12 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
             }
         }
 
+    wifiCompact();   // a network cleared from the middle of the list leaves no gap (issue #120)
+    if (g_wifiSlot >= 0) {   // a reorder/removal may have moved the network we're on
+        const String cur = WiFi.SSID();
+        g_wifiSlot = -1;
+        for (int s = 0; s < WIFI_SLOTS; s++) if (wifiSsidAt(s) == cur) { g_wifiSlot = s; break; }
+    }
     if (nReboot > 0) dmxReady = false;        // a driver is about to be rebuilt; stop clocking it
     saveConfig();
 
@@ -3602,6 +3668,8 @@ static void handleResetPost(AsyncWebServerRequest* req) {
     // always comes back on DHCP, on WiFi, at the setup page.
     cfg.wifiSsid  = "";
     cfg.wifiPsk   = "";
+    cfg.wifiSsid2 = cfg.wifiSsid3 = cfg.wifiSsid4 = "";   // every saved network, not just the first (issue #120)
+    cfg.wifiPsk2  = cfg.wifiPsk3  = cfg.wifiPsk4  = "";
     cfg.wifiMode  = NET_WIFI_STA;
     cfg.staticIp  = false;
     saveConfig();
@@ -4123,15 +4191,63 @@ static void startSetupPortal() {
         AP_SSID, ok ? "up" : "FAILED", apIp.toString().c_str());
 }
 
+// Join the best saved network that's on the air: the highest-priority one the scan sees, on its
+// strongest AP; if that fails (wrong password, gone again), the next one. Networks the scan can't
+// see (hidden SSIDs) get a blind try after that, in order. perNetMs per attempt. bootLed drives
+// the boot animation while waiting, which is only right during setup().
+static bool wifiJoinSaved(uint32_t perNetMs, bool bootLed) {
+    const char* stored[WIFI_SLOTS];
+    for (int s = 0; s < WIFI_SLOTS; s++) stored[s] = wifiSsidAt(s).c_str();
+    static constexpr int MAX_SEEN_AP = 32;
+    String   names[MAX_SEEN_AP];
+    WifiSeen seen[MAX_SEEN_AP];
+    uint8_t  bssid[MAX_SEEN_AP][6];
+    int      chan[MAX_SEEN_AP];
+    const int n = WiFi.scanNetworks(false /*async*/, true /*hidden*/);
+    int m = 0;
+    for (int i = 0; i < n && m < MAX_SEEN_AP; i++, m++) {
+        names[m] = WiFi.SSID(i);
+        seen[m].rssi = WiFi.RSSI(i);
+        memcpy(bssid[m], WiFi.BSSID(i), 6);
+        chan[m] = WiFi.channel(i);
+    }
+    for (int i = 0; i < m; i++) seen[i].ssid = names[i].c_str();
+    WiFi.scanDelete();
+    Serial.printf("[WiFi] scan: %d network(s) on the air, %d saved\n", n < 0 ? 0 : n, wifiSavedCount());
+
+    uint32_t tried = 0;
+    for (;;) {
+        int at = -1;
+        int s = wifiPick(stored, seen, m, tried, &at);
+        const bool blind = s < 0;
+        if (blind) s = wifiNextBlind(stored, tried);
+        if (s < 0) return false;
+        tried |= 1u << s;
+        if (blind) Serial.printf("[WiFi] joining '%s' (saved #%d, not in the scan: hidden?)\n", stored[s], s + 1);
+        else       Serial.printf("[WiFi] joining '%s' (saved #%d, rssi %d, ch %d)\n", stored[s], s + 1, seen[at].rssi, chan[at]);
+        WiFi.disconnect();   // drop a half-made association from the previous attempt
+        if (blind) WiFi.begin(stored[s], wifiPskAt(s).c_str());
+        else       WiFi.begin(stored[s], wifiPskAt(s).c_str(), chan[at], bssid[at], true);
+        const uint32_t t = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - t < perNetMs) {
+            if (bootLed) bootConnectingLed();   // 5-LED: Knight-Rider sweep; single LED: blue blink
+            delay(200);
+        }
+        if (WiFi.status() == WL_CONNECTED) { g_wifiSlot = s; return true; }
+        Serial.printf("[WiFi] '%s' didn't work (status=%d)\n", stored[s], (int)WiFi.status());
+    }
+}
+
 // Scan every AP for our SSID, log them, and (re)connect to the strongest one.
 // On mesh/multi-AP networks the ESP32's auto-connect often sticks to a distant
 // node; this guarantees the closest one. Also a diagnostic: the [SCAN] log
 // reveals whether the SSID has multiple BSSIDs (per-node) or a single shared
 // BSSID (seamless mesh — in which case the AP, not us, chooses the node).
 static void connectStrongestAP() {
-    String ssid = cfg.wifiSsid;          // we own the creds now (no WiFiManager WiFi-NVS copy)
+    const int slot = g_wifiSlot >= 0 ? g_wifiSlot : 0;   // the saved network we joined (issue #120)
+    String ssid = wifiSsidAt(slot);      // we own the creds now (no WiFiManager WiFi-NVS copy)
     if (ssid.length() == 0) return;
-    String pass = cfg.wifiPsk;
+    String pass = wifiPskAt(slot);
     int curRssi = (int)WiFi.RSSI();
 
     int n = WiFi.scanNetworks(false /*async*/, true /*hidden*/);
@@ -5298,6 +5414,7 @@ static void startWiFiStation() {
     WiFi.mode(WIFI_STA);   // also brings up the WiFi driver so esp_wifi_get_config() works
     WiFi.setHostname(cfg.hostname.c_str());   // DHCP hostname (option 12) so the router resolves the name
     // Upgrade path: pull creds out of the old WiFiManager WiFi-NVS into our cfg, once.
+    if (wifiCompact()) saveConfig();   // e.g. a restored backup with a gap in the list
     if (cfg.wifiSsid.length() == 0) migrateWifiCredsFromNvs();
     // First-run / BOOT-held → the setup portal (open SoftAP + captive page). Never opens
     // by itself mid-run: only here, and only with no creds or the button physically held.
@@ -5310,22 +5427,17 @@ static void startWiFiStation() {
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
     setLedColor(NEO_WHITE, true);   // connecting to stored WiFi (white = working; blue is RDM)
-    // Join the stored network. We keep our own creds (cfg.wifiSsid/wifiPsk) now — the old
-    // build let WiFiManager stash them in the ESP32 WiFi NVS.
+    // Join a stored network. We keep our own creds (cfg.wifiSsid/wifiPsk + up to three more)
+    // now; the old build let WiFiManager stash them in the ESP32 WiFi NVS. One network keeps
+    // the 30 s it always had; with several, each gets 15 s so a missing one doesn't stall boot.
     applyStaStaticIp();
-    Serial.printf("[WiFi] joining '%s'\n", cfg.wifiSsid.c_str());
-    WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPsk.c_str());
-    { uint32_t t = millis();
-      while (WiFi.status() != WL_CONNECTED && millis() - t < 30000) {
-          bootConnectingLed();   // 5-LED: Knight-Rider sweep; single LED: blue blink
-          delay(200);
-      } }
+    wifiJoinSaved(wifiSavedCount() > 1 ? 15000 : 30000, true);
     // If the stored creds simply don't work (wrong password, AP gone), reboot into the
     // setup portal so the device stays reachable instead of silently spinning. We DON'T
     // wipe the creds — the loop() watchdog also keeps retrying — but a fresh boot with no
     // association lands the user back on the setup page to fix it.
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[WiFi] could not join stored network — opening setup portal");
+        Serial.println("[WiFi] could not join any stored network — opening setup portal");
         startSetupPortal();
         return;
     }
@@ -5712,6 +5824,21 @@ void loop() {
         static uint32_t lastReconnect = 0;
         if (WiFi.status() == WL_CONNECTED) {
             lastWifiOk = now;
+        } else if (wifiSavedCount() > 1 && now - lastWifiOk > 30000 && now - lastReconnect > 10000) {
+            // Several networks saved and this one has been gone for half a minute (issue #120):
+            // it's probably not coming back (venue WiFi off, hotspot out of range), so scan and
+            // move to the best saved network that IS on the air. Blocks loop() for the scan and
+            // up to 10 s per attempt, which only delays housekeeping: the DMX tasks don't wait,
+            // and with no WiFi there are no web clients to serve anyway.
+            Serial.printf("[WiFi] '%s' gone for 30 s, looking for another saved network... up=%lus\n",
+                g_wifiSlot >= 0 ? wifiSsidAt(g_wifiSlot).c_str() : "?", (unsigned long)uptimeSec());
+            WiFi.disconnect();
+            if (wifiJoinSaved(10000, false)) {
+                WiFi.setSleep(WIFI_PS_NONE);
+                Serial.printf("[WiFi] now on '%s' / %s\n", netSSID().c_str(), netLocalIP().toString().c_str());
+            }
+            lastReconnect = millis();
+            if (WiFi.status() != WL_CONNECTED) lastWifiOk = millis() - 20000;   // retry the scan in ~10 s, not at once
         } else if (now - lastWifiOk > 5000 && now - lastReconnect > 10000) {
             Serial.printf("[WiFi] link down (status=%d), re-scanning for strongest AP... up=%lus\n",
                 (int)WiFi.status(), (unsigned long)uptimeSec());

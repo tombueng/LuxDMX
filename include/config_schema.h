@@ -114,6 +114,10 @@ struct Config {
     int       wifiMode;
     String    wifiSsid;       // STA: the router SSID we join. Empty on a fresh device -> run the setup portal.
     String    wifiPsk;        // STA: the router password (empty = open network)
+    // More networks to try, in this order, when the one above isn't on the air (issue #120).
+    // wifiSsid/wifiPsk is slot 1, these are slots 2..4. An empty SSID is an unused slot.
+    String    wifiSsid2, wifiSsid3, wifiSsid4;
+    String    wifiPsk2,  wifiPsk3,  wifiPsk4;
     bool      apFallback;     // derived legacy mirror of linkLossMode (not a schema field)
     int       linkLossMode;
     String    apPassword;

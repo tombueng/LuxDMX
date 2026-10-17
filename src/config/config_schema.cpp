@@ -148,6 +148,16 @@ const CfgField CONFIG_FIELDS[] = {
     // SSID, never the password.
     SFIELD("wifissid", "wifiSsid",     wifiSsid,     "WiFi SSID",          "Network", CFG_NONE),
     SFIELD("wifipsk",  "wifiPsk",      wifiPsk,      "WiFi password",      "Network", CFG_SECRET | CFG_KEEPNE),
+    // Saved networks 2..4, tried in order when the first isn't there (issue #120). Same rules as
+    // slot 1: the password is never echoed to the page and a blank one keeps what's stored.
+    // LIVE: nothing reads them until the next join (boot, or the watchdog moving networks), so
+    // adding a backup network must not restart a box that's running a show on the first one.
+    SFIELD_L("wifissid2", "wifiSsid2", wifiSsid2,    "WiFi SSID 2",        "Network", CFG_NONE),
+    SFIELD_L("wifipsk2",  "wifiPsk2",  wifiPsk2,     "WiFi password 2",    "Network", CFG_SECRET | CFG_KEEPNE),
+    SFIELD_L("wifissid3", "wifiSsid3", wifiSsid3,    "WiFi SSID 3",        "Network", CFG_NONE),
+    SFIELD_L("wifipsk3",  "wifiPsk3",  wifiPsk3,     "WiFi password 3",    "Network", CFG_SECRET | CFG_KEEPNE),
+    SFIELD_L("wifissid4", "wifiSsid4", wifiSsid4,    "WiFi SSID 4",        "Network", CFG_NONE),
+    SFIELD_L("wifipsk4",  "wifiPsk4",  wifiPsk4,     "WiFi password 4",    "Network", CFG_SECRET | CFG_KEEPNE),
     EFIELD("fbmode",   "linkLossMode", linkLossMode, "Link-loss policy",   "Network", ENUM_FBMODE),
     SFIELD("appw",     "apPassword",   apPassword,   "AP password",        "Network", CFG_SECRET),
     BFIELD("staticip", "staticIp",     staticIp,     "Static IP",          "Network", CFG_NONE),
