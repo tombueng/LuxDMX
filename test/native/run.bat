@@ -15,6 +15,7 @@ cl /nologo /EHsc /std:c++17 /I test\native\shim /I lib\EmbeddedConfig\src /I inc
    /DDEFAULT_TEMPLATE=luxdmx_v6 ^
    test\native\test_main.cpp ^
    lib\EmbeddedConfig\src\config_core.cpp lib\EmbeddedConfig\src\config_serial.cpp ^
+   lib\EmbeddedConfig\src\config_json.cpp ^
    src\config\config_schema.cpp src\config_templates_gen.cpp ^
    /Fe:build\cfgtest.exe /Fobuild\ > build\compile.log 2>&1
 if errorlevel 1 ( type build\compile.log & popd & exit /b 1 )

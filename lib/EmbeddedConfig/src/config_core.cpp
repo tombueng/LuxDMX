@@ -1,5 +1,7 @@
 #include "config_core.h"
 #include "config_enums.h"
+#include "config_json.h"
+#include <vector>
 #include <Preferences.h>
 #include <string.h>
 #include <stdio.h>
@@ -272,6 +274,84 @@ void dump(String& out, bool maskSecrets) {
                 out += key; out += "="; out += v; out += "\n";
             }
     }
+}
+
+// ---- backup / restore (issue #108) ----------------------------------------
+// Walk every key the way dump() does, with its schema entry.
+static void eachKey(const std::function<void(const String&, CfgKind, uint16_t)>& fn) {
+    for (size_t j = 0; j < CONFIG_FIELD_COUNT; j++)
+        fn(String(CONFIG_FIELDS[j].key), CONFIG_FIELDS[j].kind, CONFIG_FIELDS[j].flags);
+    for (size_t ai = 0; ai < CONFIG_ARRAY_COUNT; ai++) {
+        const CfgArray& A = CONFIG_ARRAYS[ai];
+        for (int i = 0; i < (int)A.count; i++)
+            for (size_t j = 0; j < A.fieldCount; j++) {
+                char kb[32]; snprintf(kb, sizeof(kb), "%c%d_%s", A.prefix, i, A.fields[j].suffix);
+                fn(String(kb), A.fields[j].kind, A.fields[j].flags);
+            }
+    }
+}
+
+void exportJson(String& out, bool includeSecrets) {
+    out += '{';
+    bool first = true;
+    eachKey([&](const String& key, CfgKind kind, uint16_t flags) {
+        if (flags & CFG_READONLY) return;
+        if ((flags & CFG_SECRET) && !includeSecrets) return;
+        String v; getValue(key, v);
+        if (!first) out += ',';
+        first = false;
+        out += cfgjson::quote(key); out += ':';
+        if (kind == CfgKind::Str) out += cfgjson::quote(v);
+        else                      out += v;   // numbers and true/false are already valid JSON
+    });
+    out += '}';
+}
+
+bool checkValue(const String& key, const String& val, String& err) {
+    void* a; CfgKind kind; int32_t mn, mx; uint16_t flags;
+    if (!resolve(key, a, kind, mn, mx, flags)) { err = String("unknown key: ") + key; return false; }
+    if (flags & CFG_READONLY) { err = key + " is read-only"; return false; }
+    switch (kind) {
+        case CfgKind::Bool:
+            if (val == "true" || val == "false" || val == "1" || val == "0") return true;
+            err = key + ": expected true or false"; return false;
+        case CfgKind::Int:
+        case CfgKind::Enum: {
+            const char* s = val.c_str(); const char* d = s + (*s == '-' ? 1 : 0);
+            if (!*d) { err = key + ": expected a number"; return false; }
+            for (const char* q = d; *q; q++) if (*q < '0' || *q > '9') { err = key + ": expected a number"; return false; }
+            if (strlen(d) > 9) { err = key + ": out of range"; return false; }
+            long v = atol(s);
+            if (v < mn || v > mx) { err = key + ": " + val + " is outside " + String((int)mn) + ".." + String((int)mx); return false; }
+            return true;
+        }
+        case CfgKind::Str:
+            return true;
+    }
+    return true;
+}
+
+bool importJson(const char* json, size_t len, String& err, int& applied) {
+    applied = 0;
+    std::vector<std::pair<String, String>> pairs;
+    String bad;
+    const bool ok = cfgjson::eachMember(json, len, [&](const cfgjson::Member& m) {
+        if (m.kind == cfgjson::Kind::Null) return true;   // "no value" = leave it alone
+        if (m.kind == cfgjson::Kind::Object || m.kind == cfgjson::Kind::Array) {
+            bad = m.key + ": expected a single value"; return false;
+        }
+        String e;
+        if (!checkValue(m.key, m.text, e)) { bad = e; return false; }
+        // Same rule as the form: a blank hostname or password never wipes the stored one.
+        void* a; CfgKind kind; int32_t mn, mx; uint16_t flags;
+        if (resolve(m.key, a, kind, mn, mx, flags) && (flags & CFG_KEEPNE) && m.text.length() == 0) return true;
+        pairs.push_back({m.key, m.text});
+        return true;
+    }, err);
+    if (!ok) return false;
+    if (bad.length()) { err = bad; return false; }
+    for (auto& kv : pairs) { String e; if (setValue(kv.first, kv.second, e)) applied++; }
+    return true;
 }
 
 } // namespace cfgcore

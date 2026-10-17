@@ -29,6 +29,7 @@
 // defined below in main.cpp; config_enums.h mirrors them for the engine TU.
 #include <config_core.h>     // EmbeddedConfig library (lib/EmbeddedConfig)
 #include <config_serial.h>   // serial configuration console (Phase 2/3)
+#include <config_json.h>     // backup file reader (issue #108)
 // Wired-Ethernet capability (compile-time). WiFi is ALWAYS compiled in too; the
 // active interface — and, on the classic ESP32, which wired PHY — is chosen at
 // runtime (issue #14).
@@ -3473,6 +3474,112 @@ static void handleLabelsBody(AsyncWebServerRequest* req, uint8_t* data, size_t l
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
+// ---------------------------------------------------------------------------
+// Config backup / restore (issue #108)
+// ---------------------------------------------------------------------------
+// GET /config.json[?secrets=1][&download=1] -- the whole config plus the channel labels, as one
+// file. Passwords only with secrets=1: the file is then as sensitive as the device itself.
+// POST /config/import[?force=1] -- takes that file back. Only the keys in it change (a partial
+// file is fine, and an absent boolean is NOT switched off the way the /config form would),
+// every value is checked before anything is written, then it saves and reboots. A file from a
+// different chip or a different picked board is refused unless force=1, because its pin numbers
+// were chosen for other copper.
+static void handleConfigExport(AsyncWebServerRequest* req) {
+    String s;
+    const bool secrets = argStr(req, "secrets", s) && s == "1";
+    String j = "{\"luxdmx\":\"config\",\"format\":1,\"fw\":\"";
+    j += FIRMWARE_VERSION;
+    j += "\",\"mcu\":\"";   j += MCU_ID;
+    j += "\",\"board\":\""; j += jsonEsc(cfg.boardSel.length() ? cfg.boardSel : String(BOARD_ID));
+    j += "\",\"host\":\"";  j += jsonEsc(cfg.hostname);
+    j += "\",\"secrets\":"; j += secrets ? "true" : "false";
+    j += ",\"config\":";
+    cfgcore::exportJson(j, secrets);
+    j += ",\"labels\":";    j += g_labels.length() ? g_labels : String("{}");
+    j += "}";
+    if (!argStr(req, "download", s) || s != "1") { sendJsonSafe(req, j); return; }
+    if (heapBlock() < j.length() + JSON_MARGIN) { req->send(503, "application/json", "{\"busy\":1}"); return; }   // as sendJsonSafe
+    try {
+        AsyncWebServerResponse* r = req->beginResponse(200, "application/json", j);
+        r->addHeader("Content-Disposition", String("attachment; filename=\"") + cfg.hostname + "-config.json\"");
+        req->send(r);
+    } catch (...) {}
+}
+
+static constexpr size_t IMPORT_MAX = 32768;   // ~6 KB of config + up to LABELS_MAX of labels
+
+// Body arrives in chunks on the AsyncTCP task; collect it in the request's own buffer, which the
+// library frees with the request (so a dropped upload leaks nothing).
+static void handleConfigImportBody(AsyncWebServerRequest* req, uint8_t* data, size_t len,
+                                   size_t index, size_t total) {
+    if (total > IMPORT_MAX) return;   // the request handler answers 413
+    if (index == 0) {
+        req->_tempObject = malloc(total + 1);
+        if (!req->_tempObject) return;
+    }
+    if (!req->_tempObject || index + len > total) return;
+    memcpy((char*)req->_tempObject + index, data, len);
+    if (index + len == total) ((char*)req->_tempObject)[total] = 0;
+}
+
+static void handleConfigImport(AsyncWebServerRequest* req) {
+    auto reply = [req](int code, const String& body) {
+        try { req->send(code, "application/json", body); } catch (...) {}
+    };
+    if (req->contentLength() > IMPORT_MAX) { reply(413, "{\"error\":\"file too large\"}"); return; }
+    const char* body = (const char*)req->_tempObject;
+    if (!body || req->contentLength() == 0) { reply(400, "{\"error\":\"empty or unreadable upload\"}"); return; }
+    const size_t len = req->contentLength();
+
+    // Pass 1: the envelope. config and labels come back as raw slices of the body.
+    String err, magic, fileMcu, fileBoard;
+    const char* cfgRaw = nullptr; size_t cfgLen = 0;
+    const char* labRaw = nullptr; size_t labLen = 0;
+    bool ok = cfgjson::eachMember(body, len, [&](const cfgjson::Member& m) {
+        if (m.key == "luxdmx")      magic     = m.text;
+        else if (m.key == "mcu")    fileMcu   = m.text;
+        else if (m.key == "board")  fileBoard = m.text;
+        else if (m.key == "config" && m.kind == cfgjson::Kind::Object) { cfgRaw = m.raw; cfgLen = m.rawLen; }
+        else if (m.key == "labels" && m.kind == cfgjson::Kind::Object) { labRaw = m.raw; labLen = m.rawLen; }
+        return true;
+    }, err);
+    if (!ok) { reply(400, "{\"error\":\"not valid JSON: " + jsonEsc(err) + "\"}"); return; }
+    if (magic != "config" || !cfgRaw) { reply(400, "{\"error\":\"not a LuxDMX config backup\"}"); return; }
+    if (labRaw && labLen > LABELS_MAX) { reply(400, "{\"error\":\"labels too large\"}"); return; }
+
+    // Board check. Same chip family, and the same picked board when both sides have one.
+    String s;
+    const bool force = argStr(req, "force", s) && s == "1";
+    const String devBoard = cfg.boardSel.length() ? cfg.boardSel : String(BOARD_ID);
+    const bool mcuDiff   = fileMcu.length() && fileMcu != MCU_ID;
+    const bool boardDiff = fileBoard.length() && fileBoard != devBoard;
+    if ((mcuDiff || boardDiff) && !force) {
+        reply(409, String("{\"error\":\"board\",\"fileMcu\":\"") + jsonEsc(fileMcu) + "\",\"fileBoard\":\""
+                   + jsonEsc(fileBoard) + "\",\"mcu\":\"" + MCU_ID + "\",\"board\":\"" + jsonEsc(devBoard) + "\"}");
+        return;
+    }
+
+    // Pass 2: the settings, all checked before any is written.
+    int applied = 0;
+    if (!cfgcore::importJson(cfgRaw, cfgLen, err, applied)) {
+        reply(400, "{\"error\":\"" + jsonEsc(err) + "\"}");
+        return;
+    }
+    dmxReady = false;   // pins and drivers may all be different after the restart
+    saveConfig();
+    if (labRaw) {
+        g_labels = String();
+        g_labels.concat(labRaw, labLen);
+        prefs.begin(PREF_NS, false);
+        prefs.putString("labels", g_labels);
+        prefs.end();
+    }
+    Serial.printf("[CFG] imported %d setting(s)%s from a backup, rebooting\n", applied, labRaw ? " + labels" : "");
+    reply(200, String("{\"ok\":true,\"applied\":") + applied + ",\"labels\":" + (labRaw ? "true" : "false")
+               + ",\"reboot\":true}");
+    pendingRebootAt = millis() + 800;
+}
+
 static void handleAutoUpdatePost(AsyncWebServerRequest* req) {
     String s;
     cfg.autoUpdate = argStr(req, "enabled", s) && s == "1";
@@ -5375,6 +5482,9 @@ void setup() {
     http.on("/pixels.json",       HTTP_GET,  handlePixelsJson);
     http.on("/pixels/frame",      HTTP_GET,  handlePixelFrame);
     http.on("/log.json",          HTTP_GET,  handleLogJson);
+    // Before "/config": the library also hands "/config/<anything>" to a "/config" handler.
+    http.on("/config/import",     HTTP_POST, handleConfigImport, NULL, handleConfigImportBody);
+    http.on("/config.json",       HTTP_GET,  handleConfigExport);
     http.on("/config",            HTTP_GET,  handleConfigGet);
     http.on("/config",            HTTP_POST, handleConfigPost);
     // Register /setup/scan BEFORE /setup: this AsyncWebServer matches a plain-string route
