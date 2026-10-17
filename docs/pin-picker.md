@@ -79,6 +79,13 @@ device that has never had a board picked falls back to the detected id, and if t
 descriptor, to **Custom**, which still validates against the chip family rules for `mcu`. The board
 can also be switched from a dropdown inside the pin-picker popup itself.
 
+A saved pick the page can't show right now is **kept**, not replaced. That covers a catalog board
+while the browser is offline (a show network with no internet is the normal case), a board the online
+catalog doesn't list, and an id from another firmware. The dropdown shows it as
+`<id> (saved, not in this firmware)`, it behaves like Custom (no copper locks) until its descriptor
+loads, and Save writes the same id back. It used to sit on the detected board instead, and the next
+Save quietly overwrote the pick with that.
+
 The pick is UI state: the firmware itself never reads it, it only stores it. Copper-pin locks and
 the diagram follow it (see below), nothing else does.
 

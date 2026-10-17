@@ -116,7 +116,9 @@ node docs/tests/board-persist.mjs # the picked board STICKS: /info.json boardSel
                                   #   (compile-time) board id, the locks follow the restored pick,
                                   #   the selector submits as board=..., "custom" stays custom, a
                                   #   device with no saved pick still falls back to detection, and
-                                  #   an unknown saved board degrades to detection instead of wedging
+                                  #   a saved board the page can't show (offline catalog, unknown id)
+                                  #   is kept and posted back on Save, without wedging the page.
+                                  #   CHROME=<path> picks the browser if playwright's own is missing
 node docs/tests/dm9051-roundtrip.mjs  # a DM9051 box survives a /config save: the wired selector
                                   #   reads ethSpiPhy from /info.json and posts it back unchanged.
                                   #   Guards the bug where /info.json didn't publish the field, so

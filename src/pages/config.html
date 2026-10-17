@@ -2933,22 +2933,25 @@ function loadRemoteCatalog(){
 }
 
 // ---- Init (called from the /info.json loader) ------------------------------
-// Point the board <select> at `id`, falling back to `alt` when that board isn't on offer.
-// A saved catalog board has no <option> until its descriptor is fetched, so sit on the
-// fallback and upgrade once it lands (offline: the fallback just stays).
+// Point the board <select> at `id` (the SAVED pick), or at `alt` (detection) when nothing was
+// picked. A saved board this page can't show right now -- a catalog board while the browser is
+// offline, one the online catalog doesn't have, one from another firmware -- stays selected
+// under a placeholder entry. It used to sit on the detected board instead, and the next Save
+// quietly wrote that over the pick. With no descriptor it behaves like Custom (no pin locks)
+// until its descriptor loads, if it ever does.
 function setBoardSel(id, alt){
   var sel = $('board-sel');
   id = id || alt || 'custom';
   if (BOARDS[id] && mcuMatch(BOARDS[id].mcu)) appendBoardOption(id, BOARDS[id].name);
   sel.value = id;
   if (sel.value === id) return;
-  sel.value = alt || 'custom';
-  if (id === 'custom' || BUILTINS.indexOf(id) >= 0) return;
+  appendBoardOption(id, id + ' (saved, not in this firmware)');
+  sel.value = id;
   ensureBoard(id, function(ok){
     if (!ok || !mcuMatch(BOARDS[id].mcu)) return;
-    appendBoardOption(id, BOARDS[id].name);
-    sel.value = id;
-    updBoardButtons(); applyHardwiredLocks(); validate();
+    var o = sel.querySelector('option[value="' + id + '"]');
+    if (o) o.textContent = BOARDS[id].name;
+    if (sel.value === id){ updBoardButtons(); applyHardwiredLocks(); validate(); }
   });
 }
 function initBoards(){
