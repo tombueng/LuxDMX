@@ -1866,6 +1866,79 @@ static bool beatRisk(int i) {
 }
 
 // ---------------------------------------------------------------------------
+// Heap numbers that mean something (issue #135)
+// ---------------------------------------------------------------------------
+// ESP.getFreeHeap() / getMaxAllocHeap() / getMinFreeHeap() ask for MALLOC_CAP_INTERNAL. On the
+// classic ESP32 that includes the IRAM left over after the code (~33 KB on this build), which is
+// 32-bit-only: malloc, new, lwIP and the WiFi buffers can never get a byte of it. So "73 KB free"
+// was really ~40 KB, every guard below sat ~33 KB too optimistic, and a field log showing
+// minFree=32 KB meant the heap had actually hit zero. These ask for byte-addressable internal
+// RAM, which is what all of those allocate from. The S3 has no such region, so there both agree.
+static constexpr uint32_t HEAP8_CAPS = MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL;
+static inline uint32_t heapFree()  { return heap_caps_get_free_size(HEAP8_CAPS); }
+static inline uint32_t heapBlock() { return heap_caps_get_largest_free_block(HEAP8_CAPS); }
+static inline uint32_t heapMin()   { return heap_caps_get_minimum_free_size(HEAP8_CAPS); }
+
+// Floors for the optional work (UI pushes, status JSON, the version check), in those real bytes.
+// The S3 keeps the numbers it always had. A classic chip idles around 40 KB real, so it needs
+// floors it can actually sit above, or the UI would go quiet for good.
+#if CONFIG_IDF_TARGET_ESP32
+static constexpr uint32_t WS_MIN_FREE    = 16000, WS_MIN_BLOCK   = 4000;    // 548 B status frame
+static constexpr uint32_t META_MIN_FREE  = 20000, META_MIN_BLOCK = 10000;   // up to ~6 KB of JSON
+static constexpr uint32_t JSON_MARGIN    = 8000;                            // on top of the body
+#else
+static constexpr uint32_t WS_MIN_FREE    = 40000, WS_MIN_BLOCK   = 12000;
+static constexpr uint32_t META_MIN_FREE  = 40000, META_MIN_BLOCK = 24000;
+static constexpr uint32_t JSON_MARGIN    = 12000;
+#endif
+
+// ---------------------------------------------------------------------------
+// WebSocket clients (issue #135)
+// ---------------------------------------------------------------------------
+// The pushes used to go out through binaryAll()/textAll() behind ws.availableForWriteAll(), which
+// is all-or-nothing: one client whose queue was full, or that sat half-closed, stopped the UI for
+// everybody. Nothing went out to the stuck one either, so nothing ever timed it out, and it kept
+// its queue (up to 32 messages, ~25 KB) for as long as it liked. On a classic ESP32 that's most
+// of the heap.
+//
+// Now every client is sent to on its own: a full or closing one is skipped and only misses frames
+// itself, everyone else keeps going, and because we keep writing to a dead peer, AsyncTCP's ack
+// timeout notices within seconds and drops it. The queue itself is capped at 4 in platformio.ini.
+// The ids are kept here because the library's own client list can't be walked safely from
+// another task. onWsEvent (AsyncTCP task) writes them, the push code (loop task) copies them.
+static constexpr int WS_SLOTS = 8;   // cleanupClients() caps live clients at 4, closing ones linger
+struct WsSlot { uint32_t id; bool meta; };   // id 0 = free; meta = wants the senders/log JSON
+static WsSlot       wsSlots[WS_SLOTS] = {};
+static portMUX_TYPE wsSlotsMux = portMUX_INITIALIZER_UNLOCKED;
+
+static void wsSlotSet(uint32_t id, bool add, bool meta = false) {
+    portENTER_CRITICAL(&wsSlotsMux);
+    int hit = -1, freeSlot = -1;
+    for (int i = 0; i < WS_SLOTS; i++) {
+        if (wsSlots[i].id == id) hit = i;
+        if (!wsSlots[i].id && freeSlot < 0) freeSlot = i;
+    }
+    if (!add)              { if (hit >= 0) wsSlots[hit] = {0, false}; }
+    else if (hit >= 0)     { wsSlots[hit].meta = wsSlots[hit].meta || meta; }
+    else if (freeSlot >= 0){ wsSlots[freeSlot] = {id, meta}; }
+    portEXIT_CRITICAL(&wsSlotsMux);
+}
+
+// Queue one shared buffer to every client that has room, skipping full or closing ones.
+// metaOnly: just the clients that asked for the senders/log JSON (the status page).
+static void wsSendEach(const AsyncWebSocketSharedBuffer& buf, bool text, bool metaOnly) {
+    WsSlot ids[WS_SLOTS];
+    portENTER_CRITICAL(&wsSlotsMux);
+    memcpy(ids, wsSlots, sizeof(ids));
+    portEXIT_CRITICAL(&wsSlotsMux);
+    for (int i = 0; i < WS_SLOTS; i++) {
+        if (!ids[i].id || (metaOnly && !ids[i].meta)) continue;
+        if (!ws.availableForWrite(ids[i].id)) continue;   // full or not CONNECTED: skip this one only
+        if (text) ws.text(ids[i].id, buf); else ws.binary(ids[i].id, buf);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket push (binary, WS_FRAME_LEN bytes)
 // frame: fps(2) rssi(2) heap(4) uptime(4) senders(1) srcStatus(1) jitter(2)
 //        rssi doubles as a link indicator: <=0 WiFi STA dBm | >=10 wired link
@@ -1875,10 +1948,10 @@ static bool beatRisk(int i) {
 // ---------------------------------------------------------------------------
 static void wsPush() {
     if (ws.count() == 0) return;
-    // Skip under heap pressure. getFreeHeap() alone is not enough: the async WS send copies
+    // Skip under heap pressure. Total free alone is not enough: the async WS send copies
     // the frame into a make_shared<vector> that needs ONE CONTIGUOUS block, so a fragmented
     // heap (heavy under a packet flood) can throw bad_alloc even with lots of total free.
-    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 12000) return;
+    if (heapFree() < WS_MIN_FREE || heapBlock() < WS_MIN_BLOCK) return;
     uint16_t fpsI  = (uint16_t)(fps * 10.0f);
     // rssi field carries the active link: <=0 WiFi STA dBm, >=10 wired Ethernet
     // link speed in Mbps, 1 standalone AP. Lets the navbar show WiFi/LAN/AP live.
@@ -1888,7 +1961,7 @@ static void wsPush() {
     else if (g_useEth) { int s = ETH.linkSpeed(); rssi = (int16_t)(s >= 10 ? s : 100); }
 #endif
     else               rssi = (int16_t)WiFi.RSSI();
-    uint32_t heap  = ESP.getFreeHeap();
+    uint32_t heap  = heapFree();   // the navbar number: what can really be allocated
     uint32_t upS   = uptimeSec();
     uint16_t jitI  = (uint16_t)(jitterMs * 10.0f < 65535.0f ? jitterMs * 10.0f : 65535.0f);
     wsBuf[0]  = fpsI >> 8;                       wsBuf[1]  = fpsI & 0xFF;
@@ -1936,13 +2009,13 @@ static void wsPush() {
     wsBuf[t]   = nf >> 8;   wsBuf[t+1] = nf & 0xFF;
     wsBuf[t+2] = rtx >> 24; wsBuf[t+3] = (rtx>>16)&0xFF; wsBuf[t+4] = (rtx>>8)&0xFF; wsBuf[t+5] = rtx & 0xFF;
     wsBuf[t+6] = rrx >> 24; wsBuf[t+7] = (rrx>>16)&0xFF; wsBuf[t+8] = (rrx>>8)&0xFF; wsBuf[t+9] = rrx & 0xFF;
-    // Only push if the async TCP queues have room, so a slow client never
-    // backs up memory or blocks.
+    // One shared copy of the frame, queued to each client that has room (see wsSendEach).
     // Belt-and-suspenders: a failed async allocation inside the WS stack throws std::bad_alloc;
     // catching it degrades a push to a no-op instead of letting the uncaught throw abort() the CPU.
-    if (ws.availableForWriteAll()) {
-        try { ws.binaryAll(wsBuf, WS_FRAME_LEN); } catch (...) {}
-    }
+    try {
+        auto buf = std::make_shared<std::vector<uint8_t>>(wsBuf, wsBuf + WS_FRAME_LEN);
+        wsSendEach(buf, false, false);
+    } catch (...) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -2065,14 +2138,29 @@ static volatile uint32_t httpReqCount = 0;   // [DEBUG] HTTP requests served
 static volatile uint32_t wsConnCount  = 0;   // [DEBUG] WS connects
 static volatile uint32_t wsDiscCount  = 0;   // [DEBUG] WS disconnects
 
-static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient*, AwsEventType type,
+static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client, AwsEventType type,
                       void* arg, uint8_t* data, size_t len) {
-    if (type == WS_EVT_CONNECT)    { wsConnCount++; return; }
-    if (type == WS_EVT_DISCONNECT) { wsDiscCount++; return; }
+    if (type == WS_EVT_CONNECT) {
+        wsConnCount++;
+        wsSlotSet(client->id(), true);
+        // Ping a client we have nothing queued for. While the pushes run, every frame already
+        // probes it; this covers the pauses (heap floor), so a peer that vanished in silence
+        // still gets an unanswered packet and AsyncTCP's ack timeout reaps it (issue #135).
+        client->keepAlivePeriod(10);
+        return;
+    }
+    if (type == WS_EVT_DISCONNECT) { wsDiscCount++; wsSlotSet(client->id(), false); return; }
     if (type != WS_EVT_DATA) return;
     AwsFrameInfo* info = (AwsFrameInfo*)arg;
     // Only handle complete, single-frame text messages (our control msgs are tiny)
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+        // The status page asks for the senders/log JSON. Nobody else gets it: it's up to ~6 KB
+        // every 2 s, and the config and RDM pages only ever wanted the navbar numbers.
+        static const char SUB_META[] = "{\"type\":\"meta\"}";
+        if (len == sizeof(SUB_META) - 1 && !memcmp(data, SUB_META, len)) {
+            wsSlotSet(client->id(), true, true);
+            return;
+        }
         handleWsText((const char*)data, len);
     }
 }
@@ -2231,10 +2319,9 @@ static void routeFrame(int artUniverse, const uint8_t* data, uint16_t length,
         frameCount  = 0;
         lastFrameMs = now;
     }
-    if (now - lastWsPush >= 40) {
-        wsPush();
-        lastWsPush = now;
-    }
+    // No WS push from here any more (issue #135). It put a tcp_write per browser into the Art-Net
+    // receive task, under the lwIP core lock, and raced loop() for wsBuf/lastWsPush from the
+    // other core. loop()'s 10 Hz push is plenty for a UI.
 }
 
 // ---------------------------------------------------------------------------
@@ -2373,7 +2460,7 @@ static bool argStr(AsyncWebServerRequest* req, const char* n, String& out) {
 // number of discovered fixtures) or /dmx.json while the heap was low under load. Guard on the largest
 // free block, and catch as a hard backstop, so a status poll degrades to a 503 instead of a reboot.
 static void sendJsonSafe(AsyncWebServerRequest* req, const String& body) {
-    if ((int)ESP.getMaxAllocHeap() < (int)body.length() + 12000) {
+    if (heapBlock() < body.length() + JSON_MARGIN) {
         try { req->send(503, "application/json", "{\"busy\":1}"); } catch (...) {}
         return;
     }
@@ -2584,19 +2671,25 @@ static void handleLogJson(AsyncWebServerRequest* req)     { sendJsonSafe(req, lo
 // Push senders + log over the WebSocket (one persistent connection) so the
 // browser doesn't have to poll two HTTP endpoints every 2 s.
 static void wsPushMeta() {
-    if (ws.count() == 0 || !ws.availableForWriteAll()) return;
+    bool anyMeta = false;
+    portENTER_CRITICAL(&wsSlotsMux);
+    for (int i = 0; i < WS_SLOTS; i++) if (wsSlots[i].id && wsSlots[i].meta) anyMeta = true;
+    portEXIT_CRITICAL(&wsSlotsMux);
+    if (!anyMeta) return;   // only the status page subscribes; don't even build it otherwise
     // The meta JSON is several KB and the WS send needs a contiguous block for it, so guard on
     // the LARGEST free block, not just total free: under a flood the heap fragments and total
     // free (~100 KB) stays high while the biggest block shrinks, which is how ws.textAll() threw
     // bad_alloc and abort()ed the board. try/catch is the hard backstop against that reboot.
-    if (ESP.getFreeHeap() < 40000 || ESP.getMaxAllocHeap() < 24000) return;
+    if (heapFree() < META_MIN_FREE || heapBlock() < META_MIN_BLOCK) return;
     try {
         String m = "{\"meta\":1,\"senders\":";
         m += sendersJson();
         m += ",\"log\":";
         m += logJson();
         m += "}";
-        ws.textAll(m);
+        auto buf = std::make_shared<std::vector<uint8_t>>(m.c_str(), m.c_str() + m.length());
+        m = String();   // free the String before the queues take their turn
+        wsSendEach(buf, true, true);
     } catch (...) {}
 }
 
@@ -2873,12 +2966,16 @@ static void handleDmxJson(AsyncWebServerRequest* req) {
     }
     s->head += "],\"rssi\":";  s->head += netRSSI();
     s->head += ",\"up\":\"";   s->head += uptimeStr();
-    s->head += "\",\"heap\":"; s->head += ESP.getFreeHeap();
+    s->head += "\",\"heap\":"; s->head += heapFree();
     // Memory diagnostics. Without them all you see from outside is "heap", and you can't tell
     // whether that's tight, whether PSRAM is running at all, or how low it already got under
     // load. Those are exactly the numbers you need when a box stops answering under load.
-    s->head += ",\"heapMin\":";   s->head += (uint32_t)ESP.getMinFreeHeap();
-    s->head += ",\"heapBlock\":"; s->head += (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    // heap/heapMin/heapBlock are byte-addressable internal RAM (see heapFree). heapAll is the old
+    // ESP.getFreeHeap() figure, which on a classic ESP32 also counts ~33 KB of IRAM nobody can use.
+    s->head += ",\"heapMin\":";   s->head += heapMin();
+    s->head += ",\"heapBlock\":"; s->head += heapBlock();
+    s->head += ",\"heapAll\":";   s->head += (uint32_t)ESP.getFreeHeap();
+    s->head += ",\"ws\":";        s->head += (uint32_t)ws.count();   // live WebSocket clients
     s->head += ",\"psram\":";     s->head += (uint32_t)heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
     s->head += ",\"psramFree\":"; s->head += (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     s->head += ",\"rdmCap\":";    s->head += g_rdmMaxDev;
@@ -3541,9 +3638,11 @@ static int parseBuild(const String& v) {
 // (^firmware/version/?$) so it does not catch .txt, and it stays pointed at GitHub so older
 // firmware in the field keeps working unchanged.
 static bool httpGet(const char* url, String& out, size_t maxLen) {
-    // Still a floor, just a realistic one: without TLS this needs single-digit KB, not 50.
-    if (ESP.getMaxAllocHeap() < 12000) {
-        Serial.printf("[VER] skipped: largest free block %u too small\n", ESP.getMaxAllocHeap());
+    // Still a floor, just a realistic one: without TLS this needs single-digit KB, not 50. Total
+    // free as well: a socket stuck in its write retries can hold on for 10 s, and on a classic
+    // chip that's running low this is the one job that can just wait for the next round.
+    if (heapBlock() < 12000 || heapFree() < 24000) {
+        Serial.printf("[VER] skipped: heap %u free, largest block %u\n", heapFree(), heapBlock());
         return false;
     }
     bool ok = false;
@@ -3612,7 +3711,10 @@ static void versionCheckTask(void*) {
                 Serial.println("[OTA] auto-update available but retry budget spent; will retry later");
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(6UL * 3600UL * 1000UL));  // re-check every 6 h
+        // Re-check every 6 h. Counted in ticks: pdMS_TO_TICKS() multiplies in 32-bit TickType_t,
+        // and 21.6e6 ms x 1000 Hz overflowed to ~125 s, so this ran every two minutes, each run
+        // holding a socket and heap and sometimes blocking 10 s in a failed write (issue #135).
+        vTaskDelay((TickType_t)6 * 3600 * configTICK_RATE_HZ);
     }
 }
 
@@ -3650,9 +3752,9 @@ static void doGithubOta() {
     // the TLS floor to a transfer that has no TLS. If the heap is fragmented, defer rather
     // than throw bad_alloc and abort -- no restart here, so this can't become a reboot loop.
     const uint32_t need = tls ? 50000 : 12000;
-    if (ESP.getMaxAllocHeap() < need) {
+    if (heapBlock() < need) {
         Serial.printf("[OTA] deferred: largest free block %u too small (need %u%s)\n",
-                      ESP.getMaxAllocHeap(), need, tls ? " for TLS" : "");
+                      heapBlock(), need, tls ? " for TLS" : "");
         otaProgPhase = 3; dmxReady = true; return;
     }
     Serial.printf("[OTA] Starting update from %s\n", otaUrl.c_str());
@@ -3797,7 +3899,7 @@ static void otaBootUpdate() {
 
     otaTarget = tgt;
     Serial.printf("[OTA] clean-heap update to %s (attempt %u), largest free block=%u\n",
-                  tgt.c_str(), (unsigned)(tries + 1), ESP.getMaxAllocHeap());
+                  tgt.c_str(), (unsigned)(tries + 1), heapBlock());
     setLedColor(NEO_BLUE, true);
     doGithubOta();        // reboots into the new image on success; returns here only on failure
     Serial.println("[OTA] update did not complete, continuing normal boot");
@@ -5572,8 +5674,11 @@ void loop() {
     static uint32_t lastHeapLog = 0;
     if (now - lastHeapLog >= 15000) {
         lastHeapLog = now;
-        Serial.printf("[HEALTH] up=%lus heap=%u minFree=%u fps=%.1f rssi=%d st=%d ws=%u req=%u wsc=%u/%u\n",
+        // heap/minFree stay the old ESP.getFreeHeap() figures so field logs keep comparing;
+        // free8/min8/blk8 are what can really be allocated (issue #135).
+        Serial.printf("[HEALTH] up=%lus heap=%u minFree=%u free8=%u min8=%u blk8=%u fps=%.1f rssi=%d st=%d ws=%u req=%u wsc=%u/%u\n",
             (unsigned long)uptimeSec(), ESP.getFreeHeap(), ESP.getMinFreeHeap(),
+            heapFree(), heapMin(), heapBlock(),
             fps, netRSSI(), (int)WiFi.status(), ws.count(), (unsigned)httpReqCount,
             (unsigned)wsConnCount, (unsigned)wsDiscCount);
     }

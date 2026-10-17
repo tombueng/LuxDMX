@@ -149,6 +149,28 @@ window.LuxNav = (function(){
     document.getElementById('nav-sub').innerHTML=(d.hostname||'')+'.local &nbsp;&middot;&nbsp; '+(d.ip||'')+' &nbsp;&middot;&nbsp; v'+(d.version||'');
     saveNav();
   }).catch(function(){});
-  return { stats:stats, style:function(){ return lastStyle; } };
+  // The page's live /ws socket, kept open only while someone can see the page (issue #135). A tab
+  // in the background, or a page being left, used to keep its socket and the full 10 Hz stream,
+  // and on a classic ESP32 a couple of forgotten sockets were enough to run the heap dry. Hidden
+  // or leaving closes it, visible again (or back from the bfcache) reconnects, a drop retries
+  // after 2 s. open() builds the WebSocket with its handlers and returns it.
+  function live(open){
+    var sock=null, timer=null, leaving=false;
+    function want(){ return !leaving && document.visibilityState!=='hidden'; }
+    function connect(){
+      clearTimeout(timer); timer=null;
+      if(!want() || (sock && sock.readyState<2)) return;
+      try{ sock=open(); }catch(_){ sock=null; }
+      if(!sock){ timer=setTimeout(connect,2000); return; }
+      var s=sock;
+      s.addEventListener('close',function(){ if(s!==sock) return; sock=null; if(want()) timer=setTimeout(connect,2000); });
+    }
+    function drop(){ clearTimeout(timer); timer=null; if(sock){ var s=sock; sock=null; try{ s.close(); }catch(_){} } }
+    document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') drop(); else connect(); });
+    window.addEventListener('pagehide',function(){ leaving=true; drop(); });
+    window.addEventListener('pageshow',function(e){ if(e.persisted){ leaving=false; connect(); } });
+    connect();
+  }
+  return { stats:stats, style:function(){ return lastStyle; }, live:live };
 })();
 </script>

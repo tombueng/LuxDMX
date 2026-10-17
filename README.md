@@ -764,7 +764,7 @@ a blocking error can't hide behind a fold.
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
 | `/reboot` | POST | Restart the device, changing nothing. **POST only** — a GET would let a link prefetch or a crawler drop the DMX output of a live rig. Also in the UI: **`/config` → Device → Restart device** |
 | `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
-| `/dmx.json` | GET | All 512 values, fps, rssi, uptime, heap, manual mode flag |
+| `/dmx.json` | GET | All 512 values, fps, rssi, uptime, manual mode flag, and memory: `heap` / `heapMin` / `heapBlock` (real allocatable RAM), `heapAll` (the old `ESP.getFreeHeap()` figure), `psram` / `psramFree`, and `ws` (connected WebSocket clients) |
 | `/enc.json` | GET | Rotary-encoder diagnostics: pins, the decoder's effective vs configured steps-per-detent, and counters for quadrature edges and emitted steps. `?reset=1` zeroes them, so `encsteps` can be measured rather than guessed, see [docs/controls.md](docs/controls.md) |
 | `/i2cscan` | GET | Scans the display header's I2C bus on the configured pins: idle line levels, whether an external pull-up is present, and every address that answers. Tells a dead panel from a wiring fault when the screen stays black, see [docs/display.md](docs/display.md) |
 | `/senders.json` | GET | Active Art-Net / sACN senders (also pushed over the WebSocket) |
@@ -778,7 +778,7 @@ a blocking error can't hide behind a fold.
 | `/rdm/bqp` | GET | Set the Art-Net BackgroundQueuePolicy (background RDM status harvest), `?p=1..3` severity, `4` off |
 | `/rdm/merge` | GET | Set an output's merge mode, `?out=<index>&mode=0/1/2` (off/HTP/LTP), applied live + persisted |
 | `/led/bright` | GET | 5-LED panel per-colour brightness (`?r=&g=&y=&b=&w=`, 0-255), applied live; `&save=1` persists to NVS, `&test=1` lights all five for calibration (10-min window) |
-| `/version.json` | GET | Current firmware version + update-available flag. `latest` is `null` when the check hasn't succeeded (it is never faked to equal `current`). The device checks `http://luxdmx.org/firmware/version.txt` over **plain HTTP** — no TLS at runtime, because a handshake needs ~40 KB of contiguous heap that a running gateway doesn't have. The old code used `setInsecure()` (no cert validation), so this gives up no authenticity that existed; the firmware image itself is the thing worth signing |
+| `/version.json` | GET | Current firmware version + update-available flag. `latest` is `null` when the check hasn't succeeded (it is never faked to equal `current`). The device checks `http://luxdmx.org/firmware/version.txt` every **6 hours** (and skips a round while memory is low) over **plain HTTP** — no TLS at runtime, because a handshake needs ~40 KB of contiguous heap that a running gateway doesn't have. The old code used `setInsecure()` (no cert validation), so this gives up no authenticity that existed; the firmware image itself is the thing worth signing |
 | `/autoupdate` | POST | Toggle auto-update (`enabled=0/1`) |
 | `/ota/upload` | POST | Upload and flash a local `firmware.bin` |
 | `/ota/github` | POST | Install a release (downloaded via luxdmx.org; `version=latest` or `1.0.N`) |
@@ -793,7 +793,8 @@ Binary status/DMX frame pushed ~10×/s (528 + 2 bytes per output):
 Bytes  0–1    fps × 10           uint16 big-endian (aggregate, all inputs)
 Bytes  2–3    link metric        int16  big-endian (≤0 = WiFi RSSI dBm,
                                    ≥10 = wired link speed Mbps, 1 = standalone AP)
-Bytes  4–7    free heap          uint32 big-endian
+Bytes  4–7    free heap          uint32 big-endian (memory that can really be allocated,
+                                   see below)
 Bytes  8–11   uptime (s)         uint32 big-endian
 Byte   12     active sender count uint8
 Byte   13     source status       uint8 (0 = normal, 1 = conflict, 2 = merging)
@@ -804,6 +805,23 @@ Bytes  528…   per-output fps × 10 uint16 big-endian × number of outputs
 
 The web UI shows the **viewed output's** frame rate in the navbar and each output's own
 rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` alongside `"fps"`.
+
+Text frames carry the senders list and the change log (`{"meta":1,"senders":[…],"log":[…]}`, every
+2 s), but **only to a socket that asked for them** by sending `{"type":"meta"}`. The status page does;
+the other pages only need the navbar numbers, so they no longer get several KB of JSON they throw away.
+
+Each client is sent to on its own, with at most 4 messages waiting for it. A browser that stops reading
+(a frozen tab, a laptop going to sleep) only misses frames itself and gets dropped once it stops
+acknowledging, instead of holding up the stream for everybody. The pages close their socket while the
+tab is hidden or being left and reopen it when it's visible again, so a pile of background tabs doesn't
+keep a pile of streams running on the device (issue #135).
+
+**Heap numbers.** Since issue #135 every heap figure the device shows or acts on (navbar, `/dmx.json`
+`heap` / `heapMin` / `heapBlock`, the internal guards) is byte-addressable internal RAM, the memory
+`malloc`, the network stack and the WiFi buffers actually draw from. The older figure, `ESP.getFreeHeap()`,
+is still in `/dmx.json` as `heapAll`. On an ESP32-S3 the two agree. On a **classic ESP32 the navbar now
+reads ~33 KB lower than before**: the old number also counted the IRAM left over after the code, which
+nothing can allocate a byte from, so it looked like ~73 KB free when ~40 KB was usable.
 
 ### Source merging (HTP / LTP)
 
