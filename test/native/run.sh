@@ -32,3 +32,7 @@ g++ -std=c++17 -O1 -Wall -Wextra \
     -I include -I src \
     test/native/pixel_map_test.cpp -o build/pixtest
 build/pixtest
+
+# Which saved WiFi network gets joined, and the form's reorder (src/wifi_pick.h, issue #120).
+g++ -std=c++17 -O1 -Wall -Wextra -I src test/native/wifi_pick_test.cpp -o build/wifitest
+build/wifitest

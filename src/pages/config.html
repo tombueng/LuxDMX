@@ -108,6 +108,9 @@ footer a:hover { color:var(--gh-text); }
   border-top:1px solid var(--gh-border); box-shadow:0 -3px 14px rgba(0,0,0,.45); }
 #save-bar .save-inner { max-width:960px; margin:0 auto; }
 body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
+/* saved WiFi list (issue #120): the network we're on right now */
+.wifi-net.wifi-active .wifi-rank{color:#45d85c!important;font-weight:600}
+.wifi-net.wifi-active .wifi-rank::after{content:' \25CF';font-size:.7em}
 </style>
 </head>
 <body>
@@ -210,17 +213,48 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
             <b>Keep retrying</b> stays reachable once the link is back and never opens a hotspot (best on a show).
             <b>Standalone AP</b> makes the device its own network (set an AP password below; it refuses to open an
             unsecured AP). <b>Reboot</b> power-cycles to re-attempt the link. <b>Join WiFi</b> falls back to your
-            saved WiFi network (below) when there is no wired link, handy if the same box is sometimes wired and
-            sometimes not. To switch to a brand-new WiFi, hold the BOOT button at power-up for the setup portal
-            (a link drop alone never moves the device to another network).
+            saved WiFi networks (below) when there is no wired link, handy if the same box is sometimes wired and
+            sometimes not. A WiFi drop only ever moves the device along that saved list, never to a network you
+            didn't save; for a brand-new one, add it below or hold the BOOT button at power-up for the setup portal.
           </div>
         </div>
         <div id="sta-creds-row" class="mb-3">
-          <label class="form-label text-secondary small mb-1">WiFi network (SSID)</label>
-          <input class="form-control mb-2" type="text" name="wifissid" id="wifi-ssid" value="" placeholder="MyNetwork">
-          <label class="form-label text-secondary small mb-1">WiFi password</label>
-          <input class="form-control" type="text" name="wifipsk" id="wifi-psk" value="" placeholder="(leave blank to keep the current one)">
-          <div class="form-text">The router network to join in WiFi client mode, or the network the wired link-loss fallback hands off to. Leave the password blank to keep the one already stored. To set this up without the web UI (first run), join the <b>LuxDMX-setup</b> access point and follow the page that pops up.</div>
+          <label class="form-label text-secondary small mb-1">WiFi networks, tried in this order</label>
+          <input type="hidden" name="wifiorder" id="wifi-order" value="0,1,2,3">
+          <div class="wifi-net d-flex gap-2 align-items-center mb-2" data-row="0">
+            <span class="wifi-rank small text-secondary text-end" style="min-width:1.2em">1</span>
+            <input class="form-control form-control-sm" type="text" name="wifissid" id="wifi-ssid" value="" placeholder="MyNetwork" aria-label="Network 1 name (SSID)">
+            <input class="form-control form-control-sm" type="text" name="wifipsk" id="wifi-psk" value="" placeholder="password" aria-label="Network 1 password">
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-up" title="Try this one earlier" aria-label="Move network 1 up" disabled>&#9650;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-down" title="Try this one later" aria-label="Move network 1 down">&#9660;</button>
+          </div>
+          <div class="wifi-net d-flex gap-2 align-items-center mb-2" data-row="1">
+            <span class="wifi-rank small text-secondary text-end" style="min-width:1.2em">2</span>
+            <input class="form-control form-control-sm" type="text" name="wifissid2" id="wifi-ssid2" value="" placeholder="(unused)" aria-label="Network 2 name (SSID)">
+            <input class="form-control form-control-sm" type="text" name="wifipsk2" id="wifi-psk2" value="" placeholder="password" aria-label="Network 2 password">
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-up" title="Try this one earlier" aria-label="Move network 2 up">&#9650;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-down" title="Try this one later" aria-label="Move network 2 down">&#9660;</button>
+          </div>
+          <div class="wifi-net d-flex gap-2 align-items-center mb-2" data-row="2">
+            <span class="wifi-rank small text-secondary text-end" style="min-width:1.2em">3</span>
+            <input class="form-control form-control-sm" type="text" name="wifissid3" id="wifi-ssid3" value="" placeholder="(unused)" aria-label="Network 3 name (SSID)">
+            <input class="form-control form-control-sm" type="text" name="wifipsk3" id="wifi-psk3" value="" placeholder="password" aria-label="Network 3 password">
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-up" title="Try this one earlier" aria-label="Move network 3 up">&#9650;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-down" title="Try this one later" aria-label="Move network 3 down">&#9660;</button>
+          </div>
+          <div class="wifi-net d-flex gap-2 align-items-center mb-2" data-row="3">
+            <span class="wifi-rank small text-secondary text-end" style="min-width:1.2em">4</span>
+            <input class="form-control form-control-sm" type="text" name="wifissid4" id="wifi-ssid4" value="" placeholder="(unused)" aria-label="Network 4 name (SSID)">
+            <input class="form-control form-control-sm" type="text" name="wifipsk4" id="wifi-psk4" value="" placeholder="password" aria-label="Network 4 password">
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-up" title="Try this one earlier" aria-label="Move network 4 up">&#9650;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm wifi-down" title="Try this one later" aria-label="Move network 4 down" disabled>&#9660;</button>
+          </div>
+          <div class="form-text">The device joins the highest one on this list that's on the air, and moves down the list if
+            that one doesn't work or goes away for more than 30 s. Home first, then the venue, then your phone's hotspot,
+            for example. Order beats signal strength: a weak network higher up still wins over a strong one further down.
+            Once connected it stays put, it doesn't hop back up when a better one appears (that would drop DMX mid-show).
+            Passwords are never shown; leave one blank to keep what's stored. Empty a name to remove that network.
+            For the first network without the web UI, join the <b>LuxDMX-setup</b> access point and follow the page that pops up.</div>
         </div>
         <div id="static-row" class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" name="staticip" id="static-sw" value="1">
@@ -1380,6 +1414,14 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   $('useeth-sw').checked = !!d.useEthernet;
   $('wifi-mode').value = d.wifiMode !== undefined ? d.wifiMode : 0;
   $('wifi-ssid').value = d.wifiSsid || '';
+  // saved networks 2..4 (issue #120); passwords never come down, only whether one is stored
+  ['', '2', '3', '4'].forEach(function(n, k){
+    if (k) $('wifi-ssid' + n).value = d['wifiSsid' + n] || '';
+    var set = Array.isArray(d.wifiPskSet) && d.wifiPskSet[k];
+    $('wifi-psk' + n).placeholder = set ? '(saved, leave blank to keep)' : 'password';
+  });
+  $('wifi-order').value = '0,1,2,3';
+  wifiMarkActive(d.wifiSlot);
   $('ap-pw').value = d.apPassword || '';
   $('fb-mode').value = String(d.linkLossMode !== undefined ? d.linkLossMode : (d.apFallback ? 1 : 0));
   $('static-sw').checked = !!d.staticIp;
@@ -1570,6 +1612,36 @@ function showModal(opts){
     }).catch(function(){ msg.textContent = 'Upload failed. Nothing was changed.'; });
   });
 })();
+
+// ---- Saved WiFi networks: reorder (issue #120) ------------------------------
+// Moving a row swaps what's typed in the two rows and records which stored slot each row now
+// stands for in #wifi-order. The device moves the stored SSID + password pairs by that order
+// before applying the fields, so a password the page never saw still follows its network.
+var WIFI_SFX = ['', '2', '3', '4'];
+function wifiSwap(a, b){
+  ['wifi-ssid', 'wifi-psk'].forEach(function(id){
+    var x = $(id + WIFI_SFX[a]), y = $(id + WIFI_SFX[b]);
+    var v = x.value; x.value = y.value; y.value = v;
+    if (id === 'wifi-psk'){ var p = x.placeholder; x.placeholder = y.placeholder; y.placeholder = p; }
+  });
+  var o = $('wifi-order').value.split(',');
+  var t = o[a]; o[a] = o[b]; o[b] = t;
+  $('wifi-order').value = o.join(',');
+  var rows = document.querySelectorAll('.wifi-net');
+  var ca = rows[a].classList.contains('wifi-active'), cb = rows[b].classList.contains('wifi-active');
+  rows[a].classList.toggle('wifi-active', cb); rows[b].classList.toggle('wifi-active', ca);
+}
+function wifiMarkActive(slot){
+  document.querySelectorAll('.wifi-net').forEach(function(r, k){
+    r.classList.toggle('wifi-active', k === slot);
+    r.querySelector('.wifi-rank').title = k === slot ? 'Connected to this one right now' : '';
+  });
+}
+document.querySelectorAll('.wifi-net').forEach(function(row){
+  var k = +row.getAttribute('data-row');
+  row.querySelector('.wifi-up').addEventListener('click', function(){ if (k > 0) wifiSwap(k, k - 1); });
+  row.querySelector('.wifi-down').addEventListener('click', function(){ if (k < 3) wifiSwap(k, k + 1); });
+});
 
 // Guard: never submit an enabled output with no TX pin, it can't drive a line
 // and the device refuses it anyway. Catch it here with a clear message.
