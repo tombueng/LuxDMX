@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Art-Net DMX an ein Geraet schicken. Bringup-Werkzeug, kein Testersatz.
-  tools/artnet_send.py <ip> <universe> <sekunden> [kanal:wert ...]
-Ohne Kanalangaben: Kanal 1..8 auf 10,20,...,80 und alles andere 0.
+"""Send Art-Net DMX to a device. Bring-up tool, not a substitute for the tests.
+  tools/artnet_send.py <ip> <universe> <seconds> [channel:value ...]
+Without channel args: channels 1..8 at 10,20,...,80 and everything else 0.
 """
 import socket, struct, sys, time
 

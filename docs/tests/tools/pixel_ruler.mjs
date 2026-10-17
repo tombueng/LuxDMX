@@ -9,8 +9,8 @@ const UNI  = Number(process.argv[3] || 0);
 const MAX  = Number(process.argv[4] || 60);
 const SECS = Number(process.argv[5] || 40);
 
-const BLOCKS = [['rot',[255,0,0]], ['gruen',[0,255,0]], ['blau',[0,0,255]],
-                ['gelb',[255,200,0]], ['tuerkis',[0,255,255]], ['magenta',[255,0,255]]];
+const BLOCKS = [['red',[255,0,0]], ['green',[0,255,0]], ['blue',[0,0,255]],
+                ['yellow',[255,200,0]], ['turquoise',[0,255,255]], ['magenta',[255,0,255]]];
 
 const d = Buffer.alloc(512);
 for (let i = 0; i < MAX && i * 3 + 2 < 512; i++) {
@@ -20,7 +20,7 @@ for (let i = 0; i < MAX && i * 3 + 2 < 512; i++) {
   d[i * 3] = px[0]; d[i * 3 + 1] = px[1]; d[i * 3 + 2] = px[2];
 }
 
-console.log('Blockfarben, je 10 Pixel, erstes Pixel jedes Blocks weiss:');
+console.log('Block colours, 10 pixels each, first pixel of every block white:');
 BLOCKS.forEach(([n], i) => { if (i * 10 < MAX) console.log(`   ${String(i*10).padStart(2)}..${Math.min(i*10+9, MAX-1)}  ${n}`); });
 
 const sock = dgram.createSocket('udp4');
@@ -31,4 +31,4 @@ while (Date.now() < until) {
   await new Promise((r) => setTimeout(r, 25));
 }
 sock.close();
-console.log(`${SECS}s gehalten.`);
+console.log(`held for ${SECS}s.`);

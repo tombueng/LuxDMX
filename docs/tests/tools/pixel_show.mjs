@@ -37,14 +37,14 @@ async function hold(buf, ms) {
   while (Date.now() < until) { await send(buf); await sleep(25); }
 }
 
-console.log(`Ziel ${HOST}, Universum ${UNI}, ${COUNT} Pixel`);
-console.log('1) Farbtest: rot, gruen, blau, dann gedimmtes weiss, je 2 s');
-for (const [name, c] of [['rot', [255, 0, 0]], ['gruen', [0, 255, 0]], ['blau', [0, 0, 255]], ['weiss (gedimmt)', [60, 60, 60]]]) {
+console.log(`Target ${HOST}, universe ${UNI}, ${COUNT} pixels`);
+console.log('1) Colour test: red, green, blue, then dimmed white, 2 s each');
+for (const [name, c] of [['red', [255, 0, 0]], ['green', [0, 255, 0]], ['blue', [0, 0, 255]], ['white (dimmed)', [60, 60, 60]]]) {
   console.log('   ->', name);
   await hold(solid(...c), 2000);
 }
 
-console.log('2) Lauflicht: ein weisses Pixel, zwei Runden - zaehl mit');
+console.log('2) Chase: one white pixel, two laps - count along');
 for (let lap = 0; lap < 2; lap++)
   for (let i = 0; i < COUNT; i++) { await send(single(i, 120, 120, 120)); await sleep(STEP); }
 
@@ -53,4 +53,4 @@ sock.close();
 
 const px = await fetch(`http://${HOST}/pixels.json`).then((r) => r.json());
 const p = px.ports[0];
-console.log(`fertig. in=${p.inFps} out=${p.outFps} latches=${p.latches} partials=${p.partials} ma=${p.ma} scale=${p.scale}/256`);
+console.log(`done. in=${p.inFps} out=${p.outFps} latches=${p.latches} partials=${p.partials} ma=${p.ma} scale=${p.scale}/256`);

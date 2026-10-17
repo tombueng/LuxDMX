@@ -173,13 +173,13 @@ function theatreChase(t) {
 }
 
 const EFFECTS = [
-  ['Rainbow-Spin (Ringe gegenlaeufig)', rainbowSpin],
-  ['Komet, spiralt nach innen',         cometSpiral],
-  ['Ripple aus der Mitte',              ripple],
-  ['Zwei kreuzende Zeiger',             crossingHands],
-  ['Feuer von oben',                    fire],
-  ['Funkeln',                           sparkle],
-  ['Theatre-Chase',                     theatreChase],
+  ['Rainbow spin (rings counter-rotating)', rainbowSpin],
+  ['Comet, spiralling inward',              cometSpiral],
+  ['Ripple from the centre',                ripple],
+  ['Two crossing hands',                    crossingHands],
+  ['Fire from above',                       fire],
+  ['Sparkle',                               sparkle],
+  ['Theatre chase',                         theatreChase],
 ];
 
 // --- transport ---------------------------------------------------------------
@@ -193,7 +193,7 @@ function send(px) {
   return new Promise((r) => sock.send(artDmxPacket(UNI, d, (seq = (seq % 255) + 1)), 6454, HOST, r));
 }
 
-console.log(`${COUNT} Pixel in ${RINGS.length} Ringen (${RINGS.join(' + ')}), Universum ${UNI} -> ${HOST}`);
+console.log(`${COUNT} pixels in ${RINGS.length} rings (${RINGS.join(' + ')}), universe ${UNI} -> ${HOST}`);
 const t0 = Date.now();
 for (const [name, fx] of EFFECTS) {
   console.log(`  ${name}`);

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Zeilen an die Konsole eines Boards schicken, dessen Port schon ein Logger liest.
-# Schreiben und Lesen auf demselben tty stoeren sich nicht; die Antworten landen im Log.
-#   tools/serial_send.sh /dev/ttyACM0 datei.txt [pause]
+# Send lines to the console of a board whose port a logger is already reading.
+# Writing and reading on the same tty don't interfere; the replies end up in the log.
+#   tools/serial_send.sh /dev/ttyACM0 file.txt [pause]
 #   echo dump | tools/serial_send.sh /dev/ttyACM0 -
 PORT="${1:-/dev/ttyACM0}"
 SRC="${2:--}"

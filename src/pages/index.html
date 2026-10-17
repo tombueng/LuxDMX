@@ -473,10 +473,9 @@ async function pixRefreshFrame(){
   }
 }
 
-// Nur pollen, wenn der Tab sichtbar ist und Pixel-Ports existieren. Jede Antwort belegt
-// Heap auf dem Gerät, und 5 Requests/s haben einen ESP32 mit offener Weboberflaeche
-// zuverlaessig leergeraeumt (minFree 1.6 kB) -- das ist kein Tempo, das man "sicherheitshalber"
-// faehrt. 1 Hz reicht fuer eine Live-Ansicht voellig.
+// Only poll while the tab is visible and pixel ports exist. Every response takes heap on
+// the device, and 5 requests/s reliably drained an ESP32 with the web UI open (minFree
+// 1.6 kB) -- that's not a rate you run "just to be safe". 1 Hz is plenty for a live view.
 function pixVisible(){
   return document.visibilityState === 'visible' &&
          document.getElementById('pix-card').style.display !== 'none';

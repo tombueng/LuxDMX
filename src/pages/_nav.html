@@ -76,12 +76,12 @@ html { scrollbar-gutter: stable; }
     var got  = on.reduce(function(a2, p){ return a2 + (p.lost ? 0 : (p.spans || 0)); }, 0);
     var u = document.getElementById('pixuni');
     if (u){ u.textContent = got + '/' + want; u.className = 'ns-val' + (got < want ? ' text-warning' : ''); }
-    // (Ob DMX-Ausgaenge aktiv sind, stand frueher aus einem zusaetzlichen /info.json-Fetch
-    // hier -- alle 2 s, auf jeder Seite. Das war den Heap nicht wert; die Navbar bekommt
-    // ihre Zahlen ohnehin ueber den WebSocket.)
+    // (Whether DMX outputs are active used to come from an extra /info.json fetch
+    // here -- every 2 s, on every page. That wasn't worth the heap; the navbar gets
+    // its numbers over the WebSocket anyway.)
   }
-  // 6 s statt 2 s, und nur bei sichtbarem Tab: die Navbar ist eine Statusanzeige,
-  // kein Messgeraet.
+  // 6 s instead of 2 s, and only while the tab is visible: the navbar is a status
+  // display, not a measuring instrument.
   pixNav();
   setInterval(function(){ if (document.visibilityState === 'visible') pixNav(); }, 6000);
 })();
