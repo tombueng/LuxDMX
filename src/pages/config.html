@@ -943,6 +943,31 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
     </div>
   </div>
 
+  <!-- Config backup / restore (issue #108) -->
+  <div class="card mb-3" data-sec="backup">
+    <div class="card-header"><span class="sec-title">Backup &amp; Restore</span></div>
+    <div class="card-body">
+      <p class="text-secondary small mb-2">
+        Save every setting on this page, plus the channel labels, as one <code>.json</code> file.
+        Restoring it puts them back and restarts the device. A file can also hold just a few
+        settings: only what's in it changes, everything else stays as it is.
+      </p>
+      <div class="d-flex gap-3 align-items-center flex-wrap mb-1">
+        <a class="btn btn-outline-secondary btn-sm" id="backup-dl" href="/config.json?download=1" download>Download config</a>
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="backup-secrets">
+          <label class="form-check-label small" for="backup-secrets">Include passwords (WiFi, OTA, AP)</label>
+        </div>
+      </div>
+      <div class="form-text mb-3" id="backup-secrets-note">Without passwords the file is fine to share, and restoring it leaves the passwords on the device alone.</div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <input type="file" accept=".json,application/json" id="restore-file" class="form-control form-control-sm" style="max-width:280px">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="restore-btn" disabled>Restore from file</button>
+      </div>
+      <div class="small mt-2" id="restore-msg"></div>
+    </div>
+  </div>
+
   <!-- WiFi Reset: danger zone -->
   <div class="card border-danger mt-2" data-sec="danger">
     <div class="card-header" style="color:#f33abc;background:#1c0a16;border-color:#6e1a4f"><span class="sec-title">Danger Zone</span></div>
@@ -1494,6 +1519,57 @@ function showModal(opts){
     document.addEventListener('keydown', onKey);
   });
 }
+
+// ---- Config backup / restore (issue #108) ----------------------------------
+// Download is a plain link to /config.json; restore checks the file here first (so a wrong file
+// never reaches the device), asks, and asks again if the device says it's from another board.
+(function(){
+  var dl = $('backup-dl'), sec = $('backup-secrets'), file = $('restore-file'), btn = $('restore-btn'), msg = $('restore-msg');
+  sec.addEventListener('change', function(){
+    dl.href = '/config.json?download=1' + (sec.checked ? '&secrets=1' : '');
+    $('backup-secrets-note').textContent = sec.checked
+      ? 'This file has your passwords in plain text. Keep it somewhere private.'
+      : 'Without passwords the file is fine to share, and restoring it leaves the passwords on the device alone.';
+  });
+  file.addEventListener('change', function(){ btn.disabled = !file.files.length; msg.textContent = ''; });
+  function post(text, force){
+    return fetch('/config/import' + (force ? '?force=1' : ''), { method:'POST', headers:{'Content-Type':'application/json'}, body:text })
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { status:r.status, j:j }; }); });
+  }
+  function waitBack(){
+    fetch('/info.json', { cache:'no-store' }).then(function(){ location.reload(); })
+      .catch(function(){ setTimeout(waitBack, 1000); });
+  }
+  btn.addEventListener('click', function(){
+    var f = file.files[0]; if (!f) return;
+    f.text().then(function(text){
+      var d; try { d = JSON.parse(text); } catch (e) { msg.textContent = 'That file isn\'t JSON. Nothing was changed.'; return; }
+      if (!d || d.luxdmx !== 'config' || !d.config) { msg.textContent = 'That isn\'t a LuxDMX config backup. Nothing was changed.'; return; }
+      var n = Object.keys(d.config).length;
+      return showModal({ title:'Restore settings?', okText:'Restore', okClass:'btn-danger',
+        body:'This writes ' + n + ' setting' + (n === 1 ? '' : 's') + (d.labels ? ' and the channel labels' : '')
+           + ' from ' + (d.host || 'the file') + (d.fw ? ' (firmware ' + d.fw + ')' : '') + ', then restarts the device.' })
+      .then(function(go){
+        if (!go) return;
+        return post(text, false).then(function(res){
+          if (res.status !== 409 || res.j.error !== 'board') return res;
+          return showModal({ title:'Different board', okText:'Restore anyway', okClass:'btn-danger',
+            body:'This file is from a ' + (res.j.fileBoard || '?') + ' (' + (res.j.fileMcu || '?') + '), this device is a '
+               + res.j.board + ' (' + res.j.mcu + '). Its pin numbers were picked for other hardware and may not fit here.' })
+            .then(function(go2){ return go2 ? post(text, true) : null; });
+        }).then(function(res){
+          if (!res) return;
+          if (res.status === 200 && res.j.ok) {
+            msg.textContent = 'Restored ' + res.j.applied + ' setting' + (res.j.applied === 1 ? '' : 's') + '. Restarting\u2026';
+            setTimeout(waitBack, 3000);
+          } else {
+            msg.textContent = 'Not restored: ' + (res.j.error || ('HTTP ' + res.status)) + '. Nothing was changed.';
+          }
+        });
+      });
+    }).catch(function(){ msg.textContent = 'Upload failed. Nothing was changed.'; });
+  });
+})();
 
 // Guard: never submit an enabled output with no TX pin, it can't drive a line
 // and the device refuses it anyway. Catch it here with a clear message.

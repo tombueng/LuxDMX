@@ -89,6 +89,7 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
+| **Config backup / restore** | **`/config` → Backup & Restore**: download every setting plus the channel labels as one `.json`, restore it later or onto another box of the same kind. Passwords stay out unless you tick the box. A file may hold just a few settings; only those change. See [Backup and restore](#backup-and-restore) |
 | **Remote restart** | Restart the box from the web UI (**Device → Restart device**) or `POST /reboot`, without changing a setting. Useful when a long-running gateway needs a nudge, or to free up memory before a firmware update |
 | **Ethernet support** | WT32-ETH01 (LAN8720) and the v6 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
 | **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
@@ -771,6 +772,8 @@ a blocking error can't hide behind a fold.
 | `/log.json` | GET | Recent DMX change log entries (also pushed over the WebSocket) |
 | `/labels.json` | GET | Channel labels object |
 | `/labels` | POST | Store the full labels object (JSON body) |
+| `/config.json` | GET | The whole config plus the channel labels as one backup file. `?secrets=1` adds the WiFi / OTA / AP passwords, `?download=1` sends it as a file download. See [Backup and restore](#backup-and-restore) |
+| `/config/import` | POST | Restore a `/config.json` file (JSON body), save, restart. Only the keys in the file change. Refused with `409` if it comes from another chip or another picked board, unless `?force=1` |
 | `/rdm.json` | GET | RDM controller state + discovered fixtures (TOD), incl. the Art-Net RDM node state (`artnetRdm`, `artPort`, `discovering`) + request counters |
 | `/rdm/discover` | GET | Trigger an RDM discovery sweep on the bus (`{ok,op}`) |
 | `/rdm/setaddr` | GET | Set a fixture's DMX start address — `?uid=MMMM:DDDDDDDD&addr=1..512` |
@@ -1232,6 +1235,36 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 | Per-output: enabled / universe / UART port / TX / RX / RTS | A on (uni 0, UART1, TX=17, RX=16, RTS=−1); B off | Web `/config` (DMX Outputs); the universe also from a console via `ArtAddress` |
 | Display type / pins | off | Web `/config` (Display) |
 | WiFi credentials | — | Setup portal, Web `/config` (Network), or `/reset` |
+
+### Backup and restore
+
+**`/config` → Backup & Restore** has two buttons. **Download config** saves every setting on
+the page plus the channel labels as one file (`<hostname>-config.json`), and **Restore from
+file** puts it back and restarts the box. The same thing without a browser:
+
+```bash
+curl -o bench.json  "http://dmx-gateway.local/config.json"             # no passwords
+curl -o full.json   "http://dmx-gateway.local/config.json?secrets=1"   # with passwords
+curl -H 'Content-Type: application/json' --data-binary @bench.json \
+     http://dmx-gateway.local/config/import
+```
+
+A few things worth knowing:
+
+- **Passwords** (WiFi, OTA, setup AP) are left out unless you ask for them. A file without them
+  restores everything else and leaves the passwords on the device as they are. A file with them
+  is as sensitive as the box itself, the UI says so when you tick the box.
+- **Partial files are fine.** Only the keys in the file change. This is NOT the `/config` form,
+  where an unticked box means "off": a file that doesn't mention `useeth` leaves wired Ethernet
+  exactly as it was. So `{"luxdmx":"config","config":{"o0_uni":4}}` is a valid restore that
+  just moves output A to universe 4.
+- **All or nothing.** Every value is checked first (known key, right type, inside its range) and
+  if one fails, nothing is written and the box doesn't restart. A number out of range is an
+  error here, not quietly clamped like it is on the form.
+- **Another board.** The file carries the chip (`mcu`) and the picked board. Restoring onto a
+  different one is refused (`409`), because the pin numbers were picked for other copper; the UI
+  tells you what the file is from and lets you go ahead anyway (`?force=1`).
+- A full flash with `factory.bin` erases NVS, so download a backup before you do that.
 
 ---
 

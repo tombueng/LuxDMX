@@ -22,6 +22,10 @@ public:
     const std::string& str() const { return s; }
     String& operator=(const String& o) { s = o.s; return *this; }
     String& operator+=(const String& o) { s += o.s; return *this; }
+    // A char must not fall through to String(int) and append its number.
+    String& operator+=(char c) { s += c; return *this; }
+    String& operator+=(const char* c) { if (c) s += c; return *this; }
+    bool concat(const char* c, unsigned n) { if (c) s.append(c, n); return true; }
     String operator+(const String& o) const { return String(s + o.s); }
     String operator+(const char* o) const { return String(s + (o ? o : "")); }
     String operator+(int v) const { char b[16]; snprintf(b, sizeof(b), "%d", v); return String(s + b); }

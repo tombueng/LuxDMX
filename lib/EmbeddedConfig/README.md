@@ -9,6 +9,9 @@ that one description:
 - A **JSON** dump (`toJson`) for status pages / inspection.
 - **Validated single-field apply** (`setValue`, range-clamped) that a web form or a
   serial line both drive, no field details duplicated per transport.
+- **Backup / restore** (`exportJson` / `importJson`): the whole config as one flat, typed JSON
+  object, and back. The import checks every pair strictly (no clamping) before writing any,
+  and only touches the keys it is given. `config_json` is the tiny reader behind it.
 - A **serial console** (`config_serial`) with one grammar that serves a human at a
   terminal *and* a machine/AI client: `help / list / get / set / json / load /
   template / save / reboot / factory / wifi`.

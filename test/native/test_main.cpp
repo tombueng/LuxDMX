@@ -239,6 +239,59 @@ int main() {
     CHECK(hasS(execute("wifi"), "ERR"),                 "serial: wifi no-ssid -> ERR");
     CHECK(hasS(execute("frobnicate"), "unknown command"), "serial: unknown command");
 
+    // ---- backup / restore (issue #108) ----
+    {
+        String err; int n = 0;
+        cfgcore::resetToTemplate();
+        cfg.hostname = "bench-1"; cfg.useEthernet = true; cfg.outputs[1].universe = 7;
+        cfg.otaPassword = "s3cret"; cfg.artShortName = "say \"hi\"\\ok";
+        String full; cfgcore::exportJson(full, false);
+        CHECK(hasS(full, "\"hostname\":\"bench-1\""),   "backup: string exported");
+        CHECK(hasS(full, "\"useeth\":true"),             "backup: bool exported as true");
+        CHECK(hasS(full, "\"o1_uni\":7"),                "backup: array key exported as a number");
+        CHECK(!hasS(full, "otapw"),                        "backup: secret left out by default");
+        CHECK(hasS(full, "\"artshort\":\"say \\\"hi\\\"\\\\ok\""), "backup: quotes and backslash escaped");
+        String withSec; cfgcore::exportJson(withSec, true);
+        CHECK(hasS(withSec, "\"otapw\":\"s3cret\""),     "backup: secret included on request");
+
+        // full round trip: scramble, import the export, everything is back
+        cfg.hostname = "other"; cfg.useEthernet = false; cfg.outputs[1].universe = 3; cfg.artShortName = "";
+        bool ok = cfgcore::importJson(full.c_str(), full.length(), err, n);
+        CHECK(ok,                                          "backup: own export imports");
+        CHECK(cfg.hostname == "bench-1" && cfg.useEthernet && cfg.outputs[1].universe == 7, "backup: values restored");
+        CHECK(cfg.artShortName == "say \"hi\"\\ok",      "backup: escaped string restored");
+        String again; cfgcore::exportJson(again, false);
+        CHECK(again == full,                               "backup: export -> import -> export is identical");
+        CHECK(cfg.otaPassword == "s3cret",                 "backup: secret untouched by a file without it");
+
+        // partial file: only its keys change, an absent bool is NOT switched off (the sharp edge)
+        const char* part = "{\"o1_uni\":12}";
+        ok = cfgcore::importJson(part, strlen(part), err, n);
+        CHECK(ok && n == 1 && cfg.outputs[1].universe == 12, "backup: partial import applies its key");
+        CHECK(cfg.useEthernet,                             "backup: partial import leaves useeth on");
+
+        // all or nothing: one bad value and nothing is written
+        const char* mixed = "{\"o1_uni\":20,\"o0_tx\":999}";
+        ok = cfgcore::importJson(mixed, strlen(mixed), err, n);
+        CHECK(!ok && hasS(err, "o0_tx"),                   "backup: out-of-range value refused, not clamped");
+        CHECK(cfg.outputs[1].universe == 12,               "backup: nothing applied from a refused file");
+        const char* unk = "{\"o1_uni\":21,\"nosuchkey\":1}";
+        CHECK(!cfgcore::importJson(unk, strlen(unk), err, n) && cfg.outputs[1].universe == 12, "backup: unknown key refused");
+        const char* typ = "{\"useeth\":\"maybe\"}";
+        CHECK(!cfgcore::importJson(typ, strlen(typ), err, n) && cfg.useEthernet, "backup: bad bool refused");
+        const char* nest = "{\"o1_uni\":{\"x\":1}}";
+        CHECK(!cfgcore::importJson(nest, strlen(nest), err, n), "backup: nested value refused");
+        const char* broken = "{\"o1_uni\":5,";
+        CHECK(!cfgcore::importJson(broken, strlen(broken), err, n) && cfg.outputs[1].universe == 12, "backup: truncated file refused");
+        const char* blank = "{\"hostname\":\"\",\"o1_uni\":4}";
+        ok = cfgcore::importJson(blank, strlen(blank), err, n);
+        CHECK(ok && cfg.hostname == "bench-1" && cfg.outputs[1].universe == 4, "backup: blank hostname keeps the old one");
+        const char* nul = "{\"o1_uni\":null}";
+        CHECK(cfgcore::importJson(nul, strlen(nul), err, n) && n == 0 && cfg.outputs[1].universe == 4, "backup: null leaves the key alone");
+        const char* uni = "{\"artshort\":\"caf\\u00e9\"}";
+        CHECK(cfgcore::importJson(uni, strlen(uni), err, n) && cfg.artShortName == "caf\xc3\xa9", "backup: \\u escape decoded to UTF-8");
+    }
+
     printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }

@@ -20,6 +20,7 @@ g++ -std=c++17 -O1 -Wall -Wextra -Wno-unused-parameter \
     -DDEFAULT_TEMPLATE=luxdmx_v6 \
     test/native/test_main.cpp \
     lib/EmbeddedConfig/src/config_core.cpp lib/EmbeddedConfig/src/config_serial.cpp \
+    lib/EmbeddedConfig/src/config_json.cpp \
     src/config/config_schema.cpp src/config_templates_gen.cpp \
     -o build/cfgtest
 
