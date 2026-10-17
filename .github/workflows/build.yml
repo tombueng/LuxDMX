@@ -45,8 +45,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Pinned: 6.2.0 pulls SCons 4.11, which dropped SCons.Tool.FortranCommon, while the
+      # platform still installs and loads SCons 4.8.1's tools. The S3 builds die with
+      # "No module named 'SCons.Tool.FortranCommon'". 6.1.19 pins 4.8.1 like the platform.
       - name: Install PlatformIO
-        run: pip install platformio
+        run: pip install "platformio==6.1.19"
 
       - name: Build firmware
         run: |
@@ -64,7 +67,20 @@ jobs:
           }
           patch_idf_tools   # no-op if tool-esp_install isn't downloaded yet
 
+          # The S3 envs are hybrid builds: their IDF stage spawns a nested pio out of the
+          # platform's own venv (~/.platformio/penv), which brings its own core 6.2.0 and so
+          # SCons 4.11 again, whatever we pip-installed above. Pin that one to 4.8.1 too.
+          # penv only exists after the first pio run, so this goes in after esp32dev.
+          pin_scons() {
+            while IFS= read -r f; do
+              sed -i -e 's|"tool-scons": "~4\.41101\.0"|"tool-scons": "~4.40801.0"|' \
+                     -e 's|download/4\.11\.1/scons-local-4\.11\.1\.tar\.gz|download/4.8.1/scons-local-4.8.1.tar.gz|' "$f"
+              echo "pinned SCons 4.8.1 in $f"
+            done < <(find ~/.platformio/penv -path '*site-packages/platformio/dependencies.py' 2>/dev/null)
+          }
+
           pio run -e esp32dev || { patch_idf_tools; pio run -e esp32dev; }
+          pin_scons
           cp .pio/build/esp32dev/firmware.bin   firmware.bin
           cp .pio/build/esp32dev/bootloader.bin bootloader.bin
           cp .pio/build/esp32dev/partitions.bin partitions.bin
