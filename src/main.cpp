@@ -1569,20 +1569,20 @@ static bool rdmAllocTables() {
     // firmware got big enough and silently fell back to the 16-device cap (found 16 instead
     // of 64 fixtures). The chip model is footprint-independent: classic ESP32 (~300 KB, tight
     // once WiFi+web+DMX are up) keeps the small table; every S3-class part gets the full cap.
-    // Kann diese Kiste ueberhaupt RDM? RDM braucht einen Transceiver mit Richtungs-Pin; ein
-    // Ausgang ohne rts kann nur senden, und ohne aktivierten Ausgang gibt es gar keinen Bus.
-    // Ein reiner Pixel-Node hat also niemals RDM -- und hat trotzdem bis hierher die volle
-    // Tabelle alloziert: 45 KB internes RAM fuer eine Funktion, die nicht existiert.
+    // Can this box do RDM at all? RDM needs a transceiver with a direction pin; an output
+    // without rts can only send, and with no output enabled there is no bus at all.
+    // So a pure pixel node never has RDM -- and up to now it still allocated the full
+    // table anyway: 45 KB of internal RAM for a feature that doesn't exist.
     bool rdmPossible = false;
     for (int i = 0; i < MAX_OUTPUTS; i++)
         if (cfg.outputs[i].enabled && cfg.outputs[i].rtsPin >= 0) { rdmPossible = true; break; }
 
     int cap; const char* how;
-    // Bewusst cap=1 statt "gar nicht allozieren": die Tabellen werden an vielen Stellen ohne
-    // Null-Pruefung indiziert (die Zugriffe haengen an rdmCount/rdmAvailable, nicht am Zeiger).
-    // Eine Minimaltabelle haelt jeden Zeiger gueltig und kostet ~700 B statt 45 KB -- derselbe
-    // Gewinn, ohne eine neue Klasse von Null-Deref-Fehlern aufzumachen.
-    if      (!rdmPossible)              { cap = 1;             how = "kein RDM-faehiger Ausgang"; }
+    // Deliberately cap=1 rather than "don't allocate at all": the tables are indexed in lots of
+    // places without a null check (the accesses hang off rdmCount/rdmAvailable, not the pointer).
+    // A minimal table keeps every pointer valid and costs ~700 B instead of 45 KB -- the same
+    // win, without opening up a whole new class of null-deref bugs.
+    if      (!rdmPossible)              { cap = 1;             how = "no RDM-capable output"; }
     else if (cfg.rdmMaxDev > 0)         { cap = cfg.rdmMaxDev; how = "manual"; }
     else if (psram)                    { cap = RDM_HW_MAX;    how = "auto/psram"; }
     else if (chip.model != CHIP_ESP32) { cap = RDM_HW_MAX;    how = "auto/s3"; }    // S3 & other large-SRAM parts
@@ -2547,8 +2547,8 @@ static void handlePixelFrame(AsyncWebServerRequest* req) {
     // mid-read when a config is applied, because a client naturally polls the frame right
     // after changing something. Join the same handshake or a config apply frees the buffer
     // under it.
-    // Immer dieselbe Form zurueckgeben, auch im Fehlerfall: ein leeres Array, wo sonst ein
-    // Hex-String steht, ist fuer jeden Aufrufer ein Typwechsel mitten im Betrieb.
+    // Always return the same shape, even on error: an empty array where there's normally a
+    // hex string is a type change mid-operation for every caller.
     static const char* EMPTY = "{\"bpp\":0,\"count\":0,\"cells\":0,\"px\":\"\"}";
     if (port < 0 || port >= MAX_PIXEL_PORTS || !pixReadEnter()) { sendJsonSafe(req, EMPTY); return; }
     if (!g_pix[port].fb) { pixReadExit(); sendJsonSafe(req, EMPTY); return; }
@@ -2756,7 +2756,7 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispSda\":";    j += cfg.dispSda;            j += ",";
     j += "\"dispScl\":";    j += cfg.dispScl;            j += ",";
     j += "\"dispRot\":";    j += cfg.dispRot;            j += ",";
-    j += "\"dispAddr\":";   j += dispI2cAddr;            j += ",";   // 0 = kein Panel gefunden
+    j += "\"dispAddr\":";   j += dispI2cAddr;            j += ",";   // 0 = no panel found
     j += "\"dispReady\":";  j += dispReady ? "true" : "false"; j += ",";
     j += "\"dispHz\":";    j += dispI2cHz;              j += ",";
     j += "\"pixBackend\":"; j += cfg.pixBackend;         j += ",";   // 0 auto, 1 RMT, 2 LCD_CAM
@@ -2874,9 +2874,9 @@ static void handleDmxJson(AsyncWebServerRequest* req) {
     s->head += "],\"rssi\":";  s->head += netRSSI();
     s->head += ",\"up\":\"";   s->head += uptimeStr();
     s->head += "\",\"heap\":"; s->head += ESP.getFreeHeap();
-    // Speicher-Diagnose. Ohne die sieht man von aussen nur "heap" und weiss nicht, ob das
-    // knapp ist, ob PSRAM ueberhaupt laeuft und wie tief es unter Last schon war. Genau diese
-    // drei Zahlen braucht man, wenn eine Kiste unter Last aufhoert zu antworten.
+    // Memory diagnostics. Without them all you see from outside is "heap", and you can't tell
+    // whether that's tight, whether PSRAM is running at all, or how low it already got under
+    // load. Those are exactly the numbers you need when a box stops answering under load.
     s->head += ",\"heapMin\":";   s->head += (uint32_t)ESP.getMinFreeHeap();
     s->head += ",\"heapBlock\":"; s->head += (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     s->head += ",\"psram\":";     s->head += (uint32_t)heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
@@ -5185,10 +5185,10 @@ void setup() {
     Serial.println("\n[BOOT] LuxDMX — Art-Net / sACN DMX Gateway");
 
     loadConfig();   // also allocates the RDM tables (rdmAllocTables) before rdmLoadPoll uses them
-    // Auch OHNE PSRAM ausgeben: dass die Zeile fehlt, war bisher die einzige Anzeige dafuer,
-    // dass ein R8-Modul ohne PSRAM laeuft -- und eine fehlende Zeile uebersieht man.
+    // Print a line WITHOUT PSRAM too: the line being missing used to be the only sign that an
+    // R8 module was running without PSRAM -- and nobody notices a line that isn't there.
     if (!heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
-        Serial.printf("[MEM] KEIN PSRAM aktiv; internes Heap %u KB frei\n",
+        Serial.printf("[MEM] NO PSRAM active; internal heap %u KB free\n",
             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
     if (heap_caps_get_total_size(MALLOC_CAP_SPIRAM))
         Serial.printf("[MEM] PSRAM %u KB total / %u KB free; internal heap %u KB free\n",

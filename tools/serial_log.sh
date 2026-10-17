@@ -1,6 +1,6 @@
 #!/bin/bash
-# Dauer-Logger fuer ein Board, das sich am USB neu anmeldet: wartet auf den Port,
-# liest bis er verschwindet, wartet wieder. Laeuft bis die PID-Datei geloescht wird.
+# Long-running logger for a board that re-enumerates on USB: waits for the port,
+# reads until it goes away, waits again. Runs until the PID file is deleted.
 PORT="${1:-/dev/ttyACM0}"
 LOG="${2:-/home/tomb/dmx-wt/carrier-3out/tools/serial.log}"
 echo $$ > "$LOG.pid"

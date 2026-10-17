@@ -45,15 +45,15 @@ try {
     o0tx: document.getElementsByName('o0_tx')[0]?.value,
     miso: document.getElementsByName('ethmiso')[0]?.value,
   }));
-  console.log('vorher :', JSON.stringify(before));
+  console.log('before :', JSON.stringify(before));
 
   const options = await page.evaluate(() =>
     [...document.getElementById('board-sel').options].map((o) => o.value));
   if (BOARD !== '-' && !options.includes(BOARD)) {
-    console.log(`FEHLER: Board "${BOARD}" nicht in der Liste: ${options.join(', ')}`);
+    console.log(`ERROR: board "${BOARD}" is not in the list: ${options.join(', ')}`);
     process.exit(2);
   }
-  if (BOARD === '-') console.log('(Template unveraendert, nur Felder)');
+  if (BOARD === '-') console.log('(template unchanged, fields only)');
 
   // The board block sits in a collapsed section, so the <select> is not "visible" to
   // Playwright's actionability checks. Driving it through the DOM hits the same handlers:
@@ -85,14 +85,14 @@ try {
     miso: document.getElementsByName('ethmiso')[0]?.value,
     p0pin: document.getElementsByName('p0_pin')[0]?.value,
   }));
-  console.log('im Formular nach Apply:', JSON.stringify(after));
+  console.log('in the form after apply:', JSON.stringify(after));
 
   if (SETS.length) {
     const applied = await page.evaluate((sets) => {
       const out = {};
       for (const [k, v] of sets) {
         const el = document.getElementsByName(k)[0];
-        if (!el) { out[k] = 'FEHLT'; continue; }
+        if (!el) { out[k] = 'MISSING'; continue; }
         // Fields a board pins in copper are rendered disabled, and a disabled field is not
         // submitted at all: setting one looks like it worked and then changes nothing on the
         // device. Un-disable it so the value actually rides along.
@@ -103,11 +103,11 @@ try {
         else el.value = v;
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        out[k] = el.type === 'checkbox' ? (el.checked ? 'an' : 'aus') : el.value;
+        out[k] = el.type === 'checkbox' ? (el.checked ? 'on' : 'off') : el.value;
       }
       return out;
     }, SETS);
-    console.log('Felder gesetzt:', JSON.stringify(applied));
+    console.log('fields set:', JSON.stringify(applied));
     await page.waitForTimeout(600);
   }
 
@@ -123,7 +123,7 @@ try {
       const bad = [...document.querySelectorAll('.is-invalid')].map((e) => `${e.name || e.id}=${e.value}`);
       return { rows: rows.slice(0, 12), bad };
     });
-    console.log('Konflikte:', JSON.stringify(w, null, 1));
+    console.log('conflicts:', JSON.stringify(w, null, 1));
   }
 
   page.on('response', (res) => {
@@ -133,9 +133,9 @@ try {
 
   await page.evaluate(() => document.getElementById('save-btn').click());
   await page.waitForTimeout(6000);
-  console.log('Seiten-Status:', await page.evaluate(() => {
+  console.log('page status:', await page.evaluate(() => {
     const s = document.getElementById('save-status') || document.getElementById('savemsg');
-    return s ? s.textContent.trim() : '(kein Statusfeld)';
+    return s ? s.textContent.trim() : '(no status field)';
   }));
 
   // Read it back from the device, not from the form: the point of the exercise is what the
@@ -146,8 +146,8 @@ try {
     try { r = await fetch(`http://${HOST}/info.json`).then((x) => x.json()); }
     catch { await new Promise((s) => setTimeout(s, 1500)); }
   }
-  if (!r) { console.log('Geraet antwortet nach dem Save nicht mehr'); process.exit(3); }
-  console.log('Geraet danach:', JSON.stringify({
+  if (!r) { console.log('device stopped answering after the save'); process.exit(3); }
+  console.log('device after :', JSON.stringify({
     boardSel: r.boardSel, ethMiso: r.ethMiso, ethCs: r.ethCs,
     outTx: (r.outputs || []).map((o) => o.tx),
     pixPins: (r.pixels || []).map((p) => p.pin),

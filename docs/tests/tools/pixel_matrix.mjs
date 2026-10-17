@@ -60,7 +60,7 @@ function hsv(h, s, v) {
 
 // ── effects ────────────────────────────────────────────────────────────────
 const FX = [
-  ['Komet', (t) => {                       // sparse and bright: cheap in current
+  ['Comet', (t) => {                       // sparse and bright: cheap in current
     const cx = (W - 1) / 2 + Math.cos(t * 1.1) * (W / 2 - 1.2);
     const cy = (H - 1) / 2 + Math.sin(t * 1.7) * (H / 2 - 1.2);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -69,7 +69,7 @@ const FX = [
       if (v > 0.004) { const [r, g, b] = hsv(t * 0.09, 0.85, v); put(x, y, r, g, b); }
     }
   }],
-  ['Ringe', (t) => {                       // expanding circles from the centre
+  ['Rings', (t) => {                       // expanding circles from the centre
     const cx = (W - 1) / 2, cy = (H - 1) / 2;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const d = Math.hypot(x - cx, y - cy);
@@ -77,7 +77,7 @@ const FX = [
       if (v > 0.004) { const [r, g, b] = hsv(0.55 + d * 0.02, 0.9, v); put(x, y, r, g, b); }
     }
   }],
-  ['Regen', (t, st) => {                   // sparse drops, the cheapest thing that still reads
+  ['Rain', (t, st) => {                    // sparse drops, the cheapest thing that still reads
     st.drops ??= [];
     if (st.drops.length < 14 && Math.random() < 0.5)
       st.drops.push({ x: Math.random() * W | 0, y: -1, v: 6 + Math.random() * 10, h: Math.random() });
@@ -108,7 +108,7 @@ const FX = [
       }
     }
   }],
-  ['Plasmawolke', (t) => {
+  ['Plasma cloud', (t) => {
     // Only the peaks. The first version washed the whole panel and the budget then scaled it
     // to 35 %, which on 256 pixels is fog. So the field is computed, a cut is taken so that
     // roughly TARGET pixels survive, and only those are drawn - bright, on black. At 250 mA
@@ -133,7 +133,7 @@ const FX = [
       put(x, y, r, g, b);
     }
   }],
-  ['Vulkan', (t, st) => {
+  ['Volcano', (t, st) => {
     // A fountain, not a fire field. The Doom-style version lit half the panel at mid heat and
     // came out at 11 % after scaling - all of it dim. This one keeps maybe twenty pixels lit
     // and lets them be properly bright: a small glowing crater, lava thrown up on ballistic
@@ -190,9 +190,9 @@ function send(seq) {
 }
 
 const idle = (N * MA_IDLE) | 0;
-console.log(`${W}x${H} = ${N} Pixel auf Universum ${UNI0}..${UNI0 + Math.ceil(N / PER_UNI) - 1}`);
-console.log(`Layout ${SERPENTINE ? 'serpentine' : 'progressiv'}, ${FPS} fps -> ${HOST}`);
-console.log(`Ruhestrom ${idle} mA (dunkel), Lichtbudget ${BUDGET} mA, zusammen ~${idle + BUDGET} mA\n`);
+console.log(`${W}x${H} = ${N} pixels on universe ${UNI0}..${UNI0 + Math.ceil(N / PER_UNI) - 1}`);
+console.log(`Layout ${SERPENTINE ? 'serpentine' : 'progressive'}, ${FPS} fps -> ${HOST}`);
+console.log(`Idle draw ${idle} mA (dark), light budget ${BUDGET} mA, together ~${idle + BUDGET} mA\n`);
 
 let seq = 0, fx = 0, t0 = Date.now(), st = {};
 const timer = setInterval(() => {
@@ -203,12 +203,12 @@ const timer = setInterval(() => {
   const { lit, mA, k } = scaleToBudget();
   send(seq = (seq + 1) & 0xff);
   if (seq % 40 === 0)
-    process.stdout.write(`\r  ${FX[fx][0].padEnd(12)} ${String(lit).padStart(3)} Pixel an,`
-      + ` Licht ~${mA.toFixed(0).padStart(3)} mA (gedimmt auf ${(k * 100).toFixed(0)}%),`
-      + ` gesamt ~${(idle + mA).toFixed(0)} mA   `);
+    process.stdout.write(`\r  ${FX[fx][0].padEnd(12)} ${String(lit).padStart(3)} pixels lit,`
+      + ` light ~${mA.toFixed(0).padStart(3)} mA (dimmed to ${(k * 100).toFixed(0)}%),`
+      + ` total ~${(idle + mA).toFixed(0)} mA   `);
 }, 1000 / FPS);
 
 for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => {
   clearInterval(timer); fb.fill(0); send(++seq);
-  setTimeout(() => { console.log('\nAus.'); sock.close(); process.exit(0); }, 120);
+  setTimeout(() => { console.log('\nOff.'); sock.close(); process.exit(0); }, 120);
 });

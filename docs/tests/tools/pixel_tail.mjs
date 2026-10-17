@@ -18,7 +18,7 @@ const frame = (idx) => {
   return d;
 };
 for (let i = FROM; i <= TO; i++) {
-  console.log(`  Schritt ${i - FROM + 1}: Pixel-Index ${i}`);
+  console.log(`  step ${i - FROM + 1}: pixel index ${i}`);
   const until = Date.now() + HOLD;
   while (Date.now() < until) {
     await new Promise((r) => sock.send(artDmxPacket(UNI, frame(i), (seq = (seq % 255) + 1)), 6454, HOST, r));
@@ -26,4 +26,4 @@ for (let i = FROM; i <= TO; i++) {
   }
 }
 sock.close();
-console.log('durch.');
+console.log('done.');

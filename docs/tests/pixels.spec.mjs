@@ -73,9 +73,9 @@ async function postConfig(changes, { pixelsOff = false } = {}) {
   }
   expect(status, '/config POST accepted').toBeGreaterThan(0);
   expect(status, '/config POST accepted').toBeLessThan(400);
-  // Der Apply laeuft bewusst NICHT im Web-Task, sondern verzoegert in loop() (sonst blockiert
-  // der Puffer-Neuaufbau die HTTP-Antwort). Also warten, bis das Geraet die Aenderung
-  // wirklich zeigt, statt blind zu schlafen -- sonst liest der Test den alten Zustand.
+  // The apply deliberately does NOT run on the web task, it's deferred to loop() (otherwise
+  // the buffer rebuild would block the HTTP response). So wait until the device actually
+  // shows the change instead of sleeping blind -- otherwise the test reads the old state.
   const wantCount = changes.p0_count != null ? Number(changes.p0_count) : null;
   for (let i = 0; i < 40; i++) {
     await sleep(150);
@@ -84,7 +84,7 @@ async function postConfig(changes, { pixelsOff = false } = {}) {
       const p0 = now.ports && now.ports[0];
       if (!p0) continue;
       if (wantCount == null || p0.count === wantCount) break;
-    } catch { /* Geraet antwortet gleich wieder */ }
+    } catch { /* device will answer again in a moment */ }
   }
   // The device must never leave the network because of a config write.
   const after = await getJson(base + '/info.json');

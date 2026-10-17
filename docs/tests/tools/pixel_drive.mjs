@@ -25,7 +25,7 @@ function frame(uni, t) {
 }
 
 const before = await fetch(`http://${HOST}/pixels.json`).then((r) => r.json());
-console.log('vorher :', before.ports.filter((p) => p.en)
+console.log('before :', before.ports.filter((p) => p.en)
   .map((p) => `P${p.idx + 1} in=${p.inFps} out=${p.outFps}`).join('  '));
 
 const t0 = Date.now();
@@ -43,8 +43,8 @@ await new Promise((r) => setTimeout(r, SECS * 1000));
 clearInterval(timer);
 
 const after = await fetch(`http://${HOST}/pixels.json`).then((r) => r.json());
-console.log(`gesendet: ${sent} ArtDMX-Pakete auf ${UNIS} Universen in ${SECS}s`);
-console.log('backend :', after.backend, ' Gesamtstrom:', after.ma, 'mA (worst', after.worstMa, 'mA)');
+console.log(`sent    : ${sent} ArtDMX packets on ${UNIS} universes in ${SECS}s`);
+console.log('backend :', after.backend, ' total current:', after.ma, 'mA (worst', after.worstMa, 'mA)');
 for (const p of after.ports.filter((q) => q.en))
   console.log(`  Port ${p.idx + 1}: in=${p.inFps} out=${p.outFps} latches=${p.latches} `
             + `partials=${p.partials} lost=${p.lost} ma=${p.ma}`);
