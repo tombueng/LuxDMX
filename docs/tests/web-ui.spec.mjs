@@ -177,7 +177,10 @@ test.describe('Web UI + REST', () => {
     if (await page.locator('#pin-unlock-row').isVisible()) {
       // target the real inputs by id — locking adds a hidden .fixed-mirror with the same name
       await expect(page.locator('#eth-cs')).toBeDisabled();    // internal (no-header) pin locked
-      await expect(page.locator('#disp-sda')).toBeEnabled();   // J4 display pin stays editable
+      // On the v6 the display comes out on header J4, so its pins stay editable. The carrier
+      // wires its display in copper too, so there it's locked like the rest.
+      if ((await page.locator('#board-sel').inputValue()) === 'luxdmx_v6')
+        await expect(page.locator('#disp-sda')).toBeEnabled(); // J4 display pin stays editable
       await page.locator('#pin-unlock').check();
       await expect(page.locator('#eth-cs')).toBeEnabled();     // unlock re-enables it
       await page.locator('#pin-unlock').uncheck();             // restore
@@ -200,7 +203,10 @@ test.describe('Web UI + REST', () => {
     await page.locator('#pin-unlock').check();
     await expect(page.locator('#eth-cs')).toBeEnabled();           // unlock re-enables it
     await page.locator('#pin-unlock').uncheck();
-    // each GPIO field is tagged with the header pin it comes out of
+    // each GPIO field is tagged with the header pin it comes out of. Put SDA on the v6's J4 pin
+    // first: the device may hold another board's value (the carrier has it on IO1, no header).
+    await page.locator('#disp-sda').fill('4');
+    await page.locator('#disp-sda').dispatchEvent('input');
     await expect(page.locator('.pin-grp:has(#disp-sda) .hdr-hint')).toHaveText('J4.3');
     // the diagram tags each header GPIO with its physical header pin...
     await page.locator('#board-open').click();
