@@ -2766,7 +2766,6 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispSck\":";    j += cfg.dispSck;            j += ",";
     j += "\"dispMosi\":";   j += cfg.dispMosi;           j += ",";
     j += "\"dispTimeout\":"; j += cfg.dispTimeout;        j += ",";   // s, 0 = never (issue #134)
-    j += "\"dispReady\":";  j += dispReady ? "true" : "false"; j += ",";   // a panel actually came up
     j += "\"dispOn\":";     j += (dispReady && dispLit) ? "true" : "false"; j += ",";   // lit right now
     // On-unit controls (issue #24): rotary encoder + buttons that drive the display menu.
     j += "\"encA\":";       j += cfg.encA;               j += ",";
