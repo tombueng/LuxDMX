@@ -23,8 +23,10 @@ test.describe('/config guards against a payload that is not the config', () => {
   test('a real /info.json renders and Save is enabled', async ({ page }) => {
     await page.goto('/config');
     await expect(page.locator(SAVE)).toBeEnabled({ timeout: 15_000 });
-    // The outputs came from the device, not from a placeholder.
-    await expect(page.locator('#o0_tx')).toHaveCount(1);
+    // The outputs came from the device, not from a placeholder. By name: the output fields
+    // have no id, and a board that wires TX in copper adds a hidden .fixed-mirror with the same
+    // name, so leave that one out.
+    await expect(page.locator('input[name="o0_tx"]:not(.fixed-mirror)')).toHaveCount(1);
   });
 
   test('an answer without outputs disables Save instead of inventing pins', async ({ page }) => {
