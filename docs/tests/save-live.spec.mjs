@@ -97,6 +97,7 @@ test.describe('Save without reboot', () => {
     // fields, is never locked by a board template, so this works on every board.
     const want = before.hostname === 'dmx-gateway' ? 'dmx-gateway-t' : 'dmx-gateway';
     await page.locator('#dev-host').fill(want);
+    const t0 = Date.now();
     await page.click('#save-btn');
     await page.waitForTimeout(2500);
 
@@ -106,7 +107,10 @@ test.describe('Save without reboot', () => {
 
     await sleep(12_000);
     const up1 = await uptimeSec(request);
-    expect(up1, `uptime ${up0} -> ${up1}, expected a restart`).toBeLessThan(up0);
+    // Without a restart uptime would have carried on to up0 + elapsed. Comparing against up0 alone
+    // isn't enough: right after another spec's reboot up0 is ~12 s, and so is a fresh boot 12 s later.
+    const elapsed = Math.round((Date.now() - t0) / 1000);
+    expect(up1, `uptime ${up0} -> ${up1} after ${elapsed} s, expected a restart`).toBeLessThan(up0 + elapsed - 3);
     expect((await info(request)).hostname).toBe(want);
 
     // put it back (and let it restart again)
