@@ -132,10 +132,10 @@ function send(o){ if(sock&&sock.readyState===1) sock.send(JSON.stringify(o)); }
 function connect(){
   sock=new WebSocket('ws://'+location.host+'/ws');
   sock.binaryType='arraybuffer';
-  sock.onclose=function(){ setTimeout(connect,2000); };
   sock.onmessage=function(e){ if(window.LuxNav) LuxNav.stats(e.data); };
+  return sock;
 }
-connect();
+LuxNav.live(connect);   // reconnects, and closes the socket while the tab is hidden
 
 // ── E1.20 labels ────────────────────────────────────────────────────────────
 var CAT={0:'',0x0100:'Fixture',0x0101:'Fixture Fixed',0x0102:'Fixture Moving Yoke',0x0103:'Fixture Moving Mirror',

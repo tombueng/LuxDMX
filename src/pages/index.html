@@ -644,14 +644,15 @@ function drawSpark() {
   document.getElementById('spark-line').setAttribute('points', pts);
 }
 
-// WebSocket
+// WebSocket. LuxNav.live() owns the lifecycle: reconnects, and closes it while the tab is hidden.
 function connect() {
   sock = new WebSocket('ws://' + location.host + '/ws');
   sock.binaryType = 'arraybuffer';
   var badge = document.getElementById('ws-badge');
   sock.onopen  = function() { badge.textContent = 'Live';    badge.style.background = '#45d85c'; badge.style.color = '#06141a';
+                              sock.send(JSON.stringify({type:'meta'}));   // this page wants the senders + log JSON
                               if (viewOut) sock.send(JSON.stringify({type:'viewout', out: viewOut})); };
-  sock.onclose = function() { badge.textContent = 'Offline'; badge.style.background = '#f33abc'; badge.style.color = '#06141a'; setTimeout(connect, 2000); };
+  sock.onclose = function() { badge.textContent = 'Offline'; badge.style.background = '#f33abc'; badge.style.color = '#06141a'; };
   sock.onmessage = function(e) {
     if (typeof e.data === 'string') {
       // Text frame: senders + log metadata (replaces HTTP polling)
@@ -684,8 +685,9 @@ function connect() {
 
     applyDmx(new Uint8Array(e.data, 16, 512));
   };
+  return sock;
 }
-connect();
+LuxNav.live(connect);
 
 // Senders & log polling
 function fmtAgo(ago) { return ago === 0 ? 'now' : ago + 's ago'; }

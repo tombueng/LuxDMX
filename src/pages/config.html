@@ -2893,10 +2893,8 @@ function initBoards(){
 
 <script>
 // This page has no socket of its own, so open a lightweight one just to feed the shared navbar.
-(function(){ var s; function c(){ try{ s=new WebSocket('ws://'+location.host+'/ws'); s.binaryType='arraybuffer';
-  s.onclose=function(){ setTimeout(c,2000); };
-  s.onmessage=function(e){ if(window.LuxNav) LuxNav.stats(e.data); }; }catch(_){ setTimeout(c,2000); } }
-  c(); })();
+LuxNav.live(function(){ var s=new WebSocket('ws://'+location.host+'/ws'); s.binaryType='arraybuffer';
+  s.onmessage=function(e){ LuxNav.stats(e.data); }; return s; });
 // Live per-output beat warning at the Transmit style dropdown: bit2 of the WS style byte (set by
 // the firmware's beatRisk()) means this Continuous output is free-running against a source at a
 // different change rate, so frames repeat/drop. Mirror it onto the card's .out-beat-warn so the
