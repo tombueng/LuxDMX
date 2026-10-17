@@ -1087,6 +1087,11 @@ Mono panels are 1-bit — white, blue and yellow/blue-split versions all behave 
 | SDA, SCL | I²C pins (mono panels). Avoid strapping pins like GPIO12; WT32-ETH01 → `14` / `15` |
 | CS, DC, RST, SCK, MOSI | hardware-SPI pins (colour panel) |
 | Orientation | normal / flipped 180° |
+| Screen off after (s) | `disptimeout`, default **20**. The panel goes dark after this many seconds without a button or encoder input, so it doesn't burn in. The first press only wakes it. `0` keeps it on. Applied live. |
+
+The screen timeout counts from boot and from the last button press. Incoming DMX doesn't wake it
+(a show runs for hours, which is exactly what burns an OLED in), and the status LED keeps working
+while the panel is dark. Saving the config lights it up again so you can see the new settings.
 
 See [docs/display.md](docs/display.md) for the full design — per-board pin tables and layout details.
 

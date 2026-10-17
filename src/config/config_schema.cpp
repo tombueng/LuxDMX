@@ -89,6 +89,9 @@ const CfgField CONFIG_FIELDS[] = {
     IFIELD("dispsda",  "dispSda",  dispSda,  -1, 48, "I2C SDA",     "Display"),
     IFIELD("dispscl",  "dispScl",  dispScl,  -1, 48, "I2C SCL",     "Display"),
     IFIELD_L("disprot",  "dispRot",  dispRot,   0,  1, "Rotate 180",  "Display"),
+    // Panel goes dark after this many seconds without a button/encoder input, to save the OLED
+    // (issue #134). LIVE: the display task re-reads it every tick. 0 = never. Max one day.
+    IFIELD_L("disptimeout", "dispTimeout", dispTimeout, 0, 86400, "Screen off after (s)", "Display"),
     IFIELD("dispcs",   "dispCs",   dispCs,   -1, 48, "SPI CS",      "Display"),
     IFIELD("dispdc",   "dispDc",   dispDc,   -1, 48, "SPI DC",      "Display"),
     IFIELD("disprst",  "dispRst",  dispRst,  -1, 48, "SPI RST",     "Display"),

@@ -766,6 +766,18 @@ static Adafruit_GFX* dispDev    = nullptr;   // physical panel
 static GFXcanvas16*  dispCanvas = nullptr;   // off-screen buffer for the colour panel
 static bool          dispReady  = false;
 
+// Screen timeout (issue #134). OLEDs burn in, so the panel goes dark after cfg.dispTimeout seconds
+// without a button/encoder input. dispWakeMs is bumped by whoever wants the panel lit (controls
+// input, a config save); only the display task actually switches the panel, so the I2C/SPI bus
+// keeps a single owner. dispLit mirrors what the panel is really doing, for /info.json.
+static volatile uint32_t dispWakeMs = 0;
+static volatile bool     dispLit    = false;
+static inline void dispWake() { dispWakeMs = millis(); }
+static bool dispTimedOut() {
+    if (cfg.dispTimeout <= 0) return false;                       // 0 = never switch off
+    return millis() - dispWakeMs >= (uint32_t)cfg.dispTimeout * 1000UL;
+}
+
 // Foreground "on" colour. Mono drivers want the 1-bit WHITE constant (==1);
 // the colour panel wants RGB565 white. Passing 0xFFFF to a mono driver draws
 // nothing (its drawPixel only matches 0/1/2), so the two must differ.
@@ -779,6 +791,19 @@ static void dispFlush() {
         static_cast<Adafruit_SH1106G*>(dispDev)->display();
     else
         static_cast<Adafruit_SSD1306*>(dispDev)->display();
+}
+
+// Panel on/off through the controller's own display-off command: the frame buffer survives, the
+// pixels stop being driven. Cheaper and safer than tearing the driver down and re-running begin().
+static void dispSetPower(bool on) {
+    if (!dispDev) return;
+    if (cfg.dispType == 4)
+        static_cast<Adafruit_SSD1351*>(dispDev)->enableDisplay(on);
+    else if (cfg.dispType == 3)
+        static_cast<Adafruit_SH1106G*>(dispDev)->oled_command(on ? SH110X_DISPLAYON : SH110X_DISPLAYOFF);
+    else
+        static_cast<Adafruit_SSD1306*>(dispDev)->ssd1306_command(on ? SSD1306_DISPLAYON : SSD1306_DISPLAYOFF);
+    dispLit = on;
 }
 
 static void dispSplash() {
@@ -845,6 +870,8 @@ static void initDisplay() {
 
     gfx->setRotation(cfg.dispRot ? 2 : 0);
     dispReady = true;
+    dispLit   = true;   // begin() leaves the panel on
+    dispWake();         // the timeout counts from boot until the first input
     Serial.printf("[DISP] type=%d %dx%d ready\n", cfg.dispType, gfx->width(), gfx->height());
     dispSplash();
 }
@@ -2293,6 +2320,9 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"dispRst\":";    j += cfg.dispRst;            j += ",";
     j += "\"dispSck\":";    j += cfg.dispSck;            j += ",";
     j += "\"dispMosi\":";   j += cfg.dispMosi;           j += ",";
+    j += "\"dispTimeout\":"; j += cfg.dispTimeout;        j += ",";   // s, 0 = never (issue #134)
+    j += "\"dispReady\":";  j += dispReady ? "true" : "false"; j += ",";   // a panel actually came up
+    j += "\"dispOn\":";     j += (dispReady && dispLit) ? "true" : "false"; j += ",";   // lit right now
     // On-unit controls (issue #24): rotary encoder + buttons that drive the display menu.
     j += "\"encA\":";       j += cfg.encA;               j += ",";
     j += "\"encB\":";       j += cfg.encB;               j += ",";
@@ -2695,23 +2725,30 @@ static void applyLiveConfig(bool universeOrProtocolChanged) {
     if (universeOrProtocolChanged) startSacn();
 
     applyEncoderLive();
+    dispWake();   // a save lights the panel and restarts its timeout, so a new value is seen at once
 }
 
 // Snapshot every schema field's current value, so a save can tell what actually CHANGED rather than
 // assuming the worst and rebooting unconditionally. Keys are the canonical schema keys, so this
 // covers per-output fields too.
 struct CfgSnapshot {
-    String keys[96];
-    String vals[96];
+    // Must hold EVERY key: one that doesn't fit reads as "unchanged", so a reboot-only setting past
+    // the cap would save without the restart it needs. 96 was exactly full once #134 added
+    // disptimeout (73 root + 2 x 11 output keys + 1), hence the headroom and the loud check.
+    static constexpr int CAP = 128;
+    String keys[CAP];
+    String vals[CAP];
     int    n = 0;
     void take() {
         n = 0;
-        for (size_t k = 0; k < CONFIG_FIELD_COUNT && n < 96; k++) {
+        if (CONFIG_FIELD_COUNT + MAX_OUTPUTS * OUTPUT_FIELD_COUNT > (size_t)CAP)
+            Serial.println("[CFG] BUG: CfgSnapshot::CAP too small, some changes will go undetected");
+        for (size_t k = 0; k < CONFIG_FIELD_COUNT && n < CAP; k++) {
             String v;
             if (cfgcore::getValue(CONFIG_FIELDS[k].key, v)) { keys[n] = CONFIG_FIELDS[k].key; vals[n++] = v; }
         }
         for (int i = 0; i < MAX_OUTPUTS; i++)
-            for (size_t k = 0; k < OUTPUT_FIELD_COUNT && n < 96; k++) {
+            for (size_t k = 0; k < OUTPUT_FIELD_COUNT && n < CAP; k++) {
                 String key = okey(i, OUTPUT_FIELDS[k].suffix), v;
                 if (cfgcore::getValue(key, v)) { keys[n] = key; vals[n++] = v; }
             }
@@ -2724,7 +2761,7 @@ struct CfgSnapshot {
 
 static void handleConfigPost(AsyncWebServerRequest* req) {
     String s, e;
-    static CfgSnapshot before;   // static: 96 String pairs is far too much for the async task's stack
+    static CfgSnapshot before;   // static: 128 String pairs is far too much for the async task's stack
     before.take();               // what the config looked like before this form touched it
     // Drive every field from the schema (config_schema.cpp), preserving the old
     // web-form semantics exactly: a bool/checkbox is set from presence; an int /
@@ -3986,6 +4023,14 @@ static void displayTask(void*) {
     uint32_t screenSince = 0;
     for (;;) {
         TickType_t period = pdMS_TO_TICKS(250);
+        if (dispReady && gfx && dispTimedOut() && !ctlOverlayActive()) {
+            // Timed out (issue #134): dark panel, no drawing, nothing on the bus. Poll quicker
+            // than the render rate so a button press lights it without a noticeable lag.
+            if (dispLit) { dispSetPower(false); Serial.println("[DISP] off (screen timeout)"); }
+            lastScreen = 255;   // start clean on wake, no banner dwell carried over
+            vTaskDelay(pdMS_TO_TICKS(50));
+            continue;
+        }
         if (dispReady && gfx) {
             uint32_t now  = millis();
             uint8_t  want = dispPickScreen();
@@ -3997,6 +4042,9 @@ static void displayTask(void*) {
                 want = lastScreen;
             if (want != lastScreen) { lastScreen = want; screenSince = now; }
             dispRender(want);
+            // Light the panel only after a fresh frame is in it, so a wake never flashes the
+            // stale picture from before it went dark.
+            if (!dispLit) { dispSetPower(true); Serial.println("[DISP] on"); }
             if (want == 5) period = pdMS_TO_TICKS(60);   // responsive while the menu is up
         }
         vTaskDelay(period);
@@ -4116,12 +4164,18 @@ static void controlsTask(void*) {
         uint32_t now = millis();
         ctlMapper.poll(ctlSample(), now);
         NavEvent e; bool acted = false;
+        // Panel dark from the screen timeout (issue #134): the first input only wakes it. Acting
+        // on it would change a value nobody can see. Checked on the real panel state AND the
+        // timer, so a press in the few ms before the display task switches it off still counts,
+        // and a second press right after the wake isn't swallowed too.
+        const bool dark = dispReady && !dispLit && dispTimedOut();
         while ((e = ctlMapper.next()) != NAV_NONE) {
             acted = true;
-            if (ctlUseMenu) ctlHandleMenu(e);
-            else            ctlHandleDirect(e);
+            if (dark)            continue;
+            if (ctlUseMenu)      ctlHandleMenu(e);
+            else                 ctlHandleDirect(e);
         }
-        if (acted) lastInputMs = now;
+        if (acted) { lastInputMs = now; dispWake(); }
 
         // Idle: the menu auto-closes (discarding a half-made edit so a stray nudge
         // never persists); the direct overlay auto-saves the shown value, which is

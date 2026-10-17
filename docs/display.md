@@ -134,6 +134,7 @@ Mirrors how the status LED is wired through the stack (`ledType`/`ledPin`).
 | `dispSda` | `dispsda` | number | −1..48 | `DEF_DISP_SDA` | I²C (1–3) |
 | `dispScl` | `dispscl` | number | −1..48 | `DEF_DISP_SCL` | I²C (1–3) |
 | `dispRot` | `disprot` | select | 0=normal · 1=flipped 180° | `0` | all |
+| `dispTimeout` | `disptimeout` | number | 0..86400 s, `0` = never off | `20` (`_base` template) | all |
 | `dispCs` | `dispcs` | number | −1..48 | −1 | SPI (4) |
 | `dispDc` | `dispdc` | number | −1..48 | −1 | SPI (4) |
 | `dispRst` | `disprst` | number | −1..48 | −1 | SPI (4) |
@@ -260,6 +261,24 @@ menu screen takes over the display while you're navigating: a scrolling item lis
 panels, or the single selected item on the 128×32 strip. A `>` caret marks the highlight (the
 only cue that survives the 1-bit mono collapse), and editing a value wraps it in `<angle
 brackets>`. It shows instantly on the first turn and disappears the moment the menu closes.
+
+### Screen timeout (issue #134)
+
+OLEDs burn in, the dual-colour ones especially. So the panel goes dark after `disptimeout`
+seconds (default **20**, `0` = never) without a button or encoder input. The countdown starts at
+boot and restarts on every input and on every config save.
+
+- **Off** is the controller's own display-off command (`0xAE` on SSD1306 / SH1106,
+  `enableDisplay(false)` on the SSD1351). The driver stays up, nothing is torn down, and the
+  display task skips drawing while dark, so the I²C/SPI bus goes quiet too.
+- **Wake:** any encoder/button input, or a `/config` save. The first input on a dark panel only
+  wakes it, it is not passed to the menu, so you never change a value you can't see. The panel
+  is lit only after a fresh frame has been drawn, so it never flashes the stale picture.
+- **Not a wake:** incoming DMX, alerts (conflict / merging banners). The status LED still shows
+  those. A board without buttons therefore shows the panel for 20 s after boot and then only
+  after a save, set `0` if you want it on permanently.
+- `/info.json` reports `dispTimeout`, `dispReady` (a panel actually came up) and `dispOn`
+  (lit right now). The setting is live, changing it needs no reboot.
 
 ### Future extra screens (not in v1)
 

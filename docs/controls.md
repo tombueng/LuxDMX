@@ -68,6 +68,10 @@ the menu always has an **Exit** item to leave by. Turn the knob to move through 
 list, press to edit a value, turn to change it, press again to save. Wander off for
 a few seconds and the menu closes on its own without saving a half-made edit.
 
+If the display has gone dark from its screen timeout (`disptimeout`, default 20 s, see
+[display.md](display.md#screen-timeout-issue-134)), the first turn or press only wakes it up
+and does nothing else. Then it works as usual.
+
 ### No display, or encoder with no button
 
 If there's no way to *select* (an encoder with no push and no buttons), or there's
