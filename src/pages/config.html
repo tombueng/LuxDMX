@@ -1076,7 +1076,10 @@ function buildPixels(ports){
     set('.pix-maxma','maxma','maxMa');   set('.pix-machan','machan','mAPerCh');
     set('.pix-loss','loss','loss');
     cont.appendChild(node);
+    secInit(node);   // fold like every other section. Without it a pixel card counted as "open"
+                     // while "Expand all" still said Expand, so that button folded everything.
   }
+  updSummaries();
   pixCards().forEach(function(card){
     card.querySelectorAll('input,select').forEach(function(el){
       el.addEventListener('input', pixRecalc);
@@ -1757,6 +1760,11 @@ var SEC_SUM = {
     return [enc ? 'encoder' : '', btns ? plural(btns, 'button') : ''].filter(Boolean).join(' · ');
   },
   'outputs-help': function(){ return 'pins and wiring'; },
+  pix:     function(card){
+    if (!card.querySelector('.pix-en').checked) return 'off';
+    return card.querySelector('.pix-count').value + ' px · GPIO ' + card.querySelector('.pix-pin').value
+         + ' · universe ' + card.querySelector('.pix-uni').value;
+  },
   device:  function(){ return ($('dev-host').value || '') + '.local'; },
   firmware:function(){ return CURRENT ? 'installed v' + CURRENT : ''; },
   danger:  function(){ return 'erase WiFi credentials'; },
@@ -1777,7 +1785,7 @@ var SEC_SUM = {
 function updSummaries(){
   secCards().forEach(function(card){
     var el = card.querySelector('.card-header > .sec-sum'); if (!el) return;
-    var k = secKey(card), fn = SEC_SUM[/^out\d+$/.test(k) ? 'out' : k];
+    var k = secKey(card), fn = SEC_SUM[/^out\d+$/.test(k) ? 'out' : /^pix\d+$/.test(k) ? 'pix' : k];
     var txt = '';
     if (card.classList.contains('sec-closed') && fn){ try { txt = fn(card) || ''; } catch(e){} }
     el.textContent = txt;
