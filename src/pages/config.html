@@ -1327,8 +1327,22 @@ function updDispPins(){
 }
 function updHostUrl(){ $('dev-host-url').textContent = 'http://' + $('dev-host').value + '.local'; }
 
-// Populate every field from /info.json (page itself is served statically)
+// Populate every field from /info.json (page itself is served statically). The request goes out
+// right away, but the answer is only used once the whole page has been parsed: populating calls
+// into the later <script> blocks (initBoards, ...), and a quick answer -- a second load in the same
+// tab, say -- used to land before they existed. The ReferenceError fell into the catch below,
+// which drew the placeholder outputs while Save was already enabled, so one click wrote "output A
+// on GPIO17 / RX 16, output B off" over the real pins (what issue #132 actually saw).
+// Set when /info.json couldn't be read: the page then shows placeholders, and Save stays off no
+// matter what validate() makes of the pins (it re-enables Save whenever they look fine).
+var SETTINGS_UNREAD = false;
+var pageParsed = new Promise(function(done){
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', done);
+  else done();
+});
 fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
+  return pageParsed.then(function(){ return d; });
+}).then(function(d){
   // A response that parses but isn't this device's config (a half-booted device, an error body,
   // a captive portal) must NOT be treated as settings. Without this the page happily rendered
   // invented pins with Save still enabled, and saving wrote them over a working setup -- the
@@ -1433,19 +1447,24 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   // saving them would overwrite a perfectly good setup with defaults. Seen for real when the page
   // was opened while the device was still rebooting -- it silently offered "output A on GPIO17,
   // output B off" and a save wrote exactly that.
-  buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]);
-  INFO_BOARD=''; INFO_MCU=''; SEL_BOARD=''; initBoards(); loadVersions();
+  // Save goes off FIRST: populating above may already have enabled it before it failed, and
+  // nothing further down may run before the button is safe.
+  SETTINGS_UNREAD = true;
   var sb = $('save-btn');
   sb.disabled = true;
   sb.textContent = 'Cannot read settings';
   sb.title = 'The device did not answer /info.json, so this page is showing placeholders rather '
            + 'than your settings. Reload once it is back; saving now would overwrite your config.';
-  showModal({
-    title: 'Could not load the current settings',
-    body: 'The device did not answer, so this page is showing placeholder values instead of your '
-        + 'actual configuration. Saving has been disabled so it cannot overwrite anything. '
-        + 'Reload the page once the device is reachable again (it may still be restarting).',
-    okText: 'OK', cancel: false
+  pageParsed.then(function(){
+    buildOutputs([{en:true,uni:0,port:1,tx:17,rx:16,rts:-1},{en:false,uni:1,port:2,tx:-1,rx:-1,rts:-1}]);
+    INFO_BOARD=''; INFO_MCU=''; SEL_BOARD=''; initBoards(); loadVersions();
+    showModal({
+      title: 'Could not load the current settings',
+      body: 'The device did not answer, so this page is showing placeholder values instead of your '
+          + 'actual configuration. Saving has been disabled so it cannot overwrite anything. '
+          + 'Reload the page once the device is reachable again (it may still be restarting).',
+      okText: 'OK', cancel: false
+    });
   });
 });
 
@@ -1479,6 +1498,9 @@ function showModal(opts){
 // Guard: never submit an enabled output with no TX pin, it can't drive a line
 // and the device refuses it anyway. Catch it here with a clear message.
 document.querySelector('form[action="/config"]').addEventListener('submit', function(e){
+  // Never send placeholders: if the settings couldn't be read, nothing on this page is the
+  // device's config, whatever state the button ended up in.
+  if (SETTINGS_UNREAD){ e.preventDefault(); return; }
   var bad = [];
   document.querySelectorAll('.out-card').forEach(function(card, i){
     if (card.querySelector('.out-en').checked && +card.querySelector('.out-tx').value < 0){
@@ -2267,7 +2289,7 @@ function validate(){
   });
   renderWarnings(msgs);
   updPinHeaderHints();
-  var sb = $('save-btn'); if (sb) sb.disabled = hard;
+  var sb = $('save-btn'); if (sb) sb.disabled = hard || SETTINGS_UNREAD;
   if ($('board-modal').classList.contains('show')) renderCurrent();
   return !hard;
 }
