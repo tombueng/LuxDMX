@@ -69,7 +69,7 @@ static inline int pixBpp(int port) { return pixBytesPerPixel(cfg.pixels[port].ch
 static void pixelService();                 // fwd decl (the task body, defined below)
 static TaskHandle_t g_pixTask = nullptr;
 
-// Apply/service handshake. pixelApply() runs on the loop task and FREES the framebuffers;
+// Apply/service handshake. pixelApply() runs on the network task and FREES the framebuffers;
 // pixelService() runs on the pixel task and READS them. Without this the two race and the
 // device reboots the moment a pixel setting is changed while a source is streaming -- which
 // is exactly how it behaved before this was added.
@@ -120,6 +120,67 @@ static void pixelStartTask() {
     if (g_pixTask || !g_pixAnyEnabled) return;
     xTaskCreatePinnedToCore(pixelTaskBody, "pixel", 4096, nullptr, 6, &g_pixTask, 1);
     Serial.println("[PIX] push task started");
+}
+
+// ---------------------------------------------------------------------------
+// Driver restart, always on the core setup() runs on
+// ---------------------------------------------------------------------------
+// Stop the running backend and start one for `ports`. True if it came up (or there is nothing
+// to drive).
+static bool pixDriverRestart(const PixOutPort* ports, int n) {
+    pixOutEnd();
+    if (n == 0) return true;
+    const PixBackend want = (cfg.pixBackend == 1) ? PIXBK_RMT
+                          : (cfg.pixBackend == 2) ? PIXBK_LCD : PIXBK_NONE;
+    if (want == PIXBK_NONE && pixLcdPreferred()) {
+        // Automatic, on a box with PSRAM: take LCD_CAM even though RMT would fit. RMT's only
+        // advantage is that it is cheap in RAM, and that stops mattering with megabytes of
+        // external RAM to spend -- while its disadvantage does not: a lane that misses the one
+        // DMA channel (DMX takes it first) is refilled from an ISR and glitches the same few
+        // LEDs under load. That cost a night of bench time to find, and nothing in the UI hinted
+        // at it. Fall through to the normal RMT-first path if LCD_CAM cannot serve these ports,
+        // e.g. because they are not all the same LED chip.
+        return (pixOutBegin(ports, n, PIXBK_LCD) != PIXBK_NONE)
+            || (pixOutBegin(ports, n, PIXBK_NONE) != PIXBK_NONE);
+    }
+    return pixOutBegin(ports, n, want) != PIXBK_NONE;
+}
+
+// The RMT peripheral has ONE interrupt for all its channels, and the IDF hooks each channel's
+// handler into it on the core that created the channel. The DMX outputs are created in setup(),
+// on ARDUINO_RUNNING_CORE. A pixel lane created on the other core routes that same interrupt
+// to both cores, each of them only knowing how to clear its own channels' bits. Usually
+// harmless, the right core clears its bit within microseconds. But a flash write (every config
+// save) parks the other core with its non-IRAM interrupts off, and if a DMX frame finishes in
+// that window, the saving core takes an interrupt it can't clear, over and over, never gets
+// back to the flash write the parked core is waiting on, and the interrupt watchdog reboots the
+// box. pixelApply() runs on the network task (core 0), so this is how a live pixel change
+// followed by a save crashed the carrier about one time in three.
+//
+// So the driver is only ever started and stopped on the setup() core: directly when already
+// there (boot), else from a short-lived task pinned to it, waited for.
+struct PixDrvCall { const PixOutPort* ports; int n; bool ok; SemaphoreHandle_t done; };
+
+static void pixDrvTaskBody(void* a) {
+    PixDrvCall* c = (PixDrvCall*)a;
+    c->ok = pixDriverRestart(c->ports, c->n);
+    xSemaphoreGive(c->done);   // c lives on the caller's stack: nothing touches it after this
+    vTaskDelete(nullptr);
+}
+
+static bool pixDriverRestartOnRmtCore(const PixOutPort* ports, int n) {
+    if (xPortGetCoreID() == ARDUINO_RUNNING_CORE) return pixDriverRestart(ports, n);
+    PixDrvCall c{ports, n, false, xSemaphoreCreateBinary()};
+    if (c.done && xTaskCreatePinnedToCore(pixDrvTaskBody, "pixdrv", 6144, &c, uxTaskPriorityGet(nullptr),
+                                          nullptr, ARDUINO_RUNNING_CORE) == pdPASS) {
+        xSemaphoreTake(c.done, portMAX_DELAY);
+        vSemaphoreDelete(c.done);
+        return c.ok;
+    }
+    if (c.done) vSemaphoreDelete(c.done);
+    // No heap for the helper. Doing it here still works, it only brings the shared interrupt back.
+    Serial.println("[PIX] driver restarted from the network core, no heap for the helper task");
+    return pixDriverRestart(ports, n);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,25 +266,7 @@ static bool pixelApply(String& err) {
         n++;
     }
 
-    pixOutEnd();
-    const PixBackend want = (cfg.pixBackend == 1) ? PIXBK_RMT
-                          : (cfg.pixBackend == 2) ? PIXBK_LCD : PIXBK_NONE;
-    bool backendOk;
-    if (n == 0) {
-        backendOk = true;
-    } else if (want == PIXBK_NONE && pixLcdPreferred()) {
-        // Automatic, on a box with PSRAM: take LCD_CAM even though RMT would fit. RMT's only
-        // advantage is that it is cheap in RAM, and that stops mattering with megabytes of
-        // external RAM to spend -- while its disadvantage does not: a lane that misses the one
-        // DMA channel (DMX takes it first) is refilled from an ISR and glitches the same few
-        // LEDs under load. That cost a night of bench time to find, and nothing in the UI hinted
-        // at it. Fall through to the normal RMT-first path if LCD_CAM cannot serve these ports,
-        // e.g. because they are not all the same LED chip.
-        backendOk = (pixOutBegin(ports, n, PIXBK_LCD) != PIXBK_NONE)
-                 || (pixOutBegin(ports, n, PIXBK_NONE) != PIXBK_NONE);
-    } else {
-        backendOk = (pixOutBegin(ports, n, want) != PIXBK_NONE);
-    }
+    const bool backendOk = pixDriverRestartOnRmtCore(ports, n);
     pixelPauseEnd();
     if (!backendOk) {
         err = (cfg.pixBackend == 0)
