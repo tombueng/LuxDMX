@@ -213,6 +213,13 @@ in a single block — which it does, and the driver falls back to that automatic
 trying for a DMA channel first. An `rmt_new_tx_channel ... register channel failed` line on the
 console followed by `RMT backend up` is that fallback working, not an error.
 
+The driver is only ever started and stopped on the core `setup()` runs on, the one the DMX
+outputs' RMT channels were created on, even when the change arrives on the network task. The RMT
+has one interrupt for all its channels, and a pixel lane created on the other core routed that
+interrupt to both. During the flash write of a later config save that could leave one core stuck
+in an interrupt it had no handler for, and the interrupt watchdog rebooted the box. It showed up
+on the carrier after forcing RMT live and then saving. `pixel-rmt-save.spec.mjs` covers it.
+
 **Nothing is allocated for a port that is off**, and disabling a port frees its buffers, so a
 DMX-only box pays nothing for this feature.
 

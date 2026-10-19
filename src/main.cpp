@@ -5647,8 +5647,11 @@ void setup() {
     http.begin();
 
     lastFrameMs = millis();
-    // LED on its own low-priority task so web traffic can't freeze it.
-    xTaskCreate(ledTask, "led", 2048, nullptr, 1, nullptr);
+    // LED on its own low-priority task so web traffic can't freeze it. Pinned to this core: a
+    // WS2812 status LED that didn't get an RMT channel in initLed() retries on every show(), and
+    // an RMT channel made on the other core splits the RMT interrupt across both (see
+    // pixDriverRestartOnRmtCore() in pixel.h for what that does during a flash write).
+    xTaskCreatePinnedToCore(ledTask, "led", 2048, nullptr, 1, nullptr, ARDUINO_RUNNING_CORE);
     if (dispReady) xTaskCreate(displayTask, "disp", 4096, nullptr, 1, nullptr);
     initControls();   // optional on-unit rotary encoder + buttons -> display menu (issue #24); no-op unless wired
     xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr);
