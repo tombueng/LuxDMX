@@ -97,11 +97,16 @@ static bool rmtDmxInit(RmtDmx* rd, int gpio) {
     // That is fine here: this build separates cores (DMX on core 1, network on core 0), so the refill
     // ISR on core 1 isn't exposed to the issue-#64 network-DMA contention that made DMA necessary in
     // the first place. Without this fallback, out1 failed to init on the S3 and the 2nd universe was dead.
+    //
+    // One memory block each, like the classic ESP32. A block is a whole channel's worth: the S3 has
+    // four, and the DMA output already holds one. This used to ask for two (half the refill rate),
+    // which left out2 only one block, so it never started on the carrier, and broke the RMT budget
+    // pixel_out.h counts on (one channel per DMX output: 3 DMX + 1 RMT pixel port fits).
     txc.flags.with_dma    = true;
     txc.mem_block_symbols = 1024;
     if (rmt_new_tx_channel(&txc, &rd->chan) != ESP_OK) {
         txc.flags.with_dma    = false;
-        txc.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL * 2;   // 2 blocks -> half the refill rate
+        txc.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
         if (rmt_new_tx_channel(&txc, &rd->chan) != ESP_OK) return false;
     }
 #else

@@ -1150,24 +1150,25 @@ See [docs/display.md](docs/display.md) for the full design — per-board pin tab
 
 ## DMX Outputs
 
-LuxDMX drives up to **2 independent DMX outputs** — each its own universe, UART port and
-RS485 transceiver — configurable at runtime under **Settings → DMX Outputs** (no recompile).
-The 2-output ceiling is a hardware limit: the ESP32 / ESP32-S3 expose 3 UARTs and UART0 is the
-serial console, leaving UART1 + UART2. **Output B ships disabled**, so single-universe setups are
-unchanged, and devices updated from older firmware keep their existing output as Output A.
+LuxDMX drives up to **3 independent DMX outputs** (A, B, C), each with its own universe, TX pin and
+RS485 transceiver, configurable at runtime under **Settings → DMX Outputs** (no recompile).
+The frames are clocked out of the **RMT** peripheral, not a UART, so the serial console stays where
+it is. Each output takes one RMT TX channel: an ESP32-S3 has 4 (also shared with RMT pixel ports and
+a WS2812 status LED), a classic ESP32 has 8. **Outputs B and C ship disabled**, so single-universe
+setups are unchanged, and devices updated from older firmware keep their existing output as Output A.
 
 Per output:
 
-| Setting | Default (Output A / B) | Description |
+| Setting | Default (Output A / B / C) | Description |
 |---|---|---|
-| Enabled | A on / B off | Whether this output drives a DMX line |
-| Universe | `0` / `1` | Art-Net universe (sACN universe = this + 1). Range 0–15 |
-| UART port | `1` / `2` | Which ESP32 UART drives the line. Each enabled output needs a **distinct** port |
+| Enabled | A on / B, C off | Whether this output drives a DMX line |
+| Universe | `0` / `1` / `2` | Art-Net universe (sACN universe = this + 1). Range 0–15 |
+| UART port | `1` / `2` / `3` | Legacy, kept so older configs still load. TX runs on RMT and doesn't use it; what has to be **distinct** per output is the TX pin |
 | TX pin | `17` (GPIO17) | ESP32 GPIO that drives the RS485 module's DI (data-in) |
 | RX pin | `16` (GPIO16) | ESP32 GPIO connected to the RS485 module's RO (data-out); needed for RDM |
 | RTS / DE pin | `−1` (disabled) | RS485 direction-control pin. −1 for auto-direction modules (Waveshare C). Required for RDM. |
 
-Setting **both outputs to the same universe** turns LuxDMX into a 1-in / 2-out DMX splitter.
+Setting **several outputs to the same universe** turns LuxDMX into a DMX splitter.
 **RDM** runs on the first enabled output with an RTS pin set (one output at a time). For
 multi-universe input, **Art-Net is recommended** (single UDP socket, no IGMP); sACN works too
 (one multicast group joined per universe).
@@ -1218,13 +1219,18 @@ management / clock / power pins, so a DMX or LED pin that lands on one is flagge
 > is the wrong end of the trade for Art-Net/sACN under full DMX load. Use a **W5500** instead: same
 > SPI bus, costs about the same, full hardware stack, and it's already built in.
 
-> **All boards drive two outputs.** A 2nd output used to panic on the ESP32-S3 back when DMX went
+> **All boards drive three outputs.** A 2nd output used to panic on the ESP32-S3 back when DMX went
 > out over the UART: a latent **esp_dmx 4.1.0 bug** where the UART2 entry was guarded by an enum the
 > preprocessor reads as 0, so it was compiled out (null peripheral pointer), and it needed a
 > build-time patch to work at all. DMX is clocked out of the **RMT** peripheral now (`dmx_rmt.h`),
 > and esp_dmx is gone from the project entirely, so neither the bug nor the patch exists any more.
+>
+> On the ESP32-S3, Output A gets the one DMA-capable RMT channel and B and C take one channel each,
+> which leaves the fourth for an RMT pixel port or a WS2812 status LED. Up to v1.0.275 Output C never
+> started on an S3: B asked for two of the four channel memory blocks and left C none, so it showed
+> as enabled and sent nothing.
 
-**ESP32-S3 — safe GPIOs for a 2nd output:** free choices are **5, 6, 7, 8, 15, 18, 21**. Avoid
+**ESP32-S3 — safe GPIOs for outputs B and C:** free choices are **5, 6, 7, 8, 15, 18, 21**. Avoid
 **26–37** (SPI flash / octal PSRAM — *will* crash), **19/20** (USB), **43/44** (serial console),
 **0/45/46** (strapping), **48** (WS2812 LED), and Output A's **16/17**.
 
@@ -1234,8 +1240,8 @@ to the RX GPIO, then set the pins under Settings → DMX Outputs.
 ### Upgrade & crash safety
 
 - **Existing single-universe devices are unaffected by the update.** Migration maps the old
-  single-output config to **Output A** and leaves **Output B disabled**, so exactly one driver is
-  installed on UART1 — byte-for-byte the same path as before.
+  single-output config to **Output A** and leaves **Outputs B and C disabled**, so exactly one
+  output is driven, same as before.
 - **No configuration can brick the device.** A safe-boot guard persists a crash counter around DMX
   init; if init ever panics (a bad pin/port), the next boots progressively disable outputs (keep
   A → all off) until the web UI is reachable. An enabled output with no TX pin is sanitized off

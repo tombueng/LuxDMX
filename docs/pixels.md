@@ -211,7 +211,9 @@ There is a subtlety worth knowing on the S3. An RMT channel asking for more than
 block borrows the *next* channel's, consuming two of the four slots, so a pixel port must fit
 in a single block — which it does, and the driver falls back to that automatically after
 trying for a DMA channel first. An `rmt_new_tx_channel ... register channel failed` line on the
-console followed by `RMT backend up` is that fallback working, not an error.
+console followed by `RMT backend up` is that fallback working, not an error. DMX outputs play by
+the same rule: the first gets the DMA channel, every other one a single block, which is what makes
+3 DMX + 1 pixel port fit in the S3's four (`outputs-all.spec.mjs` checks that on the device).
 
 The driver is only ever started and stopped on the core `setup()` runs on, the one the DMX
 outputs' RMT channels were created on, even when the change arrives on the network task. The RMT
