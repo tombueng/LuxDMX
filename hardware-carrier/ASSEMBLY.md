@@ -1,6 +1,6 @@
 # Assembly
 
-How many of the 46 positions you actually solder depends on what you are building.
+How many of the 55 positions you actually solder depends on what you are building.
 Almost nothing here is mandatory.
 
 ## Answer these first
@@ -31,7 +31,7 @@ Almost nothing here is mandatory.
 | Part | Side | Fit it when | Note |
 |---|---|---|---|
 | `1000uF 35V` | front | pixel ports are used | Buffers the current steps of the strips. 13 mm can, 5.00 mm pitch. |
-| `12-24V IN` | front | pixel ports are used | The actual power inlet. **Either** this terminal **or** the DC jack, never both. |
+| `12-24V IN` | front | pixel ports are used | The inlet for the pixel rail. Fit the screw terminal, or solder the wire flat onto the pad. |
 | `74AHCT541 pixel buffer` | back | **at least one** pixel port is used | Not optional: the terminals hang off its outputs. WS281x want 0.7 x VDD = 3.5 V and the 3.3 V from the S3 will not do it reliably. |
 | `Pixel1:Vcc/Data/GND` | front | pixel port 1 is used |  |
 | `Pixel2:Vcc/Data/GND` | front | pixel port 2 is used |  |
@@ -171,8 +171,6 @@ is no reverse or ORing protection on the board.
 
 **Set the buck before soldering it in.** These modules have a trimmer and arrive in any
 position. At 12 V out the ESP32, the W5500 and the display all go at once.
-
-**Screw terminal or DC jack, not both.** They sit on the same nets.
 
 **120 R only at the end of the bus.** And check the RS-485 module first, the cheap ones
 usually carry 120 R and bias already. A second one puts 60 R on the bus.

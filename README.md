@@ -29,7 +29,7 @@
 <p align="center">
   <a href="https://tombueng.github.io/LuxDMX/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
   <a href="https://luxdmx.org/video"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
-  <a href="hardware/README.md"><b>🛠 Custom PCB</b></a> &nbsp;·&nbsp;
+  <a href="hardware-carrier/README.md"><b>🛠 DIY carrier board</b></a> &nbsp;·&nbsp;
   <a href="#flashing-pre-built-firmware"><b>Install</b></a>
 </p>
 
@@ -49,73 +49,236 @@ A guided tour of every control — manual channel control, labels, sparkline his
 
 ## Features
 
+### DMX output
+
 | Feature | Details |
 |---|---|
 | **Art-Net → DMX512** | Full 512-channel, unicast or broadcast, universe configurable (0–15) |
 | **sACN / E1.31 → DMX512** | Multicast receive, universe configurable, runs alongside Art-Net |
 | **Protocol selection** | Art-Net only / sACN only / Both — configurable in web UI |
+| **Up to 3 DMX outputs** | Three independent universes, each its own RS485 transceiver (the same universe on several = splitter). All three are RDM-capable |
+| **Source merging** | Per-output HTP (highest takes precedence) / LTP (latest wins) / off, honouring the sACN priority field |
+| **Signal-loss policy** | Per-output choice when the source stops: hold last frame (default), blackout, or stop sending. Continuous 40 Hz refresh bridges brief input gaps either way |
+| **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
+| **Pixel output (WS281x)** | Drive addressable LED strip from Art-Net or sACN alongside DMX: up to 5 ports, multi-universe per port, WS2812/2815/2811 and SK6812 RGBW, colour order, brightness, gamma, per-port power cap with a live and all-white estimate, and ArtSync / E1.31 sync. Nothing is allocated for a port that is off. See [docs/pixels.md](docs/pixels.md) |
+
+### RDM
+
+| Feature | Details |
+|---|---|
+| **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
+| **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
+
+### Live diagnostics in the browser
+
+| Feature | Details |
+|---|---|
 | **Live Web UI** | Bootstrap 5 dark theme, WebSocket push (~10/s), all 512 channels visible |
 | **Sender list** | Shows all active Art-Net / sACN senders with per-sender FPS |
 | **Conflict detection** | Warning banner when multiple senders are active simultaneously |
-| **Source merging** | Per-output HTP (highest takes precedence) / LTP (latest wins) / off, honouring the sACN priority field |
 | **Jitter stat** | Real-time inter-frame timing deviation (EMA) |
 | **Change log** | Live log of DMX value changes with top-N changed channels per frame |
 | **Sparkline** | Per-channel history sparkline in the channel detail modal |
 | **Channel labels** | Name any channel (e.g. "Front Wash L") — shown in grid, modal, and change log |
-| **Identify** | Flash a channel to full for ~1.5 s to physically locate the fixture |
+
+### Manual control
+
+| Feature | Details |
+|---|---|
 | **Manual DMX control** | Click any channel in browser, set value via slider |
-| **Blackout button** | Zero all channels instantly from browser |
 | **Art-Net / Manual toggle** | Switch between protocol passthrough and manual override |
-| **Signal-loss policy** | Per-output choice when the source stops: hold last frame (default), blackout, or stop sending. Continuous 40 Hz refresh bridges brief input gaps either way |
+| **Identify** | Flash a channel to full for ~1.5 s to physically locate the fixture |
+| **Blackout button** | Zero all channels instantly from browser |
+
+### Network
+
+| Feature | Details |
+|---|---|
+| **Ethernet support** | WT32-ETH01 (LAN8720), the carrier board and the v6 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
+| **Selectable network mode** | Pick the interface (WiFi or wired Ethernet) and WiFi mode (client/STA or standalone AP) in the web UI, on boards that have both |
 | **Static IP or DHCP** | Configurable static IP/gateway/subnet/DNS, or automatic DHCP |
 | **Mesh-aware WiFi** | Scans all channels and joins the **strongest** AP (multi-AP/mesh friendly) |
 | **First-run setup portal** | On first boot (or BOOT-button held) LuxDMX opens its own `LuxDMX-setup` access point with a captive portal. The on-brand page (served from the same web UI) lets you either join your WiFi or run the device as its own access point, no router needed |
-| **Selectable network mode** | Pick the interface (WiFi or wired Ethernet) and WiFi mode (client/STA or standalone AP) in the web UI, on boards that have both |
 | **Standalone AP mode** | LuxDMX hosts its own WiFi network so a phone/tablet/console connects directly and sends Art-Net with no router (reachable at `192.168.4.1`) |
 | **Wired link-loss policy** | Pick what happens if wired Ethernet is selected but the link is down: keep retrying (default, never opens a hotspot), a standalone WPA2 AP, reboot, or fall back to your saved WiFi network. A runtime watchdog applies it even if the cable is pulled mid-run, and the fallback AP never opens *unsecured*. The WiFi setup portal is BOOT-button-only (physical access), never an automatic fallback |
-| **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
-| **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
 | **mDNS + DHCP hostname** | Reachable as `dmx-gateway.local` via mDNS, *and* the device sends its hostname over DHCP (option 12) so your router registers it by plain name. Clients without mDNS (e.g. Windows) can then reach it as `dmx-gateway` / `dmx-gateway.fritz.box`. Hostname configurable |
-| **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
-| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v6 board) — one status language: green = up (stays on; slow blink = DMX coming in), blue = RDM/identify **added on top of green** (both LEDs on the panel, cyan on a single RGB LED), orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
-| **Up to 3 DMX outputs** | Three independent universes, each its own RS485 transceiver (the same universe on several = splitter). All three are RDM-capable |
-| **Pixel output (WS281x)** | Drive addressable LED strip from Art-Net or sACN alongside DMX: up to 5 ports, multi-universe per port, WS2812/2815/2811 and SK6812 RGBW, colour order, brightness, gamma, per-port power cap with a live and all-white estimate, and ArtSync / E1.31 sync. Nothing is allocated for a port that is off. See [docs/pixels.md](docs/pixels.md) |
-| **RDM (E1.20)** | Discover and configure fixtures on the wire: DISC_UNIQUE_BRANCH discovery, GET/SET DEVICE_INFO / DMX start address / identify / sensors, on an RDM-capable output (one with a DE/RE pin). esp_dmx-free RMT-TX + UART-RX engine |
-| **RDM over Art-Net** | Full Art-Net 4 RDM output gateway (ArtPoll / ArtTodRequest / ArtTodControl / ArtRdm) so a console (DMX-Workshop, MagicQ, grandMA3, OLA) does RDM to the fixtures over the network. Discovery is scheduled one transaction per DMX frame, so RDM never stalls the DMX output. See [docs/rdm.md](docs/rdm.md) |
+
+### Remote config from the console
+
+| Feature | Details |
+|---|---|
 | **Remote node config (ArtAddress)** | Configure the node from the console's own network window (MagicQ Network Manager, DMX-Workshop, ...): rename it and move each output to a different universe, saved to NVS so it survives a reboot. On by default and **unauthenticated**, like every other Art-Net command. See [Remote node config over Art-Net](#remote-node-config-over-art-net-artaddress) |
 | **Remote IP config (ArtIpProg)** | A controller can read and set the node's IP / mask / gateway (or switch it to DHCP) over the network with Art-Net `ArtIpProg`, so a box that landed on an unreachable address is recoverable without the BOOT button or a serial cable. **Off by default** (Art-Net has no auth, so on = anyone on the wire can renumber it); the new address applies on the next boot. See [Remote IP config over Art-Net](#remote-ip-config-over-art-net-artipprog-off-by-default) |
+
+### On the box
+
+| Feature | Details |
+|---|---|
+| **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v6 board) — one status language: green = up (stays on; slow blink = DMX coming in), blue = RDM/identify **added on top of green** (both LEDs on the panel, cyan on a single RGB LED), orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351) — IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
 | **On-unit controls** | Optional rotary encoder and/or up to 4 buttons drive a small on-display menu to set the universe (and protocol) without a phone or PC, and the choice persists. Works with any mix of inputs — encoder-only, one button, or the lot. See [docs/controls.md](docs/controls.md) |
-| **Configurable DMX pins** | Per output: universe, UART port, TX / RX / RTS GPIO — set at runtime via web UI, no recompile |
+
+### Updates, settings and API
+
+| Feature | Details |
+|---|---|
+| **Versioned OTA** | Pick & install any past release from a table, or auto-update to latest |
+| **OTA Updates** | ArduinoOTA (IDE/CLI) + manual `.bin` upload + one-click update from luxdmx.org |
 | **NVS persistence** | Universe, protocol, IP config, labels, hostname, OTA password, LED/DMX pin config survive reboots |
-| **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
 | **Config backup / restore** | **`/config` → Backup & Restore**: download every setting plus the channel labels as one `.json`, restore it later or onto another box of the same kind. Passwords stay out unless you tick the box. A file may hold just a few settings; only those change. See [Backup and restore](#backup-and-restore) |
+| **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
 | **Remote restart** | Restart the box from the web UI (**Device → Restart device**) or `POST /reboot`, without changing a setting. Useful when a long-running gateway needs a nudge, or to free up memory before a firmware update |
-| **Ethernet support** | WT32-ETH01 (LAN8720) and the v6 board (W5500) run wired LAN *or* WiFi, switchable at runtime; any ESP32 / ESP32-S3 + an external SPI module (W5500 or DM9051) works too, and a **classic ESP32 can pick a SPI chip (W5500 / DM9051) or the built-in MAC + an RMII PHY** (LAN8720, IP101, RTL8201, DP83848, KSZ8081, JL1101) in `/config`; DHCP or static |
-| **Dual/triple target** | Builds for ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), WT32-ETH01 |
+| **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
+
+### Boards
+
+| Feature | Details |
+|---|---|
+| **Firmware builds** | ESP32 (WROOM-32), ESP32-S3 (DevKitC-1), ESP32-S3 with octal PSRAM, WT32-ETH01. Plus a catalog of 30-odd boards in the `/config` pin picker, see [Visual pin configuration](#visual-pin-configuration-board-picker) |
+| **DIY carrier board** | A 2-layer PCB for off-the-shelf modules: ESP32-S3 N16R8, up to 3 DMX/RDM ports, up to 5 pixel ports, W5500, OLED, encoder and buttons. Hand-solderable, a few bucks in parts. See [Hardware](#hardware) |
 
 ---
 
 ## Hardware
 
-> ### 🛠 Custom PCB — LuxDMX v6
->
-> Want the real thing instead of breadboard + modules? There's a complete **open-source 4-layer PCB**:
-> ESP32-S3 with **both WiFi and wired Ethernet** (W5500), **two galvanically-isolated DMX universes**
-> (two XLR-5 outputs), **802.3af PoE** or USB-C power + flashing, a 5-LED status panel, BOOT/RST buttons,
-> and an optional OLED/TFT display header. All palm-sized and fabricable at JLCPCB for a few dollars.
->
-> **v6 is DMX512-A Protected** (ANSI E1.11 Annex C): each DMX output survives a sustained fault on the data
-> pins — someone plugging mains (30 VAC) or up to ±42 VDC into the XLR — without damage. A series Bourns TBU
-> high-speed protector blocks the fault in <1 µs and the board self-recovers when it's removed. Full
-> [E1.11 / DMX512-A compliance breakdown →](hardware/E1.11_COMPLIANCE.md)
->
-> [<img src="hardware/board3d-1.png" width="360" alt="LuxDMX v6 custom PCB — DMX512-A Protected">](hardware/README.md)
->
-> **→ Full design, component rationale, BOM, gerbers & JLCPCB fab guide: [`hardware/`](hardware/README.md)**
+The easy way to a real LuxDMX box is the carrier board below: order the PCB, plug in modules,
+solder a few small parts. If you just want to try it tonight, skip to the
+[breadboard build](#breadboard-build-no-pcb), that's an ESP32 and one RS-485 module on jumper wires.
 
-The rest of this section covers the simpler **breadboard / module** build (an off-the-shelf ESP32 DevKit
-+ an isolated RS485 module) — perfect for getting started without fabricating a board.
+> ### 🛠 The LuxDMX carrier board
+>
+> The DIY path, for a few bucks. A 2-layer PCB that off-the-shelf modules plug into: an
+> **ESP32-S3-DevKitC-1 N16R8**, up to three **MAX3485** RS-485 modules, a **USR-ES1 W5500** for
+> wired Ethernet and a **1.3" SH1106 OLED**. The rotary encoder and two buttons sit right on the
+> board. Everything else is a handful of small parts on the back, and those are all optional
+> except the ones for what you actually use.
+>
+> - **DMX + RDM on up to 3 ports**, one RS-485 module per port, direction pin driven so RDM works
+> - **WS281x pixels on up to 5 ports** once you add the 74HCT541 buffer chip. It lifts the S3's
+>   3.3 V data to the 5 V the strips want, so no pixels without it
+> - **WiFi**, or wired Ethernet when the W5500 module is fitted
+> - 12/24 V pixel supply with a fuse on the board; the logic runs off USB, an external 5 V or a
+>   little buck module off the pixel supply
+> - 100 x 80 mm, any fab. Hand soldering only, and the lands take anything from 0402 to 1206, so
+>   use whatever's in your drawer
+>
+> A one-port WiFi DMX node is around 10 EUR of parts off AliExpress, plus the PCB. Ethernet and the
+> display add another 6 to 11.
+>
+> It's built, it's the board on my bench, and most of the firmware testing happens on it. One
+> honest limitation: the DMX ports are **not galvanically isolated** (plain MAX3485 modules, TVS
+> diodes on the lines). Fine for a desk or a small rig. If you need isolation, the breadboard build
+> with the Waveshare module has it.
+>
+> [<img src="hardware-carrier/production/render/iso.png" width="480" alt="LuxDMX carrier board with ESP32-S3, RS-485, W5500 and OLED modules">](hardware-carrier/README.md)
+>
+> **→ Gerbers, BOM with LCSC numbers, assembly guide and the current math: [`hardware-carrier/`](hardware-carrier/README.md)**
+
+### Carrier: what plugs in
+
+| Module | Search for | Watch out |
+|---|---|---|
+| ESP32-S3 dev board | `ESP32-S3-DevKitC-1 N16R8` | Get the N16R8 (16 MB flash, 8 MB octal PSRAM), that's what the carrier build expects. The socket rows are **25.4 mm** apart, one pitch wider than Espressif's own DevKitC-1 (22.86 mm), which is what the common dual USB-C clones have. Hold the seller's photo against a 1:1 print of the footprint before you buy |
+| RS-485, one per DMX port | `MAX3485 TTL to RS485 module 3.3V` | The bench board runs the RAKSTORE one, silk `RS485 V2.01`. Needs the **EN pin**, without it there is no RDM. Most carry 120 Ω and bias already, see the terminator below |
+| Ethernet (optional) | `USR-ES1 W5500` | Two rows of 6 pins. The W5500 boards with 8 pins in one row are a different module |
+| Display (optional) | `1.3 inch OLED I2C SH1106` | Sits on a 1x4 female socket. These ship with VCC and GND in either order, check its own silk |
+
+### Carrier: optional parts
+
+Only the ESP32 module is mandatory. A two-port DMX node without pixels leaves more than half the
+board empty. The small parts all sit on the back under the modules, so solder those first, then the
+headers.
+
+| Part | Fit it when |
+|---|---|
+| **DMX, per port** | |
+| MAX3485 module + 3-pin header (or a 2.54 mm screw terminal) | you use that port |
+| 10k on DE/RE | you use that port. Keeps the driver off the bus while the ESP boots |
+| 120 Ω terminator | that port is at the **end** of the bus, and the module doesn't already have one (a second one puts 60 Ω on the bus) |
+| 2 × 330 Ω fail-safe bias | the port drives its bus, which it normally does. Once per bus, so leave it out if the module already biases the line |
+| 2 × TVS diode (SMF12CA or SMAJ12CA) | the port leaves the enclosure |
+| **Pixels** | |
+| 74HCT541 buffer (SO-20 wide) | at least one pixel port is used. **HCT**, not HC: the HC parts don't switch reliably on 3.3 V. And not the `PW` (TSSOP) version LCSC stocks most of, it won't land |
+| 330 Ω series resistor, per port | you use that pixel port. Damps the ringing on the strip wire |
+| 3-pole screw terminal, per port | you use that pixel port |
+| 1000 µF 35 V, `12-24V IN` terminal, fuse | any pixel port is used, see power below |
+| **Network and UI** | |
+| W5500 module + 2 × 10k pull-ups + 100 nF / 1 µF / 22 µF | you want wired Ethernet |
+| 1.3" OLED | you want the display |
+| EC11 rotary encoder (the part inside a KY-040, no pull-ups needed) | you want the on-unit menu |
+| 2 × 6x6 mm tact switch | you want the buttons (IO3 and IO46). Plunger length is up to you, 30 mm reaches the same front panel as the encoder shaft |
+| **Supply and misc** | |
+| MP1584EN buck module | you power the logic from the 12/24 V pixel supply |
+| `5V IN` header | 5 V comes from outside instead of USB |
+| 100 nF + 22 µF on 3.3 V | recommended |
+| `EXP` header | spare pins: 3.3 V, GND, the UART0 pins and IO47/48 (pixel 4 and 5, unbuffered) |
+
+Part numbers, LCSC codes and what each one does: [`hardware-carrier/README.md`](hardware-carrier/README.md#all-parts).
+
+### Carrier: power
+
+Two rails. The **logic** (ESP32, RS-485 modules, W5500, display) runs on 5 V and pulls about
+270 mA fully loaded, so any decent USB port does it. The **pixel rail** is a fused pass-through from
+the `12-24V IN` terminal to the five pixel terminals and doesn't touch the logic at all unless you fit
+the buck.
+
+| Setup | Logic from | Pixel rail |
+|---|---|---|
+| DMX only, on the desk | USB-C on the ESP module. Nothing else to fit | not used |
+| DMX only, in a box | 5 V into the `5V IN` header | not used |
+| Pixels | USB or `5V IN`, as above | 12/24 V into `12-24V IN` |
+| Pixels, one cable | the buck module, making 5 V from the pixel supply | 12/24 V into `12-24V IN` |
+
+**One 5 V source at a time.** USB, `5V IN` and the buck share one rail with no diodes between them.
+With the buck fitted, don't plug in USB while the 12/24 V is on, the two will fight.
+
+**Set the buck to 5.0 V before you solder it in.** They arrive with the trimmer anywhere, and 12 V on
+the logic rail takes out the ESP32, the W5500 and the display in one go. The MP1584EN tops out at
+28 V input, so a 24 V supply that idles higher than that is a problem.
+
+**The fuse, pick exactly one:**
+
+- a **Bourns MF-R polyfuse**, 30 V (the MF-R500 is 5 A hold). Resets itself once it cools down.
+  The MF-RHT and MF-RG are 16 V parts, no good on 24 V
+- a **mini blade fuse holder** (Keystone 3568, ATM fuses) if you'd rather swap a fuse than wait
+- the **solder bridge** on the back, when the supply lead already has a fuse in it
+
+Never the polyfuse and the bridge together, a bridged fuse is no fuse.
+
+**How much current.** The pixel rail is 4.8 mm tracks on standard 1 oz copper: 7.2 A if you want the
+board to stay hand-warm, 9.8 A if it may run 20 K warmer. That's about 2 A per port with all five in use,
+and a 5 m WS2815 run draws about 5 A at full white, so two of those. Beyond that, inject power at the
+strip instead of pulling it through the board. 5 V strip works too (the rail doesn't care about
+voltage), but it needs roughly 3.5 times the current of 12 V strip for the same pixels, and the limit
+here is amps. That's why the firmware defaults the carrier to WS2815.
+
+Rails, fuse options, the buck and the full current table: [`hardware-carrier/README.md`](hardware-carrier/README.md#power).
+
+### Carrier: firmware
+
+1. Flash **ESP32-S3 + PSRAM** from the [web flasher](https://tombueng.github.io/LuxDMX/), over USB, on
+   the USB-UART port. This first one has to be USB: the PSRAM is set up by the bootloader and an OTA
+   update can't switch it on. Everything after that can go over the air.
+2. It comes up as the `LuxDMX-setup` access point. Join it and put the box on your WiFi.
+3. In `/config`, pick the **LuxDMX Carrier** board and apply. That fills in the pins the copper
+   decides: three DMX ports, W5500, display, encoder and the five pixel ports. Only DMX 1 is switched
+   on, a fresh board doesn't have modules on 2 and 3 yet. The two buttons don't come along yet, so set
+   **Button 1 pin** to 3 and **Button 2 pin** to 46 by hand.
+4. W5500 fitted? Set **Wired Ethernet PHY** to **W5500**, then turn on **Use wired Ethernet instead of WiFi**.
+
+The status LED starts off on purpose: the module's own RGB LED sits on IO48, which is pixel port 5. Not
+using port 5? Set the status LED back to GPIO48, WS2812, and it's back.
+
+Building from source, `pio run -e luxdmx_carrier` gives you an image that boots straight into the
+carrier pin map.
+
+---
+
+### Breadboard build (no PCB)
+
+No board to order: an ESP32 DevKit, one RS-485 module and four jumper wires make a working
+one-universe node. It's also the isolated option, the Waveshare module below has 2.5 kV galvanic
+isolation, which the carrier's MAX3485 modules don't.
 
 ### Bill of Materials — WiFi build (ESP32 / ESP32-S3)
 
@@ -274,6 +437,16 @@ The ESP32 DevKit is powered via its **Micro-USB port**. Any 5V USB power supply 
 - **Do not connect DE/RE** — the Waveshare (C) handles direction automatically. Connecting them will break transmission.
 - **Keep TTL wires short** (< 20 cm). Long unshielded wires on the TTL side pick up noise; the RS485 side handles long distances natively.
 - **XLR gender:** Use a **female** XLR panel socket for the DMX output. DMX sources (transmitters) use female XLR; receivers use male XLR. LuxDMX is a source.
+
+---
+
+### The v6 board (designed, never built)
+
+There's also a full custom board, LuxDMX v6: ESP32-S3 with W5500 Ethernet, two galvanically
+isolated DMX outputs with DMX512-A fault protection ([E1.11 notes](hardware/E1.11_COMPLIANCE.md)),
+PoE or USB-C, a 5-LED status panel, 4 layers. It's designed and passes its own checks, but it has
+never been fabricated, a proper fab run got too expensive for now. So read it as a reference design,
+not something to order a batch of. Design, BOM and fab notes are in [`hardware/`](hardware/README.md).
 
 ---
 
