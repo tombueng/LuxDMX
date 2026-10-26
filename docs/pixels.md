@@ -304,8 +304,10 @@ Arduino Board     : Espressif ESP32-S3-DevKitC-1-N8 (8 MB QD, No PSRAM)
 With that, `CONFIG_SPIRAM=y`, `memory_type = qio_opi` and even an explicit `-DBOARD_HAS_PSRAM`
 are all inert: PSRAM never registers with the heap allocator, `heap_caps_get_total_size(
 MALLOC_CAP_SPIRAM)` stays 0, and everything that says "prefer PSRAM" silently lands in internal
-RAM. The env now uses `esp32-s3-devkitc1-n16r8`, which brings 16 MB flash, `qio_opi` and
-`BOARD_HAS_PSRAM` with it.
+RAM. The env now uses `esp32-s3-devkitc1-n16r8`, which brings `qio_opi` and `BOARD_HAS_PSRAM`
+with it. Its 16 MB flash size is overridden to 8 MB: that number goes into the bootloader
+header, and IDF won't start on a chip smaller than the header says, so a 16 MB image boot-loops
+on an N8R8. 8 MB runs on both; the partition table only uses 4 MB anyway.
 
 Measured on an N16R8 with a 1000-pixel port and the full 64-device RDM table:
 
