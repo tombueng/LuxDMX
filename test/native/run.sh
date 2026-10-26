@@ -36,3 +36,8 @@ build/pixtest
 # Which saved WiFi network gets joined, and the form's reorder (src/wifi_pick.h, issue #120).
 g++ -std=c++17 -O1 -Wall -Wextra -I src test/native/wifi_pick_test.cpp -o build/wifitest
 build/wifitest
+
+# The DMX/RDM RMT encoder (src/dmx_rmt_enc.h, issue #135): pulled the way the IDF driver does it,
+# the symbols and the line levels have to be exactly the old whole-frame encoder's.
+g++ -std=c++17 -O1 -Wall -Wextra -I src test/native/dmx_enc_test.cpp -o build/dmxenctest
+build/dmxenctest

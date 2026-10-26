@@ -2,87 +2,53 @@
 //
 // Why: esp_dmx clocks DMX with the UART + a GPTimer ISR for the break/MAB. Under heavy
 // core-0 network DMA the timer ISR can be delayed and a frame's break comes out malformed
-// (framing errors). The RMT peripheral instead clocks a precomputed (level,duration)
-// symbol stream out ENTIRELY IN HARDWARE -- the CPU only fills a buffer, the timing is the
-// RMT's own clock. The IDF RMT driver's ISR refills the 64-word channel memory from our
-// symbol array as it drains; if that refill is ever late the RMT just idles the line (a
-// benign extra mark) instead of corrupting a break. So RMT DMX is far more contention-proof.
+// (framing errors). The RMT peripheral instead clocks a (level,duration) symbol stream out
+// ENTIRELY IN HARDWARE -- the timing is the RMT's own clock. The IDF RMT driver's ISR refills
+// the channel memory as it drains, asking our encoder (dmx_rmt_enc.h) for the next symbols; if
+// that refill is ever late the RMT just idles the line (a benign extra mark) instead of
+// corrupting a break. So RMT DMX is far more contention-proof.
 //
 // Resolution 1 MHz => 1 tick = 1 us. A DMX bit is 4 us = exactly 4 ticks (hardware-exact,
 // no jitter). Break = 176 us, MAB = 12 us. Line idles HIGH (DMX mark) between frames.
 #pragma once
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
+#include "dmx_rmt_enc.h"
 
 #define RMT_DMX_RES_HZ   1000000u   // 1 tick = 1 us
-#define RMT_DMX_BIT      4          // 4 us per bit @250 kbaud
-#define RMT_DMX_BREAK    176        // break low, us
-#define RMT_DMX_MAB      12         // mark-after-break high, us
-// Worst-case symbols: break/MAB (1 word) + 513 slots * up to 11 runs (alternating bits)
-// = ~5644 runs -> ~2822 words. Round up for safety.
-#define RMT_DMX_MAX_SYM  3000
+#define RMT_DMX_SLOTS    513        // start code + 512; also the longest RDM packet fits
 
 struct RmtDmx {
-    rmt_channel_handle_t chan = nullptr;
-    rmt_encoder_handle_t enc  = nullptr;
-    rmt_symbol_word_t*   sym  = nullptr;   // symbol buffer (DRAM)
-    int                  nsym = 0;
+    rmt_channel_handle_t chan  = nullptr;
+    rmt_encoder_handle_t enc   = nullptr;
+    uint8_t*             frame = nullptr;   // the bytes going out right now (DRAM)
+    DmxEncPos            at    = {0, 0};    // where the encoder is in the frame
 };
 
-// --- per-byte symbol lookup table -----------------------------------------------------------
-// A UART byte is start(0) + 8 data(LSB) + stop(1,1). Run-length-encoded it ALWAYS starts with a
-// level-0 run and ends with a level-1 run, so it has an EVEN number of runs = an integer number
-// of rmt_symbol_word_t (2 runs each) -- independent of the neighbouring bytes. So we precompute
-// each byte value's words once and just memcpy them per slot at encode time (no per-bit loop).
-#define RMT_MAX_WORDS_PER_BYTE 6
-static rmt_symbol_word_t g_byteLut[256][RMT_MAX_WORDS_PER_BYTE];
-static uint8_t           g_byteLutN[256];
-static rmt_symbol_word_t g_breakWord;   // break(0,176us) + MAB(1,12us) packed in one word
-static bool              g_lutReady = false;
-
-static void rmtDmxBuildLut() {
-    g_breakWord.duration0 = RMT_DMX_BREAK; g_breakWord.level0 = 0;
-    g_breakWord.duration1 = RMT_DMX_MAB;   g_breakWord.level1 = 1;
-    for (int v = 0; v < 256; v++) {
-        uint8_t bits[11]; int nb = 0;
-        bits[nb++] = 0;                                  // start bit
-        for (int i = 0; i < 8; i++) bits[nb++] = (v >> i) & 1;   // 8 data, LSB first
-        bits[nb++] = 1; bits[nb++] = 1;                  // 2 stop bits
-        struct { uint8_t lvl; uint16_t dur; } run[11]; int nr = 0;
-        for (int i = 0; i < nb; i++) {
-            if (nr && run[nr-1].lvl == bits[i]) run[nr-1].dur += RMT_DMX_BIT;
-            else { run[nr].lvl = bits[i]; run[nr].dur = RMT_DMX_BIT; nr++; }
-        }
-        int nw = 0;                                      // nr is even -> whole words
-        for (int i = 0; i + 1 < nr; i += 2) {
-            g_byteLut[v][nw].duration0 = run[i].dur;   g_byteLut[v][nw].level0 = run[i].lvl;
-            g_byteLut[v][nw].duration1 = run[i+1].dur; g_byteLut[v][nw].level1 = run[i+1].lvl;
-            nw++;
-        }
-        g_byteLutN[v] = (uint8_t)nw;
-    }
-    g_lutReady = true;
+// The RMT driver's encoder callback (IRAM, it runs in the refill interrupt). `data` is rd->frame.
+static IRAM_ATTR size_t rmtDmxEncCb(const void* data, size_t n, size_t written, size_t room,
+                                    rmt_symbol_word_t* out, bool* done, void* arg) {
+    return dmxEncStep((const uint8_t*)data, n, written, room, out, done, &((RmtDmx*)arg)->at);
 }
 
-// Build one DMX frame into rd->sym: break/MAB word + each slot's precomputed words.
-static int rmtDmxEncode(RmtDmx* rd, const uint8_t* data, int nslots) {
-    if (!g_lutReady) rmtDmxBuildLut();
-    int wi = 0;
-    rd->sym[wi++] = g_breakWord;
-    for (int s = 0; s < nslots; s++) {
-        uint8_t b = data[s]; uint8_t n = g_byteLutN[b];
-        if (wi + n >= RMT_DMX_MAX_SYM) break;
-        for (uint8_t k = 0; k < n; k++) rd->sym[wi++] = g_byteLut[b][k];
-    }
-    rd->nsym = wi;
-    return wi;
+// Copy the frame into rd->frame and start sending it. The RMT reads rd->frame until the frame is
+// out, which is why the caller's buffer is copied: the DMX task reuses its staging buffer for the
+// next output straight away.
+static void rmtDmxStart(RmtDmx* rd, const uint8_t* data, int nslots) {
+    if (nslots > RMT_DMX_SLOTS) nslots = RMT_DMX_SLOTS;
+    if (nslots < 1) return;
+    memcpy(rd->frame, data, nslots);
+    rmt_transmit_config_t tc = {};
+    tc.loop_count      = 0;               // one-shot
+    tc.flags.eot_level = 1;               // idle HIGH (DMX mark) between frames
+    rmt_transmit(rd->chan, rd->enc, rd->frame, nslots, &tc);
 }
 
 static bool rmtDmxInit(RmtDmx* rd, int gpio) {
-    if (!rd->sym)   // keep the buffer across a deinit/re-init (dynamic RMT<->UART RDM switch)
-        rd->sym = (rmt_symbol_word_t*)heap_caps_malloc(sizeof(rmt_symbol_word_t) * RMT_DMX_MAX_SYM,
-                                                       MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
-    if (!rd->sym) return false;
+    if (!g_lutReady) rmtDmxBuildLut();   // before any transmit: the encoder only reads the table
+    if (!rd->frame)  // keep the buffer across a re-init
+        rd->frame = (uint8_t*)heap_caps_malloc(RMT_DMX_SLOTS, MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
+    if (!rd->frame) return false;
     rmt_tx_channel_config_t txc = {};
     txc.gpio_num          = (gpio_num_t)gpio;
     txc.clk_src           = RMT_CLK_SRC_DEFAULT;
@@ -116,30 +82,26 @@ static bool rmtDmxInit(RmtDmx* rd, int gpio) {
     txc.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
     if (rmt_new_tx_channel(&txc, &rd->chan) != ESP_OK) return false;
 #endif
-    rmt_copy_encoder_config_t cec = {};
-    if (rmt_new_copy_encoder(&cec, &rd->enc) != ESP_OK) return false;
+    rmt_simple_encoder_config_t sec = {};
+    sec.callback       = rmtDmxEncCb;
+    sec.arg            = rd;
+    sec.min_chunk_size = RMT_MAX_WORDS_PER_BYTE;   // only sizes the driver's overflow buffer, which dmxEncStep never needs
+    if (rmt_new_simple_encoder(&sec, &rd->enc) != ESP_OK) return false;
     if (rmt_enable(rd->chan) != ESP_OK) return false;
     // Prime the channel with one throwaway all-zero frame so the DMX task's first real
     // transmit doesn't log a spurious "flush timeout" on a never-yet-transmitted channel.
-    static const uint8_t priming[513] = {0};
-    rmtDmxEncode(rd, priming, 513);
-    rmt_transmit_config_t tc = {};
-    tc.loop_count = 0; tc.flags.eot_level = 1;
-    rmt_transmit(rd->chan, rd->enc, rd->sym, rd->nsym * sizeof(rmt_symbol_word_t), &tc);
+    static const uint8_t priming[RMT_DMX_SLOTS] = {0};
+    rmtDmxStart(rd, priming, RMT_DMX_SLOTS);
     rmt_tx_wait_all_done(rd->chan, 200);   // absorb first-frame latency; result intentionally ignored
     return true;
 }
 
-// Encode this frame and KICK the transmission (async — the RMT driver streams it out in the
-// background from rd->sym). Returns immediately, so multiple channels can be started back-to-back
-// and then all run CONCURRENTLY. rd->sym must stay valid until rmtDmxWait() returns.
+// KICK this frame's transmission (async — the RMT driver streams it out in the background,
+// encoding as it goes). Returns immediately, so multiple channels can be started back-to-back
+// and then all run CONCURRENTLY.
 static void rmtDmxKick(RmtDmx* rd, const uint8_t* data, int nslots) {
     if (!rd->chan) return;
-    rmtDmxEncode(rd, data, nslots);
-    rmt_transmit_config_t tc = {};
-    tc.loop_count      = 0;               // one-shot
-    tc.flags.eot_level = 1;               // idle HIGH (DMX mark) between frames
-    rmt_transmit(rd->chan, rd->enc, rd->sym, rd->nsym * sizeof(rmt_symbol_word_t), &tc);
+    rmtDmxStart(rd, data, nslots);
 }
 // Block until this channel's frame is fully out (~23 ms + margin).
 static void rmtDmxWait(RmtDmx* rd) {
@@ -149,8 +111,8 @@ static void rmtDmxWait(RmtDmx* rd) {
 // Non-blocking "is the previous frame fully clocked out?". The transmit task uses this instead of
 // blocking, so two outputs running at DIFFERENT rates (issue #93) never delay each other: waiting
 // ~23 ms for port A would push port B's due time and hand it exactly the timing jitter we are trying
-// to remove. Must be checked before every kick, because rmtDmxEncode rewrites rd->sym in place and
-// the RMT is still streaming out of that buffer until it reports done.
+// to remove. Must be checked before every kick, because a kick rewrites rd->frame in place and
+// the RMT is still encoding out of that buffer until it reports done.
 static bool rmtDmxIdle(RmtDmx* rd) {
     if (!rd->chan) return false;
     return rmt_tx_wait_all_done(rd->chan, 0) == ESP_OK;
