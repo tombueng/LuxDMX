@@ -74,8 +74,8 @@ RULES = {
     "1000uF 35V": ("Pixel", "pixel ports are used",
                    "Buffers the current steps of the strips. 13 mm can, 5.00 mm pitch."),
     "12-24V IN 24A": ("Pixel", "pixel ports are used",
-                      "The actual power inlet. **Either** this terminal **or** the DC "
-                      "jack, never both."),
+                      "The inlet for the pixel rail. Fit the screw terminal, or solder "
+                      "the wire flat onto the pad."),
     "DC jack, alternativ zu Schraubklemme": (
         "Pixel", "pixel ports are used **and** you want a plug-in supply",
         "Rated 3.5 A. Above about 3 A use the screw terminal."),
@@ -139,8 +139,6 @@ is no reverse or ORing protection on the board.
 
 **Set the buck before soldering it in.** These modules have a trimmer and arrive in any
 position. At 12 V out the ESP32, the W5500 and the display all go at once.
-
-**Screw terminal or DC jack, not both.** They sit on the same nets.
 
 **120 R only at the end of the bus.** And check the RS-485 module first, the cheap ones
 usually carry 120 R and bias already. A second one puts 60 R on the bus.
@@ -225,7 +223,7 @@ def main():
         groups.setdefault(g, []).append((ref, val, side, cond, note))
 
     L = ["# Assembly", "",
-         "How many of the 46 positions you actually solder depends on what you are building.",
+         f"How many of the {len(rows)} positions you actually solder depends on what you are building.",
          "Almost nothing here is mandatory.", "",
          "## Answer these first", "",
          "1. Where does power come from: **USB**, **external 5 V**, or **12/24 V via buck**?",
