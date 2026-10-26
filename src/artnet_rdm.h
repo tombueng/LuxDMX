@@ -103,8 +103,8 @@ struct ArtRdmResp {
     uint8_t  data[600];
 };
 enum { ARTREQ_TOD = 0, ARTREQ_FLUSH = 1, ARTREQ_RDM = 2 };
-static QueueHandle_t g_artReqQ  = nullptr;   // depth 8
-static QueueHandle_t g_artRespQ = nullptr;   // depth 6
+static QueueHandle_t g_artReqQ  = nullptr;   // depth follows the RDM device cap, see artRdmInit()
+static QueueHandle_t g_artRespQ = nullptr;
 
 // ---- TOD subscribers (core 1 only): IPs that asked for the TOD, pushed on change ----
 static constexpr int ART_MAX_SUBS = 8;
@@ -1005,10 +1005,16 @@ static void artRdmInit() {
     g_bqPolicy = prefs.getUChar("bqpolicy", 4);   // restore BackgroundQueuePolicy (4 = disabled)
     prefs.end();
     // Deep enough to hold a whole-universe burst: a console that fires a GET at every device it just
-    // discovered (64/universe) must not have requests silently dropped while the bus drains them one
-    // per DMX frame. Dropped requests show up in the console as devices that "lost contact".
-    if (!g_artReqQ)  g_artReqQ  = xQueueCreate(48, sizeof(ArtRdmReq));
-    if (!g_artRespQ) g_artRespQ = xQueueCreate(12, sizeof(ArtRdmResp));
+    // discovered must not have requests silently dropped while the bus drains them one per DMX
+    // frame. Dropped requests show up in the console as devices that "lost contact".
+    // That burst is as big as the device table (g_rdmMaxDev, set in loadConfig), so the queues are
+    // sized to it: 48/12 on an S3 as before, 16/4 on a classic ESP32 with its 16-device table, 4/4
+    // with no RDM-capable output. At a fixed 48/12 they held ~20 KB, which a classic chip on WiFi
+    // doesn't have to spare (issue #135).
+    const int reqDepth  = g_rdmMaxDev < 4 ? 4 : (g_rdmMaxDev > 48 ? 48 : g_rdmMaxDev);
+    const int respDepth = reqDepth / 4 < 4 ? 4 : (reqDepth / 4 > 12 ? 12 : reqDepth / 4);
+    if (!g_artReqQ)  g_artReqQ  = xQueueCreate(reqDepth, sizeof(ArtRdmReq));
+    if (!g_artRespQ) g_artRespQ = xQueueCreate(respDepth, sizeof(ArtRdmResp));
     // Raw UDP socket on 0.0.0.0:6454 with SO_BROADCAST so a limited-broadcast ArtPoll
     // (255.255.255.255, used by DMX-Workshop/OLA) is received, not just subnet-directed.
     // Non-blocking: netRxTask polls it. Single-owner (core 0), so no locking needed.

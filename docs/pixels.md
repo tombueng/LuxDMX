@@ -245,6 +245,13 @@ thing on the box (~66 KB: the driver, its tasks and its buffers); each further o
 about 13 KB. And the parallel backend is *cheaper* than several RMT lanes, because the
 expanded frame is shared.
 
+> These numbers predate the #135 WiFi fix. A DMX output used to keep its whole frame
+> pre-encoded as RMT symbols, 12 KB each; now the encoder builds them while the frame goes out
+> and an output keeps only its 513 slot bytes. So every DMX row above is about 11 KB per output
+> better than shown, and the limit below is further away. Not re-measured on the carrier yet.
+> Measured on a WT32-ETH01 on WiFi with two outputs: 18 KB free before, 68 KB after (that also
+> counts the smaller Art-Net RDM queues and the version check no longer parking its stack).
+
 It also marks a real limit: three DMX outputs plus two RMT pixel ports on a build **without**
 PSRAM drops the largest free block below the ~12 KB that `sendJsonSafe` needs, at which point
 every status endpoint answers `503 {"busy":1}` and `/config` is too heavy to serve — the box

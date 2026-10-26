@@ -553,6 +553,8 @@ pio run --target upload
 
   Use `http://`, not `https://` — a TLS handshake wants ~50 KB of *contiguous* heap, which is usually the exact thing you have run out of. Plain HTTP streams straight into flash and needs almost none.
 
+  **Classic ESP32 on WiFi, v1.0.277 and older:** don't push the `.bin` over the upload form, that alone could run the board out of RAM and knock it off the network until a power cycle. Use **Install from a URL** or **Update from LuxDMX.org**, both install right after a reboot. From the fix on (issue #135) a classic board on WiFi keeps about 65 KB free instead of ~15 KB and the upload works again.
+
 > When you install from LuxDMX.org, the device reboots into a dedicated update mode and pulls the new firmware there, then reboots again into it. This is deliberate: the HTTPS download needs a large block of free RAM that the fully running gateway (DMX, RDM, Art-Net, web UI) no longer leaves free, so it does the download early at boot when the RAM is untouched. The device is offline for about a minute during the install; the progress page waits for it to come back. The local `.bin` upload doesn't need this and flashes directly.
 
 | Downloading update | Back online |

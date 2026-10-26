@@ -3867,29 +3867,41 @@ static void scheduleOtaReboot(const String& target) {
     pendingRebootAt = millis() + 1200;   // let the progress page load + the response flush first
 }
 
+// One check per task. The HTTP client wants a 12 KB stack, and a task that slept between checks
+// kept it the whole time: on a classic ESP32 with WiFi that was a quarter of the heap the web UI
+// had left, parked for a job that runs four times a day (issue #135). loop() starts this when
+// it's due (verChkDue) and the task deletes itself when it's done.
+static volatile bool g_verChkBusy = false;
+static uint32_t      g_verChkAt   = 0;   // millis() of the next check, set in setup()
 static void versionCheckTask(void*) {
-    vTaskDelay(pdMS_TO_TICKS(8000));
-    for (;;) {
-        checkForUpdate();
-        if (cfg.autoUpdate && updateAvailable) {
-            // Can't install in place (fragmented heap -> no room for TLS), so schedule a
-            // clean-heap update on reboot -- but only within a small retry budget so a
-            // download that keeps failing can't become a reboot loop. loop() clears the
-            // budget once the device has stayed up a while (a real loop never gets there).
-            prefs.begin(PREF_NS, true);
-            uint8_t tries = prefs.getUChar("otatries", 0);
-            prefs.end();
-            if (tries < OTA_BOOT_TRIES) {
-                Serial.println("[OTA] auto-update available, scheduling clean-heap update on reboot");
-                scheduleOtaReboot("latest");
-            } else {
-                Serial.println("[OTA] auto-update available but retry budget spent; will retry later");
-            }
+    checkForUpdate();
+    if (cfg.autoUpdate && updateAvailable) {
+        // Can't install in place (fragmented heap -> no room for TLS), so schedule a
+        // clean-heap update on reboot -- but only within a small retry budget so a
+        // download that keeps failing can't become a reboot loop. loop() clears the
+        // budget once the device has stayed up a while (a real loop never gets there).
+        prefs.begin(PREF_NS, true);
+        uint8_t tries = prefs.getUChar("otatries", 0);
+        prefs.end();
+        if (tries < OTA_BOOT_TRIES) {
+            Serial.println("[OTA] auto-update available, scheduling clean-heap update on reboot");
+            scheduleOtaReboot("latest");
+        } else {
+            Serial.println("[OTA] auto-update available but retry budget spent; will retry later");
         }
-        // Re-check every 6 h. Counted in ticks: pdMS_TO_TICKS() multiplies in 32-bit TickType_t,
-        // and 21.6e6 ms x 1000 Hz overflowed to ~125 s, so this ran every two minutes, each run
-        // holding a socket and heap and sometimes blocking 10 s in a failed write (issue #135).
-        vTaskDelay((TickType_t)6 * 3600 * configTICK_RATE_HZ);
+    }
+    g_verChkBusy = false;
+    vTaskDelete(nullptr);
+}
+// Every 6 h. If there's no room for the task right now, try again in 10 minutes.
+static void verChkDue(uint32_t now) {
+    if (g_verChkBusy || (int32_t)(now - g_verChkAt) < 0) return;
+    g_verChkBusy = true;
+    if (xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr) == pdPASS) {
+        g_verChkAt = now + 6UL * 3600UL * 1000UL;
+    } else {
+        g_verChkBusy = false;
+        g_verChkAt = now + 10UL * 60UL * 1000UL;
     }
 }
 
@@ -5654,7 +5666,7 @@ void setup() {
     xTaskCreatePinnedToCore(ledTask, "led", 2048, nullptr, 1, nullptr, ARDUINO_RUNNING_CORE);
     if (dispReady) xTaskCreate(displayTask, "disp", 4096, nullptr, 1, nullptr);
     initControls();   // optional on-unit rotary encoder + buttons -> display menu (issue #24); no-op unless wired
-    xTaskCreate(versionCheckTask, "ver_chk", 12288, nullptr, 1, nullptr);
+    g_verChkAt = millis() + 8000;   // first version check 8 s from now; loop() starts it (verChkDue)
     // issue #64 core separation: DMX transmit on core 1, Art-Net/sACN receive on core 0.
     // dmxTxTask: high priority (19, above loop()=1), pinned core 1, strict 40 Hz cadence,
     //   sole owner of the DMX ports; self-gates on dmxReady so it is safe to start early.
@@ -5795,6 +5807,8 @@ void loop() {
         ws.cleanupClients(4);   // cap clients; drop oldest beyond 4
         lastWsClean = now;
     }
+
+    verChkDue(now);   // the version check, every 6 h on a task of its own
 
     // Once the device has run stably for a minute, clear the OTA retry budget so the next
     // update starts fresh. A device stuck reboot-looping on a failing update would never

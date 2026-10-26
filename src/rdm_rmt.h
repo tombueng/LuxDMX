@@ -179,9 +179,7 @@ static void rdmTx(const uint8_t* pkt, int len) {
     g_rdmSentMs = millis();                   // stamp the TX for the 5-LED yellow activity blink
     uart_flush_input(g_rdmUart);              // drop anything stale before we listen
     rdmDe(1);                                    // drive
-    rmtDmxEncode(rd, pkt, len);                  // break + MAB + packet bytes
-    rmt_transmit_config_t tc = {}; tc.loop_count = 0; tc.flags.eot_level = 1;
-    rmt_transmit(rd->chan, rd->enc, rd->sym, rd->nsym * sizeof(rmt_symbol_word_t), &tc);
+    rmtDmxStart(rd, pkt, len);                   // break + MAB + packet bytes
     rmt_tx_wait_all_done(rd->chan, 60);          // wait until the last bit has left
     rdmDe(0);                                    // turnaround: stop driving, enable the receiver
     esp_rom_delay_us(90);                        // let our own echoed frame finish arriving
