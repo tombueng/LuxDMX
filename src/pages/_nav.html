@@ -13,11 +13,13 @@ html { scrollbar-gutter: stable; }
 .site-nav .brand img { height:64px; border-radius:14px; }
 .site-nav .brand-text .name { font-size:1.4rem; font-weight:700; color:#fff; line-height:1; }
 .site-nav .brand-text .sub  { font-size:.68rem; color:#8b949e; margin-top:2px; }
-/* fixed-width columns so a changing value never reflows / jumps the whole bar */
+/* Every stat has a minimum width, so a value gaining or losing a digit doesn't reflow the bar.
+   A minimum, not a fixed width: a value longer than its column (three outputs' fps, a 10 h
+   uptime) widens the column instead of running into the next one. */
 .site-nav .nav-stats { margin-left:auto; display:flex; gap:.85rem; align-items:center; flex-wrap:wrap; }
-.site-nav .nav-stat  { display:flex; flex-direction:column; line-height:1.05; align-items:flex-start; }
+.site-nav .nav-stat  { display:flex; flex-direction:column; line-height:1.05; align-items:flex-start; flex:none; }
 .site-nav .nav-stat .ns-label { font-size:.55rem; text-transform:uppercase; letter-spacing:.07em; color:#8b949e; white-space:nowrap; }
-.site-nav .nav-stat .ns-val   { font-size:.95rem; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; }
+.site-nav .nav-stat .ns-val   { font-size:.95rem; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .site-nav .nav-links { display:flex; gap:.4rem; }
 /* smooth cross-page navigation: keep the bar steady, quick crossfade of the body */
 @view-transition { navigation: auto; }
@@ -30,19 +32,19 @@ html { scrollbar-gutter: stable; }
     <div class="brand-text"><div class="name">LuxDMX</div><div class="sub" id="nav-sub">&nbsp;</div></div>
   </a>
   <div class="nav-stats">
-    <div class="nav-stat" style="width:5.5rem"><span class="ns-label">DMX FPS</span><span class="ns-val" id="fps">&middot;</span></div>
-    <div class="nav-stat" style="width:5.5rem"><span class="ns-label">In FPS</span><span class="ns-val" id="infps">&middot;</span></div>
-    <div class="nav-stat" style="width:4.5rem"><span class="ns-label">Style</span><span class="ns-val" id="txstyle">&middot;</span></div>
-    <div class="nav-stat" style="width:4rem"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">&middot;</span></div>
-    <div class="nav-stat" style="width:3.8rem"><span class="ns-label">Heap</span><span class="ns-val" id="heap">&middot;</span></div>
-    <div class="nav-stat" style="width:5rem"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime">&middot;</span></div>
-    <div class="nav-stat" style="width:3rem"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">&middot;</span></div>
-    <div class="nav-stat" style="width:4.2rem" id="ns-pixma" hidden><span class="ns-label">Pixels</span><span class="ns-val" id="pixma">&middot;</span></div>
-    <div class="nav-stat" style="width:4rem" id="ns-pixfps" hidden><span class="ns-label">Pix FPS</span><span class="ns-val" id="pixfps">&middot;</span></div>
-    <div class="nav-stat" style="width:4.4rem" id="ns-pixuni" hidden><span class="ns-label">Universes</span><span class="ns-val" id="pixuni">&middot;</span></div>
-    <div class="nav-stat" style="width:2.6rem"><span class="ns-label">Fixtures</span><span class="ns-val" id="nfix">&middot;</span></div>
-    <div class="nav-stat" style="width:4rem"><span class="ns-label">RDM tx</span><span class="ns-val" id="rdm-tx">&middot;</span></div>
-    <div class="nav-stat" style="width:4rem"><span class="ns-label">RDM rx</span><span class="ns-val" id="rdm-rx">&middot;</span></div>
+    <div class="nav-stat" style="min-width:5.5rem" id="ns-fps"><span class="ns-label">DMX FPS</span><span class="ns-val" id="fps">&middot;</span></div>
+    <div class="nav-stat" style="min-width:5.5rem" id="ns-infps"><span class="ns-label">In FPS</span><span class="ns-val" id="infps">&middot;</span></div>
+    <div class="nav-stat" style="min-width:4.5rem" id="ns-style"><span class="ns-label">Style</span><span class="ns-val" id="txstyle">&middot;</span></div>
+    <div class="nav-stat" style="min-width:4rem"><span class="ns-label" id="net-label">WiFi</span><span class="ns-val" id="rssi">&middot;</span></div>
+    <div class="nav-stat" style="min-width:3.8rem"><span class="ns-label">Heap</span><span class="ns-val" id="heap">&middot;</span></div>
+    <div class="nav-stat" style="min-width:5rem"><span class="ns-label">Uptime</span><span class="ns-val" id="uptime" style="min-width:11ch">&middot;</span></div>
+    <div class="nav-stat" style="min-width:3rem"><span class="ns-label">Jitter</span><span class="ns-val" id="jitter">&middot;</span></div>
+    <div class="nav-stat" style="min-width:4.2rem" id="ns-pixma" hidden><span class="ns-label">Pixels</span><span class="ns-val" id="pixma">&middot;</span></div>
+    <div class="nav-stat" style="min-width:4rem" id="ns-pixfps" hidden><span class="ns-label">Pix FPS</span><span class="ns-val" id="pixfps">&middot;</span></div>
+    <div class="nav-stat" style="min-width:4.4rem" id="ns-pixuni" hidden><span class="ns-label">Universes</span><span class="ns-val" id="pixuni">&middot;</span></div>
+    <div class="nav-stat" style="min-width:2.6rem"><span class="ns-label">Fixtures</span><span class="ns-val" id="nfix">&middot;</span></div>
+    <div class="nav-stat" style="min-width:4rem"><span class="ns-label">RDM tx</span><span class="ns-val" id="rdm-tx">&middot;</span></div>
+    <div class="nav-stat" style="min-width:4rem"><span class="ns-label">RDM rx</span><span class="ns-val" id="rdm-rx">&middot;</span></div>
   </div>
   <div class="nav-links">
     <a href="/" data-tab="/" class="btn btn-outline-secondary btn-sm">Status</a>
@@ -92,10 +94,19 @@ window.LuxNav = (function(){
   var NAVIDS=['fps','infps','txstyle','rssi','net-label','heap','uptime','jitter','nav-sub','nfix','rdm-tx','rdm-rx'];
   var NAV_TAIL=10;   // fixed tail on the /ws frame: fixtures(2) rdmTx(4) rdmRx(4). Before it sit the
                      // per-output blocks: output fps(2), input fps(2), transmit style(1) = 5 bytes.
-  var PER_OUT=5, lastStyle=[];
+  var PER_OUT=5, lastStyle=[], outsK=-1;
   function fmtK(n){ return n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e4 ? (n/1e3).toFixed(0)+'k' : String(n); }
-  function saveNav(){ try{ var o={}; NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=[e.innerHTML,e.style.color||'']; }); sessionStorage.setItem('luxnav',JSON.stringify(o)); }catch(_){} }
-  function paintNav(){ try{ var o=JSON.parse(sessionStorage.getItem('luxnav')||'{}'); NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e&&o[id]){ e.innerHTML=o[id][0]; if(o[id][1]) e.style.color=o[id][1]; } }); }catch(_){} }
+  // Size the per-output chips for k listed outputs, once per change of k: room for "00.0" per
+  // output plus a " · " between them, so a rate going from 9.9 to 10.0 doesn't nudge the bar.
+  // k = 0 (no DMX output enabled, e.g. a pixel-only box) hides the three DMX chips.
+  function fitOuts(k){
+    if(k===outsK) return; outsK=k;
+    ['ns-fps','ns-infps','ns-style'].forEach(function(id){ var e=document.getElementById(id); if(e) e.hidden=!k; });
+    var w=k>1 ? (3.6*k+1.6*(k-1)).toFixed(1)+'ch' : '';
+    ['fps','infps'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.minWidth=w; });
+  }
+  function saveNav(){ try{ var o={_k:outsK}; NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=[e.innerHTML,e.style.color||'']; }); sessionStorage.setItem('luxnav',JSON.stringify(o)); }catch(_){} }
+  function paintNav(){ try{ var o=JSON.parse(sessionStorage.getItem('luxnav')||'{}'); if(o._k>=0) fitOuts(o._k); NAVIDS.forEach(function(id){ var e=document.getElementById(id); if(e&&o[id]){ e.innerHTML=o[id][0]; if(o[id][1]) e.style.color=o[id][1]; } }); }catch(_){} }
   function stats(buf){
     if(!(buf instanceof ArrayBuffer) || buf.byteLength<16) return;
     var v=new DataView(buf);
@@ -107,21 +118,33 @@ window.LuxNav = (function(){
       sty.push(v.getUint8(528+4*n+oi));
     }
     lastStyle=sty;   // exposed via LuxNav.style() so the config page can flag a per-output beat risk
-    document.getElementById('fps').textContent   = out.length ? out.join(' · ') : (v.getUint16(0)/10).toFixed(1);
-    document.getElementById('infps').textContent = inp.length ? inp.join(' · ') : '0.0';
+    // Which outputs to list. A frame that marks the enabled ones (bit4 set, bit3 = enabled) lists
+    // them up to the last enabled one, with a dash for a disabled one in between so the order stays
+    // A, B, C. A frame without the marks lists every output.
+    var marked=n && sty.every(function(b){ return b&16; }), k=n;
+    if(marked){ k=0; sty.forEach(function(b,i){ if(b&8) k=i+1; }); }
+    function off(i){ return marked && !(sty[i]&8); }
+    function name(i){ return 'Output ' + String.fromCharCode(65+i) + ': '; }
+    function row(a){ return a.slice(0,k).map(function(x,i){ return off(i) ? '–' : x; }).join(' · '); }
+    function tip(a){ return a.slice(0,k).map(function(x,i){ return name(i) + (off(i) ? 'off' : x + ' fps'); }).join(String.fromCharCode(10)); }
+    fitOuts(n ? k : 1);
+    var fe=document.getElementById('fps'), ie=document.getElementById('infps');
+    fe.textContent = n ? row(out) : (v.getUint16(0)/10).toFixed(1);  fe.title = n ? tip(out) : '';
+    ie.textContent = n ? row(inp) : '0.0';                            ie.title = n ? tip(inp) : '';
     // Transmit style per output: D = delta (following the console), C = continuous (free-running).
     // A dot marks a style a controller pushed over Art-Net; a ⚠ marks a beat risk (Continuous
     // free-running against a source at a different rate, so frames repeat/drop -- issue #93).
     var se=document.getElementById('txstyle');
     if(se){
-      if(sty.length){
-        se.textContent = sty.map(function(b){ return (b&1?'D':'C') + (b&4?'⚠':'') + (b&2?'·':''); }).join(' ');
-        se.title = sty.map(function(b,i){
-          return 'Output ' + String.fromCharCode(65+i) + ': ' + (b&1?'delta (follows the input)':'continuous (free-run)')
+      var ls=sty.slice(0,k).map(function(b,i){ return off(i) ? 0 : b; });
+      if(k){
+        se.textContent = ls.map(function(b,i){ return off(i) ? '–' : (b&1?'D':'C') + (b&4?'⚠':'') + (b&2?'·':''); }).join(' ');
+        se.title = ls.map(function(b,i){
+          return name(i) + (off(i) ? 'off' : (b&1?'delta (follows the input)':'continuous (free-run)')
                + (b&2?', set over Art-Net':', set here')
-               + (b&4?' — beats against the source rate; switch to Delta for smooth output':''); }).join(String.fromCharCode(10));
-        se.style.color = sty.some(function(b){ return b&4; }) ? '#ffaa1c'
-                       : sty.some(function(b){ return b&2; }) ? 'var(--lux-cyan)' : '';
+               + (b&4?' — beats against the source rate; switch to Delta for smooth output':'')); }).join(String.fromCharCode(10));
+        se.style.color = ls.some(function(b){ return b&4; }) ? '#ffaa1c'
+                       : ls.some(function(b){ return b&2; }) ? 'var(--lux-cyan)' : '';
       } else { se.textContent='·'; se.title=''; }
     }
     var rssi=v.getInt16(2), heap=v.getUint32(4), upS=v.getUint32(8);

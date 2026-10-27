@@ -993,7 +993,7 @@ a blocking error can't hide behind a fold.
 
 ### WebSocket (`ws://<device>/ws`, port 80)
 
-Binary status/DMX frame pushed ~10×/s (528 + 2 bytes per output):
+Binary status/DMX frame pushed ~10×/s (528 + 5 bytes per output + 10):
 
 ```
 Bytes  0–1    fps × 10           uint16 big-endian (aggregate, all inputs)
@@ -1006,10 +1006,20 @@ Byte   12     active sender count uint8
 Byte   13     source status       uint8 (0 = normal, 1 = conflict, 2 = merging)
 Bytes  14–15  jitter × 10 (ms)   uint16 big-endian
 Bytes  16–527 DMX ch 1–512       uint8[512] (the viewed output)
-Bytes  528…   per-output fps × 10 uint16 big-endian × number of outputs
+Bytes  528…   output fps × 10    uint16 big-endian × N (N = number of outputs, 3)
+       +2N    input fps × 10     uint16 big-endian × N
+       +4N    transmit style     uint8 × N: bit0 delta (clear = continuous), bit1 set
+                                   over Art-Net, bit2 beat risk, bit3 output enabled,
+                                   bit4 always set
+       +5N    fixtures           uint16 big-endian
+       +5N+2  RDM frames sent    uint32 big-endian
+       +5N+6  RDM responses      uint32 big-endian
 ```
 
-The web UI shows the **viewed output's** frame rate in the navbar and each output's own
+The parsers take N from the frame length. Bit 4 only says that bit 3 is there: a frame without it
+(an older firmware, a simulator) gets every output listed in the navbar.
+
+The navbar shows the frame rate of every output it lists, and the status page each output's own
 rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` alongside `"fps"`.
 
 Text frames carry the senders list and the change log (`{"meta":1,"senders":[…],"log":[…]}`, every
@@ -1112,7 +1122,9 @@ what the **In FPS** readout in the navbar shows.
 
 The navbar carries it too: a `C` or `D` per output (continuous or delta), with a dot on any style a
 controller pushed over Art-Net, and the full wording in the tooltip. So you can see at a glance
-whether a port is free-running or following the console, without opening `/config`.
+whether a port is free-running or following the console, without opening `/config`. DMX FPS, In FPS
+and Style list the outputs up to the last enabled one, in A, B, C order; a disabled output in between
+shows as `–`, and with no DMX output enabled at all the three chips hide.
 
 **Beat warning.** You don't have to spot the mismatch yourself. When a Continuous output is
 free-running against a source whose real change rate is off the output rate (e.g. a 33 fps MagicQ
