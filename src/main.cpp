@@ -1995,12 +1995,14 @@ static void wsPush() {
     }
     // Per-output transmit style: bit0 = delta (clear = continuous), bit1 = the style was set by a
     // controller over Art-Net rather than in our UI, bit2 = beat risk (Continuous vs a source whose
-    // change rate differs from the output rate -- issue #93).
+    // change rate differs from the output rate -- issue #93), bit3 = the output is enabled, bit4 =
+    // always set, it tells the navbar bit3 is there (a frame without it lists every output).
     for (int i = 0; i < MAX_OUTPUTS; i++) {
-        uint8_t st = 0;
+        uint8_t st = 0x10;
         if (dmxIsDelta(i))                                     st |= 0x01;
         if (cfg.outputs[i].txStyleSrc == TXSRC_ARTNET)          st |= 0x02;
         if (beatRisk(i))                                        st |= 0x04;
+        if (cfg.outputs[i].enabled)                             st |= 0x08;
         wsBuf[528 + 4 * MAX_OUTPUTS + i] = st;
     }
     // Fixed tail: fixtures(2) rdmTx(4) rdmRx(4)

@@ -384,7 +384,7 @@ lit pixel in a long strip stays visible and a running chase does not vanish at l
 The navigation bar already carries ten stats, so it **adapts rather than grows**: `Pixels`
 (total draw, amber when an all-white cue would exceed the rail, red when the live figure
 already does), `Pix FPS` and `Universes` (arriving/expected) appear only when a pixel port is
-enabled, and the DMX transmit-style chip hides on a pixel-only box.
+enabled, and the three DMX chips (DMX FPS, In FPS, Style) hide on a box with no DMX output enabled.
 
 ## REST
 

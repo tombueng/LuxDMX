@@ -180,8 +180,10 @@ test.describe('DMX output rate + transmit style — shape (always)', () => {
     } finally { sender.close(); }
     const txt = (await page.locator('#txstyle').textContent()).trim();
     const title = await page.locator('#txstyle').getAttribute('title');
-    // One letter per output: C = continuous (free-run), D = delta (following the input).
-    expect(txt.replace(/·/g, '').split(/\s+/).length, 'one style per output').toBe(d.outputs.length);
+    // One letter per output up to the last enabled one (a disabled one in between is a dash):
+    // C = continuous (free-run), D = delta (following the input).
+    const listed = d.outputs.map((o) => o.en).lastIndexOf(true) + 1;
+    expect(txt.replace(/·/g, '').split(/\s+/).length, 'one style per listed output').toBe(listed);
     expect(title, 'the tooltip spells it out').toMatch(/continuous \(free-run\)|delta \(follows the input\)/);
     // A style pushed by a controller must be distinguishable from one chosen here.
     expect(title).toMatch(/set (here|over Art-Net)/);
