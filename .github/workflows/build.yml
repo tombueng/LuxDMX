@@ -219,8 +219,14 @@ jobs:
           put preflight.txt /luxdmx.org/firmware/preflight.txt
           chmod 644 /luxdmx.org/firmware/preflight.txt
           SFTP
-          # It must be readable over plain HTTP too -- that is how the device fetches it.
-          GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/preflight.txt | tr -d '[:space:]')
+          # It must be readable over plain HTTP too -- that is how the device fetches it. Same
+          # retry as the version.txt readback below: one read straight after the upload can be empty.
+          for i in $(seq 1 15); do
+            GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/preflight.txt | tr -d '[:space:]')
+            [ "$GOT" = "preflight-${{ github.run_number }}" ] && break
+            echo "read $i: '$GOT'"
+            sleep 2
+          done
           [ "$GOT" = "preflight-${{ github.run_number }}" ] \
             || { echo "::error::preflight readback got '$GOT'"; exit 1; }
           sftp -i key -P "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" <<'SFTP'
@@ -304,9 +310,15 @@ jobs:
           chmod 644 /luxdmx.org/firmware/version.txt
           SFTP
           rm -f key
-          # Prove it is live and matches this build, rather than trusting the upload.
-          sleep 2
-          GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/version.txt | tr -d '[:space:]')
+          # Prove it is live and matches this build, rather than trusting the upload. Read it a few
+          # times before giving up: the web server can lag the SFTP side. v1.0.283 failed here on a
+          # single read 2 s after a good upload (empty body), and served the right number minutes later.
           WANT="1.0.${{ github.run_number }}"
+          for i in $(seq 1 15); do
+            sleep 2
+            GOT=$(curl -fsS --max-time 20 http://luxdmx.org/firmware/version.txt | tr -d '[:space:]')
+            [ "$GOT" = "$WANT" ] && break
+            echo "read $i: '$GOT'"
+          done
           echo "live=$GOT want=$WANT"
           [ "$GOT" = "$WANT" ] || { echo "::error::luxdmx.org/firmware/version.txt says '$GOT', expected '$WANT'"; exit 1; }
