@@ -606,7 +606,7 @@ static void artRdmPollRx() {
     static uint8_t buf[640];
     for (int k = 0; k < 64; k++) {
         struct sockaddr_in src; socklen_t sl = sizeof(src);
-        int n = lwip_recvfrom(g_artSock, buf, sizeof(buf), 0, (struct sockaddr*)&src, &sl);
+        int n = lwip_recvfrom(g_artSock, buf, sizeof(buf), MSG_DONTWAIT, (struct sockaddr*)&src, &sl);
         if (n <= 0) break;                       // non-blocking: <=0 means nothing left
         if (n >= 12 && memcmp(buf, ARTNET_ID, 8) == 0)
             artHandlePacket(buf, n, (uint32_t)src.sin_addr.s_addr);

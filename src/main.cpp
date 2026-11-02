@@ -2374,20 +2374,25 @@ static void sacnLeaveAll() {
     g_sacnJoinN = 0;
 }
 
+// netRxTask only (setup and a config save raise g_sacnRejoin): it's the task that reads the socket.
 static void startSacn() {
     if (g_sacnSock < 0) {
-        g_sacnSock = lwip_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (g_sacnSock < 0) { Serial.println("[sACN] socket() failed"); return; }
+        // Made in full (bound, non-blocking) before anyone can see it: a reader that got a
+        // half-made socket would block in recvfrom until some sACN came, and on an Art-Net-only
+        // network none ever does (every input on the box went quiet until the next boot).
+        const int sock = lwip_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (sock < 0) { Serial.println("[sACN] socket() failed"); return; }
         int one = 1;
-        lwip_setsockopt(g_sacnSock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+        lwip_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
         struct sockaddr_in a = {};
         a.sin_family = AF_INET; a.sin_port = htons(5568); a.sin_addr.s_addr = htonl(INADDR_ANY);
-        if (lwip_bind(g_sacnSock, (struct sockaddr*)&a, sizeof(a)) < 0) {
+        if (lwip_bind(sock, (struct sockaddr*)&a, sizeof(a)) < 0) {
             Serial.println("[sACN] bind(5568) failed");
-            lwip_close(g_sacnSock); g_sacnSock = -1; return;
+            lwip_close(sock); return;
         }
-        int fl = lwip_fcntl(g_sacnSock, F_GETFL, 0);
-        lwip_fcntl(g_sacnSock, F_SETFL, fl | O_NONBLOCK);
+        int fl = lwip_fcntl(sock, F_GETFL, 0);
+        lwip_fcntl(sock, F_SETFL, fl | O_NONBLOCK);
+        g_sacnSock = sock;
     }
     sacnLeaveAll();
 
@@ -2422,7 +2427,7 @@ static void readSacn() {
     if (g_sacnSock < 0) return;
     for (int guard = 0; guard < 32; guard++) {
         struct sockaddr_in src; socklen_t sl = sizeof(src);
-        int n = lwip_recvfrom(g_sacnSock, sacnBuf, sizeof(sacnBuf), 0, (struct sockaddr*)&src, &sl);
+        int n = lwip_recvfrom(g_sacnSock, sacnBuf, sizeof(sacnBuf), MSG_DONTWAIT, (struct sockaddr*)&src, &sl);
         if (n <= 0) return;
         if (n < SACN_MIN_LEN) continue;                       // runt: consumed, ignored
         if (memcmp(sacnBuf + SACN_ACN_ID_OFF, ACN_PACKET_ID, 12) != 0) continue;
@@ -3320,7 +3325,7 @@ static void applyLiveConfig(bool universeOrProtocolChanged) {
     // the input/menu code all read cfg on every use, so the new value is already in effect. Only
     // the sACN sockets hold state derived from config -- they are bound per universe (multicast
     // group 239.255.x.y) and only opened at all for the sACN protocols.
-    if (universeOrProtocolChanged) startSacn();
+    if (universeOrProtocolChanged) g_sacnRejoin = true;   // netRxTask re-joins (it owns the socket)
 
     applyEncoderLive();
     dispWake();   // a save lights the panel and restarts its timeout, so a new value is seen at once
@@ -5691,8 +5696,9 @@ void setup() {
     pixInitGuardEnd();
     // Multicast joins come from the sink table, so this has to follow rebuildSinks(). It used
     // to run earlier in setup(), which was harmless while a join was derived from
-    // cfg.outputs[] directly and is not any more.
-    if (cfg.protocol != 0) startSacn();
+    // cfg.outputs[] directly and is not any more. netRxTask already runs, and it owns the
+    // socket: it opens it (startSacn() made here raced its reads, see there).
+    if (cfg.protocol != 0) g_sacnRejoin = true;
 
     // Survive a network flood without resetting. Under heavy inbound traffic (e.g. an Art-Net
     // storm on the wired link) the lwIP task pegs core 0, so core 0's idle task can't feed the

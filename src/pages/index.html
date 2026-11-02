@@ -59,7 +59,7 @@ body { background: var(--gh-bg); animation:lxfade .16s ease-out; }
 
 #pix-grid { display:grid; gap:2px; }
 #pix-grid .px {
-  aspect-ratio:1/1; border-radius:2px; background:#111; min-width:4px;
+  aspect-ratio:1/1; border-radius:2px; background:#111; min-width:0;
   outline:1px solid rgba(255,255,255,.06); outline-offset:-1px;
 }
 #pix-tabs .nav-link { padding:.15rem .5rem; font-size:.8rem; }
@@ -440,7 +440,10 @@ function pixBuildGrid(){
   const g = document.getElementById('pix-grid');
   if (pixCells !== cells || g.dataset.cols !== String(cols)){
     g.dataset.cols = String(cols);
-    g.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(4px, 1fr))';
+    // cells shrink to fit (64 of them at 4 px plus gaps were wider than a phone: the whole page
+    // scrolled sideways), and a wide strip gets thinner gaps
+    g.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+    g.style.gap = cols > 32 ? '1px' : '2px';
     g.innerHTML = '';
     for (let i = 0; i < cells; i++){
       const d = document.createElement('div');
