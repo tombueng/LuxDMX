@@ -4,9 +4,9 @@
 // sends ({"type":"relay","host":1}) to the phones ({"type":"relay"}), what a phone sends to the
 // laptop; never back, never to other pages. At most 4 KB (put back together when it arrives in TCP
 // pieces), valid UTF-8 only, 50 a second per client. Each relay (and each DMX frame) is answered
-// with one byte, 'K', and the sequencer's pages send their next message only then: the box's
-// WebSocket library (ESPAsyncWebServer v3.12.1) misreads a frame header split across two TCP
-// packets, which back-to-back messages can cause. So the tests here send like the pages do. And a
+// with one byte, 'K', and the sequencer's pages send their next message only then (one at a time,
+// so no frame header lands split across two TCP packets; the library before 8e17be5 misread that,
+// see ws-torn-header.spec.mjs). So the tests here send like the pages do. And a
 // fifth client never pushes out the one that streams DMX. Everything else about the remote (codes, held
 // buttons letting go) lives in the sequencer and is tested there (sequencer/e2e/remote.spec.ts,
 // and its hw.spec.ts on a box).

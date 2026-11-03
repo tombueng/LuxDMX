@@ -2343,11 +2343,11 @@ static void wsCap() {
 }
 
 // One byte back ('K') for every DMX frame and relay message a client sent, once it's all here. The
-// sequencer's pages (bridge, remote) send their next message only after it, so the box never gets
-// two of theirs in one TCP segment: ESPAsyncWebServer v3.12.1 misreads a frame header that is split
-// across two segments (a burst of ~1 KB messages became a close frame with a garbage code on the
-// WT32; fixed upstream in PR #473, not in a release yet). Nothing for the subscribe messages: a page
-// sends those first without waiting, and a stray ack would let its next message go out too early.
+// sequencer's pages (bridge, remote) send their next message only after it: one on the wire at a
+// time, so a slow box skips looks instead of queueing them, and a frame header never lands split
+// across two TCP segments (the WebSocket library before 8e17be5 misread that, see platformio.ini).
+// Nothing for the subscribe messages: a page sends those first without waiting, and a stray ack
+// would let its next message go out too early.
 static void wsAck(AsyncWebSocketClient* c) {
     static const uint8_t K = 'K';
     if (c && c->status() == WS_CONNECTED) c->binary(&K, 1);

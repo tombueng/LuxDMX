@@ -1026,10 +1026,9 @@ Bytes 6...  channel 1..n values (n up to 512)
 ```
 
 The box answers each `D` frame with one binary byte, `K` (0x4B), once it has all of it. Send the
-next frame only after that answer (the bridge does): two frames in one TCP packet can split a
-frame header across packets, which the WebSocket library misreads (see the remote below). The
-bridge keeps only the newest frame per universe while it waits, so a slow box skips looks instead
-of falling behind.
+next frame only after that answer, as the bridge does: one frame on the wire at a time. The bridge
+keeps only the newest frame per universe while it waits, so a slow box skips looks instead of
+falling behind.
 
 Frames for a universe no output plays are ignored, so are malformed ones. The box treats the
 sender like any other: it shows up in `/senders.json` with protocol `2` ("Web"), merges with
@@ -1074,11 +1073,9 @@ the box, the sequencer's [`e2e/remote.spec.ts`](sequencer/e2e/remote.spec.ts) an
 the rest.
 
 The box answers every relay message (and every DMX frame) with one binary byte, `K`, and the
-phone page and the bridge send their next message only after it. The WebSocket library
-(ESPAsyncWebServer v3.12.1) misreads a frame header that arrives split across two TCP packets,
-which messages sent back to back can cause on WiFi: the message is lost, and if only the header's
-first byte made it into the first packet the box can crash. One message on the wire at a time
-can't split a header. Upstream fixed the parser (its PR #473) but hasn't released it yet.
+phone page and the bridge send their next message only after it. One message on the wire at a
+time also means a frame header never lands split across two TCP packets, which the WebSocket
+library before upstream's `8e17be5` misread (firmware up to v1.0.287 could even crash on it).
 
 ### WebSocket (`ws://<device>/ws`, port 80)
 

@@ -43,9 +43,9 @@ button { font:inherit; border:0; border-radius:6px; padding:.45rem .9rem; margin
   try { allowed = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) {}
   var peer = null, ws = null, sent = 0, drops = 0, dropsShown = 0, live = false;
   // One message on the wire at a time: the box answers each DMX frame and relay message with one
-  // byte ('K'), and only then the next goes. Its WebSocket library misreads a frame header split
-  // across two TCP packets, which two messages in one packet can cause. Waiting: per universe only
-  // the newest frame (one it replaces counts as a drop), the relays in order (16 KB at most).
+  // byte ('K'), and only then the next goes. So a slow box skips looks instead of queueing them (and
+  // no frame header lands split across two TCP packets, which older box firmware misread). Waiting:
+  // per universe only the newest frame (one it replaces counts as a drop), the relays in order.
   var dmxNext = {}, dmxOrder = [], relays = [], relayBytes = 0, waiting = 0, relayTurn = false;
   var ACK_WAIT = 2000;   // no answer by then (it shouldn't happen): send anyway rather than stall
 
