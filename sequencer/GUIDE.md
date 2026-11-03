@@ -14,7 +14,8 @@ wheels), you just don't have to learn a pro console to use them.
    web page), then **Connect** and **Allow** in the popup. The popup has to stay open: it's the
    box's own page, and it's what carries the DMX (a browser page can't send Art-Net itself).
    The pill next to the box says how it's going; "no answer" means the address is wrong or the
-   box's firmware is too old for the sequencer (update it from its web page).
+   box's firmware is too old for the sequencer (it needs v1.0.293 or newer: update it from its
+   web page).
    **Any other Art-Net or sACN node** (or a LuxDMX without the popup): pick "Art-Net / sACN from
    this computer" under `+`. That needs **LuxDMX Link**, a small helper on this computer (a browser
    can't send Art-Net itself). If it isn't running, **Get Link** on the pill offers the download

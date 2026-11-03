@@ -45,8 +45,8 @@ looks, throw one of 51 effects on them and play the show from big buttons, your 
 timeline, with a 3D stage to see it before the truck's unloaded. No install, no account, and your
 shows stay in your browser.
 
-It plays a LuxDMX box straight from the page (the box serves a little bridge popup, so update
-the box's firmware first) and any other Art-Net / sACN node through
+It plays a LuxDMX box straight from the page (the box serves a little bridge popup, firmware
+v1.0.293 or newer) and any other Art-Net / sACN node through
 [LuxDMX Link](sequencer/link/README.md), a small helper for Windows, macOS and Linux.
 
 | | |
