@@ -129,6 +129,8 @@ A guided tour of every control — manual channel control, labels, sparkline his
 | **Config reset** | Hold BOOT button 3 s on startup, or via `/reset` page |
 | **Remote restart** | Restart the box from the web UI (**Device → Restart device**) or `POST /reboot`, without changing a setting. Useful when a long-running gateway needs a nudge, or to free up memory before a firmware update |
 | **REST API** | `GET /dmx.json`, `/senders.json`, `/log.json`, `/version.json`, `/labels.json` |
+| **Browser bridge** | A web page can send DMX to the box (the [LuxDMX Sequencer](sequencer/README.md) does): the box serves `/bridge`, a tiny page the app opens as a popup, which asks you once per site and forwards frames over `/ws`. Shown as a sender with protocol **Web**, merged like any other source. See [Sending DMX from a web page](#sending-dmx-from-a-web-page-the-bridge) |
+| **Phone as a remote** | The box serves `/remote`: a phone scans the sequencer's QR code and plays the laptop's live page (buttons, faders, GO, blackout) through the box. Held buttons let go by themselves if the phone drops out. See [A phone as a remote](#a-phone-as-a-remote) |
 
 ### Boards
 
@@ -967,7 +969,7 @@ a blocking error can't hide behind a fold.
 | `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins, on-unit controls (rotary encoder + buttons) (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
 | `/reboot` | POST | Restart the device, changing nothing. **POST only** — a GET would let a link prefetch or a crawler drop the DMX output of a live rig. Also in the UI: **`/config` → Device → Restart device** |
-| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.) |
+| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.), plus `reset` (why it last started: `power on`, `restart`, `crash`, `interrupt watchdog`, `task watchdog`, `watchdog`, `brownout`, `reset pin`...) and `uptime` (seconds since), so a hang or a crash can be told afterwards without a serial console |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, manual mode flag, and memory: `heap` / `heapMin` / `heapBlock` (real allocatable RAM), `heapAll` (the old `ESP.getFreeHeap()` figure), `psram` / `psramFree`, and `ws` (connected WebSocket clients) |
 | `/enc.json` | GET | Rotary-encoder diagnostics: pins, the decoder's effective vs configured steps-per-detent, and counters for quadrature edges and emitted steps. `?reset=1` zeroes them, so `encsteps` can be measured rather than guessed, see [docs/controls.md](docs/controls.md) |
 | `/i2cscan` | GET | Scans the display header's I2C bus on the configured pins: idle line levels, whether an external pull-up is present, and every address that answers. Tells a dead panel from a wiring fault when the screen stays black, see [docs/display.md](docs/display.md) |
@@ -981,6 +983,8 @@ a blocking error can't hide behind a fold.
 | `/rdm/discover` | GET | Trigger an RDM discovery sweep on the bus (`{ok,op}`) |
 | `/rdm/setaddr` | GET | Set a fixture's DMX start address — `?uid=MMMM:DDDDDDDD&addr=1..512` |
 | `/rdm/identify` | GET | Toggle a fixture's identify — `?uid=MMMM:DDDDDDDD&on=0/1` |
+| `/rdm/setpers` | GET | Set a fixture's DMX personality (mode) — `?uid=MMMM:DDDDDDDD&pers=1..255` |
+| `/rdm/setlabel` | GET | Set a fixture's device label — `?uid=MMMM:DDDDDDDD&label=<up to 32 characters>` |
 | `/rdm/bqp` | GET | Set the Art-Net BackgroundQueuePolicy (background RDM status harvest), `?p=1..3` severity, `4` off |
 | `/rdm/merge` | GET | Set an output's merge mode, `?out=<index>&mode=0/1/2` (off/HTP/LTP), applied live + persisted |
 | `/led/bright` | GET | 5-LED panel per-colour brightness (`?r=&g=&y=&b=&w=`, 0-255), applied live; `&save=1` persists to NVS, `&test=1` lights all five for calibration (10-min window) |
@@ -990,6 +994,88 @@ a blocking error can't hide behind a fold.
 | `/ota/github` | POST | Install a release (downloaded via luxdmx.org; `version=latest` or `1.0.N`) |
 | `/ota/url` | POST | Install a `.bin` from any URL the device can reach (`url=http://host/firmware.bin`). Reboots first and downloads with a fresh heap, so it works where a push upload fails; `http://` needs no TLS and therefore almost no contiguous memory |
 | `/ota/status` | GET | Live progress of an in-flight install (`{phase,pct}`) — the update page polls it |
+| `/bridge` | GET | The browser bridge page (gzip, ~4 KB): opened as a popup by a web app, asks the user once per site, then forwards that site's DMX to `/ws`. See [Sending DMX from a web page](#sending-dmx-from-a-web-page-the-bridge) |
+| `/remote` | GET | A phone as a remote for the sequencer (gzip, ~16 KB): plays the live page of a show running on a laptop, through `/ws` relay messages. See [A phone as a remote](#a-phone-as-a-remote) |
+
+### Sending DMX from a web page (the bridge)
+
+A browser can't send Art-Net or sACN (no UDP), and a page served over https can't open a plain
+`ws://` connection to the box. So the box serves `/bridge`: the web app opens it as a popup and
+talks to it with `postMessage`. The first time a site asks, the bridge shows its address with
+**Allow** / **Deny**; allowed sites are remembered in that browser (**Stop and forget this page**
+takes it back). Only the window that opened the bridge is listened to, and replies only go to that
+site.
+
+The app can hand the bridge a channel of its own (`{type: 'port'}` with a `MessagePort`): its
+output thread then sends frames straight through it, so they keep coming on time whatever the
+app's page is busy drawing; the bridge answers `{type: 'port', ok: 1}`. When the app's page goes,
+it sends `{type: 'bye', frames: [...]}`: the bridge closes the channel first, then sends those
+frames (the safe look: fog and machines off), so nothing sent through the channel a moment
+earlier can arrive after them.
+
+The bridge sends what it gets to `/ws` as binary messages, which anything that can open a
+WebSocket to the box can also send directly:
+
+```
+Byte 0      'D' (0x44)
+Byte 1      1 (format version)
+Bytes 2-3   universe, little-endian (an output's Art-Net universe)
+Byte 4      priority 1..200 as in sACN (0 = the default, 100), used when the output merges by priority
+Byte 5      0 (reserved)
+Bytes 6...  channel 1..n values (n up to 512)
+```
+
+The box answers each `D` frame with one binary byte, `K` (0x4B), once it has all of it. Send the
+next frame only after that answer, as the bridge does: one frame on the wire at a time. The bridge
+keeps only the newest frame per universe while it waits, so a slow box skips looks instead of
+falling behind.
+
+Frames for a universe no output plays are ignored, so are malformed ones. The box treats the
+sender like any other: it shows up in `/senders.json` with protocol `2` ("Web"), merges with
+Art-Net / sACN per the output's merge mode, and drops out after the usual 4 s without frames, so a
+web app sends a heartbeat when nothing changes. Tests: [`docs/tests/web-bridge.spec.mjs`](docs/tests/web-bridge.spec.mjs).
+
+### A phone as a remote
+
+The sequencer runs the show on a laptop; a phone can play its live page from anywhere in the
+room. In the sequencer: **Live**, **Phone**, switch it on, and scan the QR code (or open
+`http://<box>/remote` on the phone and type the four digits). The page comes from the box itself,
+so the phone needs no app, no popup and no internet, just the box's network.
+
+The box doesn't know about shows: the laptop and the phone talk through `/ws` text messages of the
+form `{"relay":{...}}`, which the box passes on as they came and never reads. Clients say what they
+are: the `/remote` page sends `{"type":"relay"}` (a phone), the sequencer's bridge popup
+`{"type":"relay","host":1}` (the laptop). What the laptop sends goes to the phones, what a phone
+sends goes to the laptop: never back to the sender, phones never get each other's messages, and the
+status, config and RDM pages get none. At most 4 KB each (one that arrives in TCP pieces is put back
+together), valid UTF-8 only (a browser would drop its whole socket over one bad byte), 50 a second
+per client, and skipped when the heap is short.
+
+The box keeps at most 4 pages connected (heap, issue #135): the laptop's bridge and three phones,
+say, or two phones and the status page. When a fifth comes, the newest one that isn't sending DMX
+is closed (code 4001, and the phone page says the box is full), never the bridge playing the show.
+Phones close their socket while their screen is off, so a pocketed phone doesn't take a place.
+The laptop sends what each button looks like and whether it's on; the phone sends presses, fader
+moves, GO, Back, Blackout and a tapped tempo. Every message carries the four-digit code, and the
+laptop ignores anything with another one. That keeps a stray phone out by accident; it isn't a
+password (anyone on the network can send Art-Net anyway). The laptop lists the phones that joined
+and can take one off; a phone taken off forgets the code, but whoever has the code can join again
+(New code locks everyone out).
+
+Holding is safe by design: while a button that works while held (flash, fog, blinder, drop) is
+down, the phone says so every 400 ms, and the laptop lets go of anything it hasn't heard about for
+1.5 s. The phone page also lets go itself when it's hidden, redrawn under the finger, or loses the
+laptop, and the laptop lets go of a held flash, blinder or drop after 30 s anyway (fog after its
+own maximum). Phones keep their screen on
+while playing (over plain http there's no Wake Lock, so the page plays a tiny silent video, the
+NoSleep.js trick). Tests: [`docs/tests/web-remote.spec.mjs`](docs/tests/web-remote.spec.mjs) for
+the box, the sequencer's [`e2e/remote.spec.ts`](sequencer/e2e/remote.spec.ts) and `hw.spec.ts` for
+the rest.
+
+The box answers every relay message (and every DMX frame) with one binary byte, `K`, and the
+phone page and the bridge send their next message only after it. One message on the wire at a
+time also means a frame header never lands split across two TCP packets, which the WebSocket
+library before upstream's `8e17be5` misread (firmware up to v1.0.287 could even crash on it).
 
 ### WebSocket (`ws://<device>/ws`, port 80)
 
@@ -1025,6 +1111,8 @@ rate on its selector button. `GET /dmx.json` also carries `"outfps":[…]` along
 Text frames carry the senders list and the change log (`{"meta":1,"senders":[…],"log":[…]}`, every
 2 s), but **only to a socket that asked for them** by sending `{"type":"meta"}`. The status page does;
 the other pages only need the navbar numbers, so they no longer get several KB of JSON they throw away.
+The sequencer's relay messages (`{"relay":…}`) likewise only go to sockets that sent `{"type":"relay"}`
+(see [A phone as a remote](#a-phone-as-a-remote)).
 
 Each client is sent to on its own, with at most 4 messages waiting for it. A browser that stops reading
 (a frozen tab, a laptop going to sleep) only misses frames itself and gets dropped once it stops

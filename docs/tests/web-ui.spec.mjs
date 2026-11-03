@@ -119,6 +119,18 @@ test.describe('Web UI + REST', () => {
     expect((await request.get('/logo.png')).status()).toBe(404);
   });
 
+  // Why the box last started and for how long it has run: a hang or a crash can be told afterwards
+  // without a serial console. Uptime counts on between two reads.
+  test('/info.json says why the box last started (reset) and how long ago (uptime)', async ({ request }) => {
+    const a = await (await request.get('/info.json')).json();
+    expect(['power on', 'reset pin', 'restart', 'crash', 'interrupt watchdog', 'task watchdog', 'watchdog', 'deep sleep', 'brownout', 'sdio', 'unknown']).toContain(a.reset);
+    expect(Number.isInteger(a.uptime)).toBe(true);
+    await new Promise((r) => setTimeout(r, 2200));
+    const b = await (await request.get('/info.json')).json();
+    expect(b.uptime - a.uptime).toBeGreaterThanOrEqual(1);
+    expect(b.reset).toBe(a.reset);
+  });
+
   test('/info.json advertises the W5500 SPI Ethernet config fields', async ({ request }) => {
     const d = await (await request.get('/info.json')).json();
     expect(typeof d.ethSpi).toBe('boolean');    // whether the W5500 driver is compiled in

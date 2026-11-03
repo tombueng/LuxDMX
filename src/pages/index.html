@@ -702,7 +702,7 @@ function updateSenders(data) {
     return;
   }
   tbody.innerHTML = data.map(function(s) {
-    var proto = s.p === 0 ? 'Art-Net' : 'sACN';
+    var proto = s.p === 0 ? 'Art-Net' : s.p === 2 ? 'Web' : 'sACN';
     return '<tr>' +
       '<td class="ps-3" style="font-family:monospace">' + s.ip + '</td>' +
       '<td>' + proto + '</td>' +
@@ -722,7 +722,7 @@ function updateLog(data) {
   el.innerHTML = data.map(function(entry) {
     var ageSec  = Math.round((newest - entry.ms) / 1000);
     var timeStr = ageSec === 0 ? 'now' : ageSec + 's ago';
-    var proto   = entry.p === 0 ? 'Art-Net' : 'sACN';
+    var proto   = entry.p === 0 ? 'Art-Net' : entry.p === 2 ? 'Web' : 'sACN';
     if (entry.u != null && outputs.length > 1) proto += ' U' + entry.u;
     var chs     = entry.ch.map(function(c) {
       return (labels[c[0]] ? labels[c[0]] : 'ch' + c[0]) + '=' + c[1];

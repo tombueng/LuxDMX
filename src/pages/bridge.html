@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LuxDMX bridge</title>
+<style>
+body { margin:0; background:#0d1117; color:#c9d1d9; font:14px/1.45 system-ui,sans-serif; }
+.box { padding:1.2rem 1.4rem; }
+h1 { font-size:1.05rem; margin:0 0 .6rem; }
+.origin { color:#ffaa1c; word-break:break-all; }
+.muted { color:#8b949e; font-size:.85rem; }
+button { font:inherit; border:0; border-radius:6px; padding:.45rem .9rem; margin:.6rem .4rem 0 0; cursor:pointer; }
+.ok { background:#45d85c; color:#06141a; } .no { background:#30363d; color:#c9d1d9; }
+#state b { color:#45d85c; } #state.off b { color:#f33abc; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>LuxDMX sequencer bridge</h1>
+  <div id="ask" hidden>
+    <p>Allow <span class="origin" id="askOrigin"></span> to send DMX to this LuxDMX?</p>
+    <p class="muted">It can then drive the outputs like an Art-Net console would. Only allow pages you trust.</p>
+    <button class="ok" id="allow">Allow</button><button class="no" id="deny">Deny</button>
+  </div>
+  <div id="run" hidden>
+    <p id="state">Connected to <span class="origin" id="runOrigin"></span>: <b id="ws">connecting</b></p>
+    <p class="muted"><span id="fps">0</span> frames/s, <span id="drops">0</span> dropped. Keep this window open while the sequencer plays.</p>
+    <button class="no" id="revoke">Stop and forget this page</button>
+  </div>
+  <p id="idle" class="muted">Waiting for the sequencer that opened this window.</p>
+</div>
+<script>
+// The sequencer runs on https (GitHub Pages), this box speaks plain http, and a browser won't let
+// an https page open ws:// to it (mixed content). This page lives on the box's own origin instead:
+// the sequencer opens it as a popup and talks to it with postMessage, and it forwards to /ws.
+// Only the window that opened it is heard, only after the user allowed that origin once, and
+// replies only ever go back to that origin.
+(function () {
+  var KEY = 'luxdmx.bridge.allowed';
+  var $ = function (id) { return document.getElementById(id); };
+  var allowed = [];
+  try { allowed = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) {}
+  var peer = null, ws = null, sent = 0, drops = 0, dropsShown = 0, live = false;
+  // One message on the wire at a time: the box answers each DMX frame and relay message with one
+  // byte ('K'), and only then the next goes. So a slow box skips looks instead of queueing them (and
+  // no frame header lands split across two TCP packets, which older box firmware misread). Waiting:
+  // per universe only the newest frame (one it replaces counts as a drop), the relays in order.
+  var dmxNext = {}, dmxOrder = [], relays = [], relayBytes = 0, waiting = 0, relayTurn = false;
+  var ACK_WAIT = 2000;   // no answer by then (it shouldn't happen): send anyway rather than stall
+
+  function pump() {
+    if (!ws || ws.readyState !== 1) return;
+    if (waiting && Date.now() - waiting < ACK_WAIT) return;
+    var m = null;
+    if (relays.length && (relayTurn || !dmxOrder.length)) { var r = relays.shift(); relayBytes -= r.n; m = r.t; relayTurn = false; }
+    else if (dmxOrder.length) { var u = dmxOrder.shift(); m = dmxNext[u]; delete dmxNext[u]; relayTurn = true; sent++; }
+    if (m === null) { waiting = 0; return; }
+    waiting = Date.now();
+    ws.send(m);
+  }
+  function forget() { dmxNext = {}; dmxOrder = []; relays = []; relayBytes = 0; waiting = 0; }
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(allowed)); } catch (_) {} }
+  function post(m) { if (window.opener && peer) { m.luxdmx = 1; window.opener.postMessage(m, peer); } }
+  function show(id) { ['ask', 'run', 'idle'].forEach(function (k) { $(k).hidden = (k !== id); }); }
+
+  function connect() {
+    if (!live) return;
+    ws = new WebSocket('ws://' + location.host + '/ws');
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = function () {
+      forget();
+      $('ws').textContent = 'live'; $('state').className = ''; post({ type: 'status', ws: 'open' });
+      ws.send('{"type":"relay","host":1}');   // the sequencer's remote: we are the laptop's side (the box routes phones' messages here)
+    };
+    ws.onclose = function () {
+      $('ws').textContent = 'reconnecting'; $('state').className = 'off'; post({ type: 'status', ws: 'closed' });
+      ws = null; forget(); if (live) setTimeout(connect, 1000);
+    };
+    // The box's answer lets the next message go; status frames aren't needed here; relay messages
+    // (the sequencer's remote) go to the page.
+    ws.onmessage = function (e) {
+      if (typeof e.data !== 'string') {
+        if (e.data.byteLength === 1 && new Uint8Array(e.data)[0] === 0x4b) { waiting = 0; pump(); }
+        return;
+      }
+      if (e.data.lastIndexOf('{"relay":', 0) !== 0) return;
+      try { post({ type: 'relay', data: JSON.parse(e.data).relay }); } catch (_) {}
+    };
+  }
+
+  function start() {
+    live = true; show('run'); $('runOrigin').textContent = peer;
+    fetch('/info.json').then(function (r) { return r.json(); }).then(function (i) {
+      post({ type: 'ready', host: location.host, fw: i.version, name: i.artShort || i.hostname || '', ip: i.ip || '',
+             outputs: (i.outputs || []).map(function (o) { return { en: !!o.en, uni: o.uni }; }) });
+    }).catch(function () { post({ type: 'ready', host: location.host }); });
+    connect();
+  }
+
+  // One frame: 'D', 1, universe lo, hi, priority, 0, then the channel values. It waits for its turn
+  // (above), and a newer one for the same universe takes its place: a box that can't keep up skips
+  // looks instead of falling behind. The page's safe look as it goes (bye) is simply the newest.
+  function sendDmx(m) {
+    if (!ws || ws.readyState !== 1) return;
+    var d = m.data instanceof Uint8Array ? m.data : new Uint8Array(m.data || []);
+    var n = Math.min(512, d.length);
+    if (n < 1) return;
+    var f = new Uint8Array(6 + n);
+    var u = (m.uni | 0) & 0x7fff;
+    f[0] = 0x44; f[1] = 1; f[2] = u & 0xff; f[3] = u >> 8; f[4] = Math.max(0, Math.min(200, m.prio | 0)); f[5] = 0;
+    f.set(d.subarray(0, n), 6);
+    if (u in dmxNext) drops++; else dmxOrder.push(u);
+    dmxNext[u] = f.buffer;
+    pump();
+  }
+
+  // RDM: the page asks, this page asks the box's own RDM controller (same origin) and answers with
+  // the request's id. Only for the page the user allowed, like the DMX.
+  var RDM = { list: '/rdm.json', scan: '/rdm/discover', identify: '/rdm/identify', address: '/rdm/setaddr', mode: '/rdm/setpers', label: '/rdm/setlabel' };
+  function rdm(m) {
+    var path = RDM[m.op], q = [];
+    if (!path) { post({ type: 'rdm', id: m.id, ok: false, error: 'unsupported' }); return; }
+    if (m.uid) q.push('uid=' + encodeURIComponent(String(m.uid)));
+    if (m.op === 'identify') q.push('on=' + (m.on ? 1 : 0));
+    if (m.op === 'address') q.push('addr=' + (m.addr | 0));
+    if (m.op === 'mode') q.push('pers=' + (m.mode | 0));
+    if (m.op === 'label') q.push('label=' + encodeURIComponent(String(m.label || '').slice(0, 32)));
+    if (m.op === 'scan' && typeof m.line === 'number') q.push('line=' + (m.line | 0));
+    fetch(path + (q.length ? '?' + q.join('&') : ''), { cache: 'no-store' })
+      .then(function (r) { return r.text().then(function (t) { var d = null; try { d = JSON.parse(t); } catch (_) {} post({ type: 'rdm', id: m.id, ok: r.ok, status: r.status, data: d }); }); })
+      .catch(function () { post({ type: 'rdm', id: m.id, ok: false, error: 'unreachable' }); });
+  }
+
+  var port = null, bye = false;
+  window.addEventListener('message', function (e) {
+    if (!window.opener || e.source !== window.opener) return;   // only the window that opened us
+    var m = e.data;
+    if (!m || m.luxdmx !== 1) return;
+    if (m.type === 'hello') {
+      if (peer && peer !== e.origin) return;                    // one sequencer per bridge window
+      peer = e.origin; bye = false;
+      if (live) { post({ type: 'status', ws: ws && ws.readyState === 1 ? 'open' : 'closed' }); return; }
+      if (allowed.indexOf(peer) >= 0) start();
+      else { show('ask'); $('askOrigin').textContent = peer; post({ type: 'asking' }); }
+      return;
+    }
+    if (!live || e.origin !== peer) return;
+    // The page's output thread: a channel of its own, frames straight from it (the page itself may be
+    // busy drawing). Said back, so the page knows to leave the sending to it.
+    if (m.type === 'port' && e.ports && e.ports[0]) {
+      if (port) port.close();
+      port = e.ports[0]; bye = false;
+      port.onmessage = function (pe) {
+        var p = pe.data;
+        if (bye || !live || !p || p.luxdmx !== 1) return;
+        if (p.type === 'dmx') sendDmx(p);
+        else if (p.type === 'frames' && p.frames) p.frames.forEach(function (f) { sendDmx(f); });
+      };
+      post({ type: 'port', ok: 1 });
+      return;
+    }
+    // The page is going: nothing more from its channel (a frame sent a moment before mustn't come
+    // after this), then its last look (fog and the machines off).
+    if (m.type === 'bye') {
+      bye = true;
+      if (port) { port.close(); port = null; }
+      (m.frames || []).forEach(function (f) { sendDmx(f); });
+      return;
+    }
+    if (m.type === 'rdm') { rdm(m); return; }
+    if (m.type === 'dmx') sendDmx(m);
+    else if (m.type === 'relay' && ws && ws.readyState === 1) {
+      // in turn with the DMX; when 16 KB are waiting the newer ones are dropped (the laptop sends its state again)
+      var t = JSON.stringify({ relay: m.data }), b = new TextEncoder().encode(t).length;
+      if (b <= 4096 && relayBytes + b <= 16384) { relays.push({ t: t, n: b }); relayBytes += b; pump(); }
+    }
+    else if (m.type === 'frames' && m.frames) m.frames.forEach(sendDmx);
+  });
+
+  $('allow').onclick = function () { if (allowed.indexOf(peer) < 0) allowed.push(peer); save(); start(); };
+  $('deny').onclick  = function () { post({ type: 'denied' }); peer = null; show('idle'); };
+  $('revoke').onclick = function () {
+    allowed = allowed.filter(function (o) { return o !== peer; }); save();
+    live = false; if (ws) ws.close(); post({ type: 'denied' }); peer = null; show('idle');
+  };
+  setInterval(function () {
+    pump();
+    $('fps').textContent = sent; $('drops').textContent = drops;
+    if (live) post({ type: 'stats', fps: sent, drops: drops - dropsShown });
+    sent = 0; dropsShown = drops;
+  }, 1000);
+  window.addEventListener('beforeunload', function () { live = false; post({ type: 'status', ws: 'closed' }); });
+})();
+</script>
+</body>
+</html>
