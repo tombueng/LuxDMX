@@ -131,7 +131,7 @@ while LuxDMX speaks plain http, which a browser won't mix.
   the wire at a time: the box answers each with one byte (`K`) and the popup sends the next only
   then, keeping just the newest frame per universe meanwhile, so a slow box skips looks instead of
   falling behind (and no frame header lands split across two packets, which the box's WebSocket
-  library misread before firmware v1.0.288).
+  library misread before firmware v1.0.290).
 - **A reload of the app**: the popup stays open and keeps sending its stats to `window.opener`,
   which is now the reloaded app (same browsing context). The app takes it back without a click:
   only messages from the box's own origin count, it says hello, and the popup is ours once it
