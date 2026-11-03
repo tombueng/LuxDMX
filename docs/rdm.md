@@ -11,7 +11,8 @@ Art-Net / sACN → DMX output.
 > search (an explicit range stack, not recursion — a 48-deep recursion overflowed the DMX task
 > stack and reset the board) and re-reads a garbled branch before calling it a collision, so a stray
 > bit flip on a lone fixture doesn't split forever. Trigger it over HTTP (`/rdm/discover`,
-> `/rdm/setaddr`, `/rdm/identify`) or the web UI. Validated on the RP2350 responder rig: discovery +
+> `/rdm/setaddr`, `/rdm/identify`, `/rdm/setpers`, `/rdm/setlabel`) or the web UI. The sequencer's
+> rig check reaches the same endpoints through the box's bridge page (`{type:'rdm'}` messages). Validated on the RP2350 responder rig: discovery +
 > GET DEVICE_INFO / SW_VERSION_LABEL + SET address / identify all round-trip. This design doc below
 > is the original plan and the hardware/transceiver background — still accurate except that the
 > firmware path is now RMT, not esp_dmx.

@@ -126,6 +126,8 @@ static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64
 #include "generated/index_html.h"
 #include "generated/config_html.h"
 #include "generated/rdm_html.h"
+#include "generated/bridge_html.h"
+#include "generated/remote_html.h"
 #include "generated/config_saved_html.h"
 #include "generated/setup_html.h"
 #include "generated/setup_done_html.h"
@@ -349,7 +351,7 @@ static constexpr uint8_t SRC_MERGING  = 2;
 
 struct Sender {
     uint32_t ip;        // 0 = empty slot
-    uint8_t  proto;     // 0=ArtNet, 1=sACN
+    uint8_t  proto;     // 0=ArtNet, 1=sACN, 2=Web (the sequencer bridge)
     uint32_t lastMs;
     uint32_t winMs;     // fps window start
     uint16_t winCnt;
@@ -388,7 +390,7 @@ struct SrcSeen {
     int16_t  universe;
     uint16_t winCnt;
     uint16_t dataLen;
-    uint8_t  proto;      // 0 = Art-Net, 1 = sACN
+    uint8_t  proto;      // 0 = Art-Net, 1 = sACN, 2 = Web
     uint8_t  priority;
 };
 static SrcSeen g_seen[MAX_SEEN] = {};
@@ -1908,33 +1910,50 @@ static constexpr uint32_t JSON_MARGIN    = 12000;
 // timeout notices within seconds and drops it. The queue itself is capped at 4 in platformio.ini.
 // The ids are kept here because the library's own client list can't be walked safely from
 // another task. onWsEvent (AsyncTCP task) writes them, the push code (loop task) copies them.
-static constexpr int WS_SLOTS = 8;   // cleanupClients() caps live clients at 4, closing ones linger
-struct WsSlot { uint32_t id; bool meta; };   // id 0 = free; meta = wants the senders/log JSON
+static constexpr int WS_SLOTS = 8;   // wsCap() keeps 4 live clients, closing ones linger
+// id 0 = free; meta = wants the senders/log JSON; relay = takes the sequencer's relay messages as a
+// phone (1, the /remote page) or as the laptop (2, its bridge popup); dmx = sends DMX frames
+struct WsSlot { uint32_t id; bool meta; uint8_t relay; bool dmx; };
 static WsSlot       wsSlots[WS_SLOTS] = {};
 static portMUX_TYPE wsSlotsMux = portMUX_INITIALIZER_UNLOCKED;
 
-static void wsSlotSet(uint32_t id, bool add, bool meta = false) {
+static void wsSlotSet(uint32_t id, bool add, bool meta = false, uint8_t relay = 0) {
     portENTER_CRITICAL(&wsSlotsMux);
     int hit = -1, freeSlot = -1;
     for (int i = 0; i < WS_SLOTS; i++) {
         if (wsSlots[i].id == id) hit = i;
         if (!wsSlots[i].id && freeSlot < 0) freeSlot = i;
     }
-    if (!add)              { if (hit >= 0) wsSlots[hit] = {0, false}; }
-    else if (hit >= 0)     { wsSlots[hit].meta = wsSlots[hit].meta || meta; }
-    else if (freeSlot >= 0){ wsSlots[freeSlot] = {id, meta}; }
+    if (!add)              { if (hit >= 0) wsSlots[hit] = {}; }
+    else if (hit >= 0)     { wsSlots[hit].meta = wsSlots[hit].meta || meta; if (relay) wsSlots[hit].relay = relay; }
+    else if (freeSlot >= 0){ wsSlots[freeSlot] = {id, meta, relay, false}; }
+    portEXIT_CRITICAL(&wsSlotsMux);
+}
+
+// A slot's flags, under the lock (the two writers are on different tasks).
+static WsSlot wsSlotGet(uint32_t id) {
+    WsSlot r = {};
+    portENTER_CRITICAL(&wsSlotsMux);
+    for (int i = 0; i < WS_SLOTS; i++) if (wsSlots[i].id == id) r = wsSlots[i];
+    portEXIT_CRITICAL(&wsSlotsMux);
+    return r;
+}
+static void wsSlotDmx(uint32_t id) {
+    portENTER_CRITICAL(&wsSlotsMux);
+    for (int i = 0; i < WS_SLOTS; i++) if (wsSlots[i].id == id) wsSlots[i].dmx = true;
     portEXIT_CRITICAL(&wsSlotsMux);
 }
 
 // Queue one shared buffer to every client that has room, skipping full or closing ones.
 // metaOnly: just the clients that asked for the senders/log JSON (the status page).
-static void wsSendEach(const AsyncWebSocketSharedBuffer& buf, bool text, bool metaOnly) {
+// relayTo: just the relay clients of that role (1 phones, 2 the laptop), never `skip`.
+static void wsSendEach(const AsyncWebSocketSharedBuffer& buf, bool text, bool metaOnly, uint8_t relayTo = 0, uint32_t skip = 0) {
     WsSlot ids[WS_SLOTS];
     portENTER_CRITICAL(&wsSlotsMux);
     memcpy(ids, wsSlots, sizeof(ids));
     portEXIT_CRITICAL(&wsSlotsMux);
     for (int i = 0; i < WS_SLOTS; i++) {
-        if (!ids[i].id || (metaOnly && !ids[i].meta)) continue;
+        if (!ids[i].id || (metaOnly && !ids[i].meta) || (relayTo && (ids[i].relay != relayTo || ids[i].id == skip))) continue;
         if (!ws.availableForWrite(ids[i].id)) continue;   // full or not CONNECTED: skip this one only
         if (text) ws.text(ids[i].id, buf); else ws.binary(ids[i].id, buf);
     }
@@ -2142,6 +2161,198 @@ static volatile uint32_t httpReqCount = 0;   // [DEBUG] HTTP requests served
 static volatile uint32_t wsConnCount  = 0;   // [DEBUG] WS connects
 static volatile uint32_t wsDiscCount  = 0;   // [DEBUG] WS disconnects
 
+// ---------------------------------------------------------------------------
+// DMX from a browser (the sequencer, through /bridge)
+// ---------------------------------------------------------------------------
+// A web page can't send Art-Net or sACN, browsers have no UDP. So the sequencer streams its frames
+// over this WebSocket and they go in as one more source, proto 2 ("Web"): same merge, priority,
+// signal loss and sender list as Art-Net and sACN.
+//
+// Binary message, version 1: 'D', 1, universe lo, universe hi, priority (0 = default), 0, then
+// 1..512 channel values. The universe is the Art-Net port-address the outputs are set to.
+//
+// Socket events run on the async_tcp task and routeFrame() belongs to netRxTask, so a frame only
+// gets copied into a small ring here and netRxTask routes it. The ring is allocated when the first
+// frame arrives: a box nobody streams to doesn't pay for it.
+static constexpr int     WSIN_SLOTS = 8;   // 4 universes, two ticks of slack
+static constexpr uint8_t PROTO_WEB  = 2;
+struct WsInFrame { uint32_t ip; uint16_t uni; uint16_t len; uint8_t prio; uint8_t data[512]; };
+static WsInFrame*        g_wsIn     = nullptr;
+static volatile uint8_t  g_wsInHead = 0, g_wsInTail = 0;   // head = next write, tail = next read
+static portMUX_TYPE      g_wsInMux  = portMUX_INITIALIZER_UNLOCKED;
+static volatile uint32_t g_wsInDrops = 0;
+
+// async_tcp task, the only writer.
+static void wsDmxIn(uint32_t ip, const uint8_t* p, size_t len) {
+    if (len < 7 || len > 6 + 512 || p[0] != 'D' || p[1] != 1) return;
+    if (!g_wsIn) {
+        g_wsIn = (WsInFrame*)heap_caps_calloc(WSIN_SLOTS, sizeof(WsInFrame), HEAP8_CAPS);
+        if (!g_wsIn) return;
+    }
+    portENTER_CRITICAL(&g_wsInMux);
+    const uint8_t head = g_wsInHead, next = (uint8_t)((head + 1) % WSIN_SLOTS);
+    const bool    full = (next == g_wsInTail);
+    portEXIT_CRITICAL(&g_wsInMux);
+    if (full) { g_wsInDrops++; return; }   // netRxTask is behind; the next frame is 25 ms away anyway
+    WsInFrame& f = g_wsIn[head];
+    f.ip   = ip;
+    f.uni  = (uint16_t)((p[2] | (p[3] << 8)) & 0x7FFF);
+    f.prio = p[4] == 0 ? DEFAULT_PRIORITY : (p[4] > 200 ? 200 : p[4]);
+    f.len  = (uint16_t)(len - 6);
+    memcpy(f.data, p + 6, f.len);
+    portENTER_CRITICAL(&g_wsInMux);
+    g_wsInHead = next;                       // publish only once the slot is filled
+    portEXIT_CRITICAL(&g_wsInMux);
+}
+
+// netRxTask, the only reader.
+static void wsDmxDrain() {
+    if (!g_wsIn) return;
+    for (int k = 0; k < WSIN_SLOTS; k++) {
+        portENTER_CRITICAL(&g_wsInMux);
+        const uint8_t tail  = g_wsInTail;
+        const bool    empty = (tail == g_wsInHead);
+        portEXIT_CRITICAL(&g_wsInMux);
+        if (empty) return;
+        const WsInFrame& f = g_wsIn[tail];
+        routeFrame((int)f.uni, f.data, f.len, f.ip, PROTO_WEB, f.prio);
+        portENTER_CRITICAL(&g_wsInMux);
+        g_wsInTail = (uint8_t)((tail + 1) % WSIN_SLOTS);
+        portEXIT_CRITICAL(&g_wsInMux);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The sequencer's remote: relay messages (README, "A phone as a remote")
+// ---------------------------------------------------------------------------
+// A /ws text message starting {"relay": is passed on as it came; the box never reads it. Clients
+// say what they are: {"type":"relay"} a phone (the /remote page), {"type":"relay","host":1} the
+// laptop (its bridge popup). What the laptop sends goes to the phones, what a phone (or anyone
+// else) sends goes to the laptop: phones never get each other's chatter, the status, config and
+// RDM pages get none of it. At most RELAY_MAX bytes, RELAY_RATE a second per client, valid UTF-8
+// only (one bad byte would make every browser that gets it drop its whole socket), sent per client
+// like the pushes, and skipped when the heap is short.
+static constexpr size_t   RELAY_MAX  = 4096;
+static constexpr uint16_t RELAY_RATE = 50;
+static const char         RELAY_HEAD[] = "{\"relay\":";
+
+static bool utf8Valid(const uint8_t* p, size_t n) {
+    for (size_t i = 0; i < n;) {
+        const uint8_t c = p[i];
+        size_t k = c < 0x80 ? 0 : (c & 0xE0) == 0xC0 ? 1 : (c & 0xF0) == 0xE0 ? 2 : (c & 0xF8) == 0xF0 ? 3 : 9;
+        if (k == 9 || (k == 1 && c < 0xC2) || (k == 3 && c > 0xF4) || i + k >= n + (k ? 0 : 1)) return false;
+        for (size_t j = 1; j <= k; j++) if ((p[i + j] & 0xC0) != 0x80) return false;
+        if (k == 2 && ((c == 0xE0 && p[i + 1] < 0xA0) || (c == 0xED && p[i + 1] > 0x9F))) return false;   // overlong, surrogates
+        if (k == 3 && ((c == 0xF0 && p[i + 1] < 0x90) || (c == 0xF4 && p[i + 1] > 0x8F))) return false;
+        i += k + 1;
+    }
+    return true;
+}
+
+// The tables below belong to the AsyncTCP task (the event handler): a disconnect can arrive on the
+// loop task (cleanup closes clients there), so it never touches them. Entries of gone clients
+// simply go stale and are taken over.
+struct RelayRate { uint32_t id, since; uint16_t n; };
+static RelayRate g_relayRate[WS_SLOTS * 2] = {};
+static bool relayAllowed(uint32_t id) {
+    const uint32_t now = millis();
+    RelayRate* r = nullptr;
+    for (auto& x : g_relayRate) if (x.id == id) r = &x;
+    if (!r) {                                                   // a new client: a free entry, else the stalest
+        r = &g_relayRate[0];
+        for (auto& x : g_relayRate) { if (!x.id) { r = &x; break; } if (x.since < r->since) r = &x; }
+        *r = {id, now, 0};
+    }
+    if (now - r->since >= 1000) { r->since = now; r->n = 0; }
+    return ++r->n <= RELAY_RATE;
+}
+
+static void relaySend(const AsyncWebSocketSharedBuffer& buf, uint32_t from) {
+    const size_t len = buf->size();
+    const uint8_t* data = buf->data();
+    if (len <= sizeof(RELAY_HEAD) - 1 || len > RELAY_MAX || memcmp(data, RELAY_HEAD, sizeof(RELAY_HEAD) - 1)) return;
+    if (!utf8Valid(data, len) || !relayAllowed(from)) return;
+    if (heapFree() < WS_MIN_FREE + len || heapBlock() < WS_MIN_BLOCK) return;
+    wsSendEach(buf, true, false, wsSlotGet(from).relay == 2 ? 1 : 2, from);   // the laptop's to the phones, the rest to the laptop
+}
+static void relaySend(const uint8_t* data, size_t len, uint32_t from) {
+    if (len > RELAY_MAX || heapFree() < WS_MIN_FREE + 2 * len) return;
+    try { relaySend(std::make_shared<std::vector<uint8_t>>(data, data + len), from); } catch (...) {}
+}
+
+// A frame bigger than what's left of a TCP segment reaches us in pieces (a relay over ~1.4 KB; a
+// 518-byte DMX frame that shared a segment with another). Put relays and DMX frames back together,
+// one per client at a time, straight into the buffer that is then used (no second copy). One that
+// stalls for 2 s, or takes more than 5 s in all, is dropped. Anything else in pieces is dropped as
+// before (our own control messages are tiny).
+struct Pieces { uint32_t id, first, at, ip; bool dmx; std::shared_ptr<std::vector<uint8_t>> buf; size_t got; };
+static Pieces g_pieces[WS_SLOTS] = {};
+
+static void wsPiece(uint32_t id, uint32_t ip, const AwsFrameInfo* info, const uint8_t* data, size_t len) {
+    const uint32_t now = millis();
+    for (auto& r : g_pieces) if (r.id && (now - r.at > 2000 || now - r.first > 5000)) r = {};
+    Pieces* r = nullptr;
+    for (auto& x : g_pieces) if (x.id == id) r = &x;
+    if (info->index == 0) {
+        if (r) *r = {};
+        r = nullptr;
+        // only what looks like a relay (as far as this first piece goes) or a DMX frame, within its cap
+        const bool dmx = info->opcode == WS_BINARY;
+        const size_t head = sizeof(RELAY_HEAD) - 1, cap = dmx ? 6 + 512 : RELAY_MAX;
+        if (info->len > cap || !len) return;
+        if (dmx ? data[0] != 'D' : memcmp(data, RELAY_HEAD, len < head ? len : head)) return;
+        if (heapFree() < WS_MIN_FREE + info->len || heapBlock() < info->len) return;
+        for (auto& x : g_pieces) if (!x.id) { r = &x; break; }
+        if (!r) for (auto& x : g_pieces) if (!r || x.at < r->at) r = &x;    // all busy: the stalest goes
+        *r = {};
+        try { r->buf = std::make_shared<std::vector<uint8_t>>(); r->buf->reserve(info->len); } catch (...) { *r = {}; return; }
+        r->id = id; r->ip = ip; r->dmx = dmx; r->first = now;
+    }
+    if (!r || info->index != r->got || r->got + len > info->len) { if (r) *r = {}; return; }
+    r->buf->insert(r->buf->end(), data, data + len);
+    r->got += len;
+    r->at = now;
+    if (r->got == info->len) {
+        if (r->dmx) { wsSlotDmx(id); wsDmxIn(r->ip, r->buf->data(), r->buf->size()); }
+        else relaySend(r->buf, id);
+        *r = {};
+    }
+}
+
+// Live clients are capped at WS_LIVE_MAX (heap, issue #135). The ones closed when there are more
+// are the newest that aren't the laptop's bridge (it says so when it subscribes, and it's the one
+// sending DMX): the bridge that plays the show must never be kicked (closing the oldest made it
+// rotate, each reconnect pushing out the next). Only connected clients count and get picked, until
+// WS_LIVE_MAX are left; the library's own cleanup only reaps. Loop task.
+static constexpr size_t WS_LIVE_MAX = 4;
+static void wsCap() {
+    for (int guard = 0; guard < WS_SLOTS && ws.count() > WS_LIVE_MAX; guard++) {
+        WsSlot ids[WS_SLOTS];
+        portENTER_CRITICAL(&wsSlotsMux);
+        memcpy(ids, wsSlots, sizeof(ids));
+        portEXIT_CRITICAL(&wsSlotsMux);
+        auto live = [](uint32_t id) { AsyncWebSocketClient* c = ws.client(id); return c && c->status() == WS_CONNECTED; };
+        uint32_t pick = 0;
+        for (const auto& x : ids) if (x.id && !x.dmx && x.relay != 2 && x.id > pick && live(x.id)) pick = x.id;
+        if (!pick) for (const auto& x : ids) if (x.id && x.id > pick && live(x.id)) pick = x.id;   // all are bridges: the newest
+        if (!pick) break;
+        ws.close(pick, 4001, "full");   // 4001: the box is full (the remote page says so)
+    }
+    // more than the slots can track (a flood of connects): the library's own cap, oldest first
+    ws.cleanupClients(ws.count() > (size_t)WS_SLOTS ? (uint16_t)WS_LIVE_MAX : (uint16_t)1000);
+}
+
+// One byte back ('K') for every DMX frame and relay message a client sent, once it's all here. The
+// sequencer's pages (bridge, remote) send their next message only after it, so the box never gets
+// two of theirs in one TCP segment: ESPAsyncWebServer v3.12.1 misreads a frame header that is split
+// across two segments (a burst of ~1 KB messages became a close frame with a garbage code on the
+// WT32; fixed upstream in PR #473, not in a release yet). Nothing for the subscribe messages: a page
+// sends those first without waiting, and a stray ack would let its next message go out too early.
+static void wsAck(AsyncWebSocketClient* c) {
+    static const uint8_t K = 'K';
+    if (c && c->status() == WS_CONNECTED) c->binary(&K, 1);
+}
+
 static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client, AwsEventType type,
                       void* arg, uint8_t* data, size_t len) {
     if (type == WS_EVT_CONNECT) {
@@ -2156,6 +2367,13 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client, AwsEventTyp
     if (type == WS_EVT_DISCONNECT) { wsDiscCount++; wsSlotSet(client->id(), false); return; }
     if (type != WS_EVT_DATA) return;
     AwsFrameInfo* info = (AwsFrameInfo*)arg;
+    // A whole DMX frame from the sequencer bridge (binary, single WS frame, <= 518 bytes).
+    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_BINARY) {
+        if (len && data[0] == 'D') wsSlotDmx(client->id());       // a DMX sender: never the one closed for room
+        wsDmxIn((uint32_t)client->remoteIP(), data, len);
+        if (len && data[0] == 'D') wsAck(client);
+        return;
+    }
     // Only handle complete, single-frame text messages (our control msgs are tiny)
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
         // The status page asks for the senders/log JSON. Nobody else gets it: it's up to ~6 KB
@@ -2165,7 +2383,21 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client, AwsEventTyp
             wsSlotSet(client->id(), true, true);
             return;
         }
+        // the sequencer's pages ask for the relay messages (above): a phone, or the laptop
+        static const char SUB_RELAY[] = "{\"type\":\"relay\"}", SUB_HOST[] = "{\"type\":\"relay\",\"host\":1}";
+        if (len == sizeof(SUB_RELAY) - 1 && !memcmp(data, SUB_RELAY, len)) { wsSlotSet(client->id(), true, false, 1); return; }
+        if (len == sizeof(SUB_HOST) - 1 && !memcmp(data, SUB_HOST, len)) { wsSlotSet(client->id(), true, false, 2); return; }
+        // the sequencer's remote: passed on, never read
+        if (len > sizeof(RELAY_HEAD) - 1 && !memcmp(data, RELAY_HEAD, sizeof(RELAY_HEAD) - 1)) { relaySend(data, len, client->id()); wsAck(client); return; }
         handleWsText((const char*)data, len);
+        return;
+    }
+    // a frame in pieces (it didn't fit what was left of a TCP segment): relays and DMX are put back together
+    if (info->final && (info->opcode == WS_TEXT || info->opcode == WS_BINARY) && info->len > len) {
+        wsPiece(client->id(), (uint32_t)client->remoteIP(), info, data, len);
+        // its last piece: answered even when it was dropped (too big, broken), or the page would wait
+        // for nothing. Text in pieces only from the sequencer's pages (the others' are tiny).
+        if (info->index + len == info->len && (info->opcode == WS_BINARY || wsSlotGet(client->id()).relay)) wsAck(client);
     }
 }
 
@@ -2842,6 +3074,24 @@ static void handleI2cScan(AsyncWebServerRequest* req) {
     sendJsonSafe(req, j);
 }
 
+// Why the box last started, in a word for /info.json: after a hang or a crash the next start says
+// what it was (a watchdog, a crash, the power), so it can be told afterwards without a console.
+static const char* resetWhy() {
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:   return "power on";
+        case ESP_RST_EXT:       return "reset pin";
+        case ESP_RST_SW:        return "restart";
+        case ESP_RST_PANIC:     return "crash";
+        case ESP_RST_INT_WDT:   return "interrupt watchdog";
+        case ESP_RST_TASK_WDT:  return "task watchdog";
+        case ESP_RST_WDT:       return "watchdog";
+        case ESP_RST_DEEPSLEEP: return "deep sleep";
+        case ESP_RST_BROWNOUT:  return "brownout";
+        case ESP_RST_SDIO:      return "sdio";
+        default:                return "unknown";
+    }
+}
+
 static void handleInfoJson(AsyncWebServerRequest* req) {
     String j = "{";
     j += "\"ssid\":\"";     j += netSSID();              j += "\",";
@@ -2852,6 +3102,8 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"artShort\":\""; j += jsonEsc(cfg.artShortName); j += "\",";
     j += "\"artLong\":\"";  j += jsonEsc(cfg.artLongName);  j += "\",";
     j += "\"version\":\"";  j += FIRMWARE_VERSION;       j += "\",";
+    j += "\"reset\":\"";    j += resetWhy();             j += "\",";   // why it last started
+    j += "\"uptime\":";      j += (uint32_t)(esp_timer_get_time() / 1000000ULL); j += ",";   // seconds since then
     j += "\"otapw\":\"";    j += cfg.otaPassword;        j += "\",";
     j += "\"universe\":";   j += cfg.outputs[0].universe; j += ",";   // legacy/back-compat
     j += "\"protocol\":";   j += cfg.protocol;           j += ",";
@@ -3151,6 +3403,17 @@ static void handleRdmTrigger(AsyncWebServerRequest* req) {
                     rdmSetUid = u; rdmReqAddr = (uint16_t)a; rdmSetAddrReq = true;
                     req->send(200, "application/json", "{\"ok\":true,\"op\":\"setaddr\"}"); return;
                 }
+            } else if (path.endsWith("/setpers") && req->hasParam("pers")) {
+                // the sequencer's rig check (through the bridge page): the same mailbox the RDM tab uses
+                int p = req->getParam("pers")->value().toInt();
+                if (p >= 1 && p <= 255) {
+                    rdmPersUid = u; rdmReqPers = (uint8_t)p; rdmSetPersReq = true;
+                    req->send(200, "application/json", "{\"ok\":true,\"op\":\"setpers\"}"); return;
+                }
+            } else if (path.endsWith("/setlabel") && req->hasParam("label")) {
+                strlcpy(rdmReqLabel, req->getParam("label")->value().c_str(), sizeof(rdmReqLabel));
+                rdmLabelUid = u; rdmSetLabelReq = true;
+                req->send(200, "application/json", "{\"ok\":true,\"op\":\"setlabel\"}"); return;
             } else if (path.endsWith("/identify")) {
                 rdmIdentUid = u;
                 rdmReqOn = req->hasParam("on") && req->getParam("on")->value().toInt() != 0;
@@ -3297,6 +3560,24 @@ static void handleConfigGet(AsyncWebServerRequest* req) {
     AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", CONFIG_HTML, CONFIG_HTML_LEN);
     r->addHeader("Content-Encoding", "gzip");
     r->addHeader("Cache-Control", "no-cache");   // revalidate after OTA (assets stay versioned)
+    req->send(r);
+}
+
+// The sequencer bridge (README, "Sending DMX from a web page"): a small page the browser sequencer opens as a popup. It
+// lives on this box's own origin, so it can reach /ws, which an https page can't (mixed content).
+static void handleBridgePage(AsyncWebServerRequest* req) {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", BRIDGE_HTML, BRIDGE_HTML_LEN);
+    r->addHeader("Content-Encoding", "gzip");
+    r->addHeader("Cache-Control", "no-cache");
+    req->send(r);
+}
+
+// A phone as a remote for the sequencer (README, "A phone as a remote"): the show runs on a laptop, this page
+// plays its live page through the /ws relay. On the box itself, so a phone needs no app and no popup.
+static void handleRemotePage(AsyncWebServerRequest* req) {
+    AsyncWebServerResponse* r = req->beginResponse_P(200, "text/html", REMOTE_HTML, REMOTE_HTML_LEN);
+    r->addHeader("Content-Encoding", "gzip");
+    r->addHeader("Cache-Control", "no-cache");
     req->send(r);
 }
 
@@ -5637,12 +5918,16 @@ void setup() {
     http.on("/rdm/discover",      HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/setaddr",       HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/identify",      HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/setpers",       HTTP_GET,  handleRdmTrigger);
+    http.on("/rdm/setlabel",      HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/bqp",           HTTP_GET,  handleRdmTrigger);
     http.on("/rdm/merge",         HTTP_GET,  handleRdmTrigger);
     http.on("/led/bright",        HTTP_GET,  handleLedBright);   // live-tune the 5-LED panel brightness
     // The page route matches "/rdm" and prefix "/rdm/…", so register it AFTER the /rdm/* handlers
     // (first match wins) or it would swallow /rdm/discover etc.
     http.on("/rdm",               HTTP_GET,  handleRdmPage);
+    http.on("/bridge",            HTTP_GET,  handleBridgePage);
+    http.on("/remote",            HTTP_GET,  handleRemotePage);
     http.on("/labels.json",       HTTP_GET,  handleLabelsGet);
     http.on("/labels",            HTTP_POST, [](AsyncWebServerRequest*){}, NULL, handleLabelsBody);
     http.on("/enc.json",          HTTP_GET,  handleEncJson);
@@ -5757,6 +6042,7 @@ static void netRxTask(void*) {
             artRdmDrainResponses();
             if (cfg.protocol != 0) readSacn();
         }
+        wsDmxDrain();   // frames a browser sent over /ws (the sequencer bridge)
         ArduinoOTA.handle();
 
         uint32_t now = millis();
@@ -5812,7 +6098,7 @@ void loop() {
 
     static uint32_t lastWsClean = 0;
     if (now - lastWsClean >= 1000) {
-        ws.cleanupClients(4);   // cap clients; drop oldest beyond 4
+        wsCap();   // at most 4 live clients, never closing the one that sends DMX
         lastWsClean = now;
     }
 

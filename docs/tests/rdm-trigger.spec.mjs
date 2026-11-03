@@ -3,6 +3,8 @@
 //   GET /rdm/discover
 //   GET /rdm/setaddr?uid=MMMM:DDDDDDDD&addr=N
 //   GET /rdm/identify?uid=MMMM:DDDDDDDD&on=1
+//   GET /rdm/setpers?uid=MMMM:DDDDDDDD&pers=N        (the sequencer's rig check sets a mode)
+//   GET /rdm/setlabel?uid=MMMM:DDDDDDDD&label=text   (and a light's label)
 //
 // The validation paths (bad/missing params) never queue a bus action, so they
 // run by default. The success paths actually queue an RDM transaction on the
@@ -64,6 +66,20 @@ test.describe('RDM trigger — validation (non-mutating, always runs)', () => {
     const r = await request.get('/rdm/identify?on=1');
     expect(r.status()).toBe(400);
   });
+
+  test('setpers without uid, without a mode, or with a mode out of range → 400', async ({ request }) => {
+    for (const q of ['pers=2', `uid=${UID}`, `uid=${UID}&pers=0`, `uid=${UID}&pers=256`, 'uid=notauid&pers=2']) {
+      const r = await request.get(`/rdm/setpers?${q}`);
+      expect(r.status(), q).toBe(400);
+    }
+  });
+
+  test('setlabel without uid or without a label → 400', async ({ request }) => {
+    for (const q of ['label=x', `uid=${UID}`]) {
+      const r = await request.get(`/rdm/setlabel?${q}`);
+      expect(r.status(), q).toBe(400);
+    }
+  });
 });
 
 test.describe('RDM trigger — queues a bus action (opt-in)', () => {
@@ -83,6 +99,16 @@ test.describe('RDM trigger — queues a bus action (opt-in)', () => {
     const j = await json(r);
     expect(j.ok).toBe(true);
     expect(j.op).toBe('setaddr');
+  });
+
+  test('setpers and setlabel with a valid uid → 200 {ok:true, op}', async ({ request }) => {
+    for (const [path, op] of [[`/rdm/setpers?uid=${UID}&pers=1`, 'setpers'], [`/rdm/setlabel?uid=${UID}&label=${encodeURIComponent('Test label')}`, 'setlabel']]) {
+      const r = await request.get(path);
+      expect(r.ok(), path).toBeTruthy();
+      const j = await json(r);
+      expect(j.ok).toBe(true);
+      expect(j.op).toBe(op);
+    }
   });
 
   test('identify on/off → 200 {ok:true, op:"identify"}', async ({ request }) => {

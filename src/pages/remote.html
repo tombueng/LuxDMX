@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e13">
+<title>LuxDMX remote</title>
+<style>
+:root { --bg:#0b0e13; --panel:#151a22; --panel2:#1b212b; --line:#2a313c; --line2:#384150; --text:#d7dde6; --muted:#929cab; --faint:#858f9f;
+  --green:#45d85c; --orange:#ffaa1c; --pink:#f33abc; --tile:132px; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:15px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif; }
+body { display:flex; flex-direction:column; overscroll-behavior:none; }
+/* a remote, not a document: no text selection or callout menus under a thumb */
+#play { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+button { font:inherit; color:inherit; border:1px solid var(--line); background:var(--panel2); border-radius:10px; cursor:pointer; touch-action:manipulation; }
+button:focus-visible, input:focus-visible { outline:2px solid #6aa2ff; outline-offset:2px; }
+button:disabled { opacity:.35; cursor:default; }
+svg.i { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.hidden { display:none !important; }
+
+/* joining, and the cards that ask for a code again */
+.join { margin:auto; width:min(380px, 100% - 32px); display:flex; flex-direction:column; gap:.9rem; text-align:center; padding:1.5rem 0; }
+.join h1 { font-size:1.25rem; margin:0; } .join h1 b { color:var(--orange); }
+.join p, .card p { margin:0; color:var(--muted); }
+.code { font:700 2.2rem/1 ui-monospace,monospace; letter-spacing:.5em; text-align:center; padding:.6rem 0 .6rem .5em; width:100%;
+  background:var(--panel); color:var(--text); border:1px solid var(--line2); border-radius:12px; }
+.primary { background:var(--orange); color:#1d1300; border:0; font-weight:700; padding:.8rem; font-size:1.05rem; width:100%; margin-top:.8rem; min-height:48px; }
+.msg { min-height:1.4em; font-size:.9rem; }
+.msg.bad { color:var(--pink); }
+.tip { font-size:.82rem; color:var(--faint); }
+
+/* playing */
+header { position:relative; display:flex; align-items:center; gap:.5rem; padding:calc(.4rem + env(safe-area-inset-top)) .5rem .4rem 1rem; border-bottom:1px solid var(--line); background:var(--panel); }
+.dot { width:10px; height:10px; border-radius:50%; flex:none; background:currentColor; box-shadow:0 0 8px currentColor; }
+.status { font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; flex:none; }
+.st-ok { color:var(--green); } .st-wait { color:var(--orange); } .st-bad { color:var(--pink); } .st-blind { color:#9fc0ff; }
+.show { margin:0; font-size:1rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+.more { width:44px; height:44px; display:grid; place-items:center; border:0; background:none; font-size:1.3rem; letter-spacing:.05em; }
+.menu { position:absolute; right:.5rem; top:100%; z-index:20; background:var(--panel2); border:1px solid var(--line2); border-radius:12px; padding:.3rem; display:flex; flex-direction:column; min-width:12rem; box-shadow:0 12px 32px #000a; }
+.menu button { border:0; background:none; text-align:left; padding:.75rem .8rem; min-height:44px; }
+.tabs { display:flex; gap:.35rem; padding:.5rem 1rem 0; overflow-x:auto; scrollbar-width:none; }
+.tabs button { padding:0 1rem; min-height:44px; border-radius:999px; white-space:nowrap; font-size:.9rem; }
+.tabs button[aria-selected="true"] { border-color:var(--orange); color:var(--orange); }
+main { position:relative; flex:1; min-height:0; overflow:auto; padding:.6rem 1rem 1rem; }
+/* over the grid, never pushing it under a thumb */
+.banner { position:sticky; top:0; z-index:10; margin:0 0 -3rem; padding:.6rem .8rem; border-radius:10px; background:#3a1030f2; border:1px solid var(--pink); font-size:.9rem; box-shadow:0 8px 24px #000a; }
+.banner.wait { background:#3a2a08f2; border-color:var(--orange); }
+.card { max-width:380px; margin:2rem auto; text-align:center; display:flex; flex-direction:column; gap:.6rem; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:1.2rem; }
+.card b { color:var(--text); }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(var(--tile), 1fr)); gap:.5rem; align-content:start; }
+.grid.few { --tile:42vw; } .grid.few .tile { min-height:120px; }
+.grid.lost { opacity:.4; pointer-events:none; }
+.head { grid-column:1 / -1; font-size:.76rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); padding:.7rem .1rem .1rem; display:flex; align-items:center; gap:.5rem; }
+.head::after { content:''; flex:1; height:1px; background:var(--line); }
+.cell { position:relative; display:grid; }
+.cell.wide { grid-column:span 2; }
+.tile { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-end; gap:.15rem; min-height:96px; padding:.5rem .55rem; min-width:0;
+  border-radius:12px; border:1px solid var(--line); background:linear-gradient(180deg, var(--panel2), var(--panel)); text-align:left; overflow:hidden;
+  box-shadow:inset 0 3px 0 color-mix(in srgb, var(--c) 70%, transparent); user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+.tile.on { border-color:var(--c); background:linear-gradient(180deg, color-mix(in srgb, var(--c) 28%, var(--panel2)), color-mix(in srgb, var(--c) 10%, var(--panel)));
+  box-shadow:0 0 18px color-mix(in srgb, var(--c) 35%, transparent), inset 0 3px 0 var(--c); }
+.tile.pressed, .tile.flash { transform:scale(.97); }
+.tile.flash { border-color:var(--c); }
+.tile.missing { opacity:.5; }
+.tile .t { font-weight:700; font-size:.95rem; line-height:1.15; max-width:100%; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.tile .sub { font-size:.72rem; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.tile .glyph { position:absolute; top:.5rem; left:.55rem; display:flex; color:color-mix(in srgb, var(--c) 80%, var(--muted)); }
+.tile.on .glyph { color:var(--text); }
+.tile .risk { position:absolute; bottom:.45rem; right:.5rem; font:700 .72rem ui-monospace,monospace; color:var(--orange); background:#000a; border-radius:5px; padding:.05rem .3rem; z-index:1; }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.tile .num { position:absolute; top:.45rem; right:.5rem; font:700 .72rem ui-monospace,monospace; color:var(--text); background:#0009; border-radius:5px; padding:.05rem .3rem; z-index:1; }
+.tile.cue, .tile.effect { justify-content:flex-start; padding-top:.4rem; }
+.tile .pic { width:100%; flex:1; min-height:40px; border-radius:7px; box-shadow:inset 0 0 0 1px #0006; }
+.tile .dots { display:flex; gap:5px; align-items:center; flex:1; min-height:34px; }
+.tile .dots i { width:12px; height:12px; border-radius:50%; box-shadow:0 0 8px currentColor; }
+.tile .bar { position:absolute; left:0; right:0; bottom:0; height:3px; background:#ffffff10; }
+.tile .bar span { display:block; height:100%; background:var(--c); }
+.cell.has-burst .tile { padding-right:3.6rem; }
+.burst { position:absolute; right:.35rem; bottom:.35rem; min-width:44px; min-height:36px; font-size:.8rem; border-radius:999px; border:1px solid var(--line2); color:var(--text); background:var(--panel); }
+.fader { justify-content:flex-end; touch-action:pan-y; }
+.fader .fill { position:absolute; left:0; right:0; bottom:0; height:calc(var(--v) * 100%); pointer-events:none;
+  background:linear-gradient(0deg, color-mix(in srgb, var(--c) 45%, transparent), color-mix(in srgb, var(--c) 18%, transparent)); border-top:2px solid var(--c); }
+.fader .t, .fader b { position:relative; }
+.fader b { background:#000a; border-radius:6px; padding:.05rem .35rem; font-size:.85rem; }
+.fader.grabbed { box-shadow:inset 0 0 0 2px var(--c), 0 0 18px color-mix(in srgb, var(--c) 45%, transparent); }
+@media (max-width:700px) { .cell.fadercell { grid-column:span 2; } .cell.fadercell .tile { min-height:120px; } }
+.hint { position:fixed; left:50%; bottom:9rem; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line2); border-radius:10px; padding:.5rem .8rem; font-size:.85rem; z-index:30; box-shadow:0 8px 24px #000a; }
+/* the buttons that work while held, under the thumb on a phone (they're on the page too) */
+.holdrow { display:none; flex:1 1 100%; gap:.4rem; overflow-x:auto; scrollbar-width:none; }
+.holdrow .tile { min-height:52px; min-width:5.6rem; flex:1 0 auto; justify-content:center; padding:.35rem .7rem; }
+.holdrow .tile .t { font-size:.88rem; -webkit-line-clamp:1; }
+@media (max-width:700px) { .holdrow.some { display:flex; } }
+#foot { display:flex; flex-wrap:wrap; align-items:stretch; gap:.5rem; padding:.6rem 1rem calc(.6rem + env(safe-area-inset-bottom)); background:var(--panel); border-top:1px solid var(--line); }
+.go { background:var(--green); color:#04140a; border:0; font-weight:800; font-size:1.25rem; min-width:7.5rem; min-height:56px; padding:.4rem 1rem; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; }
+.go small { font-weight:600; font-size:.75rem; opacity:.8; max-width:9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.back { width:3.4rem; min-height:56px; display:flex; align-items:center; justify-content:center; }
+.info { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; font-size:.85rem; }
+.info div { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.info .f { color:var(--faint); }
+.bo { position:relative; overflow:hidden; padding:.4rem .8rem; font-weight:700; min-height:56px; }
+.bo.on { background:var(--pink); color:#1a0010; border-color:var(--pink); }
+.bo .fillbar { position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--pink); }
+.bo.arming .fillbar { width:100%; transition:width .3s linear; }
+#foot.off .go, #foot.off .back, #foot.off .bo, #foot.off .holdrow { opacity:.35; pointer-events:none; }
+#foot.looks .go, #foot.looks .back { display:none; }
+#foot.looks .bo { flex:1; }
+#foot.looks .info > div:nth-child(2) { display:none; }
+.status.locked::after { content:' · locked'; }
+.frame { position:fixed; inset:0; pointer-events:none; box-shadow:inset 0 0 0 3px var(--pink), inset 0 0 40px #f33abc33; z-index:5; }
+@media (max-width:420px) {
+  :root { --tile:104px; }
+  .info { order:-1; flex:1 1 100%; flex-direction:row; gap:.8rem; }   /* now and next on their own line above the buttons */
+  .info div { flex:1; min-width:0; }
+  .go { flex:1; min-width:0; }
+}
+@media (hover:hover) { .tile:hover, button:hover { border-color:var(--line2); } }
+</style>
+</head>
+<body>
+<main class="join" id="join">
+  <h1>Lux<b>DMX</b> remote</h1>
+  <p>Play the live page of a show that runs on a laptop or tablet. There: <b>Live</b>, the <b>Phone</b> button, switch the remote on, then scan its code or type it here.</p>
+  <form class="codeForm" autocomplete="off" novalidate>
+    <input class="code" inputmode="numeric" maxlength="4" placeholder="····" aria-label="Code from the show" autocomplete="one-time-code">
+    <button class="primary">Join</button>
+  </form>
+  <p class="msg" id="joinMsg" role="status"></p>
+  <p class="tip sleepTip hidden">This page keeps the screen on with a tiny silent video while you play. If the phone locks anyway, held buttons let go.</p>
+</main>
+
+<section id="play" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0">
+  <header role="banner">
+    <span class="dot st-wait" id="dot" aria-hidden="true"></span><span class="status st-wait" id="status">Waiting</span>
+    <h1 class="show" id="show"></h1>
+    <button class="more" id="moreBtn" aria-label="More" aria-haspopup="menu" aria-expanded="false">⋯</button>
+    <div class="menu hidden" id="menu" role="menu">
+      <button role="menuitem" id="other">Another code…</button>
+      <button role="menuitem" id="leave">Leave the remote</button>
+    </div>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Pages"></nav>
+  <main id="main">
+    <div class="banner hidden" id="lost" role="alert"></div>
+    <div class="card hidden" id="card" role="status">
+      <p id="cardMsg"></p>
+      <form class="codeForm" autocomplete="off" novalidate>
+        <input class="code" inputmode="numeric" maxlength="4" placeholder="····" aria-label="Code from the show">
+        <button class="primary">Join</button>
+      </form>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+  <section id="foot" class="off" aria-label="Playback">
+    <div class="holdrow" id="holdrow" role="group" aria-label="Hold buttons"></div>
+    <div class="info" aria-live="polite"><div><span class="f">Now</span> <b id="now">(nothing)</b></div><div><span class="f">Next</span> <span id="next"></span></div></div>
+    <button class="go" id="go" disabled><span>GO</span><small id="goList"></small></button>
+    <button class="back" id="back" aria-label="Back" disabled><svg class="i" viewBox="0 0 24 24"><path d="M17 4v16L4 12z"/></svg></button>
+    <button class="bo" id="bo" aria-pressed="false" title="Hold to black out, tap to come back">Blackout<span class="fillbar"></span></button>
+  </section>
+</section>
+<div class="frame hidden" id="frame" aria-hidden="true"></div>
+<div class="hint hidden" id="hint" role="status"></div>
+
+<script>
+// A phone as a remote for the LuxDMX sequencer (README, "A phone as a remote"). The show runs in the
+// sequencer on a laptop; this page only shows its live page and sends presses. Both talk through
+// this box's /ws: text messages {"relay":{...}} that the box passes on to the other pages that
+// asked for them, and never reads. What's held (flash, fog, blinder) is said again every ALIVE_MS;
+// the laptop lets go of anything it doesn't hear about for 1.5 s, so a phone that locks or drops
+// out never leaves a light on. And the page lets go itself whenever it can't be sure a finger is
+// still there (hidden, redrawn, lost).
+(function () {
+  'use strict';
+  var ALIVE_MS = 400, LOST_MS = 5000, ASK_AGAIN_MS = 20000;
+  var $ = function (id) { return document.getElementById(id); };
+  var ICONS = {
+    play: '<path d="M7 4v16l13-8z"/>', back: '<path d="M17 4v16L4 12z"/>', stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
+    bolt: '<path d="M13 2 5 14h6l-1 8 8-12h-6z"/>', loop: '<path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/>',
+    eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', note: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+    fog: '<path d="M6 17h11a4 4 0 0 0 0-8 6 6 0 0 0-11.3 1.5A3.5 3.5 0 0 0 6 17z"/><path d="M5 21h6M14 21h5"/>', moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    effect: '<path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/>', fade: '<path d="M3 5h5l8 14h5"/><path d="M3 19h18" opacity=".4"/>'
+  };
+  var icon = function (n) { return ICONS[n] ? '<svg class="i" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>' : ''; };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); };
+  // what the laptop sent goes into the page as text, colours only when they are colours
+  var COLOR = /^(#[0-9a-f]{3,8}|rgba?\(\s*[\d.]+%?(\s*,\s*[\d.]+%?){2,3}\s*\))$/i;
+  var col = function (c) { return typeof c === 'string' && COLOR.test(c) ? c : '#45d85c'; };
+  var dev = /iPhone/.test(navigator.userAgent) ? 'iPhone' : /iPad/.test(navigator.userAgent) ? 'iPad' : /Android/.test(navigator.userAgent) ? 'Android phone' : 'Browser';
+
+  // new for every page load: a copied tab is another phone, not this one twice
+  var rid = Math.random().toString(36).slice(2, 10), seq = 0;
+  var code = '', phase = 'join';            // join | looking | playing | ended | removed | other
+  var ws = null, wsOpen = false, joinedAt = 0, boxAt = 0, asleep = false, fullAt = 0;
+  // keyed by ids the laptop chose: plain maps with no prototype ("__proto__" is just a name here)
+  var layout = null, tiles = Object.create(null), dyn = Object.create(null), state = null, page = '', lastHeard = 0, askedAt = 0, lostSince = 0;
+  var held = {}, kbHeld = {}, touches = {};
+  var local = {};                            // fader id -> { v, until }: what the finger set, until the laptop catches up
+
+  // One at a time: the next after the box's 'K' (see bridge.html). A waiting fader move gives way to a newer one.
+  var outQ = [], waiting = 0, ACK_WAIT = 2000;
+  function send(m) {
+    if (!wsOpen || !code) return;
+    m.code = code; m.rid = rid;
+    if (m.k === 'fader') for (var i = 0; i < outQ.length; i++) if (outQ[i].k === 'fader' && outQ[i].w === m.w) { outQ.splice(i, 1); break; }
+    outQ.push(m);
+    if (outQ.length > 64) outQ.shift();
+    pump(false);
+  }
+  function pump(all) {
+    while (wsOpen && outQ.length && (all || !waiting || Date.now() - waiting >= ACK_WAIT)) {
+      var m = outQ.shift();
+      m.n = ++seq;                             // the laptop ignores a message it got twice (one box added twice)
+      waiting = Date.now();
+      try { ws.send(JSON.stringify({ relay: m })); } catch (_) {}
+      if (!all) return;
+    }
+  }
+  // The socket is closed while the page is hidden (a phone in a pocket shouldn't hold one of the
+  // box's few places) and opened again when it's back.
+  function connect() {
+    if (asleep || ws) return;
+    ws = new WebSocket('ws://' + location.host + '/ws');
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = function () { wsOpen = true; boxAt = Date.now(); outQ = []; waiting = 0; ws.send('{"type":"relay"}'); if (phase === 'looking' || phase === 'playing') hello(); show(); };
+    // 4001: the box has no room for another page right now (it takes four: the laptop and three phones)
+    ws.onclose = function (e) { ws = null; wsOpen = false; outQ = []; waiting = 0; if (e.code === 4001) fullAt = Date.now(); letGoAll(); show(); setTimeout(connect, e.code === 4001 ? 5000 : 1000); };
+    ws.onmessage = function (e) {
+      // the box's own status frames (10 a second) say the box is there, even when the laptop is quiet
+      if (typeof e.data !== 'string') {
+        boxAt = Date.now();
+        if (e.data.byteLength === 1 && new Uint8Array(e.data)[0] === 0x4b) { waiting = 0; pump(false); }
+        return;
+      }
+      if (e.data.lastIndexOf('{"relay":', 0) !== 0) return;
+      var m; try { m = JSON.parse(e.data).relay; } catch (_) { return; }
+      // only the laptop's, for this code (other phones talk on the same socket)
+      if (!m || m.host !== 1 || m.code !== code || (phase !== 'looking' && phase !== 'playing')) return;
+      if (m.k === 'bye') { if (!m.to || m.to === rid) ended(m.to ? 'removed' : 'ended'); return; }
+      if (m.to && m.to !== rid) return;
+      lastHeard = Date.now();
+      if (m.k === 'layout') onLayout(m);
+      else if (m.k === 'tiles') onTiles(m);
+      else if (m.k === 'state') onState(m);
+    };
+  }
+  function hello() { askedAt = Date.now(); send({ k: 'hello', p: page, dev: dev }); }
+
+  // ---- joining and leaving
+  function join(c) {
+    code = c; phase = 'looking'; joinedAt = Date.now(); layout = null; state = null; dyn = {};
+    if (location.hash !== '#k=' + c) history.replaceState(null, '', '#k=' + c);
+    $('join').classList.add('hidden'); $('play').classList.remove('hidden');
+    hello(); awake(true); show();
+  }
+  function ended(why) {
+    letGoAll();
+    phase = why; layout = null; state = null; tiles = Object.create(null); dyn = Object.create(null);
+    // taken off: the code goes, so a reload or the same QR doesn't put this phone straight back in
+    if (why === 'removed') { history.replaceState(null, '', location.pathname); code = ''; }
+    render(); show();
+  }
+  document.querySelectorAll('.codeForm').forEach(function (f) {
+    f.onsubmit = function (e) {
+      e.preventDefault();
+      var c = f.querySelector('.code').value.trim();
+      if (!/^\d{4}$/.test(c)) { $('joinMsg').textContent = 'The code has four digits.'; $('joinMsg').className = 'msg bad'; f.querySelector('.code').focus(); return; }
+      join(c);
+    };
+  });
+  function leave() {
+    letGoAll(); send({ k: 'bye' });
+    phase = 'join'; layout = null; state = null; history.replaceState(null, '', location.pathname);
+    awake(false);
+    $('play').classList.add('hidden'); $('join').classList.remove('hidden');
+    var inp = $('join').querySelector('.code'); inp.value = code; inp.focus(); inp.select();
+  }
+  // the menu: leaving takes a confirm, so a stray tap mid-song doesn't do it
+  $('moreBtn').onclick = function () { var m = $('menu'); m.classList.toggle('hidden'); $('moreBtn').setAttribute('aria-expanded', !m.classList.contains('hidden')); };
+  document.addEventListener('pointerdown', function (e) { if (!e.target.closest('#menu, #moreBtn')) { $('menu').classList.add('hidden'); $('moreBtn').setAttribute('aria-expanded', 'false'); } });
+  $('leave').onclick = function () { $('menu').classList.add('hidden'); if (confirm('Leave the remote? The show keeps playing.')) leave(); };
+  $('other').onclick = function () { $('menu').classList.add('hidden'); send({ k: 'bye' }); ended('other'); };
+  window.addEventListener('hashchange', function () { var k = (location.hash.match(/k=(\d{4})/) || [])[1]; if (k && k !== code) { letGoAll(); join(k); } });
+
+  // ---- what the laptop sends
+  function onLayout(m) {
+    if (layout && layout.v === m.v) return;
+    letGoAll();                      // the page is about to be redrawn: nothing stays held under a finger
+    layout = { v: m.v, show: m.show, pages: Array.isArray(m.pages) ? m.pages.filter(function (p) { return p && typeof p.id === 'string'; }) : [] };
+    tiles = Object.create(null);
+    if (!layout.pages.some(function (p) { return p.id === page; })) page = layout.pages.length ? layout.pages[0].id : '';
+    phase = 'playing';
+    render(); show();
+  }
+  // The same layout comes again every few seconds (for a phone that missed a part): only a page
+  // that just got complete is drawn, so a finger holding a button never loses it to a redraw.
+  function onTiles(m) {
+    if (!layout || m.v !== layout.v || !Array.isArray(m.tiles)) return;
+    var pg = layout.pages[m.p]; if (!pg) return;
+    var was = complete(pg.id);
+    var list = tiles[pg.id] || (tiles[pg.id] = new Array(Math.max(0, Math.min(500, Math.floor(+pg.n) || 0))));
+    var at = Math.max(0, Math.floor(+m.from) || 0);
+    m.tiles.forEach(function (t, i) { if (t && typeof t.id === 'string' && at + i < list.length) list[at + i] = t; });
+    if (!was && complete(pg.id) && pg.id === page) render();
+  }
+  function onState(m) {
+    state = m;
+    if (m.d && typeof m.d === 'object') for (var id in m.d) if (Array.isArray(m.d[id])) dyn[id] = m.d[id];
+    update(); show();
+  }
+
+  // ---- drawing
+  function complete(id) { var l = tiles[id]; if (!l) return false; for (var i = 0; i < l.length; i++) if (!l[i]) return false; return true; }
+  function render() {
+    var grid = $('grid'), row = $('holdrow');
+    if (!layout || !complete(page)) { grid.innerHTML = ''; row.innerHTML = ''; row.classList.remove('some'); $('tabs').innerHTML = ''; return; }
+    $('tabs').classList.toggle('hidden', layout.pages.length < 2);
+    $('tabs').innerHTML = layout.pages.map(function (p) {
+      return '<button role="tab" data-page="' + esc(p.id) + '" aria-selected="' + (p.id === page) + '">' + esc(p.name) + '</button>';
+    }).join('');
+    var list = tiles[page];
+    grid.innerHTML = list.map(cell).join('');
+    // a page with only a few buttons gets big ones
+    grid.classList.toggle('few', list.filter(function (t) { return t.type !== 'label'; }).length <= 6);
+    // the big moments first (blinder, drop), then fog, then the flashes: the first ones fit a phone's width
+    var rank = function (t) { return t.type === 'special' ? 0 : t.type === 'fog' ? 1 : 2; };
+    var holds = list.filter(function (t) { return t.holds && t.type !== 'fader'; })
+      .map(function (t, i) { return [rank(t), i, t]; }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; })
+      .map(function (x) { return x[2]; }).slice(0, 6);
+    row.innerHTML = holds.map(function (t) {
+      return '<button class="tile ' + esc(t.type) + '" style="--c:' + col(t.color) + '" data-id="' + esc(t.id) + '" aria-pressed="false"><span class="t">' + esc(t.label) + '</span></button>';
+    }).join('');
+    row.classList.toggle('some', holds.length > 0);
+    update();
+  }
+  function cell(t) {
+    var c = 'style="--c:' + col(t.color) + '"', burst = Math.max(0, Math.round(+t.burst || 0));
+    var sw = Array.isArray(t.swatch) ? t.swatch.filter(function (x) { return typeof x === 'string' && COLOR.test(x); }).slice(0, 6) : [];
+    if (t.type === 'label') return '<div class="head">' + esc(t.label) + '</div>';
+    if (t.type === 'fader') {
+      return '<div class="cell fadercell' + (t.wide ? ' wide' : '') + '"><div class="tile fader" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" ' + c +
+        ' data-id="' + esc(t.id) + '" aria-label="' + esc(t.label) + ' level"><span class="fill"></span><span class="t">' + esc(t.label) + '</span><b class="v"></b></div></div>';
+    }
+    var pic = '';
+    if (t.type === 'cue' && sw.length) pic = '<span class="pic" style="background:' + (sw.length > 1 ? 'linear-gradient(90deg,' + sw.join(',') + ')' : sw[0]) + '"></span>';
+    else if (t.type === 'effect' && sw.length) pic = '<span class="dots">' + sw.map(function (x) { return '<i style="background:' + x + ';color:' + x + '"></i>'; }).join('') + '</span>';
+    var num = t.type === 'cue' && +t.num > 0 ? '<span class="num">' + Math.round(+t.num) + '</span>' : '';
+    // it fires confetti, or flames, sparks or CO2 (only while the laptop has them armed)
+    var risk = t.risk === 'hazard' ? '<span class="risk" aria-hidden="true">&#9888;</span><span class="sr">fires a machine</span>' : t.risk === 'once' ? '<span class="risk" aria-hidden="true">1&times;</span><span class="sr">fires once</span>' : '';
+    return '<div class="cell' + (t.wide ? ' wide' : '') + (burst ? ' has-burst' : '') + '"><button class="tile ' + esc(t.type) + (t.missing ? ' missing' : '') + '" ' + c +
+      ' data-id="' + esc(t.id) + '" aria-pressed="false">' + (t.glyph && !pic ? '<span class="glyph">' + icon(t.glyph) + '</span>' : '') + num + pic +
+      '<span class="t">' + esc(t.label) + '</span><span class="sub"></span><span class="bar hidden"><span></span></span>' + risk + '</button>' +
+      (burst ? '<button class="burst" data-burst="' + esc(t.id) + '" aria-label="Fog for ' + burst + ' seconds">' + burst + ' s</button>' : '') + '</div>';
+  }
+  // only when it changed: a screen reader announces live regions again on every write
+  function setText(el, t) { if (el.textContent !== t) el.textContent = t; }
+  function update() {
+    var now = Date.now();
+    document.querySelectorAll('#play [data-id]').forEach(function (el) {
+      var d = dyn[el.dataset.id]; if (!d) return;
+      var on = d[0] === 1 || !!held[el.dataset.id];
+      if (el.classList.contains('fader')) {
+        var l = local[el.dataset.id], v = l && l.until > now ? l.v : d[3];
+        el.style.setProperty('--v', Math.max(0, v));
+        el.setAttribute('aria-valuenow', Math.round(Math.max(0, v) * 100));
+        el.querySelector('.v').textContent = !(l && l.until > now) ? d[4] : /BPM/.test(d[4]) ? Math.round(40 + v * 160) + ' BPM' : Math.round(v * 100) + '%';
+        return;
+      }
+      el.classList.toggle('on', on);
+      el.setAttribute('aria-pressed', on);
+      var sub = el.querySelector('.sub'); if (sub) sub.textContent = d[1];
+      var bar = el.querySelector('.bar');
+      if (bar) { bar.classList.toggle('hidden', d[2] < 0); if (d[2] >= 0) bar.firstChild.style.width = Math.min(1, d[2]) * 100 + '%'; }
+      var burst = el.parentNode.querySelector('.burst');
+      if (burst) burst.classList.toggle('hidden', on);
+    });
+    var g = state && state.go;
+    $('go').disabled = !g || !g.canGo; $('back').disabled = !g || !g.canBack;
+    // a staff page of looks: no GO or Back (tapped, not stepped), Blackout takes the room; locked: said
+    var looks = !!(g && g.step === 0);
+    $('foot').classList.toggle('looks', looks);
+    $('status').classList.toggle('locked', !!(g && g.locked));
+    setText($('goList'), g ? g.list : '');
+    setText($('now'), g && g.now ? g.now : '(nothing)');
+    setText($('next'), looks ? '' : g ? (g.next ? g.next + (g.note ? ' · ' + g.note : '') : 'end of the list') : '');
+    var bo = !!(state && state.bo);
+    $('bo').classList.toggle('on', bo); $('bo').setAttribute('aria-pressed', bo); $('frame').classList.toggle('hidden', !bo || phase !== 'playing');
+  }
+  // Where things stand, said in words: which link is down, and what to do about it.
+  function show() {
+    var now = Date.now(), playing = phase === 'playing';
+    var box = wsOpen && now - boxAt < 2500;          // the socket can look open long after the Wi-Fi went
+    var silent = playing && now - lastHeard > LOST_MS;
+    var lost = playing && (!box || silent);
+    if (lost && !lostSince) lostSince = now; else if (!lost) lostSince = 0;
+    var full = !box && now - fullAt < 8000;
+    // playing: whether the laptop sends to the stage (blind: only its screen and this one follow) and
+    // whether its machines are armed
+    var on = !(state && state.bl), armed = !!(state && state.ar);
+    var st = full ? ['Box full', 'st-bad'] : !box ? ['No box', 'st-bad'] : playing && !silent ? (on ? [armed ? 'On stage · armed' : 'On stage', 'st-ok'] : ['Blind', 'st-blind']) : phase === 'looking' ? ['Waiting', 'st-wait'] : playing ? ['No show', 'st-wait'] : ['Off', 'st-bad'];
+    $('status').textContent = st[0]; $('status').className = 'status ' + st[1]; $('dot').className = 'dot ' + st[1];
+    $('show').textContent = layout && layout.show ? layout.show : code ? 'Code ' + code : '';
+    // the banner: over the page while it might still come back
+    var banner = $('lost');
+    banner.classList.toggle('hidden', !lost && !full);
+    banner.classList.toggle('wait', box);
+    if (lost || full) setText(banner, full ? 'The LuxDMX has no room for another page right now: it takes four (the laptop or tablet with the show and up to three phones, fewer while its own web pages are open somewhere). Trying again…'
+      : !box ? "Can't reach the LuxDMX. Is this phone on the venue's Wi-Fi?" : "The laptop or tablet running the show isn't answering. Is the show still open there?");
+    // the card: when there's nothing to play, say why and take a code
+    var card = null, ask = true;
+    if (phase === 'looking' && now - joinedAt > 4000) card = 'No show answered with code <b>' + esc(code) + '</b>. Where the show runs: <b>Live</b>, the <b>Phone</b> button, switched on. Or type the code it shows:';
+    else if (phase === 'looking') { card = 'Looking for the show with code <b>' + esc(code) + '</b>…'; ask = false; }
+    else if (phase === 'ended') card = 'The show switched the remote off or changed its code. Type the code it shows now:';
+    else if (phase === 'removed') card = 'The show took this phone off the remote. Ask for the code to join again:';
+    else if (phase === 'other') card = 'Type the code the laptop shows:';
+    else if (lost && now - lostSince > ASK_AGAIN_MS) card = 'Still nothing from the laptop. If its tab was closed, switch the remote on there again (the code may be new):';
+    $('card').classList.toggle('hidden', !card);
+    if (card && $('cardMsg').innerHTML !== card) $('cardMsg').innerHTML = card;
+    $('card').querySelector('.codeForm').classList.toggle('hidden', !ask);
+    $('grid').classList.toggle('lost', lost || !playing);
+    $('foot').classList.toggle('off', !playing || lost);
+    if (!playing) { $('grid').innerHTML = ''; $('holdrow').classList.remove('some'); $('tabs').innerHTML = ''; }
+    update();
+  }
+
+  // ---- touching (like the live page: holds fire after the finger settles, taps on a clean lift)
+  var buzz = function (ms) { try { navigator.vibrate && navigator.vibrate(ms || 8); } catch (_) {} };
+  function tileOf(e) { var el = e.target.closest && e.target.closest('.tile'); return el && el.dataset.id && tiles[page] ? el : null; }
+  function info(el) { var l = tiles[page]; for (var i = 0; i < l.length; i++) if (l[i] && l[i].id === el.dataset.id) return l[i]; return null; }
+  function blink(el) { el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 150); }
+  var hintT = 0;
+  function hint(text) { var h = $('hint'); h.textContent = text; h.classList.remove('hidden'); clearTimeout(hintT); hintT = setTimeout(function () { h.classList.add('hidden'); }, 2500); }
+  // tap tempo: timed here, on the phone, so the Wi-Fi's jitter doesn't end up in the tempo
+  var taps = [];
+  function tapTempo() {
+    var t = performance.now();
+    if (taps.length && t - taps[taps.length - 1] > 2000) taps = [];
+    taps.push(t); if (taps.length > 5) taps.shift();
+    if (taps.length >= 3) { var bpm = 60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1)); if (bpm >= 40 && bpm <= 240) send({ k: 'bpm', v: Math.round(bpm) }); }
+  }
+  function fire(el, t) { buzz(); blink(el); if (t.tap) tapTempo(); else send({ k: 'tap', w: t.id }); }
+
+  var play = $('play');
+  play.addEventListener('pointerdown', function (e) {
+    var el = tileOf(e); if (!el || e.button !== 0) return;
+    var t = info(el); if (!t || t.missing) return;
+    var p = { el: el, t: t, x: e.clientX, y: e.clientY };
+    touches[e.pointerId] = p;
+    if (t.type === 'fader') {
+      var grab = function () { p.grab = { y: p.y, v: currentFader(t.id), h: el.getBoundingClientRect().height }; el.classList.add('grabbed'); buzz(); };
+      if (e.pointerType === 'touch') p.arm = setTimeout(function () { p.arm = null; grab(); }, 180); else { el.setPointerCapture(e.pointerId); grab(); }
+      return;
+    }
+    if (!t.holds) return;                           // fires on a clean lift
+    el.setPointerCapture(e.pointerId);
+    var press = function () { p.down = true; held[t.id] = true; el.classList.add('pressed'); buzz(); send({ k: 'down', w: t.id }); update(); };
+    if (e.pointerType === 'touch') p.settle = setTimeout(function () { p.settle = null; press(); }, 90); else press();
+  });
+  window.addEventListener('pointermove', function (e) {
+    var p = touches[e.pointerId]; if (!p) return;
+    var moved = Math.hypot(e.clientX - p.x, e.clientY - p.y);
+    if (p.arm && Math.abs(e.clientY - p.y) > 8) { clearTimeout(p.arm); p.arm = null; delete touches[e.pointerId]; hint('Faders: hold a moment, then drag'); return; }
+    if (p.settle && moved > 8) { clearTimeout(p.settle); p.settle = null; delete touches[e.pointerId]; return; }
+    // the whole range takes a long drag (about the screen's height), so a thumb can place it
+    if (p.grab) setFader(p.t.id, Math.max(0, Math.min(1, p.grab.v + (p.grab.y - e.clientY) / Math.max(220, p.grab.h * 2.2))));
+    if (!p.t.holds && moved > 12) p.moved = true;
+  });
+  function lift(e, cancel) {
+    var p = touches[e.pointerId]; if (!p) return;
+    delete touches[e.pointerId];
+    if (p.arm) clearTimeout(p.arm);
+    if (p.grab) { p.el.classList.remove('grabbed'); flushFader(p.t.id); return; }
+    // lifted before the hold began: a short flash, so a quick tap on a flash button still shows
+    if (p.settle) { clearTimeout(p.settle); if (!cancel) { var id = p.t.id; buzz(); blink(p.el); send({ k: 'down', w: id }); setTimeout(function () { send({ k: 'up', w: id }); }, 150); } return; }
+    if (p.down) { delete held[p.t.id]; p.el.classList.remove('pressed'); send({ k: 'up', w: p.t.id }); update(); return; }
+    if (!cancel && !p.t.holds && !p.moved && p.t.type !== 'fader') fire(p.el, p.t);
+  }
+  // on the window: a finger lifted where the page was redrawn, or off it, still lets go
+  window.addEventListener('pointerup', function (e) { lift(e, false); }, true);
+  window.addEventListener('pointercancel', function (e) { lift(e, true); }, true);
+  play.addEventListener('lostpointercapture', function (e) { lift(e, true); });
+  play.addEventListener('contextmenu', function (e) { e.preventDefault(); });   // a long press is a hold, not a menu
+  // a held button keeps its finger even if it drifts: the page doesn't scroll it away
+  play.addEventListener('touchmove', function (e) { for (var k in touches) if ((touches[k].grab || touches[k].down) && e.cancelable) { e.preventDefault(); return; } }, { passive: false });
+  $('grid').addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-burst]');
+    if (b) { buzz(); send({ k: 'burst', w: b.dataset.burst }); }
+  });
+  // a keyboard (a tablet with one): Enter or Space on a button presses it, held while held
+  play.addEventListener('keydown', function (e) {
+    var el = tileOf(e); if (!el || e.repeat) return;
+    var t = info(el); if (!t) return;
+    if (t.type === 'fader') {
+      var d = { ArrowUp: .05, ArrowRight: .05, ArrowDown: -.05, ArrowLeft: -.05 }[e.key];
+      if (d) { e.preventDefault(); setFader(t.id, Math.max(0, Math.min(1, currentFader(t.id) + d))); flushFader(t.id); }
+      return;
+    }
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (t.holds) { held[t.id] = true; kbHeld[t.id] = true; send({ k: 'down', w: t.id }); update(); } else fire(el, t);
+  });
+  // a key held on a button lets go when any Enter or Space comes up (focus may have moved on)
+  function kbLetGo() { for (var id in kbHeld) { delete held[id]; send({ k: 'up', w: id }); } kbHeld = {}; update(); }
+  window.addEventListener('keyup', function (e) { if (e.key === 'Enter' || e.key === ' ') kbLetGo(); });
+  window.addEventListener('blur', function () { letGoAll(); });
+
+  // faders: what the finger sets shows at once, and goes out at most every 60 ms
+  var fsent = {}, fwait = {};
+  function currentFader(id) { var l = local[id]; return l && l.until > Date.now() ? l.v : Math.max(0, (dyn[id] || [])[3] || 0); }
+  function setFader(id, v) {
+    local[id] = { v: v, until: Date.now() + 800 };
+    update();
+    var now = Date.now();
+    if (now - (fsent[id] || 0) >= 60) { fsent[id] = now; send({ k: 'fader', w: id, v: v }); }
+    else if (!fwait[id]) fwait[id] = setTimeout(function () { fwait[id] = 0; flushFader(id); }, 60);
+  }
+  function flushFader(id) { var l = local[id]; if (l) { fsent[id] = Date.now(); l.until = Date.now() + 800; send({ k: 'fader', w: id, v: l.v }); } }
+
+  function letGoAll() {
+    for (var k in touches) { if (touches[k].settle) clearTimeout(touches[k].settle); if (touches[k].arm) clearTimeout(touches[k].arm); }
+    for (var id in held) send({ k: 'up', w: id });
+    held = {}; kbHeld = {}; touches = {};
+    document.querySelectorAll('.pressed,.grabbed').forEach(function (x) { x.classList.remove('pressed', 'grabbed'); });
+  }
+
+  $('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-page]'); if (!b) return;
+    letGoAll(); page = b.dataset.page; render(); send({ k: 'alive', held: [], p: page });
+  });
+  $('go').onclick = function () { buzz(); send({ k: 'go' }); };
+  $('back').onclick = function () { buzz(); send({ k: 'back' }); };
+  // Blackout: on takes holding it a moment (it's right under the thumb), off is one tap
+  var boT = 0;
+  $('bo').addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+    if (state && state.bo) { buzz(15); send({ k: 'bo', on: false }); return; }
+    $('bo').classList.add('arming');
+    boT = setTimeout(function () { boT = 0; $('bo').classList.remove('arming'); buzz(30); send({ k: 'bo', on: true }); }, 300);
+  });
+  function boCancel() { if (boT) { clearTimeout(boT); boT = 0; $('bo').classList.remove('arming'); if (!(state && state.bo)) hint('Hold Blackout a moment to black out'); } }
+  $('bo').addEventListener('pointerup', boCancel); $('bo').addEventListener('pointerleave', boCancel); $('bo').addEventListener('pointercancel', boCancel);
+  $('bo').addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); send({ k: 'bo', on: !(state && state.bo) }); } });
+
+  // "still here, still holding these"; asking again while nobody answers
+  setInterval(function () {
+    if (phase !== 'looking' && phase !== 'playing') return;
+    send({ k: 'alive', held: Object.keys(held), p: page });
+    var silent = !!layout && Date.now() - lastHeard > LOST_MS;
+    if (silent && Object.keys(held).length) letGoAll();
+    if ((phase !== 'playing' || silent) && Date.now() - askedAt > 2000) hello();
+    if (layout && !complete(page) && Date.now() - askedAt > 2000) hello();   // a part got lost on the way
+    show();
+  }, ALIVE_MS);
+  // a locked phone or another app: let go now, not 1.5 s later
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { letGoAll(); pump(true); asleep = true; if (ws) ws.close(); return; }
+    asleep = false; connect();                         // hello follows once it's open
+    if (phase === 'looking' || phase === 'playing') awake(true);
+  });
+  window.addEventListener('pagehide', function () { letGoAll(); send({ k: 'bye' }); pump(true); });
+
+  // Keeping the screen on. Wake Lock where the browser has it (https only, so not here on the box's
+  // plain http); otherwise a tiny silent looping video, started by the tap that joined (the trick
+  // NoSleep.js uses, MIT, Rich Tibbett): a phone doesn't sleep while a video plays.
+  var lock = null, video = null;
+  var MP4 = 'data:video/mp4;base64,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';
+  function awake(on) {
+    try {
+      if (!on) { if (lock) lock.release(); if (video) video.pause(); return; }
+      if (window.isSecureContext && navigator.wakeLock) { if (!lock) navigator.wakeLock.request('screen').then(function (l) { lock = l; l.onrelease = function () { lock = null; }; }).catch(function () {}); return; }
+      if (!video) {
+        video = document.createElement('video');
+        video.setAttribute('playsinline', ''); video.setAttribute('muted', ''); video.muted = true; video.setAttribute('title', 'Keeps the screen on');
+        video.src = MP4;
+        video.addEventListener('timeupdate', function () { if (video.currentTime > 0.5) video.currentTime = Math.random() * 0.4; });
+      }
+      var p = video.play(); if (p && p.catch) p.catch(function () {});
+    } catch (_) {}
+  }
+  if (!(window.isSecureContext && navigator.wakeLock)) document.querySelectorAll('.sleepTip').forEach(function (x) { x.classList.remove('hidden'); });
+
+  connect();
+  var k0 = (location.hash.match(/k=(\d{4})/) || [])[1];
+  if (k0) join(k0); else $('join').querySelector('.code').focus();
+})();
+</script>
+</body>
+</html>
