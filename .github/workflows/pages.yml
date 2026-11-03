@@ -1,15 +1,21 @@
 name: Deploy web flasher (GitHub Pages)
 
-# Publishes the browser-based firmware flasher in web/ to GitHub Pages.
+# Publishes the browser-based firmware flasher in web/ to GitHub Pages, and the
+# LuxDMX Sequencer (sequencer/) next to it under /sequencer/.
 # The firmware binaries are bundled into web/fw at deploy time (same-origin,
 # so the browser flasher needs no cross-origin CORS access to release assets).
-# Redeploys when web/ changes, when a new firmware release is built, or manually.
+# The sequencer is built here with its LuxDMX Link downloads (Go, all six
+# systems, in sequencer/public/link with their sha256) and its copies of the
+# demo songs (fetched and checked against their sha256, cached between runs).
+# Redeploys when web/ or sequencer/ changes, when a new firmware release is
+# built, or manually.
 
 on:
   push:
     branches: [master]
     paths:
       - 'web/**'
+      - 'sequencer/**'
       - '.github/workflows/pages.yml'
   workflow_run:
     workflows: ["Build & Release"]
@@ -48,6 +54,30 @@ jobs:
             --pattern 'partitions*.bin' \
             --pattern 'boot_app0.bin'
           echo "Bundled firmware:" && ls -la web/fw
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sequencer/package-lock.json
+      - name: Keep the demo songs between runs (about 280 MB from the artists' files)
+        uses: actions/cache@v4
+        with:
+          path: sequencer/public/songs
+          key: songs-${{ hashFiles('sequencer/src/timeline/catalog.ts') }}
+          restore-keys: songs-
+      - name: Build the sequencer (Link downloads, demo songs, the app) into web/sequencer
+        working-directory: sequencer
+        run: |
+          npm ci
+          npm run build:release
+          rm -rf ../web/sequencer
+          cp -r dist ../web/sequencer
+          echo "Link downloads:" && cat ../web/sequencer/link/manifest.json
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

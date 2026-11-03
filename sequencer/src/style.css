@@ -1,0 +1,108 @@
+:root {
+  --bg: #0b0e13; --bg2: #10141b; --panel: #151a22; --panel2: #1b212b; --line: #2a313c; --line2: #384150;
+  --text: #d7dde6; --muted: #929cab; --faint: #858f9f;
+  --green: #45d85c; --orange: #ffaa1c; --pink: #f33abc; --blue: #3a8ef3; --cyan: #36d6e7; --violet: #9a6bff;
+  --accent: var(--orange);
+  --radius: 10px; --radius-s: 7px;
+  --shadow: 0 6px 24px #0008;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* 14 px at the browser's usual 16: a bigger text size set in the browser or the system counts (the
+   app's Interface size multiplies on top, see ui.svelte.ts) */
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+html { font: 87.5%/1.42 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+#app { height: 100%; }
+::selection { background: #ffaa1c55; }
+
+button, input, select, textarea { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: var(--radius-s); padding: .32rem .6rem; }
+button { cursor: pointer; display: inline-flex; align-items: center; gap: .35rem; justify-content: center; white-space: nowrap; transition: border-color .12s, background .12s; }
+/* Hover rules are kept light (:where) so a component's own colours (the pink blackout, coloured
+   live tiles) always win, and only apply where there is a real hover (on touch it sticks). */
+@media (hover: hover) {
+  :where(button):hover:not(:disabled) { border-color: var(--line2); background: #222a36; }
+  :where(button.on, button.accent):hover:not(:disabled) { background: #ffbb45; border-color: #ffbb45; color: #1a1000; }
+}
+/* Keyboard focus is blue (selection is orange: the two must never look alike). Lists show focus
+   as a quiet inset line, not a frame around everything in them. */
+:root { --focus: #6aa2ff; }
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.olist:focus-visible, .cards:focus-visible, [role="listbox"]:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #6aa2ff66; border-radius: var(--radius-s); }
+button:disabled { opacity: .4; cursor: default; }
+button.primary { background: var(--green); color: #07150b; border-color: var(--green); font-weight: 650; }
+button.primary:hover:not(:disabled) { background: #5be070; }
+button.accent { background: var(--orange); color: #1a1000; border-color: var(--orange); font-weight: 650; }
+button.danger { color: var(--pink); }
+button.on { background: var(--orange); color: #1a1000; border-color: var(--orange); }
+button.ghost.on { background: #ffaa1c2a; color: var(--orange); }
+button.ghost { background: none; border-color: transparent; color: var(--muted); padding: .25rem .35rem; }
+button.ghost:hover:not(:disabled) { color: var(--text); background: #ffffff0d; border-color: transparent; }
+button.ghost.on:hover:not(:disabled) { background: #ffaa1c3a; color: var(--orange); }
+input[type=range] { padding: 0; accent-color: var(--accent); background: none; border: 0; }
+input[type=checkbox] { accent-color: var(--accent); }
+
+h2 { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; font-weight: 650; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem; min-height: 0; }
+.muted { color: var(--muted); font-size: .86rem; }
+.faint { color: var(--faint); font-size: .8rem; }
+.row { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; }
+.chip { display: inline-flex; align-items: center; gap: .25rem; font-size: .76rem; padding: .05rem .4rem; border-radius: 999px; background: #ffffff0d; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.chip.green { color: var(--green); border-color: #45d85c55; background: #45d85c14; }
+.chip.orange { color: var(--orange); border-color: #ffaa1c55; background: #ffaa1c14; }
+.chip.blue { color: #8ab8ff; border-color: #3a8ef355; background: #3a8ef314; }
+.chip.violet { color: #c3a8ff; border-color: #9a6bff55; background: #9a6bff14; }
+.toolbar { display: flex; gap: .25rem; align-items: center; flex-wrap: wrap; }
+.toolbar .sep { width: 1px; height: 1.3rem; background: var(--line); margin: 0 .2rem; }
+.hint { font-size: .82rem; color: var(--muted); line-height: 1.35; }
+.err { color: var(--pink); font-size: .85rem; }
+.kbd { font: 600 .7rem/1 ui-monospace, monospace; padding: .12rem .3rem; border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; color: var(--muted); }
+
+/* lists of objects */
+.olist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.oitem { display: flex; align-items: center; gap: .45rem; padding: .3rem .4rem; border-radius: var(--radius-s); border: 1px solid transparent; cursor: default; user-select: none; flex-shrink: 0; }
+.oitem:hover { background: #ffffff08; }
+.oitem.sel { background: #ffaa1c14; border-color: #ffaa1c66; }
+.oitem.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.oitem.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.grip { color: var(--faint); cursor: grab; display: inline-flex; touch-action: none; }
+@media (pointer: coarse) { .grip { padding: .4rem .25rem; margin: -.4rem 0; } }
+.oitem:hover .grip { color: var(--muted); }
+
+/* context menu */
+.ctx { position: fixed; z-index: 80; min-width: 15rem; width: max-content; max-width: 22rem; background: var(--panel2); border: 1px solid var(--line2); border-radius: var(--radius-s); box-shadow: var(--shadow); padding: .25rem; }
+.ctx button { width: 100%; justify-content: flex-start; background: none; border: 0; padding: .35rem .5rem; border-radius: 5px; white-space: normal; text-align: left; }
+@media (pointer: coarse) { .ctx button { min-height: 44px; } }
+.ctx button:hover:not(:disabled) { background: #ffffff10; }
+.ctx .k { margin-left: auto; color: var(--faint); font-size: .76rem; }
+.ctx hr { border: 0; border-top: 1px solid var(--line); margin: .2rem 0; }
+.ctx { max-height: calc(100vh - 16px); overflow: auto; }
+/* phones: menus come up from the bottom as a sheet, full width, thumb-reachable */
+@media (max-width: 560px) {
+  .ctx { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; width: auto; max-width: none; max-height: 72vh; }
+}
+.ctx .mh { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: .45rem .5rem .15rem; font-weight: 650; }
+.ctx .step { display: flex; align-items: center; gap: .35rem; padding: .2rem .25rem .2rem .5rem; }
+.ctx .step .sl { flex: 1; }
+.ctx .step button { width: auto; justify-content: center; padding: .2rem .55rem; border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.ctx .step .sv { min-width: 3.6rem; }
+
+/* toasts */
+/* under the top bar: at the bottom they covered the cue cards, the phone's Record button and tabs */
+.toast { position: fixed; top: 3.9rem; left: 50%; transform: translateX(-50%); animation: toast-in .16s ease-out; background: var(--panel2); border: 1px solid var(--line2); border-radius: 999px; padding: .4rem .5rem .4rem 1rem; box-shadow: var(--shadow); z-index: 90; font-size: .9rem; display: flex; align-items: center; gap: .7rem; max-width: min(720px, 94vw); }
+.toast button.sm { padding: .15rem .7rem; border-radius: 999px; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* Touch screens: everything a finger can hit is at least 38 px (Apple asks 44, which would cost
+   the stage too much room on a 10" tablet; 38 with the gaps around them taps reliably). */
+@media (pointer: coarse) {
+  button, select, [role="tab"], input:not([type=checkbox]):not([type=radio]):not([type=range]) { min-height: 38px; }
+  button { min-width: 38px; }
+  input[type=range] { min-height: 34px; }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; }
+  /* where a show is run (the Live bar, the GO strip, the cue list's transport): 44, as Apple asks */
+  .live > .bar button, .live > .bar [role="tab"], .strip button, .deck > .bar button { min-height: 44px; }
+  .live > .bar button, .strip button, .deck > .bar button { min-width: 44px; }
+}

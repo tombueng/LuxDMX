@@ -1,0 +1,1 @@
+BlenderDMX@LED_PAR_64_RGBW@v0.3.gdtf: from github.com/open-stage/python-gdtf (tests/), MIT licence.

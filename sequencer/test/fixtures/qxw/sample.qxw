@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Workspace>
+<Workspace xmlns="http://www.qlcplus.org/Workspace" CurrentWindow="FunctionManager">
+ <Creator>
+  <Name>Q Light Controller Plus</Name>
+  <Version>4.12.7</Version>
+  <Author>test</Author>
+ </Creator>
+ <Engine>
+  <InputOutputMap>
+   <BeatGenerator BeatType="Disabled" BPM="0"/>
+   <Universe Name="Universe 1" ID="0"/>
+  </InputOutputMap>
+  <Fixture>
+   <Manufacturer>Generic</Manufacturer>
+   <Model>Generic</Model>
+   <Mode>Generic</Mode>
+   <ID>0</ID>
+   <Name>Dimmers</Name>
+   <Universe>0</Universe>
+   <Address>0</Address>
+   <Channels>4</Channels>
+  </Fixture>
+  <Fixture>
+   <Manufacturer>Stairville</Manufacturer>
+   <Model>LED PAR 36 COB RGBW 12W</Model>
+   <Mode>4 channel</Mode>
+   <ID>1</ID>
+   <Name>PAR left</Name>
+   <Universe>0</Universe>
+   <Address>10</Address>
+   <Channels>4</Channels>
+  </Fixture>
+  <Fixture>
+   <Manufacturer>Acme</Manufacturer>
+   <Model>Mystery Box</Model>
+   <Mode>3 ch</Mode>
+   <ID>2</ID>
+   <Name>Mystery</Name>
+   <Universe>0</Universe>
+   <Address>20</Address>
+   <Channels>3</Channels>
+  </Fixture>
+  <Fixture>
+   <Manufacturer>Clay Paky</Manufacturer>
+   <Model>Sharpy</Model>
+   <Mode>Standard</Mode>
+   <ID>3</ID>
+   <Name>Sharpy 1</Name>
+   <Universe>0</Universe>
+   <Address>30</Address>
+   <Channels>16</Channels>
+  </Fixture>
+  <FixtureGroup ID="0">
+   <Name>Dimmer row</Name>
+   <Size X="2" Y="1"/>
+   <Head X="0" Y="0" Fixture="0">0</Head>
+   <Head X="1" Y="0" Fixture="0">2</Head>
+  </FixtureGroup>
+  <Function ID="0" Type="Scene" Name="Warm">
+   <Speed FadeIn="1500" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="0">0,255,1,128</FixtureVal>
+   <FixtureVal ID="1">0,255,1,128,2,0,3,64</FixtureVal>
+  </Function>
+  <Function ID="1" Type="Scene" Name="Blue">
+   <Speed FadeIn="0" FadeOut="0" Duration="0"/>
+   <FixtureVal ID="1">0,0,1,0,2,255,3,0</FixtureVal>
+   <FixtureVal ID="2">0,10,1,20,2,30</FixtureVal>
+  </Function>
+  <Function ID="2" Type="Chaser" Name="Warm blue chase">
+   <Speed FadeIn="0" FadeOut="0" Duration="2000"/>
+   <Direction>Forward</Direction>
+   <RunOrder>Loop</RunOrder>
+   <SpeedModes FadeIn="PerStep" FadeOut="PerStep" Duration="PerStep"/>
+   <Step Number="0" FadeIn="500" Hold="1500" FadeOut="0">0</Step>
+   <Step Number="1" FadeIn="0" Hold="4294967294" FadeOut="0" Note="wait here">1</Step>
+  </Function>
+  <Function ID="3" Type="Sequence" Name="Dimmer walk" BoundScene="0">
+   <Speed FadeIn="0" FadeOut="0" Duration="250"/>
+   <Direction>Backward</Direction>
+   <RunOrder>PingPong</RunOrder>
+   <SpeedModes FadeIn="Common" FadeOut="Common" Duration="Common"/>
+   <Step Number="0" FadeIn="0" Hold="250" FadeOut="0" Values="1">0:0,255</Step>
+   <Step Number="1" FadeIn="0" Hold="250" FadeOut="0" Values="1">0:1,255</Step>
+   <Step Number="2" FadeIn="0" Hold="250" FadeOut="0" Values="1">0:2,255</Step>
+  </Function>
+  <Function ID="4" Type="EFX" Name="Sharpy circle">
+   <Speed FadeIn="0" FadeOut="0" Duration="8000"/>
+   <Direction>Forward</Direction>
+   <RunOrder>Loop</RunOrder>
+   <PropagationMode>Parallel</PropagationMode>
+   <Algorithm>Circle</Algorithm>
+   <Width>64</Width>
+   <Height>64</Height>
+   <Rotation>0</Rotation>
+   <StartOffset>0</StartOffset>
+   <IsRelative>0</IsRelative>
+   <Axis Name="X"><Offset>127</Offset><Frequency>2</Frequency><Phase>90</Phase></Axis>
+   <Axis Name="Y"><Offset>127</Offset><Frequency>1</Frequency><Phase>0</Phase></Axis>
+   <Fixture><ID>3</ID><Head>0</Head><Mode>0</Mode><Direction>Forward</Direction><StartOffset>0</StartOffset></Fixture>
+  </Function>
+  <Function ID="5" Type="Collection" Name="Show start">
+   <Step Number="0">0</Step>
+   <Step Number="1">2</Step>
+   <Step Number="2">4</Step>
+  </Function>
+  <Function ID="6" Type="RGBMatrix" Name="Matrix"/>
+  <Function ID="7" Type="Script" Name="Script"/>
+ </Engine>
+ <VirtualConsole/>
+</Workspace>
