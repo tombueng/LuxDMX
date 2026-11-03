@@ -1,0 +1,2368 @@
+{
+  "format": "luxdmx-show",
+  "formatVersion": "1.1.0",
+  "minReaderVersion": "1.0.0",
+  "requiredFeatures": [],
+  "meta": {
+    "name": "Gig: 2 Whiskey",
+    "created": "2026-10-28T09:50:37.542Z",
+    "modified": "2026-10-28T10:05:25.294Z",
+    "app": "LuxDMX Sequencer 0.2"
+  },
+  "fixtureTypes": [],
+  "fixtures": [
+    {
+      "id": "f1",
+      "name": "Front 1",
+      "typeId": "gen-drgb",
+      "mode": "4 ch",
+      "universe": 0,
+      "address": 1,
+      "x": 0.12,
+      "y": 0.7
+    },
+    {
+      "id": "f2",
+      "name": "Front 2",
+      "typeId": "gen-drgb",
+      "mode": "4 ch",
+      "universe": 0,
+      "address": 5,
+      "x": 0.37333333333333335,
+      "y": 0.7
+    },
+    {
+      "id": "f3",
+      "name": "Front 3",
+      "typeId": "gen-drgb",
+      "mode": "4 ch",
+      "universe": 0,
+      "address": 9,
+      "x": 0.6266666666666667,
+      "y": 0.7
+    },
+    {
+      "id": "f4",
+      "name": "Front 4",
+      "typeId": "gen-drgb",
+      "mode": "4 ch",
+      "universe": 0,
+      "address": 13,
+      "x": 0.8800000000000001,
+      "y": 0.7
+    },
+    {
+      "id": "f5",
+      "name": "Back 1",
+      "typeId": "gen-drgbwauvs",
+      "mode": "8 ch",
+      "universe": 0,
+      "address": 17,
+      "x": 0.12,
+      "y": 0.22
+    },
+    {
+      "id": "f6",
+      "name": "Back 2",
+      "typeId": "gen-drgbwauvs",
+      "mode": "8 ch",
+      "universe": 0,
+      "address": 25,
+      "x": 0.37333333333333335,
+      "y": 0.22
+    },
+    {
+      "id": "f7",
+      "name": "Back 3",
+      "typeId": "gen-drgbwauvs",
+      "mode": "8 ch",
+      "universe": 0,
+      "address": 33,
+      "x": 0.6266666666666667,
+      "y": 0.22
+    },
+    {
+      "id": "f8",
+      "name": "Back 4",
+      "typeId": "gen-drgbwauvs",
+      "mode": "8 ch",
+      "universe": 0,
+      "address": 41,
+      "x": 0.8800000000000001,
+      "y": 0.22
+    },
+    {
+      "id": "f9",
+      "name": "Mover 1",
+      "typeId": "gen-mover16",
+      "mode": "11 ch",
+      "universe": 0,
+      "address": 49,
+      "x": 0.2,
+      "y": 0.06
+    },
+    {
+      "id": "f10",
+      "name": "Mover 2",
+      "typeId": "gen-mover16",
+      "mode": "11 ch",
+      "universe": 0,
+      "address": 60,
+      "x": 0.8,
+      "y": 0.06
+    },
+    {
+      "id": "f22",
+      "name": "Bar 1",
+      "typeId": "gen-bar16",
+      "mode": "48 ch",
+      "universe": 0,
+      "address": 220,
+      "x": 0.2,
+      "y": 0.38
+    },
+    {
+      "id": "f23",
+      "name": "Bar 2",
+      "typeId": "gen-bar16",
+      "mode": "48 ch",
+      "universe": 0,
+      "address": 268,
+      "x": 0.4,
+      "y": 0.38
+    },
+    {
+      "id": "f24",
+      "name": "Bar 3",
+      "typeId": "gen-bar16",
+      "mode": "48 ch",
+      "universe": 0,
+      "address": 316,
+      "x": 0.6000000000000001,
+      "y": 0.38
+    },
+    {
+      "id": "f25",
+      "name": "Bar 4",
+      "typeId": "gen-bar16",
+      "mode": "48 ch",
+      "universe": 0,
+      "address": 364,
+      "x": 0.8,
+      "y": 0.38
+    },
+    {
+      "id": "f32",
+      "name": "Hazer",
+      "typeId": "gen-hazer",
+      "mode": "2 ch",
+      "universe": 0,
+      "address": 420,
+      "x": 0.03,
+      "y": 0.22
+    },
+    {
+      "id": "f33",
+      "name": "Confetti 1",
+      "typeId": "gen-confetti",
+      "mode": "1 ch",
+      "universe": 0,
+      "address": 422,
+      "x": 0.16,
+      "y": 0.86
+    }
+  ],
+  "groups": [
+    {
+      "id": "g1",
+      "name": "Front",
+      "fixtures": [
+        "f1",
+        "f2",
+        "f3",
+        "f4"
+      ]
+    },
+    {
+      "id": "g2",
+      "name": "Back",
+      "fixtures": [
+        "f5",
+        "f6",
+        "f7",
+        "f8"
+      ]
+    },
+    {
+      "id": "g3",
+      "name": "Movers",
+      "fixtures": [
+        "f9",
+        "f10"
+      ]
+    },
+    {
+      "id": "g6",
+      "name": "Pixel bars",
+      "fixtures": [
+        "f22",
+        "f23",
+        "f24",
+        "f25"
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "pc-red",
+      "name": "Red",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 0,
+          "b": 0
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-orange",
+      "name": "Orange",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 0.45098039215686275,
+          "b": 0
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-amber",
+      "name": "Amber",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 0.6509803921568628,
+          "b": 0.10196078431372549
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-yellow",
+      "name": "Yellow",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 0.9019607843137255,
+          "b": 0
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-green",
+      "name": "Green",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 0,
+          "g": 1,
+          "b": 0
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-cyan",
+      "name": "Cyan",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 0,
+          "g": 1,
+          "b": 1
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-blue",
+      "name": "Blue",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 0,
+          "g": 0,
+          "b": 1
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-deep-blue",
+      "name": "Deep blue",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 0.10196078431372549,
+          "g": 0,
+          "b": 0.6
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-purple",
+      "name": "Purple",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 0.6,
+          "g": 0,
+          "b": 1
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-magenta",
+      "name": "Magenta",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 0,
+          "b": 1
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-pink",
+      "name": "Pink",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 0.30196078431372547,
+          "b": 0.6
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-warm-white",
+      "name": "Warm white",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 0.7490196078431373,
+          "b": 0.45098039215686275
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-white",
+      "name": "White",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pc-cool-white",
+      "name": "Cool white",
+      "kind": "color",
+      "values": {
+        "color": {
+          "r": 0.8392156862745098,
+          "g": 0.9019607843137255,
+          "b": 1
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pi-Full",
+      "name": "Full",
+      "kind": "intensity",
+      "values": {
+        "intensity": 1
+      },
+      "auto": true
+    },
+    {
+      "id": "pi-75",
+      "name": "75%",
+      "kind": "intensity",
+      "values": {
+        "intensity": 0.75
+      },
+      "auto": true
+    },
+    {
+      "id": "pi-Half",
+      "name": "Half",
+      "kind": "intensity",
+      "values": {
+        "intensity": 0.5
+      },
+      "auto": true
+    },
+    {
+      "id": "pi-25",
+      "name": "25%",
+      "kind": "intensity",
+      "values": {
+        "intensity": 0.25
+      },
+      "auto": true
+    },
+    {
+      "id": "pi-Off",
+      "name": "Off",
+      "kind": "intensity",
+      "values": {
+        "intensity": 0
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-home",
+      "name": "Home",
+      "kind": "position",
+      "values": {
+        "pan": 0.5,
+        "tilt": 0.5
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-audience",
+      "name": "Audience",
+      "kind": "position",
+      "values": {
+        "pan": 0.5,
+        "tilt": 0.75
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-stage",
+      "name": "Stage",
+      "kind": "position",
+      "values": {
+        "pan": 0.5,
+        "tilt": 0.32
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-left",
+      "name": "Left",
+      "kind": "position",
+      "values": {
+        "pan": 0.36,
+        "tilt": 0.62
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-right",
+      "name": "Right",
+      "kind": "position",
+      "values": {
+        "pan": 0.64,
+        "tilt": 0.62
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-up",
+      "name": "Up",
+      "kind": "position",
+      "values": {
+        "pan": 0.5,
+        "tilt": 0.95
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-fan",
+      "name": "Fan out",
+      "kind": "position",
+      "values": {
+        "pan": 0.5,
+        "tilt": 0.7
+      },
+      "perFixture": {
+        "f9": {
+          "pan": 0.3,
+          "tilt": 0.7
+        },
+        "f10": {
+          "pan": 0.33636363636363636,
+          "tilt": 0.7
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pp-cross",
+      "name": "Cross",
+      "kind": "position",
+      "values": {
+        "pan": 0.5,
+        "tilt": 0.65
+      },
+      "perFixture": {
+        "f9": {
+          "pan": 0.65,
+          "tilt": 0.65
+        },
+        "f10": {
+          "pan": 0.6227272727272727,
+          "tilt": 0.65
+        }
+      },
+      "auto": true
+    },
+    {
+      "id": "pb-nostrobe",
+      "name": "No strobe",
+      "kind": "beam",
+      "values": {
+        "strobe": 0
+      },
+      "auto": true
+    },
+    {
+      "id": "pb-strobe-slow",
+      "name": "Strobe slow",
+      "kind": "beam",
+      "values": {
+        "strobe": 0.3
+      },
+      "auto": true
+    },
+    {
+      "id": "pb-strobe-fast",
+      "name": "Strobe fast",
+      "kind": "beam",
+      "values": {
+        "strobe": 0.85
+      },
+      "auto": true
+    },
+    {
+      "id": "pb-narrow",
+      "name": "Narrow",
+      "kind": "beam",
+      "values": {
+        "zoom": 0
+      },
+      "auto": true
+    },
+    {
+      "id": "pb-wide",
+      "name": "Wide",
+      "kind": "beam",
+      "values": {
+        "zoom": 1
+      },
+      "auto": true
+    }
+  ],
+  "cueLists": [
+    {
+      "id": "l1",
+      "name": "Songs",
+      "cues": [
+        {
+          "id": "l1c1",
+          "name": "Walk-in",
+          "values": {
+            "f1": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f2": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f3": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f4": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f5": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f6": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f7": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f8": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f9": {
+              "intensity": 0,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.3
+            },
+            "f10": {
+              "intensity": 0,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.3
+            },
+            "f22": {
+              "intensity": 0.35,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f23": {
+              "intensity": 0.35,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f24": {
+              "intensity": 0.35,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f25": {
+              "intensity": 0.35,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            }
+          },
+          "fade": 3,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e13"
+          ]
+        },
+        {
+          "id": "l1c2",
+          "name": "Verse",
+          "values": {
+            "f1": {
+              "intensity": 0.7,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f2": {
+              "intensity": 0.7,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f3": {
+              "intensity": 0.7,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f4": {
+              "intensity": 0.7,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f5": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f6": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f7": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f8": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f9": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              },
+              "pan": 0.5,
+              "tilt": 0.55
+            },
+            "f10": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              },
+              "pan": 0.5,
+              "tilt": 0.55
+            },
+            "f22": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f23": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f24": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f25": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            }
+          },
+          "fade": 2,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e1",
+            "e3",
+            "e10"
+          ]
+        },
+        {
+          "id": "l1c3",
+          "name": "Chorus",
+          "values": {
+            "f1": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f2": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f3": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f4": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f5": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f6": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f7": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f8": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f9": {
+              "intensity": 1,
+              "color": {
+                "r": 0,
+                "g": 0.9,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.75
+            },
+            "f10": {
+              "intensity": 1,
+              "color": {
+                "r": 0,
+                "g": 0.9,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.75
+            },
+            "f22": {
+              "intensity": 1
+            },
+            "f23": {
+              "intensity": 1
+            },
+            "f24": {
+              "intensity": 1
+            },
+            "f25": {
+              "intensity": 1
+            }
+          },
+          "fade": 0.5,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e2",
+            "e4",
+            "e14"
+          ]
+        },
+        {
+          "id": "l1c4",
+          "name": "Ballad",
+          "values": {
+            "f1": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f2": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f3": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f4": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0.72,
+                "b": 0.42
+              }
+            },
+            "f5": {
+              "intensity": 0.6,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            },
+            "f6": {
+              "intensity": 0.6,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            },
+            "f7": {
+              "intensity": 0.6,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            },
+            "f8": {
+              "intensity": 0.6,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            },
+            "f9": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0.55,
+                "g": 0,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.4
+            },
+            "f10": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0.55,
+                "g": 0,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.4
+            },
+            "f22": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            },
+            "f23": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            },
+            "f24": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            },
+            "f25": {
+              "intensity": 0.3,
+              "color": {
+                "r": 0,
+                "g": 0.15,
+                "b": 1
+              }
+            }
+          },
+          "fade": 4,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e13"
+          ]
+        },
+        {
+          "id": "l1c5",
+          "name": "Intro: thunder",
+          "values": {
+            "f1": {
+              "intensity": 0
+            },
+            "f2": {
+              "intensity": 0
+            },
+            "f3": {
+              "intensity": 0
+            },
+            "f4": {
+              "intensity": 0
+            },
+            "f5": {
+              "intensity": 0.25,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f6": {
+              "intensity": 0.25,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f7": {
+              "intensity": 0.25,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f8": {
+              "intensity": 0.25,
+              "color": {
+                "r": 0.05,
+                "g": 0,
+                "b": 0.6
+              }
+            },
+            "f9": {
+              "intensity": 0
+            },
+            "f10": {
+              "intensity": 0
+            },
+            "f22": {
+              "intensity": 0
+            },
+            "f23": {
+              "intensity": 0
+            },
+            "f24": {
+              "intensity": 0
+            },
+            "f25": {
+              "intensity": 0
+            }
+          },
+          "fade": 3,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e8",
+            "e5"
+          ]
+        },
+        {
+          "id": "l1c6",
+          "name": "Rock out",
+          "values": {
+            "f1": {
+              "intensity": 0.9,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f2": {
+              "intensity": 0.9,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f3": {
+              "intensity": 0.9,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f4": {
+              "intensity": 0.9,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f5": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f6": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f7": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f8": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f9": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              },
+              "pan": 0.5,
+              "tilt": 0.7
+            },
+            "f10": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              },
+              "pan": 0.5,
+              "tilt": 0.7
+            },
+            "f22": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f23": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f24": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f25": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            }
+          },
+          "fade": 0.2,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e4",
+            "e6",
+            "e9"
+          ]
+        },
+        {
+          "id": "l1c7",
+          "name": "Guitar solo",
+          "values": {
+            "f1": {
+              "intensity": 0.2,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f2": {
+              "intensity": 0.2,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f3": {
+              "intensity": 0.2,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f4": {
+              "intensity": 0.2,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f5": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f6": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f7": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f8": {
+              "intensity": 0.4,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f9": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              },
+              "pan": 0.42,
+              "tilt": 0.56
+            },
+            "f10": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              },
+              "pan": 0.42,
+              "tilt": 0.56
+            },
+            "f22": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            },
+            "f23": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            },
+            "f24": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            },
+            "f25": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            }
+          },
+          "fade": 1,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e10"
+          ]
+        },
+        {
+          "id": "l1c8",
+          "name": "Drum solo",
+          "values": {
+            "f1": {
+              "intensity": 0
+            },
+            "f2": {
+              "intensity": 0
+            },
+            "f3": {
+              "intensity": 0
+            },
+            "f4": {
+              "intensity": 0
+            },
+            "f5": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f6": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f7": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f8": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f9": {
+              "intensity": 0
+            },
+            "f10": {
+              "intensity": 0
+            },
+            "f22": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f23": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f24": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            },
+            "f25": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0
+              }
+            }
+          },
+          "fade": 0.2,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e11",
+            "e7"
+          ]
+        },
+        {
+          "id": "l1c9",
+          "name": "Love song",
+          "values": {
+            "f1": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0.3,
+                "b": 0.6
+              }
+            },
+            "f2": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0.3,
+                "b": 0.6
+              }
+            },
+            "f3": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0.3,
+                "b": 0.6
+              }
+            },
+            "f4": {
+              "intensity": 0.6,
+              "color": {
+                "r": 1,
+                "g": 0.3,
+                "b": 0.6
+              }
+            },
+            "f5": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f6": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f7": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f8": {
+              "intensity": 0.5,
+              "color": {
+                "r": 1,
+                "g": 0,
+                "b": 0.75
+              }
+            },
+            "f9": {
+              "intensity": 0
+            },
+            "f10": {
+              "intensity": 0
+            },
+            "f22": {
+              "intensity": 0.4
+            },
+            "f23": {
+              "intensity": 0.4
+            },
+            "f24": {
+              "intensity": 0.4
+            },
+            "f25": {
+              "intensity": 0.4
+            }
+          },
+          "fade": 5,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e14",
+            "e1"
+          ]
+        },
+        {
+          "id": "l1c10",
+          "name": "Big finish",
+          "values": {
+            "f1": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f2": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f3": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f4": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f5": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f6": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f7": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f8": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f9": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.75
+            },
+            "f10": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              },
+              "pan": 0.5,
+              "tilt": 0.75
+            },
+            "f22": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f23": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f24": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            },
+            "f25": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 1,
+                "b": 1
+              }
+            }
+          },
+          "fade": 0,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e4",
+            "e6"
+          ],
+          "actions": [
+            {
+              "do": "start",
+              "list": "l4"
+            },
+            {
+              "do": "start",
+              "list": "l5"
+            },
+            {
+              "do": "start",
+              "list": "l6"
+            }
+          ],
+          "note": "Confetti, CO2 and sparks"
+        },
+        {
+          "id": "l1c11",
+          "name": "Encore",
+          "values": {
+            "f1": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f2": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f3": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f4": {
+              "intensity": 0.8,
+              "color": {
+                "r": 1,
+                "g": 0.65,
+                "b": 0.1
+              }
+            },
+            "f5": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            },
+            "f6": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            },
+            "f7": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            },
+            "f8": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              }
+            },
+            "f9": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              },
+              "pan": 0.5,
+              "tilt": 0.7
+            },
+            "f10": {
+              "intensity": 1,
+              "color": {
+                "r": 1,
+                "g": 0.45,
+                "b": 0
+              },
+              "pan": 0.5,
+              "tilt": 0.7
+            },
+            "f22": {
+              "intensity": 1
+            },
+            "f23": {
+              "intensity": 1
+            },
+            "f24": {
+              "intensity": 1
+            },
+            "f25": {
+              "intensity": 1
+            }
+          },
+          "fade": 0.5,
+          "advance": {
+            "mode": "manual"
+          },
+          "effects": [
+            "e12",
+            "e2",
+            "e4"
+          ],
+          "actions": [
+            {
+              "do": "start",
+              "list": "l7"
+            }
+          ]
+        },
+        {
+          "id": "l1c12",
+          "name": "Blackout",
+          "values": {
+            "f1": {
+              "intensity": 0
+            },
+            "f2": {
+              "intensity": 0
+            },
+            "f3": {
+              "intensity": 0
+            },
+            "f4": {
+              "intensity": 0
+            },
+            "f5": {
+              "intensity": 0
+            },
+            "f6": {
+              "intensity": 0
+            },
+            "f7": {
+              "intensity": 0
+            },
+            "f8": {
+              "intensity": 0
+            },
+            "f9": {
+              "intensity": 0
+            },
+            "f10": {
+              "intensity": 0
+            },
+            "f22": {
+              "intensity": 0
+            },
+            "f23": {
+              "intensity": 0
+            },
+            "f24": {
+              "intensity": 0
+            },
+            "f25": {
+              "intensity": 0
+            }
+          },
+          "fade": 0,
+          "advance": {
+            "mode": "manual"
+          }
+        }
+      ],
+      "end": "stop",
+      "play": false
+    },
+    {
+      "id": "l2",
+      "name": "Fog timer",
+      "cues": [
+        {
+          "id": "l2c1",
+          "name": "Fog on",
+          "values": {},
+          "fade": 0,
+          "advance": {
+            "mode": "wait",
+            "time": 3
+          }
+        },
+        {
+          "id": "l2c2",
+          "name": "Fog off",
+          "values": {},
+          "fade": 0,
+          "advance": {
+            "mode": "wait",
+            "time": 117
+          }
+        }
+      ],
+      "end": "loop",
+      "color": "#8a94a3",
+      "play": false
+    },
+    {
+      "id": "l3",
+      "name": "Haze",
+      "cues": [
+        {
+          "id": "l3c1",
+          "name": "Haze on",
+          "values": {
+            "f32": {
+              "haze": 0.35,
+              "fan": 0.5
+            }
+          },
+          "fade": 0,
+          "advance": {
+            "mode": "manual"
+          }
+        }
+      ],
+      "end": "stop",
+      "color": "#8a94a3",
+      "play": false
+    },
+    {
+      "id": "l4",
+      "name": "Confetti",
+      "cues": [
+        {
+          "id": "l4c1",
+          "name": "Shot",
+          "values": {
+            "f33": {
+              "confetti": 1
+            }
+          },
+          "fade": 0,
+          "advance": {
+            "mode": "wait",
+            "time": 0.5
+          }
+        }
+      ],
+      "end": "release",
+      "releaseTime": 0,
+      "color": "#ff4fd8",
+      "play": false
+    },
+    {
+      "id": "l5",
+      "name": "CO2",
+      "cues": [
+        {
+          "id": "l5c1",
+          "name": "1.5 s jet",
+          "values": {},
+          "fade": 0,
+          "advance": {
+            "mode": "wait",
+            "time": 1.5
+          }
+        }
+      ],
+      "end": "release",
+      "releaseTime": 0,
+      "color": "#bfe9ff",
+      "play": false
+    },
+    {
+      "id": "l6",
+      "name": "Sparks",
+      "cues": [
+        {
+          "id": "l6c1",
+          "name": "3 s of sparks",
+          "values": {},
+          "fade": 0,
+          "advance": {
+            "mode": "wait",
+            "time": 3
+          }
+        }
+      ],
+      "end": "release",
+      "releaseTime": 0,
+      "color": "#ffd23f",
+      "play": false
+    },
+    {
+      "id": "l7",
+      "name": "Flames",
+      "cues": [
+        {
+          "id": "l7c1",
+          "name": "1 s of flames",
+          "values": {},
+          "fade": 0,
+          "advance": {
+            "mode": "wait",
+            "time": 1
+          }
+        }
+      ],
+      "end": "release",
+      "releaseTime": 0,
+      "color": "#ff6a1a",
+      "play": false
+    },
+    {
+      "id": "l8",
+      "name": "Bubbles",
+      "cues": [
+        {
+          "id": "l8c1",
+          "name": "20 s of bubbles",
+          "values": {},
+          "fade": 0,
+          "advance": {
+            "mode": "wait",
+            "time": 20
+          }
+        }
+      ],
+      "end": "release",
+      "releaseTime": 0,
+      "color": "#7fd8ff",
+      "play": false
+    }
+  ],
+  "effects": [
+    {
+      "id": "e1",
+      "name": "Movers sweep",
+      "kind": "pan",
+      "group": "g3",
+      "params": {
+        "size": 0.3,
+        "speed": 8
+      }
+    },
+    {
+      "id": "e2",
+      "name": "Movers circle",
+      "kind": "circle",
+      "group": "g3",
+      "params": {
+        "size": 0.3,
+        "speed": 4
+      }
+    },
+    {
+      "id": "e3",
+      "name": "Back wave",
+      "kind": "wave",
+      "group": "g2",
+      "params": {
+        "low": 0.35,
+        "speed": 4
+      }
+    },
+    {
+      "id": "e4",
+      "name": "Spots ballyhoo",
+      "kind": "ballyhoo",
+      "params": {
+        "speed": 8
+      },
+      "fixtures": []
+    },
+    {
+      "id": "e5",
+      "name": "Spots fan",
+      "kind": "fan",
+      "params": {
+        "size": 0.5,
+        "speed": 8
+      },
+      "fixtures": []
+    },
+    {
+      "id": "e6",
+      "name": "Washes swing",
+      "kind": "swing",
+      "params": {
+        "size": 0.25,
+        "speed": 8
+      },
+      "fixtures": []
+    },
+    {
+      "id": "e7",
+      "name": "Wash colours",
+      "kind": "colorChase",
+      "params": {
+        "speed": 4
+      },
+      "fixtures": []
+    },
+    {
+      "id": "e8",
+      "name": "Lightning",
+      "kind": "lightning",
+      "group": "g2",
+      "params": {
+        "size": 0.6
+      }
+    },
+    {
+      "id": "e9",
+      "name": "Bar scanner",
+      "kind": "scanner",
+      "group": "g6",
+      "params": {}
+    },
+    {
+      "id": "e10",
+      "name": "Bar meteor rain",
+      "kind": "meteorRain",
+      "group": "g6",
+      "params": {}
+    },
+    {
+      "id": "e11",
+      "name": "Bar heartbeat",
+      "kind": "heartbeat",
+      "group": "g6",
+      "params": {}
+    },
+    {
+      "id": "e12",
+      "name": "Bar fire",
+      "kind": "fire2012",
+      "group": "g6",
+      "params": {}
+    },
+    {
+      "id": "e13",
+      "name": "Bar twinkles",
+      "kind": "twinkle",
+      "group": "g6",
+      "params": {}
+    },
+    {
+      "id": "e14",
+      "name": "Bar colour waves",
+      "kind": "pride",
+      "group": "g6",
+      "params": {}
+    }
+  ],
+  "pages": [],
+  "outputs": {
+    "devices": []
+  },
+  "settings": {
+    "bpm": 120
+  },
+  "extensions": {},
+  "timeline": {
+    "duration": 200.13725,
+    "bpm": 126,
+    "items": [
+      {
+        "id": "tmvrxtqm32",
+        "at": 0,
+        "lane": "list:l1",
+        "do": {
+          "do": "goto",
+          "list": "l1",
+          "cue": "l1c1"
+        }
+      },
+      {
+        "id": "tmvrxtqpy3",
+        "at": 16.22,
+        "lane": "list:l1",
+        "do": {
+          "do": "goto",
+          "list": "l1",
+          "cue": "l1c2"
+        }
+      },
+      {
+        "id": "tmvrxtqtm4",
+        "at": 77.17,
+        "lane": "list:l1",
+        "do": {
+          "do": "goto",
+          "list": "l1",
+          "cue": "l1c3"
+        }
+      },
+      {
+        "id": "tmvrxtqx55",
+        "at": 92.4,
+        "lane": "list:l1",
+        "do": {
+          "do": "goto",
+          "list": "l1",
+          "cue": "l1c7"
+        }
+      },
+      {
+        "id": "tmvrxtr0f6",
+        "at": 138.11,
+        "lane": "list:l1",
+        "do": {
+          "do": "goto",
+          "list": "l1",
+          "cue": "l1c2"
+        }
+      },
+      {
+        "id": "tmvrxtr2u7",
+        "at": 153.35,
+        "lane": "list:l1",
+        "do": {
+          "do": "goto",
+          "list": "l1",
+          "cue": "l1c6"
+        }
+      },
+      {
+        "id": "tmvrxtr5x8",
+        "at": 176.21,
+        "lane": "list:l1",
+        "do": {
+          "do": "goto",
+          "list": "l1",
+          "cue": "l1c11"
+        }
+      },
+      {
+        "id": "tmvrxtrgo9",
+        "at": 77.17,
+        "lane": "fx",
+        "do": {
+          "do": "effect",
+          "effect": "e14",
+          "on": true
+        },
+        "len": 15.238095238095237
+      }
+    ],
+    "audio": {
+      "name": "Whiskey Therapy - Whiskey en el Hotel.mp3",
+      "duration": 200.13725,
+      "store": "smvrxtk5c1:Whiskey Therapy - Whiskey en el Hotel.mp3",
+      "catalog": "whiskey-hotel",
+      "credit": "\"Whiskey en el Hotel\" by Whiskey Therapy, CC BY-SA"
+    },
+    "offset": 0.982,
+    "sections": [
+      {
+        "name": "Intro",
+        "at": 0,
+        "energy": 0.56
+      },
+      {
+        "name": "Verse",
+        "at": 16.22,
+        "energy": 0.8
+      },
+      {
+        "name": "Instrumental",
+        "at": 42.88,
+        "energy": 0.78
+      },
+      {
+        "name": "Verse 2",
+        "at": 54.31,
+        "energy": 0.79
+      },
+      {
+        "name": "Chorus",
+        "at": 77.17,
+        "energy": 0.87
+      },
+      {
+        "name": "Solo",
+        "at": 92.4,
+        "energy": 0.71
+      },
+      {
+        "name": "Verse 3",
+        "at": 138.11,
+        "energy": 0.79
+      },
+      {
+        "name": "Chorus 2",
+        "at": 153.35,
+        "energy": 0.88
+      },
+      {
+        "name": "Outro",
+        "at": 176.21,
+        "energy": 0.61
+      }
+    ]
+  }
+}

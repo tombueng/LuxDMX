@@ -1,0 +1,38 @@
+{
+  "name": "luxdmx-sequencer",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "link": "node scripts/build-link.mjs",
+    "songs": "node scripts/fetch-songs.mjs",
+    "build:release": "node scripts/build-link.mjs && node scripts/fetch-songs.mjs && vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json && tsc -p e2e/tsconfig.json",
+    "test": "vitest run",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@tsconfig/svelte": "5.0.8",
+    "@types/node": "22.20.5",
+    "@types/three": "0.170.0",
+    "ajv": "^8.17.1",
+    "axe-core": "4.11.0",
+    "happy-dom": "21.0.4",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.7",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "ws": "8.22.0"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "qrcode-generator": "2.0.4",
+    "three": "0.170.0"
+  }
+}

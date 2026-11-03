@@ -29,9 +29,34 @@
 <p align="center">
   <a href="https://tombueng.github.io/LuxDMX/"><b>⚡ Flash from your browser</b></a> &nbsp;·&nbsp;
   <a href="https://luxdmx.org/video"><b>▶ Watch the demo</b></a> &nbsp;·&nbsp;
+  <a href="#new-the-luxdmx-sequencer"><b>🎛 Sequencer</b></a> &nbsp;·&nbsp;
   <a href="hardware-carrier/README.md"><b>🛠 DIY carrier board</b></a> &nbsp;·&nbsp;
   <a href="#flashing-pre-built-firmware"><b>Install</b></a>
 </p>
+
+## New: the LuxDMX Sequencer
+
+<p align="center">
+  <a href="https://tombueng.github.io/LuxDMX/sequencer/"><img src="sequencer/docs/media/demo-moments.gif" alt="The sequencer's demo show: green beams, flame columns, spark fountains, a colour wash" width="100%"></a>
+</p>
+
+A lighting console in a browser tab. Patch your lights (2,400 fixture types to search), build
+looks, throw one of 51 effects on them and play the show from big buttons, your phone or a song's
+timeline, with a 3D stage to see it before the truck's unloaded. No install, no account, and your
+shows stay in your browser.
+
+It plays a LuxDMX box straight from the page (the box serves a little bridge popup, so update
+the box's firmware first) and any other Art-Net / sACN node through
+[LuxDMX Link](sequencer/link/README.md), a small helper for Windows, macOS and Linux.
+
+| | |
+|---|---|
+| ![Program: the stage plan, the cues and the programmer](sequencer/docs/media/program.png) | ![Live: a page of buttons and faders](sequencer/docs/media/live.png) |
+| ![Timeline: the song's waveform with cues, effects and moments](sequencer/docs/media/timeline.png) | ![The 3D stage with the timeline under it](sequencer/docs/media/stage3d.png) |
+
+<p align="center"><b><a href="https://tombueng.github.io/LuxDMX/sequencer/">▶ Open the Sequencer</a></b> &nbsp;·&nbsp; <a href="sequencer/README.md">What's in it</a> &nbsp;·&nbsp; <a href="sequencer/GUIDE.md">The guide</a></p>
+
+---
 
 | Status page | Settings page |
 |---|---|

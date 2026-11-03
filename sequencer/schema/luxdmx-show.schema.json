@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luxdmx.org/schema/luxdmx-show-1.1.json",
+  "title": "LuxDMX show",
+  "description": "A LuxDMX Sequencer show, format 1.1. FORMAT.md explains every field. Unknown fields are allowed everywhere (readers keep them).",
+  "type": "object",
+  "required": ["format", "formatVersion", "fixtures", "cueLists"],
+  "properties": {
+    "format": { "const": "luxdmx-show" },
+    "formatVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "minReaderVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "requiredFeatures": { "type": "array", "items": { "type": "string" } },
+    "meta": {
+      "type": "object",
+      "properties": { "name": { "type": "string" }, "created": { "type": "string" }, "modified": { "type": "string" }, "app": { "type": "string" } }
+    },
+    "fixtureTypes": { "type": "array", "items": { "$ref": "#/$defs/fixtureType" } },
+    "fixtures": { "type": "array", "items": { "$ref": "#/$defs/fixture" } },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/group" } },
+    "presets": { "type": "array", "items": { "$ref": "#/$defs/preset" } },
+    "cueLists": { "type": "array", "items": { "$ref": "#/$defs/cueList" } },
+    "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } },
+    "pages": { "type": "array", "items": { "$ref": "#/$defs/page" } },
+    "outputs": {
+      "type": "object",
+      "properties": { "devices": { "type": "array", "items": { "type": "object", "required": ["host"], "properties": { "host": { "type": "string" } } } } }
+    },
+    "settings": { "type": "object", "properties": { "bpm": { "type": "number", "minimum": 20, "maximum": 300 }, "schedule": { "type": "array", "items": { "type": "object", "required": ["id", "at", "do"], "properties": { "id": { "type": "string" }, "at": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }, "days": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 6 } }, "sun": { "enum": ["rise", "set"] }, "offset": { "type": "number", "minimum": -720, "maximum": 720 }, "do": { "$ref": "#/$defs/cueAction" } } } }, "stage3d": { "type": "object", "properties": { "hideVenue": { "type": "boolean" }, "room": { "enum": ["hall", "pub", "club", "party", "truss"] }, "model": { "type": "object", "required": ["name", "store", "scale", "x", "y", "z", "yaw"], "properties": {
+      "name": { "type": "string" }, "store": { "type": "string" }, "scale": { "type": "number" }, "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" }, "yaw": { "type": "number" } } } } }, "scheduleOff": { "type": "boolean" }, "schedulePause": { "type": "number" }, "place": { "type": "object", "required": ["lat", "lon"], "properties": { "lat": { "type": "number", "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "minimum": -180, "maximum": 180 }, "name": { "type": "string" } } }, "stage": { "type": "object", "properties": { "image": { "type": "string", "pattern": "^data:image/" }, "opacity": { "$ref": "#/$defs/level" } } }, "lockPin": { "type": "string", "pattern": "^\\d{3,8}$" }, "lockPage": { "type": "string" }, "bandName": { "type": "string", "minLength": 1, "maxLength": 60 } } },
+    "timeline": { "type": "object", "required": ["duration", "items"], "properties": {
+      "name": { "type": "string", "maxLength": 80 },
+      "duration": { "type": "number", "minimum": 0, "maximum": 86400 }, "bpm": { "type": "number", "minimum": 20, "maximum": 300 }, "offset": { "type": "number", "minimum": -60, "maximum": 86400 }, "demo": { "type": "boolean" },
+      "audio": { "type": "object", "required": ["name", "duration"], "properties": { "name": { "type": "string" }, "duration": { "type": "number" }, "store": { "type": "string" }, "catalog": { "type": "string" }, "credit": { "type": "string" } } },
+      "sections": { "type": "array", "items": { "type": "object", "required": ["name", "at"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 40 }, "at": { "type": "number", "minimum": 0 }, "energy": { "$ref": "#/$defs/level" } } } },
+      "lead": { "type": "number", "minimum": 0, "maximum": 600 }, "tail": { "type": "number", "minimum": 0, "maximum": 600 },
+      "crowd": { "type": "array", "items": { "type": "object", "required": ["id", "at", "do"], "properties": {
+        "id": { "type": "string" }, "at": { "type": "number", "minimum": -600 }, "len": { "type": "number", "minimum": 0, "maximum": 60 },
+        "do": { "oneOf": [
+          { "type": "object", "required": ["do", "mood", "level"], "properties": { "do": { "const": "crowd" }, "mood": { "enum": ["chatter", "cheer", "clap"], "description": "clap: only in old files, read as cheer at a third of its level" }, "level": { "$ref": "#/$defs/level" } } },
+          { "type": "object", "required": ["do", "level"], "properties": { "do": { "const": "cheer" }, "level": { "$ref": "#/$defs/level" } } } ] } } } },
+      "items": { "type": "array", "items": { "type": "object", "required": ["id", "at", "lane", "do"], "properties": {
+        "id": { "type": "string" }, "at": { "type": "number", "minimum": -600 }, "lane": { "type": "string" }, "len": { "type": "number", "minimum": 0 }, "do": { "type": "object", "required": ["do"],
+          "if": { "properties": { "do": { "const": "burst" } } }, "then": { "required": ["do", "attr", "seconds"], "properties": { "seconds": { "type": "number", "exclusiveMinimum": 0, "maximum": 30 } } } } } } } } },
+    "setlist": { "type": "object", "required": ["before", "after"], "properties": {
+      "before": { "type": "array", "items": { "$ref": "#/properties/timeline" } }, "after": { "type": "array", "items": { "$ref": "#/properties/timeline" } },
+      "between": { "type": "object", "required": ["list", "cue"], "properties": { "list": { "type": "string" }, "cue": { "type": "string" } } },
+      "countIn": { "type": "integer", "minimum": 0, "maximum": 2 } } },
+    "extensions": { "type": "object" }
+  },
+  "$defs": {
+    "level": { "type": "number", "minimum": 0, "maximum": 1 },
+    "dmx": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "color": {
+      "type": "object", "required": ["r", "g", "b"],
+      "properties": { "r": { "$ref": "#/$defs/level" }, "g": { "$ref": "#/$defs/level" }, "b": { "$ref": "#/$defs/level" } }
+    },
+    "presetRef": { "type": "object", "required": ["preset"], "properties": { "preset": { "type": "string" } } },
+    "levelOrRef": { "oneOf": [{ "$ref": "#/$defs/level" }, { "$ref": "#/$defs/presetRef" }] },
+    "attr": {
+      "enum": ["intensity", "red", "green", "blue", "white", "warmWhite", "coolWhite", "amber", "uv", "lime", "cyan", "magenta", "yellow",
+        "cct", "colorWheel", "pan", "tilt", "strobe", "shutter", "gobo", "goboRotation", "prism", "zoom", "focus", "iris", "frost",
+        "fog", "haze", "fan", "speed", "control", "raw", "confetti", "bubbles", "flame", "sparks", "co2", "enable"]
+    },
+    "channel": {
+      "type": "object", "required": ["name", "attr"],
+      "properties": {
+        "name": { "type": "string" }, "attr": { "$ref": "#/$defs/attr" }, "fine": { "type": "boolean" },
+        "default": { "$ref": "#/$defs/dmx" }, "cell": { "type": "integer", "minimum": 0 },
+        "span": { "type": "array", "items": { "$ref": "#/$defs/dmx" }, "minItems": 2, "maxItems": 2 },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["from", "to", "label"],
+            "properties": {
+              "from": { "$ref": "#/$defs/dmx" }, "to": { "$ref": "#/$defs/dmx" }, "label": { "type": "string" },
+              "kind": { "enum": ["open", "closed", "strobe", "slot", "other"] }, "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+            }
+          }
+        }
+      }
+    },
+    "fixtureType": {
+      "type": "object", "required": ["id", "manufacturer", "model", "source", "modes"],
+      "properties": {
+        "id": { "type": "string" }, "manufacturer": { "type": "string" }, "model": { "type": "string" },
+        "source": { "enum": ["generic", "ofl", "gdtf", "qxf", "user"] }, "ref": { "type": "string" },
+        "modes": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["name", "channels"], "properties": { "name": { "type": "string" }, "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } } } } }
+      }
+    },
+    "fixture": {
+      "type": "object", "required": ["id", "name", "typeId", "universe", "address"],
+      "properties": {
+        "id": { "type": "string" }, "name": { "type": "string" }, "typeId": { "type": "string" }, "mode": { "type": "string" },
+        "universe": { "type": "integer", "minimum": 0, "maximum": 32767 }, "address": { "type": "integer", "minimum": 1, "maximum": 512 },
+        "x": { "type": "number" }, "y": { "type": "number" }, "invertPan": { "type": "boolean" }, "invertTilt": { "type": "boolean" },
+        "p3": { "type": "object", "required": ["x", "y", "z"], "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } } },
+        "rot": { "type": "object", "required": ["yaw", "pitch", "roll"], "properties": { "yaw": { "type": "number" }, "pitch": { "type": "number" }, "roll": { "type": "number" } } },
+        "panOffset": { "type": "number" }, "tiltOffset": { "type": "number" },
+        "panDeg": { "type": "number", "minimum": 1, "maximum": 1080, "description": "This light's pan range in degrees (overrides its type's)" },
+        "tiltDeg": { "type": "number", "minimum": 1, "maximum": 1080, "description": "This light's tilt range in degrees (overrides its type's)" },
+        "swapPanTilt": { "type": "boolean", "description": "Pan goes to its tilt channel and tilt to its pan channel" },
+        "uid": { "type": "string", "pattern": "^[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}$", "description": "The real light's RDM UID (maker:device, hex)" }
+      }
+    },
+    "group": { "type": "object", "required": ["id", "name", "fixtures"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "fixtures": { "type": "array", "items": { "type": "string" } }, "auto": { "type": "boolean" } } },
+    "values": {
+      "type": "object",
+      "properties": {
+        "intensity": { "$ref": "#/$defs/levelOrRef" }, "white": { "$ref": "#/$defs/levelOrRef" }, "amber": { "$ref": "#/$defs/levelOrRef" },
+        "uv": { "$ref": "#/$defs/levelOrRef" }, "cct": { "$ref": "#/$defs/levelOrRef" }, "pan": { "$ref": "#/$defs/levelOrRef" },
+        "tilt": { "$ref": "#/$defs/levelOrRef" }, "strobe": { "$ref": "#/$defs/levelOrRef" }, "zoom": { "$ref": "#/$defs/levelOrRef" },
+        "focus": { "$ref": "#/$defs/levelOrRef" }, "iris": { "$ref": "#/$defs/levelOrRef" }, "frost": { "$ref": "#/$defs/levelOrRef" },
+        "prism": { "$ref": "#/$defs/levelOrRef" }, "goboRotation": { "$ref": "#/$defs/levelOrRef" }, "gobo": { "$ref": "#/$defs/levelOrRef" },
+        "fog": { "$ref": "#/$defs/levelOrRef" }, "haze": { "$ref": "#/$defs/levelOrRef" }, "fan": { "$ref": "#/$defs/levelOrRef" },
+        "speed": { "$ref": "#/$defs/levelOrRef" },
+        "color": { "oneOf": [{ "$ref": "#/$defs/color" }, { "$ref": "#/$defs/presetRef" }] },
+        "raw": { "type": "object", "patternProperties": { "^\\d+$": { "$ref": "#/$defs/dmx" } }, "additionalProperties": false }
+      }
+    },
+    "preset": {
+      "type": "object", "required": ["id", "name", "kind", "values"],
+      "properties": {
+        "id": { "type": "string" }, "name": { "type": "string" }, "kind": { "enum": ["color", "position", "beam", "intensity"] },
+        "values": { "$ref": "#/$defs/values" }, "perFixture": { "type": "object", "additionalProperties": { "$ref": "#/$defs/values" } }, "auto": { "type": "boolean" }
+      }
+    },
+    "advance": {
+      "oneOf": [
+        { "type": "object", "required": ["mode"], "properties": { "mode": { "const": "manual" } } },
+        { "type": "object", "required": ["mode", "time"], "properties": { "mode": { "enum": ["wait", "follow"] }, "time": { "type": "number", "minimum": 0 } } },
+        { "type": "object", "required": ["mode", "beats"], "properties": { "mode": { "const": "beats" }, "beats": { "type": "number", "exclusiveMinimum": 0 } } }
+      ]
+    },
+    "cueAction": {
+      "oneOf": [
+        { "type": "object", "required": ["do", "list"], "properties": { "do": { "enum": ["start", "stop", "release", "go"] }, "list": { "type": "string" } } },
+        { "type": "object", "required": ["do", "list", "level"], "properties": { "do": { "const": "master" }, "list": { "type": "string" }, "level": { "$ref": "#/$defs/level" } } },
+        { "type": "object", "required": ["do", "on"], "properties": { "do": { "const": "blackout" }, "on": { "type": "boolean" } } },
+        { "type": "object", "required": ["do"], "properties": { "do": { "const": "off" } } },
+        { "type": "object", "required": ["do", "list", "cue"], "properties": { "do": { "const": "goto" }, "list": { "type": "string" }, "cue": { "type": "string" } } }
+      ]
+    },
+    "cue": {
+      "type": "object", "required": ["id", "name", "values", "fade", "advance"],
+      "properties": {
+        "id": { "type": "string" }, "name": { "type": "string" },
+        "values": { "type": "object", "additionalProperties": { "$ref": "#/$defs/values" } },
+        "fade": { "type": "number", "minimum": 0, "maximum": 3600 }, "fadeOut": { "type": "number", "minimum": 0, "maximum": 3600 }, "delay": { "type": "number", "minimum": 0, "maximum": 3600 },
+        "advance": { "$ref": "#/$defs/advance" }, "effects": { "type": "array", "items": { "type": "string" } },
+        "actions": { "type": "array", "items": { "$ref": "#/$defs/cueAction" } }, "note": { "type": "string" }, "num": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "cueList": {
+      "type": "object", "required": ["id", "name", "cues", "end"],
+      "properties": {
+        "id": { "type": "string" }, "name": { "type": "string" }, "cues": { "type": "array", "items": { "$ref": "#/$defs/cue" } },
+        "end": { "enum": ["loop", "stop", "release"] }, "priority": { "enum": ["low", "normal", "high"] },
+        "releaseTime": { "type": "number", "minimum": 0, "maximum": 3600 }, "restart": { "enum": ["first", "resume"] }, "color": { "type": "string" }, "bpm": { "type": "number", "minimum": 20, "maximum": 300 }, "play": { "type": "boolean" }
+      }
+    },
+    "effect": {
+      "type": "object", "required": ["id", "name", "kind", "params"],
+      "properties": {
+        "id": { "type": "string" }, "name": { "type": "string" }, "kind": { "type": "string" },
+        "group": { "type": "string" }, "fixtures": { "type": "array", "items": { "type": "string" } },
+        "params": {
+          "type": "object",
+          "properties": {
+            "speed": { "type": "number", "minimum": 0.05, "maximum": 3600 }, "tempo": { "type": "boolean" }, "size": { "$ref": "#/$defs/level" }, "spread": { "$ref": "#/$defs/level" },
+            "direction": { "enum": ["forward", "backward", "bounce", "in", "out", "random"] }, "blocks": { "type": "integer", "minimum": 1, "maximum": 512 },
+            "width": { "$ref": "#/$defs/level" }, "colors": { "type": "array", "items": { "$ref": "#/$defs/color" } },
+            "low": { "$ref": "#/$defs/level" }, "high": { "$ref": "#/$defs/level" }, "lightUp": { "type": "boolean" }, "level": { "$ref": "#/$defs/level" },
+            "pixels": { "type": "boolean" }, "order": { "enum": ["list", "x", "y", "centre"] },
+            "formula": { "type": "string", "maxLength": 500 }, "picture": { "type": "string", "pattern": "^(pic1:[0-9]+x[0-9]+:[0-9,]+:[A-Za-z0-9+/=]+)?$" }, "mapping": { "enum": ["auto", "line", "wall"] }
+          }
+        }
+      }
+    },
+    "widget": {
+      "type": "object", "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string" }, "type": { "enum": ["list", "cue", "effect", "fader", "fog", "group", "special", "label", "cuelist", "song"] }, "action": { "enum": ["go", "back", "toggle", "flash", "release", "solo", "select"] },
+        "label": { "type": "string" }, "color": { "type": "string" }, "size": { "enum": [1, 2] }, "key": { "type": "string", "maxLength": 1 },
+        "midi": { "type": "object", "required": ["kind", "ch", "num"], "properties": { "kind": { "enum": ["note", "cc"] }, "ch": { "type": "integer", "minimum": 1, "maximum": 16 }, "num": { "type": "integer", "minimum": 0, "maximum": 127 } } }
+      },
+      "if": { "properties": { "type": { "const": "song" } } }, "then": { "required": ["do"], "properties": { "do": { "enum": ["play", "next", "part"] } } }
+    },
+    "page": { "type": "object", "required": ["id", "name", "widgets"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "widgets": { "type": "array", "items": { "$ref": "#/$defs/widget" } }, "locked": { "type": "boolean" }, "go": { "const": false } } }
+  }
+}
