@@ -409,12 +409,22 @@ class App {
     if (l?.bpm && l.bpm !== this.show.settings.bpm) { this.show.settings.bpm = l.bpm; this.markDirty(0); }
   }
   // A fog timer is never it, not even as the first list (made before any look): GO would start the fog.
+  // Worked out once per change of the show (or of the GO list): looking at every cue's values
+  // through the show's proxies is ~50 ms on the big demo, and the phone remote asks a few times a tick.
   get liveList(): CueList | undefined {
-    const ls = this.show.cueLists;
-    // (not a fog timer or the machine shots: GO, Space and Auto GO never step through those)
-    const steps = (l: CueList) => !isFogTimer(l) && !isMachineList(l);
-    return ls.find((l) => l.id === this.goList && steps(l)) ?? ls.find(steps);
+    const show = this.show, rev = this.rev, go = this.goList;
+    const c = this.liveListOf;
+    if (c && c.show === show && c.rev === rev && c.go === go) return c.list;
+    const list = untrack(() => {
+      const ls = show.cueLists;
+      // (not a fog timer or the machine shots: GO, Space and Auto GO never step through those)
+      const steps = (l: CueList) => !isFogTimer(l) && !isMachineList(l);
+      return ls.find((l) => l.id === go && steps(l)) ?? ls.find(steps);
+    });
+    this.liveListOf = { show, rev, go, list };
+    return list;
   }
+  private liveListOf: { show: Show; rev: number; go: string; list: CueList | undefined } | null = null;
   // The tempo everything runs at right now.
   // (following the microphone wins; then a song playing on the timeline, at its own tempo)
   get bpm() {
@@ -1751,7 +1761,18 @@ class App {
   addStandardPresets() { return addStandardPresets(this.show); }
 
   // ---- live pages
-  get pages(): Page[] { return this.show.pages.length ? this.show.pages : [buskingPage(this.show)]; }
+  // A show without a page of its own gets the generated one, built once per change of the show:
+  // through the show's proxies that's ~100 ms on the big demo, and the phone remote reads `pages`
+  // (and `livePage`) several times a tick. Built on every read, a phone on the demo froze the laptop.
+  get pages(): Page[] {
+    if (this.show.pages.length) return this.show.pages;
+    const show = this.show, rev = this.rev, c = this.generated;
+    if (c && c.show === show && c.rev === rev) return c.pages;
+    const pages = [untrack(() => buskingPage(show))];
+    this.generated = { show, rev, pages };
+    return pages;
+  }
+  private generated: { show: Show; rev: number; pages: Page[] } | null = null;
   // A locked live page is the service mode for the whole show: only playing, nothing that edits
   // or leaves it (other pages can still be played, they're locked too).
   // Pages first: with nothing locked this never reads the view, so switching views doesn't rebuild Live's GO strip.

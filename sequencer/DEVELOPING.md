@@ -306,7 +306,8 @@ fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in
   (`thumb.ts` `stageSvg`) are shown through `svgImage` (a data URL, cached). As SVG elements a
   deck of 40 cues on a 300-light rig was 14,000 elements and seconds of layout per tab switch.
   Marks worked out from a whole cue (`cueRisk`) go through `ui/risk.ts`, cached per cue until
-  `app.showRev` changes.
+  `app.showRev` changes. The same for the app's getters that look at the whole show: `pages` (the
+  generated page of a show without one) and `liveList` are worked out once per show and revision.
 
 ## Tests
 
@@ -331,6 +332,9 @@ lists and effects a hand-made live page doesn't have yet.)
 - Svelte trims a leading space in an element: use `&nbsp;` where a space matters.
 - `-0` ends up in saved numbers: add `+0` when rounding.
 - An empty signature equals the initial empty one: start a cache key at `null`, not `''`.
+- A getter that builds something from the whole show runs on every read, and the phone remote reads
+  `pages`, `livePage` and `liveList` a few times a tick: built each time, the demo's generated page
+  (~100 ms through the proxies) froze the laptop as soon as a phone joined. Key it on `showRev`.
 - Shared scratch vectors mutated by two callers in one frame give wrong results: own scratch.
 - Exponential growth per frame (`size *= 1 + dt * k`) runs away over a long life: ease towards a
   cap instead.
