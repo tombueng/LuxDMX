@@ -113,14 +113,13 @@
     <header>
       <img src="https://raw.githubusercontent.com/tombueng/LuxDMX/master/docs/logo.png" alt="LuxDMX logo">
       <h1>Flash LuxDMX</h1>
-      <p class="tagline">Art-Net / sACN (E1.31) &rarr; DMX512 gateway for ESP32. Flash it straight from this page &mdash; no install, no command line.</p>
+      <p class="tagline">Art-Net / sACN (E1.31) &rarr; DMX512 gateway for ESP32. Flash it straight from this page, there's nothing to install.</p>
     </header>
 
     <div class="pitch">
-      Not just another Art-Net node: LuxDMX is a node <strong>plus a live diagnostic tool</strong>.
-      Watch all 512 channels update in real time in your browser, get a warning the moment
-      <strong>two consoles fight over a universe</strong>, see per-sender FPS and frame jitter, and drive
-      <strong>galvanically-isolated</strong> DMX out. Fully open source, builds for a few dollars.
+      Its own web page shows all 512 channels live, FPS and jitter per sender, and warns you when
+      <strong>two consoles fight over a universe</strong>. It does RDM too, it's open source, and a
+      basic one is about 10 EUR in parts.
     </div>
 
     <p>Pick your board and click flash. The firmware is always the
@@ -225,7 +224,7 @@
       <b>USB-to-serial (3.3 V TTL)</b> adapter wired to <code>TXD0</code> / <code>RXD0</code> / <code>GND</code>,
       with <code>IO0</code> pulled to <code>GND</code> while you tap <code>EN</code> to enter download mode.
       If you would rather not, use the
-      <a href="https://github.com/tombueng/LuxDMX#macos--linux--wt32-eth01">scripted esptool method</a> instead.
+      <a href="https://github.com/tombueng/LuxDMX#macos--linux-wt32-eth01">scripted esptool method</a> instead.
     </div>
 
     <h2>After flashing</h2>
