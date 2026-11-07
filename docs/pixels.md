@@ -345,7 +345,9 @@ off. With port 5 unused you can turn the LED back on at `ledpin=48`, `ledtype=2`
 
 **5 V strip on a 12/24 V board.** The carrier's pixel rail is a fused pass-through and does not
 care about voltage, but 5 V strip draws roughly 3.5× the current of 12 V strip for the same
-pixel count, and the board's limit is amps. See `hardware-carrier/README.md`.
+pixel count, and the board's limit is amps. The 5 V goes into `12-24V IN`, because USB and `5V IN`
+don't reach `V+` on the pixel terminals. Without it the port looks fine in `/pixels.json` and the
+strip stays dark. See `hardware-carrier/README.md`.
 
 **sACN multicast is capped at 48 groups.** Beyond that, use unicast; the device logs exactly
 how many universes it could not join rather than silently missing them.

@@ -252,6 +252,13 @@ the buck.
 | DMX only, in a box | 5 V into the `5V IN` header | not used |
 | Pixels | USB or `5V IN`, as above | 12/24 V into `12-24V IN` |
 | Pixels, one cable | the buck module, making 5 V from the pixel supply | 12/24 V into `12-24V IN` |
+| 5 V pixels (WS2812) | USB or `5V IN`, as above | 5 V into `12-24V IN`, no buck |
+
+**USB doesn't light your pixels.** `V+` on the pixel terminals only ever comes from `12-24V IN`, and
+neither USB nor `5V IN` reaches it. With nothing on that terminal the strip stays dark while the web
+UI happily shows it running. That goes for 5 V pixels too: their 5 V goes into `12-24V IN`. More on
+that, and on a module trap with USB, in
+[`hardware-carrier/README.md`](hardware-carrier/README.md#5-v-pixels-and-usb).
 
 **One 5 V source at a time.** USB, `5V IN` and the buck share one rail with no diodes between them.
 With the buck fitted, don't plug in USB while the 12/24 V is on, the two will fight.

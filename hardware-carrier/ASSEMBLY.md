@@ -169,6 +169,10 @@ Exactly one of the two. Both together is a bridged fuse, which is no fuse.
 each other. If the buck is fitted and USB is plugged in, one source fights the other. There
 is no reverse or ORing protection on the board.
 
+**USB doesn't power the pixels.** `V+` on the pixel terminals only comes from `12-24V IN`, also
+for 5 V pixels like WS2812, and then without the buck. Details and the USB trap on some S3 modules
+in [the README](README.md#5-v-pixels-and-usb).
+
 **Set the buck before soldering it in.** These modules have a trimmer and arrive in any
 position. At 12 V out the ESP32, the W5500 and the display all go at once.
 
