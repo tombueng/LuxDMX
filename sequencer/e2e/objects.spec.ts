@@ -249,3 +249,24 @@ test('keys on a DIP switch belong to the switch, not the list', async ({ page })
   await expect(dlg.getByLabel('Fixture address')).toHaveValue('3');
   await expect(page.locator('.deck .card')).toHaveCount(0);
 });
+
+// A browser asks before a page may read the clipboard, and nothing says anyone answers: duplicate
+// and paste must not stand waiting for that (they did, and looked broken).
+test('a clipboard prompt nobody answers holds up nothing', async ({ page }) => {
+  await page.addInitScript(() => {
+    const never = () => new Promise<never>(() => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { readText: never, writeText: never }, configurable: true });
+  });
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'Dim');
+  const count = () => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length);
+  await page.locator('.fl li').first().click();
+  await page.keyboard.press('Control+d');
+  await expect.poll(count, { timeout: 3000 }).toBe(3);
+  await page.keyboard.press('Control+x');
+  await expect.poll(count, { timeout: 3000 }).toBe(2);
+  await page.keyboard.press('Control+v');
+  await expect.poll(count, { timeout: 3000 }).toBe(3);
+  await page.locator('.fl').getByRole('button', { name: 'Duplicate fixtures' }).click();
+  await expect.poll(count, { timeout: 3000 }).toBe(4);
+});

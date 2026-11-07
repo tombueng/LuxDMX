@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EFFECTS, EFFECT_MAP, arrange, paramsOf, runEffect } from './effects';
+import { withContrast } from './fxkit';
 import { Engine } from './engine';
 import { emptyShow } from '../model/format';
 import type { Show } from '../model/types';
@@ -251,5 +252,38 @@ describe('colour effects and the lights\' levels', () => {
     e.setMaster('l', 0.5);
     expect(level(at(1.5).frames.get(0)!, 0)).toBeLessThanOrEqual(52);   // 40% at half: 20%
     expect(level(at(1.5).frames.get(0)!, 1)).toBe(255);                 // the others still come up
+  });
+});
+
+describe('contrast', () => {
+  const def = EFFECTS.find((d) => d.id === 'plasmaClouds')!, n = 64;
+  const levels = (params: Record<string, unknown>) => runEffect(def, paramsOf('plasmaClouds', params), n, 1.3).map((o) => o.intensity!);
+  it('0 is the effect as it is; up pushes towards the ends, down pulls towards the middle', () => {
+    const plain = levels({}), hard = levels({ contrast: 1 }), soft = levels({ contrast: -1 });
+    expect(levels({ contrast: 0 })).toEqual(plain);
+    plain.forEach((v, i) => {
+      if (v < 0.49) { expect(hard[i]).toBeLessThanOrEqual(v); expect(soft[i]).toBeGreaterThanOrEqual(v); }
+      if (v > 0.51) { expect(hard[i]).toBeGreaterThanOrEqual(v); expect(soft[i]).toBeLessThanOrEqual(v); }
+    });
+  });
+  it('dark stays dark and full stays full', () => {
+    expect(withContrast(0, 1)).toBe(0); expect(withContrast(0, -1)).toBe(0);
+    expect(withContrast(1, 1)).toBe(1); expect(withContrast(1, -1)).toBe(1);
+    expect(withContrast(0.5, 0.7)).toBeCloseTo(0.5, 6);
+    expect(withContrast(0.25, 1)).toBeCloseTo(0.5 * 0.5 ** 4, 6);
+  });
+  it('works between Dim to and Bright to, which stay its ends', () => {
+    const v = levels({ contrast: 1, low: 0.2, high: 0.6 });
+    for (const x of v) { expect(x).toBeGreaterThanOrEqual(0.2 - 1e-9); expect(x).toBeLessThanOrEqual(0.6 + 1e-9); }
+  });
+  it('a value from a file that isn\'t a contrast can\'t break a frame', () => {
+    expect(paramsOf('plasmaClouds', { contrast: 9 }).contrast).toBe(1);
+    expect(paramsOf('plasmaClouds', { contrast: -9 }).contrast).toBe(-1);
+    expect(paramsOf('plasmaClouds', { contrast: 'hard' }).contrast).toBe(0);
+    expect(paramsOf('plasmaClouds', { contrast: NaN }).contrast).toBe(0);
+  });
+  it('leaves effects without a level alone', () => {
+    const d = EFFECTS.find((x) => x.id === 'circle')!;
+    expect(runEffect(d, paramsOf('circle', { contrast: 1 }), 4, 0.3)).toEqual(runEffect(d, paramsOf('circle'), 4, 0.3));
   });
 });

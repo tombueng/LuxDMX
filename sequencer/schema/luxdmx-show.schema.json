@@ -48,6 +48,12 @@
     "extensions": { "type": "object" }
   },
   "$defs": {
+    "pixelLayout": {
+      "oneOf": [
+        { "type": "object", "required": ["kind", "rings"], "properties": { "kind": { "const": "rings" }, "rings": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1, "maximum": 4096 } }, "ccw": { "type": "boolean" }, "turn": { "type": "number" } } },
+        { "type": "object", "required": ["kind", "cols", "rows"], "properties": { "kind": { "const": "matrix" }, "cols": { "type": "integer", "minimum": 1, "maximum": 4096 }, "rows": { "type": "integer", "minimum": 1, "maximum": 4096 }, "zigzag": { "type": "boolean" }, "vertical": { "type": "boolean" }, "from": { "enum": ["tl", "tr", "bl", "br"] } } }
+      ]
+    },
     "level": { "type": "number", "minimum": 0, "maximum": 1 },
     "dmx": { "type": "integer", "minimum": 0, "maximum": 255 },
     "color": {
@@ -84,7 +90,7 @@
       "properties": {
         "id": { "type": "string" }, "manufacturer": { "type": "string" }, "model": { "type": "string" },
         "source": { "enum": ["generic", "ofl", "gdtf", "qxf", "user"] }, "ref": { "type": "string" },
-        "modes": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["name", "channels"], "properties": { "name": { "type": "string" }, "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } } } } }
+        "modes": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["name", "channels"], "properties": { "name": { "type": "string" }, "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } }, "layout": { "$ref": "#/$defs/pixelLayout" } } } }
       }
     },
     "fixture": {
@@ -169,9 +175,9 @@
             "speed": { "type": "number", "minimum": 0.05, "maximum": 3600 }, "tempo": { "type": "boolean" }, "size": { "$ref": "#/$defs/level" }, "spread": { "$ref": "#/$defs/level" },
             "direction": { "enum": ["forward", "backward", "bounce", "in", "out", "random"] }, "blocks": { "type": "integer", "minimum": 1, "maximum": 512 },
             "width": { "$ref": "#/$defs/level" }, "colors": { "type": "array", "items": { "$ref": "#/$defs/color" } },
-            "low": { "$ref": "#/$defs/level" }, "high": { "$ref": "#/$defs/level" }, "lightUp": { "type": "boolean" }, "level": { "$ref": "#/$defs/level" },
+            "low": { "$ref": "#/$defs/level" }, "high": { "$ref": "#/$defs/level" }, "contrast": { "type": "number", "minimum": -1, "maximum": 1 }, "lightUp": { "type": "boolean" }, "level": { "$ref": "#/$defs/level" },
             "pixels": { "type": "boolean" }, "order": { "enum": ["list", "x", "y", "centre"] },
-            "formula": { "type": "string", "maxLength": 500 }, "picture": { "type": "string", "pattern": "^(pic1:[0-9]+x[0-9]+:[0-9,]+:[A-Za-z0-9+/=]+)?$" }, "mapping": { "enum": ["auto", "line", "wall"] }
+            "formula": { "type": "string", "maxLength": 500 }, "picture": { "type": "string", "pattern": "^(pic1:[0-9]+x[0-9]+:[0-9,]+:[A-Za-z0-9+/=]+)?$" }, "mapping": { "enum": ["auto", "line", "wall"] }, "text": { "type": "string", "maxLength": 200 }
           }
         }
       }

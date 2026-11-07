@@ -44,9 +44,21 @@ export interface Channel {
                            // channel (an iris from 0 to 191, effects above): value 0 -> from, 1 -> to
 }
 
+// Where the pixels of a ring, a disc or a matrix really are, so an effect can draw on them. Cells
+// count in data order (model/pixelLayout.ts works out each one's place).
+//   rings: LEDs per ring in the order the data runs through them (rim first: 60, 48, ... 1). A
+//     bigger ring is further out. Each ring starts at the top and runs clockwise (`ccw` the other
+//     way, `turn` degrees turns the whole thing).
+//   matrix: rows of LEDs from the corner `from` (top left unless it says), along the rows
+//     (`vertical`: along the columns); `zigzag`: every second row runs back.
+export type PixelLayout =
+  | { kind: 'rings'; rings: number[]; ccw?: boolean; turn?: number }
+  | { kind: 'matrix'; cols: number; rows: number; zigzag?: boolean; vertical?: boolean; from?: 'tl' | 'tr' | 'bl' | 'br' };
+
 export interface FixtureMode {
   name: string;
   channels: Channel[];
+  layout?: PixelLayout;   // a ring or a matrix (`cell` says which pixel a channel belongs to)
 }
 
 export interface FixtureType {

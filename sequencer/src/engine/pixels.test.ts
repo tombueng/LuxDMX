@@ -109,7 +109,8 @@ describe('pixel shows: all of them', () => {
       const p = paramsOf(id), n = where.length, total = 3.7 / p.speed;
       const all = runEffect(EFFECT_MAP.get(id)!, p, n, total, 1, where, { beats: 7.4, secs: 3.7 });
       const one = where.map((w, i) => {
-        const e: Elem = { phase: 0, x: n > 1 ? i / (n - 1) : 0, cycle: total % 1, total, k: i, m: n, seed: (131 + i) | 0, ...w, beats: 7.4, secs: 3.7 };
+        const e: Elem = { phase: 0, x: n > 1 ? i / (n - 1) : 0, cycle: total % 1, total, k: i, m: n, seed: (131 + i) | 0, ...w, beats: 7.4, secs: 3.7,
+          sx: 0, sy: 0, rad: 0, ang: 0, lane: 0, lanes: 1, gx: i, gy: 0, gw: n, gh: 1, first: i === 0, cell: i, cells: n };
         e.phase = (total - p.spread * (n > 1 ? i / n : 0)) % 1; if (e.phase < 0) e.phase += 1;
         return EFFECT_MAP.get(id)!.run(e, { ...p });                     // a fresh p every time: no cache
       });

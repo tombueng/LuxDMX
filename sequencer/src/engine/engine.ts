@@ -12,6 +12,7 @@
 import { enableValue, isGated, MAX_ON } from '../model/safety';
 import type { CueAction, CueList, Effect, FixtureMode, Preset, Resolved, Show, Values } from '../model/types';
 import { capsOf, modeOf, typeMap } from '../model/library';
+import { isWide, placesOf, spansOf } from '../model/pixelLayout';
 // fog, haze and the effect machines: highest wins across lists, like a level (a haze list runs all
 // night whatever the moods say; two lists firing confetti fire it)
 const SMOKE = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
@@ -24,6 +25,7 @@ const PRIO = { low: 0, normal: 1, high: 2 } as const;
 const FX_FADE = 0.4;            // seconds an effect started or stopped by hand takes to fade
 // the channels that make light (masters and Blackout scale them)
 export const LIGHT = new Set(['intensity', 'red', 'green', 'blue', 'white', 'warmWhite', 'coolWhite', 'amber', 'uv', 'lime']);
+const wide = new WeakMap<FixtureMode, Uint8Array>();   // a light too big for one universe, drawn whole
 const FX_ORDER = { move: 0, color: 1, pixel: 1, intensity: 2 } as const;   // intensity effects get the last word
 
 interface Ramp { from: number; to: number; start: number; dur: number }
@@ -354,9 +356,21 @@ export class Engine {
     for (const f of show.fixtures) {
       const m = modes.get(f.id);
       if (!m) continue;
+      fitLook(stage[f.id], capsOf(m), colored.has(f.id) || !!this.live[f.id]?.color);
+      // too big for one universe: drawn on its own, then whole pixels per universe
+      if (isWide(m)) {
+        let all = wide.get(m);
+        if (!all) { all = new Uint8Array(m.channels.length); wide.set(m, all); }
+        renderFixture(f, m, stage[f.id], all, 0);
+        for (const s of spansOf(f, m)) {
+          let b = frames.get(s.universe);
+          if (!b) { b = new Uint8Array(512); frames.set(s.universe, b); }
+          b.set(all.subarray(s.from, s.from + s.count), s.at);
+        }
+        continue;
+      }
       let buf = frames.get(f.universe);
       if (!buf) { buf = new Uint8Array(512); frames.set(f.universe, buf); }
-      fitLook(stage[f.id], capsOf(m), colored.has(f.id) || !!this.live[f.id]?.color);
       renderFixture(f, m, stage[f.id], buf);
     }
     // the channel wizard's test values on top (a fixture that isn't patched yet)
@@ -427,7 +441,10 @@ export class Engine {
       // each element's light and its place on it (pixel shows and pictures use them)
       const rowOf = new Map<string, number>();
       for (const t of targets) if (!rowOf.has(t.fixture)) rowOf.set(t.fixture, rowOf.size);
-      const where = targets.map((t) => { const n = t.cell === undefined ? 1 : capsOf(modes.get(t.fixture)!).cells; return { u: n > 1 ? t.cell! / (n - 1) : 0.5, row: rowOf.get(t.fixture)!, rows: rowOf.size }; });
+      const where = targets.map((t) => {
+        const m = modes.get(t.fixture)!, n = t.cell === undefined ? 1 : capsOf(m).cells;
+        return { u: n > 1 ? t.cell! / (n - 1) : 0.5, row: rowOf.get(t.fixture)!, rows: rowOf.size, at: t.cell === undefined ? undefined : placesOf(m), cell: t.cell };
+      });
       const clock = { beats: this.beats - since.beats, secs: this.seconds - since.seconds };
       // one effect that can't run (a formula, a picture, a value from a file) stops itself, never
       // the frame: everything else goes on going out (the app says which one, from `broken`)

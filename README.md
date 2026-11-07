@@ -39,7 +39,7 @@
 </p>
 
 A lighting console in a browser tab. Patch your lights (2,400 fixture types to search), build
-looks, add some of the 51 effects and play the show from big buttons, your phone or a song's
+looks, add some of the 72 effects and play the show from big buttons, your phone or a song's
 timeline. There's a 3D stage, so you can program without any lights. No install, no account, and
 your shows stay in your browser.
 
@@ -252,6 +252,13 @@ the buck.
 | DMX only, in a box | 5 V into the `5V IN` header | not used |
 | Pixels | USB or `5V IN`, as above | 12/24 V into `12-24V IN` |
 | Pixels, one cable | the buck module, making 5 V from the pixel supply | 12/24 V into `12-24V IN` |
+| 5 V pixels (WS2812) | USB or `5V IN`, as above | 5 V into `12-24V IN`, no buck |
+
+**USB doesn't light your pixels.** `V+` on the pixel terminals only ever comes from `12-24V IN`, and
+neither USB nor `5V IN` reaches it. With nothing on that terminal the strip stays dark while the web
+UI happily shows it running. That goes for 5 V pixels too: their 5 V goes into `12-24V IN`. More on
+that, and on a module trap with USB, in
+[`hardware-carrier/README.md`](hardware-carrier/README.md#5-v-pixels-and-usb).
 
 **One 5 V source at a time.** USB, `5V IN` and the buck share one rail with no diodes between them.
 With the buck fitted, don't plug in USB while the 12/24 V is on, the two will fight.
@@ -1025,6 +1032,11 @@ talks to it with `postMessage`. The first time a site asks, the bridge shows its
 **Allow** / **Deny**; allowed sites are remembered in that browser (**Stop and forget this page**
 takes it back). Only the window that opened the bridge is listened to, and replies only go to that
 site.
+
+When it's allowed, the bridge tells the app what the box plays: its DMX outputs and, from
+`/pixels.json`, every universe its enabled pixel ports span (`{type: 'ready', outputs, pixels}`, said
+again after the box restarts). The app only sends those universes, so a big show's others don't take
+the turns of the ones the box really plays.
 
 The app can hand the bridge a channel of its own (`{type: 'port'}` with a `MessagePort`): its
 output thread then sends frames straight through it, so they keep coming on time whatever the

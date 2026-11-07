@@ -3,6 +3,7 @@
   // attribute controls don't cover (gobo shake, a macro, the lamp). Values set here go into the
   // programmer as raw channels and are recorded with the cue like everything else.
   import { app } from '../app.svelte';
+  import { channelAt, isWide } from '../model/pixelLayout';
   import ValueEdit from './ValueEdit.svelte';
   import { ATTR_LABEL } from './attrs';
 
@@ -11,7 +12,9 @@
   const same = $derived(sel.length > 0 && sel.every((f) => f.typeId === sel[0].typeId && f.mode === sel[0].mode));
   const mode = $derived(same ? app.modeOf(sel[0].id) : undefined);
   const first = $derived(sel[0]);
-  const live = (i: number) => (first ? app.frames.get(first.universe)?.[first.address - 1 + i] ?? 0 : 0);
+  // (a light too big for one universe: wherever that channel lands)
+  const where = (i: number) => channelAt(first, mode, i);
+  const live = (i: number) => { if (!first) return 0; const w = where(i); return app.frames.get(w.universe)?.[w.at] ?? 0; };
   const held = (i: number) => app.programmer[first?.id ?? '']?.raw?.[String(i)];
   let open = $state(false);
 </script>
@@ -23,7 +26,7 @@
       <div class="chs">
         {#each mode.channels as c, i (i)}
           <div class="ch" class:held={held(i) !== undefined}>
-            <span class="muted n">{first.address + i}</span>
+            <span class="muted n">{isWide(mode) ? `${where(i).universe}.${where(i).at + 1}` : first.address + i}</span>
             <span class="name" title={ATTR_LABEL[c.attr] ?? c.attr}>{c.name}</span>
             {#if c.ranges?.length}
               <select aria-label="{c.name} range" onchange={(e) => { const r = c.ranges![+(e.target as HTMLSelectElement).value]; if (r) app.setRaw(i, Math.round((r.from + r.to) / 2)); }}>

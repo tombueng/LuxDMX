@@ -7,7 +7,7 @@
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
-  import { TEMPLATES } from '../content/templates';
+  import { ALL_TEMPLATES as TEMPLATES } from '../content/ringMatrix';
   import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
   import { DEMO_SONG, demoSong, startDemo } from './startDemo';
   import { onDestroy } from 'svelte';

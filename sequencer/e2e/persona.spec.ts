@@ -84,7 +84,7 @@ test('Ctrl+S says it saved; templates are on the empty stage; help stays on scre
   await page.locator('body').press('Control+s');
   await expect(page.locator('.toast')).toContainText('Saved in this browser');
   await welcome(page);
-  await expect(page.locator('.welcome .tpls').getByRole('button')).toHaveCount(6);
+  await expect(page.locator('.welcome .tpls').getByRole('button')).toHaveCount(7);
   await page.keyboard.press('Escape');
   await page.locator('.deck').getByRole('button', { name: 'What is this?' }).click();
   const pop = (await page.locator('.deck .pop').boundingBox())!;
