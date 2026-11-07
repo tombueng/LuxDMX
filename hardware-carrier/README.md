@@ -100,8 +100,10 @@ gets near the board, and leave USB unplugged while it's on (one 5 V source at a 
 
 **USB may not even reach `+5V`.** The pixel buffer runs on `+5V`, and USB only gets there through the
 module's 5V pin. On some S3 modules that pin isn't connected to USB until the `IN-OUT` solder pads are
-bridged. We haven't measured this on a module yet. If you run from USB, check for 5 V on `5V IN` with a
-meter. If it's missing, the ESP runs and every pixel port is silent, because the buffer has no supply.
+bridged. We haven't measured this on a module yet, but the bench carrier points that way: on USB, even
+with `5V IN` bridged to `12-24V IN`, its pixels stayed dark, and a real 5 V supply on that bridge lit
+them. If you run from USB, check for 5 V on `5V IN` with a meter. If it's missing, the ESP runs and
+every pixel port is silent, because the buffer has no supply.
 
 ### Fuse
 
