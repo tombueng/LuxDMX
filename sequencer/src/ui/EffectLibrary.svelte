@@ -1,3 +1,17 @@
+{#snippet shapes()}
+  <h2>Rings and matrices</h2>
+  <p class="hint">Pictures that know where every LED is: an eye, a reactor, a supernova, flames, code rain, your own words. Best on a LED ring, a disc or a matrix; on a strip or a row of lights you see a line through the middle.</p>
+  <div class="cards">
+    {#each SHAPES as d (d.id)}
+      <button class="card" onclick={() => pick(d.id)} data-effect={d.id}>
+        <EffectPreview kind={d.id} w={180} h={84} bpm={app.bpm} />
+        <b>{d.name}</b>
+        <span class="faint">{d.blurb}</span>
+      </button>
+    {/each}
+  </div>
+{/snippet}
+
 <script lang="ts">
   // Every built-in effect as a moving picture. Pick what to run it on, click one, it starts.
   import Modal from './Modal.svelte';
@@ -5,6 +19,7 @@
   import EffectPreview from './EffectPreview.svelte';
   import { EFFECTS, CATEGORY_LABEL, type EffectCategory } from '../engine/effects';
   import { app } from '../app.svelte';
+  import { placesOf } from '../model/pixelLayout';
   import { ui } from './ui.svelte';
 
   let { onclose, onadded }: { onclose: () => void; onadded?: (id: string) => void } = $props();
@@ -22,6 +37,10 @@
   // moves first when there are heads to move, else last (greyed out sections first look broken)
   const ORDER: Record<'movers' | 'none', EffectCategory[]> = { movers: ['move', 'color', 'pixel', 'intensity'], none: ['color', 'pixel', 'intensity', 'move'] };
   const cats = $derived(ORDER[movers ? 'movers' : 'none'].filter((c) => EFFECTS.some((d) => d.category === c)));
+  const ids = $derived(target === 'sel' ? app.selected : app.show.groups.find((g) => g.id === target)?.fixtures ?? []);
+  // (a ring or a matrix among them: their effects first)
+  const shaped = $derived(ids.some((id) => placesOf(app.modeOf(id))));
+  const SHAPES = EFFECTS.filter((d) => d.shape);
 
   function pick(kind: string) {
     if (!count) return ui.toast('Select some lights (or pick a group) first');
@@ -44,11 +63,13 @@
   </div>
   {#if !count}<p class="err">Nothing to run it on: close this, select lights on the stage (or make a group), then come back.</p>{/if}
 
+  {#if shaped}{@render shapes()}{/if}
   {#each cats as cat (cat)}
+    {#if cat === 'pixel' && !shaped}{@render shapes()}{/if}
     <h2>{CATEGORY_LABEL[cat]}</h2>
     <p class="hint">{CAT_HINT[cat]}{cat === 'move' && count && !movers ? ' (None of these lights can move.)' : ''}</p>
     <div class="cards">
-      {#each EFFECTS.filter((d) => d.category === cat) as d (d.id)}
+      {#each EFFECTS.filter((d) => d.category === cat && !d.shape) as d (d.id)}
         <button class="card" onclick={() => pick(d.id)} disabled={cat === 'move' && !!count && !movers} data-effect={d.id}>
           <EffectPreview kind={d.id} w={180} h={46} bpm={app.bpm} />
           <b>{d.name}</b>

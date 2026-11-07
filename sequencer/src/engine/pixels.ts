@@ -12,8 +12,8 @@
 // lane along the group. Size is each show's one extra knob, named in its blurb.
 import type { Color } from '../model/types';
 import {
-  PALETTES, TAU, WHITE, along, c, clamp01, frac, hash, lerpColor, noise, range, tri,
-  type EffectDef, type EffectParams, type Elem, type FxOut,
+  PALETTES, TAU, WHITE, along, c, clamp01, frac, hash, lerpColor, noise, ramp, shine, tri,
+  type EffectDef, type EffectParams, type Elem,
 } from './fxkit';
 
 // ---------------------------------------------------------------- shared parts
@@ -24,24 +24,6 @@ const secs = (e: Elem, d: number) => e.total * d;
 
 // A palette colour by a stable random number (0..1).
 const pick = (cs: Color[], h: number): Color => cs[Math.floor(h * cs.length) % cs.length] ?? WHITE;
-// Along the palette from its first colour to its last, without wrapping round (dark to bright).
-function ramp(cs: Color[], v: number): Color {
-  if (cs.length < 2) return cs[0] ?? WHITE;
-  const x = clamp01(v) * (cs.length - 1), i = Math.min(cs.length - 2, Math.floor(x));
-  return lerpColor(cs[i], cs[i + 1], x - i);
-}
-
-// Colour and brightness the way the engine takes them: the colour at full (its brightest emitter
-// at 1) and the brightness as intensity, so a dimmer or a plain white light follows the show too.
-// An unlit pixel keeps the colour `dark`: that's what shows when "Dim to" lifts the floor.
-function shine(r: number, g: number, b: number, p: EffectParams, dark: Color): FxOut {
-  const mx = Math.max(r, g, b);
-  if (!(mx > 1e-4)) {
-    const dm = Math.max(dark.r, dark.g, dark.b, 1e-6);
-    return { color: { r: dark.r / dm, g: dark.g / dm, b: dark.b / dm }, intensity: p.low };
-  }
-  return { color: { r: r / mx, g: g / mx, b: b / mx }, intensity: range(p, Math.min(1, mx)) };
-}
 const lit = (col: Color, v: number, p: EffectParams) => shine(col.r * v, col.g * v, col.b * v, p, col);
 
 // Light adding up on one pixel: balls, sparks, drops or waves crossing the same spot.

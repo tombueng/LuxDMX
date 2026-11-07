@@ -7,6 +7,7 @@
   import Help from './Help.svelte';
   import FixtureEditor from './FixtureEditor.svelte';
   import { app } from '../app.svelte';
+  import { spansOf } from '../model/pixelLayout';
   import { KIND_LABEL, typeLabel } from '../model/library';
   import { RISK_HINT, RISK_LABEL, riskOf } from '../model/safety';
   import { levelOf, lookColor } from '../engine/cuelook';
@@ -45,7 +46,7 @@
   const stage = whileShown(() => app.stage);
   const usage = $derived.by(() => {
     const u = new Map<number, number>();
-    for (const f of app.show.fixtures) u.set(f.universe, (u.get(f.universe) ?? 0) + width(f.id));
+    for (const f of app.show.fixtures) for (const s of spansOf(f, app.modeOf(f.id))) u.set(s.universe, (u.get(s.universe) ?? 0) + s.count);
     return [...u.entries()].sort((a, b) => a[0] - b[0]);
   });
 

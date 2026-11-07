@@ -39,7 +39,7 @@
 </p>
 
 A lighting console in a browser tab. Patch your lights (2,400 fixture types to search), build
-looks, add some of the 51 effects and play the show from big buttons, your phone or a song's
+looks, add some of the 72 effects and play the show from big buttons, your phone or a song's
 timeline. There's a 3D stage, so you can program without any lights. No install, no account, and
 your shows stay in your browser.
 
@@ -1025,6 +1025,11 @@ talks to it with `postMessage`. The first time a site asks, the bridge shows its
 **Allow** / **Deny**; allowed sites are remembered in that browser (**Stop and forget this page**
 takes it back). Only the window that opened the bridge is listened to, and replies only go to that
 site.
+
+When it's allowed, the bridge tells the app what the box plays: its DMX outputs and, from
+`/pixels.json`, every universe its enabled pixel ports span (`{type: 'ready', outputs, pixels}`, said
+again after the box restarts). The app only sends those universes, so a big show's others don't take
+the turns of the ones the box really plays.
 
 The app can hand the bridge a channel of its own (`{type: 'port'}` with a `MessagePort`): its
 output thread then sends frames straight through it, so they keep coming on time whatever the

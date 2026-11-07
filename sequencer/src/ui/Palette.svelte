@@ -5,7 +5,7 @@
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
-  import { TEMPLATES } from '../content/templates';
+  import { ALL_TEMPLATES as TEMPLATES } from '../content/ringMatrix';
   import { KIND_LABEL } from '../model/library';
   import { colorsFromPicture, fogTimer } from './actions';
 

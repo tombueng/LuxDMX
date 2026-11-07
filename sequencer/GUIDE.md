@@ -36,7 +36,8 @@ wheels), you just don't have to learn a pro console to use them.
    projector, CO2 jet, confetti cannon, spark machine or fogger) are known by their type and their
    own words, so they wait for Arm (fog is fog, never a dimmer) like the built-in ones; in your own
    type pick Confetti, Flame, Sparks or CO2 jet under Machines. A WS2812 or SK6812 pixel strip is one
-   light ("Pixel strip, 50 RGB pixels", up to 170 RGB or 128 RGBW: a universe), so a rainbow or a
+   light ("Pixel strip, 50 RGB pixels", up to 170 RGB or 128 RGBW: a universe; rings and matrices are
+   further down, see "LED rings and matrices"), so a rainbow or a
    chase runs along it.
    Or skip all that: click the show name (top left) and start from a template. The templates
    (Band, DJ / Party, Theatre, Church, Cinema, Bar) are well stocked on purpose: 27 to 48 lights
@@ -310,6 +311,10 @@ Three more demos come with their own room on the 3D stage:
   bar's own intensity is 0). A Release says which ones keep running, with a button to stop them, and
   the programmer's "out" reading shows what a selected light really gives (a pixel bar: its
   brightest cell).
+- **Contrast** (in an effect's settings, for pixel shows and brightness effects): how hard the light
+  falls between dark and bright. Up, what's dim gets dimmer and what's bright gets brighter; down,
+  it's softer and more of it glows. Dark stays dark and full stays full; Dim to and Bright to are
+  still the ends.
 - **Pixel shows** (Effects, Add, Pixels): the classics from LED strip firmware like WLED, colour
   and brightness together, on a pixel strip, a few bars or a plain row of PARs. Theater chase,
   Flames (rising from the start of each light), Twinkles, Juggle, Sinelon, Colour waves (Pride),
@@ -320,6 +325,27 @@ Three more demos come with their own room on the 3D stage:
   does: how many balls, how high the flames...). On a wall of strips the ones that rise or fall
   run up every strip on its own; "Back" in Direction turns them round when your strips hang the
   other way up.
+- **LED rings and matrices**: a WS2812 ring, a disc of rings (the usual 241 LEDs on 9 rings, 144, 93,
+  61, 37) or a matrix (8 x 8, 16 x 16, 32 x 8) is one light with a shape. Pick it in Add fixtures, or
+  "Ring or matrix..." for your own: how many LEDs on each ring, or columns and rows, where the data
+  starts and which way it runs. A picture walks the LEDs in data order, to compare with the real
+  one. Over 170 RGB pixels (128 RGBW) a light runs on over the next universes, whole pixels on
+  each, the way a LuxDMX box's pixel port reads it: patch it on the universe the port starts at.
+  A box tells the app what its ports listen on and only gets those universes. If a line under the
+  top bar says "No box plays pixel universe ...", set a pixel port to that universe, or update the
+  box: one on v1.0.293 or older doesn't say, and only gets its DMX universes.
+  Don't put them on a universe a DMX output listens to (the template starts at 10). On the 2D and
+  3D stage they're drawn as what they are.
+  - **Their effects** (Effects, Add, Rings and matrices) know where every LED is, so wiring order
+    doesn't matter: Eye (wakes up, looks round, gets angry, falls asleep), Reactor, Supernova and
+    Radar (short stories that start and end dark; Speed is their length in seconds), Black hole,
+    Warp, Galaxy, Hypno, Mandala, Tunnel, Plasma clouds, Lava lamp, Campfire, Code rain, Raindrops,
+    Sky rockets, Kick rings, Big heart and Equaliser (on the beat, or the bass with the microphone
+    on), Scrolling text (your words). Spread shifts several lights against each other. Wiring test
+    checks the shape: a colour per ring or row, each one's first LED white, a dot walking in data
+    order. If the picture is scrambled, that's the shape (or the LED count), not the effect.
+  - **The Ring and matrix template** (Shows, or Ctrl+K) has a disc, a matrix, a ring and a banner
+    from universe 10, with lists of these effects ready on the live page.
 - **Your own effects** (Effects, Add, under Pixels):
   - **Formula**: one line that says how bright, or which colour, each pixel is, like
     `hsv(x - c, 1, 1)` (a rainbow rolling along). `x` is where the pixel is (0 to 1), `t` the

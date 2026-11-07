@@ -17,10 +17,11 @@ play the show from big buttons, your phone or a song's timeline. No install, no 
   installs itself, no admin rights.
 - **2,400 fixtures to search**: 1,781 from QLC+ and 652 from the Open Fixture Library, plus GDTF
   files, plus your own type made by poking the channels of the real light. 16-bit, colour and
-  gobo wheels, pixel strips.
-- **51 effects.** Chases, circles, fire, lightning, and 20 pixel shows (the WLED classics: fire,
-  fireworks, matrix rain, bouncing balls...). Or write your own as a formula, or drop in a picture
-  or an animated GIF.
+  gobo wheels, pixel strips, LED rings and matrices.
+- **72 effects.** Chases, circles, fire, lightning, 20 pixel shows (the WLED classics: fire,
+  fireworks, matrix rain, bouncing balls...) and 21 for rings and matrices (an eye that wakes up, a
+  reactor that blows, a supernova, your own words). Or write your own as a formula, or drop in a
+  picture or an animated GIF.
 - **A 3D stage.** Beams in haze, moving heads that pan at real speed, flames, sparks, confetti,
   CO2, a band and a crowd. Record it as a video.
 - **A timeline.** Put cues, effects and flames on a song: it finds the tempo, the beats and the

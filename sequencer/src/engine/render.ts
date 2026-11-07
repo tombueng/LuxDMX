@@ -123,8 +123,9 @@ function level(c: Channel, hi: boolean, x: number): number {
 }
 
 type Emit = ReturnType<typeof emitters>;
-export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint8Array) {
-  const P = planOf(m), chs = m.channels, base = f.address - 1;
+// `out`: a universe, or a buffer of its own for a light too big for one (the engine splits that up).
+export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint8Array, base = f.address - 1) {
+  const P = planOf(m), chs = m.channels;
   const { hasDimmer } = P;
   // Per-pixel looks (an effect on a pixel bar): a master dimmer carries the brightest cell, each
   // cell's emitters carry the rest.
@@ -147,7 +148,7 @@ export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint
 
   for (let i = 0; i < chs.length; i++) {
     const at = base + i;
-    if (at < 0 || at >= 512) continue;
+    if (at < 0 || at >= out.length) continue;
     const c = chs[i];
     const raw = raws?.[i];
     if (raw !== undefined) { out[at] = Math.max(0, Math.min(255, Math.round(raw))); continue; }

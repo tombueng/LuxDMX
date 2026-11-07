@@ -5,7 +5,7 @@
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
   import { ui, focusSelect } from './ui.svelte';
-  import { TEMPLATES } from '../content/templates';
+  import { ALL_TEMPLATES as TEMPLATES } from '../content/ringMatrix';
 
   let { onclose }: { onclose: () => void } = $props();
   let renaming = $state<string | null>(null);

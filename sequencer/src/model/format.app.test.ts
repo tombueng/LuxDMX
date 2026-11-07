@@ -26,7 +26,7 @@ describe('importing a show file that used to stop every frame', () => {
     expect(app.show.fixtures.map((f: { universe: number }) => f.universe)).toEqual([0, 0]);
     expect(app.show.pages[0].widgets[0].max).toBe(10);
     // (a new show connects to its own boxes: the test box again)
-    app.bridges = [{ state: 'ready', host: 'box', send: (uni: number, data: Uint8Array) => sent.push({ uni, data: [...data.slice(0, 16)] }), relay() {}, close() {}, open() {}, lostAt: 0, outputs: [] }];
+    app.bridges = [{ state: 'ready', host: 'box', send: (uni: number, data: Uint8Array) => sent.push({ uni, data: [...data.slice(0, 16)] }), relay() {}, close() {}, open() {}, lostAt: 0, outputs: [], pixels: [] }];
     app.engine.startEffect('e1');
     const before = sent.length;
     let threw = 0;

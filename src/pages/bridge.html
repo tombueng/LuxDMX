@@ -65,6 +65,7 @@ button { font:inherit; border:0; border-radius:6px; padding:.45rem .9rem; margin
   function post(m) { if (window.opener && peer) { m.luxdmx = 1; window.opener.postMessage(m, peer); } }
   function show(id) { ['ask', 'run', 'idle'].forEach(function (k) { $(k).hidden = (k !== id); }); }
 
+  var lost = false;
   function connect() {
     if (!live) return;
     ws = new WebSocket('ws://' + location.host + '/ws');
@@ -72,11 +73,12 @@ button { font:inherit; border:0; border-radius:6px; padding:.45rem .9rem; margin
     ws.onopen = function () {
       forget();
       $('ws').textContent = 'live'; $('state').className = ''; post({ type: 'status', ws: 'open' });
+      if (lost) { lost = false; sayReady(true); }
       ws.send('{"type":"relay","host":1}');   // the sequencer's remote: we are the laptop's side (the box routes phones' messages here)
     };
     ws.onclose = function () {
       $('ws').textContent = 'reconnecting'; $('state').className = 'off'; post({ type: 'status', ws: 'closed' });
-      ws = null; forget(); if (live) setTimeout(connect, 1000);
+      ws = null; lost = true; forget(); if (live) setTimeout(connect, 1000);
     };
     // The box's answer lets the next message go; status frames aren't needed here; relay messages
     // (the sequencer's remote) go to the page.
@@ -90,12 +92,28 @@ button { font:inherit; border:0; border-radius:6px; padding:.45rem .9rem; margin
     };
   }
 
+  // Which universes the enabled pixel ports listen on: the app only sends what the box plays, or a
+  // big show's other universes would take the turns of the ones it does.
+  function pixelUnis(p) {
+    var out = [];
+    (p.ports || []).forEach(function (q) {
+      if (!q.en) return;
+      for (var k = 0; k < Math.max(1, q.spans | 0); k++) if (out.indexOf(q.uni + k) < 0) out.push(q.uni + k);
+    });
+    return out;
+  }
+  // `again`: the box came back (a settings change restarts it, its ports may listen elsewhere now).
+  function sayReady(again) {
+    fetch('/info.json').then(function (r) { return r.json(); }).then(function (i) {
+      return fetch('/pixels.json').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }).then(function (p) {
+        post({ type: 'ready', host: location.host, fw: i.version, name: i.artShort || i.hostname || '', ip: i.ip || '',
+               outputs: (i.outputs || []).map(function (o) { return { en: !!o.en, uni: o.uni }; }), pixels: pixelUnis(p) });
+      });
+    }).catch(function () { if (!again) post({ type: 'ready', host: location.host }); });
+  }
   function start() {
     live = true; show('run'); $('runOrigin').textContent = peer;
-    fetch('/info.json').then(function (r) { return r.json(); }).then(function (i) {
-      post({ type: 'ready', host: location.host, fw: i.version, name: i.artShort || i.hostname || '', ip: i.ip || '',
-             outputs: (i.outputs || []).map(function (o) { return { en: !!o.en, uni: o.uni }; }) });
-    }).catch(function () { post({ type: 'ready', host: location.host }); });
+    sayReady(false);
     connect();
   }
 

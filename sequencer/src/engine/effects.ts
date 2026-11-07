@@ -14,11 +14,13 @@
 //   lightUp    a colour or move effect also turns its lights on (at its level)
 //   level      the effect's own fader
 import type { Resolved } from '../model/types';
+import type { Places } from '../model/pixelLayout';
 import { CUSTOM_EFFECTS } from './custom';
 import { PIXEL_EFFECTS } from './pixels';
+import { SHAPE_EFFECTS } from './shapes';
 import {
   PALETTES, TAU, WHITE, along, clamp01, cleanParams, frac, hash, hsv, lerpColor, mix, noise, range, sine, step, tri,
-  type EffectCategory, type EffectDef, type EffectParams, type FxOut,
+  type EffectCategory, type EffectDef, type EffectParams, type FxOut, withContrast,
 } from './fxkit';
 export * from './fxkit';
 
@@ -26,8 +28,8 @@ export * from './fxkit';
 
 const BASE: EffectParams = {
   speed: 4, tempo: true, size: 1, spread: 1, direction: 'forward', blocks: 1, width: 0,
-  colors: PALETTES.Rainbow, low: 0, high: 1, lightUp: true, level: 1, pixels: true, order: 'list',
-  formula: '', picture: '', mapping: 'auto',
+  colors: PALETTES.Rainbow, low: 0, high: 1, lightUp: true, level: 1, contrast: 0, pixels: true, order: 'list',
+  formula: '', picture: '', mapping: 'auto', text: '',
 };
 
 export const EFFECTS: EffectDef[] = [
@@ -150,7 +152,7 @@ export const EFFECTS: EffectDef[] = [
     run: (e, p) => ({ intensity: range(p, noise(e.seed, e.total * 7) * 0.7 + noise(e.seed + 3, e.total * 19) * 0.3) }) },
 ];
 // the pixel shows and your own effects join the built-in ones
-EFFECTS.push(...PIXEL_EFFECTS, ...CUSTOM_EFFECTS);
+EFFECTS.push(...SHAPE_EFFECTS, ...PIXEL_EFFECTS, ...CUSTOM_EFFECTS);
 export const EFFECT_MAP = new Map(EFFECTS.map((d) => [d.id, d]));
 export const CATEGORY_LABEL: Record<EffectCategory, string> = { move: 'Moves', color: 'Colour', pixel: 'Pixels', intensity: 'Intensity' };
 
@@ -192,7 +194,8 @@ function shuffled(n: number, seed: number): number[] {
 // Run one effect for n elements at `total` cycles since it started.
 // `where`: each element's light and place on it (from the engine; one row of lights otherwise);
 // `clock`: beats and seconds since the effect started (from total and the speed otherwise).
-export interface Where { u: number; row: number; rows: number }
+// `at`, `cell`: its place on a ring or a matrix.
+export interface Where { u: number; row: number; rows: number; at?: Places; cell?: number }
 export function runEffect(def: EffectDef, p: EffectParams, n: number, total: number, seed = 1, where?: Where[], clock?: { beats: number; secs: number }): FxOut[] {
   // The clocks wrap after about eleven days (a whole number, so the cycle doesn't jump), and one that
   // isn't a number (a broken tempo) is 0: the pixel shows step through time in loops, and an
@@ -210,7 +213,18 @@ export function runEffect(def: EffectDef, p: EffectParams, n: number, total: num
     const x = m > 1 ? k / m : 0;
     const phase = frac(cyc - p.spread * x);
     const w = where?.[i], xx = m > 1 ? k / (m - 1) : 0;
-    out.push(def.run({ phase, x: xx, cycle: cyc, total, k, m, seed: (seed * 131 + i) | 0, u: w?.u ?? xx, row: w?.row ?? 0, rows: w?.rows ?? 1, beats, secs }, p));
+    const at = w?.at, ci = w?.cell ?? 0;
+    // (not on a ring or a matrix: a line through the middle, along the light or along the group)
+    const line = 2 * (w && m > w.rows ? w.u : xx) - 1;
+    const o = def.run({
+      phase, x: xx, cycle: cyc, total, k, m, seed: (seed * 131 + i) | 0, u: w?.u ?? xx, row: w?.row ?? 0, rows: w?.rows ?? 1, beats, secs,
+      sx: at ? at.x[ci] : line, sy: at ? at.y[ci] : 0, rad: at ? at.rad[ci] : Math.abs(line), ang: at ? at.ang[ci] : (line < 0 ? 0.75 : 0.25),
+      lane: at ? at.lane[ci] : 0, lanes: at ? at.lanes : 1, gx: at ? at.gx[ci] : k, gy: at ? at.gy[ci] : 0, gw: at ? at.gw : m, gh: at ? at.gh : 1,
+      first: at ? at.first[ci] === 1 : k === 0, cell: w?.cell ?? i, cells: at ? at.n : n,
+    }, p);
+    // (between Dim to and Bright to, so those stay the ends; a copy: an effect may hand out a shared one)
+    out.push(p.contrast && o.intensity !== undefined && p.high > p.low
+      ? { ...o, intensity: p.low + (p.high - p.low) * withContrast((o.intensity - p.low) / (p.high - p.low), p.contrast) } : o);
   }
   return out;
 }

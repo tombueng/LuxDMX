@@ -5,6 +5,7 @@
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
 import { emptyShow, parseShow, serializeShow, FormatError } from './model/format';
 import { GENERIC, caps, capsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
+import { isWide, placesOf, spansOf } from './model/pixelLayout';
 import type { Color, Cue, CueList, Effect, Fixture, FixtureType, Page, Preset, PresetKind, Resolved, Show, Values, Widget } from './model/types';
 import { EFFECT_MAP, hsv, paramsOf } from './engine/effects';
 import { pictureOf } from './engine/custom';
@@ -702,7 +703,7 @@ class App {
   private metaOf(show = this.show, id = this.showId): ShowMeta {
     return {
       id, name: show.meta.name || 'Untitled', modified: new Date().toISOString(), fixtures: show.fixtures.length,
-      cues: show.cueLists.reduce((n, l) => n + l.cues.length, 0), thumb: stageSvg(show.fixtures, this.fittedLook(), this.kinds),
+      cues: show.cueLists.reduce((n, l) => n + l.cues.length, 0), thumb: stageSvg(show.fixtures, this.fittedLook(), this.kinds, 160, 90, false, (id) => placesOf(this.modeOf(id))),
     };
   }
   // The look without the masters, drawn the way each light can really show it (for pictures).
@@ -997,7 +998,9 @@ class App {
     const t = this.types.get(typeId);
     if (!t) return 'unknown fixture type';
     if (t.source !== 'generic' && !this.show.fixtureTypes.some((x) => x.id === t.id)) this.show.fixtureTypes.push(rawType(JSON.parse(JSON.stringify(t))));
-    const width = modeOf(t, mode)?.channels.length ?? 1;
+    const m0 = modeOf(t, mode), width = m0?.channels.length ?? 1;
+    const need = isWide(m0) ? spansOf({ universe: 0, address: 1 }, m0).length : 0;
+    let nextUni = universe;
     // A row of their own on the stage, clear of the lights already there: the middle first, then
     // spreading out; on a crowded stage the row with the most room.
     const xs = Array.from({ length: count }, (_, i) => (i + 1) / (count + 1));
@@ -1010,12 +1013,15 @@ class App {
     const first = taken.length ? Math.max(...taken) + 1 : 1;
     for (let i = 0; i < count; i++) {
       // A given start address puts them back to back from there; otherwise after what's patched.
-      const address = start ? start + i * width : this.nextFree(universe, width);
-      if (address < 1 || address + width - 1 > 512) return `universe ${universe} is full`;
+      // Too big for one universe: from channel 1 of the first run of free universes.
+      if (need) while (nextUni < 32767 && !this.universesFree(nextUni, need)) nextUni++;
+      const address = need ? 1 : start ? start + i * width : this.nextFree(universe, width);
+      if (address < 1 || (!need && address + width - 1 > 512)) return `universe ${universe} is full`;
       this.show.fixtures.push({
         id: newId('f'), name: count > 1 || taken.length ? `${name} ${first + i}` : name, typeId, mode: modeOf(t, mode)?.name ?? mode,
-        universe, address, x: xs[i], y: row / 10,
+        universe: need ? nextUni : universe, address, x: xs[i], y: row / 10,
       });
+      if (need) nextUni += need;
     }
     return '';
   }
@@ -1055,12 +1061,23 @@ class App {
     this.markDirty(0);
   }
   nextFree(universe: number, width: number): number {
+    if (width > 512) return this.universesFree(universe, Math.ceil(width / 510)) ? 1 : -1;
     let end = 0;
-    for (const f of this.show.fixtures) {
-      if (f.universe !== universe) continue;
-      end = Math.max(end, f.address - 1 + (this.modeOf(f.id)?.channels.length ?? 1));
-    }
+    for (const f of this.show.fixtures) for (const s of spansOf(f, this.modeOf(f.id))) if (s.universe === universe) end = Math.max(end, s.at + s.count);
     return end + width <= 512 ? end + 1 : -1;
+  }
+  // Universes pixel lights are patched on that no connected box says it plays: a pixel port set to
+  // another universe, or a box too old to name its pixel ports.
+  unservedPixels(): number[] {
+    const up = this.bridges.filter((b) => b.state === 'ready');
+    if (!up.length) return [];
+    const unis = new Set<number>();
+    for (const f of this.show.fixtures) { const m = this.modeOf(f.id); if (capsOf(m).cells > 1) for (const s of spansOf(f, m)) unis.add(s.universe); }
+    return [...unis].filter((u) => !up.some((b) => b.wants(u))).sort((a, b) => a - b);
+  }
+  // nothing patched on these universes
+  universesFree(universe: number, n: number): boolean {
+    return !this.show.fixtures.some((f) => spansOf(f, this.modeOf(f.id)).some((s) => s.universe >= universe && s.universe < universe + n));
   }
   removeFixture(id: string) {
     this.show.fixtures = this.show.fixtures.filter((f) => f.id !== id);
@@ -1117,22 +1134,36 @@ class App {
     return items.length;
   }
   async cutFixtures() { this.checkpoint(); const n = await this.copyFixtures(); for (const id of [...this.selected]) this.removeFixture(id); return n; }
-  // Paste: new fixtures at the next free addresses on the same universes, a bit lower on the stage.
+  // The first place a light fits: on this universe, or the next one with room (a ring or a long strip
+  // can fill one; another of them would otherwise have nowhere to go).
+  private roomFor(universe: number, width: number): { universe: number; address: number } | null {
+    for (let u = universe; u <= 32767; u++) {
+      const address = this.nextFree(u, width);
+      if (address > 0) return { universe: u, address };
+    }
+    return null;
+  }
+  // What the last paste has to say about where the lights went (their universe changed: a box's
+  // pixel port has to listen there too).
+  pasteNote = '';
+  // Paste: new fixtures at the next free addresses from the same universes up, a bit lower on the stage.
   async pasteFixtures(): Promise<number> {
     this.checkpoint();
     const clip = await readClip('fixtures');
     if (!clip) return 0;
     const typeIds = new Map((clip.types ?? []).map((t) => [t.id, this.addType(t)]));
-    const added: string[] = [];
+    const added: string[] = [], moved = new Set<number>();
     for (const raw of clip.items as Fixture[]) {
       const f = { ...raw, typeId: typeIds.get(raw.typeId) ?? raw.typeId };
       const width = modeOf(this.types.get(f.typeId), f.mode)?.channels.length ?? 1;
-      const address = this.nextFree(f.universe, width);
-      if (address < 0) continue;
+      const room = this.roomFor(f.universe, width);
+      if (!room) continue;
+      if (room.universe !== f.universe) moved.add(room.universe);
       const id = newId('f');
-      this.show.fixtures.push({ ...f, id, name: this.uniqueName(f.name), address, y: Math.min(0.96, f.y + 0.08) });
+      this.show.fixtures.push({ ...f, id, name: this.uniqueName(f.name), universe: room.universe, address: room.address, y: Math.min(0.96, f.y + 0.08) });
       added.push(id);
     }
+    this.pasteNote = moved.size ? ` on universe ${[...moved].join(', ')}: no room left on the one it came from` : '';
     this.selected = added;
     this.markDirty();
     return added.length;

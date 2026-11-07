@@ -1,6 +1,7 @@
 // Generic fixture types, built in. Most cheap hobby gear is one of these channel orders; the manual's
 // channel table says which. Anything else: the Open Fixture Library, a QLC+ .qxf, or the wizard.
-import type { Channel, ChannelAttr, FixtureMode, FixtureType, Show } from './types';
+import type { PixelLayout, Channel, ChannelAttr, FixtureMode, FixtureType, Show } from './types';
+import { layoutCells } from './pixelLayout';
 
 const ch = (name: string, attr: ChannelAttr, extra: Partial<Channel> = {}): Channel => ({ name, attr, ...extra });
 const I = ch('Dimmer', 'intensity'), R = ch('Red', 'red'), G = ch('Green', 'green'), B = ch('Blue', 'blue');
@@ -26,6 +27,24 @@ function pixelStrip(pixels: number, white = false): FixtureType {
   }
   return gen(`gen-strip${pixels}${white ? 'w' : ''}`, `Pixel strip, ${pixels} ${white ? 'RGBW pixels (SK6812)' : 'RGB pixels (WS2811/WS2812)'}`, channels);
 }
+
+// A ring, a disc of rings or a matrix: a strip with a shape, so effects can draw on it.
+// (app-made ones come from here too: the ring and matrix maker)
+export function pixelShape(id: string, model: string, layout: PixelLayout, white = false, source: FixtureType['source'] = 'generic'): FixtureType {
+  const n = layoutCells(layout), channels: Channel[] = [];
+  for (let c = 0; c < n; c++) {
+    channels.push(ch(`Red ${c + 1}`, 'red', { cell: c }), ch(`Green ${c + 1}`, 'green', { cell: c }), ch(`Blue ${c + 1}`, 'blue', { cell: c }));
+    if (white) channels.push(ch(`White ${c + 1}`, 'white', { cell: c }));
+  }
+  const t = gen(id, model, channels);
+  t.source = source;
+  if (source !== 'generic') t.manufacturer = '';
+  t.modes[0].layout = layout;
+  return t;
+}
+const disc = (...rings: number[]) => pixelShape(`gen-disc${rings.reduce((a, b) => a + b, 0)}`, `LED disc, ${rings.reduce((a, b) => a + b, 0)} pixels on ${rings.length} rings (WS2812)`, { kind: 'rings', rings });
+const ring = (n: number) => pixelShape(`gen-ring${n}`, `LED ring, ${n} pixels (WS2812)`, { kind: 'rings', rings: [n] });
+const matrix = (cols: number, rows: number, vertical = false, from?: 'br') => pixelShape(`gen-matrix${cols}x${rows}`, `LED matrix, ${cols} x ${rows} (WS2812)`, { kind: 'matrix', cols, rows, zigzag: true, vertical, ...(from ? { from } : {}) });
 
 export const GENERIC: FixtureType[] = [
   gen('gen-dimmer', 'Dimmer', [I]),
@@ -54,6 +73,11 @@ export const GENERIC: FixtureType[] = [
   // (170 RGB or 128 RGBW pixels fill a universe)
   pixelStrip(30), pixelStrip(50), pixelStrip(60), pixelStrip(100), pixelStrip(144), pixelStrip(150), pixelStrip(170),
   pixelStrip(30, true), pixelStrip(60, true), pixelStrip(100, true), pixelStrip(128, true),
+  // rings and matrices (over 170 pixels: they run on over the next universe, as a box's pixel port does)
+  ring(12), ring(16), ring(24), ring(60),
+  disc(16, 12, 8, 1), disc(24, 16, 12, 8, 1), disc(32, 24, 16, 12, 8, 1), disc(31, 28, 24, 20, 16, 12, 8, 4, 1), disc(60, 48, 40, 32, 24, 16, 12, 8, 1),
+  // (the 16 x 16: as a real flexible panel here is wired, up and down its columns from the bottom right)
+  matrix(8, 8), matrix(16, 16, true, 'br'), matrix(32, 8, true),
   // effect machines: they fire or run while their channel is up (the 3D stage shows what they throw)
   gen('gen-confetti', 'Confetti cannon', [ch('Fire', 'confetti')]),
   gen('gen-bubbles', 'Bubble machine', [ch('Bubbles', 'bubbles'), ch('Fan', 'fan')]),

@@ -134,7 +134,8 @@ export class OutputThread {
     for (const [b, s] of this.boxes) if (!bridges.includes(b) || b.state !== 'ready') { this.post({ t: 'drop', key: b.host }); s.port?.close(); this.boxes.delete(b); b.portTaken = false; }
     for (const b of bridges) {
       if (b.host === LINK || b.state !== 'ready') continue;
-      const outputs = JSON.stringify(b.outputs.map((o) => ({ en: o.en, uni: o.uni })));
+      // (to the thread a pixel port is one more thing that plays a universe)
+      const outputs = JSON.stringify([...b.outputs.map((o) => ({ en: o.en, uni: o.uni })), ...b.pixels.map((uni) => ({ en: true, uni }))]);
       let s = this.boxes.get(b);
       if (!s) {
         const ch = new MessageChannel();

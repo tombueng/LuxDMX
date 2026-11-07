@@ -4,6 +4,7 @@
 //     else unknown is kept and written back as it was (we never rebuild objects field by field).
 //   - Older files are brought up to date by one migration step per version, in order.
 import { validEntry } from './schedule';
+import { cleanLayout } from './pixelLayout';
 import { AROUND_MAX, cleanCrowd, cleanSections, validItem, validTimeline } from './timeline';
 import type { Show } from './types';
 import { KNOBS, cleanColors, isColor } from '../engine/fxkit';
@@ -237,6 +238,13 @@ function mendType(t: Obj, note: Note) {
   t.modes.forEach((m: Obj, i: number) => {
     if (typeof m.name !== 'string') m.name = `Mode ${i + 1}`;
     m.channels = objects(m.channels, `${where}, mode "${m.name}"`, note);
+    if (m.layout !== undefined) {
+      // (its shape has to fit its pixels; without one it's still a strip)
+      const cells = m.channels.reduce((n: number, c: Obj) => Math.max(n, typeof c.cell === 'number' ? c.cell + 1 : 0), 0);
+      const shape = cleanLayout(m.layout, cells);
+      if (shape) m.layout = shape;
+      else { delete m.layout; note(`${where}: its ring or matrix layout doesn't fit its ${cells} pixels, it runs as a strip`); }
+    }
     for (const c of m.channels) {
       if (typeof c.attr !== 'string') c.attr = 'raw';
       if (typeof c.name !== 'string') c.name = '';

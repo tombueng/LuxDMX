@@ -10,6 +10,13 @@
   // (when: app.alarmed. Locked for the service: from the start, the timetable may play into nothing
   // at 09:30; after a restart that picked the show up: once something plays; never in a second tab)
   const lost = $derived((void app.bridgeRev, void app.status, app.bridges.filter((b) => app.alarmed(b))));
+  // Pixel lights no connected box says it plays: they'd stay dark without a word. Quieter than the
+  // above (a show with more pixel universes than this box has is fine to rehearse), and it can be
+  // waved away until the list changes.
+  const unserved = $derived((void app.bridgeRev, app.locked ? [] : app.unservedPixels()));
+  let waved = $state('');
+  const unservedKey = $derived(unserved.join());
+  const unservedText = $derived(unserved.length > 6 ? `${unserved.slice(0, 6).join(', ')} and ${unserved.length - 6} more` : unserved.join(', '));
   const since = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 </script>
 
@@ -25,9 +32,19 @@
     {#if b.state !== 'reconnecting' && b.state !== 'opening'}<button class="primary" onclick={() => b.open()}>{b.lostAt > 0 ? 'Reconnect' : 'Connect'}</button>{/if}
   </div>
 {/each}
+{#if unserved.length && waved !== unservedKey}
+  <div class="note" role="status" data-testid="pixels-unserved">
+    <Icon name="warn" />
+    <span><b>No box plays pixel universe {unservedText}.</b> Set a box's pixel port to it (its settings, Pixels), or update the box: one on v1.0.293 or older doesn't say what its ports listen to.</span>
+    <button class="ghost" onclick={() => (waved = unservedKey)}>OK</button>
+  </div>
+{/if}
 
 <style>
   .lost { display: flex; align-items: center; gap: .6rem; padding: .45rem .9rem; background: #3a1030; border-bottom: 1px solid var(--pink); color: var(--text); flex-wrap: wrap; }
   .lost > :global(svg) { color: var(--pink); flex: none; }
-  .lost span { flex: 1; min-width: 12rem; }
+  .lost span, .note span { flex: 1; min-width: 12rem; }
+  .note { display: flex; align-items: center; gap: .6rem; padding: .3rem .9rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .86rem; flex-wrap: wrap; }
+  .note b { color: var(--text); font-weight: 600; }
+  .note > :global(svg) { color: var(--orange); flex: none; }
 </style>

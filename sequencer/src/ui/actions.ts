@@ -8,8 +8,8 @@ const n = (k: number, what = 'fixture') => `${k} ${what}${k > 1 ? 's' : ''}`;
 export const fixtureActions = {
   async copy() { const k = await app.copyFixtures(); if (k) ui.toast(`Copied ${n(k)}`); },
   async cut() { const k = await app.cutFixtures(); if (k) app.toastUndo(`Cut ${n(k)}. Paste puts them back, Undo too.`); },
-  async paste() { const k = await app.pasteFixtures(); ui.toast(k ? `Pasted ${n(k)} at free addresses` : 'Nothing to paste'); },
-  async duplicate() { if (await app.copyFixtures()) { const k = await app.pasteFixtures(); ui.toast(`Duplicated ${n(k)}`); } },
+  async paste() { const k = await app.pasteFixtures(); ui.toast(k ? `Pasted ${n(k)} at free addresses${app.pasteNote}` : 'Nothing to paste'); },
+  async duplicate() { if (await app.copyFixtures()) { const k = await app.pasteFixtures(); ui.toast(k ? `Duplicated ${n(k)}${app.pasteNote}` : 'No room for another one'); } },
   remove() {
     const k = app.selected.length;
     if (!k) return;

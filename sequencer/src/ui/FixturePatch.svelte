@@ -10,6 +10,7 @@
   import FixtureSetupChannels from './FixtureSetupChannels.svelte';
   import FixtureSetupRdm from './FixtureSetupRdm.svelte';
   import { app } from '../app.svelte';
+  import { isWide, sharesChannels, spansOf } from '../model/pixelLayout';
   import { tablist, ui } from './ui.svelte';
   import { typeLabel } from '../model/library';
   import { modeChange } from '../model/fixtureSetup';
@@ -23,7 +24,8 @@
   const typeChoices = $derived([...app.types.values()].sort((a, b) => Number(a.source === 'generic') - Number(b.source === 'generic')));
   // (every mode's count: a spot with a 9 and an 11 channel mode says 9/11)
   const typeName = (x: FixtureType) => (/\bch\b/.test(typeLabel(x)) ? typeLabel(x) : `${typeLabel(x)} (${[...new Set(x.modes.map((m) => m.channels.length))].join('/')} ch)`);
-  const overlap = $derived(f ? app.show.fixtures.filter((x) => x.id !== f.id && x.universe === f.universe && x.address <= f.address + n - 1 && f.address <= x.address + (app.modeOf(x.id)?.channels.length ?? 1) - 1).map((x) => x.name) : []);
+  const overlap = $derived(f ? app.show.fixtures.filter((x) => x.id !== f.id && sharesChannels(f, app.modeOf(f.id), x, app.modeOf(x.id))).map((x) => x.name) : []);
+  const wide = $derived(f && isWide(app.modeOf(f.id)) ? spansOf(f, app.modeOf(f.id)) : null);
   const free = $derived(f ? app.nextFree(f.universe, n) : 0);
   // the lights after it that it runs into, moved up just enough (model/fixtureSetup.ts)
   const makeRoom = $derived(f && overlap.length ? modeChange(app.show.fixtures.map((x) => ({ id: x.id, name: x.name, universe: x.universe, address: x.address, channels: app.modeOf(x.id)?.channels.length ?? 1 })), f.id, n) : undefined);
@@ -58,8 +60,10 @@
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v)) { app.checkpoint(); f.universe = Math.max(0, Math.min(32767, Math.round(v))); app.markDirty(0); } }} /></label>
       <label>Address <span class="addr"><input type="number" min="1" max="512" value={f.address} aria-label="Fixture address"
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v)) setAddress(Math.round(v)); }} />
-        <span class="faint">{n > 1 ? `uses ${f.address} to ${f.address + n - 1}` : 'one channel'}</span></span></label>
-      {#if f.address + n - 1 > 512}
+        <span class="faint">{wide ? `${wide.length} universes` : n > 1 ? `uses ${f.address} to ${f.address + n - 1}` : 'one channel'}</span></span></label>
+      {#if wide}
+        <p class="faint wide" role="status">Too big for one universe, so it runs on over universes {wide[0].universe} to {wide[wide.length - 1].universe} with whole pixels on each. Set a box's pixel port to start at universe {wide[0].universe}.</p>
+      {:else if f.address + n - 1 > 512}
         <p class="err wide" role="status">Its last {f.address + n - 1 - 512} channel{f.address + n - 1 - 512 > 1 ? 's run' : ' runs'} past 512, the end of the universe: {f.address + n - 1 - 512 > 1 ? 'they do' : 'it does'} nothing.
           {#if free > 0}<button class="ghost link" onclick={() => setAddress(free)}>Move it to {free}</button>{/if}</p>
       {/if}

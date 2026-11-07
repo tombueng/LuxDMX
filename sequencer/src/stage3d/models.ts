@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel';
+export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel';
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 
 // moving heads: the head turns about the yoke's arms at PIVOT; its lens is HEAD_LENS above that
@@ -42,6 +42,9 @@ export function body(look: Look): { geo: THREE.BufferGeometry; lensR: number; le
     }
     case 'strobe': return { geo: merge([new THREE.BoxGeometry(0.55, 0.1, 0.24).translate(0, -0.05, 0), new THREE.BoxGeometry(0.6, 0.02, 0.05).translate(0, -0.1, -0.13)]), lensR: 0.2 };
     case 'bar': return { geo: new THREE.BoxGeometry(1, 0.08, 0.1).translate(0, -0.04, 0), lensR: 0 };
+    // the board behind a LED ring or a matrix (scaled to its size)
+    case 'disc': return { geo: new THREE.CylinderGeometry(0.5, 0.5, 0.02, 48).translate(0, -0.01, 0), lensR: 0 };
+    case 'panel': return { geo: new THREE.BoxGeometry(1, 0.02, 1).translate(0, -0.01, 0), lensR: 0 };
     case 'fog': return { geo: merge([new THREE.BoxGeometry(0.5, 0.3, 0.62).translate(0, 0.15, 0), new THREE.CylinderGeometry(0.05, 0.06, 0.12, 8).rotateX(Math.PI / 2).translate(0, 0.17, 0.36)]), lensR: 0 };
     case 'confetti': return { geo: merge([new THREE.BoxGeometry(0.4, 0.12, 0.4).translate(0, 0.06, 0), new THREE.CylinderGeometry(0.09, 0.11, 0.7, 10).translate(0, 0.45, 0)]), lensR: 0 };
     case 'bubbles': return { geo: merge([new THREE.BoxGeometry(0.42, 0.26, 0.32).translate(0, 0.13, 0), new THREE.TorusGeometry(0.12, 0.015, 4, 14).translate(0, 0.32, 0.17)]), lensR: 0 };

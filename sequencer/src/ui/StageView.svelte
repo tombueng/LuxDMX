@@ -8,6 +8,7 @@
   import { load } from '../perf/load.svelte';
   import LoadMeter from './LoadMeter.svelte';
   import { app } from '../app.svelte';
+  import { placesOf } from '../model/pixelLayout';
   import { ui } from './ui.svelte';
   import { lookColor } from '../engine/cuelook';
   import { fixtureActions, fixtureMenu } from './actions';
@@ -396,6 +397,23 @@
             <circle cx={x} cy={y} r={size * 1.25} fill={c.css} opacity={c.glow * 0.45} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
             <rect x={x - size * 0.9} y={y - size * 0.25} width={size * 1.8} height={size * 0.5} rx="3" fill="#2a313c" />
             <circle cx={x} cy={y} r={size * 0.62} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
+          {:else if kind === 'bar' && placesOf(app.modeOf(f.id))}
+            {@const at = placesOf(app.modeOf(f.id))!}
+            {@const R = size * 2}
+            {#if at.round}
+              <circle cx={x} cy={y} r={R * 1.05} fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
+              <circle cx={x} cy={y} r={R * 1.04} fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
+            {:else}
+              {@const w = R * (at.gw - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1) + size * 0.2}
+              {@const h = R * (at.gh - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1) + size * 0.2}
+              <rect x={x - w} y={y - h} width={w * 2} height={h * 2} rx="3" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
+              <rect x={x - w} y={y - h} width={w * 2} height={h * 2} rx="3" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
+            {/if}
+            <!-- its pixels, where they really are -->
+            {#each Array(at.n) as _, i (i)}
+              {@const cc = css(l?.cells?.[i] ?? l)}
+              <circle class="px" cx={x + at.x[i] * R} cy={y - at.y[i] * R} r={Math.max(0.6, at.dot * R)} fill={cc.glow > 0.02 ? cc.css : '#232a35'} pointer-events="none" />
+            {/each}
           {:else if kind === 'bar'}
             {@const n = cells(f.id)}
             <rect x={x - size * 2.2} y={y - size * 0.55} width={size * 4.4} height={size * 1.1} rx="4" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />

@@ -109,6 +109,24 @@ light), `beats` and `secs` since the effect started, a stable `seed`. `p` are th
 returns intensity, colour, pan/tilt offsets or a white strike. No state between frames: anything
 that looks stateful (bouncing balls, ripples, fire) is computed from time and seeds.
 
+Rings and matrices (`shapes.ts`, `shape: true` on the def): `FixtureMode.layout` says where the
+pixels are, `model/pixelLayout.ts` turns it into `Places` once per mode, and the effect reads
+`sx`, `sy` (-1..1), `rad`, `ang`, `lane` and the grid `gx`, `gy`, `gw`, `gh` from `e`. What's the same
+for every pixel of a frame (an eye's pose, the stars) is worked out once for that moment and kept
+for the next pixel, keyed on the time: that's a cache, not state. On a strip they get a line through
+the middle (`sy` 0), so they must not assume a second dimension. Their contact sheet is the quick
+way to judge one: run it at a few moments on a disc and a matrix and look.
+
+A box only gets the universes it plays (`Bridge.wants`): its bridge page says its DMX outputs and
+its pixel ports. Don't widen that to "every pixel universe to every box": frames go one at a time, so
+on the big demo that took a DMX universe from 0.6 to 0.1 frames a second. `app.unservedPixels()` is
+what the note under the top bar (ConnectionBanner) shows.
+
+A mode with more than 512 channels (`isWide`) spans universes: `spansOf(fixture, mode)` is the only
+place that knows how, whole pixels per universe. The engine draws it into a buffer of its own and
+copies the spans; patching, the universe counters and the channel list go through `spansOf`,
+`channelAt` and `sharesChannels`. Never add one to `f.address` by hand for those.
+
 Adding one: the def in the right file, a blurb in plain words, defaults that look good on a row of
 eight PARs and on a 60-pixel strip, a unit test of a few exact values, an e2e that runs it on the
 fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in effects.ts

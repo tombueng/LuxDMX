@@ -242,3 +242,18 @@ describe('every effect, its knobs from a hostile file', () => {
     });
   }
 });
+
+describe('a ring or matrix in a file', () => {
+  const type = (layout: unknown) => ({ id: 'user:x', manufacturer: 'My', model: 'X', source: 'user', modes: [{ name: 'm', layout,
+    channels: Array.from({ length: 12 }, (_, i) => ({ name: `c${i}`, attr: ['red', 'green', 'blue'][i % 3], cell: Math.floor(i / 3) })) }] });
+  const load = (layout: unknown) => { const s: any = emptyShow('t'); s.fixtureTypes.push(type(layout)); return parseShow(JSON.stringify(s)); };
+  it('keeps a shape that fits its pixels', () => {
+    expect(load({ kind: 'rings', rings: [3, 1], ccw: true }).fixtureTypes[0].modes[0].layout).toEqual({ kind: 'rings', rings: [3, 1], ccw: true });
+    expect(load({ kind: 'matrix', cols: 2, rows: 2, zigzag: true }).fixtureTypes[0].modes[0].layout).toEqual({ kind: 'matrix', cols: 2, rows: 2, zigzag: true });
+  });
+  it('one that doesn\'t fit: gone, and the light runs as a strip', () => {
+    expect(load({ kind: 'rings', rings: [60, 1] }).fixtureTypes[0].modes[0].layout).toBeUndefined();
+    expect(load({ kind: 'blob' }).fixtureTypes[0].modes[0].layout).toBeUndefined();
+    expect(load('square').fixtureTypes[0].modes[0].channels).toHaveLength(12);
+  });
+});
