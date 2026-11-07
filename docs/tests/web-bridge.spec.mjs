@@ -102,6 +102,28 @@ test('the popup handshake: hello -> ask -> allow -> frames reach the output (and
   }
 });
 
+// The app only sends a box what it plays, so the page says which universes that is: its DMX outputs
+// and the enabled pixel ports, every universe each of them spans.
+test('the popup names what the box plays: outputs and pixel ports', async ({ page, request }) => {
+  const r = await request.get('/pixels.json');
+  const ports = r.ok() ? (await r.json()).ports ?? [] : [];
+  const want = [...new Set(ports.filter((p) => p.en).flatMap((p) => Array.from({ length: Math.max(1, p.spans) }, (_, k) => p.uni + k)))].sort((a, b) => a - b);
+  const i = await info(request);
+  await page.goto('/');
+  await page.evaluate(() => { window.__ready = new Promise((ok) => addEventListener('message', (e) => { if (e.data?.type === 'ready') ok(e.data); })); });
+  const [popup] = await Promise.all([page.waitForEvent('popup'), page.evaluate(() => { window.__bridge = window.open('/bridge', 'bridge'); })]);
+  await popup.waitForLoadState();
+  await page.evaluate(() => window.__bridge.postMessage({ luxdmx: 1, type: 'hello' }, location.origin));
+  await popup.locator('#allow').click();
+  const ready = await page.evaluate(() => window.__ready);
+  try {
+    expect(ready.outputs.map((o) => o.uni)).toEqual((i.outputs ?? []).map((o) => o.uni));
+    expect([...ready.pixels].sort((a, b) => a - b)).toEqual(want);
+  } finally {
+    await popup.locator('#revoke').click().catch(() => {});
+  }
+});
+
 // The app's output thread gets a channel of its own to the bridge page (a MessagePort): frames
 // through it reach the output whatever the app's page is busy with; the page says it took it. A
 // page that goes away sends "bye" with its safe look: that look is what stays, nothing from the

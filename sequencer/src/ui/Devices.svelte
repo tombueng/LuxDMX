@@ -99,7 +99,7 @@
   // what a pill shows of a box, read now (`_rev`: called again whenever a box changed)
   function view(b: (typeof app.bridges)[number], _rev: number) {
     const l = isLink(b) ? (b as LinkOutput) : undefined;
-    return { state: b.state, name: b.name, fps: b.fps, outputs: b.outputs, link: !!l, version: l?.version ?? '', nodes: l?.nodes ?? [], proto: l?.proto, access: l?.access ?? '', alarmed: app.alarmed(b) };
+    return { state: b.state, name: b.name, fps: b.fps, outputs: b.outputs, pixels: b.pixels, link: !!l, version: l?.version ?? '', nodes: l?.nodes ?? [], proto: l?.proto, access: l?.access ?? '', alarmed: app.alarmed(b) };
   }
 </script>
 
@@ -111,7 +111,7 @@
   {#each app.bridges as b (b.host)}
     {@const v = view(b, app.bridgeRev)}
     <span class="dev {v.state}" data-box={b.host} title={v.link ? (v.state === 'ready' ? `LuxDMX Link ${v.version}: ${v.nodes.length} node${v.nodes.length === 1 ? '' : 's'} found (${v.nodes.map((n) => `${n.short || n.ip}: ${(n.universes ?? []).join(', ') || 'no outputs'}`).join('; ') || 'none answers ArtPoll: sends to everyone'})` : v.access === 'denied' ? linkBlocked : linkHint)
-      : v.state === 'ready' ? `${b.host}: ${v.fps} frames/s now (a still look only sends a heartbeat). Outputs universe ${v.outputs.filter((o) => o.en).map((o) => o.uni).join(', ')}` : hint[v.state] ?? b.host}>
+      : v.state === 'ready' ? `${b.host}: ${v.fps} frames/s now (a still look only sends a heartbeat). Outputs universe ${v.outputs.filter((o) => o.en).map((o) => o.uni).join(', ')}${v.pixels.length ? `, pixel ports ${v.pixels.join(', ')}` : ''}` : hint[v.state] ?? b.host}>
       <span class="dot"></span>
       <b>{v.name || b.host}</b>
       <span class="st">{v.link && v.state === 'silent' ? (v.access === 'denied' ? 'blocked by the browser' : 'not running') : v.link && v.state === 'ready' ? `connected · ${v.nodes.length} node${v.nodes.length === 1 ? '' : 's'}` : label[v.state]}</span>

@@ -3,6 +3,7 @@
 // Moving heads turn their yoke (pan) and head (tilt) the way the real ones do (geometry.ts).
 // Updated every frame from what the engine puts on stage.
 import * as THREE from 'three';
+import type { Places } from '../model/pixelLayout';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Resolved } from '../model/types';
 import type { FixtureKind } from '../model/library';
@@ -11,7 +12,10 @@ import { PAN_SPEED, TILT_SPEED, slew, type Axis } from './motion';
 import { body, headParts, lensOf, PIVOT, type Look } from './models';
 
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
-export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean }
+// how much of a ring's or matrix's size its width and height are (a wide matrix keeps its shape)
+const shapeW = (at: Places) => (at.round ? 1 : (at.gw - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1));
+const shapeH = (at: Places) => (at.round ? 1 : (at.gh - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1));
+export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number }
 
 const MAX_BEAM = 26;           // metres: a beam that hits nothing fades out by then
 const LENS_GAP = 0.018;        // the glowing lens sits this far in front of its face (no flicker against it)
@@ -210,7 +214,9 @@ export class Rig {
       q.setFromEuler(E.set(f.rot.pitch * RAD, f.rot.yaw * RAD, f.rot.roll * RAD, 'YXZ'));
       const base = BASE.compose(pos, q, sc.set(1, 1, 1));
       const level = lightOf(v, t), isSel = selected.has(f.id);
-      m4.compose(pos, q, sc.set(f.kind === 'bar' ? Math.max(1, f.cells / 30) : 0.6, 0.7, 0.6)); this.hit.setMatrixAt(nh++, m4); this.hitIds.push(f.id);
+      if (f.shape) m4.compose(pos, q, sc.set(f.size! * shapeW(f.shape) + 0.06, 0.2, f.size! * shapeH(f.shape) + 0.06));
+      else m4.compose(pos, q, sc.set(f.kind === 'bar' ? Math.max(1, f.cells / 30) : 0.6, 0.7, 0.6));
+      this.hit.setMatrixAt(nh++, m4); this.hitIds.push(f.id);
       if (isSel && ns < this.sel.instanceMatrix.count) this.sel.setMatrixAt(ns++, m4);
       if (f.look === 'spot' || f.look === 'wash') {
         const h = lensOf(f.look);
@@ -230,6 +236,19 @@ export class Rig {
         lensAt(lp, dir, h.r, lensCol(level, isSel));
         beamAt(CP.copy(lp).addScaledVector(dir, 0.03), dir, deg, level * (f.look === 'wash' ? 0.8 : 1.15), col);
         pushLit(fi, lp, dir, col, level, deg);
+      } else if (f.shape) {
+        // a ring or a matrix: its board in the light's x-z plane, its pixels on it, facing its up
+        const at = f.shape, S = f.size! / 2, dot = Math.max(0.006, 2 * at.dot * S);
+        put(f.look, TMP.copy(base).multiply(TMP2.makeScale(2 * S * shapeW(at) + 0.04, 1, 2 * S * shapeH(at) + 0.04)));
+        const dir = DIR.copy(UP).applyQuaternion(q);
+        for (let i = 0; i < at.n; i++) {
+          const cl = lightOf(v?.cells?.[i] ?? v, t);
+          const cp = CP.set(at.x[i] * S, 0.006, -at.y[i] * S).applyMatrix4(base);
+          const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off;
+          m4.compose(cp, q, sc.set(dot, 0.012, dot)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
+        }
+        lightOf(v, t);
+        pushLit(fi, pos, dir, col, level * 0.4, 60);
       } else if (f.kind === 'bar') {
         // the bar lies along its x; its cells shine along its up
         const L = f.cells > 24 ? f.cells / 30 : 1;

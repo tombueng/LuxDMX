@@ -4,6 +4,7 @@
 import type { Fixture, Resolved } from '../model/types';
 import type { FixtureKind } from '../model/library';
 import { lookColor } from '../engine/cuelook';
+import type { Places } from '../model/pixelLayout';
 
 // The picture as an image: one element on the page, drawn once, instead of a shape per light (a
 // card deck of 40 cues on a 300-light rig was 14,000 elements: seconds of layout on every tab
@@ -21,7 +22,8 @@ export function svgImage(svg: string): string {
 
 // `own`: a look of a list of looks: a light it doesn't name is drawn as an outline (it stays as it
 // is), one it switches off as a dark light, so the card tells "off" from "not in this look".
-export function stageSvg(fixtures: Fixture[], looks: Record<string, Resolved>, kinds: Record<string, FixtureKind>, w = 160, h = 90, own = false): string {
+// `places`: which lights are a ring or a matrix (drawn with a few of their pixels: it's a small picture).
+export function stageSvg(fixtures: Fixture[], looks: Record<string, Resolved>, kinds: Record<string, FixtureKind>, w = 160, h = 90, own = false, places?: (id: string) => Places | undefined): string {
   const parts: string[] = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`,
     `<rect width="${w}" height="${h}" rx="6" fill="#0b0f15"/>`];
   const r = Math.max(2.2, Math.min(7, 90 / Math.sqrt(fixtures.length + 4)));
@@ -45,6 +47,16 @@ export function stageSvg(fixtures: Fixture[], looks: Record<string, Resolved>, k
       parts.push(`<line x1="${x}" y1="${y}" x2="${ex}" y2="${ey}" stroke="${css}" stroke-width="${(r * 0.7).toFixed(1)}" stroke-linecap="round" opacity="${(0.15 + 0.25 * glow).toFixed(2)}"/>`);
     }
     if (glow > 0.02) parts.push(`<circle cx="${x}" cy="${y}" r="${(r * 1.9).toFixed(1)}" fill="${css}" opacity="${(0.25 * glow).toFixed(2)}"/>`);
+    const at = places?.(f.id);
+    if (at) {
+      const R = r * 2.1, step = Math.max(1, Math.ceil(at.n / 48));
+      parts.push(`<circle cx="${x}" cy="${y}" r="${(R * 1.08).toFixed(1)}" fill="#1c232d" stroke="#3b4450" stroke-width="0.6"/>`);
+      for (let i = 0; i < at.n; i += step) {
+        const cc = lookColor(l?.cells?.[i] ?? l);
+        if (cc.glow > 0.02) parts.push(`<circle cx="${(+x + at.x[i] * R).toFixed(1)}" cy="${(+y - at.y[i] * R).toFixed(1)}" r="${Math.max(0.5, R * 0.09).toFixed(1)}" fill="${cc.css}"/>`);
+      }
+      continue;
+    }
     if (kinds[f.id] === 'bar') {
       // A bar is a bar: its cells side by side (one colour unless an effect gave them their own).
       const cells = l?.cells?.length ? l.cells : [l];

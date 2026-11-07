@@ -5,6 +5,7 @@
 // (fixtureSetup.test.ts); the sums of where a light is and where it points are geometry.ts's.
 import type { Channel, ChannelRange, Fixture, FixtureMode, FixtureType } from './types';
 import { capsOf, type FixtureKind } from './library';
+import { placesOf, shapeSize, shapeStanding } from './pixelLayout';
 import { aimAt, aimRot, calibrate, defaultPlace, groundAt, nearestTruss, norm, toWorld, TRUSS_HANG, type Optics, type Room, type Rot, type V3 } from '../stage3d/geometry';
 import type { RigFixture, Sfx } from '../stage3d/rig';
 import type { Look } from '../stage3d/models';
@@ -208,10 +209,14 @@ export function channelRows(m: FixtureMode, address: number): ChannelRow[] {
 // pan / tilt range)
 const SFX: Sfx[] = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
 export function rigFixtureOf(f: Fixture, m: FixtureMode | undefined, k: FixtureKind, t: FixtureType | undefined, room: Room): RigFixture {
-  const c = capsOf(m), at = placeOf(f, k, room);
+  const c = capsOf(m), at = placeOf(f, k, room), shape = placesOf(m);
   const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
   const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
   const look: Look = sfx ?? (c.fog ? 'fog' : k === 'mover' ? (/wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
-    : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
-  return { id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'), p: at.p, rot: at.rot, optics: opticsOf(f, t) };
+    : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
+  const stood = shape && shapeStanding(at.p, shape);
+  return {
+    id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
+    p: stood && !f.p3 ? stood.p : at.p, rot: stood && !f.rot ? stood.rot : at.rot, optics: opticsOf(f, t), shape, size: shape && shapeSize(shape),
+  };
 }

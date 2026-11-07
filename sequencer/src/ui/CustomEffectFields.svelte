@@ -7,6 +7,7 @@
   import { pictureOf, PICTURE_LIMITS, type Picture } from '../engine/custom';
   import Icon from './Icon.svelte';
   import { clock } from './clock.svelte';
+  import { TEXT_MAX } from '../engine/fxkit';
   import { ui } from './ui.svelte';
 
   let { fx, p, set }: { fx: Effect; p: EffectParams; set: (k: string, v: unknown) => void } = $props();
@@ -100,6 +101,10 @@
   ];
 </script>
 
+{#if fx.kind === 'scrollText'}
+  <label class="knob"><span class="lab">Words</span>
+    <input value={p.text} maxlength={TEXT_MAX} aria-label="Words" oninput={(e) => set('text', (e.target as HTMLInputElement).value)} /></label>
+{/if}
 {#if fx.kind === 'formula'}
   <div class="cf">
     <div class="head">

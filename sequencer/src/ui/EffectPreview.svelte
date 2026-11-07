@@ -4,10 +4,16 @@
   // their path for moves.
   import { EFFECT_MAP, paramsOf, runEffect, type Where } from '../engine/effects';
   import { clock } from './clock.svelte';
+  import { placesFor, type Places } from '../model/pixelLayout';
 
   // one light with n pixels (made once, not every frame)
   const strips = new Map<number, Where[]>();
   const strip = (n: number) => strips.get(n) ?? strips.set(n, Array.from({ length: n }, (_, i) => ({ u: i / (n - 1), row: 0, rows: 1 }))).get(n)!;
+
+  // the two shapes a ring or matrix effect is drawn on (made once, not every frame)
+  const onShape = (at: Places): Where[] => Array.from({ length: at.n }, (_, i) => ({ u: i / Math.max(1, at.n - 1), row: 0, rows: 1, at, cell: i }));
+  const DISC = placesFor({ kind: 'rings', rings: [32, 24, 16, 12, 8, 1] }), GRID = placesFor({ kind: 'matrix', cols: 14, rows: 14 });
+  const DISC_AT = onShape(DISC), GRID_AT = onShape(GRID);
 
   let { kind, params = {}, w = 160, h = 48, n = 0, bpm = 120, paused = false }:
     { kind: string; params?: Record<string, unknown>; w?: number; h?: number; n?: number; bpm?: number; paused?: boolean } = $props();
@@ -48,6 +54,22 @@
     }
     // The sound effects get a pretend kick drum in the preview.
     const sound = Math.abs(Math.sin(t * Math.PI * 2)) ** 3;
+    if (def.shape) {
+      const clockNow = { beats: t * bpm / 60, secs: t };
+      const dots = (at: Places, where: Where[], cx: number, cy: number, R: number) => {
+        const outs = runEffect(def, { ...p, sound }, at.n, total, 1, where, clockNow), r = Math.max(0.7, at.dot * R * (at.round ? 1.1 : 1));
+        for (let i = 0; i < at.n; i++) {
+          const o = outs[i], v = o.intensity ?? 0, c = o.color ?? { r: 1, g: 1, b: 1 };
+          ctx.fillStyle = v < 0.03 ? '#222a34' : `rgb(${Math.round(c.r * v * 255)},${Math.round(c.g * v * 255)},${Math.round(c.b * v * 255)})`;
+          ctx.fillRect(cx + at.x[i] * R - r, cy - at.y[i] * R - r, r * 2, r * 2);
+        }
+      };
+      // room for both: the disc and the matrix side by side (a tight spot: the disc)
+      const R = Math.min(h / 2 - 1.5, w / 4 - 2);
+      if (w >= h * 1.6) { dots(DISC, DISC_AT, w / 2 - R - 3, h / 2, R); dots(GRID, GRID_AT, w / 2 + R + 3, h / 2, R); }
+      else dots(DISC, DISC_AT, w / 2, h / 2, Math.min(h, w) / 2 - 1.5);
+      return;
+    }
     if (def.category === 'pixel') {
       // A pixel show on a strip of small LEDs (as many as fit, up to 30), each with a little glow.
       const n = Math.max(8, Math.min(30, Math.floor(w / 6))), where = strip(n);

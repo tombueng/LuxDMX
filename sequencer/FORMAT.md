@@ -120,6 +120,24 @@ allows unknown fields everywhere, like readers must).
 | `control` | reset, lamp, internal programs: sits at its `default`, never driven |
 | `raw` | anything else: its `default`, unless a cue sets it by channel index |
 
+A mode can say where its pixels are, `layout`, for a ring or a matrix. Cells count in data order.
+It has to fit the mode's pixels, or it's dropped with a note and the light runs as a strip.
+
+```json
+{ "kind": "rings", "rings": [60, 48, 40, 32, 24, 16, 12, 8, 1], "ccw": false, "turn": 0 }
+{ "kind": "matrix", "cols": 16, "rows": 16, "zigzag": true, "vertical": false, "from": "tl" }
+```
+
+`rings`: LEDs per ring, in the order the data runs through them. A bigger ring is further out, the
+steps between rings are even, each ring starts at the top and runs clockwise (`ccw` the other way;
+`turn` degrees turns it all). `matrix`: lines of LEDs from the corner `from` (`tl`, `tr`, `bl`, `br`,
+top left unless it says), along the rows (`vertical`: along the columns); `zigzag`: every second
+line runs back.
+
+A mode with more than 512 channels runs on over the following universes from its `universe` and
+`address`, with whole pixels on each: `floor(room / size) * size` channels, where `size` is its
+channels per cell (3: 170 pixels a universe, 4: 128).
+
 - `default` is the DMX value sent when nothing drives the channel. `cell` (0-based) marks which
   pixel of a multi-cell fixture a channel belongs to. `span: [from, to]` is the DMX range the
   attribute moves through when it only owns part of the channel (an iris on 0..191 with effects
@@ -440,11 +458,13 @@ readers that follow this section produce the same output.
 | `low`, `high` | 0..1 | 0, 1 | the intensity range |
 | `lightUp` | bool | `true` | colour and move effects also switch their lights on at `level`; a light a cue or the programmer sets keeps that level, and as its cue list fades out the effect takes over |
 | `level` | 0..1 | 1 | the effect's own fader |
+| `contrast` | number | `0` | -1 to 1: an S-curve on the element's level between `low` and `high`. Up: dim gets dimmer, bright gets brighter. Down: softer. Dark and full stay where they are. Pixel and intensity effects |
 | `pixels` | bool | `true` | a multi-cell fixture (pixel bar) runs as one element per cell |
 | `order` | string | `list` | which light comes first: `list` (the group's order), `x` (left to right on the stage), `y` (back to front), `centre` (nearest the middle of the lights first) |
 | `formula` | string | `hsv(x - c, 1, 1)` | the `formula` effect's expression (see "Your own effects" below), at most 500 characters |
 | `picture` | string | `""` | the `picture` effect's picture or animation, packed (below); empty: the built-in sample |
 | `mapping` | string | `auto` | how a picture lies on the lights: `line`, `wall` or `auto` (below) |
+| `text` | string | `LUXDMX` | the `scrollText` effect's words, at most 200 characters: capitals, numbers and the usual signs |
 
 **Elements and phase.** The elements are the target fixtures in order; with `pixels`, a fixture
 with cells becomes one element per cell. Moves only use fixtures with pan/tilt, colour effects only
@@ -526,6 +546,13 @@ mirror them), and along the group when every light is a single cell. Their "spee
 
 Like `fire` and `sparkle`, most are random by nature: the code in `src/engine/pixels.ts` is the
 reference, and a reader may use its own randomness.
+
+**Rings and matrices** (category pixel): `eye`, `reactor`, `supernova`, `radar`, `blackHole`, `warp`,
+`galaxy`, `hypno`, `mandala`, `tunnel`, `plasmaClouds`, `lavaLamp`, `campfire`, `codeRain`, `raindrops`,
+`skyRockets`, `kickRings`, `bigHeart`, `equaliser`, `scrollText`, `wiringTest`. They work from each
+pixel's place on its light's `layout` (a line through the middle on a light without one); `spread`
+shifts one light of the group against the next, in rounds. The code in `src/engine/shapes.ts` is
+the reference.
 
 **Your own effects: `formula` and `picture`** (category pixel). Both colour and light their
 elements together. Their output is a colour with its brightness: the colour at full goes to

@@ -82,6 +82,28 @@ in USB while the 12/24 V is on.
 | DMX only, in a box | `5V IN` header | external 5 V | unused |
 | Pixels, two supplies | 12-24V terminal, fuse, 1000 µF | USB or `5V IN` | 12/24 V |
 | Pixels, one supply | as above + buck module | buck, from `V_PIX` | 12/24 V |
+| 5 V pixels | 12-24V terminal, fuse, 1000 µF, no buck | USB or `5V IN` | 5 V |
+
+### 5 V pixels and USB
+
+**USB never reaches the pixel terminals.** `V+` on all five is `V_PIX`, and `V_PIX` only comes from
+the `12-24V IN` terminal through the fuse. Neither USB nor `5V IN` is connected to it. With nothing on
+that terminal the data is there, `/pixels.json` shows the port running at full frame rate, and the
+strip stays dark.
+
+**WS2812 and other 5 V pixels:** the 5 V goes into `12-24V IN`, despite the name. The rail doesn't
+care about the voltage. Leave the buck out, it can't make 5 V out of 5 V.
+
+**One 5 V supply for both:** bridge `5V IN` to `12-24V IN`. That's how the bench carrier runs. The
+bridge also ties the logic to whatever is on that terminal, so take it off before anything above 5 V
+gets near the board, and leave USB unplugged while it's on (one 5 V source at a time).
+
+**USB may not even reach `+5V`.** The pixel buffer runs on `+5V`, and USB only gets there through the
+module's 5V pin. On some S3 modules that pin isn't connected to USB until the `IN-OUT` solder pads are
+bridged. We haven't measured this on a module yet, but the bench carrier points that way: on USB, even
+with `5V IN` bridged to `12-24V IN`, its pixels stayed dark, and a real 5 V supply on that bridge lit
+them. If you run from USB, check for 5 V on `5V IN` with a meter. If it's missing, the ESP runs and
+every pixel port is silent, because the buffer has no supply.
 
 ### Fuse
 
@@ -336,6 +358,8 @@ self-aligns, so this board doesn't reflow.
 
 - **One 5 V source at a time.** USB, `5V IN` and the buck share `+5V` with no diodes.
 - **Buck set to 5.0 V** before it goes on the board.
+- **Pixel power goes into `12-24V IN`**, also for 5 V pixels. USB and `5V IN` don't reach `V+`, see
+  [5 V pixels and USB](#5-v-pixels-and-usb).
 - **Polyfuse or bridge or blade fuse**, exactly one.
 - **120 Ω only at the end of the bus**, and not on top of the module's own.
 - **OLED pin order** against the module's silk: board pads are GND / 3V3 / SCL / SDA.

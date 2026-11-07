@@ -22,6 +22,8 @@
   const hex = (c: Color) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
   const fromHex = (h: string): Color => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
   const usesColors = $derived(['colorChase', 'colorFade', 'gradient', 'random', 'police', 'fire', 'ocean'].includes(fx.kind) || (def?.category === 'pixel' && !def.noColors));
+  // (most colour effects say a colour and no level: nothing for it to work on)
+  const usesContrast = $derived(def?.category === 'pixel' || def?.category === 'intensity' || ['police', 'fire', 'ocean'].includes(fx.kind));
   const usesWidth = $derived(['chase', 'pingpong', 'strobe', 'meteor'].includes(fx.kind));
   const hasBars = $derived((fx.group ? app.show.groups.find((g) => g.id === fx.group)?.fixtures ?? [] : fx.fixtures ?? []).some((id) => app.kinds[id] === 'bar'));
   const pct = (v: number) => Math.round(v * 100);
@@ -30,7 +32,7 @@
 
 <div class="ed" aria-label="Effect settings">
   <div class="top">
-    <EffectPreview kind={fx.kind} params={fx.params} w={250} h={def?.category === 'move' ? 64 : 40} bpm={app.bpm} />
+    <EffectPreview kind={fx.kind} params={fx.params} w={250} h={def?.shape ? 110 : def?.category === 'move' ? 64 : 40} bpm={app.bpm} />
   </div>
   <label class="full">Name <input bind:value={fx.name} aria-label="Effect name" /></label>
   <div class="two">
@@ -63,6 +65,9 @@
   <CustomEffectFields {fx} {p} {set} />
   <label class="knob" title="How far it moves, or how deep the colour or brightness swings"><span class="lab">Size</span><input type="range" min="0" max="1" step="0.01" value={p.size} oninput={num('size')} aria-label="Size" /><b>{pct(p.size)}</b></label>
   <label class="knob" title="0: all lights together. 100: spread evenly, one after the other"><span class="lab">Spread</span><input type="range" min="0" max="1" step="0.01" value={p.spread} oninput={num('spread')} aria-label="Spread" /><b>{pct(p.spread)}</b></label>
+  {#if usesContrast}
+    <label class="knob" title="How hard the light falls between dark and bright. Up: what's dim gets dimmer, what's bright gets brighter. Down: softer, more of it glows."><span class="lab">Contrast</span><input type="range" min="-1" max="1" step="0.01" value={p.contrast} oninput={num('contrast')} aria-label="Contrast" /><b>{p.contrast > 0 ? '+' : ''}{pct(p.contrast)}</b></label>
+  {/if}
   <div class="knob"><span class="lab">Direction</span>
     <div class="seg" role="radiogroup" aria-label="Direction">
       {#each DIRS as [d, sym, title] (d)}<button role="radio" aria-checked={p.direction === d} class:on={p.direction === d} {title} aria-label={title} onclick={() => set('direction', d)}>{sym}</button>{/each}

@@ -108,7 +108,7 @@ undo toasts, a Worker clock so output keeps running in a background tab.
   Safari).
 - The firmware side of the bridge as a PR (e2e spec, docs).
 - Audio beat detection, music-reactive auto show, setlists, user effect scripts in a Worker,
-  pixel matrix effects, OSC (needs the node to relay it).
+  OSC (needs the node to relay it).
 
 
 ## The show on the box (Thomas, 2026-10-28: "send a project to one LuxDMX controller so that it can play the show automatically and autonomously, plannable by schedule, cron, or triggered by hardware IO, network request")

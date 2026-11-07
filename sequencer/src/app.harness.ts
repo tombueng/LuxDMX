@@ -20,7 +20,7 @@ export async function freshApp(opts: { keepStorage?: boolean; output?: 'live' | 
   const app = mod.app as any;
   await app.init();
   const sent: Sent[] = [];
-  const box = { state: 'ready', host: 'box', send: (uni: number, data: Uint8Array) => sent.push({ uni, data: [...data.slice(0, 16)] }), relay() {}, close() {}, open() {}, lostAt: 0, outputs: [] };
+  const box = { state: 'ready', host: 'box', pixels: [] as number[], send: (uni: number, data: Uint8Array) => sent.push({ uni, data: [...data.slice(0, 16)] }), relay() {}, close() {}, open() {}, lostAt: 0, outputs: [] };
   app.bridges = [box];
   const tick = (n = 1) => { for (let i = 0; i < n; i++) app.tick(); };
   return { app, sent, tick, mod };

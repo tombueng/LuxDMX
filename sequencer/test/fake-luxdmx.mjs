@@ -11,6 +11,7 @@
 //   GET  /frames.json   per universe: last frame, frame count, first/last arrival (ms)
 //   GET  /history.json?uni=0&ch=1   every value channel `ch` had, with timestamps (for fades)
 //   POST /reset         forget everything received (and the RDM rig as it was, answers on time)
+//   POST /pixels?ports=10:2,12:1   pixel ports on these universes (GET /pixels.json reads them)
 //   POST /ws/test       { ackDelay: ms } answer each message that much later, { noAck: true } never
 //   GET  /ws/stats.json { acks, early }: answers sent, and messages that came before the answer to
 //                       the one before (the pages must wait: see the ack in the README)
@@ -30,6 +31,7 @@ const port = +(process.argv[2] || 8199);
 const unis = (process.argv[3] || '0,1').split(',').map(Number);
 
 let frames = new Map();   // uni -> { data, count, first, last }
+let pixelPorts = [];      // [universe, spans] of its enabled pixel ports
 
 // ---- RDM: the lights on the box's lines, as its RDM controller would report them. A scan takes a
 // moment (searching, then reading each light's details), like the box's; the spot's head warms up.
@@ -71,6 +73,16 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/bridge' || url.pathname === '/remote') {
     res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' });
     res.end(fs.readFileSync(url.pathname === '/bridge' ? BRIDGE : REMOTE, 'utf8'));
+  } else if (url.pathname === '/pixels.json') {
+    json({ ports: pixelPorts.map(([uni, spans]) => ({ en: true, uni, spans })).concat({ en: false, uni: 999, spans: 0 }) });
+  } else if (url.pathname === '/drop' && req.method === 'POST') {
+    // as if it restarted: every socket goes (the bridge page comes back by itself)
+    for (const c of wss.clients) c.terminate();
+    json({ ok: true });
+  } else if (url.pathname === '/pixels' && req.method === 'POST') {
+    // ?ports=10:2,12:1 the universes its pixel ports start on, and how many each spans
+    pixelPorts = (url.searchParams.get('ports') ?? '').split(',').filter(Boolean).map((s) => s.split(':').map(Number));
+    json({ ok: true });
   } else if (url.pathname === '/info.json') {
     json({ version: 'fake', hostname: 'fake-luxdmx', artShort: 'Fake LuxDMX', ip: '127.0.0.1', outputs: unis.map((u) => ({ en: true, uni: u })) });
   } else if (url.pathname === '/frames.json') {
@@ -81,6 +93,7 @@ const server = http.createServer((req, res) => {
     const u = +(url.searchParams.get('uni') ?? 0), ch = +(url.searchParams.get('ch') ?? 1);
     json(history.filter((h) => h.uni === u).map((h) => [h.t, h.data[ch - 1] ?? 0]));
   } else if (url.pathname === '/reset' && req.method === 'POST') {
+    pixelPorts = [];
     frames = new Map(); history = []; ackDelay = 0; noAck = false; wsStats = { acks: 0, early: 0 }; for (const c of wss.clients) c.pending = false; rig = RIG(); rdmScan = { busy: false, stage: 0, found: 0, scanned: false, at: 0 }; quiet = new Set(); json({ ok: true });
   } else if (url.pathname === '/ws/stats.json') {
     json(wsStats);

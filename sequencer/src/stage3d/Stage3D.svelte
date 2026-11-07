@@ -53,6 +53,7 @@
   import { opticsOf } from '../model/fixtureSetup';
   import { buildVenue } from './venue';
   import { Rig, type RigFixture, type Sfx } from './rig';
+  import { placesOf, shapeSize, shapeStanding } from '../model/pixelLayout';
   import type { Look } from './models';
   import { Particles } from './particles';
   import { aimAt, aimRot, beamDir, calibrate, faceBand, pivotOf, defaultPlace, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
@@ -90,14 +91,16 @@
   const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => {
     const m = app.modeOf(f.id), c = capsOf(m), k = app.kinds[f.id] ?? 'other', t = app.types.get(f.typeId);
     const def = defaultPlace(f, k, room);
+    // a ring or a matrix stands up on its lower edge, facing the audience, unless it's been placed
+    const shape = placesOf(m), size = shape && shapeSize(shape);
     const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
     const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
     // which body it gets: a wash head has a zoom and no gobo; a blinder says so in its name
     const look: Look = sfx ?? (c.fog ? 'fog' : k === 'mover' ? (/wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
-      : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
+      : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
     return {
       id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
-      p: f.p3 ? { ...f.p3 } : def.p, rot: f.rot ? { ...f.rot } : def.rot,
+      p: f.p3 ? { ...f.p3 } : shape ? shapeStanding(def.p, shape).p : def.p, rot: f.rot ? { ...f.rot } : shape ? shapeStanding(def.p, shape).rot : def.rot, shape, size,
       // (the light's own pan / tilt range first, then its type's; swapped when it says so)
       optics: { ...opticsOf(f, t), swap: !!f.swapPanTilt },
     };

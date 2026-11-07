@@ -25,6 +25,7 @@ export interface BoxOutput { en: boolean; uni: number }
 export class Bridge {
   state: BridgeState = 'closed';
   outputs: BoxOutput[] = [];
+  pixels: number[] = [];      // the universes its pixel ports listen on
   name = '';
   ip = '';             // the box's own address (what a phone can reach when the name doesn't resolve there)
   fps = 0;
@@ -90,9 +91,9 @@ export class Bridge {
     switch (m.type) {
       case 'asking': this.set('asking'); break;
       case 'ready':
-        this.outputs = m.outputs ?? []; this.name = m.name ?? ''; this.ip = typeof m.ip === 'string' ? m.ip : ''; this.sent.clear(); this.adopting = false;
+        this.outputs = m.outputs ?? []; this.pixels = Array.isArray(m.pixels) ? m.pixels.filter(Number.isInteger) : []; this.name = m.name ?? ''; this.ip = typeof m.ip === 'string' ? m.ip : ''; this.sent.clear(); this.adopting = false;
         // kept for this tab: a popup taken back after a reload doesn't say it again
-        try { sessionStorage.setItem(INFO_KEY + this.host, JSON.stringify({ outputs: this.outputs, name: this.name, ip: this.ip })); } catch { /* fine */ }
+        try { sessionStorage.setItem(INFO_KEY + this.host, JSON.stringify({ outputs: this.outputs, pixels: this.pixels, name: this.name, ip: this.ip })); } catch { /* fine */ }
         try { if (this.name) localStorage.setItem(NAME_KEY + this.host, this.name); } catch { /* fine */ }
         this.set('ready'); break;
       case 'denied': this.adopting = false; this.set('denied'); break;
@@ -121,14 +122,16 @@ export class Bridge {
     this.sent.clear();
     try {
       const info = JSON.parse(sessionStorage.getItem(INFO_KEY + this.host) ?? 'null');
-      if (info) { this.outputs = info.outputs ?? []; this.name = info.name ?? ''; this.ip = info.ip ?? ''; }
+      if (info) { this.outputs = info.outputs ?? []; this.pixels = Array.isArray(info.pixels) ? info.pixels : []; this.name = info.name ?? ''; this.ip = info.ip ?? ''; }
     } catch { /* it sends everything until it says otherwise */ }
     this.set('opening');
     src.postMessage({ luxdmx: 1, type: 'hello' }, this.origin);
   }
 
-  // Does this box output `uni`? A box that didn't say (older bridge) gets everything.
-  wants(uni: number) { return this.outputs.length === 0 || this.outputs.some((o) => o.en && o.uni === uni); }
+  // Does this box play `uni`, on a DMX output or a pixel port? A box that didn't say (an older
+  // bridge) gets everything; one that says only its outputs (too old to name its pixel ports) gets
+  // those: sending every pixel universe to every box slows down what it really plays.
+  wants(uni: number) { return this.outputs.length === 0 || this.outputs.some((o) => o.en && o.uni === uni) || this.pixels.includes(uni); }
 
   // Only what changed, plus a heartbeat so the box keeps the source (it drops one after 4 s of
   // silence). A static look costs 4 frames a second instead of 40, and a box that stalls for a

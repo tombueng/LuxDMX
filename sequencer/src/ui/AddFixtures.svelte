@@ -6,6 +6,8 @@
   import Library from './Library.svelte';
   import FixtureEditor from './FixtureEditor.svelte';
   import { app } from '../app.svelte';
+  import { spansOf } from '../model/pixelLayout';
+  import PixelShapeMaker from './PixelShapeMaker.svelte';
   import { GENERIC, KIND_LABEL, caps, kindOf, modeOf, typeLabel } from '../model/library';
   import { importFixtureFile } from '../import/file';
   import { ui } from './ui.svelte';
@@ -33,20 +35,24 @@
   let typeId = $state('gen-drgb');
   let count = $state(4), universe = $state(0), name = $state('PAR'), mode = $state('');
   let address = $state<number | null>(null);   // empty = next free
-  let lib = $state(false), make = $state(false);
+  let lib = $state(false), make = $state(false), shapeMaker = $state(false);
   let err = $state('');
   let fileInput = $state<HTMLInputElement>();
   const type = $derived(app.types.get(typeId) ?? app.myTypes.find((t) => t.id === typeId));
   $effect(() => { if (type && !type.modes.some((m) => m.name === mode)) mode = type.modes[0].name; });
   const width = $derived(modeOf(type, mode)?.channels.length ?? 1);
   const nextFree = $derived(app.nextFree(universe, width));
+  const wideSpans = $derived(spansOf({ universe: 0, address: 1 }, modeOf(type, mode)).length);
   // Lights already on the channels these would take (a template's PARs on 1-24, say).
   const overlaps = $derived.by(() => {
-    if (!address || address < 1) return [] as string[];
+    if (!address || address < 1 || width > 512) return [] as string[];
     const a0 = address, a1 = address + count * width - 1;
     return app.show.fixtures.filter((f) => f.universe === universe && f.address <= a1 && a0 <= f.address + (app.modeOf(f.id)?.channels.length ?? 1) - 1).map((f) => f.name);
   });
-  const shownTypes = $derived([...GENERIC.filter((t) => !t.id.startsWith('gen-bar') || t.id === 'gen-bar8' || t.id === 'gen-bar12'), ...app.show.fixtureTypes]);
+  const allTypes = $derived([...GENERIC.filter((t) => !t.id.startsWith('gen-bar') || t.id === 'gen-bar8' || t.id === 'gen-bar12'), ...app.show.fixtureTypes]);
+  // rings and matrices in a row of their own: down in a long list nobody finds them
+  const shapeTypes = $derived(allTypes.filter((t) => t.modes[0]?.layout));
+  const shownTypes = $derived(allTypes.filter((t) => !t.modes[0]?.layout));
   // My fixtures from other shows (the ones this show has already are listed with the rest).
   const mine = $derived(app.myTypes.filter((t) => !app.show.fixtureTypes.some((x) => x.id === t.id)));
 
@@ -60,6 +66,16 @@
     const attrs = new Set(modeOf(t, '')?.channels.map((c) => c.attr));
     return Object.entries(DOT).filter(([a]) => attrs.has(a as never)).map(([, d]) => d);
   };
+  // a ring or a matrix: how it's laid out, so you can tell which is yours
+  const shapeBlurb = (t: FixtureType) => {
+    const l = t.modes[0]?.layout;
+    if (!l) return undefined;
+    if (l.kind === 'matrix') {
+      const corner = { tl: 'top left', tr: 'top right', bl: 'bottom left', br: 'bottom right' }[l.from ?? 'tl'];
+      return `Data in at the ${corner}, ${l.zigzag ? 'in a zigzag ' : ''}along the ${l.vertical ? 'columns' : 'rows'}. Wired differently? "Ring or matrix" takes any way.`;
+    }
+    return l.rings.length > 1 ? `Rings of ${l.rings.join(', ')}, data in at the rim. Common as a round AliExpress disc.` : 'One light with a shape, so effects can draw on it.';
+  };
   function pick(id: string) {
     typeId = id;
     likePick = null;
@@ -71,6 +87,9 @@
       : k === 'dimmer' ? 'Dimmer' : !c.color && c.cct ? 'White' : 'PAR';
     // People own PARs in fours, heads in pairs, and one fog machine.
     count = k === 'fog' || k === 'sfx' || k === 'strobe' ? 1 : k === 'mover' ? 2 : k === 'bar' ? 2 : 4;
+    // a ring or a matrix: one, called what it is
+    const shape = modeOf(t, '')?.layout;
+    if (shape) { count = 1; if (t?.source === 'generic') name = shape.kind === 'matrix' ? 'Matrix' : shape.rings.length > 1 ? 'Disc' : 'Ring'; }
   }
   // In the looks: new lights can do what one that's there does (a template's looks with your own
   // lights). Offered when there are looks; a light of the same type first, then of the same kind.
@@ -116,8 +135,22 @@
   }
 </script>
 
+{#snippet typeCard(t: FixtureType)}
+          {@const k = kindOf(modeOf(t, ''))}
+          <button class="tcard" class:cur={t.id === typeId} onclick={() => pick(t.id)} title={KIND_LABEL[k]} data-type={t.id}>
+            <span class="ti"><Icon name={k} size={22} /></span>
+            <span class="tt"><b>{t.source === 'generic' ? t.model : typeLabel(t)}</b>
+              <span class="faint">{BLURB[t.id] ?? shapeBlurb(t) ?? `${t.modes.length} mode${t.modes.length > 1 ? 's' : ''}, from ${t.source === 'ofl' ? 'the Open Fixture Library' : t.source === 'qxf' ? 'QLC+' : t.source === 'gdtf' ? 'GDTF' : t.source === 'generic' ? 'the built-in ones' : 'you'}`}</span></span>
+            <span class="side2">
+              <span class="chip">{modeOf(t, '')?.channels.length} ch</span>
+              <span class="dots">{#each dots(t) as [c, title] (title)}<span class="dot" style="background:{c}" {title}></span>{/each}</span>
+            </span>
+          </button>
+{/snippet}
+
 {#if lib}<Library onclose={() => (lib = false)} onpick={(id, m) => { pick(id); if (m) mode = m; }} />
 {:else if make}<FixtureEditor onclose={() => (make = false)} onsaved={pick} />
+{:else if shapeMaker}<PixelShapeMaker onclose={() => (shapeMaker = false)} onsaved={pick} />
 {:else}
 <Modal title="Add fixtures" {onclose} wide>
   <div class="cols">
@@ -126,9 +159,14 @@
         <button onclick={() => (lib = true)}><Icon name="search" />Search 2400+ fixtures…</button>
         <button onclick={() => fileInput?.click()}><Icon name="upload" />GDTF / QLC+ / OFL file…</button>
         <button onclick={() => (make = true)}><Icon name="wizard" />Make my own…</button>
+        <button onclick={() => (shapeMaker = true)}><Icon name="sun" />Ring or matrix…</button>
         <input type="file" accept=".gdtf,.qxf,.json" bind:this={fileInput} onchange={file} hidden />
       </div>
       <p class="hint">Not sure? Look at the channel table in the manual: "CH1 dimmer, CH2 red…" tells you which of these it is.</p>
+      <h3 class="mh">LED rings and matrices <span class="faint">(WS2812: one light with a shape)</span></h3>
+      <div class="types shapes">
+        {#each shapeTypes as t (t.id)}{@render typeCard(t)}{/each}
+      </div>
       {#if mine.length}
         <h3 class="mh">My fixtures <span class="faint">(made or imported before, kept in this browser)</span></h3>
         <div class="types mine">
@@ -145,21 +183,10 @@
             </div>
           {/each}
         </div>
-        <h3 class="mh">Generic and this show's</h3>
       {/if}
+      <h3 class="mh">{mine.length ? "Generic and this show's" : 'Everything else'}</h3>
       <div class="types">
-        {#each shownTypes as t (t.id)}
-          {@const k = kindOf(modeOf(t, ''))}
-          <button class="tcard" class:cur={t.id === typeId} onclick={() => pick(t.id)} title={KIND_LABEL[k]} data-type={t.id}>
-            <span class="ti"><Icon name={k} size={22} /></span>
-            <span class="tt"><b>{t.source === 'generic' ? t.model : typeLabel(t)}</b>
-              <span class="faint">{BLURB[t.id] ?? `${t.modes.length} mode${t.modes.length > 1 ? 's' : ''}, from ${t.source === 'ofl' ? 'the Open Fixture Library' : t.source === 'qxf' ? 'QLC+' : t.source === 'gdtf' ? 'GDTF' : t.source === 'generic' ? 'the built-in ones' : 'you'}`}</span></span>
-            <span class="side2">
-              <span class="chip">{modeOf(t, '')?.channels.length} ch</span>
-              <span class="dots">{#each dots(t) as [c, title] (title)}<span class="dot" style="background:{c}" {title}></span>{/each}</span>
-            </span>
-          </button>
-        {/each}
+        {#each shownTypes as t (t.id)}{@render typeCard(t)}{/each}
       </div>
     </div>
     <!-- svelte-ignore a11y_no_static_element_interactions (Enter in any of its fields adds, as in a form) -->
@@ -171,9 +198,13 @@
       <label>How many <input type="number" min="1" max="96" bind:value={count} aria-label="How many" /></label>
       <label>Name <input bind:value={name} aria-label="Name" /></label>
       <label title="The universe number set on your LuxDMX output (most setups only use 0)">Universe <input type="number" min="0" max="32767" bind:value={universe} aria-label="Universe" /></label>
+      {#if width > 512}
+        <p class="faint">Too big for one universe, so each runs on over the next ones ({wideSpans} universes, whole pixels on each), from the first free ones at or after universe {universe}. Set your box's pixel port to the same universe.</p>
+      {:else}
       <label>Start address <input type="number" min="1" max="512" bind:value={address} aria-label="Start address" placeholder={nextFree > 0 ? `next free: ${nextFree}` : 'universe full'} /></label>
       <p class="faint">{address && address > 0 ? `${address} to ${address + count * width - 1}.` : nextFree > 0 ? `They get ${nextFree} to ${nextFree + count * width - 1}${universe ? ` on universe ${universe}` : ''}.` : `Universe ${universe} is full.`}
         {count} × {width} channels = {count * width}.</p>
+      {/if}
       {#if overlaps.length}
         <p class="err" role="status">These would share channels with {overlaps.length > 4 ? `${overlaps.slice(0, 4).join(', ')} and ${overlaps.length - 4} more` : overlaps.join(', ')}.
           {#if nextFree > 0}<button class="ghost link" onclick={() => (address = nextFree)}>Use {nextFree}, the next free one</button>{/if}
@@ -211,6 +242,7 @@
   .big { padding: .55rem; }
   .mh { font-size: .8rem; margin: .6rem 0 .1rem; color: var(--text); font-weight: 600; }
   .types.mine { max-height: 22vh; }
+  .types.shapes { max-height: none; overflow: visible; }
   .mywrap { position: relative; display: grid; }
   .forget { position: absolute; top: 2px; right: 2px; padding: .1rem; }
   .side2 { display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
