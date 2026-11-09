@@ -103,8 +103,9 @@ test('the popup handshake: hello -> ask -> allow -> frames reach the output (and
 });
 
 // The app only sends a box what it plays, so the page says which universes that is: its DMX outputs
-// and the enabled pixel ports, every universe each of them spans.
-test('the popup names what the box plays: outputs and pixel ports', async ({ page, request }) => {
+// and the enabled pixel ports, every universe each of them spans. And how each pixel port drives its
+// LEDs (brightness, gamma, power cap, current model), so the app draws them as they really light.
+test('the popup names what the box plays: outputs and pixel ports, and how each port drives its LEDs', async ({ page, request }) => {
   const r = await request.get('/pixels.json');
   const ports = r.ok() ? (await r.json()).ports ?? [] : [];
   const want = [...new Set(ports.filter((p) => p.en).flatMap((p) => Array.from({ length: Math.max(1, p.spans) }, (_, k) => p.uni + k)))].sort((a, b) => a - b);
@@ -119,6 +120,8 @@ test('the popup names what the box plays: outputs and pixel ports', async ({ pag
   try {
     expect(ready.outputs.map((o) => o.uni)).toEqual((i.outputs ?? []).map((o) => o.uni));
     expect([...ready.pixels].sort((a, b) => a - b)).toEqual(want);
+    const KEYS = ['uni', 'start', 'count', 'spans', 'bright', 'gamma', 'maxMa', 'mAPerCh', 'quiesMa'];
+    expect(ready.pixelPorts).toEqual(ports.filter((p) => p.en).map((p) => Object.fromEntries(KEYS.map((k) => [k, p[k]]))));
   } finally {
     await popup.locator('#revoke').click().catch(() => {});
   }

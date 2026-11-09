@@ -103,11 +103,19 @@ button { font:inherit; border:0; border-radius:6px; padding:.45rem .9rem; margin
     return out;
   }
   // `again`: the box came back (a settings change restarts it, its ports may listen elsewhere now).
+  // and how each one drives its LEDs, so the app can draw them as they really light (brightness,
+  // gamma, the power cap and its current model, as /pixels.json has them; spans: how many universes
+  // it reads, which only the box knows exactly for RGBW and packed ports)
+  function pixelPorts(p) {
+    return (p.ports || []).filter(function (q) { return q.en; }).map(function (q) {
+      return { uni: q.uni, start: q.start, count: q.count, spans: q.spans, bright: q.bright, gamma: q.gamma, maxMa: q.maxMa, mAPerCh: q.mAPerCh, quiesMa: q.quiesMa };
+    });
+  }
   function sayReady(again) {
     fetch('/info.json').then(function (r) { return r.json(); }).then(function (i) {
       return fetch('/pixels.json').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }).then(function (p) {
         post({ type: 'ready', host: location.host, fw: i.version, name: i.artShort || i.hostname || '', ip: i.ip || '',
-               outputs: (i.outputs || []).map(function (o) { return { en: !!o.en, uni: o.uni }; }), pixels: pixelUnis(p) });
+               outputs: (i.outputs || []).map(function (o) { return { en: !!o.en, uni: o.uni }; }), pixels: pixelUnis(p), pixelPorts: pixelPorts(p) });
       });
     }).catch(function () { if (!again) post({ type: 'ready', host: location.host }); });
   }
