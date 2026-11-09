@@ -1,0 +1,40 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.solar-flare",
+ "version": "1.0.0",
+ "name": "Solar flare",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "The sun's surface boiling, an arc of fire rising off its edge.",
+ "tags": [
+  "sun"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let aa = frac(t / 9) * tau\nlet ax = 0.8 * sin(aa)\nlet ay = 0.8 * cos(aa)",
+  "pixel": "let s = fbm(sx * 4 + t * 0.2, sy * 4 - t * 0.1)\nlet surf = (rad < 0.75) * (0.55 + 0.6 * s)\nlet arc = gauss(dist(sx, sy, ax, ay), 0.14 + 0.1 * wave(t / 3)) * (rad > 0.68)\nheat(clamp(surf * 0.8 + arc))"
+ }
+}

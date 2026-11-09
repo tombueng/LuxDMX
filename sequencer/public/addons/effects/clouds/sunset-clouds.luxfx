@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.sunset-clouds",
+ "version": "1.0.0",
+ "name": "Sunset clouds",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Clouds lit pink and gold from below, the sky going from orange to violet.",
+ "tags": [
+  "clouds"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let f = fbm(sx * 1.5 + t * 0.08, sy * 2.5)\nlet sky = mix(rgb(1, 0.42, 0.08), rgb(0.25, 0.08, 0.4), (sy + 1) / 2)\nmix(sky, rgb(1, 0.6, 0.5), smoothstep(0.5, 0.7, f) * 0.85)"
+ }
+}

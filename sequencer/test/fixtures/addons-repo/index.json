@@ -1,0 +1,34 @@
+{
+ "format": "luxdmx-addons",
+ "formatVersion": 1,
+ "name": "A tester's effects",
+ "maintainer": "https://example.org",
+ "themes": [
+  {
+   "id": "test",
+   "name": "Test"
+  }
+ ],
+ "addons": [
+  {
+   "id": "tester.green-pulse",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Green pulse",
+   "author": "A tester",
+   "license": "CC0-1.0",
+   "description": "A green glow pulsing out from the middle, from a repository that is not ours.",
+   "tags": [
+    "test"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/green-pulse.luxfx",
+   "size": 599,
+   "sha256": "330cd9598757441951fc037a107b2a2ddd27f547badef47bc14da8adeb836e1b"
+  }
+ ]
+}

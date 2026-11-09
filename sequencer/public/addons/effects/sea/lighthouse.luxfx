@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.lighthouse",
+ "version": "1.0.0",
+ "name": "Lighthouse",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A beam sweeping round over a dark sea.",
+ "tags": [
+  "sea"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let a = frac(ang - t * 0.15)\nlet beam = gauss(min(a, 1 - a), 0.04) * (0.4 + 0.6 * rad)\nlet sea = (sy < -0.2) * (0.6 + 0.4 * noise(sx * 6 - t * 0.3, sy * 8))\nrgb(1, 0.95, 0.7) * beam + rgb(0, 0.06, 0.15) * sea + rgb(1, 1, 0.8) * gauss(rad, 0.1)"
+ }
+}

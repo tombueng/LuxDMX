@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.embers",
+ "version": "1.0.0",
+ "name": "Embers",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Glowing embers under ash, breathing slowly.",
+ "tags": [
+  "fire"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let f = fbm(sx * 3, sy * 3 - t * 0.15)\nlet spots = pow(clamp((f - 0.45) * 2.4), 2.2)\nlet flick = 0.75 + 0.25 * noise(sx * 6 + t * 1.3, sy * 6)\nheat(clamp(0.06 + spots * flick * 0.95))"
+ }
+}

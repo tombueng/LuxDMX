@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.waterfall",
+ "version": "1.0.0",
+ "name": "Waterfall",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "White water falling, mist rising where it lands.",
+ "tags": [
+  "water"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let fall = smoothstep(0.4, 0.8, noise(sx * 12, (sy + t * 1.5) * 3))\nlet mist = gauss(sy + 1, 0.4) * (0.4 + 0.4 * noise(sx * 5, t))\nrgb(0.5, 0.7, 1) * fall * 0.8 + rgb(0.8, 0.9, 1) * mist * 0.5"
+ }
+}

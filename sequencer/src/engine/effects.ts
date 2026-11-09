@@ -14,7 +14,7 @@
 //   lightUp    a colour or move effect also turns its lights on (at its level)
 //   level      the effect's own fader
 import type { Resolved } from '../model/types';
-import type { Places } from '../model/pixelLayout';
+import { shapeH, shapeW, type Places } from '../model/pixelLayout';
 import { CUSTOM_EFFECTS } from './custom';
 import { PIXEL_EFFECTS } from './pixels';
 import { SHAPE_EFFECTS } from './shapes';
@@ -29,7 +29,7 @@ export * from './fxkit';
 const BASE: EffectParams = {
   speed: 4, tempo: true, size: 1, spread: 1, direction: 'forward', blocks: 1, width: 0,
   colors: PALETTES.Rainbow, low: 0, high: 1, lightUp: true, level: 1, contrast: 0, pixels: true, order: 'list',
-  formula: '', picture: '', mapping: 'auto', text: '',
+  formula: '', picture: '', mapping: 'auto', text: '', script: '', vals: {},
 };
 
 export const EFFECTS: EffectDef[] = [
@@ -206,6 +206,7 @@ export function runEffect(def: EffectDef, p: EffectParams, n: number, total: num
   const out: FxOut[] = [];
   const order = p.direction === 'random' ? shuffled(n, seed) : undefined;
   const beats = clock?.beats ?? total * p.speed, secs = clock?.secs ?? (p.tempo ? total * p.speed * 0.5 : total * p.speed);
+  const flip = !!def.shape && !def.noFlip && p.direction === 'backward', zoom = def.zoom ? Math.max(0.1, p.size) : 1;
   for (let i = 0; i < n; i++) {
     const { k, m } = arrange(i, n, p, seed, order);
     // Bounce: the cycle runs there and back, landing on the first and last element.
@@ -216,11 +217,17 @@ export function runEffect(def: EffectDef, p: EffectParams, n: number, total: num
     const at = w?.at, ci = w?.cell ?? 0;
     // (not on a ring or a matrix: a line through the middle, along the light or along the group)
     const line = 2 * (w && m > w.rows ? w.u : xx) - 1;
+    let sx = at ? at.x[ci] : line, sy = at ? at.y[ci] : 0, rad = at ? at.rad[ci] : Math.abs(line), ang = at ? at.ang[ci] : (line < 0 ? 0.75 : 0.25);
+    let gx = at ? at.gx[ci] : k;
+    // on a ring or a matrix: Back mirrors the picture (what turns, turns the other way), and Size
+    // makes it smaller on the effects that don't use Size themselves
+    if (at && flip) { sx = -sx; ang = frac(1 - ang); gx = at.gw - 1 - gx; }
+    if (at && zoom !== 1) { sx /= zoom; sy /= zoom; rad /= zoom; }
     const o = def.run({
       phase, x: xx, cycle: cyc, total, k, m, seed: (seed * 131 + i) | 0, u: w?.u ?? xx, row: w?.row ?? 0, rows: w?.rows ?? 1, beats, secs,
-      sx: at ? at.x[ci] : line, sy: at ? at.y[ci] : 0, rad: at ? at.rad[ci] : Math.abs(line), ang: at ? at.ang[ci] : (line < 0 ? 0.75 : 0.25),
-      lane: at ? at.lane[ci] : 0, lanes: at ? at.lanes : 1, gx: at ? at.gx[ci] : k, gy: at ? at.gy[ci] : 0, gw: at ? at.gw : m, gh: at ? at.gh : 1,
-      first: at ? at.first[ci] === 1 : k === 0, cell: w?.cell ?? i, cells: at ? at.n : n,
+      sx, sy, rad, ang,
+      lane: at ? at.lane[ci] : 0, lanes: at ? at.lanes : 1, gx, gy: at ? at.gy[ci] : 0, gw: at ? at.gw : m, gh: at ? at.gh : 1,
+      first: at ? at.first[ci] === 1 : k === 0, cell: w?.cell ?? i, cells: at ? at.n : n, onShape: !!at, sw: at ? shapeW(at) : 1, sh: at ? shapeH(at) : 1,
     }, p);
     // (between Dim to and Bright to, so those stay the ends; a copy: an effect may hand out a shared one)
     out.push(p.contrast && o.intensity !== undefined && p.high > p.low

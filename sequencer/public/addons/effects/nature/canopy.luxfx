@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.canopy",
+ "version": "1.0.0",
+ "name": "Forest canopy",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Green leaves moving in the wind, the sun coming through in spots.",
+ "tags": [
+  "nature"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let l = fbm(sx * 3 + 0.2 * sin(t * 0.5), sy * 3 + 0.2 * cos(t * 0.4))\nlet sun = smoothstep(0.58, 0.74, noise(sx * 4 + t * 0.2, sy * 4))\nmix(rgb(0.04, 0.22, 0.04) * (0.5 + l), rgb(0.85, 0.95, 0.45), sun * 0.75)"
+ }
+}

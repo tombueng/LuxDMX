@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.cloud-shadows",
+ "version": "1.0.0",
+ "name": "Cloud shadows",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Sunlit fields with the shadows of clouds passing over.",
+ "tags": [
+  "clouds"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let f = fbm(sx * 1.4 + t * 0.12, sy * 1.4 + t * 0.03)\nmix(rgb(0.45, 0.72, 0.12), rgb(0.06, 0.17, 0.03), smoothstep(0.5, 0.66, f))"
+ }
+}

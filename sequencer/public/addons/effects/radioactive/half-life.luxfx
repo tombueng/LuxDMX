@@ -1,0 +1,52 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.half-life",
+ "version": "1.0.0",
+ "name": "Half-life",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Atoms decaying: each LED lights once a round and fades away, fewer and fewer of them.",
+ "tags": [
+  "radioactive"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "palette",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0,
+  "colors": [
+   {
+    "r": 0.4,
+    "g": 1,
+    "b": 0.2
+   },
+   {
+    "r": 1,
+    "g": 1,
+    "b": 0.3
+   }
+  ]
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let start = pow(random(i, floor(t / 8)), 0.4) * 8\nlet age = frac(t / 8) * 8 - start\nage < 0 ? 0 : exp(-age * 1.2) * pal(rnd)"
+ }
+}

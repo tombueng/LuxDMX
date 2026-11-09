@@ -212,3 +212,55 @@ describe('formula: errors say what and where', () => {
     }
   });
 });
+
+describe('programs: their own functions can\'t multiply the work', () => {
+  it('a value given to a function is worked out once, however often the function uses it', async () => {
+    const { compileProgram, newCtx, runFrame, runPixel } = await import('./formula');
+    // each fn doubles: eight of them inside each other would be 256 times the first's work
+    const lines = ['fn f0(x) = x + x'];
+    for (let i = 1; i < 8; i++) lines.push(`fn f${i}(x) = f${i - 1}(x) * 0.5 + f${i - 1}(x) * 0.5`);
+    lines.push('f7(sx)');
+    const p = compileProgram({ pixel: lines.join('\n') }), k = newCtx();
+    runFrame(p, k);
+    k.sx = 0.25;
+    expect(runPixel(p, k)).toBeCloseTo(0.5, 9);
+  });
+  it('too many inside each other: refused when it\'s read, never running away', async () => {
+    const { compileProgram, FormulaError } = await import('./formula');
+    const lines = ['fn f0(x) = x + x'];
+    for (let i = 1; i < 24; i++) lines.push(`fn f${i}(x) = f${i - 1}(x) + f${i - 1}(x)`);
+    lines.push('f23(sx)');
+    const t0 = performance.now();
+    expect(() => compileProgram({ pixel: lines.join('\n') })).toThrow(FormulaError);
+    expect(() => compileProgram({ pixel: lines.join('\n') })).toThrow(/Too big once its own functions are put in place/);
+    expect(performance.now() - t0).toBeLessThan(3000);
+  });
+});
+
+describe('programs: what the review found', () => {
+  it('a loop is for programs: a plain formula with one is refused, it never runs unbudgeted', async () => {
+    const { compileCached, FormulaError } = await import('./formula');
+    const f = compileCached('sum(k, 64, fbm(k, x))');
+    expect(f).toBeInstanceOf(FormulaError);
+    expect((f as Error).message).toMatch(/for an add-on's program/);
+  });
+  it('an error inside a function is said where it is in that function, in its own part', async () => {
+    const { compileProgram, FormulaError } = await import('./formula');
+    const src = { frame: 'fn bad(a) = a + nonsense', pixel: 'let v = 1\nbad(sx)' };
+    try { compileProgram(src); throw new Error('read'); } catch (e) {
+      expect(e).toBeInstanceOf(FormulaError);
+      const err = e as InstanceType<typeof FormulaError>;
+      expect(err.part).toBe('frame');
+      expect(src.frame.slice(err.pos, err.pos + 8)).toBe('nonsense');
+    }
+  });
+  it('the frame part can\'t colour a number by an LED it doesn\'t have', async () => {
+    const { compileProgram } = await import('./formula');
+    expect(() => compileProgram({ frame: 'let a = t > 0 ? rgb(1, 0, 0) : 0.5', pixel: 'a' })).toThrow(/both sides/);
+  });
+  it('noise in layers costs what it costs against the budget', async () => {
+    const { compileProgram } = await import('./formula');
+    const cheap = compileProgram({ pixel: 'sx + sy' }), dear = compileProgram({ pixel: 'fbm(sx, sy)' });
+    expect(dear.cost).toBeGreaterThan(cheap.cost * 3);
+  });
+});

@@ -1,0 +1,40 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.two-souls",
+ "version": "1.0.0",
+ "name": "Two souls",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Two lights circling closer and closer until they meet in a heart. A story; Speed is its length.",
+ "tags": [
+  "love"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 20,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let r = 0.7 * (1 - smoothstep(0.05, 0.7, c))\nlet ax = r * sin(t * 2.2)\nlet ay = r * cos(t * 2.2)\nlet m = smoothstep(0.68, 0.78, c) * (1 - smoothstep(0.92, 1, c))",
+  "pixel": "fn heart(x, y) = smoothstep(0.05, -0.05, (x * x + y * y - 1) ^ 3 - x * x * y ^ 3)\nlet dots = gauss(dist(sx, sy, ax, ay), 0.13) * rgb(1, 0.3, 0.5) + gauss(dist(sx, sy, -ax, -ay), 0.13) * rgb(0.45, 0.35, 1)\ndots * (1 - m) + rgb(1, 0.1, 0.3) * heart(sx * 1.4, sy * 1.4 + 0.25) * m"
+ }
+}

@@ -1,0 +1,51 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.geiger",
+ "version": "1.0.0",
+ "name": "Geiger counter",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Clicks in the dark: single LEDs flash green, faster and slower as the source comes and goes.",
+ "tags": [
+  "radioactive"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [
+  {
+   "id": "activity",
+   "name": "Activity",
+   "description": "How hot the source is: more clicks",
+   "type": "number",
+   "min": 0,
+   "max": 1,
+   "step": 0.01,
+   "default": 0.5
+  }
+ ],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let rate = (0.004 + 0.03 * pow(wave(t / 9), 2)) * (0.2 + activity * 1.6)\nlet k = floor(t * 25)\nlet age = frac(t * 25)",
+  "pixel": "let hit = random(i * 13 + 1, k) < rate\nhit ? rgb(0.6, 1, 0.25) * (1 - age * 0.6) : rgb(0, 0.05, 0) * (0.4 + 0.6 * noise(sx * 3, t * 0.5))"
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.jellyfish",
+ "version": "1.0.0",
+ "name": "Jellyfish",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A glowing jellyfish pulsing through the dark, its tentacles trailing.",
+ "tags": [
+  "sea"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let pulse = wave(t / 2.5)\nlet bellR = 0.45 + 0.08 * pulse\nlet by = 0.25 + 0.1 * sin(t * 0.4)",
+  "pixel": "let d = dist(sx, (sy - by) * 1.4, 0, 0)\nlet bell = smoothstep(bellR, bellR - 0.1, d) * step(by - 0.05, sy)\nlet tent = (sy < by) * gauss(frac((sx + 0.5) * 3 + 0.1 * sin(sy * 6 + t * 2)) - 0.5, 0.06) * smoothstep(-1, by, sy)\nhsv(0.75 + 0.1 * pulse, 0.6, 1) * (bell * (0.4 + 0.6 * pulse) + tent * 0.5) + rgb(0, 0.02, 0.08)"
+ }
+}

@@ -11,7 +11,8 @@
 //   GET  /frames.json   per universe: last frame, frame count, first/last arrival (ms)
 //   GET  /history.json?uni=0&ch=1   every value channel `ch` had, with timestamps (for fades)
 //   POST /reset         forget everything received (and the RDM rig as it was, answers on time)
-//   POST /pixels?ports=10:2,12:1   pixel ports on these universes (GET /pixels.json reads them)
+//   POST /pixels?ports=10:2,12:1   pixel ports on these universes (GET /pixels.json reads them);
+//                                  10:2:150:500 also says its brightness and power cap
 //   POST /ws/test       { ackDelay: ms } answer each message that much later, { noAck: true } never
 //   GET  /ws/stats.json { acks, early }: answers sent, and messages that came before the answer to
 //                       the one before (the pages must wait: see the ack in the README)
@@ -27,6 +28,8 @@ import { WebSocketServer } from 'ws';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BRIDGE = path.resolve(here, '../../src/pages/bridge.html');
 const REMOTE = path.resolve(here, '../../src/pages/remote.html');
+// someone else's add-on repository, for the tests that add one as another source (/repo/...)
+const REPO = path.resolve(here, 'fixtures/addons-repo');
 const port = +(process.argv[2] || 8199);
 const unis = (process.argv[3] || '0,1').split(',').map(Number);
 
@@ -74,17 +77,25 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' });
     res.end(fs.readFileSync(url.pathname === '/bridge' ? BRIDGE : REMOTE, 'utf8'));
   } else if (url.pathname === '/pixels.json') {
-    json({ ports: pixelPorts.map(([uni, spans]) => ({ en: true, uni, spans })).concat({ en: false, uni: 999, spans: 0 }) });
+    json({ ports: pixelPorts.map(([uni, spans, bright = 255, maxMa = 0]) => ({ en: true, uni, spans, start: 1, count: spans * 170, bright, gamma: 220, maxMa, mAPerCh: 2000, quiesMa: 100 }))
+      .concat({ en: false, uni: 999, spans: 0, start: 1, count: 0, bright: 255, gamma: 220, maxMa: 0, mAPerCh: 2000, quiesMa: 100 }) });
   } else if (url.pathname === '/drop' && req.method === 'POST') {
     // as if it restarted: every socket goes (the bridge page comes back by itself)
     for (const c of wss.clients) c.terminate();
     json({ ok: true });
   } else if (url.pathname === '/pixels' && req.method === 'POST') {
-    // ?ports=10:2,12:1 the universes its pixel ports start on, and how many each spans
+    // ?ports=10:2,12:1 the universes its pixel ports start on, and how many each spans (10:2:150:500:
+    // brightness 150, a 500 mA cap; else 255 and none)
     pixelPorts = (url.searchParams.get('ports') ?? '').split(',').filter(Boolean).map((s) => s.split(':').map(Number));
     json({ ok: true });
   } else if (url.pathname === '/info.json') {
     json({ version: 'fake', hostname: 'fake-luxdmx', artShort: 'Fake LuxDMX', ip: '127.0.0.1', outputs: unis.map((u) => ({ en: true, uni: u })) });
+  } else if (url.pathname.startsWith('/repo/')) {
+    // (plain files, as any web server serves them, open to any page; nothing outside the folder)
+    const f = path.resolve(REPO, '.' + url.pathname.slice('/repo'.length));
+    if (!f.startsWith(REPO + path.sep) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404, { 'Access-Control-Allow-Origin': '*' }); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': f.endsWith('.json') ? 'application/json' : 'application/octet-stream', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+    res.end(fs.readFileSync(f));
   } else if (url.pathname === '/frames.json') {
     const out = {};
     for (const [u, f] of frames) out[u] = { ch: [...f.data], count: f.count, first: f.first, last: f.last };

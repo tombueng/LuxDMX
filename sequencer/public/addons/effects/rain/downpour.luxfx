@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.downpour",
+ "version": "1.0.0",
+ "name": "Downpour",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Heavy rain in long streaks, splashing where it lands.",
+ "tags": [
+  "rain"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let col = floor((sx + 1) * 14)\nlet y = 1.25 - frac(t * (1.6 + random(col, 1)) + random(col, 2)) * 2.5\nlet d = sy - y\nlet streak = d > 0 && d < 0.5 ? 1 - d * 2 : 0\nlet splash = gauss(sy + 0.92, 0.06) * step(0.65, random(col, floor(t * 6)))\nrgb(0.5, 0.7, 1) * (streak * 0.8 + splash)"
+ }
+}

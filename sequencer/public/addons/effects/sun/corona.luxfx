@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.corona",
+ "version": "1.0.0",
+ "name": "Corona",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A blazing sun in the middle, its rays flickering out to the edge.",
+ "tags": [
+  "sun"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let core = smoothstep(0.44, 0.36, rad)\nlet rays = pow(noise(ang * 24, t * 0.6), 2) * smoothstep(1.05, 0.35, rad) * 1.6\nheat(clamp(core + rays * (1 - core)))"
+ }
+}

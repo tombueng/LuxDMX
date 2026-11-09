@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.fallout",
+ "version": "1.0.0",
+ "name": "Fallout",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Green dust drifting down through the dark, glowing as it falls.",
+ "tags": [
+  "radioactive"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let v = maxof(k, 40, gauss(dist(sx, sy, random(k, 1) * 2.2 - 1.1 + 0.1 * sin(t * 0.6 + k), 1.25 - frac(t / (6 + random(k, 2) * 6) + random(k, 3)) * 2.5), 0.08) * (0.4 + 0.6 * random(k, 4)))\nrgb(0.45, 1, 0.3) * v + rgb(0, 0.035, 0.01) * (0.6 + 0.4 * noise(sx * 2, sy * 2 + t * 0.2))"
+ }
+}

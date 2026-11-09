@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.rose",
+ "version": "1.0.0",
+ "name": "Rose",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A rose of five petals turning slowly, dark red inside, pink at the tips.",
+ "tags": [
+  "love"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let th = ang * tau + t * 0.2\nlet petal = abs(cos(2.5 * th)) * 0.95\nlet edge = smoothstep(petal, petal - 0.15, rad)\nhsv(0.96 + 0.04 * rad, 0.85 - 0.3 * rad, edge * (0.45 + 0.55 * rad))"
+ }
+}

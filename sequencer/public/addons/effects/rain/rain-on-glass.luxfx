@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.rain-on-glass",
+ "version": "1.0.0",
+ "name": "Rain on glass",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Drops sliding down a window, leaving a wet trail.",
+ "tags": [
+  "rain"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let bokeh = maxof(k, 6, gauss(dist(sx, sy, random(k, 11) * 2 - 1, random(k, 12) * 2 - 1), 0.32) * (0.5 + 0.5 * wave(t * 0.05 + random(k, 13))))\nlet col = floor((sx + 1) * 5)\nlet cx = (col + 0.5) / 2.5 - 1 + 0.06 * sin(t * 1.3 + col * 2)\nlet y = 1.3 - frac(t * 0.1 * (0.6 + random(col, 3)) + random(col, 4)) * 2.6\nlet drop = gauss(dist(sx, sy, cx, y), 0.13)\nlet trail = step(y, sy) * gauss(sx - cx, 0.06) * exp(-(sy - y) * 2)\nrgb(0.9, 0.55, 0.2) * bokeh * 0.35 + rgb(0.03, 0.05, 0.1) + rgb(0.7, 0.85, 1) * (drop + 0.4 * trail)"
+ }
+}

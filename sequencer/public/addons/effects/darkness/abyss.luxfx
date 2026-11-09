@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.abyss",
+ "version": "1.0.0",
+ "name": "Abyss",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A dark whirl pulling everything into the black middle.",
+ "tags": [
+  "darkness"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let a = frac(ang + 0.3 / (rad + 0.15) - t * 0.06)\nrgb(0.05, 0.1, 0.32) * wave(a * 3 + rad * 2 - t * 0.2) * rad * 0.8"
+ }
+}

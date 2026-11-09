@@ -5,7 +5,7 @@
 // in investigations/sequencer-agents/B-custom/ to look at.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, channels, history, selectAll, tab, test, expect } from './helpers';
+import { openConnected, resetFake, patch, channels, history, pixelPorts, selectAll, tab, test, expect } from './helpers';
 import { encodeGif, encodePng } from '../src/engine/gif.testkit';
 
 const AXE = fs.readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
@@ -113,7 +113,7 @@ test('a picture and an animated GIF from files play on the strip', async ({ page
   // a still: 30 x 1, one colour per pixel: the strip shows it exactly
   const stripes = Array.from({ length: 30 }, (_, k) => [k * 8, 255 - k * 8, (k % 3) * 100]);
   const png = encodePng(30, 1, stripes.flatMap((c) => [...c, 255]));
-  await ed(page).getByLabel('Picture or GIF file').setInputFiles({ name: 'stripes.png', mimeType: 'image/png', buffer: Buffer.from(png) });
+  await ed(page).getByLabel('Picture, GIF or video file').setInputFiles({ name: 'stripes.png', mimeType: 'image/png', buffer: Buffer.from(png) });
   await expect(ed(page).getByTestId('picture-size')).toContainText('30 × 1 px');
   await expect(ed(page).getByText('stripes.png')).toBeVisible();
   await expect.poll(pixels).toEqual(stripes);
@@ -124,7 +124,7 @@ test('a picture and an animated GIF from files play on the strip', async ({ page
     { w: 30, h: 1, indices: Array(30).fill(1), delay: 600 },
     { w: 30, h: 1, indices: Array.from({ length: 30 }, (_, k) => 2 + (k % 2)), delay: 600 },
   ]);
-  await ed(page).getByLabel('Picture or GIF file').setInputFiles({ name: 'blink.gif', mimeType: 'image/gif', buffer: Buffer.from(gif) });
+  await ed(page).getByLabel('Picture, GIF or video file').setInputFiles({ name: 'blink.gif', mimeType: 'image/gif', buffer: Buffer.from(gif) });
   await expect(ed(page).getByTestId('picture-size')).toContainText('30 × 1 px · 2 frames · 1.2 s');
   await expect(ed(page).getByLabel('Seconds per cycle')).toHaveValue('1.2');
   const red = Array.from({ length: 30 }, () => [255, 0, 0]), gb = Array.from({ length: 30 }, (_, k) => (k % 2 ? [0, 0, 255] : [0, 255, 0]));
@@ -155,11 +155,28 @@ test('a picture and an animated GIF from files play on the strip', async ({ page
   await audit(page, 'picture editor');
 
   // not a picture: said plainly, the GIF stays
-  await ed(page).getByLabel('Picture or GIF file').setInputFiles({ name: 'notes.png', mimeType: 'image/png', buffer: Buffer.from('not a picture at all') });
+  await ed(page).getByLabel('Picture, GIF or video file').setInputFiles({ name: 'notes.png', mimeType: 'image/png', buffer: Buffer.from('not a picture at all') });
   await expect(ed(page).locator('p.err')).toHaveText(/could not be read/);
   await expect(ed(page).getByTestId('picture-size')).toContainText('2 frames');
 
   // Remove: back to the sample
   await ed(page).getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(ed(page).getByText('The sample sunset')).toBeVisible();
+});
+
+test('a video on an LED matrix: its frames where the LEDs are, red and then blue', async ({ page }) => {
+  await pixelPorts([[12, 1]]);
+  await openConnected(page);
+  await patch(page, 'gen-matrix8x8', 1, 12, 'Matrix');
+  await selectAll(page);
+  await addEffect(page, 'picture');
+  await page.locator('.ep li.oitem').first().click();
+  // two seconds: one red, one blue (test/fixtures/video/red-blue.webm)
+  await ed(page).getByLabel('Picture, GIF or video file').setInputFiles('test/fixtures/video/red-blue.webm');
+  await expect(ed(page).getByTestId('picture-size')).toContainText('frames', { timeout: 20000 });
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.effects[0].params.picture.slice(0, 5))).toBe('pic1:');
+  // on the wire: every LED red for a while, then every LED blue
+  const all = async (want: 'r' | 'b') => { const c = await channels(12, 192); let n = 0; for (let i = 0; i < 64; i++) { const [r, , b] = c.slice(i * 3, i * 3 + 3); if (want === 'r' ? r > 150 && b < 60 : b > 150 && r < 60) n++; } return n; };
+  await expect.poll(() => all('r'), { timeout: 6000, intervals: [50] }).toBe(64);
+  await expect.poll(() => all('b'), { timeout: 6000, intervals: [50] }).toBe(64);
 });

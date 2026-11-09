@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.ripples",
+ "version": "1.0.0",
+ "name": "Ripples",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Drops landing on still water, the rings spreading and crossing.",
+ "tags": [
+  "water"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "fn when(k) = t / 3 + random(k, 9)\nfn ring(k) = gauss(dist(sx, sy, random(k, floor(when(k))) * 1.6 - 0.8, random(k + 7, floor(when(k))) * 1.6 - 0.8) - frac(when(k)) * 1.6, 0.05) * (1 - frac(when(k)))\nlet v = sum(k, 5, ring(k))\nrgb(0.25, 0.65, 1) * clamp(v) + rgb(0, 0.05, 0.15)"
+ }
+}
