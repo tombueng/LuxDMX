@@ -8,7 +8,6 @@
   import { load } from '../perf/load.svelte';
   import LoadMeter from './LoadMeter.svelte';
   import { app } from '../app.svelte';
-  import { placesOf } from '../model/pixelLayout';
   import { ui } from './ui.svelte';
   import { lookColor } from '../engine/cuelook';
   import { fixtureActions, fixtureMenu } from './actions';
@@ -360,7 +359,7 @@
         {#each app.show.fixtures as f (f.id)}
           {@const k = app.kinds[f.id]}
           {#if k === 'par' || k === 'bar' || k === 'dimmer'}
-            {@const c = css(app.stage[f.id])}
+            {@const c = css(app.drawn[f.id])}
             {#if c.glow > 0.04}
               <ellipse cx={f.x * W} cy={f.y * H + size * 1.5} rx={size * (k === 'bar' ? 3.4 : 2.2)} ry={size * 0.9} fill={c.css} opacity={0.18 * Math.min(1, c.glow)} />
             {/if}
@@ -371,7 +370,7 @@
       {#each app.show.fixtures as f (f.id)}
         {@const k = app.kinds[f.id]}
         {#if k === 'mover'}
-          {@const l = app.stage[f.id]}
+          {@const l = app.drawn[f.id]}
           {@const c = css(l)}
           {#if c.glow > 0.02}
             {@const pan = ((l?.pan ?? 0.5) - 0.5) * 2.6}
@@ -383,7 +382,7 @@
         {/if}
       {/each}
       {#each app.show.fixtures as f (f.id)}
-        {@const l = app.stage[f.id]}
+        {@const l = app.drawn[f.id]}
         {@const c = css(l)}
         {@const kind = app.kinds[f.id] ?? 'other'}
         {@const sel = !readonly && app.selected.includes(f.id)}
@@ -397,8 +396,8 @@
             <circle cx={x} cy={y} r={size * 1.25} fill={c.css} opacity={c.glow * 0.45} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
             <rect x={x - size * 0.9} y={y - size * 0.25} width={size * 1.8} height={size * 0.5} rx="3" fill="#2a313c" />
             <circle cx={x} cy={y} r={size * 0.62} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-          {:else if kind === 'bar' && placesOf(app.modeOf(f.id))}
-            {@const at = placesOf(app.modeOf(f.id))!}
+          {:else if kind === 'bar' && app.placesOf(f.id)}
+            {@const at = app.placesOf(f.id)!}
             {@const R = size * 2}
             {#if at.round}
               <circle cx={x} cy={y} r={R * 1.05} fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />

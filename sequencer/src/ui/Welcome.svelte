@@ -129,7 +129,7 @@
              onchange={(e) => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; i.value = ''; if (f) void open(f); }} />
     </div>
     <div class="row end">
-      <p class="hint faint">Program builds the show; Live (top) is for playing it with big buttons.</p>
+      <p class="hint faint">Program builds the show; Live (top) is for playing it with big buttons. This is an alpha: it works, but things change and some are rough, so keep a copy of your show (Shows, Export).</p>
       <button class="ghost" onclick={close}>Start with an empty stage</button>
     </div>
   </div>

@@ -50,10 +50,10 @@
   import Icon from '../ui/Icon.svelte';
   import { canRecord, clock, extOf, FPS, megabytes, pickFormat, saveVideo, stutterNote, tallFov, Take, takeSize, VIDEO_SIZES, videoBits, videoName, type VideoSize } from './recorder';
   import { capsOf } from '../model/library';
-  import { opticsOf } from '../model/fixtureSetup';
+  import { boardReach, opticsOf, restAt } from '../model/fixtureSetup';
   import { buildVenue } from './venue';
   import { Rig, type RigFixture, type Sfx } from './rig';
-  import { placesOf, shapeSize, shapeStanding } from '../model/pixelLayout';
+  import { placesOfLight, shapeSize, shapeStanding } from '../model/pixelLayout';
   import type { Look } from './models';
   import { Particles } from './particles';
   import { aimAt, aimRot, beamDir, calibrate, faceBand, pivotOf, defaultPlace, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
@@ -92,7 +92,7 @@
     const m = app.modeOf(f.id), c = capsOf(m), k = app.kinds[f.id] ?? 'other', t = app.types.get(f.typeId);
     const def = defaultPlace(f, k, room);
     // a ring or a matrix stands up on its lower edge, facing the audience, unless it's been placed
-    const shape = placesOf(m), size = shape && shapeSize(shape);
+    const shape = placesOfLight(f, m), size = shape && shapeSize(shape);
     const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
     const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
     // which body it gets: a wash head has a zoom and no gobo; a blinder says so in its name
@@ -522,21 +522,20 @@
       else { f.p3 ??= { ...it.p }; f.rot = rotOf(qd.clone().multiply(it.q)); }
     }
   }
-  // let go near a truss: they hang on it; near the deck: they stand on it
+  // let go close to a truss: they hang on it; close to the deck or the floor: they stand on it
+  // (a ring or a matrix on its lower edge); anywhere else they stay where they were let go
   function snapAll() {
     for (const id of app.selected) {
-      const f = app.show.fixtures.find((x) => x.id === id);
+      const f = app.show.fixtures.find((x) => x.id === id), r = fixtures.find((x) => x.id === id);
       if (!f?.p3) continue;
-      const t = nearestTruss(f.p3.z, room);
-      if (Math.abs(f.p3.y - (t.y - TRUSS_HANG)) < 0.9 && Math.abs(f.p3.z - t.z) < 0.9) {
-        f.p3 = { ...f.p3, y: t.y - TRUSS_HANG, z: t.z };
-        if (app.kinds[f.id] === 'mover' && f.rot && Math.abs(f.rot.roll) < 90) f.rot = { ...f.rot, roll: 180 };
-      } else {
-        const deck = onDeck(f.p3.x, f.p3.z, room) && Math.abs(f.p3.y - DECK) < 0.6;
-        if (!deck && f.p3.y >= 0.6) continue;
-        f.p3 = { ...f.p3, y: deck ? DECK : 0 };
-        // (a head off the truss stands on its base: not upside down with its head in the floor)
-        if (app.kinds[f.id] === 'mover' && f.rot && Math.abs(f.rot.roll) >= 90) f.rot = { ...f.rot, roll: 0 };
+      const rot = f.rot ?? r?.rot ?? { yaw: 0, pitch: 0, roll: 0 };
+      const rest = restAt(f.p3, app.kinds[f.id] ?? 'other', r?.shape ? boardReach(r.shape, r.size!, rot) : undefined, room);
+      if (rest.on === 'air') continue;
+      f.p3 = { x: r1(rest.p.x), y: Math.round(rest.p.y * 1000) / 1000, z: r1(rest.p.z) };
+      if (app.kinds[f.id] === 'mover' && f.rot) {
+        // (a head on the truss hangs; one off it stands on its base, not upside down in the floor)
+        if (rest.on === 'truss' && Math.abs(f.rot.roll) < 90) f.rot = { ...f.rot, roll: 180 };
+        if (rest.on !== 'truss' && Math.abs(f.rot.roll) >= 90) f.rot = { ...f.rot, roll: 0 };
       }
     }
   }
@@ -582,6 +581,13 @@
       if (machine) {
         f.p3 = how === 'hang' ? { x: r.p.x, y: t.y + 0.2, z: t.z } : how === 'deck' ? { x: r.p.x, y: DECK, z: Math.min(D / 2 - 0.3, r.p.z) } : { x: r.p.x, y: 0, z: D / 2 + 0.9 };
         f.rot = { yaw: faceBand(f.p3), pitch: 0, roll: 0 };
+        continue;
+      }
+      // (a ring or a matrix keeps facing the way it does, on its lower edge or hung by its top)
+      if (r.shape) {
+        const reach = boardReach(r.shape, r.size!, r.rot);
+        f.p3 = how === 'hang' ? { x: r.p.x, y: t.y - 0.08 - reach.above, z: t.z } : how === 'deck' ? { x: r.p.x, y: DECK + reach.below, z: Math.min(D / 2 - 0.3, r.p.z) } : { x: r.p.x, y: reach.below, z: D / 2 + 0.9 };
+        f.rot = { ...r.rot };
         continue;
       }
       const rot: Rot = how === 'hang' ? (mover ? { yaw: 0, pitch: 0, roll: 180 } : { ...r.rot, roll: 0, pitch: Math.max(110, r.rot.pitch) }) : mover ? { yaw: 0, pitch: 0, roll: 0 } : { yaw: 0, pitch: how === 'deck' ? 30 : 40, roll: 0 };
@@ -808,7 +814,7 @@
     smokeIn += (smoke - smokeIn) * Math.min(1, dt * 0.8);
     haze = Math.min(1.5, hazeAmt * (0.9 + 0.5 * room) + 0.08 * Math.max(room, 0.5 * smokeIn));
     (scene.fog as THREE.FogExp2).density = 0.005 + 0.016 * haze;
-    rig.update(app.stageNow, t, haze, sel);
+    rig.update(app.drawnNow, t, haze, sel);
     particles.light(rig.lit);
     // (the machines' output follows the clock, not the frame rate: a slow computer gets the same fog
     // and confetti, in steps of at most 0.1 s)

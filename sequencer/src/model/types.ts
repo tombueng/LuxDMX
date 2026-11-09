@@ -118,10 +118,24 @@ export interface Fixture {
   panDeg?: number;
   tiltDeg?: number;
   swapPanTilt?: boolean;
+  // its own pan (tilt) turns the other way round from what its type says: the picture, Aim and the
+  // 3D stage follow the real one; what goes out on the wire stays the same (invert changes that)
+  panReversed?: boolean;
+  tiltReversed?: boolean;
   // the real light this fixture is (its RDM UID, "MMMM:DDDDDDDD"): set when it was patched from the
   // rig or matched to it, so the app knows it wherever its address goes (rdm/match.ts)
   uid?: string;
+  // a ring or a matrix wired or hung differently from its type: its own layout, with the same
+  // number of pixels (model/pixelLayout.ts; the light's LEDs tab sets it)
+  layout?: PixelLayout;
+  // how its LEDs really light, set by hand (model/ledCurve.ts: gamma, brightness 0..255, power cap
+  // and current model); unset: what the box's pixel port says, or a port as it comes
+  led?: { gamma?: number; bright?: number; maxMa?: number; maPerCh?: number; idleMa?: number };
 }
+
+// A mark on the real stage (a bit of tape): its place in metres, x to the audience's right, y up,
+// z towards the audience (stage3d/geometry.ts).
+export interface StageMark { id: string; name: string; p: { x: number; y: number; z: number } }
 
 export interface Group {
   id: string;
@@ -246,7 +260,9 @@ export interface Show {
   // stage3d.model: your own venue for the 3D stage (a .glb kept in the browser: store is its key);
   // stage3d.room: the built-in room ('pub': a small club or pub; unset: the big stage in a hall)
   // bandName: the band's name on the 3D stage's banners and screens (unset: the band's picture)
-  settings: { bpm: number; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string };
+  // marks: tape on the real stage, where they are (metres, the 3D stage's frame): heads are steered
+  // onto them to work out where they really hang (model/calibrate.ts), and to point at
+  settings: { bpm: number; marks?: StageMark[]; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string };
   timeline?: Timeline;              // a song with cues, effects and moments on it (model/timeline.ts): the one that's up
   setlist?: SetList;                // the other songs of the set, before and after it, in order (model/timeline.ts)
   extensions: Record<string, unknown>;

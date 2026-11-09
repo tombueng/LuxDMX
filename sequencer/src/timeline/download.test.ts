@@ -44,6 +44,16 @@ describe('downloading a demo song', () => {
       expect(f.name).toBe('The Testers - Night Bus.ogg');
     }
   });
+  it('our copy here isn\'t there either (a local server): the one on the public site', async () => {
+    const fetch = vi.fn()
+      .mockImplementationOnce(async () => { throw new TypeError('Failed to fetch'); })
+      .mockImplementationOnce(async () => new Response('<!doctype html><html>', { headers: { 'content-type': 'text/html' } }))
+      .mockImplementationOnce(async () => streamed([700], { 'content-type': 'audio/mpeg' }));
+    vi.stubGlobal('fetch', fetch);
+    const f = await downloadSong(song, () => {});
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual([song.url, song.mirror, 'https://tombueng.github.io/LuxDMX/sequencer/songs/test.mp3']);
+    expect(f.size).toBe(700);
+  });
   it('neither works: says so in plain words, and when the computer is offline, that', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
     await expect(downloadSong(song, () => {})).rejects.toThrow(SongError);

@@ -137,6 +137,75 @@ Requirement, not built yet (needs firmware work and a go):
 - **Tests**: export → upload → trigger by HTTP → measured frames on the fake box; firmware unit
   tests; on the WT32: the clock, a GPIO input and a network trigger, with the console taking over.
 
+## Effects as add-ons (Thomas, 2026-11-07: "externalize them so they become configuration as code, so others can define and contribute such in the UI, exchange, share them ... safe ... a repository that delivers such addons, pure files ... our library is the default")
+
+Requirement, not built yet. Today every effect is TypeScript in engine/effects.ts, pixels.ts and
+shapes.ts, all with the same knobs (engine/knobs.ts now hides the ones an effect ignores). Your own
+effects are the Formula (a small language of our own, no eval) and the Picture (an image or GIF).
+
+**A package** (`.luxfx`, one JSON file, also what a repository serves):
+
+```json
+{ "format": "luxdmx-effect", "formatVersion": 1,
+  "id": "tom.aurora-rings", "version": "1.0.0", "name": "Aurora rings",
+  "author": { "name": "...", "url": "..." }, "license": "CC-BY-4.0",
+  "description": "...", "tags": ["calm"], "category": "pixel",
+  "fits": ["ring", "disc", "matrix", "strip", "lights"],
+  "preview": "pic1:...",
+  "uses": ["speed", "level", "contrast", "palette", "orientation", "spread", "direction", "order"],
+  "params": [{ "id": "arms", "name": "Arms", "description": "How many spiral arms", "type": "number",
+               "min": 1, "max": 12, "step": 1, "default": 4 },
+             { "id": "glow", "name": "Glow", "type": "colour", "default": "#ff8000" }],
+  "code": { "lang": "luxfx-1", "frame": "...", "pixel": "..." },
+  "media": { "clip": "pic1:..." } }
+```
+
+- **Standard parameters** the app provides the same way for every effect and an effect only says
+  it `uses`: speed (seconds or beats), strength, brightness range (dim to, bright to), contrast,
+  size, palette, orientation on a ring or matrix (turn, mirror), and how it spreads over many
+  lights (spread, direction, order, blocks). The app draws them; the effect gets the values.
+- **Own parameters**: number (min, max, step, default, unit), choice (a list), on/off, colour,
+  text. Each with a name and a sentence of description; the editor builds itself from that.
+- **Preview**: a small animation for the picker, made by the app when a package is saved (the
+  effect rendered on a disc, a matrix and a strip), kept in the package.
+
+**The code** is the Formula language grown up, still read by our own parser into closures, never
+JavaScript: `let` for in-between values, `if ... else` as an expression, a `frame` part that runs
+once per frame (a story's positions, an eye's look), a `pixel` part per LED, bounded `for` loops
+(a few hundred steps per frame at most), the package's parameters by name, and only the names it
+already knows: the pixel's place (x, u, i, n, row, rows, sx, sy, rad, ang, lane, gx, gy...), time
+(t, beat, c, phase), bass, hash and noise, maths, colours (hsv, rgb, palette). Nothing else exists
+in it: no window, no storage, no network, no other show's data. Budgets on size, nesting, loop
+steps and time per frame; one that runs over is stopped and named (the rest of the frame goes
+out). Why not JavaScript in a sandboxed frame or worker: it would work, but a closed language gives
+a hard guarantee, the same output on every computer, and something a LuxDMX box can one day play
+by itself.
+
+**Media**: a picture, a GIF or a video (decoded in the browser: frames taken off a video element
+at the effect's size) packed as frames like the Picture effect, with limits on size and frames.
+
+**A repository** is plain files, no login: `index.json` (`{ "format": "luxdmx-addons", "name",
+"maintainer", "addons": [{ "id", "kind": "effect", "version", "name", "author", "license",
+"description", "tags", "fits", "preview", "file", "size", "sha256" }] }`) and the packages next to
+it. Ours is the default and is shown without asking: `sequencer/addons/` in this repo, published by
+the Pages workflow (luxdmx.org can mirror it). Someone else's is added by its address under
+Settings, Add-ons, More sources, with a plain warning (only add sources you trust; what they say
+about themselves isn't checked), never on the main screens. Fetched without credentials, checked
+against its size and sha256, kept for offline use.
+
+**In the app**: the effect library lists installed and available add-ons with their previews and
+authors; an add-on used in a show goes into the show (like a fixture type), so the show plays
+anywhere. Export an effect as a package, import one from a file, and a short "how to send yours
+in" (a pull request to the repository).
+
+**Our own effects** describe themselves the same way first (a package without code whose `native`
+names the built-in), then move into the language one by one where it's fast enough.
+
+**Steps**: (1) the package and parameter description for every built-in, the library reading it,
+export and import; (2) the language with its budgets, a fuzz test and an editor with live
+preview; (3) video into the Picture effect; (4) repositories, the default one built by CI, more
+sources in the submenu; (5) built-ins ported where it pays.
+
 ## UX overhaul (Thomas, 2026-10-26: "not appealing, lacks detail, can't move or modify things")
 
 The first slices worked but looked like a form. What changes, across all phases:

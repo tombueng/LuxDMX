@@ -51,5 +51,5 @@ describe('the generated live page', () => {
     app.replaceShow(s);
     expect(app.pages).toBe(app.show.pages);
     expect(app.livePage?.id).toBe('mine');
-  });
+  }, 20_000);   // (it builds the big demo twice, a hundred heads and all: about 3 s alone, more next to the rest)
 });

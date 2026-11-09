@@ -47,10 +47,13 @@ test('a chase runs at the tempo, one light after the other, and the knobs change
   // backward: light 4 now comes before light 3
   await page.locator('.ep li.oitem').first().click();
   await page.getByRole('radio', { name: 'Backward' }).click();
-  const t2 = Date.now() + 200;
-  await page.waitForTimeout(1500);
+  // (measured from once it's backward, and over a few rounds: the moment it turns round lights 3
+  // right after 4 once, which a busy machine can push past any fixed wait)
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects[0].params.direction)).toBe('backward');
+  const t2 = Date.now() + 300;
+  await page.waitForTimeout(1800);
   const r4 = await rises(0, 4, t2), r3b = await rises(0, 3, t2);
-  const after4 = r3b.find((t) => t > r4[0])! - r4[0];
+  const after4 = median(r4.map((t) => r3b.find((u) => u > t)! - t).filter((x) => !Number.isNaN(x)));
   expect(after4).toBeGreaterThan(80); expect(after4).toBeLessThan(200);       // 125 ms at 240 BPM
 
   // stop: everything dark again
@@ -244,4 +247,31 @@ test('the effects running on the selected lights stand out', async ({ page }) =>
   await expect(note).toHaveText('Nothing running on the selected light');
   await page.locator('.stage-wrap').getByRole('button', { name: 'Select none' }).click();
   await expect(note).toBeHidden();                                                // nothing selected: no line
+});
+
+test('an effect shows only the knobs that change it: a random colour, a chase, the eye', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 4, 0, 'Par');
+  await selectAll(page);
+  await addEffect(page, 'random');
+  await page.locator('.ep li.oitem').first().click();
+  const ed = page.locator('.ed');
+  // Random colour: how fast and which colours, nothing else
+  await expect(ed.getByLabel(/^(Seconds|Beats) per cycle$/)).toBeVisible();
+  await expect(ed.getByLabel('Colour 1', { exact: true })).toBeVisible();
+  for (const k of ['Size', 'Spread', 'Contrast']) await expect(ed.getByLabel(k, { exact: true })).toHaveCount(0);
+  await expect(ed.getByRole('radiogroup', { name: 'Direction' })).toHaveCount(0);
+  await ed.getByRole('button', { name: 'More' }).click();
+  for (const k of ['Low', 'High', 'Blocks', 'Order', 'Width']) await expect(ed.getByLabel(k, { exact: true })).toHaveCount(0);
+  // a chase: its width and its spread
+  await page.locator('.ed').getByLabel('Effect kind').selectOption('chase');
+  await expect(ed.getByLabel('Spread', { exact: true })).toBeVisible();
+  await expect(ed.getByLabel('Width', { exact: true })).toBeVisible();
+  await expect(ed.getByLabel('Size', { exact: true })).toHaveCount(0);
+  // the eye on a disc: Size, and Back or Forward only; no palette, no blocks
+  await page.locator('.ed').getByLabel('Effect kind').selectOption('eye');
+  await expect(ed.getByLabel('Size', { exact: true })).toBeVisible();
+  await expect(ed.getByRole('radiogroup', { name: 'Direction' }).getByRole('radio')).toHaveCount(2);
+  await expect(ed.getByLabel('Colour 1', { exact: true })).toHaveCount(0);
+  await expect(ed.getByLabel('Blocks', { exact: true })).toHaveCount(0);
 });

@@ -5,8 +5,9 @@
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
 import { emptyShow, parseShow, serializeShow, FormatError } from './model/format';
 import { GENERIC, caps, capsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
-import { isWide, placesOf, spansOf } from './model/pixelLayout';
-import type { Color, Cue, CueList, Effect, Fixture, FixtureType, Page, Preset, PresetKind, Resolved, Show, Values, Widget } from './model/types';
+import { isWide, placesOfLight, spansOf } from './model/pixelLayout';
+import { curveOfPort, curveTable, isPixelType, onPort, onScreen, powerScale, WS2812, type LedCurve, type PortInfo } from './model/ledCurve';
+import type { Color, Cue, CueList, Effect, Fixture, FixtureMode, FixtureType, Page, Preset, PresetKind, Resolved, Show, Values, Widget } from './model/types';
 import { EFFECT_MAP, hsv, paramsOf } from './engine/effects';
 import { pictureOf } from './engine/custom';
 import { isGated } from './model/safety';
@@ -137,6 +138,11 @@ class App {
   // the same, every frame and not reactive: the 3D stage reads it as it draws (its movers move as
   // smoothly as it draws, whatever the panels' update rate: perf/load.svelte.ts)
   stageNow: Record<string, Resolved> = {};
+  // what the stage pictures draw: the stage, with pixel lights shown as their LEDs really light
+  // (the box's curve: what it turns off is dark, see ledShown); every frame for the 3D stage, and
+  // as the screen's copy for the 2D one
+  drawnNow: Record<string, Resolved> = {};
+  drawn = $state.raw<Record<string, Resolved>>({});
   look = $state.raw<Record<string, Resolved>>({});     // before grand master / blackout
   frames = $state.raw<Map<number, Uint8Array>>(new Map());
   status = $state.raw<Record<string, PlayerStatus>>({});
@@ -703,7 +709,7 @@ class App {
   private metaOf(show = this.show, id = this.showId): ShowMeta {
     return {
       id, name: show.meta.name || 'Untitled', modified: new Date().toISOString(), fixtures: show.fixtures.length,
-      cues: show.cueLists.reduce((n, l) => n + l.cues.length, 0), thumb: stageSvg(show.fixtures, this.fittedLook(), this.kinds, 160, 90, false, (id) => placesOf(this.modeOf(id))),
+      cues: show.cueLists.reduce((n, l) => n + l.cues.length, 0), thumb: stageSvg(show.fixtures, this.fittedLook(), this.kinds, 160, 90, false, (id) => this.placesOf(id)),
     };
   }
   // The look without the masters, drawn the way each light can really show it (for pictures).
@@ -766,6 +772,8 @@ class App {
     await this.refreshShows();
   }
   modeOf(fixtureId: string) { return this.modes.get(fixtureId); }
+  // where a ring's or a matrix's pixels are: the light's own wiring when it has one, else its type's
+  placesOf(fixtureId: string) { const f = this.show.fixtures.find((x) => x.id === fixtureId); return f ? placesOfLight(f, this.modes.get(fixtureId)) : undefined; }
   caps(fixtureId: string) { return capsOf(this.modes.get(fixtureId)); }
 
   // One frame. Nothing in a show may stop the output for good: when a frame throws, the look that
@@ -801,6 +809,7 @@ class App {
     const lf = this.engine.liveEffects();
     if (lf.join() !== this.liveFx.join()) this.liveFx = lf;
     this.stage = stage;
+    this.drawn = this.drawnNow;
     this.look = look;
     this.frames = frames;
     const st: Record<string, PlayerStatus> = {};
@@ -861,6 +870,8 @@ class App {
     if (!this.quiet && out) for (const b of this.bridges) { if (this.thread.serves(b)) continue; for (const [uni, data] of out) b.send(uni, data, t); }
     for (const b of this.bridges) b.watch?.();      // (a box's window shut: said at once, whoever sends to it)
     if (this.output === 'live' && !this.quiet) this.lastSent = frames;
+    // (what the pictures draw, after the frame has gone out: nothing the screen does comes before it)
+    this.drawnNow = this.ledShown(stage, frames);
     // ---- then the rest
     // an effect that can't run is left out (engine.ts): said once, by name
     for (const [id, why] of this.engine.broken) if (!this.saidBroken.has(id)) {
@@ -1068,6 +1079,81 @@ class App {
   }
   // Universes pixel lights are patched on that no connected box says it plays: a pixel port set to
   // another universe, or a box too old to name its pixel ports.
+  // ---- how a pixel light's LEDs really light (model/ledCurve.ts): what it was set to by hand, else
+  // what the box playing it says about its pixel port (the same universe and start channel), else a
+  // port as it comes. Not a pixel light (a DMX bar, a PAR): undefined, drawn as its values say.
+  boxPortOf(f: Fixture): PortInfo | undefined {
+    for (const b of this.bridges) {
+      if (b.state !== 'ready' && b.state !== 'reconnecting') continue;
+      // (through LuxDMX Link: every box it found says its own; through a box's bridge: that box)
+      const lists: [PortInfo[], string][] = b instanceof LinkOutput ? b.nodes.map((n) => [n.pixelPorts ?? [], n.short || n.ip]) : [[b.ports ?? [], b.name || b.host]];
+      for (const [ports, box] of lists) {
+        const p = ports.find((q) => onPort(q, f));
+        if (p) return { ...p, box };
+      }
+    }
+    return undefined;
+  }
+  ledOf(id: string): { curve: LedCurve; from: 'own' | 'box' | 'usual'; port?: PortInfo } | undefined {
+    const f = this.show.fixtures.find((x) => x.id === id);
+    return f ? this.ledOfLight(f) : undefined;
+  }
+  // (once per mode: whether it's a pixel light doesn't change while the mode is the same object)
+  private pixelModes = new WeakMap<object, boolean>();
+  private ledOfLight(f: Fixture): { curve: LedCurve; from: 'own' | 'box' | 'usual'; port?: PortInfo } | undefined {
+    const m = this.modeOf(f.id);
+    if (!m) return undefined;
+    let px = this.pixelModes.get(m);
+    if (px === undefined) { px = isPixelType(this.types.get(f.typeId), m); this.pixelModes.set(m, px); }
+    if (!px) return undefined;
+    const port = this.boxPortOf(f), base = port ? curveOfPort(port) : WS2812;
+    if (f.led && Object.keys(f.led).length) return { curve: { ...base, ...f.led }, from: 'own', port };
+    return { curve: base, from: port ? 'box' : 'usual', port };
+  }
+  // The stage with every pixel light's cells as the LEDs show them: its channels as they go out,
+  // through its port's table, the power cap over everything on that port (as the box adds it up),
+  // back on the screen's own curve.
+  private ledShown(stage: Record<string, Resolved>, frames: Map<number, Uint8Array>): Record<string, Resolved> {
+    type One = { f: Fixture; m: FixtureMode; cells: number; out: Uint8Array; curve: LedCurve };
+    const ports = new Map<string, { curve: LedCurve; pixels: number; sum: number; lights: One[] }>();
+    for (const f of this.show.fixtures) {
+      if (!stage[f.id]) continue;
+      const led = this.ledOfLight(f), m = this.modeOf(f.id);
+      if (!led || !m) continue;
+      const n = m.channels.length, out = new Uint8Array(n), cells = capsOf(m).cells, tab = curveTable(led.curve);
+      for (const s of spansOf(f, m)) { const buf = frames.get(s.universe); if (buf) out.set(buf.subarray(s.at, Math.min(512, s.at + s.count)), s.from); }
+      let sum = 0;
+      for (let i = 0; i < n; i++) { out[i] = tab[out[i]]; sum += out[i]; }
+      // (one port, one budget: its lights add up, and all its pixels draw their idle current)
+      const key = led.port ? `${led.port.box}|${led.port.uni}|${led.port.start}` : `light ${f.id}`;
+      let g = ports.get(key);
+      if (!g) { g = { curve: led.curve, pixels: led.port?.count ?? cells, sum: 0, lights: [] }; ports.set(key, g); }
+      g.sum += sum;
+      g.lights.push({ f, m, cells, out, curve: led.curve });
+    }
+    let shownAll = stage;
+    for (const g of ports.values()) {
+      const scale = powerScale(g.curve, g.sum, g.pixels);
+      for (const { f, m, cells, out } of g.lights) {
+        if (scale < 256) for (let i = 0; i < out.length; i++) out[i] = (out[i] * scale) >> 8;
+        const rgbw = new Float32Array(cells * 4);
+        m.channels.forEach((c, i) => {
+          const k = c.attr === 'red' ? 0 : c.attr === 'green' ? 1 : c.attr === 'blue' ? 2 : c.attr === 'white' ? 3 : -1;
+          if (k >= 0 && c.cell !== undefined && c.cell < cells) rgbw[c.cell * 4 + k] = onScreen(out[i]);
+        });
+        const shown: Resolved[] = [];
+        let top = 0;
+        for (let c = 0; c < cells; c++) {
+          const r = rgbw[c * 4], gg = rgbw[c * 4 + 1], b = rgbw[c * 4 + 2], w = rgbw[c * 4 + 3], d = Math.max(r, gg, b, w);
+          top = Math.max(top, d);
+          shown.push(d > 0 ? { intensity: d, color: { r: r / d, g: gg / d, b: b / d }, ...(w ? { white: w / d } : {}) } : { intensity: 0, color: { r: 0, g: 0, b: 0 } });
+        }
+        if (shownAll === stage) shownAll = { ...stage };
+        shownAll[f.id] = { ...stage[f.id], intensity: top, cells: shown };
+      }
+    }
+    return shownAll;
+  }
   unservedPixels(): number[] {
     const up = this.bridges.filter((b) => b.state === 'ready');
     if (!up.length) return [];
@@ -1353,11 +1439,15 @@ class App {
   }
   // One raw channel (by its index in the mode) on the selected fixtures; undefined lets go of it.
   setRaw(index: number, value: number | undefined) {
-    for (const id of this.selected) {
-      const raw = { ...(this.programmer[id]?.raw ?? {}) };
+    for (const id of this.selected) this.setRawOf(id, [[index, value]]);
+  }
+  // Channels of one light by hand (its Channels tab): [channel index, DMX value or undefined to let go]
+  setRawOf(id: string, values: [number, number | undefined][]) {
+    const raw = { ...(this.programmer[id]?.raw ?? {}) };
+    for (const [index, value] of values) {
       if (value === undefined) delete raw[String(index)]; else raw[String(index)] = Math.max(0, Math.min(255, Math.round(value)));
-      this.programmer[id] = { ...this.programmer[id], raw };
     }
+    this.programmer[id] = { ...this.programmer[id], raw };
   }
 
   // ---- fixture types
@@ -1591,7 +1681,8 @@ class App {
 
   // ---- effects
   // A new effect on the selection (or a group), started at once so you see it.
-  addEffect(kind: string, target: { group?: string; fixtures?: string[] } = { fixtures: [...this.selected] }): Effect | undefined {
+  // (`extra`: an add-on's params and its name)
+  addEffect(kind: string, target: { group?: string; fixtures?: string[] } = { fixtures: [...this.selected] }, extra: { params?: Record<string, unknown>; name?: string } = {}): Effect | undefined {
     this.checkpoint();
     const def = EFFECT_MAP.get(kind);
     if (!def) return undefined;
@@ -1605,9 +1696,10 @@ class App {
     for (const n of names) while (pre && !n.startsWith(pre)) pre = pre.slice(0, -1);
     pre = names.length > 1 ? pre.replace(/[\s\d#.\-_]+$/, '') : pre;
     const where = target.group ? this.show.groups.find((g) => g.id === target.group)?.name : same ?? (pre.length >= 2 ? (names.length > 1 && !/s$/i.test(pre) ? `${pre}s` : pre) : undefined);
-    let name = where ? `${def.name} on ${where}` : def.name;
+    const called = extra.name ?? def.name;
+    let name = where ? `${called} on ${where}` : called;
     for (let k = 2, base = name; this.show.effects.some((x) => x.name === name); k++) name = `${base} ${k}`;
-    const e: Effect = { id: newId('e'), name, kind, ...(target.group ? { group: target.group } : { fixtures }), params: {} };
+    const e: Effect = { id: newId('e'), name, kind, ...(target.group ? { group: target.group } : { fixtures }), params: extra.params ? JSON.parse(JSON.stringify(extra.params)) : {} };
     this.show.effects.push(e);
     this.engine.startEffect(e.id);
     return this.show.effects[this.show.effects.length - 1];

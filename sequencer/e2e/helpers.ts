@@ -32,7 +32,7 @@ export async function history(uni: number, ch: number, host = FAKE): Promise<[nu
 }
 // Pixel ports on the fake box: [first universe, how many it spans]. Set before connecting: the box's
 // bridge page says them when it opens.
-export async function pixelPorts(ports: [number, number][], host = FAKE) { await fetch(`http://${host}/pixels?ports=${ports.map((p) => p.join(':')).join(',')}`, { method: 'POST' }); }
+export async function pixelPorts(ports: number[][], host = FAKE) { await fetch(`http://${host}/pixels?ports=${ports.map((p) => p.join(':')).join(',')}`, { method: 'POST' }); }
 export async function resetFake(host = FAKE) { await fetch(`http://${host}/reset`, { method: 'POST' }); }
 
 // A fresh app: nothing saved (no open show, no shows in the browser).

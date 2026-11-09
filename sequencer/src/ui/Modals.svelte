@@ -12,6 +12,7 @@
   import FogTimer from './FogTimer.svelte';
   import PatchCheck from './PatchCheck.svelte';
   import FixturePatch from './FixturePatch.svelte';
+  import FocusCalibrate from './FocusCalibrate.svelte';
   import PatchMany from './PatchMany.svelte';
   import RemoteDialog from './RemoteDialog.svelte';
   import ScheduleDialog from './ScheduleDialog.svelte';
@@ -56,5 +57,6 @@
 {:else if ui.modal === 'schedule'}<ScheduleDialog onclose={close} />
 {:else if ui.modal === 'rig'}<RigCheck onclose={close} />{/if}
 {#if ui.patch}<FixturePatch id={ui.patch} onclose={() => { ui.patch = null; ui.patchTab = 'patch'; }} />{/if}
+{#if ui.focusCal}<FocusCalibrate ids={ui.focusCal} onclose={() => (ui.focusCal = null)} />{/if}
 {#if ui.patchMany}<PatchMany ids={ui.patchMany} onclose={() => (ui.patchMany = null)} />{/if}
 {#if ui.question}{#key ui.question}<Question />{/key}{/if}

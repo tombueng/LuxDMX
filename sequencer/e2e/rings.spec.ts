@@ -267,8 +267,8 @@ test('effects: duplicate, cut and paste, the knobs stay', async ({ page }) => {
   await selectAll(page);
   await addEffect(page, 'scrollText');
   await page.locator('.ed').getByLabel('Words').fill('HELLO');
-  await page.locator('.ed').getByLabel('Contrast').fill('0.5');
-  const fx = () => page.evaluate(() => (window as any).__luxdmx.show.effects.map((e: any) => [e.kind, e.params.text, e.params.contrast]));
+  await page.locator('.ed').getByLabel('Spread').fill('0.5');
+  const fx = () => page.evaluate(() => (window as any).__luxdmx.show.effects.map((e: any) => [e.kind, e.params.text, e.params.spread]));
   await page.locator('.ep li.oitem').first().click();
   await page.keyboard.press('Control+d');
   await expect.poll(fx).toEqual([['scrollText', 'HELLO', 0.5], ['scrollText', 'HELLO', 0.5]]);
@@ -319,4 +319,156 @@ test('its pixel ports changed while it was away: the box says again when it come
   await pixelPorts([[10, 2]]);
   await fetch(`http://${FAKE}/drop`, { method: 'POST' });
   await expect(page.getByTestId('pixels-unserved')).toHaveCount(0, { timeout: 8000 });
+});
+
+// ---------------------------------------------------------------- the LEDs tab
+const light = (page: Page, name: string) => page.evaluate((n) => JSON.parse(JSON.stringify((window as any).__luxdmx.show.fixtures.find((f: any) => f.name === n))), name);
+async function ledsTab(page: Page, name: string) {
+  await tab(page, 'Fixtures');
+  await page.locator(`.fl li[data-fixture="${name}"]`).dblclick();
+  const dlg = page.getByRole('dialog', { name: `Patch: ${name}` });
+  await dlg.getByRole('tab', { name: 'LEDs' }).click();
+  return dlg;
+}
+// an 8 x 8 panel from the library: data in at the top left, along the rows, zigzag. LED n's colour
+// on the wire: channels 3n to 3n + 2
+const px = (c: number[], n: number) => c.slice(n * 3, n * 3 + 3);
+const RED = [255, 0, 0], GREEN = [0, 255, 0], BLUE = [0, 89, 255], YELLOW = [255, 217, 0];
+
+test("a matrix's LEDs tab: the test picture on the real one, turned and mirrored until it's right", async ({ page }) => {
+  await pixelPorts([[12, 1]]);
+  await openConnected(page);
+  await patch(page, 'gen-matrix8x8', 1, 12, 'Matrix');
+  const dlg = await ledsTab(page, 'Matrix');
+  await expect(dlg.getByTestId('led-words')).toContainText('Starts top left, runs along the rows, zigzag (8 × 8)');
+  await expect(dlg.getByTestId('led-picture').locator('circle')).toHaveCount(64);
+  // on the real one: the corners in their colours (top left red, top right green, bottom right
+  // yellow, bottom left blue: LED 56 is the bottom row's first, coming back from the right)
+  await dlg.getByLabel('Show the picture on the real one too').check();
+  await expect.poll(async () => px(await channels(12, 192), 0), { timeout: 6000 }).toEqual(RED);
+  let c = await channels(12, 192);
+  expect([px(c, 7), px(c, 56), px(c, 63)]).toEqual([GREEN, YELLOW, BLUE]);
+  // it's mirrored on the real one: mirror it here, and the picture goes out the other way round
+  await dlg.getByRole('button', { name: 'Mirror ↔' }).click();
+  await expect(dlg.getByTestId('led-words')).toContainText('Starts top right, runs along the rows, zigzag');
+  expect((await light(page, 'Matrix')).layout).toEqual({ kind: 'matrix', cols: 8, rows: 8, zigzag: true, from: 'tr' });
+  await expect.poll(async () => px(await channels(12, 192), 0)).toEqual(GREEN);
+  c = await channels(12, 192);
+  expect([px(c, 7), px(c, 56), px(c, 63)]).toEqual([RED, BLUE, YELLOW]);
+  // turned: a quarter to the right, then back; mirrored back: the type's wiring again, not a copy
+  await dlg.getByRole('button', { name: 'Turn ↻' }).click();
+  await expect(dlg.getByTestId('led-words')).toContainText('runs along the columns');
+  await dlg.getByRole('button', { name: '↺ Turn' }).click();
+  await dlg.getByRole('button', { name: 'Mirror ↔' }).click();
+  await expect.poll(async () => (await light(page, 'Matrix')).layout).toBeUndefined();
+  await expect(dlg.getByTestId('led-words')).toContainText('As its type says');
+  // switched off: the light gets back what it had (nothing)
+  await dlg.getByLabel('Show the picture on the real one too').uncheck();
+  await expect.poll(async () => (await channels(12, 192)).some((v) => v > 0), { timeout: 6000 }).toBe(false);
+  expect(await page.evaluate(() => (window as any).__luxdmx.programmer[(window as any).__luxdmx.show.fixtures[0].id])).toBeUndefined();
+});
+
+test('the finder: click where the first, second and last LED really are, and the wiring follows', async ({ page }) => {
+  await pixelPorts([[12, 1]]);
+  await openConnected(page);
+  await patch(page, 'gen-matrix8x8', 1, 12, 'Matrix');
+  const dlg = await ledsTab(page, 'Matrix');
+  await dlg.getByRole('button', { name: 'Find the wiring on the real one…' }).click();
+  // on the real one: LED 1 red, LED 2 green, LED 64 blue, nothing else
+  await expect.poll(async () => px(await channels(12, 192), 0), { timeout: 6000 }).toEqual(RED);
+  const c = await channels(12, 192);
+  expect([px(c, 1), px(c, 63)]).toEqual([GREEN, BLUE]);
+  expect(c.slice(6, 189).every((v) => v === 0)).toBe(true);
+  // the real panel is wired from the bottom right, up the columns: red shows bottom right, green
+  // above it, blue bottom left. In the picture (the library's wiring) those are LEDs 56, 55 and 63
+  const pic = dlg.getByTestId('led-picture');
+  await expect(dlg.getByTestId('led-step')).toContainText('red');
+  await pic.locator('[data-led="56"]').click();
+  await expect(dlg.getByTestId('led-step')).toContainText('green');
+  await pic.locator('[data-led="55"]').click();
+  await expect(dlg.getByTestId('led-step')).toContainText('blue');
+  await pic.locator('[data-led="63"]').click();
+  await expect(dlg.getByTestId('led-said')).toContainText('Found it: starts bottom right, runs along the columns, zigzag');
+  expect((await light(page, 'Matrix')).layout).toEqual({ kind: 'matrix', cols: 8, rows: 8, zigzag: true, vertical: true, from: 'br' });
+  // and three that no wiring puts there
+  await dlg.getByRole('button', { name: 'Find the wiring on the real one…' }).click();
+  for (const i of [0, 9, 27]) await pic.locator(`[data-led="${i}"]`).click();
+  await expect(dlg.getByTestId('led-said')).toContainText('No wiring puts those three there');
+  // the picture follows the light's own wiring: its first LED now sits bottom right, so it's yellow
+  await dlg.getByLabel('Show the picture on the real one too').check();
+  await expect.poll(async () => px(await channels(12, 192), 0), { timeout: 6000 }).toEqual(YELLOW);
+  // undo: the type's wiring again
+  await dlg.getByRole('button', { name: 'Done' }).click();
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await light(page, 'Matrix')).layout).toBeUndefined();
+});
+
+test('a ring: turned by one LED, mirrored, inside out; two of a type get the same wiring', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-disc37', 2, 12, 'Disc');
+  const dlg = await ledsTab(page, 'Disc 1');
+  await expect(dlg.getByTestId('led-words')).toContainText('Starts at the rim, runs clockwise, the first LED at the top');
+  await dlg.getByLabel('Set up').selectOption('type');
+  await dlg.getByRole('button', { name: '1 LED ↻' }).click();
+  await dlg.getByRole('button', { name: 'Mirror ↔' }).click();
+  await dlg.getByRole('button', { name: 'Inside out' }).click();
+  await expect(dlg.getByTestId('led-words')).toContainText('Starts in the middle, runs counter-clockwise, the first LED turned -22.5°');
+  const a = await light(page, 'Disc 1'), b = await light(page, 'Disc 2');
+  expect(a.layout).toEqual({ kind: 'rings', rings: [1, 8, 12, 16], ccw: true, turn: -22.5 });
+  expect(b.layout).toEqual(a.layout);
+  // by hand: the first LED turned to 3 o'clock
+  await dlg.getByText('Wiring by hand').click();
+  await dlg.getByLabel('Turned by').fill('90');
+  await dlg.getByLabel('Turned by').press('Enter');
+  await expect(dlg.getByTestId('led-words')).toContainText('the first LED turned 90°');
+  // kept with the show
+  const saved = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.map((f: any) => f.layout));
+  expect(saved).toEqual([{ kind: 'rings', rings: [1, 8, 12, 16], ccw: true, turn: 90 }, { kind: 'rings', rings: [1, 8, 12, 16], ccw: true, turn: 90 }]);
+});
+
+// ---------------------------------------------------------------- how the LEDs really light
+const litPixels = (page: Page) => page.locator('.stage-wrap .fx circle.px').evaluateAll((cs) => cs.filter((c) => c.getAttribute('fill') !== '#232a35').length);
+
+test("the stage draws a disc as its LEDs light: at the box's brightness 150 a dim colour is dark there too", async ({ page }) => {
+  await pixelPorts([[10, 2, 150]]);
+  await openConnected(page);
+  await patch(page, 'gen-disc241', 1, 10, 'Disc');
+  // every pixel at DMX 20: on the wire, and the box turns that off at brightness 150
+  await page.evaluate(() => { const a = (window as any).__luxdmx, id = a.show.fixtures[0].id; a.programmer[id] = { intensity: 1, color: { r: 20 / 255, g: 20 / 255, b: 20 / 255 } }; });
+  await expect.poll(async () => (await channels(10, 6)), { timeout: 6000 }).toEqual([20, 20, 20, 20, 20, 20]);
+  await expect.poll(() => litPixels(page)).toBe(0);
+  const dlg = await ledsTab(page, 'Disc');
+  await expect(dlg.getByTestId('led-from')).toContainText('From Fake LuxDMX: its pixel port on universe 10, brightness 150, gamma 2.2, no power cap');
+  await expect(dlg.getByTestId('led-cut')).toContainText('Below DMX 25 a colour is off');
+  // the port at full brightness (set here): DMX 20 lights, on the stage too
+  await dlg.getByLabel('Brightness').fill('255');
+  await dlg.getByLabel('Brightness').press('Tab');
+  await expect(dlg.getByTestId('led-from')).toContainText('Set here; Fake LuxDMX has brightness 150');
+  await expect(dlg.getByTestId('led-cut')).toContainText('Below DMX 15');
+  await expect.poll(() => litPixels(page)).toBe(241);
+  expect((await light(page, 'Disc')).led).toEqual({ bright: 255 });
+  // back to what the box says
+  await dlg.getByRole('button', { name: 'As the box has it' }).click();
+  expect((await light(page, 'Disc')).led).toBeUndefined();
+  await expect.poll(() => litPixels(page)).toBe(0);
+  // brighter than the cut: lit at the box's brightness too
+  await page.evaluate(() => { const a = (window as any).__luxdmx, id = a.show.fixtures[0].id; a.programmer[id] = { intensity: 1, color: { r: 60 / 255, g: 0, b: 0 } }; });
+  await expect.poll(() => litPixels(page)).toBe(241);
+});
+
+test('a pixel strip has the LEDs tab for how its LEDs light, without a wiring to set', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-strip60', 1, 12, 'Strip');
+  const dlg = await ledsTab(page, 'Strip');
+  await expect(dlg.getByRole('heading', { name: 'How the LEDs light' })).toBeVisible();
+  await expect(dlg.getByRole('heading', { name: "How it's wired" })).toHaveCount(0);
+  await expect(dlg.getByTestId('led-from')).toContainText('As a LuxDMX pixel port comes');
+  await dlg.getByLabel('Gamma').fill('1');
+  await dlg.getByLabel('Gamma').press('Tab');
+  await expect(dlg.getByTestId('led-cut')).toContainText('Below DMX 1 ');
+  // a PAR has no LEDs tab
+  await dlg.getByRole('button', { name: 'Done' }).click();
+  await patch(page, 'gen-rgb', 1, 0, 'Par');
+  await page.locator('.fl li[data-fixture="Par"]').dblclick();
+  await expect(page.getByRole('dialog', { name: 'Patch: Par' }).getByRole('tab', { name: 'LEDs' })).toHaveCount(0);
 });

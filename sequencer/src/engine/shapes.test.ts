@@ -8,7 +8,8 @@ import { emptyShow } from '../model/format';
 import { placesFor, type Places } from '../model/pixelLayout';
 import type { PixelLayout } from '../model/types';
 
-const SHAPES = EFFECTS.filter((d) => d.shape);
+// (the add-on runner is tested with the add-ons: src/addons/addons.test.ts)
+const SHAPES = EFFECTS.filter((d) => d.shape && !d.hidden);
 const on = (l: PixelLayout): Where[] => { const at = placesFor(l); return Array.from({ length: at.n }, (_, i) => ({ u: i / (at.n - 1), row: 0, rows: 1, at, cell: i })); };
 const LAYOUTS: Record<string, Where[]> = {
   disc: on({ kind: 'rings', rings: [60, 48, 40, 32, 24, 16, 12, 8, 1] }), small: on({ kind: 'rings', rings: [24, 16, 12, 8, 1] }), ring: on({ kind: 'rings', rings: [24] }),

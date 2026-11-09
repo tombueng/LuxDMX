@@ -10,9 +10,11 @@ import { beamDir, HALL, ROOMS, DECK, TRUSS_HANG, onDeck, toWorld, type Rot, type
 import { GENERIC, modeOf } from './library';
 import { emptyShow, parseShow, serializeShow } from './format';
 import type { Fixture } from './types';
+import { placesFor, shapeSize } from './pixelLayout';
 import {
   aimHead, channelRows, copySetup, DIRS, dirOf, frontOf, frontsFor, marksOf, modeChange, motors, mountOf, mountRot, MOUNTS, offsetsFor, opticsOf,
   placeFor, pointOf, pointRot, POINTS, rigFixtureOf, rotFrom, upOf, withFront, type Dir,
+  boardReach, restAt,
 } from './fixtureSetup';
 
 const near = (a: V3, b: V3, eps = 1e-3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < eps;
@@ -207,4 +209,37 @@ describe('in the show file', () => {
 it('the six directions', () => {
   for (const d of Object.keys(DIRS) as Dir[]) expect(dirOf(DIRS[d])).toBe(d);
   expect(dirOf(toWorld({ x: 0, y: 1, z: 0 }, { yaw: 0, pitch: 30, roll: 0 }))).toBeUndefined();
+});
+
+describe('where a light let go of in 3D comes to rest', () => {
+  const room = HALL;
+  const disc = placesFor({ kind: 'rings', rings: [60, 48, 40, 32, 24, 16, 12, 8, 1] });
+  const standing: Rot = { yaw: 0, pitch: 90, roll: 0 };
+  const mid = { x: 0, z: (room.deck.z0 + room.deck.z1) / 2 };
+  it('a ring standing on the deck rests on its lower edge, not half in the deck', () => {
+    const size = shapeSize(disc), reach = boardReach(disc, size, standing);
+    expect(reach.below).toBeCloseTo(size / 2 + 0.02, 3);
+    const r = restAt({ x: mid.x, y: DECK, z: mid.z }, 'bar', reach, room);
+    expect(r.on).toBe('deck');
+    expect(r.p.y).toBeCloseTo(DECK + reach.below, 6);
+    // lying flat it's only as thick as its board
+    expect(boardReach(disc, size, { yaw: 0, pitch: 0, roll: 0 }).below).toBeLessThan(0.05);
+  });
+  it('close means a hand\'s width: 25 cm over the deck it lands, 50 cm over it it stays up', () => {
+    expect(restAt({ x: 0, y: DECK + 0.25, z: mid.z }, 'mover', undefined, room).on).toBe('deck');
+    expect(restAt({ x: 0, y: DECK + 0.5, z: mid.z }, 'mover', undefined, room)).toEqual({ p: { x: 0, y: DECK + 0.5, z: mid.z }, on: 'air' });
+    // off the deck: the floor, only when close
+    const off = room.deck.z1 + 2;
+    expect(restAt({ x: 0, y: 0.2, z: off }, 'par', undefined, room).p.y).toBe(0);
+    expect(restAt({ x: 0, y: 0.5, z: off }, 'par', undefined, room).on).toBe('air');
+  });
+  it('near a truss it hangs under it: a head by its clamp, a matrix by its top', () => {
+    const t = room.truss[1];
+    expect(restAt({ x: 1, y: t.y - TRUSS_HANG - 0.3, z: t.z + 0.2 }, 'mover', undefined, room).p).toEqual({ x: 1, y: t.y - TRUSS_HANG, z: t.z });
+    expect(restAt({ x: 1, y: t.y - 1.2, z: t.z }, 'mover', undefined, room).on).not.toBe('truss');
+    const size = shapeSize(disc), reach = boardReach(disc, size, standing);
+    const r = restAt({ x: 0, y: t.y - 0.3 - reach.above, z: t.z }, 'bar', reach, room);
+    expect(r.on).toBe('truss');
+    expect(r.p.y + reach.above).toBeCloseTo(t.y - 0.08, 6);
+  });
 });

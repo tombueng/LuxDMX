@@ -22,8 +22,12 @@ class Ui {
   monitorUni = 0;                            // the universe the DMX monitor opens on
   fogFor: string[] | undefined;              // the machines a fog timer starts with (all when unset)
   patch = $state<string | null>(null);       // the fixture whose patch dialog is open
-  patchTab = $state<'patch' | 'channels' | 'mounting'>('patch');   // the tab it opens on
+  patchTab = $state<'patch' | 'channels' | 'leds' | 'mounting'>('patch');   // the tab it opens on
   patchMany = $state<string[] | null>(null); // ...or the lights patched together
+  focusCal = $state<string[] | null>(null);  // the heads in Focus and calibrate
+  // what Focus and calibrate has seen this session: per head, per mark, the pan and tilt (a cue's)
+  // that put the real beam on it (kept when the dialog closes, gone with a reload)
+  calSeen = $state<Record<string, Record<string, { pan: number; tilt: number }>>>({});
   fxSel = $state<string[]>([]);              // selected effects (Effects panel)
   zoom = $state(1);                          // UI size, saved per browser
   // the stage in 3D instead of the plan (saved per browser)

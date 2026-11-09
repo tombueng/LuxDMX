@@ -12,7 +12,7 @@
 import { enableValue, isGated, MAX_ON } from '../model/safety';
 import type { CueAction, CueList, Effect, FixtureMode, Preset, Resolved, Show, Values } from '../model/types';
 import { capsOf, modeOf, typeMap } from '../model/library';
-import { isWide, placesOf, spansOf } from '../model/pixelLayout';
+import { isWide, placesOfLight, spansOf } from '../model/pixelLayout';
 // fog, haze and the effect machines: highest wins across lists, like a level (a haze list runs all
 // night whatever the moods say; two lists firing confetti fire it)
 const SMOKE = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
@@ -439,11 +439,11 @@ export class Engine {
       const total = (p.tempo ? this.beats - since.beats : this.seconds - since.seconds) / p.speed;
       const targets = effectTargets(show, e, def, p, modes);
       // each element's light and its place on it (pixel shows and pictures use them)
-      const rowOf = new Map<string, number>();
+      const rowOf = new Map<string, number>(), lightOf = new Map(show.fixtures.map((f) => [f.id, f]));
       for (const t of targets) if (!rowOf.has(t.fixture)) rowOf.set(t.fixture, rowOf.size);
       const where = targets.map((t) => {
         const m = modes.get(t.fixture)!, n = t.cell === undefined ? 1 : capsOf(m).cells;
-        return { u: n > 1 ? t.cell! / (n - 1) : 0.5, row: rowOf.get(t.fixture)!, rows: rowOf.size, at: t.cell === undefined ? undefined : placesOf(m), cell: t.cell };
+        return { u: n > 1 ? t.cell! / (n - 1) : 0.5, row: rowOf.get(t.fixture)!, rows: rowOf.size, at: t.cell === undefined ? undefined : placesOfLight(lightOf.get(t.fixture) ?? {}, m), cell: t.cell };
       });
       const clock = { beats: this.beats - since.beats, secs: this.seconds - since.seconds };
       // one effect that can't run (a formula, a picture, a value from a file) stops itself, never

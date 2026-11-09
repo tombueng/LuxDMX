@@ -530,8 +530,12 @@ function wiringTest(e: Elem, p: EffectParams): FxOut {
 
 // ---------------------------------------------------------------- the list
 
+// (Size makes the picture smaller on the ones that don't use it themselves; Back mirrors them, so
+// what turns turns the other way, except text and the wiring test)
+const ZOOM = new Set(['eye', 'reactor', 'supernova', 'radar', 'blackHole', 'warp', 'hypno', 'mandala', 'raindrops', 'skyRockets', 'kickRings']);
 const fx = (id: string, name: string, blurb: string, run: EffectDef['run'], defaults: EffectDef['defaults'], own = true): EffectDef =>
-  ({ id, name, category: 'pixel', shape: true, noColors: own, blurb, defaults: { tempo: false, spread: 0, ...defaults }, run });
+  ({ id, name, category: 'pixel', shape: true, noColors: own, blurb, defaults: { tempo: false, spread: 0, ...defaults }, run,
+    ...(ZOOM.has(id) ? { zoom: true } : {}), ...(id === 'scrollText' || id === 'wiringTest' ? { noFlip: true } : {}) });
 
 export const SHAPE_EFFECTS: EffectDef[] = [
   fx('eye', 'Eye', 'An eye wakes up, looks around, rolls itself, gets angry and falls asleep again. A 30 s story that starts and ends dark.', eye, { speed: 30 }),

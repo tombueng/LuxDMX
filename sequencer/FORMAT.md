@@ -68,7 +68,7 @@ allows unknown fields everywhere, like readers must).
 | `effects` | Effect[] | chases, rainbows, moves: see Effects |
 | `pages` | Page[] | live control pages: see Pages |
 | `outputs` | object | `devices`: `[{ "host": "192.168.1.50" }]`, the LuxDMX boxes to send to |
-| `settings` | object | `bpm`: tempo for beat-based cues and effects; `stage`: `{ image, opacity }`, a picture (data: URL) drawn under the stage |
+| `settings` | object | `bpm`: tempo for beat-based cues and effects; `stage`: `{ image, opacity }`, a picture (data: URL) drawn under the stage; `marks`: the stage's marks, below |
 | `timeline`, `setlist` | object | the song that's up, and the other songs of the set: see The timeline, The set list |
 | `extensions` | object | anything else, under reverse-domain keys |
 
@@ -169,9 +169,21 @@ the deck, by its kind, under its 2D place):
 - `swapPanTilt`: `true` sends what a cue has as pan to the light's tilt channel and tilt to its
   pan channel. `invertPan` / `invertTilt` and the offsets are the motors' own (after the swap).
   Optional, default `false`.
+- `panReversed`, `tiltReversed`: `true` when this light's pan (tilt) turns the other way round
+  from what its type says. Only the model follows it (the 3D stage, Aim, the mounting picture: the
+  range counts backwards); the DMX is the same. `invertPan` / `invertTilt` turn what goes out
+  round instead, and the model with it. Optional, default `false`.
 - `uid`: the real light this fixture is, its RDM UID (`"MMMM:DDDDDDDD"`, the maker's ESTA id and
   the light's own number, hex). Set when the fixture was patched from the rig or matched to a light
   found with RDM; the rig check follows the light by it wherever its address goes. Optional.
+- `led`: how a pixel light's LEDs really light, set by hand: `{ "gamma": 2.2, "bright": 150, "maxMa":
+  500, "maPerCh": 20, "idleMa": 1 }`, any of them (gamma 1 to 4, brightness 0 to 255 as on a box's
+  pixel port, the power cap in mA with 0 for none, mA per channel at full and per dark pixel). Only
+  for the stage pictures: the DMX is the same. Unset: what the box playing it says about its port,
+  else a port as it comes (2.2, 255, no cap, 20, 1). Optional.
+- `layout`: a ring or a matrix wired or hung differently from its type, the same shape as a mode's
+  `layout` (below the channel list above). It counts only when it has as many pixels as the type's
+  layout; one that doesn't is ignored and the type's is used. Optional, set by the light's LEDs tab.
 
 ## Groups
 
@@ -287,6 +299,13 @@ them: the next cue that doesn't set them takes them to 0.
 the next look comes up).
 
 ## The timetable
+
+`settings.marks` (optional): marks on the real stage (bits of tape) that moving heads are steered
+onto to work out where they really hang (Focus and calibrate):
+`[{ "id": "fl", "name": "Front left", "p": { "x": -3.6, "y": 1.2, "z": 2.5 } }]`, in metres in the 3D
+stage's frame (x to the audience's right, y up from the floor, z towards the audience). Without it
+the app suggests a rectangle on the deck and its middle. A mark that can't be read is left out with
+a note.
 
 `settings.schedule` (optional) runs actions by the clock while the app is open:
 
@@ -465,6 +484,8 @@ readers that follow this section produce the same output.
 | `picture` | string | `""` | the `picture` effect's picture or animation, packed (below); empty: the built-in sample |
 | `mapping` | string | `auto` | how a picture lies on the lights: `line`, `wall` or `auto` (below) |
 | `text` | string | `LUXDMX` | the `scrollText` effect's words, at most 200 characters: capitals, numbers and the usual signs |
+| `script` | string | `""` | the `script` effect (an add-on): its program and knobs as JSON, `{ "id", "name", "frame", "pixel", "params", "uses", "speed", "defaults" }` (ADDONS.md; `speed`: the Speed its `t` runs at 1:1; `defaults`: its own starting knobs). Knob ids are names like `glow` (a letter, then letters and digits, never one every object has such as `toString`); a script with any other is left dark |
+| `vals` | object | `{}` | the `script` effect's own knobs by id: numbers, a choice's value, true / false, colours as `#rrggbb` |
 
 **Elements and phase.** The elements are the target fixtures in order; with `pixels`, a fixture
 with cells becomes one element per cell. Moves only use fixtures with pan/tilt, colour effects only
@@ -586,6 +607,14 @@ but light pixels. A reader that can't read a formula leaves those elements dark.
   operators that is endless (`1 / 0`) counts as full brightness, NaN as dark.
 - Limits: 500 characters, 24 brackets (or signs) inside each other, 250 parts.
 
+`script` (an add-on, made from a `.luxfx` package: ADDONS.md) runs `params.script`: its `frame`
+part once a frame, its `pixel` part once per element, in the luxfx-1 language (the formula's,
+with `let`, `fn`, `sum` / `maxof` / `minof` and the names of a ring or a matrix), its own knobs
+from `params.vals`. Its `t` is the seconds since it started times `script.speed / params.speed`
+(so Speed works on it); `c` is the round as for every effect. A program that doesn't read, or
+that does too much in a frame, stops that effect with a note; the rest of the frame goes on. The
+show keeps the whole program, so it plays wherever the show is opened.
+
 `picture` (default 8 s, tempo off) shows `params.picture`, packed as text:
 
 ```
@@ -603,6 +632,10 @@ mod 256. See-through parts of a GIF are black (off). The app keeps a packed pict
 The picture's columns lie along the lights, pixel `cx = x·(w-1)` (bilinear between pixels). The
 round position `r = frac(t / speed)` (with `bounce`, `tri(r)`) picks the moment:
 
+- `auto` on a ring, a disc or a matrix: each LED shows the picture where it is: across
+  `(sx / sw + 1) / 2`, down `(1 - sy / sh) / 2` (`sw`, `sh`: how far the light's LEDs reach, 1 and 1
+  on a ring, 1 and 7/31 on a 32 x 8 panel), over the middle of the picture cut to the light's own
+  shape (what sticks out over the sides is cropped, nothing stays black).
 - `line`: the lights are one line across the picture. A still scrolls through its rows, one pass
   per round: row `r·h`, the last row blending into the first (with `bounce`, row `tri(r)·(h-1)`).
   An animation plays its frames over a round (frame times scaled to fill it, so `speed` set to the

@@ -3,7 +3,7 @@
 // Moving heads turn their yoke (pan) and head (tilt) the way the real ones do (geometry.ts).
 // Updated every frame from what the engine puts on stage.
 import * as THREE from 'three';
-import type { Places } from '../model/pixelLayout';
+import { shapeH, shapeW, type Places } from '../model/pixelLayout';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Resolved } from '../model/types';
 import type { FixtureKind } from '../model/library';
@@ -12,9 +12,6 @@ import { PAN_SPEED, TILT_SPEED, slew, type Axis } from './motion';
 import { body, headParts, lensOf, PIVOT, type Look } from './models';
 
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
-// how much of a ring's or matrix's size its width and height are (a wide matrix keeps its shape)
-const shapeW = (at: Places) => (at.round ? 1 : (at.gw - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1));
-const shapeH = (at: Places) => (at.round ? 1 : (at.gh - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1));
 export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number }
 
 const MAX_BEAM = 26;           // metres: a beam that hits nothing fades out by then
