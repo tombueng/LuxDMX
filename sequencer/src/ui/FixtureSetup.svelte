@@ -6,6 +6,7 @@
   // out, and the same setup for a group (each keeps its own place). The sums: model/fixtureSetup.ts.
   import { onDestroy, untrack } from 'svelte';
   import { app } from '../app.svelte';
+  import { ui } from './ui.svelte';
   import { typeLabel } from '../model/library';
   import { groundAt, roomOf, type Rot, type V3 } from '../stage3d/geometry';
   import {
@@ -83,7 +84,7 @@
   }
 
   // ---- pan and tilt: for every head in the set (the offsets are this one's own)
-  function setFlag(k: 'invertPan' | 'invertTilt' | 'swapPanTilt', on: boolean) {
+  function setFlag(k: 'invertPan' | 'invertTilt' | 'swapPanTilt' | 'panReversed' | 'tiltReversed', on: boolean) {
     app.checkpoint();
     for (const x of peers) { const g = fx(x); if (g) { if (on) g[k] = true; else delete g[k]; } }
     app.markDirty(0);
@@ -264,7 +265,7 @@
         {:else if real}
           <p class="faint small" role="status">The lights in the set do it too. Closing this (or switching it off) gives them back what they had.</p>
         {/if}
-        {#if heads.length}<p class="faint small">Watch the real head: it should do what the picture does. Turns the other way: invert. Tilts when it should pan: swap.</p>{/if}
+        {#if heads.length}<p class="faint small">Watch the real head: it should do what the picture does. Turns the other way: first check how it's mounted (hung, standing, its front); if that's right, tick "Pan turns the other way round" (or tilt) below, so the picture follows the real one. Tilts when it should pan: swap.</p>{/if}
       </section>
     {/if}
 
@@ -275,7 +276,10 @@
           <label class="ck"><input type="checkbox" checked={!!f.invertPan} onchange={(e) => setFlag('invertPan', (e.target as HTMLInputElement).checked)} /> Invert pan</label>
           <label class="ck"><input type="checkbox" checked={!!f.invertTilt} onchange={(e) => setFlag('invertTilt', (e.target as HTMLInputElement).checked)} /> Invert tilt</label>
           <label class="ck" title="What a cue sends as pan goes to its tilt channel, and tilt to pan"><input type="checkbox" checked={!!f.swapPanTilt} onchange={(e) => setFlag('swapPanTilt', (e.target as HTMLInputElement).checked)} /> Swap pan and tilt</label>
+          <label class="ck" title="The real one pans the other way round from what its type says: the picture, Aim and the 3D stage follow it; nothing changes on the wire"><input type="checkbox" checked={!!f.panReversed} onchange={(e) => setFlag('panReversed', (e.target as HTMLInputElement).checked)} /> Pan turns the other way round</label>
+          <label class="ck" title="The real one tilts the other way round from what its type says: the picture, Aim and the 3D stage follow it; nothing changes on the wire"><input type="checkbox" checked={!!f.tiltReversed} onchange={(e) => setFlag('tiltReversed', (e.target as HTMLInputElement).checked)} /> Tilt turns the other way round</label>
         </div>
+        <p class="faint small">Invert turns what a cue sends round (the real head and the picture both follow): for heads that should mirror each other. "Turns the other way round" only puts the picture right.</p>
         <div class="angles">
           <label title="How far it pans from 0 % to 100 %, from the manual">Pan range °<input type="number" min="1" max="1080" step="1" aria-label="Pan range" value={f.panDeg ?? ''}
             placeholder={t?.physical?.panDeg ? `${t.physical.panDeg} (its type)` : '540 (a guess)'} onchange={(e) => setRange('panDeg', num(e))} /></label>
@@ -292,7 +296,8 @@
 
       <section aria-labelledby="mk-h">
         <h3 id="mk-h">Point {f.name} at a mark</h3>
-        <p class="faint small">Pick a mark (a bit of tape on the real stage), the head goes where the picture thinks it is; nudge it until the real beam is on the mark, then say so.</p>
+        <p class="faint small">Pick a mark (a bit of tape on the real stage), the head goes where the picture thinks it is; nudge it until the real beam is on the mark, then say so. That fixes its offsets.
+          Not sure where it hangs? <button class="ghost link" onclick={() => { ui.focusCal = [...peers]; ui.patch = null; }}>Focus and calibrate with four marks</button> works out its place and turn too.</p>
         <div class="seg wrap" role="group" aria-label="Marks">
           {#each marks as m (m.id)}<button aria-pressed={markOn === m.id} class:on={markOn === m.id} title={m.where} onclick={() => aimMark(m)}>{m.label}</button>{/each}
         </div>

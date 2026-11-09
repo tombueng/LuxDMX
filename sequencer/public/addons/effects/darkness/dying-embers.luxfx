@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.dying-embers",
+ "version": "1.0.0",
+ "name": "Dying embers",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A few last embers glowing red, each fading out into the dark.",
+ "tags": [
+  "darkness"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let v = maxof(k, 12, gauss(dist(sx, sy, random(k, 1) * 1.8 - 0.9, random(k, 2) * 1.8 - 0.9), 0.09) * (1 - smoothstep(0, 1, frac(t / 20 + random(k, 3)))) * (0.6 + 0.4 * noise(t * 3, k)))\nheat(v * 0.6)"
+ }
+}

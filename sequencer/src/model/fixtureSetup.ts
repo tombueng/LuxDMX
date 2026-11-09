@@ -3,10 +3,10 @@
 // against the real light (invert, swap, range, offsets, a mark on the stage to point it at), one
 // light's setup copied to a group, and what another mode does to the patch. Pure, no three.js
 // (fixtureSetup.test.ts); the sums of where a light is and where it points are geometry.ts's.
-import type { Channel, ChannelRange, Fixture, FixtureMode, FixtureType } from './types';
+import type { Channel, ChannelRange, Fixture, FixtureMode, FixtureType, StageMark } from './types';
 import { capsOf, type FixtureKind } from './library';
-import { placesOf, shapeSize, shapeStanding } from './pixelLayout';
-import { aimAt, aimRot, calibrate, defaultPlace, groundAt, nearestTruss, norm, toWorld, TRUSS_HANG, type Optics, type Room, type Rot, type V3 } from '../stage3d/geometry';
+import { placesOfLight, shapeH, shapeSize, shapeStanding, shapeW, type Places } from './pixelLayout';
+import { aimAt, aimRot, calibrate, DECK, defaultPlace, groundAt, nearestTruss, norm, toWorld, TRUSS_HANG, type Optics, type Room, type Rot, type V3 } from '../stage3d/geometry';
 import type { RigFixture, Sfx } from '../stage3d/rig';
 import type { Look } from '../stage3d/models';
 
@@ -112,8 +112,9 @@ export function placeOf(f: Pick<Fixture, 'x' | 'y' | 'p3' | 'rot'>, kind: Fixtur
 
 // ---- pan and tilt
 // The head's optics: the light's own range when it has one, else its type's, else 540 / 270
-export function opticsOf(f: Pick<Fixture, 'panDeg' | 'tiltDeg' | 'panOffset' | 'tiltOffset' | 'invertPan' | 'invertTilt'>, t?: FixtureType): Optics {
-  return { panDeg: f.panDeg || t?.physical?.panDeg || 540, tiltDeg: f.tiltDeg || t?.physical?.tiltDeg || 270, panOffset: f.panOffset ?? 0, tiltOffset: f.tiltOffset ?? 0, invertPan: !!f.invertPan, invertTilt: !!f.invertTilt };
+// (a light whose pan or tilt turns the other way round from its type: its range counts backwards)
+export function opticsOf(f: Pick<Fixture, 'panDeg' | 'tiltDeg' | 'panOffset' | 'tiltOffset' | 'invertPan' | 'invertTilt' | 'panReversed' | 'tiltReversed'>, t?: FixtureType): Optics {
+  return { panDeg: (f.panDeg || t?.physical?.panDeg || 540) * (f.panReversed ? -1 : 1), tiltDeg: (f.tiltDeg || t?.physical?.tiltDeg || 270) * (f.tiltReversed ? -1 : 1), panOffset: f.panOffset ?? 0, tiltOffset: f.tiltOffset ?? 0, invertPan: !!f.invertPan, invertTilt: !!f.invertTilt };
 }
 // What the motors get for what a cue sends (pan and tilt swapped when the light says so; the same
 // sum takes the motors' values back to a cue's). Invert, range and offsets are the motors' own.
@@ -133,6 +134,42 @@ export function marksOf(room: Room): Mark[] {
     { id: 'right', label: 'Front right', where: `${x} m right of the middle (seen from the audience), 1.5 m in from the front`, p: at(x, z) },
   ];
 }
+// Marks for calibrating heads, the way the consoles suggest: a rectangle as big as the stage allows
+// (four corners 1.5 m in from its edges) and its middle, on the deck. Each can be moved to where the
+// tape really is.
+export function calMarks(room: Room): StageMark[] {
+  const deck = room.deck.x > 0, x = r1((deck ? room.deck.x : room.W / 2) * 0.6);
+  const front = deck ? room.deck.z1 : room.zc + room.D / 2, back = deck ? room.deck.z0 : room.zc - room.D / 2;
+  const at = (px: number, pz: number) => ({ x: px, y: groundAt(px, pz, room), z: r1(pz) });
+  const fz = front - 1.5, bz = back + 1.5, cz = r1((fz + bz) / 2);
+  return [
+    { id: 'fl', name: 'Front left', p: at(-x, fz) }, { id: 'fr', name: 'Front right', p: at(x, fz) },
+    { id: 'bl', name: 'Back left', p: at(-x, bz) }, { id: 'br', name: 'Back right', p: at(x, bz) },
+    { id: 'c', name: 'Centre', p: at(0, cz) },
+  ];
+}
+// How far a ring's or a matrix's board reaches below and above its middle the way it's turned (m):
+// it stands on its lower edge and hangs by its top, instead of sitting half in the floor.
+export function boardReach(at: Places, size: number, rot: Rot): { below: number; above: number } {
+  const w = (size * shapeW(at) + 0.04) / 2, h = (size * shapeH(at) + 0.04) / 2;
+  let lo = 0, hi = 0;
+  for (const x of [-w, w]) for (const y of [0, 0.03]) for (const z of [-h, h]) { const v = toWorld({ x, y, z }, rot); lo = Math.min(lo, v.y); hi = Math.max(hi, v.y); }
+  return { below: -lo, above: hi };
+}
+// Where a light let go of in 3D comes to rest: on the truss it's close to (hung under it), on the
+// deck or the floor it's close to (standing on it), else where it was let go. Close is a hand's
+// width, not a metre: a light put up on a stand stays up. `reach`: a board's (0 for the others,
+// whose origin is their base or clamp).
+export function restAt(p: V3, kind: FixtureKind, reach: { below: number; above: number } | undefined, room: Room): { p: V3; on: 'truss' | 'deck' | 'floor' | 'air' } {
+  const t = nearestTruss(p.z, room), hang = reach ? t.y - 0.08 - reach.above : t.y - TRUSS_HANG;
+  if (Math.abs(p.y - hang) < 0.4 && Math.abs(p.z - t.z) < 0.4) return { p: { ...p, y: hang, z: t.z }, on: 'truss' };
+  const below = reach?.below ?? 0;
+  // (within the deck's area a light can't be inside the deck: below its top it comes up onto it)
+  if (onDeckArea(p, room) && p.y < DECK + below + 0.3) return { p: { ...p, y: DECK + below }, on: 'deck' };
+  if (!onDeckArea(p, room) && p.y < below + 0.3) return { p: { ...p, y: below }, on: 'floor' };
+  return { p, on: 'air' };
+}
+const onDeckArea = (p: V3, room: Room) => room.deck.x > 0 && Math.abs(p.x) <= room.deck.x && p.z >= room.deck.z0 && p.z <= room.deck.z1;
 // what a cue would send to point the head at a spot (from where it is now: no needless swing)
 export function aimHead(f: Pick<Fixture, 'swapPanTilt'>, p: V3, rot: Rot, o: Optics, target: V3, now: PanTilt): PanTilt | undefined {
   const m = aimAt(p, rot, target, o, motors(f, now));
@@ -150,11 +187,11 @@ export function offsetsFor(f: Pick<Fixture, 'swapPanTilt'>, p: V3, rot: Rot, o: 
 export const mirrorRot = (r: Rot): Rot => ({ yaw: -r.yaw + 0, pitch: r.pitch, roll: -r.roll + 0 });
 export const sideOf = (x: number) => (Math.abs(x) < 0.25 ? 0 : Math.sign(x));
 export const otherSide = (a: number, b: number) => sideOf(a) * sideOf(b) < 0;
-type SetupKeys = 'invertPan' | 'invertTilt' | 'swapPanTilt' | 'panDeg' | 'tiltDeg' | 'panOffset' | 'tiltOffset';
+type SetupKeys = 'invertPan' | 'invertTilt' | 'swapPanTilt' | 'panReversed' | 'tiltReversed' | 'panDeg' | 'tiltDeg' | 'panOffset' | 'tiltOffset';
 export function copySetup(from: Pick<Fixture, SetupKeys>, rot: Rot, to: Pick<Fixture, SetupKeys | 'rot'>, o: { mirror?: boolean; offsets?: boolean; pan?: boolean }) {
   to.rot = o.mirror ? mirrorRot(rot) : { ...rot };
   if (o.pan === false) return;
-  const keys: SetupKeys[] = ['invertPan', 'invertTilt', 'swapPanTilt', 'panDeg', 'tiltDeg', ...(o.offsets ? ['panOffset', 'tiltOffset'] as SetupKeys[] : [])];
+  const keys: SetupKeys[] = ['invertPan', 'invertTilt', 'swapPanTilt', 'panReversed', 'tiltReversed', 'panDeg', 'tiltDeg', ...(o.offsets ? ['panOffset', 'tiltOffset'] as SetupKeys[] : [])];
   for (const k of keys) {
     const v = from[k];
     if (v === undefined || v === false || v === 0) delete to[k];
@@ -209,7 +246,7 @@ export function channelRows(m: FixtureMode, address: number): ChannelRow[] {
 // pan / tilt range)
 const SFX: Sfx[] = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
 export function rigFixtureOf(f: Fixture, m: FixtureMode | undefined, k: FixtureKind, t: FixtureType | undefined, room: Room): RigFixture {
-  const c = capsOf(m), at = placeOf(f, k, room), shape = placesOf(m);
+  const c = capsOf(m), at = placeOf(f, k, room), shape = placesOfLight(f, m);
   const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
   const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
   const look: Look = sfx ?? (c.fog ? 'fog' : k === 'mover' ? (/wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')

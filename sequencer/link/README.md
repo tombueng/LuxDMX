@@ -111,6 +111,12 @@ uninstall, the status page, the Host and origin checks) and `e2e/link.spec.ts` i
 
 - Finds the nodes: an ArtPoll every 3 s to every network's broadcast address; the ones that answer
   (and the universes their outputs play) show in the sequencer.
+- Reads how a LuxDMX box drives its pixels (1.4.0 on): every node that answers gets a plain
+  `GET /pixels.json` at most every 30 s, and its enabled pixel ports go to the page with the node
+  (`pixelPorts`: universe, start, count, universes it spans, brightness, gamma, power cap, mA per
+  channel, idle mA). Only a node that answered from the address it names is asked. The
+  sequencer draws those LEDs the way the box lights them. A node that isn't a LuxDMX box just
+  doesn't answer it; nothing is ever sent to a box this way.
 - Art-Net: each universe goes unicast to the nodes that said they play it, or broadcast when none
   did. sACN (picked in the sequencer): multicast to the universe's group, universe = Art-Net + 1
   (as LuxDMX counts them). Or both.
@@ -154,7 +160,8 @@ uninstall, the status page, the Host and origin checks) and `e2e/link.spec.ts` i
 WebSocket `ws://127.0.0.1:47920/ws`. Binary messages are DMX frames as the LuxDMX bridge takes them:
 `'D', 1, universe low byte, universe high byte, priority (0 = 100), 0`, then 1 to 512 channel values.
 Text messages are JSON: Link sends `{"type":"hello","version","nodes"}`, `{"type":"nodes","nodes"}`
-when the list changes, and `{"type":"stats","fps":{"<universe>":n}}` once a second. The page may send
+when the list changes (a node: `ip`, `short`, `long`, `universes`, `proto`, and from 1.4.0 a LuxDMX
+box's `pixelPorts`), and `{"type":"stats","fps":{"<universe>":n}}` once a second. The page may send
 `{"type":"routes","routes":[{"uni":0,"proto":"artnet|sacn|both","to":"auto|broadcast|multicast|<ip>"}]}`
 and `{"type":"poll"}`. Since 1.2.0 also `{"type":"page","id":"<any id, up to 64 characters>"}`:
 connections that give the same id count as one page on Link's own page (the sequencer opens two,

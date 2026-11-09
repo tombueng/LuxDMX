@@ -10,7 +10,8 @@ How it works:
   fetch their files (ccMixter, joshwoodward.com and the odd Jamendo file), so the app then takes
   our copy from `public/songs/`. Our copies are the artists' files byte for byte (the sha256 is
   below). They aren't in git: put them in `public/songs/` before building, from the "File" links
-  below (`npm run songs` does it).
+  below (`npm run songs` does it). An app that runs somewhere without them (a dev server on this
+  computer) takes the ones on the public site last (GitHub Pages lets any page fetch them).
 - The app shows the credit under the waveform while a song is on the timeline, and a show
   file that uses a song keeps its credit.
 - CC BY asks for the credit: title, artist, licence, where it's from. CC BY-SA asks the same, and

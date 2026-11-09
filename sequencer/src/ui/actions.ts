@@ -40,6 +40,9 @@ export function fixtureMenu(id: string, extra: MenuItem[] = []): MenuItem[] {
       : { label: 'Name, address, mode…', icon: 'edit', keys: 'Enter', run: () => { ui.patchTab = 'patch'; ui.patch = id; } },
     // (how it hangs and points, in 3D with just these lights: for the selection too)
     ...(app.kinds[id] === 'mover' || app.kinds[id] === 'par' || app.kinds[id] === 'strobe' ? [{ label: app.selected.length > 1 ? `Mounting of the ${app.selected.length} selected…` : 'Mounting…', icon: 'position', run: () => { ui.patchTab = 'mounting'; ui.patch = id; } } as MenuItem] : []),
+    // (the moving heads in the selection: steered onto marks, where they really hang worked out)
+    ...(app.kinds[id] === 'mover' ? [{ label: (() => { const n = app.selected.filter((x) => app.kinds[x] === 'mover').length; return n > 1 ? `Focus and calibrate the ${n} heads…` : 'Focus and calibrate…'; })(), icon: 'position',
+      run: () => (ui.focusCal = app.selected.filter((x) => app.kinds[x] === 'mover')) } as MenuItem] : []),
     ...extra,
     ...(fog ? [{ label: 'Make a fog timer for it…', icon: 'fog', run: () => fogTimer([id]) } as MenuItem] : []),
     { label: `Select all ${t ? typeLabel(t) : 'like it'} (${app.show.fixtures.filter((x) => x.typeId === f.typeId).length})`, icon: 'check', run: () => fixtureActions.selectSameType(id) },

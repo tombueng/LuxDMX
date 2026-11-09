@@ -1,0 +1,40 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.thunderstorm",
+ "version": "1.0.0",
+ "name": "Thunderstorm",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Rain in the dark, and now and then the sky lights up and a bolt comes down.",
+ "tags": [
+  "rain"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let sn = floor(t / 3)\nlet strike = random(sn, 1) < 0.55\nlet ft = frac(t / 3) * 3\nlet flash = strike ? (ft < 0.08 ? 1 : ft < 0.16 ? 0.15 : ft < 0.26 ? 0.85 : max(0, 0.6 - (ft - 0.26) * 2)) : 0\nlet bx = random(sn, 2) * 1.2 - 0.6",
+  "pixel": "let col = floor((sx + 1) * 12)\nlet y = 1.25 - frac(t * (1.4 + random(col, 1)) + random(col, 2)) * 2.5\nlet rain = (sy - y > 0) * (sy - y < 0.4)\nlet bolt = gauss(sx - bx - 0.18 * sin(sy * 9 + sn), 0.06) * (sy > -0.7) * flash\nrgb(0.3, 0.4, 0.8) * rain * 0.6 + rgb(0.7, 0.75, 1) * flash * 0.3 + rgb(1, 1, 1) * bolt"
+ }
+}

@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.meltdown",
+ "version": "1.0.0",
+ "name": "Meltdown",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A core glows green, cracks spread, it overloads, flashes white and dies down. A story; Speed is its length.",
+ "tags": [
+  "radioactive"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 24,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let core = gauss(rad, 0.15 + 0.6 * smoothstep(0.45, 0.8, c))\nlet crack = step(0.82 - 0.35 * c, noise(ang * 14, rad * 6 - t))\nlet hum = 0.45 + 0.55 * wave(t * (0.4 + c * 5))\nlet boom = smoothstep(0.8, 0.83, c) * (1 - smoothstep(0.83, 1, c))\nmix(rgb(0.15, 1, 0.25) * (core * hum + crack * c * 0.7), rgb(1, 1, 0.9), boom)"
+ }
+}

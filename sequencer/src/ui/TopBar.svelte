@@ -97,8 +97,8 @@
 <svelte:window onkeydown={key} />
 
 <header class="top" class:witharm={app.gatedMachines.length > 0}>
-  <h1 class="sr-only">LuxDMX Sequencer: {app.show.meta.name}</h1>
-  <div class="brand" aria-hidden="true">Lux<span>DMX</span></div>
+  <h1 class="sr-only">LuxDMX Sequencer (alpha): {app.show.meta.name}</h1>
+  <div class="brand" aria-hidden="true">Lux<span>DMX</span> <small class="alpha" title="Alpha: it works, but it's young. Things change, some are rough, keep a copy of your show (Shows, Export).">alpha</small></div>
   {#if app.locked}
     <!-- Service mode: the show's name and a lock, nothing that edits or leaves the page. -->
     <span class="show lockedname" title="Locked for the show: hold the padlock on the page to unlock"><Icon name="lock" /><span class="name">{app.show.meta.name || 'Untitled'}</span></span>
@@ -171,7 +171,8 @@
 
 <style>
   .top { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; background: var(--bg2); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; } .brand span { color: var(--green); }
+  .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; white-space: nowrap; } .brand span { color: var(--green); }
+  .alpha { font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1000; background: var(--orange); border-radius: 4px; padding: .05rem .3rem; vertical-align: .2em; }
   .show { background: none; border-color: transparent; max-width: 280px; }
   .show .name { overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
   .lockedname { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .6rem; color: var(--orange); }

@@ -1,0 +1,38 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.sunrise",
+ "version": "1.0.0",
+ "name": "Sunrise",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Night turns red, the sun comes up out of the bottom and the sky goes blue. A story; Speed is its length.",
+ "tags": [
+  "sun"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 40,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let up = smoothstep(0, 0.7, c)\nlet d = dist(sx, sy, 0, -1.4 + 1.5 * up)\nlet sky = mix(rgb(0.04, 0.02, 0.14), mix(rgb(1, 0.38, 0.08), rgb(0.35, 0.65, 1), smoothstep(0.45, 0.9, c)), smoothstep(0.05, 0.45, c))\nsky * (0.35 + 0.65 * (1 - (sy + 1) / 2 * (1 - c))) + rgb(1, 0.85, 0.45) * gauss(d, 0.28)"
+ }
+}

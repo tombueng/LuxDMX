@@ -8,6 +8,7 @@
   import DipSwitch from './DipSwitch.svelte';
   import FixtureSetup from './FixtureSetup.svelte';
   import FixtureSetupChannels from './FixtureSetupChannels.svelte';
+  import FixtureSetupLeds from './FixtureSetupLeds.svelte';
   import FixtureSetupRdm from './FixtureSetupRdm.svelte';
   import { app } from '../app.svelte';
   import { isWide, sharesChannels, spansOf } from '../model/pixelLayout';
@@ -30,7 +31,7 @@
   // the lights after it that it runs into, moved up just enough (model/fixtureSetup.ts)
   const makeRoom = $derived(f && overlap.length ? modeChange(app.show.fixtures.map((x) => ({ id: x.id, name: x.name, universe: x.universe, address: x.address, channels: app.modeOf(x.id)?.channels.length ?? 1 })), f.id, n) : undefined);
   // (opened from a light's menu on its Mounting tab, or from anywhere else on the patch)
-  let tab = $state<'patch' | 'channels' | 'mounting'>(ui.patchTab);
+  let tab = $state<'patch' | 'channels' | 'leds' | 'mounting'>(ui.patchTab);
   // gone while open (undone, deleted elsewhere): the dialog closes, and a redo doesn't bring it back
   $effect(() => { if (!f) onclose(); });
   function setAddress(a: number) { if (f && a >= 1 && a <= 512) { app.checkpoint(); f.address = a; app.markDirty(0); } }
@@ -44,12 +45,14 @@
     app.markDirty(0);
     app.toastUndo(`Moved ${moves.map((mv) => `${mv.name} to ${mv.to}`).join(', ')}`);
   }
-  const TABS = [['patch', 'Patch'], ['channels', 'Channels'], ['mounting', 'Mounting']] as const;
+  // (a ring or a matrix gets a tab for its LEDs: which way it's wired, a test picture)
+  const shaped = $derived(!!app.placesOf(id) || !!app.ledOf(id));
+  const TABS = $derived([['patch', 'Patch'], ['channels', 'Channels'], ...(shaped ? [['leds', 'LEDs']] : []), ['mounting', 'Mounting']] as [typeof tab, string][]);
 </script>
 
 {#if f}
-  <Modal title="Patch: {f.name}" {onclose} wide={tab === 'mounting'}>
-    <div class="tabs" role="tablist" aria-label="Patch, channels or mounting" use:tablist>
+  <Modal title="Patch: {f.name}" {onclose} wide={tab === 'mounting' || tab === 'leds' || tab === 'channels'}>
+    <div class="tabs" role="tablist" aria-label="Patch, channels{shaped ? ', LEDs' : ''} or mounting" use:tablist>
       {#each TABS as [k, label] (k)}<button role="tab" id="fp-tab-{k}" aria-controls="fp-panel" aria-selected={tab === k} class:on={tab === k} onclick={() => (tab = k)}>{label}</button>{/each}
     </div>
     <div id="fp-panel" role="tabpanel" aria-labelledby="fp-tab-{tab}">
@@ -89,6 +92,8 @@
     </div>
     {:else if tab === 'channels'}
       <FixtureSetupChannels id={f.id} />
+    {:else if tab === 'leds' && shaped}
+      <FixtureSetupLeds id={f.id} />
     {:else}
       <FixtureSetup id={f.id} />
     {/if}

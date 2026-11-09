@@ -1,0 +1,47 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.fireflies",
+ "version": "1.0.0",
+ "name": "Fireflies",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Fireflies wandering in the night, each glowing now and then.",
+ "tags": [
+  "nature"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [
+  {
+   "id": "glow",
+   "name": "Colour",
+   "description": "Their light",
+   "type": "colour",
+   "default": "#b3ff33"
+  }
+ ],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let v = maxof(k, 12, gauss(dist(sx, sy, noise(k * 3.1, t * 0.1) * 2.2 - 1.1, noise(k * 7.3, t * 0.1 + 5) * 2.2 - 1.1), 0.08) * pow(wave(t * 0.3 + random(k, 1)), 4))\nglow * v + rgb(0, 0.02, 0.03)"
+ }
+}

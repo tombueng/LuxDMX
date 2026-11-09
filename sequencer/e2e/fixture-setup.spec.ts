@@ -7,7 +7,7 @@
 // from there. axe on each tab.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, channels, test, expect, FAKE, selectFixtures, full } from './helpers';
+import { openConnected, resetFake, patch, channels, pixelPorts, test, expect, FAKE, selectFixtures, full } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -146,6 +146,13 @@ test('a group gets the setup: each in its own place, mirrored on the other side,
   expect(after.map((h) => [h.x, h.y])).toEqual(before.map((h) => [h.x, h.y]));
   await dlg.getByLabel('Invert pan').check();
   await expect.poll(async () => (await heads()).map((h) => !!h.invertPan)).toEqual([true, true, true]);
+  // its pan turning the other way round from its type: for the picture only, nothing on the wire
+  const wire = await channels(0, 24);
+  await dlg.getByLabel('Pan turns the other way round').check();
+  await expect.poll(async () => (await heads()).map((h) => !!h.panReversed)).toEqual([true, true, true]);
+  await page.waitForTimeout(300);
+  expect(await channels(0, 24)).toEqual(wire);
+  await dlg.getByLabel('Pan turns the other way round').uncheck();
   // on its side on the left: a head on the other side of the middle gets the mirror image
   await dlg.getByRole('group', { name: 'How it is mounted' }).getByRole('button', { name: 'On its side, left' }).click();
   const side = await heads();
@@ -162,6 +169,79 @@ test('a group gets the setup: each in its own place, mirrored on the other side,
   await dlg.getByRole('button', { name: 'Make the other 2 like Head 1' }).click();
   await expect.poll(async () => (await heads()).map((h) => !!h.invertTilt)).toEqual([true, true, true]);
   expect((await heads()).map((h) => Math.abs(h.panOffset ?? 0))).toEqual([7, 7, 7]);
+});
+
+test('every channel tried on the real light, and what a channel does changed for one light or for all', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, ch = (name: string, attr: string, x: any = {}) => ({ name, attr, ...x });
+    const basic = [ch('Pan', 'pan', { default: 128 }), ch('Tilt', 'tilt', { default: 128 }), ch('Dimmer', 'intensity'), ch('Red', 'red'), ch('Green', 'green'), ch('Blue', 'blue'), ch('Strobe', 'strobe'), ch('Speed', 'speed')];
+    const t = a.addType({ id: 'user-spot2', manufacturer: 'Test', model: 'Spot Two', source: 'user', modes: [{ name: 'Basic', channels: basic }] });
+    a.addFixtures(t, 'Basic', 2, 0, 'Spot', 1);
+  });
+  const dlg = await openSetup(page, 'Spot 1', 'Channels');
+  // a value on its dimmer (channel 3): on the wire, and the row says it's held
+  await dlg.getByLabel('Dimmer DMX value').fill('200');
+  await dlg.getByLabel('Dimmer DMX value').press('Tab');
+  await expect.poll(async () => (await channels(0, 16))[2]).toBe(200);
+  await expect(dlg.locator('tr[data-ch="3"]')).toHaveClass(/held/);
+  await dlg.getByRole('button', { name: 'Let go of Dimmer' }).click();
+  await expect(dlg.locator('tr[data-ch="3"]')).not.toHaveClass(/held/);
+  // every channel at once: its defaults (pan and tilt at 128), then let go of all
+  await dlg.getByRole('button', { name: 'All to default' }).click();
+  await expect.poll(async () => channels(0, 8)).toEqual([128, 128, 0, 0, 0, 0, 0, 0]);
+  await dlg.getByRole('button', { name: 'All full' }).click();
+  await expect.poll(async () => channels(0, 8)).toEqual([255, 255, 255, 255, 255, 255, 255, 255]);
+  await dlg.getByRole('button', { name: 'Let go of all' }).click();
+  const id1 = (await fixture(page, 'Spot 1')).id;
+  await expect.poll(async () => Object.keys((await programmer(page))[id1]?.raw ?? {})).toEqual([]);
+  // channel 7 is really a shutter: changed for Spot 1 only, which gets its own copy of the type
+  await dlg.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await dlg.getByLabel('Channel 7 does').selectOption('shutter');
+  await dlg.getByLabel('Channel 7 name').fill('Shutter');
+  await dlg.getByLabel('Channel 7 name').press('Tab');
+  await audit(page, 'changing what the channels do');
+  await dlg.getByRole('button', { name: 'Only for Spot 1' }).click();
+  const s1 = await fixture(page, 'Spot 1'), s2 = await fixture(page, 'Spot 2');
+  expect(s1.typeId).not.toBe('user-spot2');
+  expect(s2.typeId).toBe('user-spot2');
+  const typeOf = (id: string) => page.evaluate((i) => JSON.parse(JSON.stringify((window as any).__luxdmx.show.fixtureTypes.find((t: any) => t.id === i))), id);
+  const own = await typeOf(s1.typeId);
+  expect(own.model).toBe('Spot Two (Spot 1)');
+  expect(own.modes[0].channels[6]).toMatchObject({ name: 'Shutter', attr: 'shutter' });
+  expect((await typeOf('user-spot2')).modes[0].channels[6]).toMatchObject({ name: 'Strobe', attr: 'strobe' });
+  await expect(dlg.locator('tr[data-ch="7"]')).toContainText('Shutter');
+  await dlg.getByRole('button', { name: 'Done' }).click();
+  // Spot 2: a type of your own changes in place, for every light that has it
+  const d2 = await openSetup(page, 'Spot 2', 'Channels');
+  await d2.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await d2.getByLabel('Channel 8 name').fill('Move speed');
+  await d2.getByLabel('Channel 8 name').press('Tab');
+  await d2.getByRole('button', { name: 'Save it to the type' }).click();
+  expect((await typeOf('user-spot2')).modes[0].channels[7].name).toBe('Move speed');
+  expect((await fixture(page, 'Spot 2')).typeId).toBe('user-spot2');
+});
+
+test("a matrix's channels: one pixel stands for all, its colour order changed in one go", async ({ page }) => {
+  await pixelPorts([[12, 1]]);
+  await openConnected(page);
+  await patch(page, 'gen-matrix8x8', 1, 12, 'Matrix');
+  const dlg = await openSetup(page, 'Matrix', 'Channels');
+  await expect(dlg.getByRole('table', { name: 'The channels of 192 ch' }).locator('tbody tr')).toHaveCount(3);
+  // the red slider sets every pixel's red
+  await dlg.getByLabel('Red DMX value').fill('100');
+  await dlg.getByLabel('Red DMX value').press('Tab');
+  await expect.poll(async () => (await channels(12, 192)).filter((v, i) => i % 3 === 0 && v === 100).length).toBe(64);
+  // the panel is GRB: the first channel of each pixel is green, the second red
+  await dlg.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await dlg.getByLabel('Channel 1 does').selectOption('green');
+  await dlg.getByLabel('Channel 2 does').selectOption('red');
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click();
+  const t = await page.evaluate(() => { const a = (window as any).__luxdmx, f = a.show.fixtures[0]; return JSON.parse(JSON.stringify(a.show.fixtureTypes.find((x: any) => x.id === f.typeId))); });
+  expect(t.source).toBe('user');
+  expect(t.modes[0].layout).toMatchObject({ kind: 'matrix', cols: 8, rows: 8, zigzag: true });
+  expect(t.modes[0].channels.slice(0, 6).map((c: any) => [c.name, c.attr])).toEqual([['Green 1', 'green'], ['Red 1', 'red'], ['Blue 1', 'blue'], ['Green 2', 'green'], ['Red 2', 'red'], ['Blue 2', 'blue']]);
+  expect(t.modes[0].channels[189]).toMatchObject({ name: 'Green 64', attr: 'green', cell: 63 });
 });
 
 test("a mode's channels, and what another mode does to the lights after it", async ({ page }) => {

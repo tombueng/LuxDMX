@@ -1034,9 +1034,13 @@ takes it back). Only the window that opened the bridge is listened to, and repli
 site.
 
 When it's allowed, the bridge tells the app what the box plays: its DMX outputs and, from
-`/pixels.json`, every universe its enabled pixel ports span (`{type: 'ready', outputs, pixels}`, said
-again after the box restarts). The app only sends those universes, so a big show's others don't take
-the turns of the ones the box really plays.
+`/pixels.json`, every universe its enabled pixel ports span (`{type: 'ready', outputs, pixels,
+pixelPorts}`, said again after the box restarts). The app only sends those universes, so a big show's
+others don't take the turns of the ones the box really plays. `pixelPorts` says how each enabled port
+drives its LEDs (`uni`, `start`, `count`, `spans`, `bright`, `gamma`, `maxMa`, `mAPerCh`, `quiesMa`,
+as in `/pixels.json`): the app draws a light anywhere on the universes that port reads the way its
+LEDs really light, dark where the box's gamma and brightness turn them off, with the power cap
+worked out over everything on the port.
 
 The app can hand the bridge a channel of its own (`{type: 'port'}` with a `MessagePort`): its
 output thread then sends frames straight through it, so they keep coming on time whatever the

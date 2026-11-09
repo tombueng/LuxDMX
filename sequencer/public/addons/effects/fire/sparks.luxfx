@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.sparks",
+ "version": "1.0.0",
+ "name": "Flying sparks",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A low glow at the bottom and sparks flying up out of it.",
+ "tags": [
+  "fire"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let base = heat(clamp(0.95 - (sy + 1) * 0.85 + 0.25 * noise(sx * 4, t * 3)))\nlet s = maxof(k, 18, gauss(dist(sx, sy, random(k, 5) * 2 - 1 + 0.15 * sin(t * 2 + k), frac(t * (0.3 + random(k, 6) * 0.5) + random(k, 7)) * 2.5 - 1.25), 0.07))\nbase + rgb(1, 0.7, 0.2) * s"
+ }
+}

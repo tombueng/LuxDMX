@@ -5,6 +5,7 @@
 //   - Older files are brought up to date by one migration step per version, in order.
 import { validEntry } from './schedule';
 import { cleanLayout } from './pixelLayout';
+import { cleanCurve } from './ledCurve';
 import { AROUND_MAX, cleanCrowd, cleanSections, validItem, validTimeline } from './timeline';
 import type { Show } from './types';
 import { KNOBS, cleanColors, isColor } from '../engine/fxkit';
@@ -84,6 +85,14 @@ function withDefaults(s: any, notes: string[]): Show {
   if (vm && !(typeof vm.name === 'string' && typeof vm.store === 'string' && ['scale', 'x', 'y', 'z', 'yaw'].every((k) => Number.isFinite((vm as unknown as Record<string, number>)[k])))) delete s.settings.stage3d!.model;
   if (s.settings.scheduleOff !== undefined && typeof s.settings.scheduleOff !== 'boolean') delete s.settings.scheduleOff;
   if (s.settings.schedulePause !== undefined && !Number.isFinite(s.settings.schedulePause)) delete s.settings.schedulePause;
+  // the stage's marks: each with a name and a place, or left out
+  if (s.settings.marks !== undefined) {
+    const ok = (m: any) => m && typeof m.id === 'string' && typeof m.name === 'string' && m.p && ['x', 'y', 'z'].every((k) => Number.isFinite(m.p[k]));
+    const list = Array.isArray(s.settings.marks) ? s.settings.marks : [];
+    const good = list.filter(ok).map((m: any) => ({ id: m.id, name: m.name, p: { x: m.p.x, y: m.p.y, z: m.p.z } }));
+    if (good.length < list.length || !Array.isArray(s.settings.marks)) note(`${(Array.isArray(s.settings.marks) ? list.length : 1) - good.length} of the stage's marks couldn't be read, left out`);
+    if (good.length) s.settings.marks = good; else delete s.settings.marks;
+  }
   if (s.settings.place !== undefined) { const p = s.settings.place; if (!p || !(Math.abs(p.lat) <= 90) || !(Math.abs(p.lon) <= 180)) delete s.settings.place; }
   mendTimeline(s, note);
 
@@ -285,7 +294,7 @@ function mendFixture(f: Obj, note: Note): boolean {
   }
   if (typeof f.mode !== 'string') f.mode = 'default';
   fixNum(f, 'x', 0, 1, where, note, 0.5); fixNum(f, 'y', 0, 1, where, note, 0.5);
-  for (const k of ['invertPan', 'invertTilt', 'swapPanTilt']) if (f[k] !== undefined && typeof f[k] !== 'boolean') delete f[k];
+  for (const k of ['invertPan', 'invertTilt', 'swapPanTilt', 'panReversed', 'tiltReversed']) if (f[k] !== undefined && typeof f[k] !== 'boolean') delete f[k];
   // its own pan / tilt range (degrees): a number a head can have, or gone (the type's, or 540 / 270)
   for (const k of ['panDeg', 'tiltDeg']) if (f[k] !== undefined && !(typeof f[k] === 'number' && f[k] >= 1 && f[k] <= 1080)) { note(`${where}: ${k} ${shown(f[k])} can't be right, left out`); delete f[k]; }
   // the 3D place and turn: well-formed or gone (a hand-edited file mustn't break the 3D stage)
@@ -293,6 +302,11 @@ function mendFixture(f: Obj, note: Note): boolean {
   if (f.p3 !== undefined && !ok(f.p3, ['x', 'y', 'z'])) delete f.p3;
   if (f.rot !== undefined && !ok(f.rot, ['yaw', 'pitch', 'roll'])) delete f.rot;
   for (const k of ['panOffset', 'tiltOffset'] as const) if (f[k] !== undefined && !Number.isFinite(f[k])) delete f[k];
+  // its own ring or matrix layout: well-formed or gone (whether it fits the type's pixels is
+  // checked where it's used: one that doesn't is ignored, the type's counts)
+  if (f.layout !== undefined) { const l = cleanLayout(f.layout); if (l) f.layout = l; else { delete f.layout; note(`${where}: its own LED layout can't be used, it has its type's`); } }
+  // how its LEDs light, set by hand: in range or gone (the box's or the usual then)
+  if (f.led !== undefined) { const c = cleanCurve(f.led); if (c) f.led = c; else delete f.led; }
   // the real light it is (RDM): a well-formed UID or none
   if (f.uid !== undefined) { if (typeof f.uid === 'string' && /^[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}$/.test(f.uid)) f.uid = f.uid.toUpperCase(); else delete f.uid; }
   return true;

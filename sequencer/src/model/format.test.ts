@@ -256,4 +256,29 @@ describe('a ring or matrix in a file', () => {
     expect(load({ kind: 'blob' }).fixtureTypes[0].modes[0].layout).toBeUndefined();
     expect(load('square').fixtureTypes[0].modes[0].channels).toHaveLength(12);
   });
+  it("a light's own wiring: kept and saved again when it's well-formed, dropped with a note when it isn't", () => {
+    const s: any = emptyShow('t');
+    s.fixtureTypes.push(type({ kind: 'matrix', cols: 2, rows: 2 }));
+    const own = { kind: 'matrix', cols: 2, rows: 2, zigzag: true, vertical: true, from: 'br' };
+    s.fixtures.push({ id: 'a', name: 'A', typeId: 'user:x', mode: 'm', universe: 0, address: 1, x: 0.5, y: 0.5, layout: own },
+      { id: 'b', name: 'B', typeId: 'user:x', mode: 'm', universe: 0, address: 13, x: 0.5, y: 0.5, layout: { kind: 'matrix', cols: -1, rows: 2 } });
+    const notes: string[] = [];
+    const back = parseShow(serializeShow(parseShow(JSON.stringify(s), notes)));
+    expect(back.fixtures[0].layout).toEqual(own);
+    expect(back.fixtures[1].layout).toBeUndefined();
+    expect(notes.join(' ')).toContain('Fixture "B": its own LED layout can\'t be used');
+  });
+});
+
+describe("the stage's marks", () => {
+  it('kept with a name and a place, broken ones left out with a note', () => {
+    const s: any = emptyShow('t');
+    s.settings.marks = [{ id: 'fl', name: 'Front left', p: { x: -3, y: 1.2, z: 1.5 } }, { id: 'x', name: 'Broken', p: { x: 'a', y: 0, z: 0 } }, 'nonsense'];
+    const notes: string[] = [];
+    const back = parseShow(serializeShow(parseShow(JSON.stringify(s), notes)));
+    expect(back.settings.marks).toEqual([{ id: 'fl', name: 'Front left', p: { x: -3, y: 1.2, z: 1.5 } }]);
+    expect(notes.join(' ')).toContain("2 of the stage's marks couldn't be read");
+    const none: any = emptyShow('t'); none.settings.marks = 'all of them';
+    expect(parseShow(JSON.stringify(none)).settings.marks).toBeUndefined();
+  });
 });

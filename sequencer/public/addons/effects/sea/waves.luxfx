@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.waves",
+ "version": "1.0.0",
+ "name": "Waves",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "The sea rolling under the sky, white foam on every crest.",
+ "tags": [
+  "sea"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let h = 0.15 * sin(sx * 4 - t * 1.5) + 0.08 * sin(sx * 9 + t)\nlet w = sy - h\nlet water = smoothstep(0.02, -0.02, w)\nrgb(0, 0.2, 0.5) * water * (0.5 + 0.5 * (w + 1)) + rgb(1, 1, 1) * gauss(w, 0.05) + rgb(0.3, 0.6, 1) * (1 - water) * 0.3"
+ }
+}

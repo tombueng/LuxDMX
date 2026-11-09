@@ -1,0 +1,41 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.sunbeams",
+ "version": "1.0.0",
+ "name": "Sunbeams",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Warm rays turning slowly round a bright middle.",
+ "tags": [
+  "sun"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "size",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0,
+  "size": 0.5
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let a = frac(ang + t * 0.03)\nlet beams = pow(wave(a * (6 + floor(size * 12))), 3)\nrgb(1, 0.72, 0.28) * (beams * (1 - rad * 0.6) * 0.9 + gauss(rad, 0.25))"
+ }
+}

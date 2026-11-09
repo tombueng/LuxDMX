@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.tide",
+ "version": "1.0.0",
+ "name": "Tide",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "The water rising up the beach and going out again. Speed is one tide.",
+ "tags": [
+  "sea"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 20,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let surf = -0.75 + 0.9 * wave(c) + 0.05 * sin(sx * 7 + t * 2)\nlet water = smoothstep(0.02, -0.02, sy - surf)\nmix(rgb(0.25, 0.2, 0.1), rgb(0, 0.3, 0.55), water) + rgb(1, 1, 1) * gauss(sy - surf, 0.04)"
+ }
+}

@@ -1,0 +1,58 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.trefoil",
+ "version": "1.0.0",
+ "name": "Trefoil",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "The radiation sign, slowly turning, its yellow breathing on black.",
+ "tags": [
+  "radioactive"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [
+  {
+   "id": "turns",
+   "name": "Turning",
+   "description": "Turns a minute",
+   "type": "number",
+   "min": 0,
+   "max": 20,
+   "step": 0.5,
+   "default": 2.5
+  },
+  {
+   "id": "tint",
+   "name": "Colour",
+   "description": "The sign's colour",
+   "type": "colour",
+   "default": "#ffd000"
+  }
+ ],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let spin = t * turns / 60\nlet glow = 0.55 + 0.45 * wave(t / 2.5)",
+  "pixel": "let a = frac(ang - spin)\nlet blade = (frac(a * 3) < 0.5) * (rad > 0.34) * (rad < 0.95)\nlet hub = rad < 0.2\n(blade + hub) > 0 ? tint * glow : tint * 0.04"
+ }
+}

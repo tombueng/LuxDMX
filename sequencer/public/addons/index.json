@@ -1,0 +1,1050 @@
+{
+ "format": "luxdmx-addons",
+ "formatVersion": 1,
+ "name": "LuxDMX",
+ "maintainer": "https://github.com/tombueng/LuxDMX",
+ "themes": [
+  {
+   "id": "radioactive",
+   "name": "Radioactive"
+  },
+  {
+   "id": "fire",
+   "name": "Fire"
+  },
+  {
+   "id": "rain",
+   "name": "Rain"
+  },
+  {
+   "id": "clouds",
+   "name": "Clouds"
+  },
+  {
+   "id": "sun",
+   "name": "Sun"
+  },
+  {
+   "id": "love",
+   "name": "Love"
+  },
+  {
+   "id": "darkness",
+   "name": "Darkness"
+  },
+  {
+   "id": "water",
+   "name": "Water"
+  },
+  {
+   "id": "sea",
+   "name": "Sea"
+  },
+  {
+   "id": "nature",
+   "name": "Nature"
+  }
+ ],
+ "addons": [
+  {
+   "id": "luxdmx.trefoil",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Trefoil",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The radiation sign, slowly turning, its yellow breathing on black.",
+   "tags": [
+    "radioactive"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/radioactive/trefoil.luxfx",
+   "size": 1147,
+   "sha256": "81154df240112a93363878a3186e24535e35b63f6bf385c2b05b08527bf5fb00"
+  },
+  {
+   "id": "luxdmx.geiger",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Geiger counter",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Clicks in the dark: single LEDs flash green, faster and slower as the source comes and goes.",
+   "tags": [
+    "radioactive"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/radioactive/geiger.luxfx",
+   "size": 1109,
+   "sha256": "ce53b19c17abeefac3674f9714874bfa18f1780f38b3db23ae6a99476fae4ae5"
+  },
+  {
+   "id": "luxdmx.meltdown",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Meltdown",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A core glows green, cracks spread, it overloads, flashes white and dies down. A story; Speed is its length.",
+   "tags": [
+    "radioactive"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/radioactive/meltdown.luxfx",
+   "size": 979,
+   "sha256": "8acd9b6a013b34b21968ecb91dd36696bd7075fe6790613a6acac0c9586704a5"
+  },
+  {
+   "id": "luxdmx.half-life",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Half-life",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Atoms decaying: each LED lights once a round and fades away, fewer and fewer of them.",
+   "tags": [
+    "radioactive"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/radioactive/half-life.luxfx",
+   "size": 891,
+   "sha256": "8df2f2bcd4fd3e8dbe894c3edf6bdf05b7e7c54355e8f9a13bea51d8ca9b808d"
+  },
+  {
+   "id": "luxdmx.fallout",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Fallout",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Green dust drifting down through the dark, glowing as it falls.",
+   "tags": [
+    "radioactive"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/radioactive/fallout.luxfx",
+   "size": 892,
+   "sha256": "4ffbc58a679fc435930bf1d2d1f3c757d6f40a329ae707794c1006a4c83639a7"
+  },
+  {
+   "id": "luxdmx.embers",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Embers",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Glowing embers under ash, breathing slowly.",
+   "tags": [
+    "fire"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/fire/embers.luxfx",
+   "size": 767,
+   "sha256": "b184f28f000e2b4a282741f3d6e22b5a69ece46f148fce930178184d474cf475"
+  },
+  {
+   "id": "luxdmx.bonfire",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Bonfire",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Flames rising from the bottom of the picture. Size sets how high.",
+   "tags": [
+    "fire"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/fire/bonfire.luxfx",
+   "size": 730,
+   "sha256": "c704a3e3fd765bb613bb305faba10d7f15f67f5712b2bff804acb9cbe46ab6d9"
+  },
+  {
+   "id": "luxdmx.fire-ring",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Ring of fire",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The rim burns, the flames licking in towards the middle.",
+   "tags": [
+    "fire"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/fire/fire-ring.luxfx",
+   "size": 680,
+   "sha256": "f78b89baa920c5b5cb2552d740856b3a61ded070b9765c96f2149c449d710fad"
+  },
+  {
+   "id": "luxdmx.fireball",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Fireball",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A ball of fire, its surface swirling and boiling.",
+   "tags": [
+    "fire"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/fire/fireball.luxfx",
+   "size": 720,
+   "sha256": "03589ef0ec635fc0bbf9543600b572d8cd00eb1583d53cc7630df935a559a4b4"
+  },
+  {
+   "id": "luxdmx.sparks",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Flying sparks",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A low glow at the bottom and sparks flying up out of it.",
+   "tags": [
+    "fire"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/fire/sparks.luxfx",
+   "size": 867,
+   "sha256": "cfed0bb34553a6b5c7db6e32d8d89b5521d762e83b3c2c40728959ec5893b478"
+  },
+  {
+   "id": "luxdmx.drizzle",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Drizzle",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Fine drops falling, slow and soft blue.",
+   "tags": [
+    "rain"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/rain/drizzle.luxfx",
+   "size": 985,
+   "sha256": "0c6b597e3deb7588c9639a6ecc95da06626c47d1c27e4d2c12a6fb253436d4fc"
+  },
+  {
+   "id": "luxdmx.downpour",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Downpour",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Heavy rain in long streaks, splashing where it lands.",
+   "tags": [
+    "rain"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/rain/downpour.luxfx",
+   "size": 881,
+   "sha256": "cca1502537bde67520165712d2fc940c4244577b1f3a94992eb2a99fab5d4660"
+  },
+  {
+   "id": "luxdmx.rain-on-glass",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Rain on glass",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Drops sliding down a window, leaving a wet trail.",
+   "tags": [
+    "rain"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/rain/rain-on-glass.luxfx",
+   "size": 1132,
+   "sha256": "2126d2e4c247f9427edc9721db667b17a1214e9e81febb8ee6eae8c51401579c"
+  },
+  {
+   "id": "luxdmx.thunderstorm",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Thunderstorm",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Rain in the dark, and now and then the sky lights up and a bolt comes down.",
+   "tags": [
+    "rain"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/rain/thunderstorm.luxfx",
+   "size": 1184,
+   "sha256": "93c31098784b83beb696e761f3256124082ef04016176e3fe7eec4adf58ec1e8"
+  },
+  {
+   "id": "luxdmx.rainbow",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "After the rain",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The rain thins out and a rainbow comes up, then the next shower. A story; Speed is its length.",
+   "tags": [
+    "rain"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/rain/rainbow.luxfx",
+   "size": 1016,
+   "sha256": "afdfce0fd832f840e47cca73139db5a248d575c8af45af0a7b57d0fb513f61a3"
+  },
+  {
+   "id": "luxdmx.drifting-clouds",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Drifting clouds",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "White clouds drifting across a blue sky.",
+   "tags": [
+    "clouds"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/clouds/drifting-clouds.luxfx",
+   "size": 707,
+   "sha256": "1b0feacab162357d6eac8f0d5775483f14b6691a840c4633d0e4795c8818c97f"
+  },
+  {
+   "id": "luxdmx.storm-clouds",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Storm clouds",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Dark clouds churning, lit from inside now and then.",
+   "tags": [
+    "clouds"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/clouds/storm-clouds.luxfx",
+   "size": 942,
+   "sha256": "b4622b814ad0d1309b8078e1bd74ad428fd45dac134c2ee442d30e228270a569"
+  },
+  {
+   "id": "luxdmx.sunset-clouds",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Sunset clouds",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Clouds lit pink and gold from below, the sky going from orange to violet.",
+   "tags": [
+    "clouds"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/clouds/sunset-clouds.luxfx",
+   "size": 800,
+   "sha256": "cd226a8f51cb6bec4abd23a53abb40c0bc469debe9c5569422ce0299037eacd6"
+  },
+  {
+   "id": "luxdmx.fog-bank",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Fog bank",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Grey fog rolling slowly, never quite dark, never bright.",
+   "tags": [
+    "clouds"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/clouds/fog-bank.luxfx",
+   "size": 728,
+   "sha256": "fb5f01e6a0deb97ea50358300487bb4d4475c1cf6d9a6fdc507284e59646ae2c"
+  },
+  {
+   "id": "luxdmx.cloud-shadows",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Cloud shadows",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Sunlit fields with the shadows of clouds passing over.",
+   "tags": [
+    "clouds"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/clouds/cloud-shadows.luxfx",
+   "size": 738,
+   "sha256": "ebd45e70d8f951f6787fb461a5d2edb434627b459796c7f792eb05e3e9139b42"
+  },
+  {
+   "id": "luxdmx.sunrise",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Sunrise",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Night turns red, the sun comes up out of the bottom and the sky goes blue. A story; Speed is its length.",
+   "tags": [
+    "sun"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sun/sunrise.luxfx",
+   "size": 925,
+   "sha256": "bdd8ecb1db65800ca6a2fa9e8278d21be7e9fedbd2b9b0fdd8fb3d33d6493725"
+  },
+  {
+   "id": "luxdmx.corona",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Corona",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A blazing sun in the middle, its rays flickering out to the edge.",
+   "tags": [
+    "sun"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sun/corona.luxfx",
+   "size": 760,
+   "sha256": "ed47c53401b5429969887de6d4124fc763b3fe662ada1aaa4dcb98455a957f02"
+  },
+  {
+   "id": "luxdmx.solar-flare",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Solar flare",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The sun's surface boiling, an arc of fire rising off its edge.",
+   "tags": [
+    "sun"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sun/solar-flare.luxfx",
+   "size": 900,
+   "sha256": "d7cea66148e1fe87469c6b65cb79397889b7cf01ba73814469a818e001911688"
+  },
+  {
+   "id": "luxdmx.sunbeams",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Sunbeams",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Warm rays turning slowly round a bright middle.",
+   "tags": [
+    "sun"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sun/sunbeams.luxfx",
+   "size": 768,
+   "sha256": "2906b29dcfa80b67a815ccccc90b52a8f09f4c3c38557923aaec0e051b6c7dd8"
+  },
+  {
+   "id": "luxdmx.eclipse",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Eclipse",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The moon slides over the sun, the corona flares round it, and it moves on. A story; Speed is its length.",
+   "tags": [
+    "sun"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sun/eclipse.luxfx",
+   "size": 941,
+   "sha256": "b25bb1892345748de3bf36087b529b69d2f8a060f422ffcb1e8625e3922cde9e"
+  },
+  {
+   "id": "luxdmx.heartbeat",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Heartbeat",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A big red heart beating twice, resting, beating again.",
+   "tags": [
+    "love"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/love/heartbeat.luxfx",
+   "size": 1133,
+   "sha256": "af0a30fe58f41229f8af969f371641ebdc2440c98397db956aa7d9bdfcdd78fd"
+  },
+  {
+   "id": "luxdmx.floating-hearts",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Floating hearts",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Little hearts rising and swaying, pink and red.",
+   "tags": [
+    "love"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/love/floating-hearts.luxfx",
+   "size": 966,
+   "sha256": "adc0551eb0121b2d262b73f05e22fbd7406fc26034d2f8e0cd00d5522380142d"
+  },
+  {
+   "id": "luxdmx.two-souls",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Two souls",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Two lights circling closer and closer until they meet in a heart. A story; Speed is its length.",
+   "tags": [
+    "love"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/love/two-souls.luxfx",
+   "size": 1098,
+   "sha256": "e987a228856d061b01c03a266b2b8ec4e54dfd2fd6bed4c18046bd83bf2b6cec"
+  },
+  {
+   "id": "luxdmx.rose",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Rose",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A rose of five petals turning slowly, dark red inside, pink at the tips.",
+   "tags": [
+    "love"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/love/rose.luxfx",
+   "size": 792,
+   "sha256": "cc952c9c4a7718ea66b23fb1811d58c6e3035ee77246a01fcfd46c9ab07cdd4d"
+  },
+  {
+   "id": "luxdmx.love-burst",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Love burst",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A heart grows, bursts into sparks and comes together again.",
+   "tags": [
+    "love"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/love/love-burst.luxfx",
+   "size": 1042,
+   "sha256": "6b86d9b16fbb277b52e5bbbc5f91adda148c47cec9c7148ce5c2f523877ccaa2"
+  },
+  {
+   "id": "luxdmx.shadow-breath",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Shadow breath",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A dark violet that breathes, barely there.",
+   "tags": [
+    "darkness"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/darkness/shadow-breath.luxfx",
+   "size": 749,
+   "sha256": "834293661b69a650aae8ee5c9612b6bcc69cf920ffcbaacb7a6ff6c0682c5fee"
+  },
+  {
+   "id": "luxdmx.haunted",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Haunted light",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A dim light that flickers and fails, as if something was in the room.",
+   "tags": [
+    "darkness"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/darkness/haunted.luxfx",
+   "size": 863,
+   "sha256": "f97234355166afaa5162b07205108968fe87003444acc310262ed834873bec08"
+  },
+  {
+   "id": "luxdmx.abyss",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Abyss",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A dark whirl pulling everything into the black middle.",
+   "tags": [
+    "darkness"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/darkness/abyss.luxfx",
+   "size": 711,
+   "sha256": "9a2c3189d5b909205c8355ddea7b7d98c2d6272930fedcb3b16e04dae716785c"
+  },
+  {
+   "id": "luxdmx.watching-eyes",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Watching eyes",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Red eyes open in the dark, look, blink and are gone.",
+   "tags": [
+    "darkness"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/darkness/watching-eyes.luxfx",
+   "size": 1000,
+   "sha256": "e5d1b857406ffb843867e10c468fe775d4f6cbc86f7576afaf1778a7bd51bdaf"
+  },
+  {
+   "id": "luxdmx.dying-embers",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Dying embers",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A few last embers glowing red, each fading out into the dark.",
+   "tags": [
+    "darkness"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/darkness/dying-embers.luxfx",
+   "size": 815,
+   "sha256": "87481c762ff63842322738bd2db1b689222a219fe425046cf0c25fabc413a593"
+  },
+  {
+   "id": "luxdmx.ripples",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Ripples",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Drops landing on still water, the rings spreading and crossing.",
+   "tags": [
+    "water"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/water/ripples.luxfx",
+   "size": 883,
+   "sha256": "88e29b818138fbc267d120e3a360b98930bc0b63a242de6add6a167719428d26"
+  },
+  {
+   "id": "luxdmx.caustics",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Caustics",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The light on the floor of a pool, the bright lines wandering.",
+   "tags": [
+    "water"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/water/caustics.luxfx",
+   "size": 837,
+   "sha256": "a1ed74f82082f843d33c6ba6ae37d4562f472751b43c945ea9aa10f0aa110d93"
+  },
+  {
+   "id": "luxdmx.bubbles",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Bubbles",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Bubbles rising through blue water, wobbling as they go.",
+   "tags": [
+    "water"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/water/bubbles.luxfx",
+   "size": 832,
+   "sha256": "06017b50a8e97c8a42d90805eeadc074890c33438e37f3e1a370f12379b8f873"
+  },
+  {
+   "id": "luxdmx.waterfall",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Waterfall",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "White water falling, mist rising where it lands.",
+   "tags": [
+    "water"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/water/waterfall.luxfx",
+   "size": 787,
+   "sha256": "e4aae9d581626204dc3cfe7dcd8efda8266bfaaef80c1b48d7adbff26ae459f2"
+  },
+  {
+   "id": "luxdmx.whirlpool",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Whirlpool",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Water spiralling round and down into the middle.",
+   "tags": [
+    "water"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/water/whirlpool.luxfx",
+   "size": 703,
+   "sha256": "4629336219873933a95887efac33139d7affae71a1ecf2c3d0d093ea8a1d258a"
+  },
+  {
+   "id": "luxdmx.waves",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Waves",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The sea rolling under the sky, white foam on every crest.",
+   "tags": [
+    "sea"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sea/waves.luxfx",
+   "size": 830,
+   "sha256": "07edad90dfdabf79af50bfba8f812068b17d99803ccb7e2dc7f49652c3a56ade"
+  },
+  {
+   "id": "luxdmx.deep-sea",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Deep sea",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Deep blue dark, with little lights drifting by.",
+   "tags": [
+    "sea"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sea/deep-sea.luxfx",
+   "size": 865,
+   "sha256": "a37b948b30300a5610d6c59218a3fcb1990b19877cf678ef3caacbce814ed777"
+  },
+  {
+   "id": "luxdmx.lighthouse",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Lighthouse",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A beam sweeping round over a dark sea.",
+   "tags": [
+    "sea"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sea/lighthouse.luxfx",
+   "size": 829,
+   "sha256": "2bf830d30fcc6848339adac01986b6543e52ae889253604a532cd84a080288d6"
+  },
+  {
+   "id": "luxdmx.tide",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Tide",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "The water rising up the beach and going out again. Speed is one tide.",
+   "tags": [
+    "sea"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sea/tide.luxfx",
+   "size": 804,
+   "sha256": "f998f5f96401e94f22d69ac820c4a17057aa9c24267b83438932a1dba5ec2923"
+  },
+  {
+   "id": "luxdmx.jellyfish",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Jellyfish",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A glowing jellyfish pulsing through the dark, its tentacles trailing.",
+   "tags": [
+    "sea"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/sea/jellyfish.luxfx",
+   "size": 1043,
+   "sha256": "5ffeb50550d72de58c60945c4cf38c09a6ad40ffb40d60d554a3047b8868e900"
+  },
+  {
+   "id": "luxdmx.canopy",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Forest canopy",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Green leaves moving in the wind, the sun coming through in spots.",
+   "tags": [
+    "nature"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/nature/canopy.luxfx",
+   "size": 823,
+   "sha256": "e8bad82bb9bc1a8ce74c9d5e538fe7318efa2e7b7c864a7b77dfbd4d2dbe341d"
+  },
+  {
+   "id": "luxdmx.fireflies",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Fireflies",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Fireflies wandering in the night, each glowing now and then.",
+   "tags": [
+    "nature"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/nature/fireflies.luxfx",
+   "size": 927,
+   "sha256": "a802c0b30e4d0601318e46f8ec841184b904501f8cb5739c62a6fdce5e5c1d95"
+  },
+  {
+   "id": "luxdmx.aurora",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Northern lights",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Curtains of green and violet light waving across the sky.",
+   "tags": [
+    "nature"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/nature/aurora.luxfx",
+   "size": 799,
+   "sha256": "ee180d2f054f3d2eb3e9ba81ae761defda9c85e9372fdb5aedb15ccf47e9f20a"
+  },
+  {
+   "id": "luxdmx.blossom",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Blossom",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "A flower opening its petals, staying a while and closing again. Speed is one bloom.",
+   "tags": [
+    "nature"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/nature/blossom.luxfx",
+   "size": 855,
+   "sha256": "2df8d0a404c103960a4244f05b026f01d490dc4a6a628e81d44c7cfec3731f10"
+  },
+  {
+   "id": "luxdmx.grass",
+   "kind": "effect",
+   "version": "1.0.0",
+   "name": "Grass in the wind",
+   "author": "LuxDMX",
+   "license": "MIT",
+   "description": "Blades of grass swaying in the wind under a light sky.",
+   "tags": [
+    "nature"
+   ],
+   "fits": [
+    "ring",
+    "disc",
+    "matrix"
+   ],
+   "file": "effects/nature/grass.luxfx",
+   "size": 868,
+   "sha256": "ffbb7a1e4bac2e5719985640a94aa9c3407c1278139868389cb3e0120493be7c"
+  }
+ ]
+}

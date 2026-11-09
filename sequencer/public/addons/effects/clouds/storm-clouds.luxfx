@@ -1,0 +1,40 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.storm-clouds",
+ "version": "1.0.0",
+ "name": "Storm clouds",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Dark clouds churning, lit from inside now and then.",
+ "tags": [
+  "clouds"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let k = floor(t * 3)\nlet on = step(0.84, random(k, 9))\nlet fx = random(k, 3) * 1.6 - 0.8\nlet fy = random(k, 4) - 0.3",
+  "pixel": "let f = fbm(sx * 2 + t * 0.2, sy * 2 - t * 0.05)\nlet shape = smoothstep(0.35, 0.7, f)\nrgb(0.12, 0.13, 0.18) * (0.25 + 0.9 * shape) + rgb(0.8, 0.8, 1) * on * gauss(dist(sx, sy, fx, fy), 0.6) * shape * 1.3"
+ }
+}

@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.floating-hearts",
+ "version": "1.0.0",
+ "name": "Floating hearts",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Little hearts rising and swaying, pink and red.",
+ "tags": [
+  "love"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "fn heart(x, y) = smoothstep(0.15, -0.15, (x * x + y * y - 1) ^ 3 - x * x * y ^ 3)\nfn hx(k) = (sx - random(k, 1) * 1.6 + 0.8 - 0.1 * sin(t + k)) * 4\nfn hy(k) = (sy - frac(t * 0.12 + random(k, 2)) * 2.8 + 1.4) * 4 + 0.25\nlet v = maxof(k, 7, heart(hx(k), hy(k)) * (0.5 + 0.5 * random(k, 3)))\nmix(rgb(1, 0.1, 0.35), rgb(1, 0.5, 0.7), rnd) * v + rgb(0.05, 0, 0.02)"
+ }
+}

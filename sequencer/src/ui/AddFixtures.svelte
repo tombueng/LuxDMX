@@ -72,7 +72,7 @@
     if (!l) return undefined;
     if (l.kind === 'matrix') {
       const corner = { tl: 'top left', tr: 'top right', bl: 'bottom left', br: 'bottom right' }[l.from ?? 'tl'];
-      return `Data in at the ${corner}, ${l.zigzag ? 'in a zigzag ' : ''}along the ${l.vertical ? 'columns' : 'rows'}. Wired differently? "Ring or matrix" takes any way.`;
+      return `Data in at the ${corner}, ${l.zigzag ? 'in a zigzag ' : ''}along the ${l.vertical ? 'columns' : 'rows'}. Wired or hung differently? Its LEDs tab turns it, mirrors it, or finds the wiring on the real one.`;
     }
     return l.rings.length > 1 ? `Rings of ${l.rings.join(', ')}, data in at the rim. Common as a round AliExpress disc.` : 'One light with a shape, so effects can draw on it.';
   };

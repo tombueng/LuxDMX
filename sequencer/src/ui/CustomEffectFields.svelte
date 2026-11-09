@@ -5,6 +5,7 @@
   import type { EffectParams } from '../engine/effects';
   import { COLOR_FUNCTIONS, EXAMPLES, FUNCTIONS, VARIABLES, check } from '../engine/formula';
   import { pictureOf, PICTURE_LIMITS, type Picture } from '../engine/custom';
+  import { VIDEO } from '../engine/video';
   import Icon from './Icon.svelte';
   import { clock } from './clock.svelte';
   import { TEXT_MAX } from '../engine/fxkit';
@@ -57,7 +58,8 @@
     try {
       const gif = await import('../engine/gif');
       try {
-        const r = await gif.loadPicture(file);
+        const video = await import('../engine/video');
+        const r = video.isVideo(file) ? await video.loadVideo(file) : await gif.loadPicture(file);
         if (fx.id !== id) return;                // another effect is open by now: not for that one
         set('picture', r.packed);
         // an animation plays at its own pace to start with (Speed then stretches or squeezes it)
@@ -65,7 +67,7 @@
         else { set('speed', undefined); set('tempo', undefined); }
         from = { id: fx.id, name: file.name, ...r.from };
       } catch (e) {
-        loadErr = e instanceof gif.PictureError ? e.message : 'That picture could not be read (PNG, JPG, WebP or GIF)';
+        loadErr = e instanceof gif.PictureError ? e.message : 'That picture could not be read (PNG, JPG, WebP, GIF, or a video)';
         ui.toast(loadErr);
       }
     } catch {
@@ -95,7 +97,7 @@
   });
 
   const MAPS: [string, string, string][] = [
-    ['auto', 'Auto', 'A wall on several pixel bars, a line otherwise'],
+    ['auto', 'Auto', 'On a ring or a matrix where each LED really is; a wall on several pixel bars; a line otherwise'],
     ['line', 'Line', 'The lights are one line: the picture scrolls through them (a GIF plays)'],
     ['wall', 'Wall', 'One row of the picture per light, its columns along each light'],
   ];
@@ -147,7 +149,7 @@
       <div class="about">
         {#if !p.picture}
           <b>The sample sunset</b>
-          <span class="faint">Load your own: a PNG, JPG, WebP or an animated GIF.</span>
+          <span class="faint">Load your own: a PNG, JPG, WebP, an animated GIF, or a short video (its first {VIDEO.seconds} seconds).</span>
         {:else if pic}
           <b>{from && from.id === fx.id ? from.name : anim ? 'Your GIF' : 'Your picture'}</b>
           <span class="faint" data-testid="picture-size">{size}</span>
@@ -161,7 +163,7 @@
         </div>
       </div>
     </div>
-    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden bind:this={input} aria-label="Picture or GIF file"
+    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/*,.mp4,.webm,.mov" hidden bind:this={input} aria-label="Picture, GIF or video file"
       onchange={(e) => { const i = e.target as HTMLInputElement, f = i.files?.[0]; i.value = ''; if (f) void load(f); }} />
     {#if loadErr}<p class="err" role="alert">{loadErr}</p>{/if}
     <div class="knob"><span class="lab">On the lights</span>

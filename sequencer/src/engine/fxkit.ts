@@ -28,6 +28,9 @@ export interface EffectParams {
   picture: string;        // the Picture effect: the picture or GIF, packed (engine/custom.ts)
   mapping: string;        // how a picture lies on the lights: 'auto', 'line' (scrolls through), 'wall' (one row per light)
   text: string;           // the Scrolling text effect's words
+  script: string;         // an add-on: its program and knobs (JSON, see engine/custom.ts and ADDONS.md)
+  vals: Record<string, unknown>;   // an add-on's own knobs by id
+  look?: boolean;         // run only to be looked at (a preview): an add-on that's too slow there rests on its own
 }
 
 // Where one element is, for the shape functions.
@@ -59,6 +62,9 @@ export interface Elem {
   first: boolean;         // the first LED of its ring or of its run along the matrix
   cell: number;           // its place in the data
   cells: number;
+  onShape: boolean;       // on a ring or a matrix: sx, sy are where the LED really is
+  sw?: number;            // how far sx and sy reach on that shape (1 and 1 on a ring; 1 and 0.23 on a 32 x 8 matrix)
+  sh?: number;
 }
 // pan/tilt are offsets; strike: a white flash over the look (it stays as it is between strikes)
 export interface FxOut { intensity?: number; color?: Color; pan?: number; tilt?: number; strike?: number }
@@ -72,6 +78,9 @@ export interface EffectDef {
   run: (e: Elem, p: EffectParams) => FxOut;
   noColors?: boolean;     // a pixel show that brings its own colours (no palette in the editor)
   shape?: boolean;        // draws on a ring or a matrix (shapes.ts): the library shows it on those
+  zoom?: boolean;         // a shape effect that doesn't use Size itself: Size makes its picture smaller
+  noFlip?: boolean;       // a shape effect Back doesn't mirror (text, the wiring test)
+  hidden?: boolean;       // not offered on its own (an add-on's runner: the add-ons are offered instead)
 }
 
 // ---------------------------------------------------------------- small helpers

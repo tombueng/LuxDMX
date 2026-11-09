@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.rainbow",
+ "version": "1.0.0",
+ "name": "After the rain",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "The rain thins out and a rainbow comes up, then the next shower. A story; Speed is its length.",
+ "tags": [
+  "rain"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 30,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let r = dist(sx, sy, 0, -1.15)\nlet band = (r - 0.85) / 0.6\nlet bow = band > 0 && band < 1 ? hsv(band * 0.8, 1, 1) : rgb(0, 0, 0)\nlet col = floor((sx + 1) * 10)\nlet y = 1.25 - frac(t * 1.2 + random(col, 2)) * 2.5\nlet rain = (sy - y > 0) * (sy - y < 0.3)\nlet k = smoothstep(0.3, 0.6, c) * (1 - smoothstep(0.88, 1, c))\nrgb(0.4, 0.5, 0.9) * rain * (1 - k) + bow * k * 0.9"
+ }
+}

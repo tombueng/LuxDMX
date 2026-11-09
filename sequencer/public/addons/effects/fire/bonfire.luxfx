@@ -1,0 +1,41 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.bonfire",
+ "version": "1.0.0",
+ "name": "Bonfire",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Flames rising from the bottom of the picture. Size sets how high.",
+ "tags": [
+  "fire"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "size",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0,
+  "size": 0.7
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let h = (sy + 1) / 2\nlet f = fbm(sx * 3, sy * 2 - t * 2.2)\nheat(clamp(f * 1.7 - h * (1.9 - size)))"
+ }
+}

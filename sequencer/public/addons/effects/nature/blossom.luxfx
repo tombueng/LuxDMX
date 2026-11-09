@@ -1,0 +1,38 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.blossom",
+ "version": "1.0.0",
+ "name": "Blossom",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A flower opening its petals, staying a while and closing again. Speed is one bloom.",
+ "tags": [
+  "nature"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 16,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let open = smoothstep(0, 0.5, c) * (1 - smoothstep(0.85, 1, c))\nlet petal = abs(cos(2.5 * ang * tau)) * 0.9 * open\nlet inside = smoothstep(petal, petal - 0.1, rad)\nhsv(0.92, 0.5 + 0.4 * rad, inside) + rgb(1, 0.8, 0.1) * gauss(rad, 0.12) * open"
+ }
+}

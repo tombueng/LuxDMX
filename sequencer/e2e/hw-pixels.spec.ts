@@ -8,7 +8,7 @@ const HOST = process.env.LUXDMX_HOST ?? '';
 const get = async (path: string) => (await fetch(`http://${HOST}${path}`, { signal: AbortSignal.timeout(4000) })).json();
 test.skip(!HOST, 'set LUXDMX_HOST to run against a real box');
 
-interface Port { idx: number; en: boolean; count: number; uni: number; inFps: number; outFps: number; latches: number; partials: number; lost: boolean }
+interface Port { idx: number; en: boolean; count: number; uni: number; inFps: number; outFps: number; latches: number; partials: number; lost: boolean; bright: number; gamma: number }
 const port = async (): Promise<Port | undefined> => ((await get('/pixels.json')).ports as Port[]).find((p) => p.en && p.count === 241);
 const pixel = async (idx: number, i: number) => { const f = await get(`/pixels/frame?port=${idx}`); return (f.px as string).slice(i * 6, i * 6 + 6); };
 
@@ -40,4 +40,33 @@ test('a 241-pixel disc reaches the port whole, over both universes', async ({ pa
   expect(b!.lost).toBe(false);
   expect((b!.latches - a!.latches) / secs).toBeGreaterThan(20);
   expect(b!.partials - a!.partials).toBeLessThan((b!.latches - a!.latches) * 0.1);
+});
+
+test("the LEDs tab on the real disc: the finder's three LEDs, then the test picture, then let go", async ({ page }) => {
+  const p = await port();
+  test.skip(!p, 'no enabled pixel port with 241 pixels');
+  await openConnected(page, HOST);
+  await patch(page, 'gen-disc241', 1, p!.uni, 'Disc');
+  await tab(page, 'Fixtures');
+  await page.locator('.fl li[data-fixture="Disc"]').dblclick();
+  const dlg = page.getByRole('dialog', { name: 'Patch: Disc' });
+  await dlg.getByRole('tab', { name: 'LEDs' }).click();
+  // the finder: the first LED red, the second green, the last blue (on the second universe), nothing else
+  await dlg.getByRole('button', { name: 'Find the wiring on the real one…' }).click();
+  await expect.poll(() => pixel(p!.idx, 0), { timeout: 6000 }).toBe('ff0000');
+  expect(await pixel(p!.idx, 1)).toBe('00ff00');
+  expect(await pixel(p!.idx, 240)).toMatch(/^00[0-9a-f]{2}ff$/);
+  expect(await pixel(p!.idx, 100)).toBe('000000');
+  await dlg.getByRole('button', { name: 'Stop', exact: true }).click();
+  // the test picture: red at the top of the rim, green at 3 o'clock, the middle white, the bottom dark
+  await dlg.getByLabel('Show the picture on the real one too').check();
+  await expect.poll(() => pixel(p!.idx, 15), { timeout: 6000 }).toBe('00ff00');
+  expect(await pixel(p!.idx, 0)).toBe('ff0000');
+  expect(await pixel(p!.idx, 240)).toBe('ffffff');
+  expect(await pixel(p!.idx, 30)).toBe('000000');
+  await dlg.getByLabel('Show the picture on the real one too').uncheck();
+  await expect.poll(() => pixel(p!.idx, 0), { timeout: 6000 }).toBe('000000');
+  // how its LEDs light: what this box's port says (its own brightness, gamma and cap)
+  const cfg = await port();
+  await expect(dlg.getByTestId('led-from')).toContainText(`its pixel port on universe ${cfg!.uni}, brightness ${cfg!.bright}, gamma ${cfg!.gamma / 100}`);
 });

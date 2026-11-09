@@ -322,7 +322,7 @@ export class RemoteHost {
   private effectDots(id: string): string[] {
     const e = this.app.show.effects.find((x) => x.id === id), def = e && EFFECT_MAP.get(e.kind);
     if (!e || !def) return [];
-    const outs = runEffect(def, paramsOf(e.kind, e.params), 6, 0.37);
+    const outs = runEffect(def, { ...paramsOf(e.kind, e.params), look: true }, 6, 0.37);
     const dots = outs.map((o) => {
       if (!o.color && o.intensity === undefined) return '';
       const k = o.intensity ?? 1, c = o.color ?? { r: 1, g: 1, b: 1 };

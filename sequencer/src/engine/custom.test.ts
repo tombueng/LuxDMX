@@ -23,7 +23,7 @@ const pack = (frames: string[][], delays = frames.map(() => 100)) => packPicture
 
 describe('the Formula effect', () => {
   it('is in the list, as a pixel show with a default that runs', () => {
-    expect(CUSTOM_EFFECTS.map((d) => d.id)).toEqual(['formula', 'picture']);
+    expect(CUSTOM_EFFECTS.map((d) => d.id)).toEqual(['formula', 'picture', 'script']);
     expect(def('formula').category).toBe('pixel');
     expect(paramsOf('formula').formula).toBe('hsv(x - c, 1, 1)');
     // the rainbow wave: red, green, blue along the lights at the start
@@ -236,5 +236,121 @@ describe('speed', () => {
       console.log(`${kind}: ${ms.toFixed(3)} ms per frame for 600 pixels`);
       expect(ms).toBeLessThan(2);
     }
+  });
+});
+
+describe('a picture on a ring or a matrix', () => {
+  it('each LED shows the picture where it is: the left half red, the right half blue', async () => {
+    const { EFFECT_MAP, paramsOf, runEffect } = await import('./effects');
+    const { packPicture } = await import('./gif');
+    const { placesFor } = await import('../model/pixelLayout');
+    // 4 x 2: red on the left, blue on the right
+    const px = new Uint8Array(4 * 2 * 3);
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 4; x++) { const o = (y * 4 + x) * 3; if (x < 2) px[o] = 255; else px[o + 2] = 255; }
+    const p = paramsOf('picture', { picture: packPicture(4, 2, [px], [0]) });
+    const at = placesFor({ kind: 'matrix', cols: 8, rows: 8 });
+    const where = Array.from({ length: at.n }, (_, i) => ({ u: 0.5, row: 0, rows: 1, at, cell: i }));
+    const out = runEffect(EFFECT_MAP.get('picture')!, p, at.n, 0.3, 1, where);
+    // (the picture's middle square: the two middle columns, red then blue)
+    for (let i = 0; i < at.n; i++) {
+      const c = out[i].color!;
+      if (at.gx[i] <= 1) expect(c.r, `LED ${i}`).toBeGreaterThan(0.9);
+      if (at.gx[i] >= 6) expect(c.b, `LED ${i}`).toBeGreaterThan(0.9);
+    }
+  });
+});
+
+describe('an add-on from a show file someone sent (the review)', () => {
+  const run = async (script: unknown, vals: unknown = {}, n = 4) => {
+    const { EFFECT_MAP, paramsOf, runEffect } = await import('./effects');
+    const p = paramsOf('script', { script: JSON.stringify(script), vals });
+    return runEffect(EFFECT_MAP.get('script')!, p, n, 0.5, 1);
+  };
+  it('a knob named __proto__ or toString: the effect doesn\'t run, and nothing every object has is touched', async () => {
+    for (const id of ['__proto__', 'toString', 'constructor', 'hasOwnProperty', 'valueOf']) {
+      const out = await run({ pixel: '1', params: [{ id, type: 'colour' }] });
+      expect(out.every((o) => (o.intensity ?? 0) === 0), id).toBe(true);
+    }
+    expect(([] as unknown as Record<number, unknown>)[0]).toBeUndefined();
+    expect(Object.keys(Object.prototype)).toEqual([]);
+    // a value given for a knob it doesn't have stays out
+    const out = await run({ pixel: 'glow', params: [{ id: 'glow', type: 'number', default: 0.5 }] }, JSON.parse('{"__proto__": {"glow": 1}, "toString": 1}'));
+    expect(out[0].intensity).toBeCloseTo(0.5, 6);
+  });
+  it('one that takes too long is stopped, and rests a while instead of eating every frame', async () => {
+    const { EFFECT_MAP, paramsOf, runEffect } = await import('./effects');
+    const heavy = { pixel: 'sum(k, 64, fbm(k, x) + fbm(x, k) + fbm(k * 2, x * 3) + fbm(x * 5, k))', params: [] };
+    const p = paramsOf('script', { script: JSON.stringify(heavy) });
+    const def = EFFECT_MAP.get('script')!, where = Array.from({ length: 4000 }, (_, i) => ({ u: i / 3999, row: 0, rows: 1 }));
+    expect(() => runEffect(def, p, 4000, 0.1, 1, where)).toThrow(/takes too long/);
+    // the next frames: refused at once, not worked out again
+    const t0 = performance.now();
+    expect(() => runEffect(def, paramsOf('script', { script: JSON.stringify(heavy) }), 4000, 0.2, 1, where)).toThrow(/rests/);
+    expect(performance.now() - t0).toBeLessThan(20);
+  });
+  it('per light: two rings of different sizes in one effect each count their own LEDs', async () => {
+    const { EFFECT_MAP, paramsOf, runEffect } = await import('./effects');
+    const { placesFor } = await import('../model/pixelLayout');
+    const a = placesFor({ kind: 'rings', rings: [12] }), b = placesFor({ kind: 'rings', rings: [24] });
+    const where = [...Array.from({ length: 12 }, (_, i) => ({ u: 0.5, row: 0, rows: 2, at: a, cell: i })), ...Array.from({ length: 24 }, (_, i) => ({ u: 0.5, row: 1, rows: 2, at: b, cell: i }))];
+    const p = paramsOf('script', { script: JSON.stringify({ pixel: 'cell / (cells - 1)', params: [] }) });
+    const out = runEffect(EFFECT_MAP.get('script')!, p, 36, 0.3, 1, where);
+    expect(out[11].intensity).toBeCloseTo(1, 6);          // the last of the 12
+    expect(out[12 + 11].intensity).toBeCloseTo(11 / 23, 6); // the 12th of the 24
+  });
+  it('a plain formula knows where an LED is on a ring', async () => {
+    const { EFFECT_MAP, paramsOf, runEffect } = await import('./effects');
+    const { placesFor } = await import('../model/pixelLayout');
+    const at = placesFor({ kind: 'rings', rings: [16, 1] });
+    const where = Array.from({ length: at.n }, (_, i) => ({ u: 0.5, row: 0, rows: 1, at, cell: i }));
+    const out = runEffect(EFFECT_MAP.get('formula')!, paramsOf('formula', { formula: 'rad' }), at.n, 0.3, 1, where);
+    expect(out[0].intensity).toBeCloseTo(1, 6);           // the rim
+    expect(out[16].intensity).toBeCloseTo(0, 6);          // the middle
+  });
+});
+
+describe('the second review', () => {
+  it('a picture on a 32 x 8 panel: the whole width of a wide picture, not a square out of its middle', async () => {
+    const { placesFor, shapeW, shapeH } = await import('../model/pixelLayout');
+    const { placeOf, timed } = await import('./custom');
+    const { paramsOf } = await import('./effects');
+    const pic = timed(155, 35, [new Uint8Array(155 * 35 * 3)], [0]);
+    const at = placesFor({ kind: 'matrix', cols: 32, rows: 8 });
+    const p = paramsOf('picture', {});
+    const xs: number[] = [], ys: number[] = [];
+    for (let i = 0; i < at.n; i++) {
+      const o = placeOf(pic, { x: 0, u: 0, row: 0, rows: 1, m: at.n, total: 0, sx: at.x[i], sy: at.y[i], onShape: true, sw: shapeW(at), sh: shapeH(at) }, p);
+      xs.push(o.cx); ys.push(o.cy);
+    }
+    // 155 x 35 is 31:7 like the panel's LEDs: all of it, edge to edge (a square crop showed its middle 35 x 35)
+    expect(Math.min(...xs)).toBeCloseTo(0, 4); expect(Math.max(...xs)).toBeCloseTo(154, 4);
+    expect(Math.min(...ys)).toBeCloseTo(0, 4); expect(Math.max(...ys)).toBeCloseTo(34, 4);
+    // a square picture on it: its full width, a band out of its middle
+    const sq = timed(64, 64, [new Uint8Array(64 * 64 * 3)], [0]);
+    const ys2 = Array.from({ length: at.n }, (_, i) => placeOf(sq, { x: 0, u: 0, row: 0, rows: 1, m: at.n, total: 0, sx: at.x[i], sy: at.y[i], onShape: true, sw: shapeW(at), sh: shapeH(at) }, p).cy);
+    expect(Math.max(...ys2) - Math.min(...ys2)).toBeCloseTo(64 * 7 / 31 - 1, 3);
+  });
+  it('one too slow on a dozen lights is still caught', async () => {
+    const { EFFECT_MAP, paramsOf, runEffect } = await import('./effects');
+    const slow = { pixel: 'sum(k, 64, fbm(k, x) + fbm(x, k) + fbm(k * 2, x * 3) + fbm(x * 5, k) + fbm(k * 7, x * 9) + fbm(x * 11, k * 13))', params: [] };
+    const def = EFFECT_MAP.get('script')!;
+    let caught = false;
+    for (let f = 0; f < 40 && !caught; f++) {
+      try { runEffect(def, paramsOf('script', { script: JSON.stringify(slow) }), 12, f / 10, 1); } catch (e) { caught = /takes too long/.test(String(e)); }
+    }
+    // (on a fast machine 12 LEDs of this may stay under 30 ms: then there was nothing to catch)
+    const t0 = performance.now();
+    try { runEffect(def, paramsOf('script', { script: JSON.stringify(slow) }), 12, 9, 1); } catch { /* resting */ }
+    expect(caught || performance.now() - t0 < 30).toBe(true);
+  });
+  it('a preview that\'s too slow rests on its own: the show\'s effect goes on', async () => {
+    const { EFFECT_MAP, paramsOf, runEffect } = await import('./effects');
+    // (not the same text as the test above: that one's still resting)
+    const heavy = { pixel: 'sum(k, 64, fbm(k, x) + fbm(x, k) + fbm(k * 2, x * 3) + fbm(x * 5, k)) * 0.5', params: [] };
+    const def = EFFECT_MAP.get('script')!, script = JSON.stringify(heavy);
+    const big = Array.from({ length: 4000 }, (_, i) => ({ u: i / 3999, row: 0, rows: 1 }));
+    expect(() => runEffect(def, { ...paramsOf('script', { script }), look: true }, 4000, 0.1, 1, big)).toThrow(/takes too long/);
+    // the show, on four LEDs: runs
+    expect(runEffect(def, paramsOf('script', { script }), 4, 0.2, 1)).toHaveLength(4);
   });
 });

@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.fog-bank",
+ "version": "1.0.0",
+ "name": "Fog bank",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Grey fog rolling slowly, never quite dark, never bright.",
+ "tags": [
+  "clouds"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let f = fbm(sx * 1.4 + t * 0.07, sy * 1.6 + sin(t * 0.13) * 0.5)\nrgb(0.55, 0.6, 0.66) * (0.06 + 0.6 * smoothstep(0.3, 0.75, f))"
+ }
+}

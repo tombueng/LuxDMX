@@ -1,0 +1,40 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.haunted",
+ "version": "1.0.0",
+ "name": "Haunted light",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "A dim light that flickers and fails, as if something was in the room.",
+ "tags": [
+  "darkness"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "frame": "let fail = random(floor(t * 0.7), 3) < 0.3\nlet fl = fail ? step(0.6, random(floor(t * 9), 1)) : 0.7 + 0.3 * noise(t * 5, 1)",
+  "pixel": "rgb(1, 0.55, 0.2) * fl * (0.1 + 0.9 * gauss(rad, 0.45)) * (0.75 + 0.25 * noise(sx * 3 + t, sy * 3)) * 0.7"
+ }
+}

@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.aurora",
+ "version": "1.0.0",
+ "name": "Northern lights",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Curtains of green and violet light waving across the sky.",
+ "tags": [
+  "nature"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let h = sx * 2 + 0.3 * sin(t * 0.3 + sy * 2)\nlet curtain = pow(wave(noise(h * 1.5, t * 0.1) * 3), 2) * smoothstep(-0.6, 0.6, sy)\nhsv(0.38 + 0.2 * (sy + 1) / 2, 0.9, curtain) + rgb(0, 0, 0.03)"
+ }
+}

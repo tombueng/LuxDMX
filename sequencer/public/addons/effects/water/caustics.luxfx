@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.caustics",
+ "version": "1.0.0",
+ "name": "Caustics",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "The light on the floor of a pool, the bright lines wandering.",
+ "tags": [
+  "water"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let a = fbm(sx * 1.8 + t * 0.18, sy * 1.8 - t * 0.05)\nlet b = fbm(sx * 1.8 - t * 0.12 + 3.7, sy * 1.8 + t * 0.07 + 8.1)\nlet web = pow(clamp(1 - abs(a - b) * 7), 3)\nrgb(0.03, 0.22, 0.38) * (0.8 + 0.4 * a) + rgb(0.65, 0.92, 1) * web"
+ }
+}

@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.whirlpool",
+ "version": "1.0.0",
+ "name": "Whirlpool",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "Water spiralling round and down into the middle.",
+ "tags": [
+  "water"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let a = frac(ang + 0.25 / (rad + 0.1) + t * 0.15)\nmix(rgb(0, 0.1, 0.35), rgb(0.6, 0.9, 1), wave(a * 4) * rad)"
+ }
+}

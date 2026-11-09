@@ -57,8 +57,10 @@ type Node struct {
 	Long      string `json:"long"`
 	Universes []int  `json:"universes"` // port-addresses its outputs play
 	Proto     string `json:"proto"`
-	Bind      int    `json:"-"` // which of its replies (a node with many ports sends one per four)
-	Seen      int64  `json:"-"`
+	// a LuxDMX box: how its pixel ports drive their LEDs (pixels.go), so the page draws them that way
+	PixelPorts []PixelPort `json:"pixelPorts,omitempty"`
+	Bind       int         `json:"-"` // which of its replies (a node with many ports sends one per four)
+	Seen       int64       `json:"-"`
 }
 
 func parsePollReply(b []byte) (Node, bool) {

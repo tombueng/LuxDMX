@@ -34,8 +34,13 @@ function within<T>(p: Promise<T>, ms: number, giveUp: () => void): Promise<T> {
 
 // The song as a file, as if it had been loaded from the disk. progress(got, total): bytes so far
 // and the size (0 when the server doesn't say). `stallMs`: how long an address may stay silent.
+// Our copies on the public site: the last place to try, wherever the app runs (on this computer
+// or another server, `songs/` next to it may not have them; GitHub Pages lets any page fetch them)
+export const PUBLIC_SONGS = 'https://tombueng.github.io/LuxDMX/sequencer/';
 export async function downloadSong(s: CatalogSong, progress: (got: number, total: number) => void, signal?: AbortSignal, stallMs = STALL_MS): Promise<File> {
-  for (const url of [s.url, s.mirror].filter((u): u is string => !!u)) {
+  const here = typeof location !== 'undefined' && s.mirror ? new URL(s.mirror, location.href).href : '';
+  const pub = s.mirror ? new URL(s.mirror, PUBLIC_SONGS).href : '';
+  for (const url of [s.url, s.mirror, pub && pub !== here ? pub : ''].filter((u): u is string => !!u)) {
     signal?.throwIfAborted();
     // this address's own stop: the person's Cancel, or this address going silent
     const ctl = new AbortController(), stop = () => ctl.abort();

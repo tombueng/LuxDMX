@@ -329,7 +329,8 @@ Three more demos come with their own room on the 3D stage:
   61, 37) or a matrix (8 x 8, 16 x 16, 32 x 8) is one light with a shape. Pick it in Add fixtures, or
   "Ring or matrix..." for your own: how many LEDs on each ring, or columns and rows, where the data
   starts and which way it runs. A picture walks the LEDs in data order, to compare with the real
-  one. Over 170 RGB pixels (128 RGBW) a light runs on over the next universes, whole pixels on
+  one. Once it's patched, its **LEDs** tab (double-click it in the list) has a test picture for the
+  real one, turns and mirrors it, and finds the wiring from three LEDs you click. Over 170 RGB pixels (128 RGBW) a light runs on over the next universes, whole pixels on
   each, the way a LuxDMX box's pixel port reads it: patch it on the universe the port starts at.
   A box tells the app what its ports listen on and only gets those universes. If a line under the
   top bar says "No box plays pixel universe ...", set a pixel port to that universe, or update the
@@ -346,6 +347,32 @@ Three more demos come with their own room on the 3D stage:
     order. If the picture is scrambled, that's the shape (or the LED count), not the effect.
   - **The Ring and matrix template** (Shows, or Ctrl+K) has a disc, a matrix, a ring and a banner
     from universe 10, with lists of these effects ready on the live page.
+- **Add-ons** (Effects, Add, Add-ons): fifty effects for rings, discs and matrices in ten themes:
+  radioactive, fire, rain, clouds, sun, love, darkness, water, the sea and nature (a trefoil
+  sign, a Geiger counter, a meltdown, embers, a bonfire, a thunderstorm, a sunrise, an eclipse, a
+  beating heart, watching eyes, ripples, a jellyfish, northern lights, fireflies...). Pick a theme
+  to see its five. They come as packages from our add-on repository (next to the app, kept for
+  offline use) and run in a sandbox: a little language of our own that sees the light it draws
+  on and nothing else (ADDONS.md). Some have knobs of their own (Trefoil's colour and how fast it
+  turns, the Geiger counter's activity, how much drizzle, the heartbeat's pulse, the fireflies'
+  colour); the settings show those and only the standard knobs that change it.
+  - **Share as a file** (an effect's settings, More): any effect, an add-on, a built-in as you set
+    it, a formula or a picture, saved as a `.luxfx` file with your name, what it is, a licence and
+    a little animation. **Import an effect file…** (the add-ons' line in the library) reads one
+    strictly, shows it under Imported (kept in this browser; × forgets it) and refuses one that
+    isn't right, saying why.
+  - **More sources…** (at the end of the add-ons): someone else's repository by its address
+    (https). Only add sources you trust: anyone can put one up, and what it says about its effects
+    isn't checked by anyone (the effects run in the same sandbox as ours). Adding one needs a tick
+    that you trust it, and it's kept only once it loads; its effects show under "From ..." in this
+    browser, × removes it again. An imported effect or one from another source shows its own
+    little animation; one that has none plays only when you point at its card, so nobody's code
+    runs just because the library is open. One that takes too long (over 30 ms a frame) stops
+    and rests a few seconds, a message says which one; the rest of the show goes on.
+- **Every knob does something.** An effect's settings show only what changes that effect (a ring's
+  Eye has no palette, a random colour no Size): engine/knobs.ts lists them, and a test runs every
+  effect with every knob moved to check. On a ring or a matrix **Size** makes the picture smaller
+  and **Back** mirrors it, so what turns turns the other way.
 - **Your own effects** (Effects, Add, under Pixels):
   - **Formula**: one line that says how bright, or which colour, each pixel is, like
     `hsv(x - c, 1, 1)` (a rainbow rolling along). `x` is where the pixel is (0 to 1), `t` the
@@ -356,7 +383,10 @@ Three more demos come with their own room on the 3D stage:
     is shown right under the field, where it is, and the lights keep the last formula that
     worked. A formula can only light pixels: it's read by the app itself, never run as code, so a
     show from someone else is safe to open.
-  - **Picture**: load a PNG, JPG, WebP or an animated GIF. On a strip or a row of PARs the picture
+  - **Picture**: load a PNG, JPG, WebP, an animated GIF or a short video (MP4, WebM, whatever the
+    browser plays: its first 8 seconds at up to 12 frames a second, 64 at most). On a ring, a disc
+    or a matrix the picture lies where the LEDs really are, its middle filling the shape (a wide
+    one loses its sides). On a strip or a row of PARs the picture
     scrolls through the lights, one row of it at a time (a pass per round), and a GIF plays its
     frames at its own pace (Speed stretches or squeezes it). On several pixel bars it shows as a
     wall, one row of the picture per bar. "On the lights" picks line or wall yourself. Pictures
@@ -403,7 +433,8 @@ Three more demos come with their own room on the 3D stage:
   alternative, drum & bass and funk; credits and licences in [SONGS.md](SONGS.md)), free to use under their Creative Commons licences, listed by genre with their
   tempo, length and credit, or the demo beat (ten minutes at 126 BPM, made in the app). Listen
   plays 15 seconds of one first. Picking a song downloads it (with a progress bar; if its own site
-  is down or blocked it tries our copy, and says so in plain words when neither works) and keeps
+  is down or blocked it tries our copy, then the one on the public site, and says so in plain words
+  when none works) and keeps
   it in this browser like a loaded file. It brings its tempo, its first downbeat and its parts
   (intro, verse, chorus, drop...): they show as a strip on the ruler, a click on one goes there,
   and cues snap to them. A song file of your own gets the same, found from its sound when it's
@@ -605,6 +636,43 @@ Three more demos come with their own room on the 3D stage:
   modes say what picking one does (how many channels more or fewer, which lights after it would
   move and to where, what comes free): **Use it**, or **Use it, move the lights after it**. The real
   light has to be set to the same mode (its menu, DIP switches, or RDM).
+  - **Try every channel**: each one has a slider and a number that send that value to the real
+    light (through the programmer, so Blind, Blackout and the machines' arming apply as always), a
+    wheel's or a gobo's slots are buttons that send the middle of their range, and **All to
+    default**, **All to 0**, **All full** and **Let go of all** do the whole light. A held channel is
+    marked; its **×** gives it back to the show.
+  - **Change what the channels do**: name, what it does, fine, default and the named ranges, right in
+    the table. **Save for all N lights of this type** (a type of your own changes in place; one from
+    the library becomes a copy the lights use) or **Only for** this light (a copy for it alone). To
+    add or remove channels, use "Change the channel layout" in the fixture list's menu.
+  - **A ring or a matrix** shows one pixel's channels, standing for every pixel: their sliders set
+    all pixels at once, and changing what one does (a GRB panel: the first is green, the second red)
+    changes it on every pixel.
+- **A ring's or a matrix's LEDs** (the patch's **LEDs** tab): which way it's wired, in words, and a
+  picture of it seen from the front. The **Test picture** is an F with its corners in four colours
+  on a matrix (top left red, top right green, bottom left blue, bottom right yellow), and an arrow
+  pointing up with red at the top of the rim and green on its right on a ring: it looks wrong
+  whichever way the real one is off. **Show the picture on the real one too** puts it on the LEDs.
+  Mirrored or turned on the real one? **Mirror ↔**, **Mirror ↕**, **Turn ↻** and **↺ Turn** until
+  it looks like the picture (a ring also turns by one LED, and **Inside out** when its data starts
+  in the middle). **Find the wiring on the real one** lights the first LED red, the second green
+  and the last blue; click where you see each of them in the picture, and the wiring follows.
+  **Data order** shows the same three and walks a dot along the LEDs. **Wiring by hand**: columns
+  and rows, the corner the data starts in, along the rows or the columns, zigzag; or the LEDs per
+  ring, the direction and the angle. It's the light's own wiring (two of the same panel can hang
+  differently); **Set up: All N of this type** gives them all the same, **Back to the type's
+  wiring** drops it. Effects, the stage and the 3D stage follow it.
+  - **How the LEDs light** (also for a pixel strip): WS2812 pixels on a LuxDMX box go through its
+    gamma and brightness and are rounded to 8 bits, so the low end of a fade is simply off (at
+    brightness 150, everything below DMX 25), and over its power cap everything is dimmed together.
+    The 2D and 3D stage draw them that way: what the real LEDs don't show is dark there too. The
+    numbers come from the box that plays the light, through its bridge or through LuxDMX Link 1.4 or
+    later (same universe and start channel: "From
+    dmx-gateway: its pixel port on universe 10, brightness 150, gamma 2.2, a 500 mA cap"), else
+    from a port as it comes (gamma 2.2, brightness 255, no cap). **Brightness**, **Gamma**, **Power
+    cap**, **mA per colour** and **mA dark** can be set here for a light whose box isn't connected
+    or says something else; **As the box has it** goes back. It says from which DMX value on a
+    colour lights at all. Only the pictures change: what goes out is the same.
 - **Setting up a light** (the patch's **Mounting** tab, or **Mounting…** in a light's menu, for the selection too): how it's mounted, the way it's done at a
   rig. A moving head is **Hung** (under a truss, it goes onto the nearest one), **Standing**, **On
   its side** on the left or right (base against a tower, head towards the middle) or **at the
@@ -617,8 +685,12 @@ Three more demos come with their own room on the 3D stage:
   on and off, on the picture and, with **On the real lights too**, on the real ones (through the
   programmer, so Blind, Blackout and the machine safety apply as always; machines get nothing;
   switching it off or closing gives the lights back what they had). Watch the real head do what
-  the picture does: turning the other way means **Invert pan** or **Invert tilt**, tilting when it
-  should pan means **Swap pan and tilt**. **Pan range** and **Tilt range** for a light whose type
+  the picture does: tilting when it should pan means **Swap pan and tilt**. Turning the other way:
+  first check how it's mounted; if
+  that's right, its type has the direction the other way round from this light: **Pan turns the
+  other way round** (or tilt) puts the picture, Aim and the 3D stage right and changes nothing on
+  the wire. **Invert pan** / **Invert tilt** turn what a cue sends round instead (the real head and
+  the picture both follow): for heads that should mirror each other. **Pan range** and **Tilt range** for a light whose type
   doesn't say (540 and 270 if nothing does). **Point it at a mark**: pick the centre of the stage
   or a front corner (it says how far from the middle and the edge, to put a bit of tape there), the
   head goes where the model thinks the mark is, nudge it (1°, 5° or 0.2° steps) until the real beam
@@ -628,6 +700,30 @@ Three more demos come with their own room on the 3D stage:
   mirrored for the ones on the other side of the middle (on its side on the left becomes on its
   side on the right); **Make the other 3 like Head 1** copies one light's setup to the rest (its
   offsets only when asked: every head is a little different). One Undo per change.
+- **Focus and calibrate** (a moving head's menu, for all the heads selected; or the link under
+  "Point it at a mark"): so ten heads really meet on one spot, the way the big consoles do it.
+  Tape a few marks on the real stage; the app suggests a rectangle on the deck and its middle, and
+  each mark's place can be typed in (metres across from the middle, back from the front edge, up
+  from the floor; a small plan shows them). Pick a mark, and for each head: steer it with the
+  arrows (or ◀ ▶ ▲ ▼, in 0.2°, 1° or 5° steps, or its Pan % and Tilt %) until the real beam is on
+  the tape, then **Head 3 is on Front left**; the next head that isn't on it yet comes up. **On the
+  real heads** sends it out (through the programmer, so Blind applies), **Only the one I'm steering
+  is lit** keeps the others dark so you know which beam is which; a gobo with a cross or a narrow
+  zoom helps. Once a head has been on three marks (four for its tilt offset too), **Work it out**
+  says where it really hangs (metres left or right, up, from the front edge), how it's turned, its
+  offsets and how well it fits: "fits all its marks within 2 cm", or which mark is off (steered
+  wrongly, or the tape isn't where the table says). If its pan turns the other way round from
+  what its type says it says so, and Use it ticks "Pan turns the other way round" for it (a tilt
+  the other way round is the same to the beams as a pan offset of 180°, so it comes out as that); if it
+  points as if it hung quite differently (turned over), it says that too. With every mark at one
+  height, a head's mirror image on the other side of them fits just as well; it then takes the
+  likelier one (not reversed, above the floor) and says so: give one mark another height (a box
+  on the stage) and steer it there to settle it. Its invert settings are
+  never changed. **Use it** puts that into the show (one Undo): from then on Aim, the 3D stage and every
+  position worked out from a place point it where the real one goes. **Keep the marks as position
+  presets** makes one position preset per mark with each head's own pan and tilt (focus palettes):
+  at the next venue, steer them again and keep them again, and every cue using them follows. What
+  was steered stays while the app is open, also when the dialog is closed.
 - **Big rigs**: past a dozen lights the fixture list gets a filter (name, type, group, or an
   address: "25" finds whatever sits on channel 25). The library search works from the keyboard
   (arrows, Enter loads, Enter again uses it) and lists each mode's channels, to hold next to the

@@ -3,7 +3,7 @@
 // show file: formulas are parsed and evaluated by our own small interpreter (formula.ts).
 import { unzlibSync } from 'fflate';
 import type { Color } from '../model/types';
-import { EXAMPLES, FormulaError, compileCached, newCtx, type Formula } from './formula';
+import { EXAMPLES, FormulaError, PROGRAM_LIMITS, compileCached, compileProgramCached, newCtx, runFrame, runPixel, type Formula, type Program, type ProgramParam } from './formula';
 import { frac, hash, along, range, tri, type EffectDef, type EffectParams, type FxOut } from './fxkit';
 
 // ---------------------------------------------------------------- the formula
@@ -39,6 +39,8 @@ const formula: EffectDef = {
     ctx.x = e.x; ctx.u = e.u; ctx.i = e.k; ctx.n = e.m; ctx.row = e.row; ctx.rows = e.rows;
     ctx.t = e.secs; ctx.beat = e.beats; ctx.c = e.cycle; ctx.phase = e.phase;
     ctx.bass = p.sound ?? 0; ctx.rnd = hash(e.seed, 5); ctx.size = p.size; ctx.colors = p.colors;
+    ctx.sx = e.sx; ctx.sy = e.sy; ctx.rad = e.rad; ctx.ang = e.ang; ctx.lane = e.lane; ctx.lanes = e.lanes; ctx.gx = e.gx; ctx.gy = e.gy;
+    ctx.gw = e.gw; ctx.gh = e.gh; ctx.first = e.first ? 1 : 0; ctx.cell = e.cell; ctx.cells = e.cells;
     if (f.type === 'num') return { intensity: range(p, unit(f.num(ctx))), color: along(p.colors, e.x) };
     const o = f.col(ctx);
     return lit(unit(o[0]), unit(o[1]), unit(o[2]), p);
@@ -179,10 +181,18 @@ export function sampleAt(pic: Picture, f: number, cx: number, cy: number, wrap: 
 // width; a still picture scrolls through them one row per moment (a whole pass per round), an
 // animation plays its frames on its middle row. `wall`: one picture row per light of the group,
 // columns along each light. `auto`: a wall when the group is several lights with pixels each.
-export function placeOf(pic: Picture, e: { x: number; u: number; row: number; rows: number; m: number; total: number }, p: EffectParams): { f: number; cx: number; cy: number; wrap: boolean } {
+export function placeOf(pic: Picture, e: { x: number; u: number; row: number; rows: number; m: number; total: number; sx?: number; sy?: number; onShape?: boolean; sw?: number; sh?: number }, p: EffectParams): { f: number; cx: number; cy: number; wrap: boolean } {
   const r = frac(e.total), there = p.direction === 'bounce' ? tri(r) : r;
   const anim = pic.frames.length > 1;
   const f = anim ? frameAt(pic, there * pic.total) : 0;
+  // on a ring or a matrix: where each LED really is, the picture filling it (its middle, cropped
+  // to the light's own shape, square on a ring, wide on a 32 x 8 panel: what sticks out over the
+  // sides is lost and nothing stays black)
+  if (e.onShape && p.mapping === 'auto') {
+    const sw = e.sw || 1, sh = e.sh || 1, u = ((e.sx ?? 0) / sw + 1) / 2, v = (1 - (e.sy ?? 0) / sh) / 2;
+    const shape = sw / sh, cw = pic.w / pic.h > shape ? pic.h * shape : pic.w, ch = pic.w / pic.h > shape ? pic.h : pic.w / shape;
+    return { f, cx: (pic.w - cw) / 2 + u * (cw - 1), cy: (pic.h - ch) / 2 + v * (ch - 1), wrap: false };
+  }
   const wall = p.mapping === 'wall' || (p.mapping !== 'line' && e.rows > 1 && e.m > e.rows);
   if (wall) return { f, cx: e.u * (pic.w - 1), cy: e.rows > 1 ? e.row / (e.rows - 1) * (pic.h - 1) : (pic.h - 1) / 2, wrap: false };
   const cx = e.x * (pic.w - 1);
@@ -204,4 +214,100 @@ const picture: EffectDef = {
   },
 };
 
-export const CUSTOM_EFFECTS: EffectDef[] = [formula, picture];
+// ---------------------------------------------------------------- an add-on
+
+// What an add-on effect keeps in its params (`script`, JSON): its program and its own knobs, and
+// which of the standard knobs it uses (the editor shows those). Its knobs' values are in `vals`.
+// (its knobs as the package describes them: ADDONS.md)
+export type ScriptParam = ProgramParam & { name: string; description?: string; default?: unknown; min?: number; max?: number; step?: number; unit?: string; choices?: { value: string; name: string }[] };
+// (speed: the Speed its time runs at 1:1; defaults: the package's own starting knobs, for "Back to
+// the defaults")
+export interface Script { id: string; name: string; frame?: string; pixel: string; params: ScriptParam[]; uses?: string[]; speed?: number; defaults?: Record<string, unknown> }
+// A knob's id: a name a program can use, never one every object already has (a show file can say
+// anything: "__proto__" or "toString" mustn't reach an object's insides)
+const PROTO = new Set([...Object.getOwnPropertyNames(Object.prototype), '__proto__', 'prototype', 'constructor']);
+export const knobId = (id: unknown): id is string => typeof id === 'string' && /^[a-z][a-zA-Z0-9]{0,31}$/.test(id) && !PROTO.has(id);
+const TYPES = new Set(['number', 'choice', 'toggle', 'colour', 'text']);
+const scripts = new Map<string, Script | null>();
+export function scriptOf(s: string): Script | null {
+  if (!s) return null;
+  let v = scripts.get(s);
+  if (v === undefined) {
+    try {
+      const o = JSON.parse(s);
+      v = o && typeof o === 'object' && typeof o.pixel === 'string' && (o.frame === undefined || typeof o.frame === 'string') && Array.isArray(o.params)
+        && o.params.length <= 24 && o.params.every((q: unknown) => !!q && typeof q === 'object' && knobId((q as ScriptParam).id) && TYPES.has((q as ScriptParam).type))
+        && new Set(o.params.map((q: ScriptParam) => q.id)).size === o.params.length ? o as Script : null;
+    } catch { v = null; }
+    if (scripts.size > 200) scripts.clear();
+    scripts.set(s, v);
+  }
+  return v;
+}
+// its knobs as the program reads them: numbers (a choice by its place, on/off as 1/0) and colours
+function knobsInto(sc: Script, vals: Record<string, unknown>, k: ReturnType<typeof newCtx>) {
+  for (const q of sc.params) {
+    const v = vals && typeof vals === 'object' && Object.hasOwn(vals, q.id) ? vals[q.id] : q.default;
+    if (q.type === 'colour') {
+      const h = typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : '#ffffff';
+      const c = Object.hasOwn(k.cols, q.id) ? k.cols[q.id] : (k.cols[q.id] = new Float64Array(3));
+      c[0] = parseInt(h.slice(1, 3), 16) / 255; c[1] = parseInt(h.slice(3, 5), 16) / 255; c[2] = parseInt(h.slice(5, 7), 16) / 255;
+    } else if (q.type === 'choice') {
+      const list = (q as { choices?: { value: string }[] }).choices ?? [];
+      k.vals[q.id] = Math.max(0, list.findIndex((x) => x.value === v));
+    } else k.vals[q.id] = typeof v === 'boolean' ? +v : typeof v === 'number' && Number.isFinite(v) ? v : 0;
+  }
+}
+// (its program, once per script: scriptOf hands the same object out for the same text)
+const programs = new WeakMap<Script, Program | FormulaError>();
+// (one context per program: the frame part's values stay there for its LEDs)
+// (t0: when its frame started, for the time it may take; resting: until when it's left out after
+// taking too long, so it doesn't eat every frame)
+type Run = { k: ReturnType<typeof newCtx>; secs: number; beats: number; p: EffectParams | null; t0: number; n: number; resting: number };
+// (the show's and the previews' apart: a preview on a big disc that's too slow mustn't keep the
+// show's effect out while the editor is open, nor share its frame part)
+const runs = new WeakMap<Program, Run>(), looks = new WeakMap<Program, Run>();
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+export const SCRIPT_REST_MS = 5000;
+const script: EffectDef = {
+  id: 'script', name: 'Add-on', category: 'pixel', shape: true, noColors: false, hidden: true,
+  blurb: 'An effect from a package: an add-on of ours or one you imported.',
+  defaults: { speed: 8, tempo: false, spread: 0 },
+  run: (e, p) => {
+    const sc = scriptOf(p.script);
+    if (!sc) return { intensity: 0 };
+    let prog = programs.get(sc);
+    if (!prog) { prog = compileProgramCached({ frame: sc.frame, pixel: sc.pixel }, sc.params); programs.set(sc, prog); }
+    if (prog instanceof FormulaError) throw new Error(`its code doesn't read: ${prog.message}`);
+    const all = p.look ? looks : runs;
+    let r = all.get(prog);
+    if (!r) { r = { k: newCtx(), secs: NaN, beats: NaN, p: null, t0: 0, n: 0, resting: 0 }; r.k.budget = PROGRAM_LIMITS.work; all.set(prog, r); }
+    const k = r.k;
+    // a new frame (or another effect with the same program): its knobs, the time, the frame part
+    if (r.secs !== e.secs || r.beats !== e.beats || r.p !== p) {
+      if (r.resting && now() < r.resting) throw new Error(`it takes too long to work out (over ${PROGRAM_LIMITS.ms} ms a frame), so it rests a few seconds`);
+      r.resting = 0; r.t0 = now(); r.n = 0;
+      r.secs = e.secs; r.beats = e.beats; r.p = p;
+      // (Speed: its time runs faster or slower than at the speed it came with)
+      k.t = e.secs * ((sc.speed ?? 8) / Math.max(0.05, p.speed)); k.beat = e.beats; k.c = e.cycle; k.bass = p.sound ?? 0; k.size = p.size; k.colors = p.colors;
+      k.n = e.m; k.rows = e.rows;
+      knobsInto(sc, p.vals ?? {}, k);
+      runFrame(prog, k);
+    }
+    k.x = e.x; k.u = e.u; k.i = e.k; k.row = e.row; k.phase = e.phase; k.rnd = hash(e.seed, 5);
+    k.sx = e.sx; k.sy = e.sy; k.rad = e.rad; k.ang = e.ang; k.lane = e.lane; k.gx = e.gx; k.gy = e.gy; k.first = e.first ? 1 : 0; k.cell = e.cell;
+    k.lanes = e.lanes; k.gw = e.gw; k.gh = e.gh; k.cells = e.cells;
+    // (the clock looked at on each of a frame's first 32 LEDs, then every 32: cheap, and a slow one
+    // is caught within its frame however few LEDs it plays on)
+    const n = ++r.n;
+    if ((n <= 32 || (n & 31) === 0) && now() - r.t0 > PROGRAM_LIMITS.ms) {
+      r.resting = now() + SCRIPT_REST_MS;
+      throw new Error(`it takes too long to work out (over ${PROGRAM_LIMITS.ms} ms a frame), so it rests a few seconds`);
+    }
+    const o = runPixel(prog, k);
+    if (typeof o === 'number') return { intensity: range(p, unit(o)), color: along(p.colors, e.x) };
+    return lit(unit(o[0]), unit(o[1]), unit(o[2]), p);
+  },
+};
+
+export const CUSTOM_EFFECTS: EffectDef[] = [formula, picture, script];

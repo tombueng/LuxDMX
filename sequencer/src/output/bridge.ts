@@ -4,6 +4,7 @@
 // See DESIGN.md, "Talking to LuxDMX".
 
 import type { RdmReply, RdmRequest } from '../rdm/types';
+import type { PortInfo } from '../model/ledCurve';
 
 const HEARTBEAT_MS = 250;
 const INFO_KEY = 'luxdmx.seq.box.';
@@ -22,10 +23,15 @@ export type BridgeState = 'closed' | 'opening' | 'asking' | 'ready' | 'denied' |
 
 export interface BoxOutput { en: boolean; uni: number }
 
+// A box's pixel ports as its bridge page says them (only the well-formed ones)
+export const portsOf = (v: unknown): PortInfo[] => (Array.isArray(v) ? v : []).filter((q): q is PortInfo => !!q && typeof q === 'object'
+  && ['uni', 'start', 'count', 'bright', 'gamma', 'maxMa', 'mAPerCh', 'quiesMa'].every((k) => Number.isFinite((q as Record<string, unknown>)[k])));
+
 export class Bridge {
   state: BridgeState = 'closed';
   outputs: BoxOutput[] = [];
   pixels: number[] = [];      // the universes its pixel ports listen on
+  ports: PortInfo[] = [];     // and how each drives its LEDs (a box older than this doesn't say)
   name = '';
   ip = '';             // the box's own address (what a phone can reach when the name doesn't resolve there)
   fps = 0;
@@ -91,9 +97,9 @@ export class Bridge {
     switch (m.type) {
       case 'asking': this.set('asking'); break;
       case 'ready':
-        this.outputs = m.outputs ?? []; this.pixels = Array.isArray(m.pixels) ? m.pixels.filter(Number.isInteger) : []; this.name = m.name ?? ''; this.ip = typeof m.ip === 'string' ? m.ip : ''; this.sent.clear(); this.adopting = false;
+        this.outputs = m.outputs ?? []; this.pixels = Array.isArray(m.pixels) ? m.pixels.filter(Number.isInteger) : []; this.ports = portsOf(m.pixelPorts); this.name = m.name ?? ''; this.ip = typeof m.ip === 'string' ? m.ip : ''; this.sent.clear(); this.adopting = false;
         // kept for this tab: a popup taken back after a reload doesn't say it again
-        try { sessionStorage.setItem(INFO_KEY + this.host, JSON.stringify({ outputs: this.outputs, pixels: this.pixels, name: this.name, ip: this.ip })); } catch { /* fine */ }
+        try { sessionStorage.setItem(INFO_KEY + this.host, JSON.stringify({ outputs: this.outputs, pixels: this.pixels, ports: this.ports, name: this.name, ip: this.ip })); } catch { /* fine */ }
         try { if (this.name) localStorage.setItem(NAME_KEY + this.host, this.name); } catch { /* fine */ }
         this.set('ready'); break;
       case 'denied': this.adopting = false; this.set('denied'); break;
@@ -122,7 +128,7 @@ export class Bridge {
     this.sent.clear();
     try {
       const info = JSON.parse(sessionStorage.getItem(INFO_KEY + this.host) ?? 'null');
-      if (info) { this.outputs = info.outputs ?? []; this.pixels = Array.isArray(info.pixels) ? info.pixels : []; this.name = info.name ?? ''; this.ip = info.ip ?? ''; }
+      if (info) { this.outputs = info.outputs ?? []; this.pixels = Array.isArray(info.pixels) ? info.pixels : []; this.ports = portsOf(info.ports); this.name = info.name ?? ''; this.ip = info.ip ?? ''; }
     } catch { /* it sends everything until it says otherwise */ }
     this.set('opening');
     src.postMessage({ luxdmx: 1, type: 'hello' }, this.origin);

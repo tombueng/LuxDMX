@@ -3,7 +3,8 @@
 // itself, no popup and no click, and finds the nodes on the network with ArtPoll. (From a page on
 // the internet, like the app on GitHub Pages, Chrome first asks whether the site may reach devices
 // on the local network: see `access`.) Frames go out as the LuxDMX bridge takes them ('D' frames).
-import { Bridge } from './bridge';
+import { Bridge, portsOf } from './bridge';
+import type { PortInfo } from '../model/ledCurve';
 import type { RdmReply, RdmRequest } from '../rdm/types';
 
 export const LINK = 'link';
@@ -11,7 +12,8 @@ export const LINK_URL = 'ws://127.0.0.1:47920/ws';
 // This page, to Link: its own connection and its output thread's say the same id, so Link's status
 // page counts one page (Link 1.2.0 on; an older Link ignores it)
 export const PAGE_ID = (() => { try { return crypto.randomUUID(); } catch { return Math.random().toString(36).slice(2); } })();
-export interface LinkNode { ip: string; short: string; long: string; universes: number[] }
+// (pixelPorts: a LuxDMX box's pixel ports, read by Link 1.4 on from its /pixels.json)
+export interface LinkNode { ip: string; short: string; long: string; universes: number[]; pixelPorts?: PortInfo[] }
 
 export class LinkOutput extends Bridge {
   nodes: LinkNode[] = [];
@@ -48,7 +50,7 @@ export class LinkOutput extends Bridge {
       let m: { type?: string; version?: string; nodes?: LinkNode[]; fps?: Record<string, number> };
       try { m = JSON.parse(e.data); } catch { return; }
       // (a node that answers with no outputs says universes: null)
-      const fix = (ns?: LinkNode[]) => (ns ?? []).map((n) => ({ ...n, universes: n.universes ?? [] }));
+      const fix = (ns?: LinkNode[]) => (ns ?? []).map((n) => ({ ...n, universes: n.universes ?? [], pixelPorts: portsOf(n.pixelPorts) }));
       if (m.type === 'hello') { this.version = m.version ?? ''; this.nodes = fix(m.nodes); this.sent.clear(); ws.send(JSON.stringify({ type: 'page', id: PAGE_ID })); this.routes(); this.set('ready'); }
       else if (m.type === 'nodes') { this.nodes = fix(m.nodes); this.changedNow(); }
       else if (m.type === 'stats') { this.fps = Math.max(0, ...Object.values(m.fps ?? {}), 0); this.changedNow(); }

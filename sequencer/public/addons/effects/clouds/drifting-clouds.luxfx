@@ -1,0 +1,39 @@
+{
+ "format": "luxdmx-effect",
+ "formatVersion": 1,
+ "id": "luxdmx.drifting-clouds",
+ "version": "1.0.0",
+ "name": "Drifting clouds",
+ "author": {
+  "name": "LuxDMX",
+  "url": "https://github.com/tombueng/LuxDMX"
+ },
+ "license": "MIT",
+ "description": "White clouds drifting across a blue sky.",
+ "tags": [
+  "clouds"
+ ],
+ "category": "pixel",
+ "fits": [
+  "ring",
+  "disc",
+  "matrix"
+ ],
+ "uses": [
+  "speed",
+  "level",
+  "range",
+  "contrast",
+  "orientation"
+ ],
+ "params": [],
+ "defaults": {
+  "speed": 8,
+  "tempo": false,
+  "spread": 0
+ },
+ "code": {
+  "lang": "luxfx-1",
+  "pixel": "let f = fbm(sx * 1.6 + t * 0.15, sy * 1.6)\nmix(rgb(0.08, 0.3, 0.9), rgb(1, 1, 1), smoothstep(0.45, 0.72, f))"
+ }
+}

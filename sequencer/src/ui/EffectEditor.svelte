@@ -5,6 +5,10 @@
   import CustomEffectFields from './CustomEffectFields.svelte';
   import { app } from '../app.svelte';
   import { EFFECTS, EFFECT_MAP, PALETTES, paramsOf, type Direction } from '../engine/effects';
+  import { knobsOf, type Knob } from '../engine/knobs';
+  import { scriptOf } from '../engine/custom';
+  import { PackageError, packageOfEffect } from '../addons/package';
+  import { previewOf } from '../addons/preview';
   import type { Color } from '../model/types';
 
   // By id, looked up in the show: the editor changes the show's own object.
@@ -21,13 +25,43 @@
   ];
   const hex = (c: Color) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
   const fromHex = (h: string): Color => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
-  const usesColors = $derived(['colorChase', 'colorFade', 'gradient', 'random', 'police', 'fire', 'ocean'].includes(fx.kind) || (def?.category === 'pixel' && !def.noColors));
-  // (most colour effects say a colour and no level: nothing for it to work on)
-  const usesContrast = $derived(def?.category === 'pixel' || def?.category === 'intensity' || ['police', 'fire', 'ocean'].includes(fx.kind));
-  const usesWidth = $derived(['chase', 'pingpong', 'strobe', 'meteor'].includes(fx.kind));
+  // only the knobs that change this effect (engine/knobs.ts, checked against every effect; an
+  // add-on says its own, measured when it was packed)
+  const sc = $derived(fx.kind === 'script' ? scriptOf(p.script) : null);
+  const STD: Record<string, Knob[]> = { speed: ['speed'], size: ['size'], spread: ['spread'], direction: ['direction'], orientation: ['direction'], blocks: ['blocks'], width: ['width'], range: ['low', 'high'], contrast: ['contrast'], palette: ['colors'] };
+  const live = $derived(sc ? new Set<Knob>((sc.uses ?? []).flatMap((u) => STD[u] ?? [])) : knobsOf(fx.kind));
+  const own = $derived(sc?.params ?? []);
+  const vals = $derived((p.vals ?? {}) as Record<string, unknown>);
+  const setVal = (id: string, v: unknown) => set('vals', { ...vals, [id]: v });
+  const usesColors = $derived(live.has('colors'));
+  const usesContrast = $derived(live.has('contrast'));
+  const usesWidth = $derived(live.has('width'));
+  // (the order of the lights matters to an effect where they differ: spread, direction or blocks)
+  const usesOrder = $derived(live.has('spread') || live.has('direction') || live.has('blocks'));
+  // (on a ring or a matrix Back mirrors the picture; the other directions are for rows of lights)
+  const dirs = $derived(def?.shape ? DIRS.filter(([d]) => d === 'forward' || d === 'backward') : DIRS);
   const hasBars = $derived((fx.group ? app.show.groups.find((g) => g.id === fx.group)?.fixtures ?? [] : fx.fixtures ?? []).some((id) => app.kinds[id] === 'bar'));
   const pct = (v: number) => Math.round(v * 100);
   let more = $state(false);
+
+  // ---- share it as a file (a package: ADDONS.md), with a little animation for the picker
+  let sharing = $state(false), author = $state(''), about = $state(''), license = $state('CC-BY-4.0'), shareErr = $state('');
+  $effect(() => { if (sharing && !author) { try { author = localStorage.getItem('luxdmx.seq.author') ?? ''; } catch { /* fine */ } } });
+  function share() {
+    shareErr = '';
+    if (!author.trim()) { shareErr = 'Say who made it'; return; }
+    try {
+      const pkg = packageOfEffect($state.snapshot(fx) as typeof fx, { author, description: about.trim() || undefined, license });
+      pkg.preview = previewOf(pkg);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(pkg, null, 1)], { type: 'application/json' }));
+      a.download = `${pkg.id}.luxfx`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      try { localStorage.setItem('luxdmx.seq.author', author.trim()); } catch { /* fine */ }
+      sharing = false;
+    } catch (e) { shareErr = e instanceof PackageError ? e.message : `It couldn't be packed: ${e instanceof Error ? e.message : String(e)}`; }
+  }
 </script>
 
 <div class="ed" aria-label="Effect settings">
@@ -37,7 +71,8 @@
   <label class="full">Name <input bind:value={fx.name} aria-label="Effect name" /></label>
   <div class="two">
     <label>Effect <select value={fx.kind} onchange={(e) => (fx.kind = (e.target as HTMLSelectElement).value)} aria-label="Effect kind">
-      {#each EFFECTS as d (d.id)}<option value={d.id}>{d.name}</option>{/each}</select></label>
+      {#if sc}<option value="script">Add-on: {sc.name}</option>{/if}
+      {#each EFFECTS.filter((d) => !d.hidden) as d (d.id)}<option value={d.id}>{d.name}</option>{/each}</select></label>
     <label>Runs on <select value={fx.group ?? ''} aria-label="Runs on" onchange={(e) => {
       const v = (e.target as HTMLSelectElement).value;
       if (v === '__sel') { delete fx.group; fx.fixtures = app.show.fixtures.map((f) => f.id).filter((id) => app.selected.includes(id)); }
@@ -49,6 +84,7 @@
     </select></label>
   </div>
 
+  {#if live.has('speed')}
   <div class="knob">
     <span class="lab">Speed</span>
     <label class="tempo" title="Follow the show tempo (Tap)"><input type="checkbox" checked={p.tempo} onchange={(e) => set('tempo', (e.target as HTMLInputElement).checked)} /> tempo</label>
@@ -62,17 +98,38 @@
     {/if}
     <span class="faint">per round{#if p.tempo} · {Math.round(p.speed * 60 / app.bpm * 10) / 10} s at {app.bpm} BPM{/if}</span>
   </div>
+  {/if}
   <CustomEffectFields {fx} {p} {set} />
-  <label class="knob" title="How far it moves, or how deep the colour or brightness swings"><span class="lab">Size</span><input type="range" min="0" max="1" step="0.01" value={p.size} oninput={num('size')} aria-label="Size" /><b>{pct(p.size)}</b></label>
-  <label class="knob" title="0: all lights together. 100: spread evenly, one after the other"><span class="lab">Spread</span><input type="range" min="0" max="1" step="0.01" value={p.spread} oninput={num('spread')} aria-label="Spread" /><b>{pct(p.spread)}</b></label>
+  {#each own as q (q.id)}
+    {@const v = vals[q.id] ?? q.default}
+    {#if q.type === 'number'}
+      <label class="knob" title={q.description ?? ''}><span class="lab">{q.name}</span><input type="range" min={q.min ?? 0} max={q.max ?? 1} step={q.step ?? ((q.max ?? 1) - (q.min ?? 0)) / 100} value={Number(v)} aria-label={q.name}
+        oninput={(e) => setVal(q.id, +(e.target as HTMLInputElement).value)} /><b>{Math.round(Number(v) * 100) / 100}{q.unit ?? ''}</b></label>
+    {:else if q.type === 'choice'}
+      <label class="knob" title={q.description ?? ''}><span class="lab">{q.name}</span><select value={String(v)} aria-label={q.name} onchange={(e) => setVal(q.id, (e.target as HTMLSelectElement).value)}>
+        {#each q.choices ?? [] as o (o.value)}<option value={o.value}>{o.name}</option>{/each}</select></label>
+    {:else if q.type === 'toggle'}
+      <label class="check" title={q.description ?? ''}><input type="checkbox" checked={!!v} onchange={(e) => setVal(q.id, (e.target as HTMLInputElement).checked)} /> {q.name}</label>
+    {:else if q.type === 'colour'}
+      <label class="knob" title={q.description ?? ''}><span class="lab">{q.name}</span><input type="color" value={String(v)} aria-label={q.name} oninput={(e) => setVal(q.id, (e.target as HTMLInputElement).value)} /></label>
+    {/if}
+  {/each}
+  {#if live.has('size')}
+    <label class="knob" title={def?.shape ? 'How big the picture is on the ring or matrix' : 'How far it moves, or how deep the colour or brightness swings'}><span class="lab">Size</span><input type="range" min="0" max="1" step="0.01" value={p.size} oninput={num('size')} aria-label="Size" /><b>{pct(p.size)}</b></label>
+  {/if}
+  {#if live.has('spread')}
+    <label class="knob" title={def?.shape ? '0: every ring or matrix the same. 100: each one a step further on' : '0: all lights together. 100: spread evenly, one after the other'}><span class="lab">Spread</span><input type="range" min="0" max="1" step="0.01" value={p.spread} oninput={num('spread')} aria-label="Spread" /><b>{pct(p.spread)}</b></label>
+  {/if}
   {#if usesContrast}
     <label class="knob" title="How hard the light falls between dark and bright. Up: what's dim gets dimmer, what's bright gets brighter. Down: softer, more of it glows."><span class="lab">Contrast</span><input type="range" min="-1" max="1" step="0.01" value={p.contrast} oninput={num('contrast')} aria-label="Contrast" /><b>{p.contrast > 0 ? '+' : ''}{pct(p.contrast)}</b></label>
   {/if}
+  {#if live.has('direction')}
   <div class="knob"><span class="lab">Direction</span>
     <div class="seg" role="radiogroup" aria-label="Direction">
-      {#each DIRS as [d, sym, title] (d)}<button role="radio" aria-checked={p.direction === d} class:on={p.direction === d} {title} aria-label={title} onclick={() => set('direction', d)}>{sym}</button>{/each}
+      {#each dirs as [d, sym, title] (d)}<button role="radio" aria-checked={p.direction === d || (!!def?.shape && d === 'forward' && p.direction !== 'backward')} class:on={p.direction === d || (!!def?.shape && d === 'forward' && p.direction !== 'backward')} {title} aria-label={title} onclick={() => set('direction', d)}>{sym}</button>{/each}
     </div>
   </div>
+  {/if}
   {#if usesColors}
     <div class="knob col"><span class="lab">Colours</span>
       <div class="pal">
@@ -91,17 +148,23 @@
 
   <button class="ghost morebtn" onclick={() => (more = !more)} aria-expanded={more}>{more ? '▾' : '▸'} More</button>
   {#if more}
-    <label class="knob" title="Which light comes first: the order of the list, or where they are on the stage"><span class="lab">Order</span>
-      <select value={p.order} onchange={(e) => set('order', (e.target as HTMLSelectElement).value)} aria-label="Order">
-        <option value="list">as in the list</option><option value="x">left to right on the stage</option>
-        <option value="y">back to front</option><option value="centre">from the centre out</option>
-      </select></label>
-    <label class="knob" title="Neighbours that move together: 2 = pairs"><span class="lab">Blocks</span><input type="number" min="1" max="32" value={p.blocks} oninput={num('blocks')} aria-label="Blocks" style="width:4.5em" /></label>
+    {#if usesOrder}
+      <label class="knob" title="Which light comes first: the order of the list, or where they are on the stage"><span class="lab">Order</span>
+        <select value={p.order} onchange={(e) => set('order', (e.target as HTMLSelectElement).value)} aria-label="Order">
+          <option value="list">as in the list</option><option value="x">left to right on the stage</option>
+          <option value="y">back to front</option><option value="centre">from the centre out</option>
+        </select></label>
+    {/if}
+    {#if live.has('blocks')}
+      <label class="knob" title="Neighbours that move together: 2 = pairs"><span class="lab">Blocks</span><input type="number" min="1" max="32" value={p.blocks} oninput={num('blocks')} aria-label="Blocks" style="width:4.5em" /></label>
+    {/if}
     {#if usesWidth}
       <label class="knob" title="How long each step is on. 0 = one light's worth"><span class="lab">Width</span><input type="range" min="0" max="1" step="0.01" value={p.width} oninput={num('width')} aria-label="Width" /><b>{p.width ? pct(p.width) : 'auto'}</b></label>
     {/if}
-    {#if def?.category !== 'move'}
+    {#if live.has('low')}
       <label class="knob"><span class="lab">Dim to</span><input type="range" min="0" max="1" step="0.01" value={p.low} oninput={num('low')} aria-label="Low" /><b>{pct(p.low)}</b></label>
+    {/if}
+    {#if live.has('high')}
       <label class="knob"><span class="lab">Bright to</span><input type="range" min="0" max="1" step="0.01" value={p.high} oninput={num('high')} aria-label="High" /><b>{pct(p.high)}</b></label>
     {/if}
     {#if def?.category !== 'intensity'}
@@ -110,7 +173,19 @@
     {#if hasBars}
       <label class="check"><input type="checkbox" checked={p.pixels} onchange={(e) => set('pixels', (e.target as HTMLInputElement).checked)} /> every pixel of a bar on its own</label>
     {/if}
-    <button class="ghost" onclick={() => { fx.params = {}; }}><Icon name="update" />Back to the defaults</button>
+    <button class="ghost" onclick={() => { fx.params = fx.kind === 'script' ? { ...(sc?.defaults ?? {}), script: p.script, vals: {} } : {}; }}><Icon name="update" />Back to the defaults</button>
+    <button class="ghost" onclick={() => (sharing = !sharing)} aria-expanded={sharing} title="Save it as an effect file (.luxfx) that others can import">Share as a file…</button>
+    {#if sharing}
+      <div class="share" role="group" aria-label="Share as a file">
+        <label>Your name <input bind:value={author} aria-label="Your name" maxlength="60" /></label>
+        <label>What it is <input bind:value={about} aria-label="What it is" maxlength="300" placeholder={fx.name} /></label>
+        <label>Licence <select bind:value={license} aria-label="Licence">
+          <option value="CC-BY-4.0">CC BY 4.0 (others may use it, naming you)</option><option value="CC0-1.0">CC0 (anyone, anything)</option><option value="MIT">MIT</option>
+        </select></label>
+        {#if shareErr}<p class="err small">{shareErr}</p>{/if}
+        <button class="primary" onclick={share}>Download the file</button>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -138,4 +213,8 @@
   .pc .x { position: absolute; top: -7px; right: -7px; padding: 1px; background: var(--panel2); border-radius: 50%; }
   .check { display: flex; gap: .35rem; align-items: center; font-size: .82rem; }
   .morebtn { align-self: flex-start; }
+  .share { display: flex; flex-direction: column; gap: .35rem; border: 1px solid var(--line); border-radius: var(--radius-s); padding: .5rem; }
+  .share label { display: flex; flex-direction: column; gap: .1rem; }
+  .share input, .share select { width: 100%; }
+  .small { margin: 0; font-size: .8rem; } .err { color: var(--pink); }
 </style>

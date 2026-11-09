@@ -18,10 +18,11 @@ play the show from big buttons, your phone or a song's timeline. No install, no 
 - **2,400 fixtures to search**: 1,781 from QLC+ and 652 from the Open Fixture Library, plus GDTF
   files, plus your own type made by poking the channels of the real light. 16-bit, colour and
   gobo wheels, pixel strips, LED rings and matrices.
-- **72 effects.** Chases, circles, fire, lightning, 20 pixel shows (the WLED classics: fire,
-  fireworks, matrix rain, bouncing balls...) and 21 for rings and matrices (an eye that wakes up, a
-  reactor that blows, a supernova, your own words). Or write your own as a formula, or drop in a
-  picture or an animated GIF.
+- **72 effects and 50 add-ons.** Chases, circles, fire, lightning, 20 pixel shows (the WLED
+  classics: fire, fireworks, matrix rain, bouncing balls...) and 21 for rings and matrices (an eye
+  that wakes up, a reactor that blows, a supernova, your own words). Fifty more as add-ons in ten
+  themes (fire, rain, the sea, love, darkness...), packages anyone can make, share and import
+  (ADDONS.md). Or write your own as a formula, or drop in a picture or an animated GIF.
 - **A 3D stage.** Beams in haze, moving heads that pan at real speed, flames, sparks, confetti,
   CO2, a band and a crowd. Record it as a video.
 - **A timeline.** Put cues, effects and flames on a song: it finds the tempo, the beats and the
@@ -32,6 +33,9 @@ play the show from big buttons, your phone or a song's timeline. No install, no 
   cut out on their own.
 - **RDM rig check.** Finds the lights on the cable, compares them with your patch and fixes
   addresses and modes.
+- **Set up at the venue.** Try every channel of a light, change what a channel does, turn and mirror
+  a LED panel until its test picture looks right. Steer the moving heads onto four bits of tape
+  and it works out where they really hang, so they all meet on one spot.
 - **Templates** for a band, a DJ night, theatre, church, cinema and bar. QLC+ workspaces in and out.
 - **The DMX runs in its own thread**, so a busy page never makes the lights stutter. Works offline
   once it's loaded.

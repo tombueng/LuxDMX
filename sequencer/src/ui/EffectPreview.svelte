@@ -5,6 +5,7 @@
   import { EFFECT_MAP, paramsOf, runEffect, type Where } from '../engine/effects';
   import { clock } from './clock.svelte';
   import { placesFor, type Places } from '../model/pixelLayout';
+  import { unpackPicture, type Picture } from '../engine/custom';
 
   // one light with n pixels (made once, not every frame)
   const strips = new Map<number, Where[]>();
@@ -15,11 +16,14 @@
   const DISC = placesFor({ kind: 'rings', rings: [32, 24, 16, 12, 8, 1] }), GRID = placesFor({ kind: 'matrix', cols: 14, rows: 14 });
   const DISC_AT = onShape(DISC), GRID_AT = onShape(GRID);
 
-  let { kind, params = {}, w = 160, h = 48, n = 0, bpm = 120, paused = false }:
-    { kind: string; params?: Record<string, unknown>; w?: number; h?: number; n?: number; bpm?: number; paused?: boolean } = $props();
+  // (picture: a package's own little animation, pic1:, shown instead of running the effect: the
+  // library shows someone else's add-on that way)
+  let { kind, params = {}, w = 160, h = 48, n = 0, bpm = 120, paused = false, picture = '' }:
+    { kind: string; params?: Record<string, unknown>; w?: number; h?: number; n?: number; bpm?: number; paused?: boolean; picture?: string } = $props();
+  const pic = $derived.by(() => { if (!picture) return null; try { return unpackPicture(picture); } catch { return null; } });
   let canvas = $state<HTMLCanvasElement>();
   const def = $derived(EFFECT_MAP.get(kind));
-  const p = $derived(paramsOf(kind, params));
+  const p = $derived({ ...paramsOf(kind, params), look: true });
   const count = $derived(n || (def?.category === 'move' ? 4 : 8));
 
   $effect(() => { if (!paused) return clock.use(); });
@@ -27,12 +31,35 @@
   $effect(() => {
     const t = paused ? 1.3 : clock.t;
     const ctx = canvas?.getContext('2d');
-    if (!ctx || !def) return;
+    if (!ctx || (!def && !pic)) return;
     const dpr = window.devicePixelRatio || 1;
     if (canvas!.width !== w * dpr) { canvas!.width = w * dpr; canvas!.height = h * dpr; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    const total = (p.tempo ? t * bpm / 60 : t) / p.speed;
+    if (pic) { drawPicture(ctx, pic, t); return; }
+    // (an effect that can't run, a broken formula or program from a show someone sent: a dark
+    // card, not an error on every tick)
+    try { draw(ctx, t); } catch { ctx.fillStyle = '#2a1018'; ctx.fillRect(0, 0, w, h); }
+  });
+  // the package's own frames, scaled into the card, at their own pace
+  function drawPicture(ctx: CanvasRenderingContext2D, pc: Picture, t: number) {
+    const k = Math.min(w / pc.w, h / pc.h), dw = pc.w * k, dh = pc.h * k, ox = (w - dw) / 2, oy = (h - dh) / 2;
+    let f = 0;
+    if (pc.frames.length > 1 && pc.total > 0) { const ms = (t * 1000) % pc.total; f = pc.ends.findIndex((e) => ms < e); if (f < 0) f = 0; }
+    const px = pc.frames[f], cw = dw / pc.w, ch = dh / pc.h;
+    for (let y = 0; y < pc.h; y++) for (let x = 0; x < pc.w; x++) {
+      const o = (y * pc.w + x) * 3;
+      if (!px[o] && !px[o + 1] && !px[o + 2]) continue;
+      ctx.fillStyle = `rgb(${px[o]},${px[o + 1]},${px[o + 2]})`;
+      ctx.fillRect(ox + x * cw, oy + y * ch, Math.ceil(cw), Math.ceil(ch));
+    }
+  }
+  function draw(ctx: CanvasRenderingContext2D, t: number) {
+    if (!def) return;
+    // (a still doesn't follow the tempo: with the music on it changes many times a second, and every
+    // still in the library would be drawn again each time)
+    const tempo = paused ? 120 : bpm;
+    const total = (p.tempo ? t * tempo / 60 : t) / p.speed;
     if (def.category === 'move') {
       const cw = w / count;
       // A short trail: the same heads a moment ago, fainter.
@@ -55,7 +82,7 @@
     // The sound effects get a pretend kick drum in the preview.
     const sound = Math.abs(Math.sin(t * Math.PI * 2)) ** 3;
     if (def.shape) {
-      const clockNow = { beats: t * bpm / 60, secs: t };
+      const clockNow = { beats: t * tempo / 60, secs: t };
       const dots = (at: Places, where: Where[], cx: number, cy: number, R: number) => {
         const outs = runEffect(def, { ...p, sound }, at.n, total, 1, where, clockNow), r = Math.max(0.7, at.dot * R * (at.round ? 1.1 : 1));
         for (let i = 0; i < at.n; i++) {
@@ -73,7 +100,7 @@
     if (def.category === 'pixel') {
       // A pixel show on a strip of small LEDs (as many as fit, up to 30), each with a little glow.
       const n = Math.max(8, Math.min(30, Math.floor(w / 6))), where = strip(n);
-      const outs = runEffect(def, { ...p, sound }, n, total, 1, where, { beats: t * bpm / 60, secs: t });
+      const outs = runEffect(def, { ...p, sound }, n, total, 1, where, { beats: t * tempo / 60, secs: t });
       const pad = 4, step = (w - 2 * pad) / n, s = Math.max(2, Math.min(step * 0.6, h * 0.24)), cy = h / 2;
       ctx.fillStyle = '#141a22';
       ctx.fillRect(pad - 2, cy - s * 0.9, w - 2 * pad + 4, s * 1.8);
@@ -113,7 +140,7 @@
       ctx.strokeStyle = '#3b4450'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     });
-  });
+  }
 </script>
 
 <canvas bind:this={canvas} style="width:{w}px;height:{h}px" aria-hidden="true"></canvas>

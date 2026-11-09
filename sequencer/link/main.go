@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const version = "1.3.0"
+const version = "1.4.0"
 
 type Route struct {
 	Uni   int    `json:"uni"`
@@ -50,11 +50,15 @@ type Link struct {
 	nodePort  int
 	rdmWait   time.Duration
 	rdmSearch time.Duration
+	// what LuxDMX boxes say about their pixel ports, by address (pixels.go)
+	pixels map[string]*pixelInfo
+	httpc  *http.Client
 }
 
 func newLink(artPort int, allowed []string) (*Link, error) {
 	l := &Link{nodes: map[string]Node{}, routes: map[int]Route{}, seqArt: map[int]byte{}, seqSacn: map[int]byte{}, clients: map[*wsConn]client{}, sent: map[int]int{}, fps: map[int]int{}, allowed: allowed, artPort: artPort,
-		nodePort: 6454, rdmWait: 800 * time.Millisecond, rdmSearch: 2500 * time.Millisecond}
+		nodePort: 6454, rdmWait: 800 * time.Millisecond, rdmSearch: 2500 * time.Millisecond,
+		pixels: map[string]*pixelInfo{}, httpc: &http.Client{Timeout: 1500 * time.Millisecond}}
 	l.rdm = newRdm(l)
 	rand.Read(l.cid[:])
 	var err error
@@ -158,6 +162,11 @@ func (l *Link) listen() {
 		if changed {
 			go l.tellNodes() // (not holding up the replies behind it)
 		}
+		// (only a node that answered from the address it names: a reply anyone can send mustn't make
+		// Link ask some other machine)
+		if from != nil && from.IP.Equal(net.ParseIP(node.IP)) {
+			l.askPixels(node.IP)
+		}
 	}
 }
 
@@ -172,6 +181,21 @@ func (l *Link) nodeList() []Node {
 			delete(l.nodes, k)
 			continue
 		}
+	}
+	// (what a node said about its pixels goes with it)
+	for ip := range l.pixels {
+		gone := true
+		for _, n := range l.nodes {
+			if n.IP == ip {
+				gone = false
+				break
+			}
+		}
+		if gone && !l.pixels[ip].asking {
+			delete(l.pixels, ip)
+		}
+	}
+	for _, n := range l.nodes {
 		if m, ok := by[n.IP]; ok {
 			m.Universes = append(m.Universes, n.Universes...)
 		} else {
@@ -183,6 +207,9 @@ func (l *Link) nodeList() []Node {
 	out := []Node{}
 	for _, n := range by {
 		n.Universes = union(n.Universes, nil)
+		if p := l.pixels[n.IP]; p != nil && len(p.ports) > 0 {
+			n.PixelPorts = p.ports
+		}
 		out = append(out, *n)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].IP < out[j].IP })

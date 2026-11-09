@@ -2,6 +2,9 @@
 // over several. Pure, and worked out once per mode (a fixture type is never edited in place).
 import type { FixtureMode, PixelLayout } from './types';
 
+type Matrix = Extract<PixelLayout, { kind: 'matrix' }>;
+type Rings = Extract<PixelLayout, { kind: 'rings' }>;
+
 export interface Places {
   n: number;
   round: boolean;       // a ring or a disc
@@ -25,7 +28,7 @@ const TAU = Math.PI * 2;
 const LONE_RING = 0.72;
 const frac = (v: number) => v - Math.floor(v);
 
-function ringPlaces(l: Extract<PixelLayout, { kind: 'rings' }>): Places {
+function ringPlaces(l: Rings): Places {
   const n = layoutCells(l), m = l.rings.length;
   // a bigger ring is further out; the steps between rings are even, as on the real boards
   const rank = l.rings.map((_, i) => i).sort((a, b) => l.rings[a] - l.rings[b] || a - b);
@@ -50,7 +53,7 @@ function ringPlaces(l: Extract<PixelLayout, { kind: 'rings' }>): Places {
   return out;
 }
 
-function matrixPlaces(l: Extract<PixelLayout, { kind: 'matrix' }>): Places {
+function matrixPlaces(l: Matrix): Places {
   const { cols, rows } = l, n = cols * rows, big = Math.max(cols, rows), from = l.from ?? 'tl';
   const out = blank(n, false, rows);
   out.gw = cols; out.gh = rows;
@@ -105,7 +108,8 @@ export function placesOf(m: FixtureMode | undefined): Places | undefined {
 const count = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Number.isInteger(v) && v >= lo && v <= hi;
 export const MAX_PIXELS = 4096;
 // A shape read from a file: mended where it's only a detail, undefined when it can't be used.
-export function cleanLayout(v: unknown, cells: number): PixelLayout | undefined {
+// (no `cells`: any size, for a light's own layout, which only counts when it fits its type's pixels)
+export function cleanLayout(v: unknown, cells?: number): PixelLayout | undefined {
   if (!v || typeof v !== 'object') return undefined;
   const l = v as Record<string, unknown>;
   if (l.kind === 'rings') {
@@ -113,7 +117,7 @@ export function cleanLayout(v: unknown, cells: number): PixelLayout | undefined 
     const out: PixelLayout = { kind: 'rings', rings: l.rings as number[] };
     if (l.ccw === true) out.ccw = true;
     if (typeof l.turn === 'number' && Number.isFinite(l.turn) && l.turn !== 0) out.turn = l.turn;
-    return layoutCells(out) === cells ? out : undefined;
+    return cells === undefined || layoutCells(out) === cells ? out : undefined;
   }
   if (l.kind === 'matrix') {
     if (!count(l.cols, 1, MAX_PIXELS) || !count(l.rows, 1, MAX_PIXELS)) return undefined;
@@ -121,9 +125,148 @@ export function cleanLayout(v: unknown, cells: number): PixelLayout | undefined 
     if (l.zigzag === true) out.zigzag = true;
     if (l.vertical === true) out.vertical = true;
     if (l.from === 'tr' || l.from === 'bl' || l.from === 'br') out.from = l.from;
-    return layoutCells(out) === cells ? out : undefined;
+    return cells === undefined || layoutCells(out) === cells ? out : undefined;
   }
   return undefined;
+}
+
+// ---------------------------------------------------------------- a light's own wiring
+// Two of the same panel can be wired or hung differently: a light can have its own layout, with the
+// same number of pixels as its type's. Turning and mirroring work on what you see from the front.
+
+// The layout a light really has: its own when that fits its type's pixels, else its type's.
+export function layoutOfLight(f: { layout?: PixelLayout }, m: FixtureMode | undefined): PixelLayout | undefined {
+  const base = placesOf(m);
+  if (!base) return undefined;
+  return f.layout && layoutCells(f.layout) === base.n ? f.layout : m!.layout;
+}
+export function placesOfLight(f: { layout?: PixelLayout }, m: FixtureMode | undefined): Places | undefined {
+  const base = placesOf(m);
+  return base && f.layout && layoutCells(f.layout) === base.n ? placesFor(f.layout) : base;
+}
+
+const CORNERS = ['tl', 'tr', 'bl', 'br'] as const;
+const tidyMatrix = (l: Matrix): Matrix => {
+  const out: Matrix = { kind: 'matrix', cols: l.cols, rows: l.rows };
+  if (l.zigzag) out.zigzag = true;
+  if (l.vertical) out.vertical = true;
+  if (l.from && l.from !== 'tl') out.from = l.from;
+  return out;
+};
+const tidyRings = (l: Rings): Rings => {
+  const out: Rings = { kind: 'rings', rings: [...l.rings] };
+  if (l.ccw) out.ccw = true;
+  const turn = Math.round(((((l.turn ?? 0) % 360) + 540) % 360 - 180) * 100) / 100;
+  if (turn) out.turn = turn === -180 ? 180 : turn;
+  return out;
+};
+// Every way a cols x rows panel can be wired: each corner, along the rows or the columns, zigzag or not.
+export function matrixWirings(cols: number, rows: number): Matrix[] {
+  const out: Matrix[] = [];
+  for (const from of CORNERS) for (const vertical of [false, true]) for (const zigzag of [true, false])
+    out.push(tidyMatrix({ kind: 'matrix', cols, rows, from, vertical, zigzag }));
+  return out;
+}
+// The wiring that puts every LED where `to` says (column, row from the bottom), if there is one.
+function matrixWhere(cols: number, rows: number, zigzag: boolean, to: (i: number) => [number, number]): Matrix | undefined {
+  const fits = (l: Matrix) => { const p = placesFor(l); for (let i = 0; i < p.n; i++) { const [x, y] = to(i); if (p.gx[i] !== x || p.gy[i] !== y) return false; } return true; };
+  const all = matrixWirings(cols, rows);
+  return all.find((l) => !!l.zigzag === zigzag && fits(l)) ?? all.find(fits);
+}
+
+// Turned clockwise by 90 degrees (a matrix) or by `deg` (a ring), as seen from the front.
+export function turnLayout(l: PixelLayout, deg = 90): PixelLayout {
+  if (l.kind === 'rings') return tidyRings({ ...l, turn: (l.turn ?? 0) + deg });
+  let out: Matrix = l;
+  for (let k = 0; k < (((Math.round(deg / 90) % 4) + 4) % 4); k++) {
+    const p = placesFor(out), { cols } = out;
+    out = matrixWhere(out.rows, out.cols, !!out.zigzag, (i) => [p.gy[i], cols - 1 - p.gx[i]]) ?? out;
+  }
+  return out === l ? l : out;
+}
+// Mirrored left to right ('x') or top to bottom ('y'), as seen from the front.
+export function mirrorLayout(l: PixelLayout, axis: 'x' | 'y'): PixelLayout {
+  if (l.kind === 'rings') return tidyRings({ ...l, ccw: !l.ccw, turn: axis === 'x' ? -(l.turn ?? 0) : 180 - (l.turn ?? 0) });
+  const p = placesFor(l), { cols, rows } = l;
+  return matrixWhere(cols, rows, !!l.zigzag, (i) => (axis === 'x' ? [cols - 1 - p.gx[i], p.gy[i]] : [p.gx[i], rows - 1 - p.gy[i]])) ?? l;
+}
+// A disc whose data starts in the middle instead of at the rim (or the other way round).
+export const insideOut = (l: Rings): Rings => tidyRings({ ...l, rings: [...l.rings].reverse() });
+
+// Where the data really runs, from three LEDs someone found on the real thing: which LED of the
+// picture lit up as the first (`first`), the second and the last. The picture is `l` as it is now.
+// Undefined when no wiring puts them there.
+export function fitLayout(l: PixelLayout, first: number, second: number, last: number): PixelLayout | undefined {
+  const now = placesFor(l), n = now.n;
+  if (n < 2) return l;
+  if (l.kind === 'matrix') {
+    const at = (i: number) => [now.gx[i], now.gy[i]];
+    const want = [at(first), at(second), at(last)], idx = [0, 1, n - 1];
+    const ok = matrixWirings(l.cols, l.rows).filter((c) => { const p = placesFor(c); return idx.every((i, k) => p.gx[i] === want[k][0] && p.gy[i] === want[k][1]); });
+    return ok.find((c) => !!c.zigzag === !!l.zigzag) ?? ok[0];
+  }
+  // a ring or a disc: which end the data starts at, which way it runs, and where the first LED is
+  const pts = [first, second, last].map((i) => [now.x[i], now.y[i]]);
+  let best: { l: Rings; d: number } | undefined;
+  for (const rings of [l.rings, [...l.rings].reverse()]) for (const ccw of [false, true]) {
+    const flat: Rings = { kind: 'rings', rings, ccw }, p = placesFor(flat);
+    // turned so the first LED of a ring with more than one lands on the LED that was found for it
+    const lead = rings[0] > 1 ? 0 : 1, want = pts[lead === 0 ? 0 : 1];
+    const turn = (Math.atan2(want[0], want[1]) - Math.atan2(p.x[lead], p.y[lead])) * 180 / Math.PI;
+    const c = tidyRings({ ...flat, turn: Math.round(turn) }), q = placesFor(c);
+    const d = [0, 1, n - 1].reduce((s, i, k) => s + Math.hypot(q.x[i] - pts[k][0], q.y[i] - pts[k][1]), 0);
+    if (!best || d < best.d - 1e-6) best = { l: c, d };
+  }
+  // (each LED is within about one LED's width of where it was found)
+  return best && best.d < 3 * Math.max(now.dot * 2.5, 0.05) ? best.l : undefined;
+}
+
+// What a layout says, in words: where the data starts and how it runs.
+export function layoutWords(l: PixelLayout): string {
+  if (l.kind === 'rings') {
+    const where = l.rings.length > 1 ? (l.rings[0] >= l.rings[l.rings.length - 1] ? 'at the rim' : 'in the middle') : '';
+    const turn = l.turn ? `, the first LED turned ${l.turn}°` : ', the first LED at the top';
+    const runs = `runs ${l.ccw ? 'counter-clockwise' : 'clockwise'}${turn}`;
+    return where ? `Starts ${where}, ${runs}` : runs[0].toUpperCase() + runs.slice(1);
+  }
+  const corner = { tl: 'top left', tr: 'top right', bl: 'bottom left', br: 'bottom right' }[l.from ?? 'tl'];
+  return `Starts ${corner}, runs along the ${l.vertical ? 'columns' : 'rows'}${l.zigzag ? ', zigzag' : ''}`;
+}
+
+// The test picture on a ring or a matrix, per LED as [r, g, b] (0..1): it shows at a glance whether
+// the real one is turned or mirrored. A matrix gets an F (it looks wrong whichever way it's off)
+// and its four corners in four colours; a ring an arrow pointing up, red at 12 and green at 3 o'clock.
+export const TEST_COLOURS = { tl: [1, 0, 0], tr: [0, 1, 0], bl: [0, 0.35, 1], br: [1, 0.85, 0], mark: [1, 1, 1], arrow: [1, 1, 1] } as const;
+export function testPicture(at: Places): [number, number, number][] {
+  const out: [number, number, number][] = Array.from({ length: at.n }, () => [0, 0, 0]);
+  if (!at.round) {
+    const W = at.gw, H = at.gh;
+    // the F: a stem on the left, a full bar at the top, a shorter one in the middle, inside a margin
+    const m = W >= 6 && H >= 6 ? 1 : 0, x0 = m, x1 = W - 1 - m, y1 = H - 1 - m, y0 = m;
+    const stem = Math.max(1, Math.round((x1 - x0 + 1) / 5)), bar = Math.max(1, Math.round((y1 - y0 + 1) / 6));
+    const midTop = Math.round((y0 + y1) / 2 + bar / 2), midEnd = x0 + Math.round((x1 - x0) * 0.7);
+    for (let i = 0; i < at.n; i++) {
+      const x = at.gx[i], y = at.gy[i];
+      const inF = x >= x0 && x <= x1 && y >= y0 && y <= y1 && (x < x0 + stem || y > y1 - bar || (y <= midTop && y > midTop - bar && x <= midEnd));
+      if (inF) out[i] = [...TEST_COLOURS.mark];
+      const corner = (x === 0 ? (y === H - 1 ? 'tl' : y === 0 ? 'bl' : '') : x === W - 1 ? (y === H - 1 ? 'tr' : y === 0 ? 'br' : '') : '') as keyof typeof TEST_COLOURS | '';
+      if (corner) out[i] = [...TEST_COLOURS[corner]];
+    }
+    return out;
+  }
+  // a ring or a disc: an arrow up the middle with its head at the top, the rim's top red, its right green
+  let rim = 0;
+  for (let i = 0; i < at.n; i++) rim = Math.max(rim, at.rad[i]);
+  const near = (a: number, b: number, w: number) => Math.abs(((a - b + 1.5) % 1) - 0.5) <= w;
+  for (let i = 0; i < at.n; i++) {
+    const x = at.x[i], y = at.y[i], r = at.rad[i] / (rim || 1);
+    const shaft = Math.abs(x) <= Math.max(at.dot * 1.2, 0.08) && y < 0.55 * rim && y > -0.85 * rim;
+    const head = y >= 0.2 * rim && Math.abs(x) <= (0.8 * rim - y) * 0.9 + at.dot * 0.5 && y <= 0.85 * rim;
+    if (shaft || head || r < 0.05) out[i] = [...TEST_COLOURS.arrow];
+    if (r > 0.97 && near(at.ang[i], 0, 0.03)) out[i] = [1, 0, 0];
+    if (r > 0.97 && near(at.ang[i], 0.25, 0.03)) out[i] = [0, 1, 0];
+  }
+  return out;
 }
 
 // A likely set of rings for a disc when all you know is how many LEDs and rings it has: one in the
@@ -169,6 +312,9 @@ export function sharesChannels(a: { universe: number; address: number }, ma: Fix
   const sb = spansOf(b, mb);
   return spansOf(a, ma).some((x) => sb.some((y) => x.universe === y.universe && x.at < y.at + y.count && y.at < x.at + x.count));
 }
+// how much of a ring's or matrix's size its width and height are (a wide matrix keeps its shape)
+export const shapeW = (at: Places) => (at.round ? 1 : (at.gw - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1));
+export const shapeH = (at: Places) => (at.round ? 1 : (at.gh - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1));
 // How big a ring or a matrix looks on the 3D stage, in metres (real ones are small: this is what
 // reads from the back of a hall). A matrix keeps its LEDs 3 cm apart.
 export const shapeSize = (at: Places) => (at.round ? (at.lanes > 1 ? 0.6 : 0.4) : Math.max(0.36, Math.max(at.gw, at.gh) * 0.03));
