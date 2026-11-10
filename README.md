@@ -1622,3 +1622,57 @@ LUXDMX_HOST=dmx-gateway.local npm test
 ## License
 
 MIT. Do whatever you want, attribution appreciated.
+
+
+---
+
+<!-- disclaimer-notice:v1 -->
+## ⚖️ Haftungsausschluss / Disclaimer
+
+> **Deutsch**
+>
+> Diese Software bzw. dieses Hardware-Design wird **unentgeltlich** und **„wie besehen" (as is)**
+> bereitgestellt — ohne jede ausdrückliche oder stillschweigende Gewährleistung. Insbesondere
+> werden **keine Eigenschaften zugesichert** und **keine Garantie** für Mängelfreiheit, Richtigkeit,
+> Vollständigkeit, Aktualität, Verfügbarkeit, handelsübliche Qualität, Eignung für einen bestimmten
+> Zweck oder die Nichtverletzung von Rechten Dritter übernommen. Die Nutzung erfolgt **auf eigenes
+> Risiko**; die Eignung für den konkreten Einsatz ist vor der Verwendung eigenverantwortlich zu prüfen
+> — das gilt besonders beim Ansteuern realer Hardware sowie in sicherheits- oder betriebskritischen
+> Umgebungen.
+>
+> Eine Haftung des Autors für Schäden gleich welcher Art, die aus der Nutzung oder Nichtnutzbarkeit
+> entstehen, ist — soweit gesetzlich zulässig — ausgeschlossen.
+>
+> **Unberührt** bleibt die zwingende gesetzliche Haftung: für Vorsatz und grobe Fahrlässigkeit, für
+> die schuldhafte Verletzung von Leben, Körper oder Gesundheit, nach dem Produkthaftungsgesetz sowie
+> aus einer ausdrücklich übernommenen Garantie. Ergänzend gelten die Haftungserleichterungen der
+> §§ 521, 523, 524 BGB für die unentgeltliche Überlassung.
+>
+> Dies ist Freizeit-/Open-Source-Arbeit; es besteht **kein Anspruch auf Support, Wartung oder
+> Weiterentwicklung**, und das Projekt kann jederzeit geändert oder eingestellt werden. Genannte
+> Produkt- und Markennamen gehören ihren jeweiligen Inhabern; es besteht **keine Verbindung zu,
+> Billigung durch oder Partnerschaft mit** diesen Unternehmen.
+
+> **English**
+>
+> This software / hardware design is provided **free of charge** and **"as is"**, without warranty of
+> any kind, express or implied. In particular, **no warranties and no guaranteed characteristics** are
+> given — including, without limitation, merchantability, fitness for a particular purpose, correctness,
+> accuracy, completeness, availability, or non-infringement. **Use is at your own risk**; you are
+> responsible for verifying suitability for your intended use before relying on it, especially when
+> driving real hardware or in safety- or mission-critical environments.
+>
+> To the maximum extent permitted by applicable law, the author shall **not be liable** for any damages
+> whatsoever arising from the use of, or inability to use, this work.
+>
+> Mandatory statutory liability remains **unaffected** (under German law: liability for intent and gross
+> negligence, for culpable injury to life, body or health, under the Product Liability Act, and from any
+> expressly given guarantee).
+>
+> This is a hobby / open-source project with **no obligation of support, maintenance or further
+> development**, and it may be changed or discontinued at any time. All product and brand names are the
+> property of their respective owners; this project is **not affiliated with, endorsed, or sponsored by**
+> them.
+
+The applicable open-source license (see [`LICENSE`](./LICENSE)) governs use, reproduction and
+distribution. In case of any conflict between this notice and the `LICENSE`, the `LICENSE` prevails.
