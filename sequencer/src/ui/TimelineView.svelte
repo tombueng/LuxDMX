@@ -658,7 +658,7 @@
           {@const chip = { kind: 'cue', list: l.id, cue: c.id } as Chip}
           {@const risk = cueRiskOf(app.show, c, app.showRev)}
           <button class="chip" class:risky={risk === 'hazard' || risk === 'once'} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))}
-                  title="Drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {/if}{cueNumber(l, i)}. {c.name}</button>
+                  title="{cueNumber(l, i)}. {c.name}: drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {/if}<span class="t">{cueNumber(l, i)}. {c.name}</span></button>
         {/each}
         {#if !l.cues.length}<span class="faint">No cues yet</span>{/if}
       </div>
@@ -719,7 +719,7 @@
     <div class="board">
       <div class="names">
         <div class="nr" title={songs.length > 1 ? `Song ${cur + 1} of ${songs.length}: ${songName(tl, cur)}` : undefined}>{songs.length > 1 ? `${cur + 1}. ${songName(tl, cur)}` : 'Song'}</div>
-        {#each lanes as ln (ln.id)}<div class="nl" style="--c:{ln.color}">{ln.name}</div>{/each}
+        {#each lanes as ln (ln.id)}<div class="nl" style="--c:{ln.color}" title={ln.name}>{ln.name}</div>{/each}
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions (drops from the palette; every item is a button of its own) -->
       <div class="tracks" bind:this={tracks} bind:clientWidth={() => width, (v) => { if (v > 0) width = v; }} onscroll={() => (scrolled = tracks!.scrollLeft)} ondragover={over} ondragleave={() => (dropAt = null)} ondrop={drop} onwheel={wheel}>
@@ -828,7 +828,10 @@
   .snd.off { color: var(--faint); text-decoration: line-through; }
   .vol .snd { min-height: 0; padding: .15rem .3rem; }
   .chips { display: flex; flex-wrap: wrap; gap: .25rem; }
-  .chip { cursor: grab; font-size: .8rem; padding: .15rem .5rem; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); min-height: 0; }
+  /* (a long name stops at the panel's edge, the whole of it in the title) */
+  .chip { cursor: grab; font-size: .8rem; padding: .15rem .5rem; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); min-height: 0;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .chip.fx { border-color: #ffaa1c66; } .chip.mo { border-color: #f33abc66; } .chip.cr { border-color: #7fc8ff66; }
   /* the time before and after the song: two small fields under the song */
   .around { display: flex; flex-wrap: wrap; gap: .2rem .6rem; font-size: .8rem; color: var(--muted); }
@@ -857,7 +860,7 @@
   .board { max-height: 52vh; overflow-y: auto; }
   .names { border-right: 1px solid var(--line); }
   .nr { height: 78px; display: flex; align-items: flex-end; padding: .3rem .5rem; color: var(--muted); font-size: .8rem; border-bottom: 1px solid var(--line); overflow: hidden; overflow-wrap: anywhere; }
-  .nl { height: 38px; display: flex; align-items: center; padding: 0 .5rem; font-size: .82rem; border-bottom: 1px solid var(--line); border-left: 3px solid var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nl { height: 38px; line-height: 37px; padding: 0 .5rem; font-size: .82rem; border-bottom: 1px solid var(--line); border-left: 3px solid var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tracks { overflow-x: auto; overflow-y: hidden; position: relative; }
   .inner { position: relative; }
   .ruler { height: 78px; position: relative; border-bottom: 1px solid var(--line); cursor: text; background: #0b0f15; }
