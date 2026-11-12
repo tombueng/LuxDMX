@@ -21,7 +21,7 @@
   <a href="https://tombueng.github.io/LuxDMX/"><img alt="Flash in browser" src="https://img.shields.io/badge/flash%20in-browser-2dd4bf"></a>
   <a href="https://github.com/tombueng/LuxDMX/actions/workflows/build.yml"><img alt="Build" src="https://github.com/tombueng/LuxDMX/actions/workflows/build.yml/badge.svg"></a>
   <a href="https://github.com/tombueng/LuxDMX/releases"><img alt="Latest firmware" src="https://img.shields.io/github/v/tag/tombueng/LuxDMX?filter=v*&sort=semver&label=firmware"></a>
-  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
 </p>
 
 <p align="center">
@@ -32,6 +32,20 @@
   <a href="#flashing-pre-built-firmware"><b>Install</b></a>
 </p>
 
+## News
+
+**2026-11-12**
+
+- Pixel lights cell by cell: single LEDs in cues, presets, groups and effects
+- A console mode with a command line, fixture numbers, faders, encoders and MIDI learn
+- Real gobos, prisms and beam angles in the 3D stage
+- Endless pan/tilt, a roll axis, moving bars, and winches (they only move while armed)
+- Render the 3D stage to a video, up to 8K
+- Firmware: the OTA and AP passwords stay out of `/info.json`
+
+Before that: the sequencer came out (11-04), LED rings and matrices (11-07), Apache-2.0 (11-10).
+Everything else is in the [version history](CHANGELOG.md).
+
 ## New: the LuxDMX Sequencer
 
 <p align="center">
@@ -41,7 +55,9 @@
 A lighting console in a browser tab. Patch your lights (2,400 fixture types to search), build
 looks, add some of the 72 effects and play the show from big buttons, your phone or a song's
 timeline. There's a 3D stage, so you can program without any lights. No install, no account, and
-your shows stay in your browser.
+your shows stay in your browser. If you know desks: there's a console mode with a command line
+("1 thru 4 @ 50", "goto cue 5"), fixed fixture numbers, faders, encoders and MIDI learn, and pixel
+lights can be programmed cell by cell (single LEDs of a bar, a ring or a matrix).
 
 It plays a LuxDMX box straight from the page (the box serves a little bridge popup, firmware
 v1.0.293 or newer) and any other Art-Net / sACN node through
@@ -501,7 +517,7 @@ Firmware versions are pinned in `platformio.ini`. This is what gets pulled in an
 | [Adafruit BusIO](https://github.com/adafruit/Adafruit_BusIO) | transitive | MIT | I²C/SPI abstraction the Adafruit display drivers sit on. |
 
 > The two `ESP32Async` libraries and Adafruit NeoPixel are **LGPL-3.0**. We link them
-> unmodified, which is what the LGPL asks for; the LuxDMX source itself stays MIT.
+> unmodified, which is what the LGPL asks for; the LuxDMX source itself is Apache-2.0.
 
 There is no DMX or RDM library. Both protocols are ours: `dmx_rmt.h` clocks DMX512 out of
 the RMT peripheral, and `rdm_rmt.h` is an RDM E1.20 controller on RMT-TX plus a RX-only
@@ -798,7 +814,7 @@ opens its own setup access point and a captive portal:
   - **Join my WiFi**: choose your network from the scanned list (or type the name),
     enter the password.
   - **Use as access point**: the device becomes its own WiFi network, no router needed.
-    Set an optional AP password (8+ chars for WPA2), or leave it open.
+    Set an optional AP password (8 to 63 characters, WPA2), or leave it open.
 - The device saves your choice and reboots into it. The confirmation page then waits for
   the device to come back on its new network and jumps to it automatically: `http://<hostname>.local`
   (default `dmx-gateway.local`) after joining your WiFi, or `192.168.4.1` in access-point mode.
@@ -822,7 +838,7 @@ Choose how LuxDMX connects in **`/config` → Network**. Changes apply after a r
 - **Interface** (boards with wired Ethernet: WT32-ETH01, v3, or **any board with a W5500 / DM9051 SPI module** picked under *Wired Ethernet*): **WiFi** or **wired Ethernet**. WT32-ETH01/v3 default to Ethernet/DHCP; turn off "Use wired Ethernet" to run on WiFi. On a plain ESP32/ESP32-S3, first pick the SPI chip (W5500 or DM9051) under *Wired Ethernet* and set its pins, then enable "Use wired Ethernet".
 - **WiFi mode:**
   - **Client (STA)**: join your existing 2.4 GHz network (the default; set the SSID + password via the setup portal above, or right here in **`/config` → Network**). You can save **up to four networks**, see [Several WiFi networks](#several-wifi-networks) below.
-  - **Standalone AP**: LuxDMX hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8+ characters for WPA2, or leave it empty for an open network. The device is reachable at **`192.168.4.1`**.
+  - **Standalone AP**: LuxDMX hosts its own WiFi network, so a phone, tablet, or console joins it directly with **no router required**. SSID = the device hostname (`dmx-gateway` by default); set a password of 8 to 63 characters for WPA2, or tick **Open network** for none (an empty field keeps the password there is). The device is reachable at **`192.168.4.1`**.
 - **Wired link-loss policy** (boards on wired Ethernet), for when *the wired Ethernet link is down*:
   - **Keep retrying the wired link** (default): never opens a hotspot, reconnects on its own when the cable is back. Best on a show.
   - **Standalone WiFi AP**: the device becomes its own network (needs an **AP password**; it refuses to open an *unsecured* AP).
@@ -963,6 +979,31 @@ key=value interface using the same field names as the web form:
 of lines, paste them back, `save`. For everyday setup use the web UI; the serial
 path is there for headless tweaks and getting a stranded board back online.
 
+### Put it on a network of its own
+
+Art-Net and sACN have no passwords: anything on the same network can send a universe, and the
+box puts it on the DMX line. The web UI, `/config` and the firmware upload don't ask for a login
+either. That's normal for lighting gear, and the way pros deal with it is the network, not the box:
+
+- Give the lights a network of their own (their own switch, or their own VLAN on a managed one):
+  no internet, no guest WiFi, no audio or video on it. A laptop or a tablet that runs the show
+  joins it; nothing else does.
+- If there's WiFi for a tablet, its own network name and password, not the house WiFi.
+- Unused ports on the switch off, and the switch where the public can't reach it.
+- Anything that can hurt someone (flames, sparks, CO2, pyro) gets its own key switch or dead-man
+  button in its power or enable line, whatever the network says. The Sequencer only fires them
+  while someone holds Arm, but that's a software lock on top, not instead of the real one.
+- The output those machines are on: set its signal-loss policy to **blackout** (the default is
+  hold). If the laptop crashes, sleeps or drops off the network while a shot is on, the box then
+  takes the line to 0 instead of holding the last frame, and the app's own time limit can't help
+  any more.
+
+`/info.json` never shows a password (only whether one is set); the backup with passwords ticked is
+the one place they leave the box, so keep that file safe. An AP password is 8 to 63 characters
+(WPA2): the settings page and the setup portal don't take another length. One that isn't, from an
+old backup or the serial console (`apPwOk` false), can't be used: a shorter one leaves the AP open,
+a longer one keeps it from starting. The settings page says so; type a new one there.
+
 ---
 
 ## Web UI
@@ -993,10 +1034,10 @@ a blocking error can't hide behind a fold.
 | URL | Method | Function |
 |---|---|---|
 | `/` | GET | Live status + 512-channel DMX grid (gzip) |
-| `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password, LED config, DMX pins, on-unit controls (rotary encoder + buttons) (gzip) |
+| `/config` | GET / POST | Change universe, protocol, per-output merge mode (off/HTP/LTP) and signal-loss policy (hold/blackout/stop), static IP, hostname, OTA password (the page never shows it: an empty field keeps it, the "Remove the password" box takes it away, and a change counts at once), LED config, DMX pins, on-unit controls (rotary encoder + buttons) (gzip) |
 | `/reset` | GET / POST | Clear WiFi credentials, reboot to AP mode |
 | `/reboot` | POST | Restart the device, changing nothing. **POST only**, a GET would let a link prefetch or a crawler drop the DMX output of a live rig. Also in the UI: **`/config` → Device → Restart device** |
-| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.), plus `reset` (why it last started: `power on`, `restart`, `crash`, `interrupt watchdog`, `task watchdog`, `watchdog`, `brownout`, `reset pin`...) and `uptime` (seconds since), so a hang or a crash can be told afterwards without a serial console |
+| `/info.json` | GET | Current settings + status (SSID, IP, universe, version, detected `board`/`mcu` id, picked `boardSel`, etc.), plus `reset` (why it last started: `power on`, `restart`, `crash`, `interrupt watchdog`, `task watchdog`, `watchdog`, `brownout`, `reset pin`...) and `uptime` (seconds since), so a hang or a crash can be told afterwards without a serial console. Passwords never come out here: `otapwSet`, `apPwSet` and `wifiPskSet` only say whether one is stored (`apPwOk`: and it's one WPA2 takes, 8 to 63 characters) (on the settings page an empty field keeps a password; the AP's "Open network" box takes it away) (a backup from `/config.json?download=1` with passwords ticked is the one place they leave the box) |
 | `/dmx.json` | GET | All 512 values, fps, rssi, uptime, manual mode flag, and memory: `heap` / `heapMin` / `heapBlock` (real allocatable RAM), `heapAll` (the old `ESP.getFreeHeap()` figure), `psram` / `psramFree`, and `ws` (connected WebSocket clients) |
 | `/enc.json` | GET | Rotary-encoder diagnostics: pins, the decoder's effective vs configured steps-per-detent, and counters for quadrature edges and emitted steps. `?reset=1` zeroes them, so `encsteps` can be measured rather than guessed, see [docs/controls.md](docs/controls.md) |
 | `/i2cscan` | GET | Scans the display header's I2C bus on the configured pins: idle line levels, whether an external pull-up is present, and every address that answers. Tells a dead panel from a wiring fault when the screen stays black, see [docs/display.md](docs/display.md) |

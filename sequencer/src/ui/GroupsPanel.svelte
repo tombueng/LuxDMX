@@ -49,7 +49,7 @@
   }
 </script>
 
-<div class="panel gp">
+<div class="panel gp" data-marks="show">
   <div class="row head">
     <h2>Groups</h2><span class="chip">{app.show.groups.length}</span><span class="grow"></span>
     <Help><p>A <b>group</b> is a named set of lights, like "Front" or "Movers". Click it to select them all at once. Effects run along the group's order, so a chase goes left to right if the group is ordered that way: drag lights in the fixture list to change it.</p></Help>
@@ -81,7 +81,7 @@
             <button class="main" aria-pressed={allSel} title="Select {g.name} (Shift or Ctrl adds)"
                     onclick={(e) => app.selectGroup(g.id, e.shiftKey || e.ctrlKey || e.metaKey)}
                     onkeydown={(e) => { if (e.key === 'F2') { e.preventDefault(); renaming = g.id; } else if (e.key === 'Delete') del(g.id); }}>
-              <span class="txt"><span class="nm">{g.name}</span><span class="faint">{g.fixtures.length} light{g.fixtures.length === 1 ? '' : 's'}</span></span>
+              <span class="txt"><span class="nm">{g.name}</span><span class="faint" title="Group {i + 1}: &quot;group {i + 1}&quot; on the console">{i + 1} · {g.fixtures.length} light{g.fixtures.length === 1 ? '' : 's'}{g.cells?.length ? `, ${g.cells.length} cell${g.cells.length === 1 ? '' : 's'} each` : ''}</span></span>
               <span class="dots">
                 {#each g.fixtures.slice(0, 12) as id (id)}{@const lc = lookColor(stage()[id])}<span class="d" style="background:{lc.glow > 0.02 ? lc.css : 'var(--line)'}"></span>{/each}
               </span>

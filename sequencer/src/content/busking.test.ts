@@ -53,7 +53,7 @@ describe('the effect machines', () => {
   it('a list that only fires machines is a shot: its own section, a tap fires it, no master fader, not a look for staff', () => {
     const s = emptyShow();
     s.cueLists = [shot('conf', { c1: { confetti: 1 } }), list('moods', [cue('a', { p: { intensity: 1 } })]), shot('bub', { b1: { bubbles: 1, fan: 1 } }), list('haze', [cue('h', { hz: { haze: 0.3, fan: 0.5 } })])];
-    expect(s.cueLists.map(isMachineList)).toEqual([true, false, true, false]);
+    expect(s.cueLists.map((l) => isMachineList(l))).toEqual([true, false, true, false]);
     const w = buskingPage(s).widgets, ids = w.map((x) => x.id);
     // the looks are the first list that isn't a machine's shot
     expect(w.find((x) => x.type === 'cue')).toMatchObject({ list: 'moods', key: '1' });

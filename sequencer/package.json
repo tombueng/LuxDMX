@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "fflate": "0.8.3",
+    "mediabunny": "1.62.1",
     "qrcode-generator": "2.0.4",
     "three": "0.170.0"
   }

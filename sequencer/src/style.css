@@ -22,6 +22,8 @@ button { cursor: pointer; display: inline-flex; align-items: center; gap: .35rem
    live tiles) always win, and only apply where there is a real hover (on touch it sticks). */
 @media (hover: hover) {
   :where(button):hover:not(:disabled) { border-color: var(--line2); background: #222a36; }
+  /* (faint text on a hovered button: one step lighter, it keeps its contrast on the lighter ground) */
+  :where(button):hover:not(:disabled) :is(.faint, .chip:not(.green, .orange, .blue, .violet)) { color: #a9b2bf; }
   :where(button.on, button.accent):hover:not(:disabled) { background: #ffbb45; border-color: #ffbb45; color: #1a1000; }
 }
 /* Keyboard focus is blue (selection is orange: the two must never look alike). Lists show focus

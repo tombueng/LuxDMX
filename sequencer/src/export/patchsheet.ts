@@ -30,7 +30,7 @@ export function patchSheetHtml(show: Show): string {
     <table><thead><tr><th>Address</th><th>Fixture</th><th>Type</th><th>Mode</th><th>DIP switches (knob up = ON)</th></tr></thead><tbody>
     ${fs.map((f) => {
       const t = types.get(f.typeId), m = modeOf(t, f.mode), n = m?.channels.length ?? 1;
-      return `<tr><td class="a">${f.address}${n > 1 ? `<span>–${f.address + n - 1}</span>` : ''}</td><td><b>${esc(f.name)}</b></td><td>${esc(t ? typeLabel(t) : f.typeId)}</td><td>${esc(m?.name ?? f.mode)}${chs(m?.name ?? f.mode, n)}</td><td>${dip(f.address)} <span class="c">${dipSwitches(f.address).map((on, i) => (on ? i + 1 : 0)).filter(Boolean).join(', ') || 'none'}</span></td></tr>`;
+      return `<tr><td class="a">${f.address}${n > 1 ? `<span>–${f.address + n - 1}</span>` : ''}</td><td>${f.num ? `<span class="c">${f.num}</span> ` : ''}<b>${esc(f.name)}</b></td><td>${esc(t ? typeLabel(t) : f.typeId)}</td><td>${esc(m?.name ?? f.mode)}${chs(m?.name ?? f.mode, n)}</td><td>${dip(f.address)} <span class="c">${dipSwitches(f.address).map((on, i) => (on ? i + 1 : 0)).filter(Boolean).join(', ') || 'none'}</span></td></tr>`;
     }).join('')}
     </tbody></table>`;
   }).join('');

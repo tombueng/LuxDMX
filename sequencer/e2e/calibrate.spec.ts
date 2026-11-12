@@ -116,3 +116,84 @@ test('the arrows steer the head being steered; a head needs three marks', async 
   await expect(dlg.getByRole('button', { name: 'Work it out' })).toBeDisabled();
   await expect(dlg).toContainText('A head needs three marks');
 });
+
+test('a head that pans 630° and tilts 250° where its profile says 540° and 270°: six marks, one raised, measure it', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover16', 1, 0, 'Head');
+  const room = roomOf(undefined);
+  const s = placeOf((await lights(page))[0], 'mover', room);
+  const truth: Truth = { p: { x: s.p.x + 0.4, y: s.p.y - 0.3, z: s.p.z + 0.2 }, rot: { yaw: s.rot.yaw + 5, pitch: s.rot.pitch, roll: s.rot.roll }, panOffset: 6, tiltOffset: -2 };
+  const realO: Optics = { ...O, panDeg: 630, tiltDeg: 250, panOffset: truth.panOffset, tiltOffset: truth.tiltOffset };
+  const marks = calMarks(room);
+  await tab(page, 'Fixtures');
+  await page.locator('.fl li[data-fixture="Head"]').click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Focus and calibrate…' }).click();
+  const dlg = page.getByRole('dialog', { name: 'Focus and calibrate: Head' });
+  const steerOnto = async (mi: number) => {
+    const m = marks[mi], v = aimAt(truth.p, truth.rot, m.p, realO)!;
+    await dlg.getByRole('radio', { name: `${mi + 1} ${m.name}` }).click();
+    await dlg.getByLabel('Pan %').fill((v.pan * 100).toFixed(5)); await dlg.getByLabel('Pan %').press('Tab');
+    await dlg.getByLabel('Tilt %').fill((v.tilt * 100).toFixed(5)); await dlg.getByLabel('Tilt %').press('Tab');
+    await dlg.getByRole('button', { name: `Head is on ${m.name}` }).click();
+  };
+  // four marks: they don't meet, and it says six (one at another height) would measure the ranges
+  for (const mi of [0, 1, 2, 3]) await steerOnto(mi);
+  await dlg.getByRole('button', { name: 'Work it out for 1' }).click();
+  const res = dlg.getByRole('list', { name: 'Results' }).locator('li[data-head="Head"]');
+  await expect(res).toContainText('Six marks or more, one at least 40 cm higher or lower than the rest, measure it');
+  // the fifth on a box 90 cm up, and a sixth: measured
+  await dlg.getByLabel('Mark 5 height').fill(String(Math.round((marks[4].p.y + 0.9) * 100) / 100));
+  await dlg.getByLabel('Mark 5 height').press('Tab');
+  marks[4] = { ...marks[4], p: { ...marks[4].p, y: Math.round((marks[4].p.y + 0.9) * 100) / 100 } };
+  await steerOnto(4);
+  await dlg.getByRole('button', { name: '+ Mark' }).click();
+  await dlg.getByLabel('Mark 6 across').fill('1.5'); await dlg.getByLabel('Mark 6 across').press('Tab');
+  marks.push(...(await page.evaluate(() => (window as any).__luxdmx.show.settings.marks.slice(5))));
+  await steerOnto(5);
+  await dlg.getByRole('button', { name: 'Work it out for 1' }).click();
+  await expect(res).toContainText(/Its pan goes 6[23]\d° and its tilt 2[45]\d°, not the 540° and 270°/);
+  await expect(res).toContainText('Fits all its marks within');
+  await expect(res.getByRole('checkbox', { name: /Keep 6\d\d° and 2\d\d° for Head/ })).toBeChecked();
+  await dlg.getByRole('button', { name: 'Use it', exact: true }).click();
+  const f = (await lights(page))[0];
+  expect(Math.abs(f.panDeg - 630)).toBeLessThan(6);
+  expect(Math.abs(f.tiltDeg - 250)).toBeLessThan(3);
+  // the show now aims it at a spot it was never steered to just as the real one gets there
+  const spot = { x: 1, y: 1.2, z: 0.5 };
+  const mine = aimAt(f.p3, f.rot, spot, { ...O, panDeg: f.panDeg, tiltDeg: f.tiltDeg, panOffset: f.panOffset ?? 0, tiltOffset: f.tiltOffset ?? 0 })!, theirs = aimAt(truth.p, truth.rot, spot, realO)!;
+  expect(Math.abs(mine.pan - theirs.pan) * 630).toBeLessThan(1);
+  expect(Math.abs(mine.tilt - theirs.tilt) * 250).toBeLessThan(1);
+});
+
+test('a light whose profile has no pan and tilt (plain channels): find them, then it calibrates like any head', async ({ page }) => {
+  await openConnected(page);
+  // a light the library doesn't know, as RDM patches it: "Channel 1" to "Channel 6", nothing named
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.addType({ id: 'rdm-1234-9', manufacturer: 'Maker 1234', model: 'Model 9', source: 'user', modes: [{ name: '6 channel', channels: [1, 2, 3, 4, 5, 6].map((i) => ({ name: `Channel ${i}`, attr: 'raw' })) }] });
+    a.show.fixtures.push({ id: 'mx', name: 'Mystery', typeId: 'rdm-1234-9', mode: '6 channel', universe: 0, address: 1, x: 0.5, y: 0.3 });
+    a.checkpoint();
+  });
+  await tab(page, 'Fixtures');
+  await page.locator('.fl li[data-fixture="Mystery"]').click({ button: 'right' });
+  await expect(page.locator('.ctx').getByRole('menuitem', { name: 'Focus and calibrate…' })).toHaveCount(0);
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Find pan and tilt…' }).click();
+  const dlg = page.getByRole('dialog', { name: 'Find pan and tilt: Mystery' });
+  // trying a slider reaches the real light
+  await dlg.getByLabel('Try channel 3').fill('200');
+  await expect.poll(async () => (await channels(0, 6))[2]).toBe(200);
+  const rows = dlg.getByRole('table', { name: 'Its channels' }).locator('tbody tr');
+  await rows.nth(0).getByRole('button', { name: 'Pan' }).click();
+  await rows.nth(2).getByRole('button', { name: 'Tilt' }).click();
+  await dlg.getByLabel('Pan fine channel').selectOption('1');      // (channel 2)
+  await rows.nth(3).getByRole('button', { name: 'Dimmer' }).click();
+  await dlg.getByLabel('Pan range in degrees').fill('630');
+  await dlg.getByRole('button', { name: 'Save and focus on marks…' }).click();
+  // it's a head now: the calibration opens for it, and its type says so
+  await expect(page.getByRole('dialog', { name: 'Focus and calibrate: Mystery' })).toBeVisible();
+  const t = await page.evaluate(() => { const a = (window as any).__luxdmx; const f = a.show.fixtures.find((x: any) => x.id === 'mx'); return JSON.parse(JSON.stringify(a.show.fixtureTypes.find((x: any) => x.id === f.typeId))); });
+  expect(t.modes[0].channels.slice(0, 4).map((c: any) => [c.name, c.attr, !!c.fine])).toEqual([['Pan', 'pan', false], ['Pan fine', 'pan', true], ['Tilt', 'tilt', false], ['Dimmer', 'intensity', false]]);
+  expect(t.physical).toEqual({ panDeg: 630, tiltDeg: 270 });
+  // the try values were let go: home (128) on pan and tilt, from the light's own defaults
+  await expect.poll(async () => { const c = await channels(0, 3); return [c[0], c[2]]; }).toEqual([128, 128]);
+});

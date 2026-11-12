@@ -113,8 +113,8 @@ footer a { color: var(--gh-muted); text-decoration: none; }
           <input type="hidden" name="mode" value="ap">
           <p class="text-secondary small">The gateway will broadcast its own WiFi network (named after the device hostname). Join that network to control it.</p>
           <label class="form-label text-secondary small mb-1">AP password (optional)</label>
-          <input class="form-control mb-1" type="text" name="appw" id="ap-pw" placeholder="(leave blank for an open network)">
-          <div class="form-text mb-3">8 or more characters enables WPA2. Leave it blank for an open network.</div>
+          <input class="form-control mb-1" type="text" name="appw" id="ap-pw" placeholder="(leave blank for an open network)" minlength="8" maxlength="63">
+          <div class="form-text mb-3">8 to 63 characters enables WPA2. Leave it blank for an open network.</div>
           <div class="d-flex gap-2">
             <button type="button" class="btn btn-outline-secondary back-btn">Back</button>
             <button type="submit" class="btn btn-primary flex-grow-1">Create AP &amp; reboot</button>

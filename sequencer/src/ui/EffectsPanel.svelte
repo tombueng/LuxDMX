@@ -87,7 +87,7 @@
   }
 </script>
 
-<div class="panel ep">
+<div class="panel ep" data-marks="hide">
   <div class="row head">
     <h2>Effects</h2><span class="chip">{app.show.effects.length}</span><span class="grow"></span>
     <Help>

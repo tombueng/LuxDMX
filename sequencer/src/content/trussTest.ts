@@ -8,13 +8,13 @@ import type { Cue, CueAction, CueList, Show, Values } from '../model/types';
 import type { TimelineItem } from '../model/timeline';
 import { ROOMS, aimRot } from '../stage3d/geometry';
 import { BAR_S, DEMO_BPM, DEMO_SECONDS } from '../timeline/beat';
-import { Builder, C, gobo, on } from './templates';
+import { Builder, C, gobo, on, profile, slotNames, turn } from './templates';
 import { inRoom } from './cueing';
 
 export const TRUSS_NAME = 'Test truss';
 const R = ROOMS.truss, T = R.truss[0];
 // the kinds on the truss, left to right as the audience sees it, and the machines on the floor
-export const TRUSS_KINDS = ['spot', 'wash', 'par', 'strobe', 'blinder', 'fresnel', 'bar', 'strip'] as const;
+export const TRUSS_KINDS = ['profile', 'spot', 'wash', 'par', 'strobe', 'blinder', 'fresnel', 'bar', 'strip'] as const;
 export const TRUSS_MACHINES = ['fog', 'hazer', 'confetti', 'flame', 'sparks', 'co2', 'bubbles'] as const;
 const hung = { yaw: 0, pitch: 0, roll: 180 };
 
@@ -24,6 +24,8 @@ export function buildTrussTest(): Show {
   s.settings.bpm = DEMO_BPM;
   inRoom(s, 'truss');
   // ---- two of each, all on universes 0 and 1 (one box runs it)
+  // (the profile spots: everything a touring gobo head has, see library.ts)
+  const prof = b.add('gen-profile', 2, 'Profile', 0.05, { universe: 0, x0: 0.01, x1: 0.03 });
   const spot = b.add('gen-spotgobo', 2, 'Spot', 0.05, { universe: 0, x0: 0.04, x1: 0.13 });
   const wash = b.add('gen-wash', 2, 'Wash', 0.05, { universe: 0, x0: 0.21, x1: 0.3 });
   const par = b.add('gen-drgbwauvs', 2, 'PAR', 0.05, { universe: 0, x0: 0.38, x1: 0.47 });
@@ -39,11 +41,11 @@ export function buildTrussTest(): Show {
   // ---- on the truss: the hung lights a metre apart under it (the fixed ones aimed at the floor in
   // front), the bars and strips on its front face tipped down a little; the machines in a row in front
   const hy = T.y - 0.35, face = T.z + 0.2, mid = T.y + 0.15;
-  const hang = [spot, wash, par, strobe, blinder, fresnel].flat();
+  const hang = [prof, spot, wash, par, strobe, blinder, fresnel].flat();
   b.place(hang, (f, i) => {
-    const p = { x: -5.5 + i, y: hy, z: T.z };
+    const p = { x: -6.5 + i, y: hy, z: T.z };
     // (the moving heads hang straight, the fixed lights are aimed)
-    f.p3 = p; f.rot = i < 4 ? { ...hung } : aimRot(p, { x: p.x * 0.7, y: 0, z: 4.5 });
+    f.p3 = p; f.rot = i < 6 ? { ...hung } : aimRot(p, { x: p.x * 0.7, y: 0, z: 4.5 });
   });
   b.place(bar, (f, i) => { f.p3 = { x: -4.6 + i * 1.3, y: mid, z: face }; f.rot = { yaw: 0, pitch: 110, roll: 0 }; });
   b.place(strip, (f, i) => { f.p3 = { x: 1.6 + i * 2.8, y: mid, z: face }; f.rot = { yaw: 0, pitch: 110, roll: 0 }; });
@@ -56,7 +58,7 @@ export function buildTrussTest(): Show {
 
   // ---- groups and effects
   const g = {
-    spot: b.group('Spots', spot), wash: b.group('Washes', wash), par: b.group('PARs', par), strobe: b.group('Strobes', strobe),
+    prof: b.group('Profiles', prof), spot: b.group('Spots', spot), wash: b.group('Washes', wash), par: b.group('PARs', par), strobe: b.group('Strobes', strobe),
     blinder: b.group('Blinders', blinder), fresnel: b.group('Fresnels', fresnel), bar: b.group('LED bars', bar), strip: b.group('Pixel strips', strip),
   };
   const e = {
@@ -76,17 +78,32 @@ export function buildTrussTest(): Show {
   // fog has no one-shot of its own in the builder: a three second shot that ends by itself
   const fogShot = b.shot('Fog shot', fog, { fog: 1 }, 3, '3 s of fog', '#8a94a3');
   const chase = b.list('Chase', { end: 'loop', color: '#ffd23f' });
-  const lights = [spot, wash, par, strobe, blinder, fresnel, bar, strip].flat();
-  const dark: [string[], Values][] = [[lights, { intensity: 0 }]];
+  const lights = [prof, spot, wash, par, strobe, blinder, fresnel, bar, strip].flat();
+  // (the profiles open, no prism, still, nothing by hand: each cue says what it tests)
+  const dark: [string[], Values][] = [[lights, { intensity: 0 }], [prof, profile()]];
   const work: [string[], Values][] = [[fresnel, on(0.3)]];        // a little light to see the machines by
   const down = (more: Values = {}): Values => ({ pan: 0.5, tilt: 0.62, ...more });
   const fire = (...ls: (CueList | undefined)[]): CueAction[] => ls.filter((l): l is CueList => !!l).map((l) => ({ do: 'start', list: l.id }));
   const test = (name: string, parts: [string[], Values][], o: Partial<Cue> = {}) => b.cue(L, name, [...dark, ...parts], { fade: 1, ...o });
   const at: Record<string, Cue> = {};
   at.off = test('All off', [], { fade: 0 });
+  // the profile spots: every gobo thing a touring head does, one at a time
+  const P = (more: Values, d: Parameters<typeof profile>[0] = {}): [string[], Values][] => [[prof, on(1, C.white, down({ zoom: 0.25, ...profile(d), ...more }))]];
+  at.profWheel = test('Profiles: the rotating wheel, Stars turning', P({}, { gobo: 'Stars', spin: 0.5 }));
+  at.profGlass = test('Profiles: a glass gobo, Rainbow glass', P({}, { gobo2: 'Rainbow glass' }));
+  at.profBoth = test('Profiles: both wheels, Breakup over Window', P({}, { gobo: 'Breakup', gobo2: 'Window', spin: -0.3 }));
+  at.prism3 = test('Profiles: 3-facet prism turning', P({}, { gobo: 'Ring of dots', prism: '3-facet prism', prismSpin: 0.6 }));
+  at.prism5 = test('Profiles: 5-facet linear prism', P({}, { gobo: 'Stars', prism: '5-facet linear prism', prismSpin: 0.3 }));
+  at.prism8 = test('Profiles: 8-facet prism', P({}, { gobo: 'Tunnel', prism: '8-facet prism' }));
+  at.anim = test('Profiles: animation wheel running', P({}, { anim: 0.9 }));
+  at.shake = test('Profiles: Stars shaking', P({}, { gobo: 'Stars', shake: 0.6 }));
+  at.scroll = test('Profiles: the wheel running round', P({}, { scroll: 0.5 }));
+  at.iris = test('Profiles: iris closing', P({ iris: 0.9 }, { gobo: 'Flower' }), { fade: 4 });
+  at.focus = test('Profiles: focus, near to far', P({ focus: 1 }, { gobo: 'Water' }), { fade: 4 });
+  at.frost = test('Profiles: frost', P({ frost: 0.8 }, { gobo: 'Stars' }), { fade: 2 });
   at.spotWhite = test('Spots: open white', [[spot, on(1, C.white, down({ zoom: 0.2 }))]]);
   at.spotMove = test('Spots: pan and tilt', [[spot, on(1, C.white, down({ zoom: 0.1 }))]], { effects: [e.circle] });
-  at.spotGobo = test('Spots: gobos and prism', [[spot, on(1, C.white, down({ zoom: 0.3, gobo: gobo('Star'), goboRotation: 0.3, prism: 1 }))]]);
+  at.spotGobo = test('Spots: gobos and prism', [[spot, on(1, C.white, down({ zoom: 0.3, gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.6), prism: 1 }))]]);
   at.spotColour = test('Spots: colour', [[[spot[0]], on(1, C.red, down())], [[spot[1]], on(1, C.blue, down())]]);
   at.washColour = test('Washes: colour', [[wash, on(1, C.white, down({ zoom: 0.5 }))]], { effects: [e.washRainbow] });
   at.washZoom = test('Washes: zoom, narrow to wide', [[wash, on(1, C.cyan, down({ zoom: 1 }))]], { fade: 4 });
@@ -110,15 +127,21 @@ export function buildTrussTest(): Show {
   at.bubbles = test('Bubbles: 20 s', work, { actions: fire(m.bubbles) });
   at.end = test('Done: all off', [], { fade: 2, actions: [{ do: 'release', list: haze.id }] });
   // the chase: each kind in turn, half a second each, round and round
-  const kinds: [string, string[], Values][] = [['Spots', spot, on(1, C.white, down({ zoom: 0.1 }))], ['Washes', wash, on(1, C.cyan, down({ zoom: 0.5 }))], ['PARs', par, on(1, C.magenta)],
+  const kinds: [string, string[], Values][] = [['Profiles', prof, on(1, C.white, down({ zoom: 0.2, ...profile({ gobo: 'Stars' }) }))], ['Spots', spot, on(1, C.white, down({ zoom: 0.1 }))], ['Washes', wash, on(1, C.cyan, down({ zoom: 0.5 }))], ['PARs', par, on(1, C.magenta)],
     ['LED bars', bar, on(1, C.yellow)], ['Pixel strips', strip, on(1, C.green)], ['Blinders', blinder, on(1)], ['Fresnels', fresnel, on(1)], ['Strobes', strobe, on(1, undefined, { strobe: 0.7 })]];
   for (const [name, ids, v] of kinds) b.cue(chase, `Chase: ${name}`, [...dark, [ids, v]], { fade: 0, advance: { mode: 'wait', time: 0.5 } });
+  // every gobo on the profiles' two wheels, one after the other, two seconds each
+  const walk = b.list('Gobos, one by one', { end: 'loop', color: '#c38bff' });
+  for (const [attr, label] of [['gobo', 'Gobo'], ['gobo2', 'Gobo 2']] as const)
+    for (const name of slotNames('gen-profile', attr).slice(1))
+      b.cue(walk, `${label}: ${name}`, [...dark, ...P({}, { [attr]: name })], { fade: 0, advance: { mode: 'wait', time: 2 } });
 
   // ---- the little show on the demo beat: through the test list, four bars a cue, then the chase
   const items: TimelineItem[] = [];
   let n = 0;
   const put = (t: number, lane: string, a: TimelineItem['do']) => items.push({ id: `tt${++n}`, at: t, lane, do: a });
-  const order = [at.spotWhite, at.spotMove, at.spotGobo, at.spotColour, at.washColour, at.washZoom, at.washMove, at.par, at.parFade, at.bar, at.barChase,
+  const order = [at.profWheel, at.profGlass, at.profBoth, at.prism3, at.prism5, at.prism8, at.anim, at.shake, at.scroll, at.iris, at.focus, at.frost,
+    at.spotWhite, at.spotMove, at.spotGobo, at.spotColour, at.washColour, at.washZoom, at.washMove, at.par, at.parFade, at.bar, at.barChase,
     at.strip, at.stripMeteor, at.strobe, at.blinder, at.fresnel, at.all, at.haze, at.fog, at.confetti, at.flame, at.sparks, at.co2, at.bubbles];
   order.forEach((c, i) => put(i * 4 * BAR_S, `list:${L.id}`, { do: 'goto', list: L.id, cue: c.id }));
   const chaseAt = order.length * 4 * BAR_S;

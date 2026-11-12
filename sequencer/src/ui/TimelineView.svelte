@@ -48,7 +48,7 @@
   // the time after it (the song itself is 0 to its length)
   const span = $derived(spanOf(tl ? { duration: P.duration || tl.duration, lead: tl.lead, tail: tl.tail } : { duration: 240 }));
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
-  const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l)));
+  const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   // one lane per list that's on the timeline or could be, then effects, then moments
   const lanes = $derived([...lists.map((l) => ({ id: `list:${l.id}`, name: l.name, color: l.color ?? '#45d85c' })),
     { id: 'fx', name: 'Effects', color: '#ffaa1c' }, { id: 'crowd', name: 'Crowd', color: '#7fc8ff' }, { id: 'special', name: 'Moments', color: '#f33abc' }]);

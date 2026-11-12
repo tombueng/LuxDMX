@@ -55,7 +55,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions (dropping a picture is extra; the button does the same) -->
-<div class="panel pp" class:picover={picOver}
+<div class="panel pp" data-marks="hide" class:picover={picOver}
      ondragover={(e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); picOver = true; } }}
      ondragleave={(e) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) picOver = false; }}
      ondrop={(e) => { if (e.dataTransfer?.files.length) { e.preventDefault(); picOver = false; fromPicture(e.dataTransfer.files[0]); } }}>

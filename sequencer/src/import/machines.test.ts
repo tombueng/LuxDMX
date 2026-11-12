@@ -59,7 +59,7 @@ describe('real QLC+ machines', () => {
   it('MagicFX Psyco2Jet: the valve and GO are CO2; angle, speed and presets stay what they are', () => {
     const t = qxf('MagicFX-Psyco2Jet.qxf');
     expect(chs(mode(t, 'RAW'))).toEqual(['Safety=enable', 'Angle=tilt', 'Speed=speed', 'Output=co2']);
-    expect(chs(mode(t, 'Preset'))).toEqual(['Safety=enable', 'Preset=raw', 'Speed=speed', 'Direction=control', 'GO=co2']);
+    expect(chs(mode(t, 'Preset'))).toEqual(['Safety=enable', 'Preset=effectMacro', 'Speed=speed', 'Direction=control', 'GO=co2']);
     expect(enableValue(mode(t, 'RAW').channels[0].ranges)).toEqual({ on: 128, off: 0 });    // "Device enabled"; the top is a test mode
     for (const m of t.modes) expect(riskOf(m.channels.map((c) => c.attr))).toBe('hazard');
     expect(render(mode(t, 'RAW'), { co2: 1 })[3]).toBe(255);             // 200..255: valve open
@@ -80,7 +80,7 @@ describe('real QLC+ machines', () => {
     // (the "Co2 FX" in its name is the look of its fog: it has no CO2 channel)
     const t = qxf('Stairville-AF-180-LED-Fogger-Co2-FX.qxf');
     const m = t.modes[0];
-    expect(chs(m)).toEqual(['Amount of Fog=fog', 'Brightness of All LEDs=intensity', 'Colour effect=colorWheel', 'Stroboscope Effect=raw',
+    expect(chs(m)).toEqual(['Amount of Fog=fog', 'Brightness of All LEDs=intensity', 'Colour effect=colorWheel', 'Stroboscope Effect=effectMacro',
       'Intensity Colour Effect Red=red', 'Intensity Colour Effect Green=green', 'Intensity Colour Effect Blue=blue']);
     expect(m.channels[0].span).toBeUndefined();                          // fog 0 is DMX 0 (0..9: no fog)
     expect(riskOf(m.channels.map((c) => c.attr))).toBe('atmosphere');
@@ -98,7 +98,7 @@ describe('real QLC+ machines', () => {
       <Channel Name="Flame macro"><Group Byte="0">Effect</Group><Capability Min="0" Max="255">Flame colours</Capability></Channel>
       <Mode Name="4ch"><Channel Number="0">Dimmer</Channel><Channel Number="1">Red</Channel><Channel Number="2">Fire effect</Channel><Channel Number="3">Flame macro</Channel></Mode>
       </FixtureDefinition>`;
-    expect(chs(fromQxf(xml).modes[0])).toEqual(['Dimmer=intensity', 'Red=red', 'Fire effect=raw', 'Flame macro=raw']);
+    expect(chs(fromQxf(xml).modes[0])).toEqual(['Dimmer=intensity', 'Red=red', 'Fire effect=effectMacro', 'Flame macro=effectMacro']);
   });
 
   it('a home-made .qxf confetti cannon ("Effect" type, a "Fire" channel) fires confetti, not flames', () => {
@@ -169,7 +169,7 @@ describe('Open Fixture Library machines', () => {
       Intensity: { capability: { type: 'Intensity' } },
       Effects: { capabilities: [{ dmxRange: [0, 127], type: 'Effect', effectName: 'Fireworks' }, { dmxRange: [128, 255], type: 'Effect', effectName: 'Explosion' }] },
     }, modes: [{ name: '2ch', channels: ['Intensity', 'Effects'] }] };
-    expect(fromOfl('x/ls', j, 'X').modes[0].channels.map((c) => c.attr)).toEqual(['intensity', 'raw']);
+    expect(fromOfl('x/ls', j, 'X').modes[0].channels.map((c) => c.attr)).toEqual(['intensity', 'effectMacro']);
   });
 
   it('the fog machine from the library (Stairville M-Fog 1000) sends 0 for no fog', () => {
@@ -209,7 +209,7 @@ describe('GDTF machines', () => {
   it('a PAR with a "Fire" effect program stays a light', () => {
     const t = gdtf('LED PAR 7', ch(1, 'Dimmer') + ch(2, 'ColorAdd_R')
       + ch(3, 'Effects1', '<ChannelFunction Attribute="Effects1" Name="Fire" DMXFrom="0/1"/><ChannelFunction Attribute="Effects1" Name="Lightning" DMXFrom="128/1"/>'));
-    expect(t.modes[0].channels.map((c) => c.attr)).toEqual(['intensity', 'red', 'raw']);
+    expect(t.modes[0].channels.map((c) => c.attr)).toEqual(['intensity', 'red', 'effectMacro']);
   });
 });
 

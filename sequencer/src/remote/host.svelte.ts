@@ -9,7 +9,7 @@
 // page closed) lets go of everything within HOLD_MS.
 import type { Page, Widget } from '../model/types';
 import type { Bridge } from '../output/bridge';
-import { lookColor } from '../engine/cuelook';
+import { levelOf, lookColor, wholeLook } from '../engine/cuelook';
 import { cueNum, cueNumber } from '../model/cuenum';
 import { EFFECT_MAP, paramsOf, runEffect } from '../engine/effects';
 import { SONG_STILL, holdsWhilePressed, widgetFace, type Face } from '../ui/widgetFace';
@@ -312,8 +312,10 @@ export class RemoteHost {
     if (!look) return [];
     const n = new Map<string, number>();
     for (const v of Object.values(look)) {
-      if ((v.intensity ?? 0) < 0.05) continue;
-      const c = lookColor({ ...v, intensity: 1 }).css;
+      if (levelOf(v) < 0.05) continue;                  // (lit by its cells counts as lit)
+      // (its colour at full, so a red at 50 % and one at 100 % are one red; a light lit by its cells
+      // shows its brightest cell's colour, as on the plan)
+      const c = lookColor({ ...(wholeLook(v) ?? v), intensity: 1 }).css;
       n.set(c, (n.get(c) ?? 0) + 1);
     }
     return [...n].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([c]) => c);

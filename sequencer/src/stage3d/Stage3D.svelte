@@ -49,17 +49,24 @@
   import { ui, dismiss, dialogOpen } from '../ui/ui.svelte';
   import Icon from '../ui/Icon.svelte';
   import { canRecord, clock, extOf, FPS, megabytes, pickFormat, saveVideo, stutterNote, tallFov, Take, takeSize, VIDEO_SIZES, videoBits, videoName, type VideoSize } from './recorder';
-  import { capsOf } from '../model/library';
+  import { headCellsOf, capsOf } from '../model/library';
+  import { slotsOf } from '../engine/render';
+  import { ATLAS_CELLS, ATLAS_SIZE, drawAtlas, GOBOS, wheelPatterns } from './gobos';
+  import { loadGoboFonts } from './goboFonts';
   import { boardReach, opticsOf, restAt } from '../model/fixtureSetup';
   import { buildVenue } from './venue';
-  import { Rig, type RigFixture, type Sfx } from './rig';
+  import { Rig, type GoboWheel, type RigFixture, type Sfx } from './rig';
   import { placesOfLight, shapeSize, shapeStanding } from '../model/pixelLayout';
   import type { Look } from './models';
   import { Particles } from './particles';
   import { aimAt, aimRot, beamDir, calibrate, faceBand, pivotOf, defaultPlace, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
   import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
-  import type { Timeline } from '../model/timeline';
+  import { spanOf, type Timeline } from '../model/timeline';
+  import type { Resolved, Show } from '../model/types';
+  import { AUDIO_CODECS, ChunkFile, CODEC_NAMES, frameCount, RENDER_FPS, RENDER_ORDER, RENDER_SIZES, renderBits, renderName, timeLeft, tooBig, VIDEO_CODECS, type CardLimits, type RenderFps, type RenderSize } from '../render/offline';
+  import { ShowAt } from '../render/showAt';
+  import { mixSong } from '../render/audio';
 
   let { readonly = false }: { readonly?: boolean } = $props();
   let host = $state<HTMLDivElement>();
@@ -78,6 +85,9 @@
   // besides your lights. On a curve like the eye's (most of the slider is the dark end); 1 is a
   // little more than it always had, it starts at about a third of that
   let ambient = $state(Math.min(1, stored('luxdmx.seq.ambient2', 0.6)));
+  // how much your lights light up the room round them (the band, the deck, the walls, the haze's
+  // glow): 1 as it always was, 0 only their beams and the light where they land
+  let spill = $state(Math.min(1, stored('luxdmx.seq.spill', 0.45)));
   const ambLight = (s: number) => 1.25 * Math.pow(s, 2.2);
   let hemi: THREE.HemisphereLight | undefined, keyLight: THREE.DirectionalLight | undefined;
   let houseOf: THREE.Object3D | undefined, houseMats: THREE.MeshBasicMaterial[] = [];
@@ -96,15 +106,67 @@
     const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
     const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
     // which body it gets: a wash head has a zoom and no gobo; a blinder says so in its name
-    const look: Look = sfx ?? (c.fog ? 'fog' : k === 'mover' ? (/wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
+    const look: Look = sfx ?? (has('hoist') ? 'winch' : c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
       : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
     return {
       id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
       p: f.p3 ? { ...f.p3 } : shape ? shapeStanding(def.p, shape).p : def.p, rot: f.rot ? { ...f.rot } : shape ? shapeStanding(def.p, shape).rot : def.rot, shape, size,
       // (the light's own pan / tilt range first, then its type's; swapped when it says so)
       optics: { ...opticsOf(f, t), swap: !!f.swapPanTilt },
+      // its gobo wheels: each slot's pattern from its name (gobos.ts), and its rotation channel's ranges
+      gobos: look === 'spot' ? goboWheels(m) : undefined,
+      // its prism (facets from the prism channel's ranges) and its animation wheel
+      prism: look === 'spot' ? prismOfMode(m) : undefined,
+      anim: look === 'spot' && has('animation') ? { rot: chOf(m, 'animationRotation')?.ranges } : undefined,
+      // its beam's opening angle: its own, else its type's data (else the 3D stage guesses by its kind)
+      beam: f.beamDeg ?? t?.physical?.beamDeg,
+      ...(c.heads > 1 && m ? { heads: c.heads, headCells: headCellsOf(m), headPan: c.cellMoves.includes('pan'), barPan: m.channels.some((ch) => ch.attr === 'pan' && ch.cell === undefined) } : {}),
+      // a winch: its travel and speed from its type (a guess without), its soft limits
+      ...(has('hoist') ? { winch: { travel: t?.physical?.travel ?? 4, speed: t?.physical?.hoistSpeed ?? 0.4, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}),
+      // more than two axes: endless pan and tilt, a third axis (roll) and its endless turning
+      axes: has('panRotation') || has('tiltRotation') || has('roll') || has('rollRotation') ? {
+        ...(has('panRotation') ? { panRot: chOf(m, 'panRotation')?.ranges ?? null } : {}), ...(has('tiltRotation') ? { tiltRot: chOf(m, 'tiltRotation')?.ranges ?? null } : {}),
+        ...(has('roll') || has('rollRotation') ? { rollDeg: t?.physical?.rollDeg || 360 } : {}), ...(has('rollRotation') ? { rollRot: chOf(m, 'rollRotation')?.ranges ?? null } : {}),
+      } : undefined,
     };
   }));
+
+  const chOf = (m: ReturnType<typeof app.modeOf>, attr: string) => m?.channels.find((ch) => ch.attr === attr && !ch.fine && ch.cell === undefined);
+  function prismOfMode(m: ReturnType<typeof app.modeOf>): RigFixture['prism'] {
+    const c = chOf(m, 'prism');
+    return c ? { ranges: c.ranges, rot: chOf(m, 'prismRotation')?.ranges } : undefined;
+  }
+  function goboWheels(m: ReturnType<typeof app.modeOf>): GoboWheel[] | undefined {
+    const out: GoboWheel[] = [];
+    for (const [attr, rotAttr] of [['gobo', 'goboRotation'], ['gobo2', 'gobo2Rotation']] as const) {
+      const c = m?.channels.find((ch) => ch.attr === attr && !ch.fine && ch.cell === undefined);
+      if (!c) continue;
+      const r = m!.channels.find((ch) => ch.attr === rotAttr && !ch.fine && ch.cell === undefined);
+      out.push({ attr, rotAttr, slots: wheelPatterns(slotsOf(c).map((x) => x.label ?? '')), rot: r?.ranges });
+    }
+    return out.length ? out : undefined;
+  }
+  // The gobo patterns, drawn once for the page into one texture (gobos.ts), with the symbol fonts
+  // that come with the app (until they're in, the beams have no gobos)
+  let goboAtlas: { canvas: HTMLCanvasElement; tex: THREE.CanvasTexture; empty: string[] } | null = null;
+  async function makeGobos() {
+    if (goboAtlas) return goboAtlas;
+    await loadGoboFonts();
+    const canvas = document.createElement('canvas');
+    drawAtlas(canvas);
+    // (a pattern that drew nothing: said by the tests, not hidden)
+    const c = canvas.getContext('2d')!, empty: string[] = [];
+    GOBOS.forEach((g, i) => {
+      const d = c.getImageData((i % ATLAS_CELLS) * ATLAS_SIZE, Math.floor(i / ATLAS_CELLS) * ATLAS_SIZE, ATLAS_SIZE, ATLAS_SIZE).data;
+      let lit = 0;
+      for (let k = 0; k < d.length; k += 4) if (d[k] > 128) lit++;
+      if (lit < ATLAS_SIZE * ATLAS_SIZE * 0.01) empty.push(g.id);
+    });
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.NoColorSpace; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+    tex.anisotropy = 4;
+    return (goboAtlas = { canvas, tex, empty });
+  }
 
   let renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, controls: OrbitControls, gizmo: TransformControls;
   let composer: EffectComposer, bloom: UnrealBloomPass;
@@ -276,7 +338,7 @@
     if (custom) scene.add(custom);
     lensBase = 0; lensSet = 0;
     restoreCam();
-    glow = Math.min(0.8, stored('luxdmx.seq.glow3', 0.3)); hazeAmt = stored('luxdmx.seq.haze', 0.45); ambient = Math.min(1, stored('luxdmx.seq.ambient2', 0.6));
+    glow = Math.min(0.8, stored('luxdmx.seq.glow3', 0.3)); hazeAmt = stored('luxdmx.seq.haze', 0.45); ambient = Math.min(1, stored('luxdmx.seq.ambient2', 0.6)); spill = Math.min(1, stored('luxdmx.seq.spill', 0.45));
     try { liveScreens = localStorage.getItem('luxdmx.seq.screensLive') !== '0'; } catch { /* as it was */ }
     composer.setPixelRatio(renderer.getPixelRatio());
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook;
@@ -287,6 +349,7 @@
     active = false; alive--;
     if (!holding) return;                    // (still waiting for it: it's passed on when it comes)
     if (take) void stopRecording(true, true); // (a take running: saved as it is)
+    if (rendering) renderStop = true;         // (a render: stopped, nothing saved)
     camSaved = 0; keepCam();
     cancelAnimationFrame(raf); clearInterval(hiddenDraw); hiddenDraw = 0;
     ro?.disconnect(); ro = undefined;
@@ -335,6 +398,7 @@
     venue = buildVenue({ room: room.id, band: app.show.settings.bandName }); builtRoom = room.id; showRoom(room);
     scene.add(venue.group);
     rig = new Rig(); scene.add(rig.group);
+    { const r = rig; void makeGobos().then((a) => { if (rig === r) r.setGobos(a.tex); }); }
     particles = new Particles(); scene.add(particles.group);
   }
   // what each stage has of its own: the camera controls, the gizmo, the glow
@@ -400,6 +464,14 @@
       take: () => take,
       // a moving head where its motors are (degrees), and the haze the beams get now
       head: (id: string) => rig.headOf(id),
+      marks: () => rig.marksNow(),
+      spill: () => ({ spill, washes: wash.map((w) => w.intensity) }),
+      gobo: (id: string) => rig.goboOf(id),
+      beam: (id: string) => rig.beamOf(id),
+      bar: (id: string) => rig.barOf(id),
+      winch: (id: string) => rig.winchOf(id),
+      gobos: () => (goboAtlas ? { count: GOBOS.length, empty: [...goboAtlas.empty], size: goboAtlas.canvas.width } : null),
+      rendering: () => (rendering ? { ...rendering } : null),
       haze: () => haze,
       ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: houseMats.length ? Math.max(...houseMats.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null }),
     };
@@ -423,6 +495,7 @@
     if (active) { active = false; alive--; }
     ro?.disconnect();
     if (take) void stopRecording(true, true);        // (a take running: saved as it is)
+    if (rendering) renderStop = true;
     if (holding && camera && controls) { camSaved = 0; keepCam(); }
     cancelAnimationFrame(raf);
     dropParts(); meter.dispose();
@@ -781,6 +854,13 @@
   }
   function frame(now: number) {
     raf = requestAnimationFrame(frame);
+    // (a render draws its own frames, on its own clock: see renderVideo)
+    if (src) return;
+    draw(now);
+  }
+  // What a render draws instead of the live show: its own show's look at its moment (render/showAt.ts)
+  let src: { drawn: Record<string, Resolved>; stage: Record<string, Resolved>; beats: number; music: boolean } | null = null;
+  function draw(now: number) {
     // (a take goes on drawing: in a hidden tab a timer calls this, see hiddenTake())
     if ((document.hidden && !taking) || !host?.isConnected) return;
     // (folded away to nothing, e.g. the timeline's picture on a phone: nothing to draw)
@@ -792,12 +872,14 @@
     quality();
     const real = Math.min(0.5, (now - last) / 1000), dt = Math.min(0.1, real); last = now;
     const t = now / 1000;
-    const sel = new Set(app.selected);
+    // (a Live page's or the timeline's stage is for looking: no selection on it, as on the plan)
+    const sel = readonly || src ? new Set<string>() : new Set(app.selected);
+    rig.marks = ui.selMarks ? 1 : 0;
     // haze: a base so beams show, more while a fog or haze machine runs
     let smoke = 0;
     const machines = [];
     for (const f of fixtures) {
-      const v = app.stageNow[f.id];
+      const v = (src?.stage ?? app.stageNow)[f.id];
       if (f.fog) {
         const s = Math.max(typeof v?.fog === 'number' ? v.fog : 0, typeof v?.haze === 'number' ? v.haze : 0); smoke = Math.max(smoke, s);
         // out of its nozzle (the machine's front), along the floor; a hazer's fine haze rises
@@ -814,7 +896,9 @@
     smokeIn += (smoke - smokeIn) * Math.min(1, dt * 0.8);
     haze = Math.min(1.5, hazeAmt * (0.9 + 0.5 * room) + 0.08 * Math.max(room, 0.5 * smokeIn));
     (scene.fog as THREE.FogExp2).density = 0.005 + 0.016 * haze;
-    rig.update(app.drawnNow, t, haze, sel);
+    // (a winch live and not armed: where the wire holds it, not where the show would send it)
+    rig.winchWire = src ? undefined : (id) => app.winchHeldAt(id);
+    rig.update(src?.drawn ?? app.drawnNow, t, haze, sel);
     particles.light(rig.lit);
     // (the machines' output follows the clock, not the frame rate: a slow computer gets the same fog
     // and confetti, in steps of at most 0.1 s)
@@ -824,16 +908,17 @@
     sideCol.forEach((c) => c.setRGB(0, 0, 0));
     const lv = [0, 0, 0];
     for (const l of rig.lit) { const s = l.p.x < -W / 6 ? 0 : l.p.x > W / 6 ? 2 : 1; sideCol[s].r += l.c.r * l.level; sideCol[s].g += l.c.g * l.level; sideCol[s].b += l.c.b * l.level; lv[s] += l.level; energy += l.level; }
-    wash.forEach((w, i) => { const n = Math.max(1e-3, lv[i]); w.color.setRGB(sideCol[i].r / n, sideCol[i].g / n, sideCol[i].b / n); w.intensity = Math.min(1, lv[i] / 4) * 140; });
+    wash.forEach((w, i) => { const n = Math.max(1e-3, lv[i]); w.color.setRGB(sideCol[i].r / n, sideCol[i].g / n, sideCol[i].b / n); w.intensity = Math.min(1, lv[i] / 4) * 140 * spill; });
     energy = Math.min(1, energy / Math.max(4, fixtures.length * 0.4));
     const all = sideCol[0].clone().add(sideCol[1]).add(sideCol[2]).multiplyScalar(1 / Math.max(1e-3, lv[0] + lv[1] + lv[2]));
     // (music: the song playing on the timeline, inside the song, or the microphone hearing a beat;
     // without it the band and the DJ stand still)
-    const tl = app.timeline, music = (tl.playing && tl.position >= 0 && tl.position < tl.duration) || (app.music.on && app.music.confidence > 0.3);
-    venue.animate(t, app.engine.beatCount, energy, lv[0] + lv[1] + lv[2] > 0.01 ? all : new THREE.Color(0x6a40ff), music);
-    particles.ambient(all.r * energy, all.g * energy, all.b * energy);
+    const tl = app.timeline, music = src ? src.music : (tl.playing && tl.position >= 0 && tl.position < tl.duration) || (app.music.on && app.music.confidence > 0.3);
+    venue.animate(t, src?.beats ?? app.engine.beatCount, energy, lv[0] + lv[1] + lv[2] > 0.01 ? all : new THREE.Color(0x6a40ff), music);
+    const sp = 0.25 + 0.75 * spill;
+    particles.ambient(all.r * energy * sp, all.g * energy * sp, all.b * energy * sp);
     // a foggy room glows in the colour of the light in it
-    const tint = 0.045 * Math.min(1, room) * Math.min(1, energy * 2.5);
+    const tint = 0.045 * Math.min(1, room) * Math.min(1, energy * 2.5) * sp;
     fogCol.copy(DARK).add(sideCol[0].clone().add(sideCol[1]).add(sideCol[2]).multiplyScalar(tint / Math.max(1e-3, lv[0] + lv[1] + lv[2])));
     (scene.fog as THREE.FogExp2).color.copy(fogCol); (scene.background as THREE.Color).copy(fogCol);
     // the camera: a crew moving it (held still while you grab the stage), or yours
@@ -863,16 +948,17 @@
     const q = gpuBegin();
     if (glow > 0.02 && (load.level > 0 || taking)) composer.render(); else renderer.render(scene, camera);
     // the gizmo on top, after the glow (inside it, a bright look washed it out)
-    renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+    // (not in a render: the video is the show, not the tools)
+    if (!src) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true; }
     gpuEnd(q);
     if (taking) take?.frame(now);          // (a take running: this frame into the video, see recorder.ts)
-    load.did(performance.now() - work0);
+    if (!src) load.did(performance.now() - work0);   // (a render's slow frames aren't the screen's load)
   }
 
   async function fullscreen() {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await host!.requestFullscreen(); } catch { ui.toast('This browser won\'t go full screen here'); }
   }
-  $effect(() => { try { localStorage.setItem('luxdmx.seq.glow3', String(glow)); localStorage.setItem('luxdmx.seq.haze', String(hazeAmt)); localStorage.setItem('luxdmx.seq.ambient2', String(ambient)); } catch { /* not remembered */ } });
+  $effect(() => { try { localStorage.setItem('luxdmx.seq.glow3', String(glow)); localStorage.setItem('luxdmx.seq.haze', String(hazeAmt)); localStorage.setItem('luxdmx.seq.ambient2', String(ambient)); localStorage.setItem('luxdmx.seq.spill', String(spill)); } catch { /* not remembered */ } });
   const pickedName = $derived(app.selected.length === 1 ? app.show.fixtures.find((f) => f.id === app.selected[0])?.name : app.selected.length ? `${app.selected.length} lights` : '');
 
   // ---- a video of the stage with its sound (the timeline's song or the demo beat): Record starts a
@@ -913,6 +999,144 @@
     ui.recording = true;
     recTimer = window.setInterval(() => { recSecs = Math.floor(take?.seconds ?? 0); }, 250);
   }
+  // ---- Render: a video drawn frame by frame on the show's own clock (render/), not recorded as it
+  // plays. 4K and 8K at whatever speed this computer manages, never a dropped or doubled frame. The
+  // song (from its start, or from the playhead) or the look as it is for a while; the sound mixed
+  // from the song's file. The live show isn't touched: the render runs its own copy of the show,
+  // nothing goes out from it, the box keeps getting what it got. While it runs this stage shows the
+  // frames being drawn.
+  const RENDER_KEY = 'luxdmx.seq.render3d';
+  type ROpts = { size: RenderSize; fps: RenderFps; what: 'song' | 'here' | 'look'; seconds: number; programmer: boolean };
+  const R_DEFAULT: ROpts = { size: '4k', fps: 30, what: 'song', seconds: 30, programmer: false };
+  let rOpts = $state<ROpts>((() => {
+    try {
+      const v = { ...R_DEFAULT, ...JSON.parse(localStorage.getItem(RENDER_KEY) ?? '{}') } as ROpts;
+      if (!RENDER_ORDER.includes(v.size)) v.size = R_DEFAULT.size;
+      if (!RENDER_FPS.includes(v.fps)) v.fps = R_DEFAULT.fps;
+      if (!['song', 'here', 'look'].includes(v.what)) v.what = 'song';
+      v.seconds = Math.max(1, Math.min(3600, Math.round(+v.seconds || 30)));
+      return v;
+    } catch { return { ...R_DEFAULT }; }
+  })());
+  $effect(() => { try { localStorage.setItem(RENDER_KEY, JSON.stringify(rOpts)); } catch { /* not remembered */ } });
+  let renderPanel = $state(false);
+  let rendering = $state<{ k: number; n: number; left?: number; codec: string; label: string; phase: 'sound' | 'frames' | 'saving' } | null>(null);
+  let renderStop = false;
+  const renderable = typeof VideoEncoder !== 'undefined';
+  // the song on the timeline (a file or the demo beat): Render can take it from its start
+  const songThere = $derived(!!app.show.timeline && (!!app.show.timeline.demo || !!app.show.timeline.audio));
+  // (seconds of video, for the panel's estimate)
+  const renderSecs = $derived.by(() => {
+    if (rOpts.what === 'look' || !songThere) return rOpts.seconds;
+    const span = spanOf(app.show.timeline);
+    return Math.max(0, span.to - (rOpts.what === 'here' ? Math.max(span.from, app.timeline.position) : span.from));
+  });
+  function cardLimits(): CardLimits {
+    const gl = renderer.getContext();
+    const vp = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
+    return { renderbuffer: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), viewport: [vp[0], vp[1]], texture: gl.getParameter(gl.MAX_TEXTURE_SIZE) };
+  }
+  // a pause for the page (the progress shows, Cancel is heard) that a hidden tab doesn't slow down
+  const breathe = () => new Promise<void>((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => r(); ch.port2.postMessage(0); });
+  // drawn before the first frame and thrown away: fades, the heads' motors and the haze settle
+  const SETTLE = 2;
+  async function renderVideo() {
+    if (rendering || take || !renderer || !canvas || !host) return;
+    renderPanel = false;
+    if (!renderable) { ui.toast('This browser can\'t render video (no WebCodecs). Chrome, Edge and Safari can.', 7000); return; }
+    const o = $state.snapshot(rOpts) as ROpts, size = RENDER_SIZES[o.size];
+    const big = tooBig(size.w, size.h, cardLimits(), size.label);
+    if (big) { ui.toast(big, 9000); return; }
+    const tl = app.show.timeline ? ($state.snapshot(app.show.timeline) as Timeline) : undefined;
+    const song = o.what !== 'look' && songThere && tl;
+    const span = spanOf(tl);
+    const from = song ? (o.what === 'here' ? Math.max(span.from, Math.min(span.to - 0.5, app.timeline.position)) : span.from) : 0;
+    const to = song ? span.to : o.seconds;
+    const n = frameCount(to - from, o.fps), name = renderName(app.show.meta.name, o.size, new Date());
+    // where it goes: asked first where the browser can (Chrome, Edge), so an 8K file goes straight
+    // to disk; else it's kept as it's made and saved at the end
+    let handle: FileSystemFileHandle | undefined;
+    const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
+    if (picker) {
+      try { handle = await picker({ suggestedName: name, types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] }); }
+      catch (e) { if ((e as DOMException)?.name === 'AbortError') return; handle = undefined; }
+    }
+    const bits = renderBits(size.w, size.h, o.fps);
+    let mb: typeof import('mediabunny');
+    try { mb = await import('mediabunny'); } catch { ui.toast('The video maker didn\'t load (offline and never used here before?). Try again online.', 8000); return; }
+    const codec = await mb.getFirstEncodableVideoCodec([...VIDEO_CODECS], { width: size.w, height: size.h, bitrate: bits, frameRate: o.fps }).catch(() => null);
+    if (!codec) { ui.toast(`This browser can't encode ${size.label} video here (none of H.264, HEVC, AV1 or VP9 at ${size.w} x ${size.h}). Try a smaller size, or Chrome or Edge.`, 10000); return; }
+    renderStop = false;
+    rendering = { k: 0, n, codec: CODEC_NAMES[codec], label: size.label, phase: 'sound' };
+    ui.recording = true;                   // (the layout holds still meanwhile, as for a take)
+    const started = performance.now();
+    let output: InstanceType<typeof mb.Output> | undefined, file: ChunkFile | undefined;
+    let lost = false;
+    const onLost = () => { lost = true; renderStop = true; };
+    canvas.addEventListener('webglcontextlost', onLost);
+    try {
+      // the sound: the song from the render's start to its end, at full
+      let mix: AudioBuffer | undefined;
+      if (song) { try { await app.timeline.prepare(); mix = await mixSong({ song: app.timeline.song, demo: !!tl.demo, from, to }); } catch { mix = undefined; } }
+      if (renderStop) throw new Error('stopped');
+      file = handle ? undefined : new ChunkFile();
+      const writable = (handle ? await handle.createWritable() : file!.writable()) as WritableStream;
+      output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: false }), target: new mb.StreamTarget(writable, { chunked: true }) });
+      const video = new mb.CanvasSource(canvas, { codec, bitrate: bits, keyFrameInterval: 2, latencyMode: 'quality' });
+      output.addVideoTrack(video, { frameRate: o.fps });
+      let sound: InstanceType<typeof mb.AudioBufferSource> | undefined, soundCodec = '';
+      if (mix) {
+        const ac = await mb.getFirstEncodableAudioCodec([...AUDIO_CODECS], { numberOfChannels: 2, sampleRate: mix.sampleRate, bitrate: 256e3 }).catch(() => null);
+        if (ac) { sound = new mb.AudioBufferSource({ codec: ac, bitrate: 256e3 }); output.addAudioTrack(sound); soundCodec = CODEC_NAMES[ac]; }
+      }
+      await output.start();
+      // (the sound goes in as the pictures do: the file takes them side by side)
+      const soundIn = sound && mix ? sound.add(mix).then(() => sound!.close()) : Promise.resolve();
+      // the stage at the video's size, drawn by this loop instead of the screen's
+      const show = $state.snapshot(app.show) as Show;
+      const at = new ShowAt({ show, burstValues: (a) => app.burstValues(a), shown: (st, fr) => app.ledShown(st, fr) },
+        app.renderStart(o.programmer), from - SETTLE, song ? tl : undefined, song && o.what === 'song');
+      takePr = renderer.getPixelRatio(); takeSz = { w: size.w, h: size.h }; takeFov = fitTall(size.w, size.h);
+      renderer.setPixelRatio(1); composer.setPixelRatio(1); resize();
+      taking = true;
+      // (the stage's clock goes on from now: the frames before the video start right after the last shown one)
+      const base = performance.now() + SETTLE * 1000;
+      const drawAt = (secs: number) => {
+        const m = at.step(secs);
+        src = { drawn: m.drawn, stage: m.stage, beats: m.beats, music: !!song && secs >= 0 && secs < (tl?.duration ?? 0) };
+        draw(base + (secs - from) * 1000);
+      };
+      for (let s = from - SETTLE; s < from - 1e-6; s += 1 / o.fps) drawAt(s);
+      rendering.phase = 'frames';
+      for (let k = 0; k < n; k++) {
+        if (renderStop) break;
+        drawAt(from + k / o.fps);
+        await video.add(k / o.fps, 1 / o.fps);
+        rendering.k = k + 1;
+        if ((k & 7) === 7 || k === n - 1) rendering.left = timeLeft(k + 1, n, performance.now() - started);
+        await breathe();
+      }
+      if (renderStop) throw new Error(lost ? 'lost' : 'stopped');
+      rendering.phase = 'saving';
+      video.close();
+      await soundIn;
+      await output.finalize();
+      const secs = n / o.fps, bytes = file?.size;
+      if (file) saveVideo(file.blob('video/mp4'), name);
+      ui.toast(`Saved "${handle?.name ?? name}" (${size.label}, ${o.fps} frames a second, ${clock(secs)}, ${CODEC_NAMES[codec]}${soundCodec ? ` with ${soundCodec} sound` : ', no sound'}${bytes ? `, ${megabytes(bytes)} MB` : ''}; rendered in ${clock((performance.now() - started) / 1000)})`, 9000);
+    } catch (e) {
+      try { await output?.cancel(); } catch { /* gone already */ }
+      const why = (e as Error)?.message;
+      if (why === 'stopped') ui.toast('Render stopped. Nothing saved.', 5000);
+      else if (why === 'lost' || lost) ui.toast(`The graphics card gave up at ${size.label} (out of memory?). Try a smaller size, close other tabs, or another computer.`, 10000);
+      else ui.toast(`The render stopped (${String(why ?? e).slice(0, 120)}). Nothing saved.`, 9000);
+    } finally {
+      canvas?.removeEventListener('webglcontextlost', onLost);
+      src = null; taking = false; rendering = null; ui.recording = false;
+      if (!gone) { sizeBack(); last = performance.now(); }
+    }
+  }
+
   // closing: the 3D stage is going away (no size to go back to); save: the file, or only stop
   async function stopRecording(save = true, closing = false) {
     const t = take;
@@ -1007,9 +1231,10 @@
   <label class="slide" title="How much haze is in the air: how much of the beams you see (the fog and haze machines add to it)">Haze <input type="range" min="0" max="1" step="0.05" bind:value={hazeAmt} aria-label="Haze in the air" /></label>
   <label class="slide" title="The glow round bright lenses (0: none; it costs a little speed)">Glow <input type="range" min="0" max="0.8" step="0.05" bind:value={glow} aria-label="Glow" /></label>
   <label class="slide" title="The room's own light besides your lights (the sky, the house, reflections): 0 is a dark venue where only your lights show anything">Ambient <input type="range" min="0" max="1" step="0.01" bind:value={ambient} aria-label="Ambient light" /></label>
+  <label class="slide" title="How much your lights light up the room round them (the band, the deck, the walls, the haze's glow): 0 only their beams and where they land, full as bright as a real rig's spill gets">Spill <input type="range" min="0" max="1" step="0.05" bind:value={spill} aria-label="Spill from your lights" /></label>
 {/snippet}
 {#snippet sizePick()}
-  <label class="slide" title="How big the video is: 1080p is 1920 x 1080 whatever the window, 9:16 is 1080 x 1920 for phones (Reels, Stories), As shown is the 3D stage as it is on the screen">Video
+  <label class="slide" title="How big the video is: 1080p is 1920 x 1080 whatever the window, 9:16 is 1080 x 1920 for phones (Reels, Stories), As shown is the 3D stage as it is on the screen">{#if tier !== 'wide'}Video{/if}
     <select bind:value={videoSize} disabled={!!take} aria-label="Video size"><option value="1080p">1080p</option><option value="vertical">9:16</option><option value="shown">As shown</option></select></label>
   {#if webmOnly}<span class="webm" role="note" aria-label="WebM only" title={WEBM_NOTE}>WebM</span>{/if}
 {/snippet}
@@ -1039,7 +1264,8 @@
       {/if}
       <span class="grow"></span>
       {#if tier !== 'narrow' && !readonly}<button class="ghost" bind:this={venueBtn} class:on={venuePanel} aria-expanded={venuePanel} onclick={() => (venuePanel ? closeVenue() : openVenue(false))} title="Your own venue as a 3D model (.glb), or the built-in stage">Venue</button>{/if}
-      {#if tier === 'wide'}{@render looks()}{/if}
+      <!-- (the sliders in one box on the toolbar: one frame round all four, room for the rest) -->
+      {#if tier === 'wide'}<div class="slides" role="group" aria-label="How the stage looks">{@render looks()}</div>{/if}
       {#if take}
         <div class="seg recseg" role="group" aria-label="Recording">
           <span class="rec" role="timer" aria-label="Recording: {clock(recSecs)}"><span class="dot"></span>REC {clock(recSecs)}</span>
@@ -1048,6 +1274,16 @@
       {:else}
         <button class="ghost recbtn" class:off={!recordable} onclick={record} aria-label="Record a video"
           title={recordable ? `Record a video of the 3D stage with the song (${SIZE_SAYS[videoSize]}); Stop saves it${webmOnly ? `. ${WEBM_NOTE}` : ''}` : 'This browser can\'t record video here'}><Icon name="record" size={14} />{#if tier !== 'narrow'}Record{/if}</button>
+      {/if}
+      {#if rendering}
+        <div class="seg recseg" role="group" aria-label="Rendering">
+          <span class="rec rend" role="status" aria-label="Rendering {rendering.label}: {rendering.k} of {rendering.n} frames">{rendering.label}
+            {rendering.phase === 'sound' ? 'sound…' : rendering.phase === 'saving' ? 'saving…' : `${Math.floor((rendering.k / rendering.n) * 100)} %`}{#if rendering.phase === 'frames' && rendering.left !== undefined}{' '}· {clock(rendering.left)} left{/if}</span>
+          <button class="ghost" onclick={() => (renderStop = true)} aria-label="Stop rendering" title="Stop the render (nothing is saved)"><Icon name="stop" size={14} />{#if tier !== 'narrow'}Stop{/if}</button>
+        </div>
+      {:else if !take}
+        <button class="ghost" data-popover-toggle class:on={renderPanel} aria-expanded={renderPanel} class:off={!renderable} onclick={() => (renderPanel = !renderPanel)} aria-label="Render a video"
+          title={renderable ? 'Render a video frame by frame: up to 8K, never a dropped frame (slower than real time)' : 'This browser can\'t render video here'}><Icon name="film" size={14} />{#if tier !== 'narrow' && tier !== 'wide'}Render{/if}</button>
       {/if}
       {#if tier === 'wide'}
         {@render sizePick()}{@render fullBtn(false)}
@@ -1065,6 +1301,28 @@
           {@render sizePick()}
           {@render fullBtn(true)}
         </div>
+      </div>
+    {/if}
+    {#if renderPanel && !rendering}
+      <div class="venue rpanel" role="group" aria-label="Render a video" use:dismiss={() => (renderPanel = false)}>
+        <div class="vhead"><b>Render a video</b><button class="ghost x" onclick={() => (renderPanel = false)} aria-label="Close the render panel" title="Close (Esc)"><Icon name="close" size={14} /></button></div>
+        <div class="seg rooms" role="group" aria-label="Video size">
+          {#each RENDER_ORDER as k (k)}<button class="ghost" class:on={rOpts.size === k} aria-pressed={rOpts.size === k} onclick={() => (rOpts.size = k)} title={RENDER_SIZES[k].says}>{RENDER_SIZES[k].label}</button>{/each}
+        </div>
+        <label class="fld"><span>Frames a second</span>
+          <select bind:value={rOpts.fps} aria-label="Frames a second">{#each RENDER_FPS as f (f)}<option value={f}>{f}</option>{/each}</select></label>
+        <div class="what" role="radiogroup" aria-label="What to render">
+          {#if songThere}
+            <label class="ck"><input type="radio" name="rwhat" value="song" bind:group={rOpts.what} /> The song, from its start</label>
+            <label class="ck"><input type="radio" name="rwhat" value="here" bind:group={rOpts.what} /> The song, from the playhead ({clock(Math.max(0, app.timeline.position))})</label>
+          {/if}
+          <label class="ck"><input type="radio" name="rwhat" value="look" checked={rOpts.what === 'look' || !songThere} onchange={() => (rOpts.what = 'look')} /> The look as it is, for
+            <input type="number" min="1" max="3600" bind:value={rOpts.seconds} aria-label="Seconds to render" onkeydown={(e) => e.stopPropagation()} /> s</label>
+        </div>
+        <label class="ck"><input type="checkbox" bind:checked={rOpts.programmer} /> With what's in the programmer</label>
+        <p class="faint note">{clock(renderSecs)} of video, about {megabytes((renderBits(RENDER_SIZES[rOpts.size].w, RENDER_SIZES[rOpts.size].h, rOpts.fps) + 256e3) * renderSecs / 8)} MB.
+          Drawn frame by frame: slower than real time at 4K and 8K, but never a dropped frame. Nothing goes out to the lights from it; the show here goes on as it is.</p>
+        <button class="load" onclick={() => void renderVideo()} disabled={!renderable}>Render {RENDER_SIZES[rOpts.size].label}</button>
       </div>
     {/if}
     {#if venuePanel && !readonly}
@@ -1147,7 +1405,12 @@
   .seg button, .tools > button, .more .row > button { font-size: .8rem; padding: .2rem .55rem; }
   .tools > button, .more .row > button { background: #0b0f15cc; border: 1px solid var(--line); }
   .slide { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; color: var(--muted); background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .35rem; }
-  .slide input { width: 4.6rem; }
+  .slide input { width: 4.2rem; }
+  /* on the toolbar: the four sliders share one frame, a little narrower (so Record, Render and the
+     video size fit the one row too) */
+  .slides { display: inline-flex; align-items: center; gap: .55rem; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .45rem; }
+  .slides .slide { background: none; border: 0; padding: 0; gap: .25rem; }
+  .slides .slide input { width: 3.5rem; }
   .slide select { font-size: .78rem; padding: .05rem .2rem; background: transparent; border-color: transparent; }
   /* Record: a red dot; while it records, the red REC chip with the time and Stop */
   .recbtn :global(svg) { color: #ff4d55; fill: #ff4d55; }
@@ -1174,6 +1437,11 @@
   .venue .rooms { flex: 1 1 100%; }
   .venue .rooms button { flex: 1; font-size: .8rem; padding: .2rem .5rem; }
   .venue .bandname { flex: 1 1 100%; }
+  .rpanel .what { flex: 1 1 100%; display: flex; flex-direction: column; gap: .2rem; }
+  .rpanel .what input[type=number] { width: 4.2em; padding: .05rem .25rem; font-size: .8rem; min-height: 0; }
+  .rpanel .note { flex: 1 1 100%; margin: 0; font-size: .76rem; line-height: 1.35; }
+  .rpanel .load { flex: 1 1 100%; }
+  .rend { background: #2a5bd7; }
   .venue .bandname input { width: 100%; font-size: .85rem; padding: .2rem .4rem; }
   /* a browser that only records WebM: said next to Record (the full sentence is its tooltip) */
   .webm { font-size: .72rem; color: var(--muted); background: #0b0f15cc; border: 1px dashed var(--line); border-radius: 6px; padding: .1rem .4rem; white-space: nowrap; cursor: help; }

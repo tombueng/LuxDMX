@@ -117,8 +117,8 @@ test.describe('a wide screen', () => {
     const s3 = page.locator('.s3');
     const row = await oneRow(page);
     expect(row.h).toBeLessThan(40); expect(row.over).toBeLessThanOrEqual(1);
-    for (const b of ['Front', 'Tour', 'Select', 'Venue', 'Record a video', 'Full screen']) await expect(s3.locator('.tools').getByRole('button', { name: b, exact: true })).toBeVisible();
-    for (const l of ['Haze in the air', 'Glow', 'Video size']) await expect(s3.locator('.tools').getByLabel(l)).toBeVisible();
+    for (const b of ['Front', 'Tour', 'Select', 'Venue', 'Record a video', 'Render a video', 'Full screen']) await expect(s3.locator('.tools').getByRole('button', { name: b, exact: true })).toBeVisible();
+    for (const l of ['Haze in the air', 'Glow', 'Ambient light', 'Spill from your lights', 'Video size']) await expect(s3.locator('.tools').getByLabel(l)).toBeVisible();
     await expect(s3.getByRole('button', { name: 'More', exact: true })).toHaveCount(0);
     // the venue panel opens under the toolbar and closes with its X
     await s3.getByRole('button', { name: 'Venue', exact: true }).click();

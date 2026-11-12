@@ -7,6 +7,7 @@
 // once on import and the show keeps our version. Data: MIT, (c) Florian & Felix Edelmann.
 // Effect machines (fog, flames, CO2...) are named from their own words in machines.ts.
 import type { Channel, ChannelAttr, ChannelRange, FixtureMode, FixtureType } from '../model/types';
+import { secondWheels } from './wheels';
 import { machineAttrs, machineSpan, needsSpan, type ChannelFacts, type FixtureClass } from './machines';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -80,6 +81,14 @@ export function fromOfl(key: string, j: Json, manufacturer: string): FixtureType
     const span = machineSpan(ch.attr, ranges);
     if (span) ch.span = span; else delete ch.span;
   });
+  for (const m of modes) secondWheels(m.channels, (c) => wheelOf.get(c));
+  // A grid of pixels (a matrix panel): its cells laid out as the file draws them, so pictures,
+  // the cell picker and pixel effects see a panel, not one long row.
+  const grid = gridOf(j.matrix);
+  if (grid) for (const m of modes) {
+    const cells = new Set(m.channels.flatMap((c) => (c.cell === undefined ? [] : [c.cell])));
+    if (cells.size === grid.cols * grid.rows && [...cells].every((k) => k < cells.size)) m.layout = { kind: 'matrix', cols: grid.cols, rows: grid.rows };
+  }
 
   const ang = (type: string) => {
     for (const c of Object.values<Json>(j.availableChannels ?? {}))
@@ -88,7 +97,7 @@ export function fromOfl(key: string, j: Json, manufacturer: string): FixtureType
   };
   return {
     id: `ofl:${key}`, manufacturer, model: j.name, source: 'ofl', ref: key, modes,
-    physical: { panDeg: ang('Pan'), tiltDeg: ang('Tilt') },
+    physical: { panDeg: ang('Pan'), tiltDeg: ang('Tilt'), ...lensOf(j) },
   };
 }
 
@@ -108,6 +117,8 @@ function classOf(categories: string[]): FixtureClass {
 const SETTLED = new Set(['Fog', 'FogOutput', 'FogType', 'Time', 'Speed', 'EffectSpeed', 'EffectDuration', 'SoundSensitivity',
   'Rotation', 'Pan', 'Tilt', 'PanContinuous', 'TiltContinuous', 'PanTiltSpeed', 'Maintenance', 'NoFunction']);
 
+// which wheel a channel's slots or turning belong to (a head with two gobo wheels)
+const wheelOf = new WeakMap<Channel, string>();
 function convertChannel(name: string, r: Resolved, wheels: Record<string, Json>, allRanges: ChannelRange[]): Channel {
   const c = r.ch;
   const list = caps(c);
@@ -132,10 +143,19 @@ function convertChannel(name: string, r: Resolved, wheels: Record<string, Json>,
   const main = list.length === 1 ? list[0] : [...list].sort((x: Json, y: Json) => span(y) - span(x)).find((x: Json) => x.type !== 'NoFunction') ?? list[0];
   const types = new Set(list.map((x: Json) => x.type));
   let attr: ChannelAttr = 'raw';
+  // (a wheel's slots, or its turning: what the wheel holds says which; the wheel goes with the
+  // channel, so a head's second gobo wheel can be told from its first)
+  const wheelName = (type: string) => { const w = list.find((x: Json) => x.type === type)?.wheel; return (Array.isArray(w) ? w[0] : w) ?? r.key; };
+  const kindsOf = (name: string) => new Set((wheels[name]?.slots ?? []).map((s: Json) => s.type));
   if (types.has('WheelSlot')) {
-    const wheel = wheels[list.find((x: Json) => x.type === 'WheelSlot').wheel ?? r.key];
-    const kinds = new Set((wheel?.slots ?? []).map((s: Json) => s.type));
-    attr = kinds.has('Color') ? 'colorWheel' : kinds.has('Gobo') ? 'gobo' : 'raw';
+    const name = wheelName('WheelSlot'), kinds = kindsOf(name);
+    attr = kinds.has('Color') ? 'colorWheel' : kinds.has('Gobo') ? 'gobo' : kinds.has('AnimationGoboStart') || kinds.has('AnimationGoboEnd') ? 'animation' : 'raw';
+    wheelOf.set(ch, name);
+  } else if (main.type === 'WheelRotation' || main.type === 'WheelSlotRotation') {
+    const name = wheelName(main.type), kinds = kindsOf(name);
+    attr = kinds.has('Gobo') ? 'goboRotation' : kinds.has('AnimationGoboStart') || kinds.has('AnimationGoboEnd') ? 'animationRotation' : kinds.has('Color') ? 'raw' : 'goboRotation';
+    wheelOf.set(ch, name);
+    if (attr !== 'raw' && list.length > 1 && main.dmxRange) ch.span = [to8(main.dmxRange[0]), to8(main.dmxRange[1])];
   } else if (types.has('ShutterStrobe') && [...types].every((t) => ['ShutterStrobe', 'NoFunction', 'StrobeSpeed', 'StrobeDuration'].includes(t as string))) {
     attr = 'shutter';
   } else if ([...types].every((t) => t === 'Maintenance' || t === 'NoFunction')) {
@@ -144,11 +164,24 @@ function convertChannel(name: string, r: Resolved, wheels: Record<string, Json>,
     attr = attrOf(main);
     if (attr !== 'raw' && list.length > 1 && main.dmxRange) ch.span = [to8(main.dmxRange[0]), to8(main.dmxRange[1])];
   }
-  // Colour presets on a pixel bar would fight the RGB channels: leave them at their default.
-  if (main.type === 'ColorPreset') attr = 'raw';
+  // Colour presets: the light's own colour programs, picked by name, never driven unless picked
+  // (on a pixel bar they'd fight the RGB channels: at their default they don't).
+  if (main.type === 'ColorPreset') attr = 'colorMacro';
   ch.attr = attr;
   if (attr === 'shutter' && !ch.ranges) ch.attr = 'strobe';
   return ch;
+}
+
+// the beam's opening angle from the file: its lens (degreesMinMax), else a zoom channel's angles
+function lensOf(j: Json): { beamDeg?: [number, number] } {
+  const d = j.physical?.lens?.degreesMinMax;
+  if (Array.isArray(d) && d.length === 2 && d.every((v: unknown) => typeof v === 'number' && v > 0)) return { beamDeg: [Math.min(d[0], d[1]), Math.max(d[0], d[1])] };
+  for (const c of Object.values<Json>(j.availableChannels ?? {}))
+    for (const cap of caps(c)) if ((cap.type === 'BeamAngle' || cap.type === 'Zoom') && cap.angleStart && cap.angleEnd) {
+      const a = deg(cap.angleStart), b = deg(cap.angleEnd);
+      if (a > 0 && b > 0) return { beamDeg: [Math.min(a, b), Math.max(a, b)] };
+    }
+  return {};
 }
 
 function attrOf(cap: Json): ChannelAttr {
@@ -158,6 +191,10 @@ function attrOf(cap: Json): ChannelAttr {
     case 'ColorTemperature': return 'cct';
     case 'Pan': return 'pan';
     case 'Tilt': return 'tilt';
+    case 'PanContinuous': return 'panRotation';
+    case 'TiltContinuous': return 'tiltRotation';
+    // (the head or the whole light turning round: an angle is a third axis, a speed its endless turning)
+    case 'Rotation': return cap.angle !== undefined || cap.angleStart !== undefined ? 'roll' : 'rollRotation';
     case 'PanTiltSpeed': return 'speed';
     case 'StrobeSpeed': return 'strobe';
     case 'ShutterStrobe': return 'shutter';
@@ -166,6 +203,9 @@ function attrOf(cap: Json): ChannelAttr {
     case 'Iris': return 'iris';
     case 'Frost': return 'frost';
     case 'Prism': return 'prism';
+    case 'PrismRotation': return 'prismRotation';
+    case 'Effect': return 'effectMacro';
+    case 'EffectSpeed': return 'effectSpeed';
     case 'WheelSlotRotation': case 'WheelRotation': return 'goboRotation';
     case 'Fog': case 'FogOutput': return cap.fogType === 'Haze' ? 'haze' : 'fog';
     case 'Maintenance': return 'control';
@@ -226,12 +266,27 @@ function deg(s: string | number) { return typeof s === 'number' ? s : parseFloat
 function pixelKeys(m: Json): string[] {
   if (!m) return [];
   if (m.pixelKeys) return (m.pixelKeys as Json[][][]).flat(2).filter((k): k is string => typeof k === 'string');
-  const [x = 1, y = 1, z = 1] = m.pixelCount ?? [];
+  const [x = 1, y = 1, z = 1] = Array.isArray(m.pixelCount) ? m.pixelCount : [];
   const keys: string[] = [];
   const dims = [x, y, z].filter((d) => d > 1).length;
   for (let k = 1; k <= z; k++) for (let j = 1; j <= y; j++) for (let i = 1; i <= x; i++)
     keys.push(dims <= 1 ? String(i * j * k) : dims === 2 ? `(${i}, ${j})` : `(${i}, ${j}, ${k})`);
   return keys;
+}
+
+// OFL's matrix as a flat panel: x across, y down, one deep, every place a pixel (pixelKeys in
+// rows from the top, or pixelCount). A row or a 3D block: none.
+export function gridOf(m: Json): { cols: number; rows: number } | undefined {
+  if (!m) return undefined;
+  if (Array.isArray(m.pixelKeys)) {
+    const z = m.pixelKeys as Json[][][];
+    if (z.length !== 1 || !Array.isArray(z[0])) return undefined;
+    const rows = z[0].length, cols = Array.isArray(z[0][0]) ? z[0][0].length : 0;
+    if (rows < 2 || cols < 2 || z[0].some((r: Json) => !Array.isArray(r) || r.length !== cols || r.some((k: Json) => typeof k !== 'string'))) return undefined;
+    return { cols, rows };
+  }
+  const [x = 1, y = 1, z = 1] = Array.isArray(m.pixelCount) ? m.pixelCount : [];
+  return x > 1 && y > 1 && z === 1 ? { cols: x, rows: y } : undefined;
 }
 
 function expandMode(entries: Json[], pixels: string[], groups: string[], _matrix: Json): (string | null)[] {

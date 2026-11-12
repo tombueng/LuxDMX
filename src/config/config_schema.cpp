@@ -70,7 +70,8 @@ const CfgField CONFIG_FIELDS[] = {
     // not something the firmware reads, but it must survive a reboot/OTA, since the board a
     // build reports is compile-time and a v6 runs the generic esp32s3dev build.
     SFIELD_L("board",    "boardSel", boardSel,    "Board",          "Identity", CFG_NONE),
-    SFIELD("otapw",    "otapw",    otaPassword, "OTA password",   "Identity", CFG_SECRET | CFG_KEEPNE),
+    // (live: the config POST hands a new OTA password to ArduinoOTA at once, no restart)
+    SFIELD_L("otapw",  "otapw",    otaPassword, "OTA password",   "Identity", CFG_SECRET | CFG_KEEPNE),
     EFIELD_L("protocol", "protocol", protocol,    "Input protocol", "Identity", ENUM_PROTOCOL),
 
     // --- Status LED ---------------------------------------------------------
@@ -159,7 +160,7 @@ const CfgField CONFIG_FIELDS[] = {
     SFIELD_L("wifissid4", "wifiSsid4", wifiSsid4,    "WiFi SSID 4",        "Network", CFG_NONE),
     SFIELD_L("wifipsk4",  "wifiPsk4",  wifiPsk4,     "WiFi password 4",    "Network", CFG_SECRET | CFG_KEEPNE),
     EFIELD("fbmode",   "linkLossMode", linkLossMode, "Link-loss policy",   "Network", ENUM_FBMODE),
-    SFIELD("appw",     "apPassword",   apPassword,   "AP password",        "Network", CFG_SECRET),
+    SFIELD("appw",     "apPassword",   apPassword,   "AP password",        "Network", CFG_SECRET | CFG_KEEPNE),
     BFIELD("staticip", "staticIp",     staticIp,     "Static IP",          "Network", CFG_NONE),
     SFIELD("ip",       "ip",           ip,           "IP address",         "Network", CFG_NONE),
     SFIELD("gateway",  "gateway",      gateway,      "Gateway",            "Network", CFG_NONE),

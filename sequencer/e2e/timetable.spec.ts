@@ -9,6 +9,10 @@ const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.g
 const live = (page: Page) => page.evaluate(() => { const a = (window as any).__luxdmx; const l = a.show.cueLists[0]; const st = a.engine.status(l.id); return st.running ? l.cues[st.index].name : ''; });
 
 test('a time that comes plays its look; a later one shows as next; switched on later it picks up what should be on', async ({ page }) => {
+  // (the page's clock held at ten in the morning: the Bar's own evening times, and a time two hours
+  // on running past midnight, would otherwise make it pass by day and fail at night)
+  const now = new Date(2026, 10, 11, 10, 0, 5);
+  await page.clock.setFixedTime(now);
   await openConnected(page);
   await page.locator('.top .show').click();
   await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
@@ -20,7 +24,7 @@ test('a time that comes plays its look; a later one shows as next; switched on l
   await dlg.getByRole('button', { name: 'Add a time' }).click();
   const [second] = await page.evaluate(() => (window as any).__luxdmx.show.cueLists[0].cues.slice(1, 3).map((c: any) => c.name));
   // the first comes in a minute (it plays the second look); the second in two hours
-  const now = new Date(), soon = new Date(now.getTime() + 60e3), later = new Date(now.getTime() + 2 * 3600e3);
+  const soon = new Date(now.getTime() + 60e3), later = new Date(now.getTime() + 2 * 3600e3);
   await page.evaluate(({ a, b }) => {
     const app = (window as any).__luxdmx, l = app.show.cueLists[0], [e1, e2] = app.show.settings.schedule;
     e1.at = a; e1.do = { do: 'goto', list: l.id, cue: l.cues[1].id };

@@ -23,19 +23,28 @@ play the show from big buttons, your phone or a song's timeline. No install, no 
   that wakes up, a reactor that blows, a supernova, your own words). Fifty more as add-ons in ten
   themes (fire, rain, the sea, love, darkness...), packages anyone can make, share and import
   (ADDONS.md). Or write your own as a formula, or drop in a picture or an animated GIF.
-- **A 3D stage.** Beams in haze, moving heads that pan at real speed, flames, sparks, confetti,
-  CO2, a band and a crowd. Record it as a video.
+- **A 3D stage.** Beams in haze, real gobo patterns in them, moving heads that pan at real speed, moving bars,
+  winches, flames, sparks, confetti, CO2, a band and a crowd. Record it as a video, or render one frame by frame in 4K or 8K.
 - **A timeline.** Put cues, effects and flames on a song: it finds the tempo, the beats and the
   hits. 39 Creative Commons songs come with it.
 - **Live pages.** Big buttons and faders, GO, fog only while you hold it, MIDI learn, and your
   phone as a remote (scan a QR code).
+- **A console mode** for people who know desks: a command line ("1 thru 4 @ 50", "goto cue 5",
+  "record cue 2.5"), fixed fixture numbers, faders per light, group masters, encoders with gobo
+  wheels that click by name, cue list faders with GO and Back, Next/Prev with Highlight. Works with
+  a mouse, a keyboard or a touch screen.
+- **Pixels as cells.** Pick single LEDs of a bar, a ring or a matrix (typed, dragged, or Alt-click
+  on the plan), give them their own colour in a cue, run a chase on just the rim. Groups of cells
+  too.
 - **Safe by default.** It starts Blind. Flames and sparks fire only when armed (hold to arm) and
   cut out on their own.
 - **RDM rig check.** Finds the lights on the cable, compares them with your patch and fixes
   addresses and modes.
 - **Set up at the venue.** Try every channel of a light, change what a channel does, turn and mirror
   a LED panel until its test picture looks right. Steer the moving heads onto four bits of tape
-  and it works out where they really hang, so they all meet on one spot.
+  and it works out where they really hang, so they all meet on one spot (six marks at two heights
+  also measure how far pan and tilt really go). A light with a plain profile gets its pan and tilt
+  found by trying its channels.
 - **Templates** for a band, a DJ night, theatre, church, cinema and bar. QLC+ workspaces in and out.
 - **The DMX runs in its own thread**, so a busy page never makes the lights stutter. Works offline
   once it's loaded.
@@ -62,8 +71,17 @@ hits, flames, sparks and confetti.
 ```sh
 npm ci
 npm run dev        # http://localhost:5173
-npm test           # about 1,000 unit tests
-npm run e2e        # about 310 browser tests, the DMX checked on the wire of a fake box
+npm test           # about 1,550 unit tests
+npm run e2e        # about 370 browser tests, the DMX checked on the wire of a fake box
+BENCH=1 npx vitest run src/bench   # a big pixel rig timed: frames, GO, saving
 ```
+
+The show file's JSON Schema (`schema/luxdmx-show.schema.json`) is laid out by hand; to add to it
+without reformatting the rest, write the new version with any tool and carry only the changes over:
+`python3 tools/json_patch_keep_format.py schema/luxdmx-show.schema.json new.json schema/luxdmx-show.schema.json`.
+
+Rendering videos (Render in the 3D stage) uses [mediabunny](https://github.com/Vanilagy/mediabunny)
+for the MP4 and the browser's encoders, loaded only when a render starts. It's MPL-2.0, used as it
+comes from npm, unchanged; its source is at that link.
 
 The whole how-to is in [GUIDE.md](GUIDE.md).

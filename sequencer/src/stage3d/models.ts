@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel';
+export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch';
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 
 // moving heads: the head turns about the yoke's arms at PIVOT; its lens is HEAD_LENS above that
@@ -30,6 +30,27 @@ const LENS: Partial<Record<Look, { at: number; r: number; lamps?: [number, numbe
   blinder: { at: 0, r: 0.12, lamps: [[-0.15, 0], [0.15, 0]] }, strobe: { at: 0, r: 0.2 },
 };
 export function lensOf(look: Look) { const l = LENS[look] ?? { at: 0, r: 0.1 }; return { at: l.at, r: l.r, lamps: l.lamps ?? [[0, 0]] as [number, number][] }; }
+
+// A moving bar: a mount on the truss (or the floor), the bar turning on it (its pan), and its heads
+// in a row along the bar, each tilting about the bar's length. The bar is a metre long here (scaled
+// to its heads); a head's lens is HEADBAR_LENS above where it turns.
+export const HEADBAR_PIVOT = 0.17, HEADBAR_LENS = 0.13, HEADBAR_PITCH = 0.26;
+export function headBarParts() {
+  const base = merge([new THREE.BoxGeometry(0.24, 0.08, 0.2).translate(0, 0.04, 0), new THREE.CylinderGeometry(0.06, 0.06, 0.06, 10).translate(0, 0.11, 0)]);
+  const bar = merge([new THREE.BoxGeometry(1, 0.08, 0.16).translate(0, 0.15, 0), new THREE.BoxGeometry(1, 0.02, 0.18).translate(0, 0.2, 0)]);
+  const head = merge([new THREE.CylinderGeometry(0.06, 0.07, 0.2, 12).translate(0, 0.03, 0), new THREE.CylinderGeometry(0.072, 0.072, 0.02, 12).translate(0, 0.13, 0)]);
+  return { base, bar, head };
+}
+
+// A kinetic winch: its motor box on the truss, a cable (a metre long here, scaled to how far it's
+// let out) and the load on it, an LED ball WINCH_BALL across.
+export const WINCH_BALL = 0.24, WINCH_BOX = 0.14;
+export function winchParts() {
+  const box = merge([new THREE.BoxGeometry(0.22, WINCH_BOX, 0.18).translate(0, 0, 0), new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateZ(Math.PI / 2).translate(0, -0.02, 0)]);
+  const cable = new THREE.CylinderGeometry(0.005, 0.005, 1, 5).translate(0, -0.5, 0);
+  const ball = new THREE.SphereGeometry(WINCH_BALL / 2, 20, 14);
+  return { box, cable, ball };
+}
 
 // fixed lights and machines, standing on their up (the beam / what they throw goes up)
 export function body(look: Look): { geo: THREE.BufferGeometry; lensR: number; lenses?: [number, number][] } {

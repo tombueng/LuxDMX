@@ -5,6 +5,7 @@
   import Modal from './Modal.svelte';
   import { app } from '../app.svelte';
   import { ATTR_GROUPS } from './attrs';
+  import { cellBlock, nextCell } from '../model/cellBlock';
   import type { Channel, ChannelAttr } from '../model/types';
 
   let { onclose, onfinish, count: initialCount = 8, universe: u0 = 0, address: a0 = 1 }:
@@ -46,6 +47,28 @@
     if (step + 1 >= count) { onfinish(found); onclose(); return; }
     step += 1; level = 255;
   }
+  // A pixel head: once one LED's channels are found, the rest are the same again. `blockFrom`: the
+  // channel (1-based) the found cell starts at, by default where the last run of colours began.
+  // (colours only: a dimmer before them is usually the whole head's; the number can be changed)
+  const LIGHTISH = new Set<ChannelAttr>(['red', 'green', 'blue', 'white', 'amber', 'uv', 'lime', 'warmWhite', 'coolWhite', 'cyan', 'magenta', 'yellow']);
+  let repeating = $state(false);
+  let blockFrom = $state(1);
+  function askRepeat() {
+    let a = found.length;
+    while (a > 0 && LIGHTISH.has(found[a - 1].attr)) a--;
+    blockFrom = Math.min(found.length, a + 1);
+    repeating = true;
+  }
+  const from = $derived(Math.max(1, Math.min(found.length, Math.floor(blockFrom) || 1)));   // (typed out of range: the nearest that is)
+  const blockLen = $derived(Math.max(1, found.length - from + 1));
+  const repeatCells = $derived(Math.floor((count - from + 1) / blockLen));
+  const leftover = $derived(count - (from - 1) - repeatCells * blockLen);
+  function finishRepeat() {
+    const before = found.slice(0, from - 1), block = found.slice(from - 1);
+    const rest = Array.from({ length: leftover }, (_, i) => ({ name: `Channel ${count - leftover + i + 1}`, attr: 'raw' as ChannelAttr, default: 0 }));
+    onfinish([...before, ...cellBlock(block, repeatCells, nextCell(before)), ...rest]);
+    onclose();
+  }
   function back() { if (step > 0) { step -= 1; level = 255; found = found.slice(0, step); const h = { ...hold }; delete h[step]; hold = h; } }
 </script>
 
@@ -55,10 +78,10 @@
     <div class="row">
       <label>Universe <input type="number" min="0" bind:value={universe} style="width:5em" /></label>
       <label>Start address <input type="number" min="1" max="512" bind:value={address} style="width:5em" /></label>
-      <label>Channels <input type="number" min="1" max="64" bind:value={count} style="width:4em" /></label>
+      <label>Channels <input type="number" min="1" max="512" value={count} oninput={(e) => { const v = Math.floor(+(e.target as HTMLInputElement).value); if (v >= 1) count = Math.min(512, v); }} style="width:4.5em" /></label>
     </div>
     <p class="muted">The number of channels is in the manual, or on the fixture's display (e.g. "8CH"). The output goes to the boxes connected at the top.</p>
-    <p class="warn">Not for fog machines, flames, sparks, CO2 or confetti: each channel goes to full while you try it. Their channel tables come from the manual.</p>
+    <p class="warn">Not for fog machines, flames, sparks, CO2, confetti or winches: each channel goes to full while you try it (a winch's height channel would run it all the way down and up). Their channel tables come from the manual.</p>
     {#if app.output !== 'live'}
       <p class="blindnote">You're blind: nothing reaches the fixture. <button onclick={() => void app.askOnStage()}>Send to the stage…</button></p>
     {/if}
@@ -80,6 +103,18 @@
     {/each}
     <div class="grp"><button onclick={() => pick('nothing')}>Nothing happens</button></div>
     {#if found.length}<p class="muted">So far: {found.map((c) => c.name).join(', ')}</p>{/if}
+    {#if found.length && step < count - 1}
+      {#if !repeating}
+        <button class="ghost" onclick={askRepeat} title="A pixel head or bar: the same few channels for every LED, ring or lamp">The rest are more of the same (cells)…</button>
+      {:else}
+        <div class="rep" aria-label="The rest are cells">
+          <label>One cell is channels <input type="number" min="1" max={found.length} bind:value={blockFrom} style="width:4em" aria-label="The cell starts at channel" /> to {found.length}
+            <span class="muted">({found.slice(from - 1).map((c) => c.name).join(', ')})</span></label>
+          <p class="muted">{repeatCells} cell{repeatCells === 1 ? '' : 's'} of {blockLen} channel{blockLen === 1 ? '' : 's'} up to channel {count - leftover}{leftover ? `, the last ${leftover} channel${leftover > 1 ? 's' : ''} as "something else"` : ''}.</p>
+          <div class="row"><button onclick={() => (repeating = false)}>Cancel</button><button class="primary" onclick={finishRepeat} disabled={repeatCells < 1}>Use {repeatCells} cells</button></div>
+        </div>
+      {/if}
+    {/if}
   {/if}
 </Modal>
 
@@ -92,4 +127,6 @@
   .grp { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin: .35rem 0; }
   .grp .muted { width: 5.5rem; }
   .err { color: var(--pink); font-size: .85rem; margin-left: .5rem; }
+  .rep { border: 1px solid var(--line2); border-radius: var(--radius); padding: .5rem .7rem; margin-top: .4rem; display: flex; flex-direction: column; gap: .35rem; }
+  .rep p { margin: 0; }
 </style>

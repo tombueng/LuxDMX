@@ -14,7 +14,7 @@
   let boArm = $state(0), boFired = false;
   function boStop() { if (boArm) { clearTimeout(boArm); boArm = 0; } }
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
-  const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l)));
+  const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   const list = $derived(app.liveList);
   const st = $derived(list ? app.status[list.id] : undefined);
   const now = $derived(st?.running ? list?.cues[st.index] : undefined);

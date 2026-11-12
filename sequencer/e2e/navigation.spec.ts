@@ -76,6 +76,7 @@ test('"How it works" opens from the welcome card and the menu', async ({ page })
   await page.getByRole('button', { name: 'How it works, in two minutes' }).click();
   const g = page.getByRole('dialog', { name: 'How it works' });
   await expect(g).toContainText('Cues remember the preset, not the value');
+  await expect(g).toContainText('A small lighting desk on the screen');
   await page.keyboard.press('Escape');
   await expect(g).toBeHidden();
   await page.locator('.top').getByRole('button', { name: 'More' }).click();

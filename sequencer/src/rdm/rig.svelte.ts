@@ -193,8 +193,11 @@ class Rig {
     for (const uid of uids) {
       const d = this.device(uid);
       if (!d || app.show.fixtures.some((f) => f.uid === uid)) continue;
-      const g = guessProfile(d, lib);
-      let typeId = '', mode = '';
+      // a type of the show's own or one of yours with its RDM ids first (an imported GDTF, a plain
+      // one you've since told what its channels do), then the library, then a plain one
+      const own = ownType(d);
+      const g = own ? undefined : guessProfile(d, lib);
+      let typeId = own?.typeId ?? '', mode = own?.mode ?? '';
       if (g) {
         try { const t = await fetchType(g.entry as Parameters<typeof fetchType>[0]); const m = t.modes.find((x) => x.name === g.mode) ?? t.modes.find((x) => x.channels.length === d.footprint); if (m) { typeId = app.addType(t); mode = m.name; } } catch { /* plain then */ }
       }
@@ -205,19 +208,42 @@ class Rig {
       const f = app.show.fixtures[app.show.fixtures.length - 1];
       f.uid = uid;
       n++;
-      this.log({ kind: 'set', uid, text: `Patched ${f.name} at ${d.uni}.${d.addr}${g ? ` as ${g.entry.manufacturer} ${g.entry.name}${g.sure ? '' : ' (by its name)'}` : ' (a plain profile)'}` });
+      this.log({ kind: 'set', uid, text: `Patched ${f.name} at ${d.uni}.${d.addr}${own ? ` as ${own.name}` : g ? ` as ${g.entry.manufacturer} ${g.entry.name}${g.sure ? '' : ' (by its name)'}` : ' (a plain profile)'}` });
     }
     if (n) app.markDirty(0);
     return n;
   }
 }
 
+// A type the show (or this browser, "My fixtures") already has for a light, by its RDM maker and
+// model ids: the mode its personality is, else one with as many channels as it uses.
+export function ownType(d: RdmDevice): { typeId: string; mode: string; name: string } | undefined {
+  const maker = parseInt(d.uid.slice(0, 4), 16);
+  // (the show's own first, the latest of them first: one you changed is a copy made after the
+  // plain one; then yours from other shows)
+  const all = [...[...app.show.fixtureTypes].reverse(), ...app.myTypes.filter((t) => !app.show.fixtureTypes.some((x) => x.id === t.id))];
+  for (const t of all) {
+    if (t.rdm?.maker !== maker || t.rdm.model !== d.modelId) continue;
+    const named = t.rdm.modes?.[String(d.mode)];
+    const m = t.modes.find((x) => x.name === named && x.channels.length === d.footprint) ?? t.modes.find((x) => x.channels.length === d.footprint);
+    if (!m) continue;
+    const typeId = app.show.fixtureTypes.some((x) => x.id === t.id) ? t.id : app.addType(t);
+    return { typeId, mode: m.name, name: `${t.manufacturer} ${t.model}`.trim() };
+  }
+  return undefined;
+}
 // a light the library doesn't know: its channels, plain (named "Channel 1" and on), its own maker
 // and model, so the next one of these is the same type
+// E1.20 product category: pyrotechnics (an atmospheric effect that fires)
+const PYRO = 0x0402;
 export function plainType(d: RdmDevice): FixtureType {
-  const channels: Channel[] = Array.from({ length: Math.max(1, d.footprint) }, (_, i) => ({ name: `Channel ${i + 1}`, attr: 'raw' }));
+  // (a pyro device whose channels nobody knows yet: every one of them waits for Arm and is cut off
+  // after the shortest time a machine may fire, until its channels are told apart in the editor)
+  const pyro = d.category === PYRO;
+  const channels: Channel[] = Array.from({ length: Math.max(1, d.footprint) }, (_, i) => (pyro ? { name: `Pyro ${i + 1}`, attr: 'flame' } : { name: `Channel ${i + 1}`, attr: 'raw' }));
   const model = d.model || `Model ${d.modelId.toString(16).toUpperCase()}`, mode = d.modeList?.find((m) => m.n === d.mode)?.name ?? `${d.footprint} channel`;
-  return { id: `rdm-${d.uid.slice(0, 4)}-${d.modelId.toString(16)}`, manufacturer: d.maker || `Maker ${d.uid.slice(0, 4)}`, model, source: 'user', modes: [{ name: mode, channels }] };
+  return { id: `rdm-${d.uid.slice(0, 4)}-${d.modelId.toString(16)}`, manufacturer: d.maker || `Maker ${d.uid.slice(0, 4)}`, model, source: 'user', modes: [{ name: mode, channels }],
+    rdm: { maker: parseInt(d.uid.slice(0, 4), 16), model: d.modelId, modes: { [String(d.mode)]: mode } } };
 }
 
 export const rig = new Rig();

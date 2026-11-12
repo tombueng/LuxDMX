@@ -15,9 +15,17 @@ export type ChannelAttr =
   | 'cct'                 // colour temperature, warm (0) .. cool (255)
   | 'colorWheel'          // slots described by ranges
   | 'pan' | 'tilt'
+  | 'panRotation' | 'tiltRotation'   // endless pan / tilt: turning round and round (ranges: stop, CW, CCW, or an index)
+  | 'roll' | 'rollRotation'          // a third axis (the head or bar turning round its beam), and its endless turning
+  | 'hoist'                          // a winch: how far down it has let its load (0 at the top of its travel, 1 at the bottom)
   | 'strobe'              // 0 = no strobe, then slow .. fast
   | 'shutter'             // ranges: open / closed / strobe
   | 'gobo' | 'goboRotation' | 'prism' | 'zoom' | 'focus' | 'iris' | 'frost'
+  | 'gobo2' | 'gobo2Rotation'   // a second gobo wheel (slots by ranges) and its rotation
+  | 'prismRotation'
+  | 'animation' | 'animationRotation'   // an animation wheel: how far in (or which part), and its turning
+  | 'effectMacro' | 'effectSpeed'       // the light's own built-in effects (picked by their ranges) and their speed
+  | 'colorMacro'                        // its own colour programs (picked by their ranges)
   | 'fog' | 'haze' | 'fan'
   | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2'   // effect machines (fire, run while up)
   | 'enable'              // a machine's own safety / enable channel: on while armed, 0 while safe
@@ -68,7 +76,13 @@ export interface FixtureType {
   source: 'generic' | 'ofl' | 'gdtf' | 'qxf' | 'user';
   ref?: string;           // where it came from (OFL key, file name)
   modes: FixtureMode[];
-  physical?: { panDeg?: number; tiltDeg?: number };
+  // rollDeg: how far its third axis turns (360 when not said); beamDeg: its beam's opening angle in
+  // degrees, narrowest and widest (zoom in and out; the same twice: no zoom), from its data sheet
+  // travel, hoistSpeed: a winch's travel in metres (from the top of it down) and how fast it goes (m/s)
+  physical?: { panDeg?: number; tiltDeg?: number; rollDeg?: number; beamDeg?: [number, number]; travel?: number; hoistSpeed?: number };
+  // the light's RDM maker (ESTA) and model ids, and which of its modes each RDM personality is (by
+  // number): a light found on the line is patched with this type and the right mode
+  rdm?: { maker: number; model: number; modes?: Record<string, string> };
 }
 
 // ---------------------------------------------------------------- values
@@ -80,17 +94,38 @@ export type NumAttr =
   | 'intensity' | 'white' | 'amber' | 'uv' | 'cct'
   | 'pan' | 'tilt' | 'strobe' | 'zoom' | 'focus' | 'iris' | 'frost' | 'prism' | 'goboRotation'
   | 'gobo' | 'fog' | 'haze' | 'fan' | 'speed'
-  | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
+  | 'gobo2' | 'gobo2Rotation' | 'prismRotation' | 'animation' | 'animationRotation' | 'effectMacro' | 'effectSpeed' | 'colorMacro'
+  | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2'
+  // a gobo wheel's own functions, on its channel's ranges (render.ts): the gobo shaking (0 still,
+  // up to 1 fastest) and the whole wheel running round (-1..1: counter-clockwise .. clockwise, 0 not)
+  | 'goboShake' | 'goboScroll' | 'gobo2Shake' | 'gobo2Scroll'
+  // more axes than pan and tilt: endless pan / tilt, a third axis (roll) and its endless turning
+  | 'panRotation' | 'tiltRotation' | 'roll' | 'rollRotation'
+  // a winch (kinetics): how far down its load is, 0 at the top of its travel, 1 at the bottom
+  | 'hoist';
 
-// One fixture's state. Every number is 0..1 (gobo: the slot's position in its range list, as a
-// fraction). Each attribute is either a value or a reference to a preset. Missing = not touched.
+// One fixture's state. Every number is 0..1 (gobo, gobo2, effectMacro, colorMacro: the slot's
+// position in its range list, as a fraction). Each attribute is either a value or a reference to a preset. Missing = not touched.
 export type Values = { [K in NumAttr]?: number | PresetRef } & {
   color?: Color | PresetRef;
   raw?: Record<string, number>;   // channel index in the mode -> DMX value, for channels we don't model
+  // a light made of cells (a pixel bar, a ring, each LED of a pixel head): what single cells show,
+  // by cell index (as a string key): what makes light (intensity, color, white, amber, uv), and on a
+  // light whose cells are heads (a moving bar) where each points (pan, tilt). A cell that isn't
+  // named (or doesn't name one of those) shows what the light as a whole shows.
+  cells?: Record<string, CellValues>;
 };
+export type CellAttr = 'intensity' | 'white' | 'amber' | 'uv';
+// a head of its own among the cells (a moving bar's heads, each with its own tilt and pan): where it points
+export type CellMove = 'pan' | 'tilt' | 'hoist';
+export type CellValues = { [K in CellAttr | CellMove]?: number | PresetRef } & { color?: Color | PresetRef };
+export const CELL_ATTRS: CellAttr[] = ['intensity', 'white', 'amber', 'uv'];
+export const CELL_MOVES: CellMove[] = ['pan', 'tilt', 'hoist'];
 
 // Values with every preset looked up: what the engine works with.
 export type Resolved = { [K in NumAttr]?: number } & { color?: Color; raw?: Record<string, number>; cells?: Resolved[];   // cells: per pixel, from effects
+  cellVals?: Record<string, Resolved>;   // what single cells were set to (Values.cells): sparse, colours and the like
+  cellLvl?: Float64Array;                // each cell's level, when the engine worked them out per cell (HTP across lists)
   draw?: Color };   // what the light looks like, for drawing only (a white fixture asked for "Purple" still looks white)
 
 // ---------------------------------------------------------------- patch
@@ -98,6 +133,7 @@ export type Resolved = { [K in NumAttr]?: number } & { color?: Color; raw?: Reco
 export interface Fixture {
   id: string;
   name: string;
+  num?: number;           // its number (from 1, unique): "5 @ full" and the console go by it; kept when others come and go (model/numbers.ts)
   typeId: string;
   mode: string;
   universe: number;       // Art-Net port-address, as set on the LuxDMX output
@@ -117,6 +153,10 @@ export interface Fixture {
   // (model/fixtureSetup.ts, the light's setup)
   panDeg?: number;
   tiltDeg?: number;
+  beamDeg?: [number, number];   // this light's own beam angle, narrowest and widest (over its type's)
+  // a winch's soft limits: how high and how low it may go, as parts of its travel (0 the top, 1 the
+  // bottom): whatever a cue says, the winch is sent within them
+  hoistLimits?: [number, number];
   swapPanTilt?: boolean;
   // its own pan (tilt) turns the other way round from what its type says: the picture, Aim and the
   // 3D stage follow the real one; what goes out on the wire stays the same (invert changes that)
@@ -141,6 +181,7 @@ export interface Group {
   id: string;
   name: string;
   fixtures: string[];     // ordered: effects run along this order
+  cells?: number[];       // some cells of its lights only ("Rim": the rings' outer LEDs), in order: selecting it picks them, an effect on it runs on them
   auto?: boolean;         // made by the app from the patch (rebuilt when the patch changes)
 }
 
@@ -177,6 +218,9 @@ export interface Cue {
   fade: number;                     // seconds
   fadeOut?: number;                 // advanced: intensity going down
   delay?: number;                   // advanced: seconds before the fade starts
+  // advanced: a fade of its own for colour, position and the beam (seconds; not set: the fade), as
+  // desks have: a quick colour change while the heads take their time to move
+  times?: CueTimes;
   advance: Advance;
   effects?: string[];               // effect ids running while this cue is on
   actions?: CueAction[];
@@ -205,12 +249,16 @@ export interface Effect {
   kind: string;
   group?: string;                   // a group id: its fixtures, in its order
   fixtures?: string[];              // or these fixtures, in this order (used when there's no group)
+  cells?: number[];                 // on lights with cells: only these (a chase round a ring's rim), in this order
   params: Record<string, unknown>;
 }
 
 // Live pages: grids of buttons and faders for playing the show.
 export type ListAction = 'go' | 'back' | 'toggle' | 'flash' | 'release' | 'solo' | 'select';   // select: GO plays this list (a song in a set list)
+export interface CueTimes { color?: number; position?: number; beam?: number }
 export interface MidiBinding { kind: 'note' | 'cc'; ch: number; num: number }   // ch 1..16
+// A console fader on a MIDI control: `to` is 'grand', 'list:<id>', 'group:<id>' or 'light:<id>'
+export interface ConsoleMidi { to: string; midi: MidiBinding }
 interface WidgetBase { id: string; label?: string; color?: string; size?: 1 | 2; key?: string; midi?: MidiBinding }
 export type Widget = WidgetBase & (
   | { type: 'list'; list: string; action: ListAction }                  // a cue list button
@@ -262,7 +310,7 @@ export interface Show {
   // bandName: the band's name on the 3D stage's banners and screens (unset: the band's picture)
   // marks: tape on the real stage, where they are (metres, the 3D stage's frame): heads are steered
   // onto them to work out where they really hang (model/calibrate.ts), and to point at
-  settings: { bpm: number; marks?: StageMark[]; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string };
+  settings: { bpm: number; marks?: StageMark[]; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string; consoleMidi?: ConsoleMidi[]; recordChanges?: boolean };
   timeline?: Timeline;              // a song with cues, effects and moments on it (model/timeline.ts): the one that's up
   setlist?: SetList;                // the other songs of the set, before and after it, in order (model/timeline.ts)
   extensions: Record<string, unknown>;

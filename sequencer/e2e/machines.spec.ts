@@ -123,7 +123,7 @@ test('a home-made fixture with a Flame channel is gated the same way', async ({ 
 test('a fogger from a QLC+ file: its fog amount is fog, Full lights its LEDs without fogging, Blind stops the fog', async ({ page }) => {
   await openConnected(page);
   await importFile(page, 'Stairville-AF-180-LED-Fogger-Co2-FX.qxf');
-  expect((await patched(page))[0].attrs).toEqual(['fog', 'intensity', 'colorWheel', 'raw', 'red', 'green', 'blue']);
+  expect((await patched(page))[0].attrs).toEqual(['fog', 'intensity', 'colorWheel', 'effectMacro', 'red', 'green', 'blue']);
   await selectAll(page);
   await page.locator('#pg-int .quick').getByRole('button', { name: 'Full' }).click();   // intensity full: the LEDs
   await expect.poll(async () => (await channels(0, 2))[1]).toBe(255);
@@ -135,4 +135,29 @@ test('a fogger from a QLC+ file: its fog amount is fog, Full lights its LEDs wit
   await expect(page.locator('.top .out')).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => (await channels(0, 2))[0]).toBe(0);
   expect((await channels(0, 2))[1]).toBe(255);                 // the light stays as it was
+});
+
+test('a flame projector\'s own program waits for Arm, and goes to 0 the moment the output goes blind', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.saveType({ id: 'user:fp', manufacturer: 'Test', model: 'Flame + program', source: 'user', modes: [{ name: '2 ch', channels: [
+      { name: 'Fire', attr: 'flame' }, { name: 'Program', attr: 'effectMacro', ranges: [{ from: 0, to: 9, label: 'Off' }, { from: 10, to: 255, label: 'Auto 1' }] }] }] });
+    a.show.fixtures.push({ id: 'fp', name: 'Flame', typeId: 'user:fp', mode: '2 ch', universe: 0, address: 1, x: 0.5, y: 0.2 });
+    a.checkpoint();
+    a.selected = ['fp']; a.setSlot('effectMacro', 'Auto 1', 1);
+  });
+  // (sampled over the whole time, not one look: a safety "never" has to hold all along)
+  const never = async (ms: number) => { for (let t = 0; t < ms; t += 50) { const c = await channels(0, 2); expect([c[0] ?? 0, c[1] ?? 0]).toEqual([0, 0]); await page.waitForTimeout(50); } };
+  await never(600);                                                    // not armed: nothing
+  // armed: one already on when it was armed waits until it has been off (arming never fires by itself)
+  await holdArm(page);
+  await never(400);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.setSlot('effectMacro', 'Off', 0); });
+  await expect.poll(async () => (await channels(0, 2))[1]).toBe(5);    // its Off goes out (the middle of 0..9)
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.setSlot('effectMacro', 'Auto 1', 1); });
+  await expect.poll(async () => (await channels(0, 2))[1]).toBe(133);  // now it runs (the middle of Auto 1)
+  await page.locator('.top .out').click();                             // blind
+  await expect(page.locator('.top .out')).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(async () => (await channels(0, 2))[1]).toBe(0);    // the program stops on the wire too
 });

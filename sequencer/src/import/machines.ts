@@ -26,9 +26,11 @@ export interface ChannelFacts {
 
 const MACHINES = new Set<string>(['fog', 'haze', 'bubbles', 'confetti', 'flame', 'sparks', 'co2']);
 // what a machine's channel may have come in as; colours, wheels, pan/tilt and speeds stay as they are
-const CANDIDATE = new Set<string>([...MACHINES, 'raw', 'intensity', 'strobe', 'shutter', 'control', 'fan']);
+// (a fixture's "Effect" channel comes in as its built-in effects: a flame projector's fire channel too)
+const CANDIDATE = new Set<string>([...MACHINES, 'raw', 'intensity', 'strobe', 'shutter', 'control', 'fan', 'effectMacro', 'effectSpeed', 'colorMacro', 'animation',
+  'animationRotation', 'prismRotation', 'gobo2Rotation']);
 // only lights have these: a fixture with them is (also) a light (a fogger with LEDs)
-const EMITTERS = new Set<string>(['red', 'green', 'blue', 'white', 'warmWhite', 'coolWhite', 'amber', 'uv', 'lime', 'cyan', 'magenta', 'yellow', 'colorWheel', 'gobo']);
+const EMITTERS = new Set<string>(['red', 'green', 'blue', 'white', 'warmWhite', 'coolWhite', 'amber', 'uv', 'lime', 'cyan', 'magenta', 'yellow', 'colorWheel', 'gobo', 'gobo2']);
 
 // "Eco2Jet" -> "eco 2 jet", "StadiumShot III" -> "stadium shot iii", "Effects1" -> "effects 1".
 // (CO2 is matched on the plain lower-case text, where "Eco2Jet" still says "co2".)

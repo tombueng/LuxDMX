@@ -87,6 +87,26 @@ test.describe('first-run setup portal', () => {
     expect(p.get('appw')).toBe('showtime123');
   });
 
+  // WPA2 takes 8 to 63 characters: a shorter (or longer) one is said on the page and never posted,
+  // or the box would start an AP that no phone can join. Blank stays allowed: an open network.
+  test('access-point path: an AP password of fewer than 8 characters is not posted', async ({ page }) => {
+    await page.goto(BASE + '/setup');
+    await page.locator('#go-ap').click();
+    const pw = page.locator('#ap-pw');
+    await expect(pw).toHaveAttribute('minlength', '8');
+    await expect(pw).toHaveAttribute('maxlength', '63');
+    let posted = false;
+    page.on('request', (r) => { if (r.url().endsWith('/setup') && r.method() === 'POST') posted = true; });
+    await pw.fill('short7!');
+    await page.locator('#form-ap button[type=submit]').click();
+    await page.waitForTimeout(800);
+    expect(posted).toBe(false);
+    expect(await pw.evaluate((el) => el.validity.tooShort)).toBe(true);
+    // 63 typed in, 64 asked for: the field keeps 63
+    await pw.fill('x'.repeat(64));
+    expect((await pw.inputValue()).length).toBeLessThanOrEqual(63);
+  });
+
   test('join path: pick a scanned SSID, post mode=sta with ssid + password', async ({ page }) => {
     await page.goto(BASE + '/setup');
     await page.locator('#go-sta').click();

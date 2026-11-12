@@ -6,6 +6,7 @@
 import type { Channel, ChannelAttr, ChannelRange, FixtureMode, FixtureType } from '../model/types';
 import { kid, kids, num, parseXml, text } from './xml';
 import { machineAttrs, machineSpan, needsSpan, type FixtureClass } from './machines';
+import { secondWheels } from './wheels';
 
 export const QLC_COMMIT = 'fb21860d8cb73dd817b2a9b0e3cab25830790fa6';
 export const qlcUrl = (path: string, commit = QLC_COMMIT) =>
@@ -30,6 +31,8 @@ function fromPreset(p: string): { attr: ChannelAttr; fine?: boolean } | undefine
   if (/^Color(CTO|CTC|CTB)Mixer$/.test(base)) return { attr: 'cct', fine };
   if (base === 'GoboWheel') return { attr: 'gobo', fine };
   if (base === 'GoboIndex') return { attr: 'goboRotation', fine };
+  if (base.startsWith('PrismRotation')) return { attr: 'prismRotation', fine };
+  if (base === 'ColorMacro') return { attr: 'colorMacro', fine };
   if (base.startsWith('ShutterStrobe')) return { attr: 'strobe', fine };
   if (base.startsWith('ShutterIris')) return { attr: 'iris', fine };
   if (base.startsWith('BeamFocus')) return { attr: 'focus', fine };
@@ -41,15 +44,18 @@ function fromGroup(group: string, colour: string, name: string, ranges: ChannelR
   const n = name.toLowerCase();
   switch (group) {
     case 'Intensity': return colour && colour !== 'Generic' ? (COLOUR[colour] ?? 'raw') : 'intensity';
-    case 'Colour': return ranges.filter((r) => r.color).length >= 2 ? 'colorWheel' : /cto|ctc|ctb|temperature/.test(n) ? 'cct' : 'raw';
+    case 'Colour': return ranges.filter((r) => r.color).length >= 2 ? 'colorWheel' : /cto|ctc|ctb|temperature/.test(n) ? 'cct'
+      : /macro|program|preset|chase|auto|effect/.test(n) ? 'colorMacro' : 'raw';
     case 'Gobo': return /rot|index/.test(n) ? 'goboRotation' : 'gobo';
-    case 'Speed': return 'speed';
-    case 'Pan': return 'pan';
-    case 'Tilt': return 'tilt';
+    // (a PAR's program speed isn't a head's move speed)
+    case 'Speed': return /effect|program|auto|sound|macro|chase|show/.test(n) ? 'effectSpeed' : 'speed';
+    case 'Pan': return /rot|endless|infinite|spin|continuous/.test(n) ? 'panRotation' : 'pan';
+    case 'Tilt': return /rot|endless|infinite|spin|continuous/.test(n) ? 'tiltRotation' : 'tilt';
     case 'Shutter': return ranges.some((r) => r.kind === 'open' || r.kind === 'closed') ? 'shutter' : /iris/.test(n) ? 'iris' : 'strobe';
-    case 'Prism': return /rot/.test(n) ? 'raw' : 'prism';
+    case 'Prism': return /rot/.test(n) ? 'prismRotation' : 'prism';
     case 'Beam': return /zoom/.test(n) ? 'zoom' : /focus/.test(n) ? 'focus' : /iris/.test(n) ? 'iris' : /frost/.test(n) ? 'frost' : 'raw';
-    case 'Effect': return /fog|smoke/.test(n) ? 'fog' : /haze/.test(n) ? 'haze' : /fan/.test(n) ? 'fan' : 'raw';
+    // (a fixture's built-in effects; a machine's fire channel filed here is found by machines.ts)
+    case 'Effect': return /fog|smoke/.test(n) ? 'fog' : /haze/.test(n) ? 'haze' : /fan/.test(n) ? 'fan' : /speed|rate/.test(n) ? 'effectSpeed' : 'effectMacro';
     case 'Maintenance': return 'control';
     default: return 'raw';
   }
@@ -128,12 +134,16 @@ export function fromQxf(xml: string, ref?: string): FixtureType {
     kids(m, 'Head').forEach((h, cell) => {
       for (const c of kids(h, 'Channel')) { const i = Math.round(num(text(c))); if (channels[i]) channels[i].cell = cell; }
     });
+    secondWheels(channels);   // (a second gobo wheel: gobo2)
     return { name: m.getAttribute('Name') ?? 'Default', channels };
   });
 
-  const focus = kid(kid(root, 'Physical'), 'Focus');
+  const focus = kid(kid(root, 'Physical'), 'Focus'), lens = kid(kid(root, 'Physical'), 'Lens');
+  // (the lens: its beam angle, narrowest and widest)
+  const dMin = num(lens?.getAttribute('DegreesMin')) || 0, dMax = num(lens?.getAttribute('DegreesMax')) || 0;
+  const beamDeg: [number, number] | undefined = dMin > 0 || dMax > 0 ? [Math.min(dMin || dMax, dMax || dMin), Math.max(dMin, dMax)] : undefined;
   return {
     id: `qxf:${manufacturer}/${model}`, manufacturer, model, source: 'qxf', ref, modes,
-    physical: focus ? { panDeg: num(focus.getAttribute('PanMax')) || undefined, tiltDeg: num(focus.getAttribute('TiltMax')) || undefined } : undefined,
+    physical: focus || beamDeg ? { ...(focus ? { panDeg: num(focus.getAttribute('PanMax')) || undefined, tiltDeg: num(focus.getAttribute('TiltMax')) || undefined } : {}), ...(beamDeg ? { beamDeg } : {}) } : undefined,
   };
 }

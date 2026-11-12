@@ -3,17 +3,20 @@
 //   - A file listing a `requiredFeatures` entry the reader doesn't know is refused, everything
 //     else unknown is kept and written back as it was (we never rebuild objects field by field).
 //   - Older files are brought up to date by one migration step per version, in order.
+import { MAX_NUM } from './numbers';
 import { validEntry } from './schedule';
-import { cleanLayout } from './pixelLayout';
+import { cleanLayout, MAX_PIXELS } from './pixelLayout';
 import { cleanCurve } from './ledCurve';
 import { AROUND_MAX, cleanCrowd, cleanSections, validItem, validTimeline } from './timeline';
 import type { Show } from './types';
 import { KNOBS, cleanColors, isColor } from '../engine/fxkit';
 
 export const FORMAT = 'luxdmx-show';
-export const FORMAT_VERSION = '1.1.0';
+export const FORMAT_VERSION = '1.2.0';
 export const MIN_READER = '1.0.0';
-export const KNOWN_FEATURES: string[] = [];
+// 'cells': cues, presets, groups or effects with single cells of pixel lights (a reader that
+// doesn't know them would play those looks wrong: it must refuse the file)
+export const KNOWN_FEATURES: string[] = ['cells'];
 export const APP = 'LuxDMX Sequencer 0.2';
 
 export function semverCmp(a: string, b: string): number {
@@ -39,6 +42,8 @@ export class FormatError extends Error {}
 const MIGRATIONS: { from: string; to: string; run: (s: any) => any }[] = [
   // 1.1.0 specified effects and pages; 1.0.0 files had none in use, nothing to change.
   { from: '1.0.0', to: '1.1.0', run: (s) => s },
+  // 1.2.0 added cells, fixture numbers, console MIDI, RDM ids and new attributes: all new fields.
+  { from: '1.1.0', to: '1.2.0', run: (s) => s },
 ];
 
 // `notes`, when given, collects what had to be mended to open the file, in plain words (see mend).
@@ -50,6 +55,10 @@ export function parseShow(text: string, notes?: string[]): Show {
 
 export function upgrade(raw: any, notes: string[] = []): Show {
   if (!isObj(raw)) throw new FormatError('not a show file');
+  // (keys that would set an object's prototype later: "__proto__": {"flame": 1} hides a flame
+  // from every risk mark while the engine still reads it. Gone, said.)
+  const bad = stripProtoKeys(raw);
+  if (bad) notes.push(`${bad} key${bad > 1 ? 's' : ''} named like JavaScript internals (__proto__) left out`);
   if (raw.format !== FORMAT) {
     if (raw.version === 1 && Array.isArray(raw.fixtures) && Array.isArray(raw.cues)) raw = fromDev(raw);
     else throw new FormatError('not a LuxDMX show file');
@@ -62,6 +71,21 @@ export function upgrade(raw: any, notes: string[] = []): Show {
   if (unknown.length) throw new FormatError(`needs features this version doesn't have: ${unknown.join(', ')}`);
   for (const m of MIGRATIONS) if (semverCmp(ver(raw.formatVersion), m.from) === 0) { raw = m.run(raw); raw.formatVersion = m.to; }
   return withDefaults(raw, notes);
+}
+
+// own keys "__proto__" anywhere in a parsed file, taken out (how many): the one name an assignment
+// turns into a prototype ("constructor" and "prototype" are plain keys, an extension may use them)
+const PROTO_KEYS = ['__proto__'];
+function stripProtoKeys(root: unknown): number {
+  let n = 0;
+  const stack: unknown[] = [root];
+  while (stack.length) {
+    const o = stack.pop();
+    if (!o || typeof o !== 'object') continue;
+    for (const k of PROTO_KEYS) if (Object.prototype.hasOwnProperty.call(o, k)) { delete (o as Record<string, unknown>)[k]; n++; }
+    for (const v of Object.values(o as Record<string, unknown>)) if (v && typeof v === 'object') stack.push(v);
+  }
+  return n;
 }
 
 // Fill in anything missing (a hand-written or partial file), without touching what's there, and
@@ -93,6 +117,23 @@ function withDefaults(s: any, notes: string[]): Show {
     if (good.length < list.length || !Array.isArray(s.settings.marks)) note(`${(Array.isArray(s.settings.marks) ? list.length : 1) - good.length} of the stage's marks couldn't be read, left out`);
     if (good.length) s.settings.marks = good; else delete s.settings.marks;
   }
+  if (s.settings.recordChanges !== undefined && typeof s.settings.recordChanges !== 'boolean') delete s.settings.recordChanges;
+  // the console's faders on MIDI controls: what they move and which control, each readable
+  if (s.settings.consoleMidi !== undefined) {
+    const ok = (b: any) => b && typeof b.to === 'string' && /^(grand|(list|group|light):.+)$/s.test(b.to) && b.midi && (b.midi.kind === 'cc' || b.midi.kind === 'note')
+      && Number.isInteger(b.midi.ch) && b.midi.ch >= 1 && b.midi.ch <= 16 && Number.isInteger(b.midi.num) && b.midi.num >= 0 && b.midi.num <= 127;
+    const list = Array.isArray(s.settings.consoleMidi) ? s.settings.consoleMidi : [];
+    // (one control moves one fader: of two for the same control or the same fader, the later stays)
+    const good: { to: string; midi: { kind: string; ch: number; num: number } }[] = [];
+    for (const b of list.filter(ok)) {
+      const m = { kind: b.midi.kind, ch: b.midi.ch, num: b.midi.num };
+      for (let i = good.length - 1; i >= 0; i--) if (good[i].to === b.to || (good[i].midi.kind === m.kind && good[i].midi.ch === m.ch && good[i].midi.num === m.num)) good.splice(i, 1);
+      good.push({ to: b.to, midi: m });
+    }
+    const unread = list.length - list.filter(ok).length;
+    if (unread > 0 || !Array.isArray(s.settings.consoleMidi)) note(`${Math.max(1, unread)} of the console's MIDI controls couldn't be read, left out`);
+    if (good.length) s.settings.consoleMidi = good; else delete s.settings.consoleMidi;
+  }
   if (s.settings.place !== undefined) { const p = s.settings.place; if (!p || !(Math.abs(p.lat) <= 90) || !(Math.abs(p.lon) <= 180)) delete s.settings.place; }
   mendTimeline(s, note);
 
@@ -100,7 +141,18 @@ function withDefaults(s: any, notes: string[]): Show {
   for (const t of s.fixtureTypes) mendType(t, note);
   s.fixtures = withIds(s.fixtures, 'Fixtures', note).filter((f) => mendFixture(f, note));
   s.groups = withIds(s.groups, 'Groups', note);
-  for (const g of s.groups) g.fixtures = strings(g.fixtures);
+  // (numbers: whole, from 1; the app gives out missing and doubled ones when it opens the show)
+  for (const f of s.fixtures) if (f.num !== undefined && !(Number.isInteger(f.num) && f.num >= 1 && f.num <= MAX_NUM)) { note(`${f.name}: its number "${String(f.num)}" isn't one, it gets a new one`); delete f.num; }
+  for (const g of s.groups) {
+    g.fixtures = strings(g.fixtures);
+    // (a group of cells: whole numbers from 0; none that can be read: the whole lights)
+    if (g.cells !== undefined) {
+      const was = Array.isArray(g.cells) ? g.cells.length : 1;
+      const ok = Array.isArray(g.cells) ? g.cells.filter((x: unknown) => Number.isInteger(x) && (x as number) >= 0 && (x as number) < MAX_PIXELS) : [];
+      if (ok.length < was) note(`Group ${String(g.name)}: ${was - ok.length} of its cells couldn't be read${ok.length ? ', left out' : ': a group of whole lights now'}`);
+      if (ok.length) g.cells = ok; else delete g.cells;
+    }
+  }
   s.presets = withIds(s.presets, 'Presets', note);
   for (const p of s.presets) mendPreset(p, note);
   s.cueLists = withIds(s.cueLists, 'Cue lists', note);
@@ -277,7 +329,11 @@ function mendType(t: Obj, note: Note) {
   });
   if (t.physical !== undefined) {
     if (!isObj(t.physical)) delete t.physical;
-    else for (const k of ['panDeg', 'tiltDeg']) fixNum(t.physical, k, 1, 1080, where, note);
+    else {
+      for (const k of ['panDeg', 'tiltDeg', 'rollDeg']) fixNum(t.physical, k, 1, 1080, where, note);
+      fixNum(t.physical, 'travel', 0.1, 100, where, note); fixNum(t.physical, 'hoistSpeed', 0.01, 10, where, note);
+      if (t.physical.beamDeg !== undefined) { const b = beamDegOf(t.physical.beamDeg); if (b) t.physical.beamDeg = b; else { note(`${where}: beam angle ${shown(t.physical.beamDeg)} can't be right, left out`); delete t.physical.beamDeg; } }
+    }
   }
 }
 
@@ -297,6 +353,14 @@ function mendFixture(f: Obj, note: Note): boolean {
   for (const k of ['invertPan', 'invertTilt', 'swapPanTilt', 'panReversed', 'tiltReversed']) if (f[k] !== undefined && typeof f[k] !== 'boolean') delete f[k];
   // its own pan / tilt range (degrees): a number a head can have, or gone (the type's, or 540 / 270)
   for (const k of ['panDeg', 'tiltDeg']) if (f[k] !== undefined && !(typeof f[k] === 'number' && f[k] >= 1 && f[k] <= 1080)) { note(`${where}: ${k} ${shown(f[k])} can't be right, left out`); delete f[k]; }
+  if (f.beamDeg !== undefined) { const b = beamDegOf(f.beamDeg); if (b) f.beamDeg = b; else { note(`${where}: beam angle ${shown(f.beamDeg)} can't be right, left out`); delete f.beamDeg; } }
+  // (a winch's soft limits: two parts of its travel, the top one first; anything else isn't kept, and
+  // the winch has its whole travel)
+  if (f.hoistLimits !== undefined) {
+    const h = f.hoistLimits;
+    if (Array.isArray(h) && h.length === 2 && h.every((x: unknown) => typeof x === 'number' && x >= 0 && x <= 1)) f.hoistLimits = [Math.min(h[0], h[1]), Math.max(h[0], h[1])];
+    else { note(`${where}: winch limits ${shown(h)} can't be right, left out`); delete f.hoistLimits; }
+  }
   // the 3D place and turn: well-formed or gone (a hand-edited file mustn't break the 3D stage)
   const ok = (o: unknown, k: string[]) => !!o && typeof o === 'object' && k.every((x) => Number.isFinite((o as Record<string, number>)[x]));
   if (f.p3 !== undefined && !ok(f.p3, ['x', 'y', 'z'])) delete f.p3;
@@ -312,10 +376,19 @@ function mendFixture(f: Obj, note: Note): boolean {
   return true;
 }
 
+// a beam's opening angle, narrowest and widest: two numbers from half a degree to 180, the narrow one first
+function beamDegOf(x: unknown): [number, number] | undefined {
+  if (!Array.isArray(x) || x.length !== 2 || !x.every((v) => typeof v === 'number' && v >= 0.5 && v <= 180)) return undefined;
+  return [Math.min(x[0], x[1]), Math.max(x[0], x[1])];
+}
 // Values (a cue's, a preset's): levels in 0..1, colours with r, g, b in 0..1, raw channels 0..255,
 // or a preset reference. What isn't is left out (the light keeps what it had). Counts the changes.
 const NUM_ATTRS = new Set(['intensity', 'white', 'amber', 'uv', 'cct', 'pan', 'tilt', 'strobe', 'zoom', 'focus', 'iris', 'frost', 'prism',
-  'goboRotation', 'gobo', 'fog', 'haze', 'fan', 'speed', 'confetti', 'bubbles', 'flame', 'sparks', 'co2']);
+  'goboRotation', 'gobo', 'fog', 'haze', 'fan', 'speed', 'confetti', 'bubbles', 'flame', 'sparks', 'co2',
+  'gobo2', 'gobo2Rotation', 'prismRotation', 'animation', 'animationRotation', 'effectMacro', 'effectSpeed', 'colorMacro',
+  'goboShake', 'goboScroll', 'gobo2Shake', 'gobo2Scroll', 'panRotation', 'tiltRotation', 'roll', 'rollRotation', 'hoist']);
+// (a wheel running round goes either way: -1..1)
+const SIGNED_ATTRS = new Set(['goboScroll', 'gobo2Scroll']);
 function mendValues(v: Obj, bad: { n: number }) {
   // (a level a hair outside its range, from rounding, is put right without counting as a change)
   const off = (was: unknown, now: number) => !(typeof was === 'number' && Math.abs(was - now) < 1e-6);
@@ -333,8 +406,21 @@ function mendValues(v: Obj, bad: { n: number }) {
         if (Number.isFinite(n)) x[ch] = Math.round(n); else delete x[ch];
         if (off(d, n)) bad.n++;
       }
+    } else if (k === 'cells') {
+      // single cells by number (0, 1, 2 ...: "01" is no cell number), each mended like a light's
+      // values; what a cell doesn't use yet is kept (a newer app may)
+      if (!isObj(x)) { delete v.cells; bad.n++; continue; }
+      for (const [ci, c] of Object.entries(x)) {
+        if (!/^(0|[1-9]\d*)$/.test(ci) || +ci >= MAX_PIXELS || !isObj(c)) { delete x[ci]; bad.n++; continue; }
+        // (a cell has no cells or channels of its own)
+        if ('cells' in c) { delete c.cells; bad.n++; }
+        if ('raw' in c) { delete c.raw; bad.n++; }
+        mendValues(c, bad);
+        if (!Object.keys(c).length) delete x[ci];
+      }
+      if (!Object.keys(x).length) delete v.cells;
     } else if (NUM_ATTRS.has(k) && !isRef(x)) {
-      const n = numIn(x, 0, 1);
+      const n = numIn(x, SIGNED_ATTRS.has(k) ? -1 : 0, 1);
       if (n === x) continue;
       if (Number.isFinite(n)) v[k] = n; else delete v[k];
       if (off(x, n)) bad.n++;
@@ -372,6 +458,11 @@ function mendList(l: Obj, note: Note) {
     c.values = mendByFixture(c.values ?? {}, bad);
     fixNum(c, 'fade', 0, 3600, cw, note, 0);
     fixNum(c, 'fadeOut', 0, 3600, cw, note); fixNum(c, 'delay', 0, 3600, cw, note);
+    // (fades of its own for colour, position, beam: each a number of seconds, or not there)
+    if (c.times !== undefined) {
+      if (!isObj(c.times)) { delete c.times; note(`${cw}: its colour / position / beam times couldn't be read, it uses its fade`); }
+      else { for (const k of ['color', 'position', 'beam']) fixNum(c.times, k, 0, 3600, cw, note); if (!Object.keys(c.times).length) delete c.times; }
+    }
     c.advance = mendAdvance(c.advance, cw, note);
     if (c.effects !== undefined) { if (Array.isArray(c.effects)) c.effects = strings(c.effects); else delete c.effects; }
     if (c.actions !== undefined) {
@@ -401,6 +492,12 @@ function mendEffect(e: Obj, note: Note): boolean {
   if (typeof e.kind !== 'string') { note(`${where}: no kind of effect, left out`); return false; }
   if (e.group !== undefined && typeof e.group !== 'string') delete e.group;
   if (e.fixtures !== undefined) { if (Array.isArray(e.fixtures)) e.fixtures = strings(e.fixtures); else { delete e.fixtures; note(`${where}: its lights couldn't be read`); } }
+  // (cells: whole numbers from 0; what isn't one is left out, none left: the whole lights)
+  if (e.cells !== undefined) {
+    const ok = Array.isArray(e.cells) ? e.cells.filter((x: unknown) => Number.isInteger(x) && (x as number) >= 0 && (x as number) < MAX_PIXELS) : [];
+    if (!Array.isArray(e.cells) || ok.length !== e.cells.length) note(`${where}: cells that couldn't be read left out`);
+    if (ok.length) e.cells = ok; else delete e.cells;
+  }
   if (!isObj(e.params)) { if (e.params !== undefined) note(`${where}: its settings couldn't be read, it plays its defaults`); e.params = {}; }
   const p = e.params;
   for (const [k, r] of Object.entries(KNOBS)) fixNum(p, k, r.lo, r.hi, where, note, undefined, k === 'blocks');
@@ -441,11 +538,24 @@ function mendPage(pg: Obj, note: Note) {
 // Pretty for files people may open; compact (pretty: false) for the browser's storage.
 export function serializeShow(show: Show, pretty = true): string {
   show.format = FORMAT;
-  show.formatVersion = FORMAT_VERSION;
-  show.minReaderVersion = MIN_READER;
+  // (a newer file this version opened keeps its own numbers: a later app mustn't redo its upgrades)
+  if (!show.formatVersion || semverCmp(show.formatVersion, FORMAT_VERSION) < 0) show.formatVersion = FORMAT_VERSION;
+  if (!show.minReaderVersion || semverCmp(show.minReaderVersion, MIN_READER) < 0) show.minReaderVersion = MIN_READER;
+  // what a reader must know to play it: cells, when the show has any (others it brought, kept)
+  const req = new Set((show.requiredFeatures ?? []).filter((f) => f !== 'cells'));
+  if (usesCells(show)) req.add('cells');
+  show.requiredFeatures = [...req];
   show.meta.modified = new Date().toISOString();
   show.meta.app = APP;
   return JSON.stringify(show, null, pretty ? 2 : undefined);
+}
+
+// single cells anywhere that changes how the show plays
+export function usesCells(s: Show): boolean {
+  const has = (v: { cells?: unknown } | undefined) => !!v?.cells && Object.keys(v.cells as object).length > 0;
+  return s.cueLists.some((l) => l.cues.some((c) => Object.values(c.values).some(has)))
+    || s.presets.some((p) => has(p.values) || Object.values(p.perFixture ?? {}).some(has))
+    || s.groups.some((g) => !!g.cells?.length) || s.effects.some((e) => !!e.cells?.length);
 }
 
 // The format the first prototype saved (2026-10-26, never released): { version: 1, types,

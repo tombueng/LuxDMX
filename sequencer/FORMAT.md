@@ -1,8 +1,11 @@
 # The LuxDMX show format
 
 A show is one JSON file, usually named `<name>.luxdmx.json`. This document describes format
-version **1.1.0** (1.1.0 specified effects and live pages; a 1.0.0 reader opens 1.1.0 files and
-keeps both untouched). The TypeScript types in `src/model/types.ts` are the same thing in code.
+version **1.2.0** (1.1.0 specified effects and live pages; 1.2.0 added single cells of pixel
+lights in cues, presets, groups and effects, fixture numbers, a cue's own times for colour,
+position and beam, the console's MIDI controls, `settings.recordChanges`, a type's `physical` and
+RDM ids, and new attributes. A 1.0.0 reader opens newer files and keeps what it doesn't know untouched; a show with
+cells says so in `requiredFeatures`, so an older reader refuses it instead of playing it wrong). The TypeScript types in `src/model/types.ts` are the same thing in code.
 
 The format is open: read it, write it, generate it from a script. Nothing in it is encrypted or
 tied to this app. A JSON Schema for checking files is in `schema/luxdmx-show.schema.json` (it
@@ -13,7 +16,7 @@ allows unknown fields everywhere, like readers must).
 ```json
 {
   "format": "luxdmx-show",
-  "formatVersion": "1.1.0",
+  "formatVersion": "1.2.0",
   "minReaderVersion": "1.0.0",
   "requiredFeatures": [],
   ...
@@ -25,8 +28,12 @@ allows unknown fields everywhere, like readers must).
   with. Minor versions only add fields; a major version changes the meaning of existing ones.
 - `minReaderVersion` is the oldest format version that can still read this file correctly. A
   reader that's older than this must refuse the file and say so.
-- `requiredFeatures` lists features a reader must understand to play the show correctly (none
-  exist yet). A reader that doesn't know one of them must refuse the file.
+- `requiredFeatures` lists features a reader must understand to play the show correctly. A reader
+  that doesn't know one of them must refuse the file. The one there is: `cells`, written when a
+  cue, a preset, a group or an effect uses single cells of pixel lights (`cells` in Values, Groups,
+  Effects). A file without any has none.
+- A writer keeps a newer `formatVersion` and `minReaderVersion` it found in the file (it doesn't
+  write its own older numbers over them).
 - **Unknown fields must be kept.** A reader that finds a field it doesn't know (anywhere, at any
   depth) keeps it and writes it back unchanged when it saves. That's what lets an older app open a
   newer show, edit it, and save it without destroying what it didn't understand.
@@ -98,6 +105,18 @@ allows unknown fields everywhere, like readers must).
 ```
 
 - `source`: `generic` (built in), `ofl` (Open Fixture Library), `gdtf`, `qxf` (QLC+), `user`.
+- `physical` (optional): `panDeg`, `tiltDeg`, how far pan and tilt go from 0 to 255, in degrees;
+  `rollDeg`, how far a third axis (roll) turns (360 when not said); `beamDeg`, the beam's opening
+  angle in degrees, `[narrowest, widest]` (zoomed in and out; the same twice for a light without a
+  zoom), from the fixture file (OFL `physical.lens.degreesMinMax` or a zoom's angles, GDTF a zoom
+  in degrees or the beam's `BeamAngle`, QLC+ `Lens DegreesMin/DegreesMax`). The 3D stage draws the
+  beam at that angle; without it, a guess for its kind. `travel` and `hoistSpeed`, for a winch:
+  how far its load goes from the top down (metres, 0.1 to 100) and its top speed (metres a second,
+  0.01 to 10); the 3D stage moves it so (4 m and 0.4 m/s when not said).
+- `rdm` (optional): what the real fixture says it is over RDM, so a light found on the line is
+  patched with this type: `maker` (its ESTA manufacturer id), `model` (its device model id) and
+  `modes`, its RDM personalities by number (`{ "1": "6 ch" }`, the name of this type's mode).
+  A GDTF file brings them along; a copy of a type made for one light leaves them out.
 - Built-in generic types (ids starting with `gen-`) are not stored in the file; a reader that
   doesn't know one should treat the fixture's channels as `raw`.
 - A channel's `attr` says what it does:
@@ -112,7 +131,15 @@ allows unknown fields everywhere, like readers must).
 | `strobe` | 0 = no strobe, then slow to fast |
 | `shutter` | `ranges` with `kind` `open`, `closed`, `strobe` |
 | `gobo` | gobo wheel; slots are `ranges` |
-| `goboRotation`, `prism`, `zoom`, `focus`, `iris`, `frost` | beam |
+| `gobo2` | a second gobo wheel (most profile spots have a static and a rotating one); slots are `ranges` |
+| `goboRotation`, `gobo2Rotation`, `prism`, `prismRotation`, `zoom`, `focus`, `iris`, `frost` | beam (each wheel's rotation, the prism and its turning) |
+| `animation`, `animationRotation` | an animation wheel: how far it's in (or which part), and its turning |
+| `panRotation`, `tiltRotation` | endless pan / tilt: turning round and round (ranges: off, CW, stop, CCW, or an index) |
+| `roll`, `rollRotation` | a third axis (the head turning round its own beam, over the type's `physical.rollDeg`), and its endless turning |
+| `hoist` | a winch (kinetics): how far down its load is, 0 at the top of its travel, 1 at the bottom. Sent only while the machines are armed, within the light's `hoistLimits` (a `raw` number on its channel is never sent); safe, or armed with nothing setting it, the last value sent armed is held (never 0, its top). A winch's motion enable is an `enable` channel; it stays shut while the winch's place isn't known |
+| `effectMacro` | the light's own built-in effects (programs, chases); each is a range of the channel, picked by its place in the list |
+| `effectSpeed` | the speed of those effects |
+| `colorMacro` | the light's own colour programs (fades, chases); each is a range, picked like the effects |
 | `fog`, `haze`, `fan` | atmospherics |
 | `confetti`, `bubbles`, `flame`, `sparks`, `co2` | effect machines: confetti fires once each time it rises past 50 %, the others run while above 0 |
 | `enable` | a machine's own safety / enable channel: the app drives it, on (its range labelled enable, armed, active or ready, else 255) while the machines are armed, 0 while they're safe; a look or a raw value never sets it |
@@ -146,11 +173,14 @@ channels per cell (3: 170 pixels a universe, 4: 128).
 ## Fixtures
 
 ```json
-{ "id": "f1", "name": "PAR 1", "typeId": "gen-drgb", "mode": "4 ch",
+{ "id": "f1", "name": "PAR 1", "num": 1, "typeId": "gen-drgb", "mode": "4 ch",
   "universe": 0, "address": 1, "x": 0.25, "y": 0.1, "invertPan": false }
 ```
 
 `x`, `y` place the fixture on the 2D stage (0 to 1, top left is 0,0). `mode` is the mode's name.
+`num` is its number (a whole number from 1, each once), what the console and typed commands go by
+("5 @ full"). It stays when other fixtures are added, deleted or moved in the list. A file without
+numbers, or with a number used twice, gets them in list order after the highest one.
 
 For the 3D stage (all optional; without them a fixture hangs on the nearest truss or stands on
 the deck, by its kind, under its 2D place):
@@ -166,6 +196,11 @@ the deck, by its kind, under its 2D place):
   straight along its base's up; pan 50 % tilts it towards its front.
 - `panDeg`, `tiltDeg`: this light's own pan and tilt range in degrees (1 to 1080), for a type that
   doesn't say or says wrong. Optional.
+- `beamDeg`: this light's own beam angle, `[narrowest, widest]` in degrees (0.5 to 180), over its
+  type's `physical.beamDeg`. Optional.
+- `hoistLimits`: a winch's soft limits, `[highest, lowest]` as parts of its travel (0 the top, 1 the
+  bottom): whatever a cue says, its `hoist` is sent within them. Optional (none: its whole travel);
+  anything that isn't two numbers from 0 to 1 is left out with a note.
 - `swapPanTilt`: `true` sends what a cue has as pan to the light's tilt channel and tilt to its
   pan channel. `invertPan` / `invertTilt` and the offsets are the motors' own (after the swap).
   Optional, default `false`.
@@ -192,7 +227,9 @@ the deck, by its kind, under its 2D place):
 ```
 
 The order of `fixtures` is the order effects run in. `auto: true` marks groups the app made from
-the patch (it may rebuild them).
+the patch (it may rebuild them). `cells` (optional, numbers from 0) makes it a group of some cells
+of its lights ("Rim": `[0, 1, ... 59]` on discs): selecting it picks those cells, and an effect on
+the group (without `cells` of its own) runs on just them, in this order.
 
 ## Values
 
@@ -205,9 +242,39 @@ The state of one fixture. Every field is optional: a missing field means "not to
 
 - Numeric attributes: `intensity`, `white`, `amber`, `uv`, `cct`, `pan`, `tilt`, `strobe`, `zoom`,
   `focus`, `iris`, `frost`, `prism`, `goboRotation`, `gobo`, `fog`, `haze`, `fan`, `speed`,
-  `confetti`, `bubbles`, `flame`, `sparks`, `co2`.
-- `gobo` picks a slot by its position in the channel's slot list (0 = first, 1 = last).
+  `confetti`, `bubbles`, `flame`, `sparks`, `co2`, `gobo2`, `gobo2Rotation`, `prismRotation`,
+  `animation`, `animationRotation`, `effectMacro`, `effectSpeed`, `colorMacro`, `goboShake`,
+  `goboScroll`, `gobo2Shake`, `gobo2Scroll`, `panRotation`, `tiltRotation`, `roll`, `rollRotation`,
+  `hoist`.
+- `gobo`, `gobo2`, `effectMacro` and `colorMacro` pick a slot by its position in the channel's slot
+  list (0 = first, 1 = last; a channel without ranges takes it as a plain level). They jump to the
+  new slot when a fade starts, they don't fade through the ones in between.
+- `goboShake` / `gobo2Shake` (0..1: 0 still, then how fast) and `goboScroll` / `gobo2Scroll`
+  (-1..1: counter-clockwise .. clockwise, 0 not running, the only attributes below 0) are a gobo
+  wheel's own functions: the gobo on it shaking, and the whole wheel running round through its
+  gobos. They go out on the wheel channel's other ranges (a range named "Shake 3 ..." for the third
+  slot, counting Open; "... rotation CW / CCW ..." for running round; "fast..slow" in the name
+  turns the speed round); a channel without such ranges just shows the slot. They jump like the
+  slots. (Added in 1.2.0; an older reader leaves them out.)
 - `raw` sets channels by their index in the fixture's mode (as a string key) to a DMX value.
+- `cells` sets single cells of a fixture made of cells (a pixel bar, a ring, each LED of a pixel
+  head: the channels with a `cell`), by cell index from 0 (as a string key). A cell takes
+  `intensity`, `color`, `white`, `amber` and `uv` (values or preset references, like the fixture's
+  own), and on a fixture whose cells are heads (a moving bar: `pan` or `tilt` channels with a
+  `cell`) also `pan` and `tilt`, where that head points (a `tilt` for the whole bar tilts every
+  head, as `color` does); on one whose cells are winches (`hoist` channels with a `cell`), `hoist`.
+  A position preset of a moving bar keeps each head's own `pan` / `tilt` as `cells` in its values
+  (or its `perFixture` entry); a cue referring to the preset's `pan` or `tilt` gets them too. What a cell doesn't set, it takes from the fixture's own values, so
+  `{ "intensity": 0, "cells": { "0": { "intensity": 1 } } }` lights only the first cell and
+  `{ "color": { "preset": "p-blue" }, "cells": { "3": { "color": { "preset": "p-red" } } } }` makes
+  cell 3 red and every other cell blue.
+  - In a play, cues add up cell by cell like everything else: a later cue that sets cell 5 keeps
+    the cell 2 an earlier one set. A later cue that sets a fixture's own colour (or level) for
+    the whole light takes the cells with it (all blue means every cell blue).
+  - Intensity is highest-takes-precedence per cell across lists, like the fixture's own: a list
+    that doesn't name cells lights all of them at its level.
+  - Effects on cells (a pixel chase) run on top of what the cues set.
+  - Cell numbers past the fixture's cells are kept but do nothing.
 - Any attribute can instead hold a preset reference: `"color": { "preset": "p-warm" }`.
 - How a colour reaches a fixture is the reader's job (the app does: RGB direct; white extracted
   onto a white emitter when `white` isn't set; CMY inverted; colour wheel nearest slot; on a
@@ -256,7 +323,10 @@ whose cues advance on their own, a theatre show is a list you step through with 
 - A cue's `values` lists only the fixtures it sets. Fixtures it doesn't list keep what the list had
   for them.
 - `fade` is the crossfade time. `fadeOut` (intensity going down) and `delay` (before the fade
-  starts) are optional.
+  starts) are optional. `times` (optional): `{ "color": 0, "position": 4, "beam": 2 }`, a fade of
+  its own in seconds for colour (`color`, `cct`), position (`pan`, `tilt`) and the beam (zoom,
+  focus, iris, frost, prism, gobos, animation and their rotations); one not given uses `fade`.
+  Intensity and white, amber, UV keep `fade` / `fadeOut`.
 - `num` (optional) is the cue's number as in a script (`20.5`). A list without numbers is numbered by
   position; once a cue went in between two others every cue carries its own, and readers should
   show `num` when present, the position (1, 2, 3) otherwise.
@@ -441,6 +511,20 @@ on, the only one shown while locked. A page's `locked` is the lock itself; a rea
 file should open it unlocked. A page with `"go": false` (a staff page of looks) shows no GO or Back:
 its looks are tapped, not stepped through.
 
+## Recording
+
+`settings.recordChanges` (optional, `true`): Record and Update keep only what the programmer
+holds (a play tracks through); without it each touched fixture goes into the cue with its whole
+look.
+
+## The console's MIDI controls
+
+`settings.consoleMidi` (optional): the console's faders on a MIDI controller, a list of
+`{ "to": "list:l1", "midi": { "kind": "cc", "ch": 1, "num": 7 } }`. `to` is `grand` (the grand
+master), `list:<id>` (a cue list's fader), `group:<id>` (a group's master) or `light:<id>` (a
+light's level); `kind` is `cc` or `note`, `ch` 1 to 16, `num` 0 to 127. One control moves one
+fader. They work in every view, not just on the console.
+
 ## How several cue lists combine (for readers that play shows)
 
 - Intensity: the highest value wins across running lists (HTP), each scaled by its list level.
@@ -461,6 +545,10 @@ readers that follow this section produce the same output.
 
 - `group` is a group id; without one, `fixtures` (an ordered list of fixture ids) says where it
   runs.
+- `cells` (optional, numbers from 0): on lights made of cells, the effect runs on just these, in
+  this order (a chase round a ring's rim, `[0, 1, ... 59]`), and the light's other cells keep what
+  the cues give them. Without it a pixel effect runs over every cell. Lights without cells aren't
+  affected by it.
 - `params` holds the knobs. Every knob is optional; a missing one takes the effect's default
   (below), and an unknown one is kept.
 

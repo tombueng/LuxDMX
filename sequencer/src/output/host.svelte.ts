@@ -13,7 +13,7 @@ import type { FromThread, Inputs, ToThread } from './thread';
 import type { Show } from '../model/types';
 
 const COMMANDS = ['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
-  'setMaster', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'stopAllEffects', 'act'];
+  'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'stopAllEffects', 'act'];
 const ASK_MS = 1500;          // a box's page that doesn't take a channel by then: the page sends to it
 const QUIET_MS = 1500;        // the thread not heard from for this long: the page sends again
 
@@ -22,6 +22,7 @@ export class OutputThread {
   private heardAt = 0;
   private depth = 0;
   private prev: Record<string, unknown> = {};
+  private progRef: unknown = undefined;
   private showJson = '';
   private showDirty = true;
   private policyKey = '';
@@ -30,6 +31,9 @@ export class OutputThread {
   // the thread's own timing (shown by the load display)
   stats = $state({ rate: 0, worst: 0, late: 0, ms: 0, sent: 0, to: 0, quiet: true, unis: 0 });
   onBroken?: (why: string) => void;
+  // the winches' heights as the output thread holds them (what's on the wire)
+  held: Record<string, number> | null = null;
+  onHeld?: () => void;
 
   // it sends (it's running and was heard from lately)
   get running() { return !!this.w && performance.now() - this.heardAt < QUIET_MS; }
@@ -51,6 +55,7 @@ export class OutputThread {
     this.heardAt = performance.now();
     if (m.t === 'stats') this.stats = { rate: m.rate, worst: m.worst, late: m.late, ms: m.ms, sent: m.sent, to: m.to, quiet: m.quiet, unis: m.unis };
     else if (m.t === 'broken') this.onBroken?.(m.why);
+    else if (m.t === 'held') { this.held = m.held; this.onHeld?.(); }
   }
 
   // Every command to the page's engine goes to the thread's too, once (not the ones a command makes
@@ -114,7 +119,9 @@ export class OutputThread {
     const t = performance.now();
     const v: Partial<Inputs> = {};
     for (const k of ['grandMaster', 'blackout', 'bpm', 'sound', 'armed'] as const) if (engine[k] !== this.prev[k]) { (v as Record<string, unknown>)[k] = engine[k]; this.prev[k] = engine[k]; }
-    for (const k of ['programmer', 'live', 'overlay'] as const) {
+    for (const k of ['programmer', 'live', 'overlay', 'groupMasters', 'heldSeed'] as const) {
+      // (the programmer's copy is the same object until it changes: nothing to compare then)
+      if (k === 'programmer') { if (engine.programmer === this.progRef) continue; this.progRef = engine.programmer; }
       const s = JSON.stringify(engine[k] ?? null);
       if (s !== this.prev[k]) { this.prev[k] = s; (v as Record<string, unknown>)[k] = engine[k] ? JSON.parse(s) : engine[k]; }
     }

@@ -111,7 +111,8 @@ test('save as file and open it again, with the format header', async ({ page }, 
   await dl.saveAs(file);
   const json = JSON.parse(fs.readFileSync(file, 'utf8'));
   expect(json.format).toBe('luxdmx-show');
-  expect(json.formatVersion).toBe('1.1.0');
+  expect(json.formatVersion).toBe('1.2.0');
+  expect(json.requiredFeatures).toEqual([]);                    // (no cells in this show: an older reader may open it)
   expect(json.fixtures).toHaveLength(2);
   expect(json.cueLists[0].cues).toHaveLength(1);
   // the cue keeps the colour preset by reference
@@ -131,4 +132,29 @@ test('save as file and open it again, with the format header', async ({ page }, 
   const [dl2] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save current as file' }).click()]);
   const again = JSON.parse(fs.readFileSync(await dl2.path(), 'utf8'));
   expect(again.fromTheFuture).toEqual({ keep: 'me' });
+});
+
+test('a cue\'s own times: the colour at once, the head takes 4 s to get there (More timing)', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover16', 1, 0, 'Head');                     // pan 1 (+fine), dimmer 6, R 8, B 10
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, id = a.show.fixtures[0].id;
+    const l = a.newList('Moves');
+    l.cues.push({ id: 'm1', name: 'Left red', fade: 0, advance: { mode: 'manual' }, values: { [id]: { intensity: 1, pan: 0, color: { r: 1, g: 0, b: 0 } } } },
+      { id: 'm2', name: 'Right blue', fade: 0, advance: { mode: 'manual' }, values: { [id]: { intensity: 1, pan: 1, color: { r: 0, g: 0, b: 1 } } } });
+    a.checkpoint(); a.markDirty(0);
+  });
+  await cues(page).nth(1).click();
+  await inspector(page).getByText('More timing').click();
+  await inspector(page).getByLabel('Position time').fill('4');
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists.at(-1).cues[1].times)).toEqual({ position: 4 });
+  await jumpTo(page, 0);
+  await expect.poll(async () => { const c = await channels(0, 12); return [c[0], c[7], c[9]]; }).toEqual([0, 255, 0]);
+  const t0 = Date.now();
+  await jumpTo(page, 1);
+  await expect.poll(async () => { const c = await channels(0, 12); return [c[7], c[9]]; }, { timeout: 1500 }).toEqual([0, 255]);   // blue at once
+  await page.waitForTimeout(1600);
+  const mid = (await history(0, 1)).filter(([t]) => t >= t0 + 1200 && t <= t0 + 1800).map(([, v]) => v);
+  expect(mid.some((v) => v > 30 && v < 200)).toBe(true);              // the head on its way, a second in
+  await expect.poll(async () => (await channels(0, 2))[0], { timeout: 6000 }).toBe(255);
 });

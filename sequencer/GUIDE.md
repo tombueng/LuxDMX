@@ -32,7 +32,17 @@ wheels), you just don't have to learn a pro console to use them.
 2. **Add your lights** (Fixtures, Add). Most cheap PARs are one of the generic types: look at the
    channel table in the manual ("CH1 dimmer, CH2 red...") and pick the one that matches. Anything
    else: search the library, open a GDTF / QLC+ / OFL file, or make your own type, even by trying
-   the channels on the real fixture with the channel wizard. Effect machines from a file (a flame
+   the channels on the real fixture with the channel wizard. A pixel head or bar (a bee eye, a
+   37-LED wash, a 4-lite blinder) is a few head channels and then the same few channels for every
+   LED: in your own type **+ Cells…** adds them in one go (red, green, blue, white per LED, or rows
+   of your table as the first LED, times 61), with the shape when it has one (rings of 1, 6, 12, 18
+   in the order the data runs, or a grid), and the long run shows as one line ("Cells 1 to 61:
+   Red, Green, Blue, White each"; RGB cells and white ones next to them are two lines). Its bin
+   takes those cells out: the looks already recorded stay on the LEDs that are left (cell 6 that
+   becomes cell 2 keeps its colour), and cells the light no longer has go from cues, presets,
+   groups and effects. The wizard does the same: find one LED's channels, then "The
+   rest are more of the same". A channel you give a job takes its name from it (Red, Pan) unless
+   you named it. Effect machines from a file (a flame
    projector, CO2 jet, confetti cannon, spark machine or fogger) are known by their type and their
    own words, so they wait for Arm (fog is fog, never a dimmer) like the built-in ones; in your own
    type pick Confetti, Flame, Sparks or CO2 jet under Machines. A WS2812 or SK6812 pixel strip is one
@@ -50,7 +60,10 @@ wheels), you just don't have to learn a pro console to use them.
    its part in every look, its groups and its effects. Otherwise they stay dark until you set them.
 3. **Select lights and set them** in the programmer on the right: intensity, colour (presets or
    the wheel), position for moving heads, and every other channel under "All channels". The
-   number next to a slider takes a typed value too (click it: 37 %, a channel at 127). With
+   number next to a slider takes a typed value too (click it: 37 %, a channel at 127). A channel
+   set by hand under "All channels" shows on the stage plan and in 3D as what its value does (a
+   pan byte turns the head, a gobo or colour wheel slot shows that slot, the shutter closes it),
+   read back from the DMX the way a visualizer reads it; its × lets go of it again. With
    nothing selected it offers your groups (one click selects one) and shows what's playing, each
    with a way to stop it.
 4. **Record** a cue. Set the next look, Record again. **GO** (or Space) steps through them with
@@ -129,11 +142,47 @@ Three more demos come with their own room on the 3D stage:
   of and pressed again, so a cue left on a flame can't keep it burning. Nothing gets round this: not
   a light patched over a machine's address, not a number typed in "All channels", not the channel
   wizard. A machine's own Safety / Enable channel (MagicFX and the like) follows Arm: its "LIVE" or
-  "enabled" value while armed, 0 while safe, so Arm opens both locks and one click shuts both. The
+  "enabled" value while armed, 0 while safe, so Arm opens both locks and one click shuts both. A
+  machine's own programs (a flame projector's "Auto 1", a colour program on a spark machine) wait
+  for Arm the same way, are cut off after the machine's longest time, never start from a jump, and
+  go to 0 with the rest when the output goes blind, the page closes or a frame fails. A cue that
+  fires one by its channel number ("All channels") is marked like any other. A pyro device found
+  over RDM that no library knows comes in with every channel waiting for Arm, until you tell its
+  channels apart. On the box, set the output these machines are on to blackout on signal loss: a
+  laptop that crashes mid-shot then can't leave one on. The
   2D and 3D stage still show what they'd do. Fixture rows say what each machine is: fog,
   haze or bubbles (repeatable, fog can set off smoke detectors), fires once (confetti, "· safe" or
   "· armed"), dangerous (flames, sparks, CO2). Cues, live buttons, phone buttons and timeline
   items that fire one carry a mark (⚠, or 1× for confetti).
+- **Winches (kinetics).** A winch's height (how far down its load is) moves only while the machines
+  are armed, like a flame. Made safe (one click on ARMED, Blind, another show, closing the page, a
+  reload) it stays where it was last sent, never 0: 0 is its top, and a winch sent there would run
+  all the way up. The page keeps where each winch was, so a reload holds it there too (with more
+  than one tab open, the newest height wins). Armed with nothing setting its height (the cue
+  released, only the confetti meant to be armed), it stays where it is too. Its motion enable
+  channel (if it has one) follows Arm like a machine's Safety channel, except while nobody knows
+  where the winch is (never sent armed here, nothing kept): then the enable stays shut, armed or
+  not, until a cue or a fader gives it a height. Each winch has soft
+  limits in its Mounting (Its travel: the highest and the lowest it may go, in % of its travel):
+  whatever a cue, an effect, a fader, a number in All channels or the channel wizard says, it's
+  sent within them, so set the lowest above the heads of the people under it. Cues that move a
+  winch carry the ⚠ mark. A number typed on its height channel in All channels becomes its height;
+  raw numbers on that channel (from an old file, say) are never sent, since they'd fade in from 0.
+  A controller with several winches as cells: each is its own, pick them in the cell picker like a
+  bar's heads, each held on its own (two height channels without cells are one height, a truss
+  lifted at both ends). A jump or a scrub on the timeline never moves a winch: it waits until the
+  list is played on. Its own programs and control channels (a wave program, homing) stay at their
+  off while safe. Nothing patched over it and no number from the channel wizard gets past its
+  limits. Taken out of the patch, moved to another address or left behind by another show, its old
+  channels keep what they had, its enable safe, until something else is patched there (a reload
+  forgets that). Limits set while it hangs outside them don't move it: it goes within them the next
+  time the show gives it a height. A winch type without a motion enable channel gets a warning in
+  its Mounting: until it has been sent a height armed here, nobody knows where it hangs. The 3D
+  stage moves the ball at the winch's real speed (its type's travel and speed): on stage and not
+  armed it shows where the winch really hangs (where it's held), armed or blind the show's height. The library has a winch with an LED ball. On the box,
+  blackout on signal loss sends its height to 0 as well: fine while its motion enable is on that
+  output too (that goes to 0 and the winch stops), but a winch without one needs its own
+  controller's hold on DMX loss.
 - **Nothing fires by itself.** Jumping about or scrubbing the timeline, Next part and Next song never fire a moment (on
   stage the real lights and heads do follow a drag of the playhead; the first drag says so, and
   Blind is the way to look around without them); Play
@@ -274,7 +323,8 @@ Three more demos come with their own room on the 3D stage:
   A GO by hand in between doesn't get stepped over half a second later: the next automatic one
   waits for the bar after.
 - **Highlight** (the sun in the programmer): the selected lights go full white so you can see which
-  one is which in the room. Not recorded.
+  one is which in the room (with cells picked: just those cells, the rest of their light dark). Not
+  recorded.
 - **Fog** buttons only fog while held, and switch off after their maximum even if you keep holding.
   A **fog timer** (Live, Edit, Add; or right-click the fog machine) fogs a few seconds every few
   minutes, with its own button. A burst is at most 60 s, the pause at least 15 s and as long as
@@ -291,6 +341,81 @@ Three more demos come with their own room on the 3D stage:
   your layout, keys and MIDI; a new look goes on it next to the others, and a list, an effect or a
   group made later shows as "2 new in the show" at the top: one tap puts them on the page (Undo
   takes them off). In Edit a finger moves a control by its grip, the keyboard with Alt+arrows.
+- **Console** (the Console tab, a row of faders as its icon on a laptop; on a tablet or a phone in
+  the ⋯ menu, near the top; or Ctrl+K): the app laid out like a compact lighting desk, for a mouse,
+  a keyboard or a touch screen. The ? next to Enter has examples, and so does typing "help". The
+  stage sits beside it (on a narrow screen under the command line): the plan or 3D, as on Program,
+  and a click on a light there selects it, as a desk's visualiser does. The eye next to Enter hides
+  or shows it (remembered in the browser).
+
+  | Type | It does |
+  |---|---|
+  | `5 @ full`, `5 full` | light 5 at full |
+  | `1 thru 4 @ 50`, `1>4 @ 50` | four lights at half (`@ 5` is 50 %, `@ 05` and `@ 5%` are 5 %) |
+  | `1 thru 10 - 5 @ out` | nine lights out (`-` takes out, as on MA and Eos: `1-4` is light 1 without 4) |
+  | `+ 7`, `@ +10` | add to what's selected; up 10 from where each light is |
+  | `group 2 @ full`, `all @ out` | a group by its number, every light |
+  | `1.3 thru 1.16 @ full` | cells 3 to 16 of light 1 (a desk's sub-fixtures) |
+  | `record`, `record cue 5 time 3` | a new cue in the list Live plays; cue 5 where it belongs, its fade 3 s |
+  | `update`, `update cue 5` | the cue on stage; cue 5 |
+  | `goto cue 5`, `cue 5 time 3`, `delete cue 5` | by the cue's number, in the list Live plays or in `list 2` |
+  | `go`, `back`, `release`, `go 2` | the list Live plays, or list 2 |
+  | `next`, `prev`, `clear`, `undo`, `blackout`, `highlight` | as the buttons |
+
+  - **The command line.** Lights go by their number (the grey one in front of each light in the
+    fixture list, on the plan with its # button). It stays when other lights come and go; the patch
+    dialog's "Fixture number" changes it, and "Number the 3 from…" in the list's menu numbers a
+    selection in one go (101, 102, 103). A run skips numbers without a light and says so. Cells and
+    whole lights in one command are refused ("1.3 + 2.5" picks cell 3 on light 1 and cell 5 on
+    light 2). "record cue 5" is refused when 5 is there; in a play that's running elsewhere the cue
+    is stored and the programmer keeps your changes until Clear. Typed go and goto say when a list's
+    machines are safe. Short forms: clr, rec, upd, bo, hl, q (cue), del, oops (undo), ff (full), t
+    and > (thru). Typing anywhere on the console goes to the command line, ↑ brings back the last
+    one; the keypad keeps a phone's own keyboard down (⌫ rubs out the last digit or word, Esc empties
+    the line).
+  - **Next / Prev** step through the selection one light at a time; with Highlight on each one
+    lights up in turn while the rest of the selection stays faintly on (**Lowlight**, 15 %), **All**
+    brings the whole selection back; with one light selected they go to the next light by number.
+  - **Faders.** A fader, a select and a Flash button for every light in number order (20 at a time,
+    ◀ ▶ for the next; Shift-click or **Add** adds to the selection). A light's fader sets its level
+    in the programmer (Record keeps it, Clear lets go). Machines (fog, flames, sparks, CO2, confetti)
+    have no strip. Or a **master for every group**: it scales everything its lights do (cues, the
+    programmer, flashes; a group of cells just those cells), like the grand master for just them, so
+    a GO still changes them and Record doesn't store it. A master below full shows in the top bar
+    wherever you are (a tap opens the console), the reply to "5 @ full" says so, and it stays after
+    a reload. Faders move from where they are, by how far you drag (a finger landing on the track
+    doesn't make it jump), with the wheel or the keyboard (arrows, Page Up/Down, Home is 0, End is
+    full; a mouse's double-click: full and back, not on a cue list's fader).
+  - **Encoders** for what the selection has, a page each: Intensity (and strobe), Position (pan,
+    tilt, move speed), Colour (hue and saturation, a white light turned in hue gets full colour;
+    white, amber, UV, colour temperature), Beam (zoom, focus, iris, frost, prism, rotations, and the
+    gobo wheels, which click from one gobo to the next and show its name), Built-in (the light's own
+    programs: a built-in effect and a colour program that click by name, effect speed, the animation
+    wheel) and Fog. Drag up or right, the mouse wheel, or the arrow keys (Shift: fine, Page Up/Down:
+    big steps; a tap on the value, a double-click or Enter types one, a hue in degrees). Each light
+    turns from where it is, so a fan stays a fan, and lights at different values show it
+    ("20–80%"). The page's **palettes** sit under the encoders, and **+ Palette** records a new one
+    from what the selected lights show now.
+  - **Cue lists.** A fader for every cue list (10 at a time) with GO (the next cue shows under it),
+    Flash, ◀ Back and ■ Release; its name lists its cues, numbered, the one on stage marked, and a
+    tap on one goes there. Up from 0 starts the list, down to 0 lets it go, and a list let go that
+    way plays at full when anything starts it again. A list that fires machines is marked, and while
+    they aren't armed GO, Flash and the fader say so. Space is GO on the list Live plays, also after
+    a click on a button. Leaving the console lets go of anything held.
+  - **Recording.** The grand master and Blackout on the right; Record into (the list), Update,
+    Clear (a toast can take it back), Highlight and Undo under the keypad. **Only changes** (also in
+    Ctrl+K) makes Record and Update keep just what the programmer holds, as desks do: in a play the
+    cues then track (light 2 recorded at half in cue 5 keeps the colour cue 1 gave it, and a change
+    to cue 1 shows in cue 5 too), and Update merges your changes into the cue. Off (the default):
+    each light you touched goes in with its whole look, so the cue looks the same whatever played
+    before it. The show keeps the choice.
+  - **MIDI.** With the MIDI button on, every fader gets a small Learn button: press it, move a fader
+    or knob on your controller, and from then on that control moves it (it shows "CC7"; pressed
+    again it lets go). Lights, group masters, cue lists and the grand master; they work in every
+    view (not on a page locked for the service), and the show keeps them. A fader or knob takes over
+    only once it reaches where the fader is (plugging in a controller or changing its bank never
+    jumps a level or starts a list); a pad is a flash: full while held, back when let go. A control
+    a live page's button had goes to the console (learning it says so).
 - **Background tabs** don't slow the output down (the clock runs in a Worker).
 - **No internet at the venue?** Open the app once at home: it keeps itself and works offline after
   that (shows live in the browser anyway). Chrome and Edge can also install it as an app (the
@@ -301,8 +426,44 @@ Three more demos come with their own room on the 3D stage:
 - **White lights** (warm white + cool white LEDs) take the white colour presets as a colour
   temperature: "Warm white" makes them warm. A real colour they can't make leaves them white, and
   the stage draws what they really show; the programmer says which lights can't do colour.
+- **Gobos, built-in effects and colour programs by name** (programmer, for lights that have
+  them): Gobo, Gobo 2, Built-in effect and Colour program show the names from the light's own
+  profile ("Star", "Auto show", "Rainbow fade"); picking one gives every selected light the slot of
+  that name, wherever it sits on its wheel or channel (a head without one by that name is left as
+  it is; one light alone takes the one at that place). Gobo 2 rotation, Prism rotation, the Animation wheel and its
+  rotation, and Effect speed are sliders. Files from GDTF, the Open Fixture Library and QLC+ bring
+  them in: a second gobo wheel is Gobo 2 (its rotation goes with it), effect and colour programs
+  are what they are. Effect machines are still found by their own words, so a flame projector's
+  fire channel filed as an "effect" still waits for Arm. A matrix panel from GDTF (its pixels'
+  places in the file) or the Open Fixture Library (its pixel grid) comes in laid out as a grid, wired
+  the way the file says, so the cell picker's Top and Bottom, pixel effects and the pictures see a
+  panel and not one long row.
 - **Fan and colour spread** (programmer): one slider fans moving heads out; Rainbow or a two-colour
-  gradient spreads colours along the selection.
+  gradient spreads colours along the selection (picked cells count one by one: a rainbow round a
+  ring's rim).
+- **Single cells** (Cells, at the top of the programmer, for pixel bars, rings, matrices and pixel
+  heads): pick cells on the little picture of the light, and the brightness and colour below go to
+  just them, like a desk's sub-fixtures. Click a cell, drag across cells, drag a box from outside
+  them (Alt, or **Take out** on a touch screen, takes them out), type them ("1 thru 16, 20",
+  "30-40/2": a range, single cells, every second one; "16-1" backwards, the way a rainbow then
+  runs; a number past the light's last cell is said), step through them one at a time with ◀ ▶
+  like a desk's Next, or use the keyboard (arrows move the blue ring, Space picks). Picked cells
+  are outlined orange. A big matrix gets **Zoom** (2×, 4×): the picture scrolls and a tap picks a
+  cell. On the stage plan, Alt-click one of a selected light's pixels to pick that cell (Alt-drag
+  still moves the light without snapping); picked cells are outlined there too. Quick picks:
+  Whole light, Each cell, Odd, Even, Every 3rd, Invert, the halves, a ring (Rim to Centre), a
+  matrix's Border and Checker. Cells the programmer holds something for are outlined; **Let go of these cells**
+  frees the picked ones. Record (and Update) keep them in the cue: the rim red and the middle blue
+  stays that way, cue after cue, until a cue sets the whole light again. With several lights of the
+  same shape selected (same type, mode and wiring), the same cells are picked on each; lights of
+  another shape are left alone while cells are picked (it says which). Another selection drops the
+  picks. A colour preset made or updated with cells picked takes the first picked cell's colour.
+  Effects run on top of the cells a cue set, a whole-light effect on every cell. An effect added
+  while cells are picked runs on just those cells, in their order ("Chase on Disc (16 cells)": a
+  chase round the rim, the middle keeps its colour). A group made while cells are picked is a group
+  of those cells ("Rim"): selecting it picks them again, an effect on it runs on them, its flash
+  (a live button, the console) lights just them, and its master on the console scales just them.
+  To QLC+ it goes as a group of its whole lights (the export says so).
 - **Effects in stage order**: an effect normally runs along the group's order; "Order" in the
   effect editor makes it run left to right on the stage, back to front, or from the centre out,
   however the lights were patched.
@@ -407,8 +568,11 @@ Three more demos come with their own room on the 3D stage:
   **set the light** to the patch's address or mode over RDM, or **move the patch** to where the light
   is; **Make the rig match the show** does every fix towards the lights in one go (with the list of
   what changes). Lights the show doesn't know are patched where they are with **Patch the new
-  lights**: with their own profile when the fixture library knows them (by their RDM maker and
-  model ids, else by their names), else a plain one with their number of channels. **Identify**
+  lights**: first with a type of your own that has their RDM maker and model ids (one used in this
+  show, then your fixtures; a GDTF file brings them, a type you fixed for this light alone doesn't
+  count), in the mode of the light's personality; then with their own profile when the fixture
+  library knows them (by their RDM maker and model ids, else by their names); else a plain one with
+  their number of channels (a pyro device's channels all wait for Arm). **Identify**
   makes the real light flash and selects its fixture (in the list, the plan and the 3D stage);
   **Name it** writes the fixture's name into the light. A fixture patched from the rig, or told to
   **Remember it**, knows its light (its RDM id is kept in the show) and is followed wherever its
@@ -552,7 +716,61 @@ Three more demos come with their own room on the 3D stage:
   is selected in the fixture list too (it scrolls to it). Moving heads turn at a real head's speed
   (about two seconds for a full pan, speeding up and braking), so a fast effect looks like a real
   head chasing it, with smaller swings when it's too fast to follow; what goes out to the lights is
-  the same either way. Switching between Program, Timeline and Live keeps the 3D stage as it is
+  the same either way. Heads with more axes: **endless pan and tilt** (a turning channel: off, CW,
+  stop, CCW) turn round and round past any position while it turns, and go back to their position
+  the short way when it stops; a **third axis (roll)** turns the head round its own beam, to an angle
+  or on and on, and its gobos and prism turn with it. The programmer has them under the sliders
+  (Pan rotation, Tilt rotation, Roll, Roll rotation, with a button for each range), the console on
+  its Position page; fixture files bring them in (OFL PanContinuous / TiltContinuous / Rotation,
+  GDTF PanRotate / TiltRotate). The library has an endless head and a beam head with a roll.
+  **Moving bars** (heads in a row, each tilting on its own, sometimes panning too) are lights whose
+  cells are heads: pick heads in the cell picker (or "1.2 thru 1.3" on the console) and the pan and
+  tilt controls point just them, the rest keep the bar's; a cue keeps each head's, and fades them
+  on its position time. A move effect on a bar runs along its heads (a tilt sweep with spread is a
+  wave from head to head, a fan fans them); on a bar whose heads only tilt, its pan part turns the
+  whole bar. Record, Update and position presets keep each head's own position, and an encoder with
+  no heads picked turns each head from where it is (a fan stays a fan). Heads that pan each are
+  drawn panning each; a bar with its own pan or tilt besides its heads' keeps their motors at the
+  middle unless set, so an angle doesn't count twice. In 3D each head is drawn on the bar with its own motor and its own beam in its cell's
+  colour, and the bar pans as one. Fixture files bring them in: GDTF heads (a tilt on each head's
+  axis, the colour on the beam under it: one cell), OFL pixels with a tilt each. The library has a
+  bar of four.
+  A beam is as wide as the light's data says: its fixture file's beam angle
+  (OFL's lens, a GDTF zoom or beam angle, QLC+'s lens), narrowest to widest over its zoom; the
+  library's heads have their data sheets' angles. One whose file doesn't say gets a guess for its
+  kind. The patch dialog's Mounting tab shows it under **Its beam**, and takes the real light's own
+  angles when they differ (empty: its type's again). **Spill** (next to Ambient) is how much your lights light up the room round
+  them: the band, the deck, the walls and the haze's glow (0 only their beams and where they land;
+  it starts lower than it used to be). A spot's gobo shows in 3D as the real pattern: fingers of light in the haze
+  and its picture where the beam lands. Which pattern comes from the slot's name in the fixture
+  file, in English or German (Stars, Sterne, Flower, Dots, Breakup, Leaves, Water, Spiral, Tunnel,
+  Window, Snowflake, Heart, Triangle and so on: 96 of them, symbols and the classic metal ones);
+  a slot whose name says nothing ("Gobo 5") gets a pattern of its own, different from the others
+  on its wheel, and Open is none; the programmer's gobo buttons show the same pictures. Glass gobos
+  (Rainbow glass, Fire glass, Ocean glass, Aurora, Stained glass, Galaxy glass, Sunset) are in
+  colour and tint the light. A second wheel lays its pattern over the first. The gobo rotation
+  channel turns it as its ranges say (an index range is an angle, CW and CCW ranges turn slow to
+  fast; a range called reverse, backward or rückwärts turns the other way too); without ranges 0 is
+  still. The library's generic gobo spot turns its gobo and its prism either way (index, CW, stop,
+  CCW), as real heads do. Where the wheel has them, **Shake** makes the gobo shake and
+  **Wheel ↻ / ↺** runs the whole wheel round through its gobos (buttons under the gobos; a cue keeps
+  them). The **prism** splits the beam and the picture: 3, 5 or 8 facets, round or in a line, as the
+  prism channel's ranges say (a plain prism channel: three round), turned by its rotation channel.
+  The **animation wheel** slides a breakup through the beam as far as it's in, running as its
+  rotation says. The **iris** closes the beam down. The **focus** is sharp at one throw: near for 0,
+  far for 1, so a head focused for the floor is soft on a closer wall; **frost** softens on top.
+  Channels with named ranges (a prism's facets, a rotation's index, CW, stop and CCW) get a button
+  for each range above their slider; the slider fine-tunes within it. The library's **Profile spot**
+  has all of it: CMY and a colour wheel, a rotating gobo wheel with shake, a fixed wheel with glass
+  gobos, an animation wheel, three prisms, iris, zoom, focus and frost. The symbols come from a small
+  font that comes with the app (a part of Noto Sans Symbols, SIL Open Font License), so every
+  computer draws them the same. The orange frame round the selected lights fades while you work on their
+  look (the programmer, effects, presets, the cues, a light's patch), so a colour or an effect shows
+  as it is, and comes back as soon as the pointer is on the stage, the fixture list, the groups or
+  the cell picker again, or the selection changes. A Live page's stage and the timeline's picture
+  never show it: they're for looking. On a busy computer that draws the 3D only a few times a second the heads
+  still move at that speed, they don't jump; after the tab was hidden they're straight where the
+  show has them. Switching between Program, Timeline and Live keeps the 3D stage as it is
   (it's only built again after 2D, or 3 minutes away from it). The **Haze** slider is
   how much haze is in the air (it acts at once, over its whole range); while the fog machines run
   the room fills up as the fog spreads (the beams show more everywhere) and it clears with the fog. A fog machine blasts a hard jet out of its nozzle
@@ -611,6 +829,25 @@ Three more demos come with their own room on the 3D stage:
   holds still while it records (a window made narrower doesn't end the take). Closing the 3D
   view saves what's recorded so far; closing the page ends it without a file. A browser that can't
   record says so.
+- **Render a video (up to 8K)**: **Render** (next to Record) draws the video frame by frame instead
+  of recording it as it plays, so it never stutters, whatever the computer: **1080p**, **9:16**
+  (1080 x 1920), **4K** (3840 x 2160) or **8K** (7680 x 4320), at 25, 30, 50 or 60 frames a second.
+  It renders **the song from its start**, **the song from the playhead**, or **the look as it is**
+  for as many seconds as you say (without a song on the timeline, only that). It starts from the
+  look on stage now (the lists playing, the effects on, the masters), then the song's cues come at
+  their moments; **With what's in the programmer** takes the programmer along too. The sound is the
+  song's file (or the demo beat) mixed at full, not the speakers. The panel says how long the video
+  is and about how big the file gets. While it renders the 3D stage shows the frames being drawn and
+  a chip counts the per cent and the time left; **Stop** ends it and saves nothing. It runs its own
+  copy of the show: nothing goes out to the lights from it, and the show here (the box, the cues,
+  the programmer) goes on as it is. Slower than real time at 4K and 8K (each frame is drawn at full
+  size with the glow and the haze), but every frame is there. Where the browser asks where to save
+  (Chrome, Edge) the file goes straight to disk as it's made (an 8K song is gigabytes); elsewhere
+  it's saved to the downloads at the end. It's an MP4: H.264 where the browser encodes that size,
+  else HEVC or AV1 (8K usually needs one of those: a graphics card that encodes them, or the
+  browser's own slower encoder), VP9 last; the sound AAC, or Opus where AAC isn't there (Chrome on
+  Linux). A graphics card that can't draw that big says so before anything starts, one that runs
+  out of memory part way stops the render with a note. The crowd's sound isn't in a render.
 - **Your layout**: drag the gaps between the panels to make the lists, the programmer or the cues
   bigger (double-click a gap for the normal size, or focus it and use the arrows). Remembered in
   the browser. The chips at the top of the programmer (Intensity, Colour, Position, Channels) jump
@@ -621,7 +858,7 @@ Three more demos come with their own room on the 3D stage:
   each goes under its light, above it, or beside it; one with no room left is shown on hover (a
   selected light always shows its name).
 - **A light's patch** (double-click it in the list, or "Name, address, mode…" in its menu): name,
-  universe, address (it says when channels are shared and offers the next free spot), the DIP
+  number (what the console goes by; one no other light has), universe, address (it says when channels are shared and offers the next free spot), the DIP
   switches to click, its type and mode. When it shares channels with the lights after it (a
   bigger mode, say) it offers to move those up just as far as needed. When the fixture knows its
   real light (or one answers RDM at its address), **The real light** shows what that light says:
@@ -718,8 +955,22 @@ Three more demos come with their own room on the 3D stage:
   points as if it hung quite differently (turned over), it says that too. With every mark at one
   height, a head's mirror image on the other side of them fits just as well; it then takes the
   likelier one (not reversed, above the floor) and says so: give one mark another height (a box
-  on the stage) and steer it there to settle it. Its invert settings are
-  never changed. **Use it** puts that into the show (one Undo): from then on Aim, the 3D stage and every
+  on the stage) and steer it there to settle it. With **six marks or more**, one of them at least 40 cm higher or lower than the others, a head whose pan or
+  tilt goes further (or less far) than its manual or profile says is measured too: "Its pan goes
+  630° and its tilt 250°, not the 540° and 270° its profile says", and Use it keeps that for the
+  light (with fewer that don't meet, or all at one height, it says what would measure it). Its invert settings are
+  never changed.
+- **Find pan and tilt** (in the menu of a light whose profile names nothing that moves it, a plain
+  profile from RDM with "Channel 1" to "Channel 12"; and on the patch dialog's Channels tab of any
+  light that doesn't move, "Does it move?", for a file that got it wrong): every channel with a
+  slider that goes to the real light ("Profile says" what it does now); say which one is **Pan**
+  and which **Tilt** (the channel after it as its 16-bit fine one when its name says so, or pick
+  it), which one is the **Dimmer** and which opens the **Shutter** (left where the light is on and
+  steady), so it lights while you steer it onto marks; one channel may reset the light or turn its
+  lamp off, put that slider back to 0 then; how far each goes (540° and 270° unless the manual says
+  otherwise; six marks, one at least 40 cm higher or lower, measure it later), and save it for this light or for all of its type. It's
+  a head from then on (Aim, 3D, presets), and **Save and focus on marks** goes straight on to Focus
+  and calibrate. **Use it** puts that into the show (one Undo): from then on Aim, the 3D stage and every
   position worked out from a place point it where the real one goes. **Keep the marks as position
   presets** makes one position preset per mark with each head's own pan and tilt (focus palettes):
   at the next venue, steer them again and keep them again, and every cue using them follows. What
@@ -738,7 +989,10 @@ Three more demos come with their own room on the 3D stage:
 - The **programmer** holds what you're changing right now. It sits on top of everything until you
   Record it into a cue or Clear it.
 - A **cue** is a look plus timing. It only contains the lights you changed, so lights it doesn't
-  mention keep doing what they were doing.
+  mention keep doing what they were doing. Its timing (on the right when it's selected): a fade,
+  and under **More timing** a delay, a fade out for lights getting darker, and times of their own
+  for **Colour, Position and Beam** (empty: the fade), so a colour can change at once while the
+  heads take 4 s to get to their marks.
 - A **cue list** plays cues in order: with GO, or on their own (a chase). Several lists can run at
   once: brightness is highest-wins, everything else is latest-wins. House lights on their own
   list, a fog timer on another, the show on a third.

@@ -3,6 +3,7 @@
 import { app } from '../app.svelte';
 import { ui, type MenuItem } from './ui.svelte';
 import { typeLabel } from '../model/library';
+import { renumber } from '../model/numbers';
 
 const n = (k: number, what = 'fixture') => `${k} ${what}${k > 1 ? 's' : ''}`;
 export const fixtureActions = {
@@ -21,6 +22,19 @@ export const fixtureActions = {
   async group() {
     const name = await ui.ask('New group', `Group ${app.show.groups.length + 1}`, { ok: 'Make the group' });
     if (name) { app.groupFromSelection(name); ui.toast(`Group "${name}" made`); }
+  },
+  // numbers for the selection, from one you type on (in list order: 101, 102, ...)
+  async number() {
+    const ids = app.show.fixtures.map((f) => f.id).filter((id) => app.selected.includes(id));
+    if (!ids.length) return;
+    const first = app.show.fixtures.find((f) => f.id === ids[0])?.num ?? 1;
+    const v = await ui.ask(ids.length > 1 ? `Number the ${ids.length} lights from` : 'Its number', String(first), { ok: 'Number', digits: true, hint: ids.length > 1 ? 'They get this one and the ones after it, in the order of the list.' : 'What the console and typed commands go by.' });
+    if (v === null) return;
+    app.checkpoint();
+    const why = renumber(app.show.fixtures, ids, Math.round(Number(v)));
+    if (why) { ui.toast(why, 6000); return; }
+    app.markDirty(0);
+    app.toastUndo(ids.length > 1 ? `Numbered ${v} to ${Math.round(Number(v)) + ids.length - 1}` : `Number ${v}`);
   },
   selectSameType(id: string) {
     const f = app.show.fixtures.find((x) => x.id === id);
@@ -43,9 +57,15 @@ export function fixtureMenu(id: string, extra: MenuItem[] = []): MenuItem[] {
     // (the moving heads in the selection: steered onto marks, where they really hang worked out)
     ...(app.kinds[id] === 'mover' ? [{ label: (() => { const n = app.selected.filter((x) => app.kinds[x] === 'mover').length; return n > 1 ? `Focus and calibrate the ${n} heads…` : 'Focus and calibrate…'; })(), icon: 'position',
       run: () => (ui.focusCal = app.selected.filter((x) => app.kinds[x] === 'mover')) } as MenuItem] : []),
+    // (a light that may move but whose profile doesn't say how: channels nobody named)
+    // (a plain profile: most of its channels unnamed; not a fog machine or a PAR with a macro channel)
+    ...((() => { const c = app.caps(id), chs = app.modeOf(id)?.channels ?? [], raw = chs.filter((x) => x.attr === 'raw').length;
+      return !c.position && !c.fog && raw >= 2 && raw * 2 >= chs.length; })()
+      ? [{ label: 'Find pan and tilt…', icon: 'position', run: () => (ui.panTiltFind = id) } as MenuItem] : []),
     ...extra,
     ...(fog ? [{ label: 'Make a fog timer for it…', icon: 'fog', run: () => fogTimer([id]) } as MenuItem] : []),
     { label: `Select all ${t ? typeLabel(t) : 'like it'} (${app.show.fixtures.filter((x) => x.typeId === f.typeId).length})`, icon: 'check', run: () => fixtureActions.selectSameType(id) },
+    { label: app.selected.length > 1 ? `Number the ${app.selected.length} from…` : `Number (now ${f.num ?? '–'})…`, icon: 'edit', run: () => void fixtureActions.number() },
     { sep: true },
     { label: 'Copy', icon: 'copy', keys: 'Ctrl+C', run: fixtureActions.copy },
     { label: 'Cut', icon: 'cut', keys: 'Ctrl+X', run: fixtureActions.cut },

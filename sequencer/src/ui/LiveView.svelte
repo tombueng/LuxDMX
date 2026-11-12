@@ -3,6 +3,7 @@
   import { whatsNew } from '../content/whatsNew';
   import { clockOf } from '../model/timeline';
   import { actionRisk, isGated } from '../model/safety';
+  import { machines } from './risk';
   import { inWords, nextUp } from '../model/schedule';
   import { actionShort, actionText } from '../model/actions';
   // Live: play the show with big buttons. Starts with a page built from the show; Edit makes it
@@ -347,13 +348,14 @@
     const tl = app.show.timeline, now = songAt;
     if (!tl || !app.timeline.playing || app.sfxArmed || app.output !== 'live') return undefined;
     let best: { at: number; what: string } | undefined;
+    const machineRisk = machines(app.show);              // (a machine's own programs fire it too)
     for (const i of tl.items) {
       if (i.at <= now || i.at - now > 90 || (best && i.at >= best.at)) continue;
       const d = i.do;
       if (d.do === 'burst') { if (isGated(d.attr)) best = { at: i.at, what: MACHINE_WORD[d.attr] ?? d.attr }; continue; }
       if (d.do === 'effect') continue;
       if (!('list' in d)) continue;
-      const r = actionRisk(app.show, d);
+      const r = actionRisk(app.show, d, undefined, machineRisk);
       if (r === 'once' || r === 'hazard') {
         const l = app.show.cueLists.find((x) => x.id === d.list), c = d.do === 'goto' ? l?.cues.find((x) => x.id === d.cue) : undefined;
         best = { at: i.at, what: c?.name ?? l?.name ?? 'A machine' };

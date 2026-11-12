@@ -46,7 +46,7 @@
   }
   async function armClick(e: MouseEvent) {
     if (justArmed) { justArmed = false; return; }
-    if (app.sfxArmed) { app.armMachines(false); ui.toast('Safe: confetti, flames, sparks and CO2 send nothing.'); return; }
+    if (app.sfxArmed) { app.armMachines(false); ui.toast('Safe: confetti, flames, sparks and CO2 send nothing, winches stay where they are.'); return; }
     if (holding) return;
     // a click with no press behind it (a screen reader): ask instead of the hold
     if (e.detail === 0 && app.output === 'live') {
@@ -55,6 +55,7 @@
     }
     if (app.output === 'live') ui.toast('Hold the button for a moment to arm the machines.');
   }
+  const groupsDown = $derived(Object.entries(app.groupMasters).filter(([, v]) => v < 0.995).flatMap(([id, v]) => { const g = app.show.groups.find((x) => x.id === id); return g ? [{ name: g.name, pct: Math.round(v * 100) }] : []; }));
   function more(e: MouseEvent) {
     // on a phone the undo buttons don't fit the bar: they're the first thing in here
     // (on a tablet, following the music: the bar has it only while it's on)
@@ -63,6 +64,8 @@
       ...(phone ? [{ label: 'Undo', icon: 'undo', disabled: !app.canUndo, run: () => app.undo() }, { label: 'Redo', icon: 'redo', disabled: !app.canRedo, run: () => app.redo() }] : []),
       ...(tablet ? [{ label: app.music.on ? 'Stop following the music' : 'Follow the music', icon: 'music', run: () => void music() }, { sep: true }] : []),
       { label: 'Find anything…', icon: 'search', keys: 'Ctrl+K', run: () => (ui.modal = 'palette') },
+      // (on a tablet or a phone the console's tab doesn't fit the bar: here, near the top)
+      ...(tablet && !app.locked ? [{ label: 'Console (like a lighting desk)', icon: 'sliders', run: () => (app.view = 'console') }] : []),
       { heading: 'The rig' },
       { label: 'DMX output (every channel, live)', icon: 'grid', run: () => (ui.modal = 'monitor') },
       { label: 'Check the patch (one light at a time)', icon: 'sun', disabled: !app.show.fixtures.length, run: () => (ui.modal = 'patchCheck') },
@@ -113,6 +116,7 @@
     <button role="tab" aria-label="Program" aria-selected={app.view === 'program'} class:cur={app.view === 'program'} onclick={() => (app.view = 'program')}><Icon name="program" /><span class="lbl">Program</span></button>
     <button role="tab" aria-label="Live" aria-selected={app.view === 'live'} class:cur={app.view === 'live'} onclick={() => (app.view = 'live')}><Icon name="live" /><span class="lbl">Live</span></button>
     {#if !app.locked}<button role="tab" aria-label="Timeline" aria-selected={app.view === 'timeline'} class:cur={app.view === 'timeline'} onclick={() => (app.view = 'timeline')} title="A song with your cues on it"><Icon name="music" /><span class="lbl">Timeline</span></button>{/if}
+    {#if !app.locked}<button role="tab" class="tconsole" aria-label="Console" aria-selected={app.view === 'console'} class:cur={app.view === 'console'} onclick={() => (app.view = 'console')} title="Console: like a lighting desk, a command line, faders, encoders, playbacks"><Icon name="sliders" /><span class="lbl">Console</span></button>{/if}
   </div>
   {/if}
 
@@ -125,6 +129,12 @@
     <input type="range" min="0" max="1" step="0.01" bind:value={app.grandMaster} aria-label="Grand master" />
     <b>{Math.round(app.grandMaster * 100)}%</b>
   </label>
+  <!-- a group's master pulled down (the console's group faders): said here, wherever you are, so
+       lights that stay dim aren't a mystery -->
+  {#if groupsDown.length}
+    <button class="chip gms" onclick={() => (app.view = 'console')} title="Group masters below full: {groupsDown.map((g) => `${g.name} ${g.pct}%`).join(', ')}. Their lights are scaled down. On the console's Groups faders.">
+      {groupsDown.length === 1 ? `${groupsDown[0].name} ${groupsDown[0].pct}%` : `${groupsDown.length} groups down`}</button>
+  {/if}
   {/if}
   <!-- in Live the GO bar has it -->
   {#if app.view !== 'live'}<button class="bo" class:on={app.blackout} aria-pressed={app.blackout} onclick={() => (app.blackout = !app.blackout)} title="Blackout: every light off, until you press it again">Blackout</button>{/if}
@@ -159,7 +169,7 @@
   {/if}
   {#if app.gatedMachines.length && (!app.locked || app.sfxArmed)}
     <button class="arm" class:armed={app.sfxArmed} class:holding aria-pressed={app.sfxArmed} aria-label="Machines armed"
-            title={app.sfxArmed ? 'Confetti, flames, sparks and CO2 can fire. Click to make them safe.' : app.output === 'live' ? 'Confetti, flames, sparks and CO2 send nothing (the stage view still shows them). Hold to arm.' : 'Confetti, flames, sparks and CO2 send nothing. Blind: go on stage first to arm them.'}
+            title={app.sfxArmed ? 'Confetti, flames, sparks and CO2 can fire, winches move. Click to make them safe.' : app.output === 'live' ? 'Confetti, flames, sparks and CO2 send nothing, winches stay where they are (the stage view still shows them). Hold to arm.' : 'Confetti, flames, sparks and CO2 send nothing, winches stay where they are. Blind: go on stage first to arm them.'}
             onpointerdown={holdStart} onpointerup={holdEnd} onpointerleave={holdEnd} onpointercancel={holdEnd}
             onkeydown={armKey} onkeyup={holdEnd} onclick={armClick}>
       <Icon name="sfx" size={14} /><span class="txt">{app.sfxArmed ? 'ARMED' : 'Safe'}</span>
@@ -181,6 +191,10 @@
   .modes { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
   .modes button { border: 0; background: none; border-radius: 999px; padding: .3rem .85rem; color: var(--muted); }
   .modes button.cur { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+  .modes button.tconsole { padding-inline: .55rem; }
+  /* (its name only on a wide screen or while it's open: the bar stays one row on a laptop) */
+  @media (max-width: 1500px) { .modes button.tconsole:not(.cur) .lbl { display: none; } }
+  .gms { border-color: var(--orange); color: var(--orange); max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gm { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); } .gm input { width: 90px; } .gm b { width: 2.6rem; color: var(--text); font-size: .85rem; }
   .lab { color: var(--muted); font-size: .82rem; }
   .bpm { align-items: center; }
@@ -210,6 +224,8 @@
     /* (room for Blind / On stage and the arm button: the tabs by name, no icons; Safe and ARMED
        written out, the machines' state is never just an icon) */
     .modes :global(svg) { display: none; }
+    .modes button.tconsole:not(.cur) { display: none; }   /* (in the ⋯ menu on a tablet or a phone) */
+    .modes button.tconsole :global(svg) { display: inline-block; }
     .bpm .lab { display: none; }
     .gm input { width: 64px; }
     .brand, .gm .lab, .gm b { display: none; }          /* (the slider shows the master; its title says it) */

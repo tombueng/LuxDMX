@@ -10,7 +10,9 @@
 //   GET  /info.json     { version, hostname, outputs: [{ en, uni }] }
 //   GET  /frames.json   per universe: last frame, frame count, first/last arrival (ms)
 //   GET  /history.json?uni=0&ch=1   every value channel `ch` had, with timestamps (for fades)
-//   POST /reset         forget everything received (and the RDM rig as it was, answers on time)
+//   POST /reset         forget everything received (and the RDM rig as it was, answers on time);
+//                       ?pyro=1 puts a pyro device nobody's library knows on the line too (E1.20
+//                       category 0x0402)
 //   POST /pixels?ports=10:2,12:1   pixel ports on these universes (GET /pixels.json reads them);
 //                                  10:2:150:500 also says its brightness and power cap
 //   POST /ws/test       { ackDelay: ms } answer each message that much later, { noAck: true } never
@@ -105,7 +107,10 @@ const server = http.createServer((req, res) => {
     json(history.filter((h) => h.uni === u).map((h) => [h.t, h.data[ch - 1] ?? 0]));
   } else if (url.pathname === '/reset' && req.method === 'POST') {
     pixelPorts = [];
-    frames = new Map(); history = []; ackDelay = 0; noAck = false; wsStats = { acks: 0, early: 0 }; for (const c of wss.clients) c.pending = false; rig = RIG(); rdmScan = { busy: false, stage: 0, found: 0, scanned: false, at: 0 }; quiet = new Set(); json({ ok: true });
+    frames = new Map(); history = []; ackDelay = 0; noAck = false; wsStats = { acks: 0, early: 0 }; for (const c of wss.clients) c.pending = false; rig = RIG();
+    if (url.searchParams.get('pyro') === '1') rig.push({ uid: '7A70:00000001', uni: unis[0], addr: 100, model: 0x0042, mfg: 'Spark Co', modelName: 'Jet 2', label: '', cat: 0x0402,
+      modes: [{ n: 1, name: '2 channel', footprint: 2 }], pers: 1, sw: '1.0', swVer: 0x0100 });
+    rdmScan = { busy: false, stage: 0, found: 0, scanned: false, at: 0 }; quiet = new Set(); json({ ok: true });
   } else if (url.pathname === '/ws/stats.json') {
     json(wsStats);
   } else if (url.pathname === '/ws/test' && req.method === 'POST') {

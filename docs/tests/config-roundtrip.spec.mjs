@@ -34,7 +34,7 @@ function fullForm(info, flips = {}) {
   const f = {
     hostname: info.hostname,
     artshort: info.artShort || '', artlong: info.artLong || '',   // Art-Net node names (issue #129)
-    otapw: info.otapw,
+    otapw: info.otapw ?? '',   // (the box no longer sends it back: empty keeps it)
     protocol: String(info.protocol),
     ledtype: String(info.ledType), ledpin: String(info.ledPin),
     ledr: String(info.ledR), ledg: String(info.ledG), ledy: String(info.ledY),
