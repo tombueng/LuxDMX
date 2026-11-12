@@ -12,7 +12,7 @@ import { EFFECT_MAP, hsv, paramsOf } from './engine/effects';
 import { pictureOf } from './engine/custom';
 import { isGated, isHeld, isKinetic, isMachine, listRisk } from './model/safety';
 import { machines } from './ui/risk';
-import { addStandardPresets } from './content/presets';
+import { addStandardPresets, standardPresets } from './content/presets';
 import { buskingPage, isMachineList } from './content/busking';
 import { fromQxw, type QxwReport } from './import/qxw';
 import { toQxw } from './export/qxw';
@@ -856,14 +856,24 @@ class App {
     return out;
   }
   async refreshShows() { try { this.shows = await listShows(); } catch { this.shows = []; } }
+  // A show with nothing in it (the blank one a first start makes, a "New blank show" never used):
+  // left for another one, it goes, rather than sitting in the list as an empty "New show".
+  private isBlank(): boolean {
+    const s = this.show, std = new Set(standardPresets(emptyShow()).map((p) => p.id));
+    return !s.fixtures.length && !s.groups.length && !s.effects.length && !s.pages.length && !s.outputs.devices.length
+      && s.cueLists.every((l) => !l.cues.length) && s.presets.every((p) => std.has(p.id)) && !s.timeline?.items?.length && !s.timeline?.audio
+      && !s.setlist && s.meta.name === emptyShow().meta.name;
+  }
   async openShow(id: string) {
-    this.checkpoint();                         // the last edits of the open show first
+    const blank = id !== this.showId && this.isBlank() ? this.showId : '';
+    if (!blank) this.checkpoint();             // the last edits of the open show first
     const text = await readShow(id);
     if (!text) throw new Error('that show is gone');
     const notes: string[] = [];
     const s = parseShow(text, notes);          // throws (and nothing changes) if it can't be read
     this.replaceShow(s);
     this.setShowId(id);
+    if (blank) { await dbDelete(blank).catch(() => {}); await this.refreshShows(); }
     this.setLocal(text);
     this.sayRepaired(notes);
   }
@@ -874,10 +884,12 @@ class App {
   }
   // Save the current show first, then switch to a fresh one (blank or from a template).
   async startShow(s: Show, saveCurrent = true) {
-    if (saveCurrent) this.checkpoint(); else clearTimeout(this.dirtyTimer);
+    const blank = this.isBlank() ? this.showId : '';
+    if (saveCurrent && !blank) this.checkpoint(); else clearTimeout(this.dirtyTimer);
     this.replaceShow(s);
     this.setShowId(newId('s'));
     await this.persist(this.lastSnap);
+    if (blank) { await dbDelete(blank).catch(() => {}); await this.refreshShows(); }
   }
   private setShowId(id: string) {
     this.showId = id;

@@ -114,3 +114,24 @@ test('renaming the open show from the manager renames it in the top bar', async 
   await manager(page).getByLabel('Show name').press('Enter');
   await expect(page.locator('.top .show .name')).toHaveText('Garage gig');
 });
+
+test('the blank show a first start makes goes when a template or another show takes over; one with something in it stays', async ({ page }) => {
+  await fresh(page);
+  const manager = async () => { await page.locator('.top .show').click(); return page.getByRole('dialog', { name: 'Shows' }); };
+  // a template over the blank first show: the list has the template only
+  let dlg = await manager();
+  await dlg.getByRole('button', { name: /^Bar / }).click();
+  await expect(page.locator('.top .show .name')).toHaveText('Bar');
+  dlg = await manager();
+  await expect(dlg.getByRole('button', { name: 'New show', exact: true })).toHaveCount(0);
+  await expect(dlg.getByRole('button', { name: 'Bar', exact: true })).toHaveCount(1);
+  // a new blank show that gets a light: kept when another template comes
+  await dlg.getByRole('button', { name: 'New blank show' }).click();
+  await expect(page.locator('.top .show .name')).toHaveText('New show');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.fixtures.push({ id: 'k', name: 'Kept', typeId: 'gen-dimmer', mode: '', universe: 0, address: 1, x: 0.5, y: 0.5 }); a.checkpoint(); });
+  dlg = await manager();
+  await dlg.getByRole('button', { name: /^Church / }).click();
+  await expect(page.locator('.top .show .name')).toHaveText('Sunday service');
+  dlg = await manager();
+  await expect(dlg.getByRole('button', { name: 'New show', exact: true })).toHaveCount(1);
+});
