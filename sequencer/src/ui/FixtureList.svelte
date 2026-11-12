@@ -49,6 +49,11 @@
     for (const f of app.show.fixtures) for (const s of spansOf(f, app.modeOf(f.id))) u.set(s.universe, (u.get(s.universe) ?? 0) + s.count);
     return [...u.entries()].sort((a, b) => a[0] - b[0]);
   });
+  // (a big rig's many universes: one line saying how many and which are over-full, the chips on a
+  // click, so they never push the lights out of the list)
+  const MANY_UNIS = 4;
+  const overFull = $derived(usage.filter(([, n]) => n > 512).map(([u]) => u));
+  const usedChannels = $derived(usage.reduce((a, [, n]) => a + n, 0));
 
   let listEl = $state<HTMLElement>();
   // A light selected on the stage (2D or 3D; on a big rig often far down this list): the list scrolls
@@ -194,9 +199,20 @@
       {/each}
     </ul>
     <div class="usage">
-      {#each usage as [u, n] (u)}
-        <span class="chip" class:orange={n > 512} title="Channels used on universe {u}">U{u}: {n}/512</span>
-      {/each}
+      {#if usage.length <= MANY_UNIS}
+        {#each usage as [u, n] (u)}
+          <span class="chip" class:orange={n > 512} title="Channels used on universe {u}">U{u}: {n}/512</span>
+        {/each}
+      {:else}
+        <details class="many">
+          <summary title="Channels used on each universe">{usage.length} universes · {usedChannels.toLocaleString('en')} channels{#if overFull.length} · <span class="over">{overFull.map((u) => `U${u}`).join(', ')} over 512</span>{/if}</summary>
+          <div class="unis">
+            {#each usage as [u, n] (u)}
+              <span class="chip" class:orange={n > 512} title="Channels used on universe {u}">U{u}: {n}/512</span>
+            {/each}
+          </div>
+        </details>
+      {/if}
       <button class="ghost sm check" onclick={() => (ui.modal = 'patchCheck')} title="Light one fixture at a time to check the addresses in the room"><Icon name="sun" size={13} />Check the patch</button>
     </div>
   {/if}
@@ -222,6 +238,11 @@
   .check { margin-left: auto; font-size: .78rem; padding: .1rem .4rem; }
   .filter { width: 100%; padding: .3rem .5rem; font-size: .85rem; }
   .usage { display: flex; gap: .3rem; flex-wrap: wrap; align-items: center; }
+  .many { flex: 1; min-width: 0; font-size: .78rem; color: var(--muted); }
+  .many summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .many .over { color: var(--orange); }
+  .many .unis { display: flex; gap: .3rem; flex-wrap: wrap; max-height: 6.4rem; overflow: auto; margin-top: .3rem; }
+  .many[open] { flex-basis: 100%; }
   .empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .5rem; padding: 1.5rem .5rem; color: var(--muted); }
   .risk { font-size: .7rem; white-space: nowrap; }
   .risk.atmosphere { color: #9fb4c8; }

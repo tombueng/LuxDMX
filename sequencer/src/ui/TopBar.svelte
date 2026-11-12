@@ -180,20 +180,40 @@
 
 
 <style>
-  .top { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; background: var(--bg2); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  /* (one row on every screen: what doesn't fit gets shorter, the show's name first; a laptop's
+     1366 px with the arm button and a box connected still fits) */
+  .top { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; background: var(--bg2); border-bottom: 1px solid var(--line); flex-wrap: nowrap; min-width: 0; }
+  .top > :global(*) { flex-shrink: 0; }
   .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; white-space: nowrap; } .brand span { color: var(--green); }
   .alpha { font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1000; background: var(--orange); border-radius: 4px; padding: .05rem .3rem; vertical-align: .2em; }
-  .show { background: none; border-color: transparent; max-width: 280px; }
+  .show { background: none; border-color: transparent; max-width: 280px; min-width: 4.5rem; flex-shrink: 1 !important; overflow: hidden; }
   .show .name { overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
   .lockedname { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .6rem; color: var(--orange); }
   .lockedname .name { color: var(--text); }
-  .saved { font-size: .76rem; color: var(--green); } .saved.dirty { color: var(--muted); }
+  /* (as wide saving as saved: the bar doesn't jump every time the show is saved) */
+  .saved { font-size: .76rem; color: var(--green); display: inline-block; min-width: 2.7em; text-align: left; } .saved.dirty { color: var(--muted); }
   .modes { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
   .modes button { border: 0; background: none; border-radius: 999px; padding: .3rem .85rem; color: var(--muted); }
   .modes button.cur { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
   .modes button.tconsole { padding-inline: .55rem; }
   /* (its name only on a wide screen or while it's open: the bar stays one row on a laptop) */
-  @media (max-width: 1500px) { .modes button.tconsole:not(.cur) .lbl { display: none; } }
+  @media (max-width: 1500px) {
+    .modes button.tconsole:not(.cur) .lbl { display: none; }
+    .gm .lab, .bpm .lab { display: none; }
+    .show { max-width: 200px; }
+    .top { gap: .5rem; }
+  }
+  @media (max-width: 1380px) {
+    .modes button { padding-inline: .6rem; }
+    .alpha, .gm b { display: none; }
+    .gm input { width: 76px; }
+  }
+  @media (max-width: 1200px) {
+    .modes button { padding-inline: .45rem; }
+    .gm input { width: 64px; }
+    .top { gap: .4rem; }
+    .brand { display: none; }
+  }
   .gms { border-color: var(--orange); color: var(--orange); max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gm { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); } .gm input { width: 90px; } .gm b { width: 2.6rem; color: var(--text); font-size: .85rem; }
   .lab { color: var(--muted); font-size: .82rem; }

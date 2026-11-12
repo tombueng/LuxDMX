@@ -113,7 +113,7 @@
           </optgroup>
         </select>
       </label>
-      <p class="faint credit">{#if picked}{picked.title} by {picked.artist}: {GENRES[picked.genre]}, {Math.round(picked.bpm)} BPM, {clock(picked.duration)}, {picked.license}. Comes down from the artist's site first (a few MB).{:else}Builds, drops and breaks at 126 BPM, played by this page.{/if}</p>
+      <p class="faint credit">{#if picked}{picked.title} by {picked.artist}: {GENRES[picked.genre]}, {Math.round(picked.bpm)} BPM, {clock(picked.duration)}, {picked.license}. Comes down from the artist's site, or our copy of it (a few MB).{:else}Builds, drops and breaks at 126 BPM, played by this page.{/if}</p>
       {/if}
     </section>
 

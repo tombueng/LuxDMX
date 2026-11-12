@@ -37,10 +37,16 @@ function within<T>(p: Promise<T>, ms: number, giveUp: () => void): Promise<T> {
 // Our copies on the public site: the last place to try, wherever the app runs (on this computer
 // or another server, `songs/` next to it may not have them; GitHub Pages lets any page fetch them)
 export const PUBLIC_SONGS = 'https://tombueng.github.io/LuxDMX/sequencer/';
+// Sites that turn every browser away (no CORS, a 403 to any request from another site): asking
+// them first only costs time and a red line in the console, so their songs come from our copy.
+// The credit still links the artist's page. (Measured 2026-11-13: ccmixter.org, joshwoodward.com.)
+export const NO_BROWSERS = ['ccmixter.org', 'www.joshwoodward.com', 'joshwoodward.com'];
+const turnsAway = (u: string) => { try { return NO_BROWSERS.includes(new URL(u).hostname); } catch { return false; } };
 export async function downloadSong(s: CatalogSong, progress: (got: number, total: number) => void, signal?: AbortSignal, stallMs = STALL_MS): Promise<File> {
   const here = typeof location !== 'undefined' && s.mirror ? new URL(s.mirror, location.href).href : '';
   const pub = s.mirror ? new URL(s.mirror, PUBLIC_SONGS).href : '';
-  for (const url of [s.url, s.mirror, pub && pub !== here ? pub : ''].filter((u): u is string => !!u)) {
+  const artist = s.url && s.mirror && turnsAway(s.url) ? '' : s.url;
+  for (const url of [artist, s.mirror, pub && pub !== here ? pub : ''].filter((u): u is string => !!u)) {
     signal?.throwIfAborted();
     // this address's own stop: the person's Cancel, or this address going silent
     const ctl = new AbortController(), stop = () => ctl.abort();

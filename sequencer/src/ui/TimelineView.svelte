@@ -97,9 +97,17 @@
   const grid = $derived.by(() => {
     // (a tempo that isn't a sane number would loop for ever here: 120)
     const raw = tl?.bpm ?? app.show.settings.bpm, bpm = Number.isFinite(raw) && raw >= 20 && raw <= 300 ? raw : 120;
-    const beat = 60 / bpm, d = P.duration || tl?.duration || 240, out: { t: number; bar: boolean; n: number }[] = [];
+    const beat = 60 / bpm, d = P.duration || tl?.duration || 240, out: { t: number; bar: boolean; n: number; label: boolean }[] = [];
     const every = scale * beat < 6 ? (scale * beat * 4 < 14 ? 4 * Math.ceil(14 / (scale * beat * 4)) : 4) : 1;
-    for (let i = 0, t = tl?.offset ?? 0; t <= d; i += every, t = (tl?.offset ?? 0) + i * beat) out.push({ t, bar: i % 4 === 0, n: i / 4 + 1 });
+    // (the bar numbers as far apart as they need: "121" is wider than "9", so past bar 99 only
+    // every second or fourth bar is numbered where they'd run into each other)
+    const barStep = Math.max(1, every / 4), barPx = scale * beat * 4 * barStep;
+    const need = String(Math.max(1, Math.ceil(d / (beat * 4)))).length * 6.6 + 6;
+    const lab = barStep * ([1, 2, 4, 8, 16, 32].find((k) => barPx * k >= need) ?? 64);
+    for (let i = 0, t = tl?.offset ?? 0; t <= d; i += every, t = (tl?.offset ?? 0) + i * beat) {
+      const n = i / 4 + 1;
+      out.push({ t, bar: i % 4 === 0, n, label: i % 4 === 0 && (n - 1) % lab === 0 });
+    }
     return out;
   });
   // the song's parts: the demo beat's own, the ones a demo song came with, the ones found in a song
@@ -723,7 +731,7 @@
               <button class="span {a.cls}" style="left:{x(a.from)}px;width:{Math.max(6, x(a.to) - x(a.from) - 1)}px" onpointerdown={(e) => e.stopPropagation()} onclick={() => jump(a.from)}
                 title="{a.name}: {clockOf(a.from, false)} to {clockOf(a.to, false)}. Click to go there." aria-label="Go to {a.name} ({clockOf(a.from, false)})">{a.name}</button>
             {/each}
-            {#each grid as g (g.t)}<span class="tick" class:bar={g.bar} style="left:{x(g.t)}px">{#if g.bar}{g.n}{/if}</span>{/each}
+            {#each grid as g (g.t)}<span class="tick" class:bar={g.bar} style="left:{x(g.t)}px">{#if g.label}{g.n}{/if}</span>{/each}
             {#each sections as s, i (s.at)}
               <button class="sec" style="left:{x(s.at)}px;width:{Math.max(6, (s.end - s.at) * scale - 1)}px;--mix:{Math.round(8 + (s.energy ?? (i % 2 ? 0.25 : 0.5)) * 30)}%"
                 onpointerdown={(e) => e.stopPropagation()} onclick={() => jump(s.at)} ondblclick={() => renamePart(s.at)} oncontextmenu={(e) => partMenu(e, s)}
@@ -831,6 +839,13 @@
   .preview { min-height: 0; display: flex; overflow: hidden; }      /* (never over the transport) */
   .preview :global(.stage-wrap) { flex: 1; }
   .transport { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: .35rem .5rem; }
+  /* (one row on a laptop: the song's name gets shorter, then the volumes) */
+  @media (min-width: 1340px) {
+    .transport { flex-wrap: nowrap; min-width: 0; }
+    .transport > :global(*) { flex-shrink: 0; }
+    .transport > .name { flex-shrink: 1; min-width: 2rem; }
+  }
+  @media (min-width: 1340px) and (max-width: 1500px) { .vol input { width: 4.5rem; } }
   .play { min-width: 6.5rem; }
   .clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
   .bpm input { width: 4.2em; }

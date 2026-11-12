@@ -262,8 +262,8 @@ export async function loadPicture(file: Blob): Promise<Loaded> {
     // the browser scales a big photo down first (well, and fast), we take it from there
     const [cw, ch] = fitSize(bmp.width, bmp.height, 640, 640);
     let ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-    if (typeof OffscreenCanvas !== 'undefined') ctx = new OffscreenCanvas(cw, ch).getContext('2d');
-    else { const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; ctx = cv.getContext('2d'); }
+    if (typeof OffscreenCanvas !== 'undefined') ctx = new OffscreenCanvas(cw, ch).getContext('2d', { willReadFrequently: true });
+    else { const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; ctx = cv.getContext('2d', { willReadFrequently: true }); }
     from = { w: bmp.width, h: bmp.height, frames: 1 };
     if (!ctx) { bmp.close(); throw new PictureError('This browser can\'t read pictures'); }
     ctx.drawImage(bmp, 0, 0, cw, ch);

@@ -155,7 +155,7 @@
     const canvas = document.createElement('canvas');
     drawAtlas(canvas);
     // (a pattern that drew nothing: said by the tests, not hidden)
-    const c = canvas.getContext('2d')!, empty: string[] = [];
+    const c = canvas.getContext('2d', { willReadFrequently: true })!, empty: string[] = [];
     GOBOS.forEach((g, i) => {
       const d = c.getImageData((i % ATLAS_CELLS) * ATLAS_SIZE, Math.floor(i / ATLAS_CELLS) * ATLAS_SIZE, ATLAS_SIZE, ATLAS_SIZE).data;
       let lit = 0;
@@ -1189,7 +1189,9 @@
   // about 670; on a phone the click tools, Record and More about 270)
   // (the WebM note next to Record takes about 60 px more)
   // (wide: every tool on one row, the camera moves and the Haze/Glow/Ambient sliders too)
-  const tier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= 700 ? 'mid' : 'narrow');
+  // (mid needs room for the cameras, Select/Move/Turn/Aim, Venue, Record, Render and ⋯ in one row:
+  // ~780 px where you can edit, less where the stage is only watched)
+  const tier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= (readonly ? 700 : 790) ? 'mid' : 'narrow');
   let more = $state(false);
   let venueBtn = $state<HTMLButtonElement>(), moreBtn = $state<HTMLButtonElement>(), venueEl = $state<HTMLDivElement>();
   // (from More, which closes: the keys go on in the panel, not lost on the page)

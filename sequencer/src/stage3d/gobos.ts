@@ -264,7 +264,7 @@ export function drawGobo(c: CanvasRenderingContext2D, g: Gobo, size: number, see
 export function drawAtlas(canvas: HTMLCanvasElement | OffscreenCanvas): void {
   const n = ATLAS_CELLS, s = ATLAS_SIZE;
   canvas.width = canvas.height = n * s;
-  const c = canvas.getContext('2d') as CanvasRenderingContext2D;
+  const c = canvas.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
   c.fillStyle = '#000'; c.fillRect(0, 0, n * s, n * s);
   GOBOS.forEach((g, i) => { c.save(); c.translate((i % n) * s + s / 2, Math.floor(i / n) * s + s / 2); drawGobo(c, g, s, goboSeed(i)); c.restore(); });
 }
