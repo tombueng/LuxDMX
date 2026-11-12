@@ -342,9 +342,11 @@ bool importJson(const char* json, size_t len, String& err, int& applied) {
         }
         String e;
         if (!checkValue(m.key, m.text, e)) { bad = e; return false; }
-        // Same rule as the form: a blank hostname or password never wipes the stored one.
+        // A blank hostname never wipes the stored one (as on the form). A password is different here:
+        // a backup leaves passwords out unless they were asked for, so one that's in the file and
+        // empty means "none" (an open AP, no OTA password) and is restored as that.
         void* a; CfgKind kind; int32_t mn, mx; uint16_t flags;
-        if (resolve(m.key, a, kind, mn, mx, flags) && (flags & CFG_KEEPNE) && m.text.length() == 0) return true;
+        if (resolve(m.key, a, kind, mn, mx, flags) && (flags & CFG_KEEPNE) && !(flags & CFG_SECRET) && m.text.length() == 0) return true;
         pairs.push_back({m.key, m.text});
         return true;
     }, err);

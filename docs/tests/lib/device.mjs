@@ -43,7 +43,7 @@ export function configForm(snapshot, overrides = {}, outIdx = 1) {
     // which is what makes this helper a faithful round-trip either way.
     artshort: snapshot.artShort || '',
     artlong: snapshot.artLong || '',
-    otapw: snapshot.otapw,
+    otapw: snapshot.otapw ?? '',   // (the box no longer sends it back: empty keeps it)
     ledtype: String(snapshot.ledType),
     ledpin: String(snapshot.ledPin),
     ip: snapshot.sip || '',

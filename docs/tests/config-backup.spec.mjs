@@ -19,6 +19,7 @@ import {
 } from './lib/net.mjs';
 import { info, dmx, pollFor, universes } from './lib/device.mjs';
 import { openConfig } from './lib/ui.mjs';
+import { otaLogin, otaInvite } from './lib/ota-auth.mjs';
 
 const WRITE = process.env.LUXDMX_WRITE === '1';
 function skipUnlessWrite() { test.skip(!WRITE, 'device-mutating: set LUXDMX_WRITE=1 to run'); }
@@ -35,6 +36,11 @@ async function importCfg(request, body, force = false) {
   });
   let j = {}; try { j = await r.json(); } catch {}
   return { status: r.status(), j };
+}
+// after an OTA login that was taken, the box looks for the firmware for a few seconds, then gives up
+async function settleAfterOta(request) {
+  await sleep(1500);
+  for (let i = 0; i < 40; i++) { try { await info(request); return; } catch { await sleep(500); } }
 }
 async function uptimeSec(request) {
   const m = /(\d+)d (\d+):(\d+):(\d+)/.exec((await dmx(request)).up);
@@ -100,7 +106,145 @@ test.describe('Config backup and restore (issue #108)', () => {
     const f = await exportCfg(request, true);
     expect(f.secrets).toBe(true);
     for (const s of ['otapw', 'wifipsk', 'appw']) expect(s in f.config, `${s} included`).toBe(true);
-    expect(f.config.otapw).toBe((await info(request)).otapw);
+    expect(typeof f.config.otapw).toBe('string');
+    // (the backup asked for with passwords is the only place the OTA password comes out)
+    const d = await info(request);
+    expect(d.otapwSet).toBe(f.config.otapw.length > 0);
+  });
+
+  test('/info.json and the settings page never give the OTA or AP password away', async ({ page, request }) => {
+    const d = await info(request);
+    expect('otapw' in d, 'no otapw in /info.json').toBe(false);
+    expect('apPassword' in d, 'no apPassword in /info.json').toBe(false);
+    expect(typeof d.otapwSet).toBe('boolean');
+    expect(typeof d.apPwSet).toBe('boolean');
+    expect(typeof d.apPwOk).toBe('boolean');
+    const ap = (await exportCfg(request, true)).config.appw;
+    if (ap) expect((await (await request.get('/info.json')).text()).includes(`"${ap}"`), 'the AP password nowhere in /info.json').toBe(false);
+    const pw = (await exportCfg(request, true)).config.otapw;
+    const raw = await (await request.get('/info.json')).text();
+    if (pw) expect(raw.includes(`"${pw}"`), 'the password nowhere in /info.json').toBe(false);
+    await openConfig(page);
+    await expect(page.locator('#dev-otapw')).toHaveValue('');
+    await expect(page.locator('#dev-otapw')).toHaveAttribute('type', 'password');
+    if (pw) await expect(page.locator('#dev-otapw')).toHaveAttribute('placeholder', /leave empty to keep it/);
+  });
+
+  // The page never shows the password, so an empty field keeps it; the "Remove the password" box
+  // is how it goes. Set one, keep it with an empty field, take it away, then the original back.
+  test('the OTA password: set, kept by an empty field, removed by its box', async ({ page, request }) => {
+    skipUnlessWrite();
+    const orig = (await exportCfg(request, true)).config.otapw ?? '';
+    const save = async (fill, clear = false) => {
+      const want = await info(request);
+      await openConfig(page);
+      await expect.poll(async () => page.locator('#dev-host').inputValue(), { timeout: 15_000 }).toBe(want.hostname);
+      if (fill !== null) await page.locator('#dev-otapw').fill(fill);
+      if (clear) await page.locator('#dev-otapwclear').check();
+      // (done when the box has answered the save, not after a guessed wait)
+      await Promise.all([page.waitForResponse((r) => r.url().endsWith('/config') && r.request().method() === 'POST', { timeout: 15_000 }), page.click('#save-btn')]);
+      await page.waitForTimeout(300);
+    };
+    try {
+      await save('e2e-pw-1');
+      expect((await info(request)).otapwSet).toBe(true);
+      expect((await exportCfg(request, true)).config.otapw).toBe('e2e-pw-1');
+      // it counts at once, no restart: ArduinoOTA's own login takes the new one, not a wrong one
+      const host = await deviceHost();
+      expect(await otaLogin(host, 'not-it')).toBe('refused');
+      expect(await otaLogin(host, 'e2e-pw-1')).toBe('ok');
+      await settleAfterOta(request);
+      // a login left half-way (asked for, never answered) holds ArduinoOTA where it takes no new
+      // password: a change made then still counts once something ends the wait
+      expect(await otaInvite(host)).toMatch(/^AUTH /);
+      await save('e2e-pw-2');
+      expect(await otaInvite(host)).toBeNull();                    // (ends the wait, isn't answered)
+      await sleep(2500);
+      expect(await otaLogin(host, 'e2e-pw-1')).toBe('refused');
+      expect(await otaLogin(host, 'e2e-pw-2')).toBe('ok');
+      await settleAfterOta(request);
+      await save('');                                              // empty: kept
+      expect((await exportCfg(request, true)).config.otapw).toBe('e2e-pw-2');
+      await openConfig(page);
+      await expect(page.locator('#dev-otapwclear')).toBeVisible();
+      await save(null, true);                                      // the box: gone
+      expect((await info(request)).otapwSet).toBe(false);
+      // (ArduinoOTA keeps asking, for an empty one: the old one isn't taken any more)
+      expect(await otaLogin(host, 'e2e-pw-2')).not.toBe('ok');
+      expect((await exportCfg(request, true)).config.otapw ?? '').toBe('');
+      await openConfig(page);
+      await expect(page.locator('#dev-otapwclear')).toBeHidden();  // (nothing to remove)
+    } finally {
+      // (back as it was: its password, or none)
+      await save(orig || null, !orig);
+      expect((await exportCfg(request, true)).config.otapw ?? '').toBe(orig);
+    }
+  });
+
+  // The AP password the same way: the page never shows it, an empty field keeps it, "Open network"
+  // takes it away. A wired box doesn't run its AP, so nothing restarts or drops off the network.
+  test('the AP password: set, kept by an empty field, opened by its box', async ({ page, request }) => {
+    skipUnlessWrite();
+    const orig = (await exportCfg(request, true)).config.appw ?? '';
+    const save = async (fill, open = false) => {
+      const want = await info(request);
+      await openConfig(page);
+      await expect.poll(async () => page.locator('#dev-host').inputValue(), { timeout: 15_000 }).toBe(want.hostname);
+      // (the field sits in a row shown for AP modes only: set on the real, named input)
+      if (fill !== null) await page.locator('#ap-pw').evaluate((el, v) => { el.value = v; }, fill);
+      if (open) await page.locator('#ap-open').evaluate((el) => { el.checked = true; });
+      // (done when the box has answered the save, not after a guessed wait)
+      // (a changed AP password restarts the box to take it: then wait for it to come back)
+      const [resp] = await Promise.all([page.waitForResponse((r) => r.url().endsWith('/config') && r.request().method() === 'POST', { timeout: 15_000 }), page.click('#save-btn')]);
+      if ((await resp.json().catch(() => ({}))).reboot) await waitRestart(request);
+      await page.waitForTimeout(300);
+    };
+    try {
+      await save('e2e-ap-pass-1');
+      expect((await info(request)).apPwSet).toBe(true);
+      expect((await exportCfg(request, true)).config.appw).toBe('e2e-ap-pass-1');
+      await openConfig(page);
+      await expect(page.locator('#ap-pw')).toHaveValue('');
+      await save('');                                              // empty: kept
+      expect((await exportCfg(request, true)).config.appw).toBe('e2e-ap-pass-1');
+      await save('short7c');                                       // under 8 (no WPA2): not taken
+      expect((await exportCfg(request, true)).config.appw).toBe('e2e-ap-pass-1');
+      await save('x'.repeat(64));                                  // over 63: not taken either
+      expect((await exportCfg(request, true)).config.appw).toBe('e2e-ap-pass-1');
+      expect((await info(request)).apPwOk).toBe(true);
+      await save('e2e-new-pass', true);                            // typed in and the box: the new one wins
+      expect((await exportCfg(request, true)).config.appw).toBe('e2e-new-pass');
+      await save(null, true);                                      // the box: an open network
+      expect((await info(request)).apPwSet).toBe(false);
+      expect((await exportCfg(request, true)).config.appw ?? '').toBe('');
+    } finally {
+      // (back as it was: its password, or an open network)
+      await save(orig || null, !orig);
+      expect((await exportCfg(request, true)).config.appw ?? '').toBe(orig);
+    }
+  });
+
+  test('a backup with an empty password restores it empty (no password), one without passwords keeps them', async ({ request }) => {
+    skipUnlessWrite();
+    const before = await exportCfg(request, true);
+    try {
+      // a password set, then a file with it empty: none again
+      let r = await importCfg(request, { ...before, config: { ...before.config, appw: 'e2e-import-pw' } });
+      expect(r.status).toBe(200); await waitRestart(request);
+      expect((await exportCfg(request, true)).config.appw).toBe('e2e-import-pw');
+      r = await importCfg(request, { ...before, config: { ...before.config, appw: '' } });
+      expect(r.status).toBe(200); await waitRestart(request);
+      expect((await exportCfg(request, true)).config.appw ?? '').toBe('');
+      // a backup made without passwords leaves them as they are
+      await importCfg(request, { ...before, config: { ...before.config, appw: 'e2e-import-pw' } }); await waitRestart(request);
+      const plain = await exportCfg(request, false);
+      expect('appw' in plain.config).toBe(false);
+      r = await importCfg(request, plain); expect(r.status).toBe(200); await waitRestart(request);
+      expect((await exportCfg(request, true)).config.appw).toBe('e2e-import-pw');
+    } finally {
+      await importCfg(request, before); await waitRestart(request);
+      expect((await exportCfg(request, true)).config).toEqual(before.config);
+    }
   });
 
   test('/config offers the download, and it is the same file', async ({ page, request }) => {

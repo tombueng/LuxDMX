@@ -38,7 +38,7 @@ function configForm(info, o1Overrides = {}) {
   const f = {
     protocol: String(info.protocol),
     hostname: info.hostname,
-    otapw: info.otapw,
+    otapw: info.otapw ?? '',   // (the box no longer sends it back: empty keeps it)
     ledtype: String(info.ledType),
     ledpin: String(info.ledPin),
     ip: info.sip || '',

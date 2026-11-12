@@ -37,7 +37,7 @@ function configForm(snap, o0Overrides = {}) {
   const f = {
     protocol: String(snap.protocol),
     hostname: snap.hostname,
-    otapw: snap.otapw,
+    otapw: snap.otapw ?? '',   // (the box no longer sends it back: empty keeps it)
     ledtype: String(snap.ledType),
     ledpin: String(snap.ledPin),
     ip: snap.sip || '', gateway: snap.gateway || '',

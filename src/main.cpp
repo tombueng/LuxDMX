@@ -3104,7 +3104,8 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "\"version\":\"";  j += FIRMWARE_VERSION;       j += "\",";
     j += "\"reset\":\"";    j += resetWhy();             j += "\",";   // why it last started
     j += "\"uptime\":";      j += (uint32_t)(esp_timer_get_time() / 1000000ULL); j += ",";   // seconds since then
-    j += "\"otapw\":\"";    j += cfg.otaPassword;        j += "\",";
+    // (the OTA password itself never leaves the box, like the WiFi passwords: only whether there is one)
+    j += "\"otapwSet\":";    j += cfg.otaPassword.length() ? "true" : "false"; j += ",";
     j += "\"universe\":";   j += cfg.outputs[0].universe; j += ",";   // legacy/back-compat
     j += "\"protocol\":";   j += cfg.protocol;           j += ",";
     j += "\"ledType\":";    j += cfg.ledType;            j += ",";
@@ -3226,7 +3227,8 @@ static void handleInfoJson(AsyncWebServerRequest* req) {
     j += "],\"wifiSlot\":"; j += (!g_useEth && !g_apMode && WiFi.status() == WL_CONNECTED) ? g_wifiSlot : -1; j += ",";
     j += "\"apFallback\":"; j += cfg.apFallback ? "true" : "false"; j += ",";
     j += "\"linkLossMode\":"; j += cfg.linkLossMode;          j += ",";   // WIRED_FB_*
-    j += "\"apPassword\":\""; j += cfg.apPassword;       j += "\",";
+    j += "\"apPwSet\":";   j += cfg.apPassword.length() ? "true" : "false"; j += ",";   // (whether one is stored: never the password)
+    j += "\"apPwOk\":";    j += (cfg.apPassword.length() >= 8 && cfg.apPassword.length() <= 63) ? "true" : "false"; j += ",";   // (and it's one WPA2 takes: 8 to 63)
     j += "\"staticIp\":";   j += cfg.staticIp ? "true" : "false"; j += ",";
     j += "\"ipProg\":";     j += cfg.ipProg ? "true" : "false";   j += ",";   // Art-Net ArtIpProg remote IP config (default off)
     j += "\"sip\":\"";      j += cfg.ip;                 j += "\",";
@@ -3679,6 +3681,8 @@ struct CfgSnapshot {
     }
 };
 
+static String g_otaPwApplied;   // the OTA password ArduinoOTA should have (set at boot, then on a change)
+static volatile bool g_otaPwPending = false;   // a changed one waits for the loop
 static void handleConfigPost(AsyncWebServerRequest* req) {
     String s, e;
     static CfgSnapshot before;   // static: ~2 KB of hashes is still too much for the async task's stack
@@ -3710,9 +3714,20 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
             cfgcore::setValue(f.key, formChecked(req, f.key) ? "1" : "0", e);
         } else if (argStr(req, f.key, s)) {
             if ((f.flags & CFG_KEEPNE) && s.length() == 0) continue;
+            // (an AP password is 8 or more for WPA2: 1 to 7 would come up as an open network that
+            // looks protected, and keep the wired box's fallback AP from starting. Kept as it was.)
+            if (strcmp(f.key, "appw") == 0 && (s.length() < 8 || s.length() > 63)) continue;
             cfgcore::setValue(f.key, s, e);
         }
     }
+    // (a blank password field keeps the password; this box is how to take it away)
+    // (the boxes only with the field left empty: a new password typed in is what's meant)
+    String typed;
+    if (formChecked(req, "otapwclear") && !(argStr(req, "otapw", typed) && typed.length())) cfgcore::setValue("otapw", "", e);
+    if (formChecked(req, "apopen") && !(argStr(req, "appw", typed) && typed.length())) cfgcore::setValue("appw", "", e);    // (an open AP: a blank field keeps the password)
+    // a new OTA password (or none) counts now, not after a restart: handed to the loop, which
+    // runs ArduinoOTA (never swapped under an upload that's logging in)
+    g_otaPwPending = true;   // (the loop compares and applies: only it touches what ArduinoOTA has)
     for (int i = 0; i < MAX_OUTPUTS; i++) {
         const int styleWas = cfg.outputs[i].txStyle;
         for (size_t k = 0; k < OUTPUT_FIELD_COUNT; k++) {
@@ -4022,7 +4037,8 @@ static void handleSetupPost(AsyncWebServerRequest* req) {
     String title, msg, url, urlLabel, hint;
     if (mode == "ap") {
         cfg.wifiMode  = NET_WIFI_AP;
-        if (argStr(req, "appw", pw)) cfg.apPassword = pw;   // empty = open AP, >=8 = WPA2
+        // empty = open AP, 8 to 63 = WPA2; anything else isn't one WPA2 takes: the AP stays open, said
+        if (argStr(req, "appw", pw)) cfg.apPassword = (pw.length() >= 8 && pw.length() <= 63) ? pw : String("");
         title    = "Access point ready";
         msg      = "LuxDMX is restarting as its own WiFi network \"" + htmlEsc(cfg.hostname) +
                    "\". Join that network on this device, then open:";
@@ -4704,11 +4720,13 @@ static void pixInitGuardEnd() {
 static void initOTA() {
     ArduinoOTA.setHostname(cfg.hostname.c_str());
     ArduinoOTA.setPassword(cfg.otaPassword.c_str());
+    g_otaPwApplied = cfg.otaPassword;
     ArduinoOTA.onStart([]() { dmxReady = false; Serial.println("[OTA] start"); });
     ArduinoOTA.onEnd([]()   { Serial.println("[OTA] done"); });
     ArduinoOTA.onError([](ota_error_t e) { dmxReady = true; Serial.printf("[OTA] error[%u]\n", e); });
     ArduinoOTA.begin();
-    Serial.printf("[OTA] %s.local pw:%s\n", cfg.hostname.c_str(), cfg.otaPassword.c_str());
+    // (the password itself stays in the box: whether there is one is enough for the log)
+    Serial.printf("[OTA] %s.local pw:%s\n", cfg.hostname.c_str(), cfg.otaPassword.length() ? "set" : "none");
 }
 
 // ---------------------------------------------------------------------------
@@ -6043,6 +6061,14 @@ static void netRxTask(void*) {
             if (cfg.protocol != 0) readSacn();
         }
         wsDmxDrain();   // frames a browser sent over /ws (the sequencer bridge)
+        // (a new OTA password from the settings page: taken here, between two handle()s. ArduinoOTA
+        // only takes one while it's idle, not while a login it was asked for waits for its answer,
+        // so it's handed over again every 2 s: a change counts once ArduinoOTA is idle again)
+        {
+            static uint32_t otaPwAt = 0;
+            if (g_otaPwPending) { g_otaPwPending = false; g_otaPwApplied = cfg.otaPassword; otaPwAt = 0; }
+            if (otaPwAt == 0 || millis() - otaPwAt >= 2000) { otaPwAt = millis() | 1; ArduinoOTA.setPassword(g_otaPwApplied.c_str()); }
+        }
         ArduinoOTA.handle();
 
         uint32_t now = millis();

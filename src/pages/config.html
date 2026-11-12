@@ -197,8 +197,12 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
         </div>
         <div id="ap-pw-row" class="mb-3" style="display:none">
           <label class="form-label text-secondary small mb-1">AP password</label>
-          <input class="form-control" type="text" name="appw" id="ap-pw" value="" placeholder="(open network)">
-          <div class="form-text">The AP broadcasts the hostname below as its SSID. 8 or more characters enables WPA2; leave empty for an open network.</div>
+          <input class="form-control" type="password" name="appw" id="ap-pw" value="" placeholder="(open network)" autocomplete="new-password" minlength="8" maxlength="63">
+          <div class="form-check mt-1" id="ap-open-row" style="display:none">
+            <input class="form-check-input" type="checkbox" name="apopen" id="ap-open" value="1">
+            <label class="form-check-label small" for="ap-open">Open network (remove the password)</label>
+          </div>
+          <div class="form-text">The AP broadcasts the hostname below as its SSID. 8 to 63 characters (WPA2; a shorter one isn't taken). The box never shows the password: leave the field empty to keep it.</div>
         </div>
         <div id="ap-fb-row" class="mb-3" style="display:none">
           <label class="form-label text-secondary small mb-1">If the wired Ethernet link is down</label>
@@ -875,11 +879,15 @@ body { padding-bottom:5rem; }   /* keep page content clear of the fixed bar */
         </div>
         <div class="mb-3">
           <label class="form-label text-secondary small mb-1">OTA Password</label>
-          <input class="form-control" type="text" name="otapw" id="dev-otapw" maxlength="32" value="">
+          <input class="form-control" type="password" name="otapw" id="dev-otapw" maxlength="32" value="" autocomplete="new-password">
+          <div class="form-check mt-1" id="dev-otapwclear-row" style="display:none">
+            <input class="form-check-input" type="checkbox" name="otapwclear" id="dev-otapwclear" value="1">
+            <label class="form-check-label small" for="dev-otapwclear">Remove the password (OTA without one)</label>
+          </div>
           <div class="form-text text-secondary small">
             Only used for network OTA from the Arduino IDE / PlatformIO
             (<code>upload_protocol = espota</code>). The browser "Firmware Update" below
-            does not use it.
+            does not use it. The box never shows it: leave the field empty to keep it.
           </div>
         </div>
         <!-- Save lives in the fixed #save-bar at the bottom of the page -->
@@ -1422,7 +1430,15 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   });
   $('wifi-order').value = '0,1,2,3';
   wifiMarkActive(d.wifiSlot);
-  $('ap-pw').value = d.apPassword || '';
+  $('ap-pw').value = '';
+  $('ap-pw').placeholder = d.apPwSet ? (d.apPwOk === false ? '(not 8 to 63 characters: the AP can\'t use it; type a new one)' : '(set: leave empty to keep it)') : '(open network)';
+  $('ap-open').checked = false;
+  $('ap-open-row').style.display = d.apPwSet ? '' : 'none';
+  // (a new password typed in and "remove it" can't both be meant: the last one done wins)
+  $('ap-pw').oninput = function () { if (this.value) $('ap-open').checked = false; };
+  $('ap-open').onchange = function () { if (this.checked) $('ap-pw').value = ''; };
+  $('dev-otapw').oninput = function () { if (this.value) $('dev-otapwclear').checked = false; };
+  $('dev-otapwclear').onchange = function () { if (this.checked) $('dev-otapw').value = ''; };
   $('fb-mode').value = String(d.linkLossMode !== undefined ? d.linkLossMode : (d.apFallback ? 1 : 0));
   $('static-sw').checked = !!d.staticIp;
   $('ipprog-sw').checked = !!d.ipProg;
@@ -1500,7 +1516,11 @@ fetch('/info.json').then(function(r){ return r.json(); }).then(function(d){
   // Empty means "use the hostname" -- show that as the placeholder so the field doesn't look unset.
   $('dev-artshort').placeholder = d.hostname || 'LuxDMX';
   $('dev-artlong').placeholder  = d.hostname || 'LuxDMX Art-Net / sACN DMX gateway';
-  $('dev-otapw').value = d.otapw || '';
+  // (the box never sends the OTA password back: an empty field keeps it, a new one replaces it)
+  $('dev-otapw').value = '';
+  $('dev-otapw').placeholder = d.otapwSet ? '(set: leave empty to keep it)' : '(none)';
+  $('dev-otapwclear').checked = false;
+  $('dev-otapwclear-row').style.display = d.otapwSet ? '' : 'none';
   $('auto-update-sw').checked = !!d.autoUpdate;
   updNetMode(); updLedPin(); updDispPins(); updHostUrl(); updSummaries();
   $('save-btn').disabled = false;

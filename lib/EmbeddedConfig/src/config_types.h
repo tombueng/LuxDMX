@@ -24,7 +24,7 @@ enum CfgFlags : uint16_t {
     CFG_LIVE     = 1 << 5,  // applies the instant it is saved (no reboot, nothing to re-init)
     CFG_READONLY = 1 << 2,  // shown but not settable (runtime/derived)
     CFG_NOWEB    = 1 << 3,  // not part of the /config form (has its own route)
-    CFG_KEEPNE   = 1 << 4,  // a blank web field is ignored, never blanks the value (hostname/otapw)
+    CFG_KEEPNE   = 1 << 4,  // a blank web field is ignored, never blanks the value (hostname/otapw/appw)
 };
 
 // A root (scalar) config field. `offset` is offsetof(Config, member); the engine
