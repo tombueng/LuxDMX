@@ -151,9 +151,9 @@
   </div>
   {#if !count}<p class="err">Nothing to run it on: close this, select lights on the stage (or make a group), then come back.</p>{/if}
 
+  <!-- (a ring or a matrix among them: their pictures first; else last, after what suits these lights) -->
   {#if shaped}{@render shapes()}{@render addonCards()}{/if}
   {#each cats as cat (cat)}
-    {#if cat === 'pixel' && !shaped}{@render shapes()}{@render addonCards()}{/if}
     <h2>{CATEGORY_LABEL[cat]}</h2>
     <p class="hint">{CAT_HINT[cat]}{cat === 'move' && count && !movers ? ' (None of these lights can move.)' : ''}</p>
     <div class="cards">
@@ -166,6 +166,7 @@
       {/each}
     </div>
   {/each}
+  {#if !shaped}{@render shapes()}{@render addonCards()}{/if}
 </Modal>
 
 <style>

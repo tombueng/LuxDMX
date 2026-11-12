@@ -31,7 +31,26 @@
     'gen-hazer': 'Haze and fan.',
     'gen-mover8': 'Pan, tilt, dimmer, RGB, strobe, speed.',
     'gen-mover16': 'Fine pan/tilt for smooth moves, RGBW.',
+    'gen-drgbsms': 'Dimmer, RGB, strobe, a built-in mode and its speed.',
+    'gen-drgbwsms': 'Dimmer, RGBW, strobe, a built-in mode and its speed.',
+    'gen-haze1': 'One channel: haze output.',
+    'gen-blinder2': 'Two lamps on one dimmer: the audience blinder.',
+    'gen-confetti': 'Fires once. Only while the machines are armed.',
+    'gen-bubbles': 'Bubbles and the fan that blows them.',
+    'gen-flame': 'Fires a flame. Only while the machines are armed.',
+    'gen-sparks': 'Cold sparks. Only while the machines are armed.',
+    'gen-co2': 'A CO2 jet. Only while the machines are armed.',
+    'gen-wash': 'An RGBW wash with zoom, 16-bit pan and tilt.',
+    'gen-spotgobo': 'Gobos turning either way, a prism, zoom, focus.',
+    'gen-endless': 'Pan and tilt that turn round and round.',
+    'gen-roll': 'A third axis: the head turns round its own beam.',
+    'gen-headbar4': 'Four heads in a row, each tilting on its own.',
+    'gen-winch': 'Height, speed, motion enable: moves only while armed.',
+    'gen-profile': 'Two gobo wheels, animation wheel, prisms, iris, frost.',
   };
+  // (a pixel strip: what its pixels are and how many channels each takes)
+  const stripBlurb = (t: FixtureType) => (t.id.startsWith('gen-strip') ? `One light, ${t.id.endsWith('w') ? '4 channels a pixel (RGBW)' : '3 channels a pixel (RGB)'}, drawn cell by cell.`
+    : t.id.startsWith('gen-bar') ? 'A batten of RGB cells: one colour each, or chases along it.' : undefined);
   let typeId = $state('gen-drgb');
   let count = $state(4), universe = $state(0), name = $state('PAR'), mode = $state('');
   let address = $state<number | null>(null);   // empty = next free
@@ -140,7 +159,7 @@
           <button class="tcard" class:cur={t.id === typeId} onclick={() => pick(t.id)} title={KIND_LABEL[k]} data-type={t.id}>
             <span class="ti"><Icon name={k} size={22} /></span>
             <span class="tt"><b>{t.source === 'generic' ? t.model : typeLabel(t)}</b>
-              <span class="faint">{BLURB[t.id] ?? shapeBlurb(t) ?? `${t.modes.length} mode${t.modes.length > 1 ? 's' : ''}, from ${t.source === 'ofl' ? 'the Open Fixture Library' : t.source === 'qxf' ? 'QLC+' : t.source === 'gdtf' ? 'GDTF' : t.source === 'generic' ? 'the built-in ones' : 'you'}`}</span></span>
+              <span class="faint">{BLURB[t.id] ?? shapeBlurb(t) ?? stripBlurb(t) ?? `${t.modes.length} mode${t.modes.length > 1 ? 's' : ''}, from ${t.source === 'ofl' ? 'the Open Fixture Library' : t.source === 'qxf' ? 'QLC+' : t.source === 'gdtf' ? 'GDTF' : t.source === 'generic' ? 'the built-in ones' : 'you'}`}</span></span>
             <span class="side2">
               <span class="chip">{modeOf(t, '')?.channels.length} ch</span>
               <span class="dots">{#each dots(t) as [c, title] (title)}<span class="dot" style="background:{c}" {title}></span>{/each}</span>
@@ -163,10 +182,6 @@
         <input type="file" accept=".gdtf,.qxf,.json" bind:this={fileInput} onchange={file} hidden />
       </div>
       <p class="hint">Not sure? Look at the channel table in the manual: "CH1 dimmer, CH2 red…" tells you which of these it is.</p>
-      <h3 class="mh">LED rings and matrices <span class="faint">(WS2812: one light with a shape)</span></h3>
-      <div class="types shapes">
-        {#each shapeTypes as t (t.id)}{@render typeCard(t)}{/each}
-      </div>
       {#if mine.length}
         <h3 class="mh">My fixtures <span class="faint">(made or imported before, kept in this browser)</span></h3>
         <div class="types mine">
@@ -184,9 +199,14 @@
           {/each}
         </div>
       {/if}
-      <h3 class="mh">{mine.length ? "Generic and this show's" : 'Everything else'}</h3>
+      <!-- (the usual lights first: dimmers, PARs, heads; the pixel rings and matrices after them) -->
+      <h3 class="mh">{mine.length ? "Generic and this show's" : 'Generic lights'} <span class="faint">(PARs, dimmers, heads, bars, machines)</span></h3>
       <div class="types">
         {#each shownTypes as t (t.id)}{@render typeCard(t)}{/each}
+      </div>
+      <h3 class="mh">LED rings and matrices <span class="faint">(WS2812: one light with a shape)</span></h3>
+      <div class="types shapes">
+        {#each shapeTypes as t (t.id)}{@render typeCard(t)}{/each}
       </div>
     </div>
     <!-- svelte-ignore a11y_no_static_element_interactions (Enter in any of its fields adds, as in a form) -->
@@ -232,24 +252,25 @@
 <style>
   .cols { display: grid; grid-template-columns: 1fr 240px; gap: 1rem; }
   .src { margin-bottom: .4rem; }
-  .types { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .4rem; margin-top: .4rem; max-height: 58vh; overflow: auto; }
+  /* (one scroll for the whole list, the dialog's; the Add panel stays in view beside it) */
+  .types { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .4rem; margin-top: .4rem; }
   .tcard { justify-content: flex-start; text-align: left; white-space: normal; padding: .45rem .5rem; gap: .5rem; align-items: flex-start; }
   .tcard.cur { border-color: var(--accent); background: #ffaa1c12; }
   .ti { color: var(--accent); margin-top: .1rem; }
   .tt { display: flex; flex-direction: column; flex: 1; }
-  .side { display: flex; flex-direction: column; gap: .45rem; }
+  .side { display: flex; flex-direction: column; gap: .45rem; position: sticky; top: 0; align-self: start; }
   .side label { display: flex; flex-direction: column; gap: .15rem; color: var(--muted); font-size: .85rem; }
   .big { padding: .55rem; }
   .mh { font-size: .8rem; margin: .6rem 0 .1rem; color: var(--text); font-weight: 600; }
   .types.mine { max-height: 22vh; }
-  .types.shapes { max-height: none; overflow: visible; }
+  .types.mine { overflow: auto; }
   .mywrap { position: relative; display: grid; }
   .forget { position: absolute; top: 2px; right: 2px; padding: .1rem; }
   .side2 { display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
   .dots { display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; max-width: 60px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid #0006; }
   /* Phones: the settings and the Add button first, the types below. */
-  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } .side { order: -1; } .types { max-height: 46vh; } }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } .side { order: -1; position: static; } }
   .link { padding: 0; color: var(--accent); text-decoration: underline; font-size: inherit; min-height: 0; min-width: 0; }
   .small { font-size: .78rem; margin: -.25rem 0 0; }
 </style>
