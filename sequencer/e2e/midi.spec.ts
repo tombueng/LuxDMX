@@ -86,3 +86,65 @@ test('unplugging the controller while a pad is held lets go of it', async ({ pag
   await page.evaluate(() => { const a = (window as any).__midiAccess; a.inputs.delete('in1'); a.onstatechange?.(); });
   await expect.poll(async () => Math.max(...(await channels(0, 24))), { timeout: 3000 }).toBe(0);
 });
+
+test('the console faders learn MIDI controls, and they work in every view', async ({ page }) => {
+  await openConnected(page);
+  const { patch } = await import('./helpers');
+  await patch(page, 'gen-drgb', 2, 0, 'PAR');                           // 1 at 1, 2 at 5
+  await page.getByRole('tab', { name: 'Console' }).click();
+  const con = page.locator('.console');
+  await con.getByRole('button', { name: 'MIDI', exact: true }).click();
+  // CC 8 on channel 1 -> PAR 1's level
+  await con.getByRole('button', { name: 'MIDI for PAR 1' }).click();
+  await expect(con.getByRole('button', { name: 'MIDI for PAR 1' })).toHaveText('…');
+  await send(page, [0xb0, 8, 0]);
+  await expect(con.getByRole('button', { name: 'MIDI for PAR 1' })).toHaveText('CC8');
+  await send(page, [0xb0, 8, 127]);
+  await expect.poll(async () => (await channels(0, 8))[0]).toBe(255);
+  // CC 7 -> the grand master, then from Program (another view) both still move
+  await con.getByRole('button', { name: 'MIDI for the grand master' }).click();
+  await send(page, [0xb0, 7, 127]);
+  await expect(con.getByRole('button', { name: 'MIDI for the grand master' })).toHaveText('CC7');
+  await page.getByRole('tab', { name: 'Program' }).click();
+  await send(page, [0xb0, 7, 64]);
+  await expect.poll(async () => (await channels(0, 8))[0]).toBe(129);                  // (64 of 127: just over half)
+  await send(page, [0xb0, 8, 0]);
+  await expect.poll(async () => (await channels(0, 8))[0]).toBe(0);
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.settings.consoleMidi.map((b: any) => [b.to.split(':')[0], b.midi.num]))).toEqual([['light', 8], ['grand', 7]]);
+  // the controller unplugged and back (or its bank changed): a fader far from the grand master
+  // doesn't jump it; once it passes where the master is, it moves it again
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.releaseMidi(); a.grandMaster = 0.5; });
+  await send(page, [0xb0, 7, 127]);
+  await send(page, [0xb0, 7, 90]);
+  expect(await page.evaluate(() => (window as any).__luxdmx.grandMaster)).toBe(0.5);
+  await send(page, [0xb0, 7, 50]);                                      // (crossed it)
+  expect(await page.evaluate(() => (window as any).__luxdmx.grandMaster)).toBeCloseTo(50 / 127, 3);
+  await send(page, [0xb0, 7, 127]);
+  // a pad on PAR 2's level is a flash: full while held, back when let go
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await con.getByRole('button', { name: 'MIDI for PAR 2' }).click();
+  await send(page, [0x90, 40, 100]);
+  await expect(con.getByRole('button', { name: 'MIDI for PAR 2' })).toHaveText('N40');
+  await send(page, [0x80, 40, 0]);
+  await expect.poll(async () => (await channels(0, 8))[4]).toBe(0);
+  await send(page, [0x90, 40, 100]);
+  await expect.poll(async () => (await channels(0, 8))[4]).toBe(255);
+  await send(page, [0x80, 40, 0]);
+  await expect.poll(async () => (await channels(0, 8))[4]).toBe(0);
+  // a control a live page's button had: learning it for the console says so
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.pages.push({ id: 'pg-m', name: 'Mine', widgets: [{ id: 'w-m', type: 'special', do: 'blackout', label: 'Kill it', midi: { kind: 'cc', ch: 1, num: 9 } }] }); });
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await con.getByRole('button', { name: 'MIDI for PAR 2' }).click();            // (it had the pad: let go of it first)
+  await expect(con.getByRole('button', { name: 'MIDI for PAR 2' })).toHaveText('Learn');
+  await con.getByRole('button', { name: 'MIDI for PAR 2' }).click();
+  await send(page, [0xb0, 9, 64]);
+  await expect(page.locator('.toast')).toContainText("It was on Kill it on a live page: that one doesn't answer it any more");
+  // and it really doesn't: the control pushed all the way, let go, no Blackout
+  await send(page, [0xb0, 9, 127]); await send(page, [0xb0, 9, 0]);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).__luxdmx.blackout)).toBe(false);
+  // its button again lets go of the control
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await con.getByRole('button', { name: 'MIDI for PAR 1' }).click();
+  await expect(con.getByRole('button', { name: 'MIDI for PAR 1' })).toHaveText('Learn');
+});

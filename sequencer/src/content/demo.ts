@@ -23,7 +23,7 @@ import type { BurstAttr, CrowdAction, CrowdItem, TimelineAction, TimelineItem } 
 import type { CatalogHit, CatalogSong } from '../timeline/catalog';
 import { DEMO_BPM, DEMO_SECONDS, sectionStarts } from '../timeline/beat';
 import { DECK, D, TRUSS, W, aimAt, defaultPlace, faceBand, worldToPlan, type V3 } from '../stage3d/geometry';
-import { Builder, C, gobo, on } from './templates';
+import { Builder, C, gobo, on, turn, profile, spotGobo, type Dress } from './templates';
 
 export const DEMO_NAME = 'We Are Not The Band: live';
 // seconds of show before the song starts and after it ends
@@ -52,8 +52,8 @@ export function buildDemo(song?: DemoSong) {
   const backWash = b.add('gen-wash', 8, 'Back wash', 0.13, { universe: 0, x0: 0.05, x1: 0.89 });
   const backBeam = b.add('gen-spotgobo', 8, 'Back beam', 0.13, { universe: 0, x0: 0.11, x1: 0.95 });
   const backStrobe = b.add('gen-strobe', 8, 'Back strobe', 0.13, { universe: 0, x0: 0.1, x1: 0.9 });
-  // the mid truss: twenty spots
-  const spot = b.add('gen-mover16', 20, 'Spot', 0.5, { universe: 1, x0: 0.04, x1: 0.96 });
+  // the mid truss: twenty profile spots (two gobo wheels, prisms, an animation wheel)
+  const spot = b.add('gen-profile', 20, 'Spot', 0.5, { universe: 1, x0: 0.04, x1: 0.96 });
   // the front truss: washes, blinders, strobes
   const frontWash = b.add('gen-wash', 16, 'Front wash', 0.88, { universe: 2, x0: 0.04, x1: 0.96 });
   const blinder = b.add('gen-blinder2', 12, 'Blinder', 0.88, { universe: 2, x0: 0.06, x1: 0.94 });
@@ -66,9 +66,9 @@ export function buildDemo(song?: DemoSong) {
   const floorHead = b.add('gen-mover8', 20, 'Floor head', 0.98, { universe: 14, x0: 0.02, x1: 0.98 });
   const beam = b.add('gen-spotgobo', 16, 'Beam', 0.08, { universe: 14, x0: 0.04, x1: 0.96 });
   // the towers and the side trusses
-  const towerHead = b.add('gen-mover16', 12, 'Tower head', 0.5, { universe: 15 });
+  const towerHead = b.add('gen-spotgobo', 12, 'Tower head', 0.5, { universe: 15 });
   const crowdBlinder = b.add('gen-blinder2', 8, 'Crowd blinder', 0.9, { universe: 15 });
-  const sideSpot = b.add('gen-spotgobo', 8, 'Side spot', 0.5, { universe: 15, x0: 0.01, x1: 0.99 });
+  const sideSpot = b.add('gen-profile', 8, 'Side spot', 0.5, { universe: 15, x0: 0.01, x1: 0.99 });
   const towerStrobe = b.add('gen-strobe', 8, 'Tower strobe', 0.5, { universe: 15, x0: 0.02, x1: 0.98 });
   // the machines
   const confetti = b.add('gen-confetti', 4, 'Confetti', 0.97, { universe: 16, x0: 0.15, x1: 0.85 });
@@ -185,7 +185,53 @@ export function buildDemo(song?: DemoSong) {
 
   // ---- the looks: every light dark but what the look lights, the beams narrow, the washes wide
   const all = [air, wash, blinder, strobe, backStrobe, towerStrobe, crowdBlinder, strip, ledBar, edge].flat();
-  const dark: [string[], Values][] = [[all, { intensity: 0 }]];
+  // (the gobo heads open, no prism, still: each look dresses them itself, nothing carries over)
+  const PROFILES = [...spot, ...sideSpot], GOBO_SPOTS = [...backBeam, ...beam, ...towerHead];
+  const dark: [string[], Values][] = [[all, { intensity: 0 }], [PROFILES, profile()], [GOBO_SPOTS, spotGobo()]];
+  const pf = (ids: string[], d: Dress): [string[], Values] => [ids, profile(d)];
+  const sg = (ids: string[], d: Dress): [string[], Values] => [ids, spotGobo(d)];
+  // Each look's gobos, as a lighting designer dresses them: breakups and the animation wheel in the
+  // riffs, leaves for a warm verse, water for a cool one, a tunnel and a line prism in a build, stars
+  // through a turning prism in a drop, glass gobos in colour for the finale, space and fire
+  const dress: Record<string, [string[], Values][]> = {
+    intro: [sg(beam, { gobo: 'Dots', spin: 0.2 }), sg(backBeam, { gobo: 'Ring' })],
+    wake: [pf(spot, { gobo: 'Ring of dots', prism: '3-facet prism', prismSpin: 0.4 }), sg(towerHead, { gobo: 'Star' })],
+    riffRed: [pf(spot, { gobo: 'Breakup', anim: 0.7 }), sg(beam, { gobo: 'Bars' }), pf(sideSpot, { gobo: 'Spiral', spin: 0.6 })],
+    riffIce: [pf(spot, { gobo: 'Water', anim: 0.6 }), pf(sideSpot, { gobo: 'Breakup', gobo2: 'Snowflake', spin: -0.3 }), sg(towerHead, { gobo: 'Dots' })],
+    riffGold: [pf(spot, { gobo: 'Stars', gobo2: 'Fire glass', spin: 0.5 }), sg(beam, { gobo: 'Star', spin: 0.4 })],
+    warm: [pf(spot, { gobo: 'Leaves', frost: 0.25 })],
+    cyan: [pf(spot, { gobo: 'Water', anim: 0.8 }), pf(sideSpot, { gobo: 'Tunnel', spin: 0.3 })],
+    build: [pf(spot, { gobo: 'Tunnel', spin: 0.9, prism: '5-facet linear prism', prismSpin: 0.5 }), sg(beam, { gobo: 'Spiral', spin: 0.8 })],
+    lift: [sg(beam, { gobo: 'Ring' }), pf(spot, { gobo: 'Ring of dots', spin: 0.6 })],
+    riser: [pf(spot, { gobo: 'Ring of dots', prism: '8-facet prism', prismSpin: 1 })],
+    drop: [pf(spot, { gobo: 'Stars', prism: '3-facet prism', prismSpin: 0.7 }), sg(beam, { gobo: 'Triangles', spin: 0.6 }), pf(sideSpot, { gobo2: 'Rainbow glass', spin: 0.4 })],
+    redblue: [pf(spot, { gobo: 'Spiral', spin: -0.7 }), sg(beam, { gobo: 'Bars' }), sg(towerHead, { gobo: 'Ring' })],
+    white: [pf(spot, { gobo: 'Ring of dots', prism: '8-facet prism', prismSpin: 0.8 }), sg(beam, { prism: 'in' }), sg(backBeam, { prism: 'in' })],
+    final: [pf(spot, { gobo2: 'Rainbow glass', spin: 0.6, prism: '3-facet prism', prismSpin: -0.5 }), sg(beam, { gobo: 'Star', spin: 0.5 }), pf(sideSpot, { gobo2: 'Galaxy glass', spin: 0.3 }),
+      sg(towerHead, { gobo: 'Flower', spin: 0.4 })],
+    solo: [pf(spot, { gobo: 'Tunnel', spin: 0.3, iris: 0.5 }), pf(sideSpot, { gobo: 'Flower', spin: -0.4 })],
+    sunset: [[sideSpot, on(0.6, C.white, { zoom: 0.3 })], pf(sideSpot, { gobo2: 'Fire glass', spin: 0.15 })],
+    space: [pf(spot, { gobo: 'Stars', gobo2: 'Galaxy glass', spin: 0.2, frost: 0.1 })],
+    breakdown: [sg(beam, { gobo: 'Bars' }), sg(backBeam, { gobo: 'Ring' })],
+    outro: [sg(beam, { gobo: 'Flower', spin: 0.1 })],
+    aurora: [sg(beam, { gobo: 'Ring' }), [sideSpot, on(0.7, C.white, { zoom: 0.3 })], pf(sideSpot, { gobo2: 'Aurora', spin: 0.2 })],
+    matrix: [pf(spot, { gobo2: 'Grid' }), sg(beam, { prism: 'in' })],
+    plasma: [pf(spot, { gobo2: 'Galaxy glass', spin: 0.3 })],
+    fireworks: [pf(spot, { gobo: 'Stars', prism: '3-facet prism', prismSpin: 0.9 }), sg(beam, { gobo: 'Star' })],
+    rain: [pf(spot, { gobo: 'Water', anim: 1 }), sg(beam, { gobo: 'Bars' })],
+    flames: [pf(spot, { gobo: 'Breakup', gobo2: 'Fire glass', anim: 0.8 }), sg(beam, { gobo: 'Flower', spin: 0.5 })],
+    bounce: [sg(beam, { gobo: 'Dots' })],
+    ripple: [sg(backBeam, { gobo: 'Ring', spin: 0.3 })],
+    meteors: [pf(spot, { gobo: 'Ring of dots', spin: 0.5 }), sg(beam, { gobo: 'Triangles' })],
+    pride: [pf(spot, { gobo2: 'Rainbow glass', spin: 0.5 })],
+    popcorn: [sg(beam, { gobo: 'Dots', spin: 0.6 }), pf(spot, { gobo: 'Ring of dots', prism: '3-facet prism' })],
+    heartbeat: [sg(beam, { gobo: 'Ring' })],
+    glitter: [pf(spot, { gobo: 'Stars', prism: '8-facet prism', prismSpin: 0.6 }), sg(beam, { prism: 'in' })],
+    juggle: [pf(spot, { gobo: 'Flower', spin: 0.4 })],
+    formula: [pf(spot, { gobo: 'Spiral', spin: 0.5 }), pf(sideSpot, { gobo: 'Tunnel', spin: -0.5 })],
+    reveal: [pf(spot, { gobo: 'Breakup', frost: 0.2 }), pf(sideSpot, { gobo: 'Breakup' })],
+    walkon: [pf(spot, { gobo: 'Ring of dots', prism: '3-facet prism', prismSpin: 0.6 })],
+  };
   const alt = (ids: string[], a: Color, c2: Color, level = 1, more: Values = {}): [string[], Values][] =>
     [[ids.filter((_, i) => i % 2 === 0), on(level, a, more)], [ids.filter((_, i) => i % 2 === 1), on(level, c2, more)]];
   const narrow = (level: number, c?: Color, more: Values = {}) => on(level, c, { zoom: 0, ...more });
@@ -196,7 +242,8 @@ export function buildDemo(song?: DemoSong) {
     WASHES.flatMap((ids) => (c2 ? alt(ids, c, c2, level, { zoom }) : [[ids, on(level, c, { zoom })] as [string[], Values]]));
   const look = (name: string, parts: [string[], Values][], effects: string[] = [], fade = 0): Cue => b.cue(L, name, [...dark, ...parts], { fade, effects });
   const at: Record<string, string> = {};
-  const mk = (key: string, c: Cue) => { at[key] = c.id; };
+  // (a look's gobos on top of its colours: dress[key])
+  const mk = (key: string, c: Cue) => { at[key] = c.id; for (const [ids, v] of dress[key] ?? []) for (const id of ids) c.values[id] = { ...c.values[id], ...v }; };
   mk('intro', look('Intro: blue haze', [[backWash, on(0.45, C.deepBlue, { zoom: 0.8 })], [frontWash, on(0.2, C.deepBlue, { zoom: 0.8 })], [beam, narrow(0.7, C.white)], [backBeam, narrow(0.4, C.ice)], [strip, on(0.6)], [edge, on(0.3, C.deepBlue)]],
     [e.lightning, e.aurora, e.beamWave], 4));
   // the busy parts between the singing: riffs
@@ -209,7 +256,7 @@ export function buildDemo(song?: DemoSong) {
   mk('riffGold', look('Riff: gold', [...beams(1, C.gold, C.white), ...washes(0.8, C.amber, C.orange), [strip, on(1)], [edge, on(1, C.amber)]],
     [e.fire, e.beamPing, e.spotFig8, e.floorSwing, e.towerChase, paint('edge', 'juggle', 'gold', 'amber', 'white')]));
   // the verses: a colour each, the heads moving gently
-  mk('warm', look('Verse: warm', [...washes(0.8, C.amber, C.orange, 0.6), [spot, narrow(0.8, C.warm)], [beam, narrow(0.8, C.warm, { gobo: gobo('Flower'), goboRotation: 0.2 })], [floorHead, narrow(0.6, C.amber)],
+  mk('warm', look('Verse: warm', [...washes(0.8, C.amber, C.orange, 0.6), [spot, narrow(0.8, C.warm)], [beam, narrow(0.8, C.warm, { gobo: gobo('Flower'), goboRotation: turn('gen-spotgobo', 0.4) })], [floorHead, narrow(0.6, C.amber)],
     [strip, on(0.8)], [ledBar, on(0.6, C.amber)], [edge, on(0.8, C.amber)]], [e.fire, e.spotCircle, e.floorWave, paint('edge', 'sinelon', 'amber', 'orange')], 1));
   mk('cyan', look('Verse: cyan sweep', [...washes(0.7, C.cyan, C.blue), [spot, narrow(1, C.white)], [sideSpot, narrow(1, C.cyan)], [floorHead, narrow(0.8, C.cyan)], [backBeam, narrow(0.8, C.ice)],
     [strip, on(0.9, C.cyan)], [edge, on(0.9, C.cyan)]], [e.chase, e.sideSweep, e.backSwing, paint('edge', 'juggle', 'cyan', 'blue', 'ice')], 1));
@@ -236,7 +283,7 @@ export function buildDemo(song?: DemoSong) {
   // the quiet parts
   mk('sunset', look('Break: sunset', [...washes(0.6, C.orange, C.pink, 0.7), [backBeam, narrow(0.5, C.amber)], [strip, on(0.6)], [edge, on(1)]], [e.ocean, e.twinkle, e.picture], 3));
   mk('space', look('Break: deep space', [...washes(0.4, C.deepBlue, C.purple, 0.7), [spot, narrow(0.6, C.cool)], [strip, on(0.5, C.purple)],
-    [beam, narrow(0.8, C.lavender, { gobo: gobo('Star'), goboRotation: 0.3 })], [edge, on(0.4, C.purple)]], [e.spotFig8, e.lightning, e.twinkle], 4));
+    [beam, narrow(0.8, C.lavender, { gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.6) })], [edge, on(0.4, C.purple)]], [e.spotFig8, e.lightning, e.twinkle], 4));
   mk('breakdown', look('Breakdown: red pillars', [[beam, narrow(1, C.red)], [backBeam, narrow(0.6, C.red)], [backWash, on(0.3, C.red, { zoom: 0.8 })], [strip, on(0.4, C.red)], [ledBar, on(1, C.red)], [edge, on(0.5, C.red)]],
     [e.heartbeat, e.beamWave], 2));
   mk('outro', look('Outro: embers', [[backWash, on(0.4, C.red)], [frontWash, on(0.25, C.orange)], [beam, narrow(0.5, C.red)], [strip, on(0.5)], [edge, on(0.4, C.red)]], [e.fire2012, e.beamWave], 5));
@@ -245,7 +292,7 @@ export function buildDemo(song?: DemoSong) {
   mk('aurora', look('Wall: aurora', [...washes(0.5, C.teal, C.deepBlue, 0.7), [strip, on(1)], [beam, narrow(0.7, C.teal)], [backBeam, narrow(0.6, C.green)], [edge, on(0.5, C.teal)]], [e.aurora, e.beamCircle, e.twinkle], 3));
   mk('matrix', look('Wall: matrix rain', [...washes(0.6, C.green, undefined, 0.6), [spot, narrow(1, C.green)], [beam, narrow(1, C.green, { prism: 1 })], [floorHead, narrow(1, C.green)], [strip, on(1)], [ledBar, on(0.6, C.green)], [edge, on(0.8, C.green)]],
     [e.matrix, e.beamFan, e.floorChase, paint('edge', 'scanner', 'green', 'white')], 1));
-  mk('plasma', look('Wall: plasma', [...washes(0.8, C.purple, C.blue), [spot, narrow(0.9, C.lavender)], [beam, narrow(0.9, C.purple, { gobo: gobo('Star'), goboRotation: 0.4 })], [strip, on(1)], [edge, on(1, C.purple)]],
+  mk('plasma', look('Wall: plasma', [...washes(0.8, C.purple, C.blue), [spot, narrow(0.9, C.lavender)], [beam, narrow(0.9, C.purple, { gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.8) })], [strip, on(1)], [edge, on(1, C.purple)]],
     [e.plasma, e.spotFig8, paint('edge', 'juggle', 'purple', 'blue', 'lavender')], 1));
   mk('fireworks', look('Wall: fireworks', [...washes(0.3, C.deepBlue), ...beams(1, C.white), [strip, on(1)], [edge, on(1, C.white)]], [e.fireworks, e.spotBally, e.beamBally, e.floorWave]));
   mk('rain', look('Wall: rain', [...washes(0.5, C.blue, C.cyan, 0.7), [beam, narrow(0.8, C.ice)], [spot, narrow(0.6, C.ice)], [strip, on(1)], [edge, on(0.6, C.ice)]], [e.rain, paint('edge', 'sinelon', 'ice', 'blue'), e.beamWave], 3));

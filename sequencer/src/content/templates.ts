@@ -7,6 +7,7 @@
 // tests lean on those), everything else comes after them.
 import { emptyShow } from '../model/format';
 import { GENERIC, modeOf } from '../model/library';
+import { slotsOf } from '../engine/render';
 import type { ChannelAttr, Color, Cue, CueList, Effect, Fixture, Group, Show, Values } from '../model/types';
 import { D, DECK, W, aimRot, defaultPlace, planToWorld } from '../stage3d/geometry';
 import { addStandardPresets } from './presets';
@@ -22,6 +23,52 @@ export const C = {
 // The gobo wheel of the generic spot (library.ts, gen-spotgobo): a cue stores the slot as a fraction.
 const GOBOS = ['Open', 'Dots', 'Star', 'Ring', 'Bars', 'Flower', 'Triangles', 'Spiral'] as const;
 export const gobo = (name: (typeof GOBOS)[number]) => GOBOS.indexOf(name) / (GOBOS.length - 1);
+
+// A generic type's slot or named range as the value a cue stores, by its name (a name it doesn't
+// have is a mistake in the demo, said at once): a slot (a gobo, a colour) is its place on its wheel;
+// a range is a point in it (`at`: 0 its start, 1 its end), as the channel sends it.
+function channelOf(typeId: string, attr: ChannelAttr) {
+  const c = modeOf(GENERIC.find((g) => g.id === typeId), '')?.channels.find((x) => x.attr === attr && !x.fine && x.cell === undefined);
+  if (!c) throw new Error(`${typeId} has no ${attr} channel`);
+  return c;
+}
+export function slotValue(typeId: string, attr: ChannelAttr, label: string): number {
+  const slots = slotsOf(channelOf(typeId, attr)), i = slots.findIndex((r) => r.label === label);
+  if (i < 0) throw new Error(`${typeId} ${attr}: no slot "${label}"`);
+  return slots.length > 1 ? i / (slots.length - 1) : 0;
+}
+export function rangeValue(typeId: string, attr: ChannelAttr, label: string, at = 0.5): number {
+  const r = channelOf(typeId, attr).ranges?.find((x) => x.label === label);
+  if (!r) throw new Error(`${typeId} ${attr}: no range "${label}"`);
+  return Math.round(r.from + (r.to - r.from) * Math.max(0, Math.min(1, at))) / 255;
+}
+
+// the slot names of a generic type's wheel, in order (the test truss walks through them)
+export const slotNames = (typeId: string, attr: ChannelAttr) => slotsOf(channelOf(typeId, attr)).map((r) => r.label ?? '');
+
+// How a gobo head is dressed in a look: its gobos (by the slot's name), turning (-1..1: CCW..CW, how
+// fast), a prism (its range's name) turning too, the animation wheel (how far in), iris and frost.
+// Every look dresses all its gobo heads (unset: open, no prism, still), so nothing carries over from
+// the look before.
+export interface Dress { gobo?: string; gobo2?: string; spin?: number; prism?: string; prismSpin?: number; anim?: number; iris?: number; frost?: number; shake?: number; scroll?: number }
+const spinOf = (typeId: string, attr: ChannelAttr, spin?: number) =>
+  !spin ? rangeValue(typeId, attr, 'Stop') : spin > 0 ? rangeValue(typeId, attr, 'Rotation CW fast..slow', 1 - Math.min(1, spin)) : rangeValue(typeId, attr, 'Rotation CCW slow..fast', Math.min(1, -spin));
+// the Profile spot (gen-profile): two wheels, prisms, animation, iris, frost
+export const profile = (d: Dress = {}): Values => ({
+  gobo: slotValue('gen-profile', 'gobo', d.gobo ?? 'Open'), gobo2: slotValue('gen-profile', 'gobo2', d.gobo2 ?? 'Open'),
+  goboRotation: spinOf('gen-profile', 'goboRotation', d.spin), prism: rangeValue('gen-profile', 'prism', d.prism ?? 'Open'),
+  prismRotation: spinOf('gen-profile', 'prismRotation', d.prism ? d.prismSpin : 0),
+  animation: d.anim ? rangeValue('gen-profile', 'animation', 'In (how far)', d.anim) : 0,
+  animationRotation: spinOf('gen-profile', 'animationRotation', d.anim ? 0.5 : 0), iris: d.iris ?? 0, frost: d.frost ?? 0,
+  goboShake: d.shake ?? 0, goboScroll: d.scroll ?? 0,
+});
+// the generic gobo spot (gen-spotgobo): one wheel turning either way, a plain prism that turns too
+export const spotGobo = (d: Dress = {}): Values => ({
+  gobo: slotValue('gen-spotgobo', 'gobo', d.gobo ?? 'Open'), goboRotation: spinOf('gen-spotgobo', 'goboRotation', d.spin), prism: d.prism ? 1 : 0,
+  prismRotation: spinOf('gen-spotgobo', 'prismRotation', d.prism ? d.prismSpin : 0),
+});
+// a gobo turning on a head (-1..1: CCW .. CW, how fast), as its rotation channel's ranges send it
+export const turn = (typeId: string, spin: number) => spinOf(typeId, 'goboRotation', spin);
 
 // The effect machines, each as a one-shot cue list: a GO (a tap on the live page, a cue's action,
 // the timeline) fires it for a few seconds and it ends by itself. Nothing in a template leaves a
@@ -176,7 +223,7 @@ export const TEMPLATES: Template[] = [
       b.cue(songs, 'Chorus', [...dark, [front, on(1, C.white)], [back, on(1, C.magenta)], [movers, on(1, C.cyan, { pan: 0.5, tilt: 0.75 })],
         [washes, on(1, C.purple, { pan: 0.5, tilt: 0.6, zoom: 0.4 })], [spots, on(1, C.white, { pan: 0.5, tilt: 0.7, zoom: 0.05 })], [bars, on(1)]], { fade: 0.5, effects: [circle, bally, pride] });
       b.cue(songs, 'Ballad', [...dark, [front, on(0.5, C.warm)], [back, on(0.6, C.blue)], [movers, on(0.3, C.purple, { pan: 0.5, tilt: 0.4 })],
-        [washes, on(0.4, C.deepBlue, { pan: 0.5, tilt: 0.5, zoom: 1 })], [spots, on(0.5, C.lavender, { pan: 0.5, tilt: 0.52, gobo: gobo('Star'), goboRotation: 0.2, zoom: 0.3 })], [bars, on(0.3, C.blue)]], { fade: 4, effects: [twinkle] });
+        [washes, on(0.4, C.deepBlue, { pan: 0.5, tilt: 0.5, zoom: 1 })], [spots, on(0.5, C.lavender, { pan: 0.5, tilt: 0.52, gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.4), zoom: 0.3 })], [bars, on(0.3, C.blue)]], { fade: 4, effects: [twinkle] });
       b.cue(songs, 'Intro: thunder', [...dark, [back, on(0.25, C.deepBlue)], [washes, on(0.35, C.deepBlue, { pan: 0.5, tilt: 0.5, zoom: 0.9 })],
         [spots, on(1, C.white, { pan: 0.5, tilt: 0.5, zoom: 0, gobo: gobo('Open') })], [strobes, on(0)]], { fade: 3, effects: [lightning, fan] });
       b.cue(songs, 'Rock out', [...dark, ...split(back, C.red, C.white), [front, on(0.9, C.white)], [movers, on(1, C.red, { pan: 0.5, tilt: 0.7 })],
@@ -186,7 +233,7 @@ export const TEMPLATES: Template[] = [
       b.cue(songs, 'Drum solo', [...dark, [back, on(1, C.amber)], [washes, on(0.8, C.amber, { pan: 0.5, tilt: 0.52, zoom: 0.1 })], [bars, on(1, C.red)],
         [spots, on(1, C.amber, { pan: 0.5, tilt: 0.5, zoom: 0, gobo: gobo('Ring') })], [strobes, on(1, undefined, { strobe: 0.4 })]], { fade: 0.2, effects: [heart, chase] });
       b.cue(songs, 'Love song', [...dark, [front, on(0.6, C.pink)], [back, on(0.5, C.magenta)], [washes, on(0.5, C.pink, { pan: 0.5, tilt: 0.55, zoom: 1 })],
-        [spots, on(0.4, C.pink, { pan: 0.5, tilt: 0.55, gobo: gobo('Flower'), goboRotation: 0.15 })], [bars, on(0.4)]], { fade: 5, effects: [pride, sweep] });
+        [spots, on(0.4, C.pink, { pan: 0.5, tilt: 0.55, gobo: gobo('Flower'), goboRotation: turn('gen-spotgobo', 0.3) })], [bars, on(0.4)]], { fade: 5, effects: [pride, sweep] });
       b.cue(songs, 'Big finish', [...dark, [lights, on(1, C.white)], [movers, { pan: 0.5, tilt: 0.75 }], [washes, { pan: 0.5, tilt: 0.7, zoom: 0.5 }],
         [spots, { pan: 0.5, tilt: 0.75, zoom: 0.05 }], [strobes, { strobe: 0.7 }]], { fade: 0, effects: [bally, swing], actions: fire(m.confetti, m.co2, m.sparks), note: 'Confetti, CO2 and sparks' });
       b.cue(songs, 'Encore', [...dark, [front, on(0.8, C.amber)], [back, on(1, C.orange)], [movers, on(1, C.orange, { pan: 0.5, tilt: 0.7 })],
@@ -356,7 +403,7 @@ export const TEMPLATES: Template[] = [
       b.cue(show, 'Storm', [...out, [front, on(0.25)], [cyc, on(0.35, C.deepBlue)], [side, on(0.4, C.ice)], [ground, on(0.5)], [lightningStrobe, on(0)], [washes, on(0.4, C.deepBlue, down({ zoom: 0.8 }))]],
         { fade: 2, effects: [storm, flash, rain, sway], actions: [{ do: 'start', list: fogShot.id }], note: 'Thunder on the sound cue, fog with it' });
       b.cue(show, 'Dream', [...out, [front, on(0.2, undefined)], [cyc, on(0.6, C.lavender)], [ground, on(0.8)], [specials, on(0.5)],
-        [spots, on(0.8, C.lavender, down({ tilt: 0.55, gobo: gobo('Star'), goboRotation: 0.2, zoom: 0.4, focus: 0.5 }))], [washes, on(0.5, C.purple, down({ zoom: 1 }))]],
+        [spots, on(0.8, C.lavender, down({ tilt: 0.55, gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.4), zoom: 0.4, focus: 0.5 }))], [washes, on(0.5, C.purple, down({ zoom: 1 }))]],
       { fade: 8, effects: [aurora, drift, waltz], actions: fire(m.bubbles), note: 'Bubbles with the music' });
       b.cue(show, 'Ballroom', [...out, [front, on(0.7)], [cyc, on(0.8, C.gold)], [side, on(0.8, C.warm)], [ground, on(0.6, C.amber)],
         [spots, on(1, C.white, down({ tilt: 0.6, gobo: gobo('Dots'), prism: 1, zoom: 0.5 }))], [washes, on(0.6, C.gold, down({ zoom: 0.7 }))]], { fade: 4, effects: [waltz] });
@@ -480,7 +527,7 @@ export const TEMPLATES: Template[] = [
       b.cue(l, 'Kids matinee', [...out, [house, on(0.8)], [walls, on(0.8, C.yellow)], [marquee, on(0.8)], [steps, on(0.8, C.green)], [ceiling, on(0.6)]], { fade: 2, effects: [scan, stageColours], actions: fire(m.bubbles) });
       b.cue(l, 'Horror night', [...out, [house, on(0)], [walls, on(0.5, C.red)], [steps, on(0.2, C.red)], [marquee, on(0.3, C.red)]], { fade: 3, effects: [flicker] });
       b.cue(l, 'Sci-fi night', [...out, [house, on(0.1)], [walls, on(0.6, C.cyan)], [marquee, on(0.8, C.cyan)], [steps, on(0.4, C.cyan)], [ceiling, on(0.8)],
-        [spots, on(0.8, C.cyan, { pan: 0.5, tilt: 0.65, zoom: 0.1, gobo: gobo('Spiral'), goboRotation: 0.4 })]], { fade: 3, effects: [stars, scan, searchlight] });
+        [spots, on(0.8, C.cyan, { pan: 0.5, tilt: 0.65, zoom: 0.1, gobo: gobo('Spiral'), goboRotation: turn('gen-spotgobo', 0.8) })]], { fade: 3, effects: [stars, scan, searchlight] });
       return b.done();
     },
   },

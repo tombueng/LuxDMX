@@ -7,7 +7,7 @@
 // song's parts (catalog.ts): the drops get CO2, a strobe hit and the blinders, the breaks get fog.
 import type { Color, Cue, Fixture, Show, Values } from '../model/types';
 import { DECK, DJ_BOOTH, ROOMS, aimAt, aimRot, type V3 } from '../stage3d/geometry';
-import { Builder, C, gobo, on } from './templates';
+import { Builder, C, gobo, on, turn, profile, spotGobo, type Dress } from './templates';
 import { DEMO_BPM } from '../timeline/beat';
 import { cueParts, inRoom } from './cueing';
 import type { DemoSong } from './demo';
@@ -36,7 +36,8 @@ export function buildClub(song?: DemoSong): Show {
 
   // ---- the rig, universe by universe (each fits in its 512)
   // universe 0: the heads, strobes, blinders, PARs and the machines
-  const spot = b.add('gen-spotgobo', 6, 'Spot', 0.08, { universe: 0, x0: 0.1, x1: 0.9 });
+  // (profile spots over the dance floor: two gobo wheels, prisms, an animation wheel)
+  const spot = b.add('gen-profile', 6, 'Spot', 0.08, { universe: 0, x0: 0.1, x1: 0.9 });
   const strobe = b.add('gen-strobe', 4, 'Strobe', 0.08, { universe: 0, x0: 0.2, x1: 0.8 });
   const wash = b.add('gen-wash', 6, 'Wash', 0.92, { universe: 0, x0: 0.1, x1: 0.9 });
   const blinder = b.add('gen-blinder2', 4, 'Blinder', 0.92, { universe: 0, x0: 0.2, x1: 0.8 });
@@ -118,7 +119,31 @@ export function buildClub(song?: DemoSong): Show {
   const haze = b.haze(hazer);
   b.machines();
   const lights = [spot, wash, deckSpot, deckWash, strobe, blinder, par, wall, edge, portal, header, boothBar, deckBar, pitBar].flat();
-  const dark: [string[], Values][] = [[lights, { intensity: 0 }]];
+  // (the gobo heads open, no prism, still: each look dresses them itself, nothing carries over)
+  const dark: [string[], Values][] = [[lights, { intensity: 0 }], [spot, profile()], [deckSpot, spotGobo()]];
+  const pf = (ids: string[], d: Dress): [string[], Values] => [ids, profile(d)];
+  const sg = (ids: string[], d: Dress): [string[], Values] => [ids, spotGobo(d)];
+  // each look's gobos: patterns on the dance floor from the spots over it, beams from the deck
+  const dress: Record<string, [string[], Values][]> = {
+    intro: [pf(spot, { gobo: 'Stars', gobo2: 'Galaxy glass', spin: 0.15 }), sg(deckSpot, { gobo: 'Dots' })],
+    pulse: [pf(spot, { gobo: 'Ring of dots', spin: 0.4 }), sg(deckSpot, { gobo: 'Ring' })],
+    cyan: [pf(spot, { gobo: 'Water', anim: 0.7 }), sg(deckSpot, { gobo: 'Bars' })],
+    red: [pf(spot, { gobo: 'Tunnel', prism: '3-facet prism', prismSpin: 0.6 }), sg(deckSpot, { gobo: 'Triangles', spin: 0.5 })],
+    bounce: [pf(spot, { gobo: 'Ring of dots', prism: '5-facet linear prism' }), sg(deckSpot, { gobo: 'Dots', spin: 0.4 })],
+    juggle: [pf(spot, { gobo: 'Flower', spin: 0.4 })],
+    build: [pf(spot, { gobo: 'Spiral', spin: 0.9, prism: '5-facet linear prism', prismSpin: 0.5 }), sg(deckSpot, { gobo: 'Spiral', spin: 0.8 })],
+    drop: [pf(spot, { gobo: 'Stars', prism: '8-facet prism', prismSpin: 0.7 }), sg(deckSpot, { gobo: 'Star', spin: 0.6 })],
+    dropRW: [pf(spot, { gobo: 'Breakup', anim: 0.8 }), sg(deckSpot, { gobo: 'Bars' })],
+    dropUV: [pf(spot, { gobo: 'Ring of dots', prism: '3-facet prism', prismSpin: -0.6 }), sg(deckSpot, { prism: 'in' })],
+    fireworks: [pf(spot, { gobo: 'Stars', gobo2: 'Rainbow glass', spin: 0.5 })],
+    pride: [pf(spot, { gobo2: 'Rainbow glass', spin: 0.6 })],
+    popcorn: [pf(spot, { gobo: 'Ring of dots', prism: '3-facet prism' }), sg(deckSpot, { gobo: 'Dots', spin: 0.6 })],
+    break: [pf(spot, { gobo: 'Tunnel', spin: 0.2, iris: 0.4 })],
+    rain: [pf(spot, { gobo: 'Water', anim: 1 })],
+    ripple: [pf(spot, { gobo2: 'Aurora', spin: 0.2 })],
+    final: [pf(spot, { gobo2: 'Rainbow glass', spin: 0.7, prism: '3-facet prism', prismSpin: -0.5 }), sg(deckSpot, { gobo: 'Flower', spin: 0.5 })],
+    outro: [pf(spot, { gobo: 'Breakup', gobo2: 'Fire glass', anim: 0.5 })],
+  };
   const alt = (ids: string[], a: Color, c2: Color, level = 1, more: Values = {}): [string[], Values][] => [[ids.filter((_, i) => i % 2 === 0), on(level, a, more)], [ids.filter((_, i) => i % 2 === 1), on(level, c2, more)]];
   const look = (name: string, parts: [string[], Values][], effects: string[] = [], fade = 2): Cue => b.cue(L, name, [...dark, ...parts], { fade, effects });
   // heads over the crowd (hung: tilted out towards the dance floor), beams from the deck (up and out)
@@ -127,7 +152,8 @@ export function buildClub(song?: DemoSong): Show {
   const onDj = (id: string) => { const f = b.fx([id])[0]; return aimAt(f.p3!, f.rot!, { x: DJ_AT.x, y: DECK + 1.5, z: DJ_AT.z }, OPTICS) ?? { pan: 0.5, tilt: 0.5 }; };
   const djWash: [string[], Values][] = [wash[2], wash[3]].map((id) => [[id], on(0.9, C.lavender, { ...onDj(id), zoom: 0.25 })]);
   const looks: Record<string, string> = {};
-  const mk = (key: string, c: Cue) => { looks[key] = c.id; };
+  // (a look's gobos on top of its colours: dress[key])
+  const mk = (key: string, c: Cue) => { looks[key] = c.id; for (const [ids, v] of dress[key] ?? []) for (const id of ids) c.values[id] = { ...c.values[id], ...v }; };
   mk('intro', look('Intro: blue night', [[wash, on(0.35, C.deepBlue, out(0.55, { zoom: 0.8 }))], [wall, on(0.6)], [portal, on(0.5, C.deepBlue)], [header, on(0.4, C.deepBlue)],
     [boothBar, on(0.5, C.blue)], [deckSpot, on(0.9, C.white, out(0.5, { zoom: 0 }))], ...djWash], [e.aurora, e.sinelon], 4));
   mk('pulse', look('Groove: purple pulse', [...alt(wash, C.purple, C.magenta, 0.8, out(0.62, { zoom: 0.5 })), [spot, on(0.8, C.purple, out(0.66, { zoom: 0.1, gobo: gobo('Dots') }))], [wall, on(0.9)],
@@ -155,7 +181,7 @@ export function buildClub(song?: DemoSong): Show {
     [deckSpot, on(1, C.yellow, out(0.6, { zoom: 0 }))]], [e.pride, e.washColours, e.parChase, e.deckFan, e.theater, e.gradient], 0.5));
   mk('popcorn', look('Drop: popcorn', [...alt(wash, C.magenta, C.yellow, 1, out(0.65)), [wall, on(1)], [deckSpot, on(1, C.yellow, out(0.6, { zoom: 0 }))], [edge, on(1)], [deckBar, on(1, C.magenta)]],
     [e.popcorn, e.deckBally, e.swing, e.sinelon], 0));
-  mk('break', look('Break: the DJ alone', [[wall, on(0.45)], [boothBar, on(0.6, C.purple)], [spot, on(0.5, C.lavender, out(0.6, { zoom: 0.1, gobo: gobo('Star'), goboRotation: 0.2 }))], ...djWash],
+  mk('break', look('Break: the DJ alone', [[wall, on(0.45)], [boothBar, on(0.6, C.purple)], [spot, on(0.5, C.lavender, out(0.6, { zoom: 0.1, gobo: gobo('Star'), goboRotation: turn('gen-profile', 0.4) }))], ...djWash],
     [e.twinkle, e.heartbeat], 4));
   mk('rain', look('Break: rain', [[wash, on(0.4, C.blue, out(0.55, { zoom: 0.8 }))], [wall, on(1)], [edge, on(0.6, C.ice)], [deckSpot, on(0.7, C.ice, out(0.52, { zoom: 0 }))], ...djWash], [e.rain, e.sinelon], 3));
   mk('ripple', look('Break: ripples', [[wash, on(0.5, C.cyan, out(0.55, { zoom: 0.9 }))], [wall, on(1)], [edge, on(0.6, C.cyan)], ...djWash], [e.ripple, e.lightning], 3));

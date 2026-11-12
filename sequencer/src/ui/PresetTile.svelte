@@ -19,7 +19,7 @@
     return all.map((v) => ({ x: num(v.pan) ?? 0.5, y: num(v.tilt) ?? 0.5 }));
   });
   // Is it on the selection right now (by reference)?
-  const active = $derived(app.selected.length > 0 && app.selected.every((id) => Object.values(app.programmer[id] ?? {}).some((x) => !!x && typeof x === 'object' && (x as { preset?: string }).preset === preset.id)));
+  const active = $derived(app.usesPreset(preset.id));
   const uses = $derived(app.presetUses.get(id) ?? 0);
   let was = '';                       // the name before a rename
 </script>

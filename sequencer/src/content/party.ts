@@ -8,7 +8,7 @@
 import type { Color, Cue, Fixture, Show, Values } from '../model/types';
 import { ROOMS, aimRot, type V3 } from '../stage3d/geometry';
 import { DEMO_BPM } from '../timeline/beat';
-import { Builder, C, gobo, on } from './templates';
+import { Builder, C, gobo, on, turn, spotGobo, type Dress } from './templates';
 import { cueParts, inRoom } from './cueing';
 import type { DemoSong } from './demo';
 
@@ -104,19 +104,29 @@ export function buildParty(song?: DemoSong): Show {
   const haze = b.haze(hazer);
   b.machines();
   const lights = [spot, wash, floorWash, par, strobe, blinder, legBar, ring].flat();
-  const dark: [string[], Values][] = [[lights, { intensity: 0 }]];
+  // (the gobo spots open, no prism, still: each look dresses them itself, nothing carries over)
+  const dark: [string[], Values][] = [[lights, { intensity: 0 }], [spot, spotGobo()]];
+  const sg = (d: Dress): [string[], Values] => [spot, spotGobo(d)];
+  // each look's gobos, thrown on the dancers from the square of truss
+  const dress: Record<string, [string[], Values][]> = {
+    intro: [sg({ gobo: 'Flower', spin: 0.2 })], sunset: [sg({ gobo: 'Ring' })], teal: [sg({ gobo: 'Dots', spin: 0.3 })], juggle: [sg({ gobo: 'Star', spin: 0.4 })],
+    build: [sg({ gobo: 'Spiral', spin: 0.9 })], drop: [sg({ gobo: 'Triangles', spin: 0.6, prism: 'in' })], dropGold: [sg({ gobo: 'Star', spin: 0.5 })],
+    dropWaves: [sg({ gobo: 'Bars', spin: 0.3 })], fireworks: [sg({ gobo: 'Star', prism: 'in' })], popcorn: [sg({ gobo: 'Dots', spin: 0.6 })],
+    bubbles: [sg({ gobo: 'Ring', spin: 0.2 })], ripple: [sg({ gobo: 'Spiral', spin: 0.2 })], final: [sg({ gobo: 'Flower', spin: 0.6, prism: 'in' })], outro: [sg({ gobo: 'Ring', spin: 0.1 })],
+  };
   const alt = (ids: string[], a: Color, c2: Color, level = 1, more: Values = {}): [string[], Values][] => [[ids.filter((_, i) => i % 2 === 0), on(level, a, more)], [ids.filter((_, i) => i % 2 === 1), on(level, c2, more)]];
   const look = (name: string, parts: [string[], Values][], effects: string[] = [], fade = 2): Cue => b.cue(L, name, [...dark, ...parts], { fade, effects });
   // hung heads tilted a little out over the crowd; the floor washes up into the truss
   const out = (tilt: number, more: Values = {}): Values => ({ pan: 0.5, tilt, ...more });
   const looks: Record<string, string> = {};
-  const mk = (key: string, c: Cue) => { looks[key] = c.id; };
+  // (a look's gobos on top of its colours: dress[key])
+  const mk = (key: string, c: Cue) => { looks[key] = c.id; for (const [ids, v] of dress[key] ?? []) for (const id of ids) c.values[id] = { ...c.values[id], ...v }; };
   mk('intro', look('Intro: warm welcome', [[wash, on(0.5, C.amber, out(0.5, { zoom: 0.9 }))], [ring, on(0.5)], [legBar, on(0.4, C.amber)], [par, on(0.3, C.warm)]], [e.ringAurora, e.legSinelon], 4));
   mk('sunset', look('Groove: sunset', [...alt(wash, C.orange, C.pink, 0.8, out(0.55, { zoom: 0.6 })), [spot, on(0.8, C.amber, out(0.6, { zoom: 0.15, gobo: gobo('Dots') }))], [ring, on(0.9, C.orange)],
     [legBar, on(0.7, C.pink)], [par, on(0.6, C.amber)], [floorWash, on(0.6, C.orange, out(0.5, { zoom: 0.5 }))]], [e.ringGradient, e.circle, e.washSwing, e.legTheater]));
   mk('teal', look('Groove: teal and pink', [...alt(wash, C.teal, C.pink, 0.8, out(0.55, { zoom: 0.5 })), [spot, on(1, C.white, out(0.62, { zoom: 0.05 }))], [ring, on(1)], [legBar, on(0.8, C.teal)],
     [par, on(0.6, C.pink)]], [e.ringPlasma, e.fan, e.parFade, e.legSinelon]));
-  mk('juggle', look('Groove: juggling colours', [...alt(wash, C.purple, C.cyan, 0.8, out(0.55)), [ring, on(1)], [legBar, on(0.8)], [spot, on(0.8, C.lavender, out(0.62, { zoom: 0.1, gobo: gobo('Flower'), goboRotation: 0.2 }))]],
+  mk('juggle', look('Groove: juggling colours', [...alt(wash, C.purple, C.cyan, 0.8, out(0.55)), [ring, on(1)], [legBar, on(0.8)], [spot, on(0.8, C.lavender, out(0.62, { zoom: 0.1, gobo: gobo('Flower'), goboRotation: turn('gen-spotgobo', 0.4) }))]],
     [e.ringJuggle, e.fig8, e.washCircle, e.legTheater], 1));
   mk('build', look('Build: rising', [[wash, on(0.8, C.white, out(0.55, { zoom: 0.2 }))], [spot, on(1, C.white, out(0.62, { zoom: 0.05 }))], [ring, on(1, C.white)], [legBar, on(1, C.white)],
     [floorWash, on(1, C.white, out(0.5, { zoom: 0.1 }))]], [e.ringMeteor, e.bally, e.floorTilt, e.ringScanner], 1));
@@ -129,7 +139,7 @@ export function buildParty(song?: DemoSong): Show {
   mk('fireworks', look('Drop: fireworks', [[wash, on(0.4, C.deepBlue, out(0.55))], [spot, on(1, C.white, out(0.68, { zoom: 0.03 }))], [ring, on(1)], [floorWash, on(1, C.white, out(0.5, { zoom: 0 }))]],
     [e.ringFireworks, e.bally, e.floorTilt], 0));
   mk('popcorn', look('Drop: popcorn', [...alt(wash, C.magenta, C.yellow, 1, out(0.6)), [ring, on(1)], [legBar, on(1, C.magenta)], [par, on(1, C.yellow)]], [e.ringPopcorn, e.washSwing, e.parPulse], 0));
-  mk('bubbles', look('Break: bubbles', [[wash, on(0.5, C.ice, out(0.5, { zoom: 0.9 }))], [ring, on(0.7)], [legBar, on(0.4, C.cyan)], [spot, on(0.6, C.lavender, out(0.6, { zoom: 0.1, gobo: gobo('Star'), goboRotation: 0.2 }))]],
+  mk('bubbles', look('Break: bubbles', [[wash, on(0.5, C.ice, out(0.5, { zoom: 0.9 }))], [ring, on(0.7)], [legBar, on(0.4, C.cyan)], [spot, on(0.6, C.lavender, out(0.6, { zoom: 0.1, gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.4) }))]],
     [e.ringTwinkle, e.legHeart, e.fig8], 4));
   mk('ripple', look('Break: ripples', [[wash, on(0.5, C.cyan, out(0.5, { zoom: 0.9 }))], [ring, on(1)], [legBar, on(0.5, C.blue)]], [e.ringRipple, e.legHeart], 3));
   mk('strobe', look('Strobe hits', [[wash, on(0.6, C.white, out(0.6))], [ring, on(0.5, C.white)], [strobe, on(1)], [spot, on(1, C.white, out(0.65, { zoom: 0 }))]], [e.strobeHits, e.bally], 0));

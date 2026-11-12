@@ -140,6 +140,9 @@ export class TimelinePlayer {
       this.buffer = buf; this.bufferFor = key; this.peaks = peaksOf(buf, 1600); this.missing = '';
     } catch { if (this.tl?.audio?.store === key) this.missing = tl.audio.name; }
   }
+  // the song, decoded (after prepare()); undefined for the demo beat or a missing file. For a render
+  // (render/audio.ts): the mix is made from it, not from what the speakers play.
+  get song(): AudioBuffer | undefined { return this.tl?.audio && this.bufferFor === this.tl.audio.store ? this.buffer : undefined; }
   // (undefined: this browser can't make sound here; the show plays on the page's clock)
   private audio(): AudioContext | undefined { try { return (this.ctx ??= new AudioContext()); } catch { return undefined; } }
   // Every sound goes into the bus: the speakers get it at the volume, a recording at full (a muted

@@ -25,10 +25,22 @@ class Ui {
   patchTab = $state<'patch' | 'channels' | 'leds' | 'mounting'>('patch');   // the tab it opens on
   patchMany = $state<string[] | null>(null); // ...or the lights patched together
   focusCal = $state<string[] | null>(null);  // the heads in Focus and calibrate
+  panTiltFind = $state<string | null>(null);  // a light whose pan and tilt channels are being found
   // what Focus and calibrate has seen this session: per head, per mark, the pan and tilt (a cue's)
   // that put the real beam on it (kept when the dialog closes, gone with a reload)
   calSeen = $state<Record<string, Record<string, { pan: number; tilt: number }>>>({});
   fxSel = $state<string[]>([]);              // selected effects (Effects panel)
+  // The thick frame round the selected lights in 3D: shown while the pointer (or the keyboard) is
+  // where lights are picked (the stage, the fixture list, groups, the cell picker), faded while it's
+  // where their look is worked on (the programmer, effects, presets, cues, a light's patch), so an
+  // effect isn't hidden behind it. A new selection shows it again. Places say which they are with
+  // data-marks="show" or "hide"; anywhere else leaves it as it is.
+  selMarks = $state(true);
+  marksFrom(t: EventTarget | null) {
+    const z = (t as Element | null)?.closest?.('[data-marks]')?.getAttribute('data-marks');
+    if (z === 'show' && !this.selMarks) this.selMarks = true;
+    else if (z === 'hide' && this.selMarks) this.selMarks = false;
+  }
   zoom = $state(1);                          // UI size, saved per browser
   // the stage in 3D instead of the plan (saved per browser)
   private s3 = $state((() => { try { return localStorage.getItem('luxdmx.seq.stage3d') === '1'; } catch { return false; } })());

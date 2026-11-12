@@ -33,6 +33,20 @@ describe('show format', () => {
     expect(() => parseShow(JSON.stringify(s))).toThrow(/timecode/);
   });
 
+  it('a show with cells says so (an older reader refuses it instead of playing it wrong)', async () => {
+    const { serializeShow } = await import('./format');
+    const s: any = emptyShow();
+    expect(JSON.parse(serializeShow(s)).requiredFeatures).toEqual([]);
+    s.cueLists = [{ id: 'l', name: 'L', end: 'stop', cues: [{ id: 'c', name: 'c', fade: 0, advance: { mode: 'manual' }, values: { a: { cells: { 0: { intensity: 1 } } } } }] }];
+    const out = JSON.parse(serializeShow(s));
+    expect(out.requiredFeatures).toEqual(['cells']);
+    expect(out.formatVersion).toBe('1.2.0');
+    expect(parseShow(JSON.stringify(out)).cueLists[0].cues[0].values.a.cells).toBeTruthy();   // (this version knows them)
+    // a newer file keeps its version when saved here
+    const newer: any = emptyShow(); newer.formatVersion = '1.4.0';
+    expect(JSON.parse(serializeShow(parseShow(JSON.stringify(newer)))).formatVersion).toBe('1.4.0');
+  });
+
   it('opens a newer minor version (forward compatible)', () => {
     const s: any = emptyShow(); s.formatVersion = '1.4.0'; s.newThing = [1, 2];
     expect((parseShow(JSON.stringify(s)) as any).newThing).toEqual([1, 2]);
@@ -280,5 +294,83 @@ describe("the stage's marks", () => {
     expect(notes.join(' ')).toContain("2 of the stage's marks couldn't be read");
     const none: any = emptyShow('t'); none.settings.marks = 'all of them';
     expect(parseShow(JSON.stringify(none)).settings.marks).toBeUndefined();
+  });
+});
+
+describe('a hostile file', () => {
+  it('a "__proto__" key can\'t hide a flame from the risk marks: it is taken out, and said', async () => {
+    const { parseShow } = await import('./format');
+    const { cueRisk } = await import('./safety');
+    const text = JSON.stringify({ format: 'luxdmx-show', formatVersion: '1.1.0', fixtures: [{ id: 'g', name: 'G', typeId: 'gen-flame', universe: 0, address: 1 }],
+      cueLists: [{ id: 'l', name: 'L', cues: [{ id: 'c', name: 'c', fade: 0, advance: { mode: 'manual' }, values: {} }] }] }).replace('"values":{}', '"values":{"g":{"__proto__":{"flame":1}}}');
+    const notes: string[] = [];
+    const s = parseShow(text, notes);
+    const v = s.cueLists[0].cues[0].values.g as Record<string, unknown>;
+    expect(Object.keys(v)).toEqual([]);
+    expect((v as { flame?: number }).flame).toBeUndefined();
+    expect(cueRisk(s, s.cueLists[0].cues[0])).toBe('light');
+    expect(notes.join()).toMatch(/__proto__/);
+  });
+});
+
+describe('mending what review 7 found', () => {
+  it('cells in a cell go, a group\'s unreadable cells are said, doubled MIDI controls become one', async () => {
+    const { parseShow } = await import('./format');
+    const notes: string[] = [];
+    const s = parseShow(JSON.stringify({ format: 'luxdmx-show', formatVersion: '1.2.0', fixtures: [{ id: 'a', name: 'A', typeId: 'gen-bar8', universe: 0, address: 1 }],
+      groups: [{ id: 'g', name: 'Rim', fixtures: ['a'], cells: [0, 'x', 2] }],
+      settings: { bpm: 120, consoleMidi: [{ to: 'grand', midi: { kind: 'cc', ch: 1, num: 7 } }, { to: 'light:a', midi: { kind: 'cc', ch: 1, num: 7 } }] },
+      cueLists: [{ id: 'l', name: 'L', cues: [{ id: 'c', name: 'c', fade: 0, advance: { mode: 'manual' }, values: { a: { cells: { 0: { intensity: 1, cells: { 1: {} }, raw: { 0: 9 } } } } } }] }] }), notes);
+    expect(s.cueLists[0].cues[0].values.a.cells).toEqual({ 0: { intensity: 1 } });
+    expect(s.groups[0].cells).toEqual([0, 2]);
+    expect(notes.join()).toMatch(/Rim: 1 of its cells/);
+    expect(s.settings.consoleMidi).toEqual([{ to: 'light:a', midi: { kind: 'cc', ch: 1, num: 7 } }]);
+  });
+});
+
+describe('requiredFeatures cells from every place cells can be', () => {
+  it('a preset (its own or per light), a group or an effect with cells is enough', async () => {
+    const { usesCells } = await import('./format');
+    const base = () => { const s: any = emptyShow(); s.cueLists = [{ id: 'l', name: 'L', end: 'stop', cues: [] }]; return s; };
+    expect(usesCells(base())).toBe(false);
+    let s = base(); s.presets = [{ id: 'p', name: 'P', kind: 'color', values: { cells: { 0: { color: { r: 1, g: 0, b: 0 } } } } }]; expect(usesCells(s)).toBe(true);
+    s = base(); s.presets = [{ id: 'p', name: 'P', kind: 'color', values: {}, perFixture: { a: { cells: { 3: { intensity: 1 } } } } }]; expect(usesCells(s)).toBe(true);
+    s = base(); s.groups = [{ id: 'g', name: 'Rim', fixtures: ['a'], cells: [0, 1] }]; expect(usesCells(s)).toBe(true);
+    s = base(); s.effects = [{ id: 'e', name: 'E', kind: 'chase', fixtures: ['a'], cells: [2], params: {} }]; expect(usesCells(s)).toBe(true);
+    s = base(); s.groups = [{ id: 'g', name: 'G', fixtures: ['a'] }]; expect(usesCells(s)).toBe(false);
+  });
+});
+
+describe('plain keys named like JavaScript internals', () => {
+  it('"constructor" and "prototype" in extensions come back as they were', async () => {
+    const { parseShow } = await import('./format');
+    const s: any = emptyShow(); s.extensions = { 'org.example.tool': { constructor: 'x', prototype: { a: 1 } } };
+    expect((parseShow(JSON.stringify(s)) as any).extensions).toEqual(s.extensions);
+  });
+});
+
+describe('a gobo wheel\'s shake and running round in a file', () => {
+  it('kept: shake 0..1, running round -1..1 (the one attribute that goes below 0); out of range brought in', () => {
+    const s: any = emptyShow('Gobos');
+    s.cueLists.push({ id: 'L', name: 'L', end: 'stop', cues: [{ id: 'c', name: 'c', fade: 0, advance: { mode: 'manual' },
+      values: { a: { gobo: 0.5, goboShake: 0.4, goboScroll: -0.5, gobo2Shake: -0.3, gobo2Scroll: -2 } } }] });
+    const back: any = parseShow(serializeShow(parseShow(JSON.stringify(s))));
+    expect(back.cueLists[0].cues[0].values.a).toEqual({ gobo: 0.5, goboShake: 0.4, goboScroll: -0.5, gobo2Shake: 0, gobo2Scroll: -1 });
+  });
+});
+
+describe('a beam angle in a file', () => {
+  it('a type\'s and a light\'s: two degrees, narrow first; nonsense left out with a note', () => {
+    const s: any = emptyShow('Beams');
+    s.fixtureTypes.push({ id: 'user:a', manufacturer: 'A', model: 'A', source: 'user', modes: [{ name: 'm', channels: [{ name: 'Dimmer', attr: 'intensity' }] }], physical: { beamDeg: [40, 8] } },
+      { id: 'user:b', manufacturer: 'B', model: 'B', source: 'user', modes: [{ name: 'm', channels: [{ name: 'Dimmer', attr: 'intensity' }] }], physical: { beamDeg: [0, 400] } });
+    s.fixtures.push({ id: 'f1', name: 'F1', typeId: 'user:a', mode: 'm', universe: 0, address: 1, x: 0, y: 0, beamDeg: [12, 12] },
+      { id: 'f2', name: 'F2', typeId: 'user:a', mode: 'm', universe: 0, address: 2, x: 0, y: 0, beamDeg: 'wide' });
+    const notes: string[] = [];
+    const back: any = parseShow(serializeShow(parseShow(JSON.stringify(s), notes)));
+    expect(back.fixtureTypes.find((t: any) => t.id === 'user:a').physical.beamDeg).toEqual([8, 40]);
+    expect(back.fixtureTypes.find((t: any) => t.id === 'user:b').physical.beamDeg).toBeUndefined();
+    expect(back.fixtures.map((f: any) => f.beamDeg)).toEqual([[12, 12], undefined]);
+    expect(notes.join(' ')).toMatch(/beam angle/);
   });
 });

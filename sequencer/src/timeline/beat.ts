@@ -42,7 +42,9 @@ export function demoPeaks(n: number): number[] {
 
 // Plays it from `from` seconds on an AudioContext; returns stop(). Notes are scheduled a little
 // ahead (a timer looks every 50 ms), so a busy page doesn't stutter the beat.
-export function playDemo(ctx: AudioContext, out: AudioNode, from: number): () => void {
+// `until` (seconds on the song's clock): every beat up to there is put in at once, no timer (for a
+// render's mix in an OfflineAudioContext, whose clock only runs when it renders)
+export function playDemo(ctx: BaseAudioContext, out: AudioNode, from: number, until?: number): () => void {
   const beatS = 60 / DEMO_BPM, t0 = ctx.currentTime - from;
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   { const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
@@ -92,11 +94,11 @@ export function playDemo(ctx: AudioContext, out: AudioNode, from: number): () =>
     s.connect(f).connect(g).connect(comp); s.start(at); s.stop(at + len);
   }
 
-  const timer = setInterval(() => {
-    if (stopped) return;
-    while (t0 + nextBeat * beatS < ctx.currentTime + 0.25) {
+  // every beat before `horizon` (on the context's clock) not put in yet; false once the song is over
+  function schedule(horizon: number): boolean {
+    while (t0 + nextBeat * beatS < horizon) {
       const at = Math.max(ctx.currentTime, t0 + nextBeat * beatS), t = nextBeat * beatS;
-      if (t >= DEMO_SECONDS) { clearInterval(timer); return; }
+      if (t >= DEMO_SECONDS) return false;
       const s = sectionAt(t), inBar = nextBeat % 4, bar = Math.floor(nextBeat / 4), root = ROOTS[bar % 4];
       if (s.kick) kick(at);
       if (s.hats) { hat(at + beatS / 2, true, 0.14); if (s.energy > 0.6) { hat(at + beatS / 4); hat(at + (beatS * 3) / 4); } }
@@ -106,6 +108,12 @@ export function playDemo(ctx: AudioContext, out: AudioNode, from: number): () =>
       if (s.riser && inBar === 0 && bar === Math.floor(s.start / BAR_S)) riser(at, s.end - t);
       nextBeat++;
     }
+    return true;
+  }
+  if (until !== undefined) { schedule(t0 + until); return () => undefined; }
+  const timer = setInterval(() => {
+    if (stopped) return;
+    if (!schedule(ctx.currentTime + 0.25)) clearInterval(timer);
   }, 50);
   return () => { stopped = true; clearInterval(timer); master.gain.setTargetAtTime(0, ctx.currentTime, 0.05); setTimeout(() => master.disconnect(), 400); };
 }

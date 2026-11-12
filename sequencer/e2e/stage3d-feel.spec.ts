@@ -4,7 +4,7 @@
 // drawing quality starts at High, a pixel bar lit by an effect reads its real level, and a Release
 // says which effects go on running.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, fresh, test, expect } from './helpers';
+import { channels, full, openConnected, resetFake, patch, fresh, selectAll, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -16,7 +16,7 @@ async function open3d(page: Page) {
 }
 const room = (page: Page) => page.evaluate(() => (window as any).__stage3d?.venue().group);
 
-test('a moving head turns at a real head\'s speed: on its way after a moment, there after two seconds', async ({ page }) => {
+test('a moving head turns at a real head\'s speed: the whole way round takes it about two seconds, through the middle', async ({ page }) => {
   test.setTimeout(90_000);
   await openConnected(page);
   await patch(page, 'gen-mover8', 1, 0, 'Head');
@@ -26,10 +26,26 @@ test('a moving head turns at a real head\'s speed: on its way after a moment, th
   const aim = (pan: number) => page.evaluate(([id, pan]) => { (window as any).__luxdmx.programmer[id as string] = { pan, tilt: 0.5, intensity: 1 }; }, [id, pan] as const);
   await aim(0);
   await expect.poll(async () => (await head())?.pan, { timeout: 15000 }).toBeCloseTo(-270, 0);
-  await aim(1);                                     // the whole way round: 540°
-  await page.waitForTimeout(500);
-  const mid = (await head())!.pan;
-  expect(mid).toBeGreaterThan(-265); expect(mid).toBeLessThan(200);   // on its way, not there
+  // the whole way round (540°): sampled in the page as it goes (a busy machine draws the 3D less
+  // often, and a look from outside comes late), it passes through the middle, not jumping there,
+  // and takes a real head's time: 280°/s at most, about 2.1 s (a busy machine only makes it slower)
+  const seen = await page.evaluate(async (id) => {
+    const a = (window as any).__luxdmx, s = (window as any).__stage3d, out: { t: number; p: number }[] = [];
+    a.programmer[id] = { pan: 1, tilt: 0.5, intensity: 1 };
+    const t0 = performance.now();
+    while (performance.now() - t0 < 12000) {
+      await new Promise((r) => setTimeout(r, 30));
+      const p = s.head(id)?.pan; out.push({ t: performance.now() - t0, p });
+      if (p > 269) break;
+    }
+    return out;
+  }, id);
+  expect(seen.some(({ p }) => p > -265 && p < 200)).toBe(true);          // on its way at some point
+  // (timed from the command to the first look that finds it there: a late look, a late start or a
+  // slow frame only make that longer, so a head faster than a real one is the only way under it)
+  const there = seen.find(({ p }) => p > 269);
+  expect(there).toBeTruthy();
+  expect(there!.t).toBeGreaterThan(1900);                                // not faster than a real head (~2.1 s)
   await expect.poll(async () => (await head())?.pan, { timeout: 15000 }).toBeCloseTo(270, 0);
 });
 
@@ -137,4 +153,125 @@ test('the Ambient slider sets the room\'s own light: starts low, 0 is a dark ven
   await page.reload();
   await open3d(page).catch(() => {});
   await expect.poll(async () => (await amb())?.sky, { timeout: 30000 }).toBeCloseTo(0.4375, 3);
+});
+
+test('the selection frame in 3D fades while the look is worked on, and is back on the stage, the lists or a new selection', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await patch(page, 'gen-mover8', 2, 0, 'Head');
+  await open3d(page);
+  await selectAll(page);
+  const marks = () => page.evaluate(() => (window as any).__stage3d.marks() as { opacity: number; visible: boolean; framed: number });
+  const shown = async () => { await expect.poll(async () => (await marks()).opacity, { timeout: 5000 }).toBeGreaterThan(0.85); expect((await marks()).framed).toBe(await page.evaluate(() => (window as any).__luxdmx.selected.length)); };
+  const gone = () => expect.poll(async () => (await marks()).visible, { timeout: 5000 }).toBe(false);
+  const canvas = page.locator('.stage-wrap canvas').first();
+  await canvas.hover();
+  await shown();
+  // the programmer: the frame goes, so an effect or a colour shows as it is
+  await page.locator('.panel.prog').hover();
+  await gone();
+  // onto the 3D stage: back
+  await canvas.hover();
+  await shown();
+  // the effects list: gone; the fixture list: back
+  await page.getByRole('tab', { name: 'Effects' }).click();
+  await page.locator('.panel.ep').hover();
+  await gone();
+  await page.getByRole('tab', { name: 'Fixtures' }).click();
+  await page.locator('.panel.fl').hover();
+  await shown();
+  // the keyboard counts too: Tab into the programmer
+  await page.locator('.panel.prog button').first().focus();
+  await gone();
+  // a new selection shows it, wherever the pointer is
+  await page.locator('.panel.prog').hover();
+  await gone();
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selectNone(); a.selectAll(); });
+  await shown();
+  // a Live page's stage is for looking: no frame there at all
+  await page.getByRole('tab', { name: 'Live' }).click();
+  await expect.poll(async () => (await marks()).framed, { timeout: 10000 }).toBe(0);
+});
+
+test('a channel set by hand under All channels moves the light on the stage too (pan, the dimmer), and letting go puts it back', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await open3d(page);
+  await selectAll(page);
+  await full(page);
+  const id = await page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].id);
+  const head = () => page.evaluate((id) => (window as any).__stage3d.head(id)?.pan, id);
+  const drawn = () => page.evaluate((id) => (window as any).__luxdmx.drawn[id], id);
+  await expect.poll(head, { timeout: 15000 }).toBeCloseTo(0, 0);           // (pan in the middle)
+  await page.getByText('All channels').click();
+  const slider = (name: string) => page.locator(`#pg-all-ch input[type=range][aria-label="${name} value"]`);
+  await slider('Pan').fill('255');
+  await expect.poll(async () => (await channels(0, 1))[0]).toBe(255);       // on the wire
+  await expect.poll(head, { timeout: 15000 }).toBeCloseTo(270, 0);         // and the 3D head all the way round
+  expect((await drawn()).pan).toBe(1);                                      // (the plan draws it too)
+  await slider('Dimmer').fill('0');
+  await expect.poll(async () => (await drawn()).intensity).toBe(0);
+  // letting go of pan: back to where the look has it
+  await page.locator('#pg-all-ch .ch', { hasText: 'Pan' }).first().locator('button.x').click();
+  await expect.poll(head, { timeout: 15000 }).toBeCloseTo(0, 0);
+});
+
+test('the Spill slider: how much the lights light up the room round them, lower than it was by default, 0 none, full as it was; remembered', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 4, 0, 'Head');
+  await open3d(page);
+  await selectAll(page); await full(page);
+  const spill = () => page.evaluate(() => (window as any).__stage3d.spill() as { spill: number; washes: number[] });
+  const lit = async () => Math.max(...(await spill()).washes);
+  expect((await spill()).spill).toBeCloseTo(0.45, 2);                      // (less than the full it always was)
+  await expect.poll(lit, { timeout: 10000 }).toBeGreaterThan(0);
+  const at45 = await lit();
+  const slider = async (v: string) => {
+    const s3 = page.locator('.s3'), input = s3.getByLabel('Spill from your lights');
+    if (!(await input.isVisible())) await s3.getByRole('button', { name: 'More', exact: true }).click();
+    await input.fill(v);
+  };
+  await slider('0');
+  await expect.poll(lit).toBe(0);
+  await slider('1');
+  await expect.poll(lit).toBeGreaterThan(at45 * 1.8);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('luxdmx.seq.spill'))).toBe('1');
+});
+
+test('a beam as wide as the light\'s data says: a wash from the library 7° to 50° over its zoom; its own angle set in Mounting counts, cleared it\'s its type\'s again', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await patch(page, 'gen-wash', 1, 0, 'Wash');
+  await open3d(page);
+  await selectAll(page); await full(page);
+  const id = await page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].id);
+  const beam = () => page.evaluate((id) => (window as any).__stage3d.beam(id), id);
+  const zoom = (v: string) => page.locator('.prog input[type=range][aria-label="Zoom"]').fill(v);
+  await zoom('0');
+  await expect.poll(beam, { timeout: 10000 }).toBeCloseTo(7, 1);
+  await zoom('1');
+  await expect.poll(beam).toBeCloseTo(50, 1);
+  // its own narrowest angle (the real one differs from its type)
+  await page.locator('.fl li[data-fixture="Wash"]').dblclick();
+  const dlg = page.getByRole('dialog', { name: 'Patch: Wash' });
+  await dlg.getByRole('tab', { name: 'Mounting' }).click();
+  await expect(dlg.getByLabel('Beam angle, narrowest')).toHaveAttribute('placeholder', '7 (its type)');
+  await dlg.getByLabel('Beam angle, narrowest').fill('20');
+  await dlg.getByLabel('Beam angle, narrowest').press('Tab');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].beamDeg)).toEqual([20, 50]);
+  await page.keyboard.press('Escape');
+  await zoom('0');
+  await expect.poll(beam).toBeCloseTo(20, 1);
+  // cleared: its type's again
+  await page.locator('.fl li[data-fixture="Wash"]').dblclick();
+  await dlg.getByRole('tab', { name: 'Mounting' }).click();
+  await dlg.getByLabel('Beam angle, narrowest').fill('');
+  await dlg.getByLabel('Beam angle, narrowest').press('Tab');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].beamDeg ?? null)).toBeNull();
+  await page.keyboard.press('Escape');
+  await expect.poll(beam).toBeCloseTo(7, 1);
 });

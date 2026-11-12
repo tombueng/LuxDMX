@@ -230,3 +230,16 @@ describe('a reload with a second tab that has its own remote on', () => {
     } finally { L.uninstall(); }
   });
 });
+
+describe('a cue button\'s colours on the phone', () => {
+  it('a ring lit only by its cells shows their colour, not white', () => {
+    const cue: Widget = { id: 'cu', type: 'cue', list: 'l', cue: 'c1' } as Widget;
+    const { app, host } = rig([cue]);
+    (app.show as any).cueLists = [{ id: 'l', name: 'L', cues: [{ id: 'c1', name: 'Rim', values: {}, fade: 0, advance: { mode: 'manual' } }] }];
+    app.cueLooksOf = new Map([['l', [{ r1: { cellVals: { 0: { intensity: 1, color: { r: 1, g: 0, b: 0 } } } } }]]]) as never;
+    expect((host as any).swatch('l', 'c1')).toEqual(['rgb(255,0,0)']);
+    // the same red at half and at full: one swatch, at full
+    app.cueLooksOf = new Map([['l', [{ a: { intensity: 0.5, color: { r: 1, g: 0, b: 0 } }, b: { intensity: 1, color: { r: 1, g: 0, b: 0 } } }]]]) as never;
+    expect((host as any).swatch('l', 'c1')).toEqual(['rgb(255,0,0)']);
+  });
+});

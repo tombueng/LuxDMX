@@ -25,9 +25,10 @@ export type ToThread =
   | { t: 'link'; on: boolean; url: string; proto: 'artnet' | 'sacn' | 'both' }
   | { t: 'final' };
 export type FromThread =
+  | { t: 'held'; held: Record<string, number> }
   | { t: 'stats'; rate: number; worst: number; late: number; ms: number; sent: number; to: number; quiet: boolean; unis: number }
   | { t: 'broken'; why: string };
-export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean }
+export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
 
 const PERIOD = 25, HEARTBEAT_MS = 250, LATE = 10;
 const post = (m: FromThread, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(m, transfer);
@@ -38,6 +39,7 @@ let at: number | null = null;                         // a command's own moment,
 // the page's clock (seconds), so a fade started there starts at the same moment here
 const now = () => at ?? (performance.now() + performance.timeOrigin - mainOrigin) / 1000;
 const engine = new Engine(() => show ?? EMPTY, now);
+engine.cacheTracks = true;        // (the show here is a fresh copy after every edit)
 const EMPTY = { fixtures: [], cueLists: [], effects: [], groups: [], presets: [], fixtureTypes: [], pages: [] } as unknown as Show;
 let modes = new Map<string, FixtureMode | undefined>();
 let quiet = true, blind: Map<number, Uint8Array> | null = null, stopped = false, failing = false;
@@ -93,6 +95,19 @@ function send(frames: Map<number, Uint8Array>, t: number) {
   if (link.on) for (const [uni, data] of frames) linkSend(uni, data, t);
 }
 
+// The winches' held heights, for the page to keep over a reload and to freeze for Blind: what
+// went on the wire. Said on the frame they change (they only change while armed).
+let heldSaid = '', wasArmed = false;
+function tellHeld() {
+  const now = engine.armed;
+  if (!now && !wasArmed && heldSaid) return;
+  wasArmed = now;
+  const h = engine.heldOwn(), s = JSON.stringify(h);
+  if (s === heldSaid) return;
+  heldSaid = s;
+  post({ t: 'held', held: h });
+}
+
 // ---- the clock
 const ticks: number[] = [];
 let work = 0, statAt = 0, sentN = 0;
@@ -100,7 +115,7 @@ function frame() {
   if (stopped || !show) return;
   const t0 = performance.now();
   let frames: Map<number, Uint8Array> | null;
-  try { frames = engine.tick().frames; failing = false; } catch (e) {
+  try { frames = engine.tick().frames; failing = false; tellHeld(); } catch (e) {
     // a frame that throws: the look that went out, fog and the machines off; said once
     if (!failing) { failing = true; post({ t: 'broken', why: (e as Error)?.message ?? String(e) }); }
     frames = last && zeroedFrames(last, show.fixtures, (f) => modes.get(f.id), atmosAndMachines);
@@ -137,7 +152,7 @@ function loop() {
 
 // ---- what the page says
 const COMMANDS = new Set(['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
-  'setMaster', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'stopAllEffects', 'act']);
+  'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'stopAllEffects', 'act']);
 self.onmessage = (e: MessageEvent<ToThread>) => {
   const m = e.data;
   switch (m.t) {

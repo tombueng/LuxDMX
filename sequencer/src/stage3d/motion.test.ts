@@ -38,9 +38,21 @@ describe('a moving head\'s motors', () => {
     const at = run(a, (t) => 20 * t, 2);                     // 20°/s
     expect(Math.abs(at.at(-1)! - 40)).toBeLessThan(1);
   });
+  it('a slow frame counts the time that went by, as the real motors ran: no jump, no lag', () => {
+    // 0.6 s in one frame (a busy machine) lands where 36 frames at 60 a second would
+    const slow: Axis = { at: 0, v: 0 }, fast: Axis = { at: 0, v: 0 };
+    slew(slow, 540, 0.6, PAN_SPEED);
+    for (let i = 0; i < 36; i++) slew(fast, 540, 1 / 60, PAN_SPEED);
+    expect(slow.at).toBeGreaterThan(100); expect(slow.at).toBeLessThan(200);   // on its way, not there
+    expect(Math.abs(slow.at - fast.at)).toBeLessThan(3);
+    expect(Math.abs(slow.v - fast.v)).toBeLessThan(5);
+    // and 2.5 s in one go: there, as a real head would be
+    expect(slew({ at: 0, v: 0 }, 540, 2.5, PAN_SPEED)).toBe(540);
+  });
   it('a long gap (a hidden tab) or the first frame: straight where it should be', () => {
     const a: Axis = { at: 0, v: 0 };
-    expect(slew(a, 200, 1, PAN_SPEED)).toBe(200);
+    expect(slew(a, 20000, 5, PAN_SPEED)).toBe(20000);              // (far beyond what 5 s would reach)
+    a.at = 200;
     expect(slew({ at: NaN, v: 0 }, 30, 1 / 60, PAN_SPEED)).toBe(30);
     expect(slew(a, 100, 0, PAN_SPEED)).toBe(200);              // no time: nowhere
   });

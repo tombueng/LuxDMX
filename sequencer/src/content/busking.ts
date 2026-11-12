@@ -5,18 +5,20 @@
 import type { CueList, Page, Show, Widget } from '../model/types';
 import { caps, isFogTimer, isLooks, isPlay, modeOf, typeMap } from '../model/library';
 import { songsOf } from '../model/timeline';
+import { isMachine } from '../model/safety';
 
 // Keys: the number row plays the looks, the letter rows the lists and effects.
 const NUM = [...'1234567890'], ROW1 = [...'qwertyuiop'], ROW2 = [...'asdfghjkl'], ROW3 = [...'zxcm'];
 
 type ListLike = Pick<CueList, 'cues'>;
-const keysOf = (l: ListLike) => l.cues.flatMap((c) => Object.values(c.values).map((v) => Object.keys(v)));
+// (a machine's own programs, built-in effects and colour programs, count as firing it)
+const keysOf = (l: ListLike, machine?: (fid: string) => boolean) => l.cues.flatMap((c) => Object.entries(c.values).map(([fid, v]) => Object.keys(v).map((k) => (machine && (k === 'effectMacro' || k === 'colorMacro') && machine(fid) ? 'flame' : k))));
 const MACHINE = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
 // A list that only fires effect machines (a confetti shot, a few seconds of flames): a button that
 // fires it, not a look or an on/off. Its cue ends by itself (a wait and the list's end), so a tap
 // is a shot, never a machine left running.
-export function isMachineList(l: ListLike): boolean {
-  const keys = keysOf(l);
+export function isMachineList(l: ListLike, machine?: (fid: string) => boolean): boolean {
+  const keys = keysOf(l, machine);
   return keys.length > 0 && keys.every((ks) => ks.every((k) => MACHINE.includes(k) || k === 'fan')) && keys.some((ks) => ks.some((k) => MACHINE.includes(k)));
 }
 // A list that only fogs or hazes (a fog timer, haze for the night with its fan): it lives with the fog.
@@ -25,10 +27,11 @@ const fogOnly = (l: ListLike) => isFogTimer(l) || (keysOf(l).length > 0 && keysO
 export function buskingPage(show: Show) {
   const w: Widget[] = [];
   const types = typeMap(show);
+  const isM = (fid: string) => { const f = show.fixtures.find((x) => x.id === fid); return !!f && isMachine(modeOf(types.get(f.typeId), f.mode)); };
   // the main looks: the first list that isn't a fog timer or a machine's shot (one made before any
   // look mustn't be it)
-  const main = show.cueLists.find((l) => !isFogTimer(l) && !isMachineList(l));
-  const machines = show.cueLists.filter((l) => l !== main && isMachineList(l));
+  const main = show.cueLists.find((l) => !isFogTimer(l) && !isMachineList(l, isM));
+  const machines = show.cueLists.filter((l) => l !== main && isMachineList(l, isM));
   const others = show.cueLists.filter((l) => l !== main && !machines.includes(l));
   // A play (standby notes or follow-ons, or the list says so): the page shows the whole list the
   // way a play is run, and leaves out the DJ's things (blinder, drop, tempo).

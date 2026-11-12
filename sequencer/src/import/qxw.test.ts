@@ -81,6 +81,13 @@ describe('QLC+ workspace import', () => {
 });
 
 describe('QLC+ workspace export', () => {
+  it('a group of cells goes as its whole lights, and says so', () => {
+    const band = TEMPLATES[0].build();
+    band.groups.push({ id: 'gc', name: 'Rim', fixtures: [band.fixtures[0].id], cells: [0, 1] });
+    const { xml, skipped } = toQxw(band);
+    expect(skipped.join()).toContain('Rim: groups of cells go to QLC+ as groups of their whole lights');
+    expect(xml).toContain('<Name>Rim</Name>');
+  });
   it('a template goes out and comes back with the same patch, cues and output', async () => {
     const band = TEMPLATES[0].build();
     const { xml, skipped } = toQxw(band);

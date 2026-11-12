@@ -22,6 +22,8 @@
   const room = $derived(roomOf(app.show.settings.stage3d?.room));
   const mover = $derived(kind === 'mover');
   const machine = $derived(kind === 'fog' || kind === 'sfx');
+  // a winch (kinetics): its soft limits are set here
+  const winch = $derived(!!app.modeOf(id)?.channels.some((c) => c.attr === 'hoist'));
   const sortOf = (k: string) => (k === 'mover' ? 'mover' : k === 'fog' || k === 'sfx' ? 'machine' : 'fixed');
   const fx = (x: string) => app.show.fixtures.find((g) => g.id === x);
   const r1 = (v: number) => Math.round(v * 10) / 10 + 0;
@@ -92,6 +94,37 @@
   function setRange(k: 'panDeg' | 'tiltDeg', v: number) {
     app.checkpoint();
     for (const x of peers) { const g = fx(x); if (g) { if (Number.isFinite(v) && v >= 1 && v <= 1080) g[k] = Math.round(v); else delete g[k]; } }
+    app.markDirty(0);
+  }
+  // a winch's soft limits, as parts of its travel (0 the top): the highest and lowest it may go;
+  // both back at the ends: none
+  function setLimit(i: 0 | 1, pct: number) {
+    app.checkpoint();
+    for (const x of peers) {
+      const g = fx(x);
+      if (!g || !app.modeOf(g.id)?.channels.some((c) => c.attr === 'hoist')) continue;
+      const cur: [number, number] = [...(g.hoistLimits ?? [0, 1])];
+      cur[i] = Number.isFinite(pct) ? Math.max(0, Math.min(1, pct / 100)) : i;
+      const lim: [number, number] = [Math.min(cur[0], cur[1]), Math.max(cur[0], cur[1])];
+      if (lim[0] <= 0 && lim[1] >= 1) delete g.hoistLimits; else g.hoistLimits = lim;
+    }
+    app.markDirty(0);
+  }
+  // the beam angle (narrowest or widest): this light's own, over its type's; both empty: its type's again
+  function setBeam(i: 0 | 1, v: number) {
+    app.checkpoint();
+    const ok = Number.isFinite(v) && v >= 0.5 && v <= 180;
+    for (const x of peers) {
+      const g = fx(x);
+      if (!g) continue;
+      const type = app.types.get(g.typeId)?.physical?.beamDeg;
+      const cur: (number | undefined)[] = [g.beamDeg?.[0] ?? type?.[0], g.beamDeg?.[1] ?? type?.[1]];
+      // (a number: that end; an empty field: that end back to its type's)
+      cur[i] = ok ? Math.round(v * 2) / 2 : type?.[i];
+      const a = cur[0] ?? cur[1], b = cur[1] ?? cur[0];
+      if (a === undefined || b === undefined || (type && Math.min(a, b) === type[0] && Math.max(a, b) === type[1])) delete g.beamDeg;
+      else g.beamDeg = [Math.min(a, b), Math.max(a, b)];
+    }
     app.markDirty(0);
   }
   function setOffsets(o: { panOffset?: number; tiltOffset?: number }) {
@@ -245,6 +278,37 @@
       {#if machine}<p class="faint small">Machines aren't tried from here: nothing is sent to them.</p>{/if}
     </section>
 
+    {#if winch}
+      <!-- a winch's soft limits: whatever a cue says, it's sent within them -->
+      {@const tr = t?.physical?.travel}
+      <section aria-labelledby="winch-h">
+        <h3 id="winch-h">Its travel</h3>
+        <div class="angles">
+          <label title="The highest it may go, as a part of its travel from the top (0 % is all the way up)">Highest %<input type="number" min="0" max="100" step="1" aria-label="Winch limit, highest" value={Math.round((f.hoistLimits?.[0] ?? 0) * 100)}
+            onchange={(e) => setLimit(0, num(e))} /></label>
+          <label title="The lowest it may go (100 % is all the way down): set it above the heads of the people under it">Lowest %<input type="number" min="0" max="100" step="1" aria-label="Winch limit, lowest" value={Math.round((f.hoistLimits?.[1] ?? 1) * 100)}
+            onchange={(e) => setLimit(1, num(e))} /></label>
+        </div>
+        {#if !app.modeOf(id)?.channels.some((c) => c.attr === 'enable')}
+          <p class="warn small" role="note">This winch has no motion enable channel. Until it has been sent a height armed here, nobody knows where it hangs, and its height channel gets its default (0 is its top). Set its controller to ignore DMX until it's enabled, or add its enable channel to its type.</p>
+        {/if}
+        <p class="faint small">Soft limits: whatever a cue or a fader says, the winch is sent within them.{tr ? ` Its travel is ${tr} m, so the lowest is ${r1(tr * (f.hoistLimits?.[1] ?? 1))} m below the top.` : ''} It moves only while the machines are armed; safe, it stays where it is.</p>
+      </section>
+    {/if}
+    {#if !machine}
+      <!-- the beam's opening angle: from its type's data (the fixture file), or this light's own -->
+      {@const tb = t?.physical?.beamDeg}
+      <section aria-labelledby="beam-h">
+        <h3 id="beam-h">Its beam</h3>
+        <div class="angles">
+          <label title="The beam's opening angle at its narrowest (zoomed in), from the data sheet: the 3D stage draws it so">Narrowest °<input type="number" min="0.5" max="180" step="0.5" aria-label="Beam angle, narrowest" value={f.beamDeg?.[0] ?? ''}
+            placeholder={tb ? `${tb[0]} (its type)` : 'a guess'} onchange={(e) => setBeam(0, num(e))} /></label>
+          <label title="At its widest (zoomed out); the same as the narrowest for a light without a zoom">Widest °<input type="number" min="0.5" max="180" step="0.5" aria-label="Beam angle, widest" value={f.beamDeg?.[1] ?? ''}
+            placeholder={tb ? `${tb[1]} (its type)` : 'a guess'} onchange={(e) => setBeam(1, num(e))} /></label>
+        </div>
+        <p class="faint small">{tb ? "From its type's fixture file; set your own if the real one differs." : "Its type doesn't say: the 3D stage guesses from what kind of light it is. The data sheet has it (beam angle, often with a zoom range)."}</p>
+      </section>
+    {/if}
     {#if testable.length}
       <section aria-labelledby="try-h">
         <h3 id="try-h">Try it</h3>
@@ -353,6 +417,7 @@
   .inl select { color: var(--text); }
   .line { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
   .small { margin: 0; font-size: .8rem; }
+  .warn { color: var(--orange); margin-bottom: .3rem; }
   .note { margin: 0; font-size: .85rem; color: var(--orange); }
   .nudge { display: flex; gap: .25rem; flex-wrap: wrap; align-items: center; }
   .nudge button { padding: .25rem .55rem; font-size: .85rem; }

@@ -15,6 +15,7 @@
   import { tablist, ui } from './ui.svelte';
   import { typeLabel } from '../model/library';
   import { modeChange } from '../model/fixtureSetup';
+  import { MAX_NUM } from '../model/numbers';
   import type { FixtureType } from '../model/types';
 
   let { id, onclose }: { id: string; onclose: () => void } = $props();
@@ -34,6 +35,18 @@
   let tab = $state<'patch' | 'channels' | 'leds' | 'mounting'>(ui.patchTab);
   // gone while open (undone, deleted elsewhere): the dialog closes, and a redo doesn't bring it back
   $effect(() => { if (!f) onclose(); });
+  // its number: one no other light has (said, not swapped)
+  let numSaid = $state('');
+  function setNum(v: number, el: HTMLInputElement) {
+    if (!f) return;
+    const n = Math.round(v), other = app.show.fixtures.find((x) => x.id !== f.id && x.num === n);
+    // (refused: the field shows its own number again, the message says why)
+    const no = (why: string) => { numSaid = why; el.value = f.num === undefined ? '' : String(f.num); };
+    if (!(n >= 1 && n <= MAX_NUM)) return no(`A number from 1 to ${MAX_NUM}`);
+    if (other) return no(`${n} is already ${other.name}'s: pick another, or renumber ${other.name} first`);
+    numSaid = '';
+    if (n !== f.num) { app.checkpoint(); f.num = n; app.markDirty(0); }
+  }
   function setAddress(a: number) { if (f && a >= 1 && a <= 512) { app.checkpoint(); f.address = a; app.markDirty(0); } }
   function setMode(name: string) { if (f && name !== f.mode) { app.checkpoint(); f.mode = name; app.markDirty(0); } }
   function moveAfter() {
@@ -52,6 +65,7 @@
 
 {#if f}
   <Modal title="Patch: {f.name}" {onclose} wide={tab === 'mounting' || tab === 'leds' || tab === 'channels'}>
+    <div class="marks" data-marks="hide">
     <div class="tabs" role="tablist" aria-label="Patch, channels{shaped ? ', LEDs' : ''} or mounting" use:tablist>
       {#each TABS as [k, label] (k)}<button role="tab" id="fp-tab-{k}" aria-controls="fp-panel" aria-selected={tab === k} class:on={tab === k} onclick={() => (tab = k)}>{label}</button>{/each}
     </div>
@@ -59,6 +73,9 @@
     {#if tab === 'patch'}
     <div class="fp">
       <label class="wide">Name <input bind:value={f.name} aria-label="Fixture name" /></label>
+      <label title="Its number: the console and typed commands go by it (5 @ full). It stays when other lights come and go.">Fixture number <span class="addr"><input type="number" min="1" max={MAX_NUM} value={f.num ?? ''} aria-label="Fixture number"
+        onchange={(e) => { const el = e.target as HTMLInputElement; setNum(Number.isFinite(el.valueAsNumber) ? el.valueAsNumber : NaN, el); }} />
+        {#if numSaid}<span class="err" role="status">{numSaid}</span>{/if}</span></label>
       <label>Universe <input type="number" min="0" max="32767" value={f.universe} aria-label="Fixture universe"
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v)) { app.checkpoint(); f.universe = Math.max(0, Math.min(32767, Math.round(v))); app.markDirty(0); } }} /></label>
       <label>Address <span class="addr"><input type="number" min="1" max="512" value={f.address} aria-label="Fixture address"
@@ -99,10 +116,12 @@
     {/if}
     </div>
     <div class="row end done"><button class="primary" onclick={onclose}>Done</button></div>
+    </div>
   </Modal>
 {/if}
 
 <style>
+  .marks { display: contents; }
   .tabs { display: flex; gap: .2rem; margin-bottom: .7rem; }
   .tabs button { padding: .25rem .8rem; font-size: .88rem; }
   .tabs button.on { background: var(--orange); color: #1a1000; border-color: var(--orange); }

@@ -167,6 +167,9 @@ export function matrixWirings(cols: number, rows: number): Matrix[] {
     out.push(tidyMatrix({ kind: 'matrix', cols, rows, from, vertical, zigzag }));
   return out;
 }
+// The wiring of a panel whose LEDs sit where `to` says (column, row from the bottom), if any
+// (a GDTF file's pixel positions).
+export const matrixForGrid = (cols: number, rows: number, to: (i: number) => [number, number]) => matrixWhere(cols, rows, false, to);
 // The wiring that puts every LED where `to` says (column, row from the bottom), if there is one.
 function matrixWhere(cols: number, rows: number, zigzag: boolean, to: (i: number) => [number, number]): Matrix | undefined {
   const fits = (l: Matrix) => { const p = placesFor(l); for (let i = 0; i < p.n; i++) { const [x, y] = to(i); if (p.gx[i] !== x || p.gy[i] !== y) return false; } return true; };

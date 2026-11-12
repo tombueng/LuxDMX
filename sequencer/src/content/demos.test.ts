@@ -50,6 +50,19 @@ function restsOn(f: Fixture, cells: number, r: Room): string | undefined {
   return undefined;
 }
 
+// Gobos in a demo's looks: every look sets every gobo head's gobo (open at least: nothing carries over
+// from the look before), most looks have some, and the profile spots' glass, prisms and animation
+// wheel show up somewhere
+function gobosInLooks(s: ReturnType<typeof buildTrussTest>, list: string, share: number, profileExtras: boolean) {
+  const show = s.cueLists.find((l) => l.name === list)!;
+  const heads = s.fixtures.filter((f) => f.typeId === 'gen-profile' || f.typeId === 'gen-spotgobo').map((f) => f.id);
+  expect(heads.length).toBeGreaterThan(0);
+  for (const c of show.cues) for (const id of heads) expect(c.values[id]?.gobo, `${c.name}: ${id}`).toBeDefined();
+  const dressed = show.cues.filter((c) => heads.some((id) => { const v = c.values[id]; return v && (Number(v.gobo ?? 0) > 0 || Number(v.gobo2 ?? 0) > 0 || Number(v.prism ?? 0) > 0.04 || Number(v.animation ?? 0) > 0); }));
+  expect(dressed.length / show.cues.length).toBeGreaterThan(share);
+  if (profileExtras) for (const k of ['gobo2', 'animation', 'prism'] as const) expect(show.cues.some((c) => heads.some((id) => Number(c.values[id]?.[k] ?? 0) > 0.04)), k).toBe(true);
+}
+
 describe('the list of demos', () => {
   it('the festival first (the big demo on its metal song), then the club, the party and the test truss', () => {
     expect(DEMOS.map((d) => d.id)).toEqual(['festival', 'club', 'party', 'truss']);
@@ -159,10 +172,12 @@ describe('the club', () => {
   const song = songOf('in-peace')!, s = demoById('club')!.build(song), t = s.timeline!;
   const at = (attr: string) => t.items.filter((i) => i.do.do === 'burst' && i.do.attr === attr).map((i) => i.at);
   const of = (re: RegExp) => s.fixtures.filter((f) => re.test(f.name));
+  it('gobos in its looks: on the dance floor from the profile spots (glass, prisms, the animation wheel), beams from the deck', () => gobosInLooks(s, 'Club', 0.75, true));
   it('twenty moving heads, spots and washes, on the trusses and on the deck', () => {
     const heads = s.fixtures.filter((f) => kindIn(s, f) === 'mover');
     expect(heads).toHaveLength(20);
-    expect(heads.filter((f) => f.typeId === 'gen-spotgobo').length).toBeGreaterThanOrEqual(8);
+    expect(heads.filter((f) => f.typeId === 'gen-spotgobo' || f.typeId === 'gen-profile').length).toBeGreaterThanOrEqual(8);
+    expect(heads.filter((f) => f.typeId === 'gen-profile').length).toBeGreaterThanOrEqual(6);   // (profile spots over the dance floor)
     expect(heads.filter((f) => f.typeId === 'gen-wash').length).toBeGreaterThanOrEqual(8);
     const where = heads.map((f) => restsOn(f, 1, roomOf('club')));
     expect(where.filter((w) => w === 'truss').length).toBeGreaterThanOrEqual(10); expect(where.filter((w) => w === 'deck').length).toBeGreaterThanOrEqual(6);
@@ -192,6 +207,7 @@ describe('the club', () => {
 
 describe('the party', () => {
   const s = demoById('party')!.build(songOf(demoById('party')!.song)), r = roomOf('party');
+  it('gobos in its looks, from the spots on the square of truss', () => gobosInLooks(s, 'Party', 0.75, false));
   it('no stage; twenty moving heads all round the square of truss and at its legs', () => {
     expect(r.deck.x).toBeLessThan(0);
     const heads = s.fixtures.filter((f) => kindIn(s, f) === 'mover');
@@ -213,7 +229,7 @@ describe('the test truss', () => {
   const look = (f: Fixture) => {
     const k = kindIn(s, f), t = typeMap(s).get(f.typeId)!;
     if (k === 'bar') return cellsOf(s, f) > 24 ? 'strip' : 'bar';
-    if (k === 'mover') return /wash/i.test(t.model) ? 'wash' : 'spot';
+    if (k === 'mover') return /wash/i.test(t.model) ? 'wash' : /profile/i.test(t.model) ? 'profile' : 'spot';
     if (k === 'dimmer') return /blinder/i.test(t.model) ? 'blinder' : 'fresnel';
     if (k === 'fog') return attrsOf(s, f).includes('haze') ? 'hazer' : 'fog';
     if (k === 'sfx') return attrsOf(s, f).find((a) => (MACHINES as readonly string[]).includes(a))!;
@@ -229,11 +245,11 @@ describe('the test truss', () => {
   });
   it('a cue that tests each kind, named for it; a chase round them all; a button per machine', () => {
     const L = s.cueLists[0], names = L.cues.map((c) => c.name);
-    for (const k of ['Spots', 'Washes', 'PARs', 'LED bars', 'Pixel strips', 'Strobes', 'Blinders', 'Fresnels', 'Fog', 'Hazers', 'Confetti', 'Flames', 'Sparks', 'CO2', 'Bubbles'])
+    for (const k of ['Profiles', 'Spots', 'Washes', 'PARs', 'LED bars', 'Pixel strips', 'Strobes', 'Blinders', 'Fresnels', 'Fog', 'Hazers', 'Confetti', 'Flames', 'Sparks', 'CO2', 'Bubbles'])
       expect(names.some((n) => n.startsWith(`${k}:`)), k).toBe(true);
     expect(names).toContain('Spots: pan and tilt'); expect(names).toContain('Washes: colour');
     const chase = s.cueLists.find((l) => l.name === 'Chase')!;
-    expect(chase.end).toBe('loop'); expect(chase.cues.length).toBe(8);
+    expect(chase.end).toBe('loop'); expect(chase.cues.length).toBe(TRUSS_KINDS.length);
     for (const c of chase.cues) expect(c.advance).toEqual({ mode: 'wait', time: 0.5 });
     const w = buskingPage(s).widgets;
     expect(w.filter((x) => x.type === 'list' && x.id.startsWith('sfx-')).map((x) => s.cueLists.find((l) => x.type === 'list' && l.id === x.list)!.name))

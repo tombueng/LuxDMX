@@ -4,6 +4,7 @@
 import type { Fixture, Resolved } from '../model/types';
 import type { FixtureKind } from '../model/library';
 import { lookColor } from '../engine/cuelook';
+import { cellLookAt, cellsOf } from '../engine/resolve';
 import type { Places } from '../model/pixelLayout';
 
 // The picture as an image: one element on the page, drawn once, instead of a shape per light (a
@@ -23,7 +24,9 @@ export function svgImage(svg: string): string {
 // `own`: a look of a list of looks: a light it doesn't name is drawn as an outline (it stays as it
 // is), one it switches off as a dark light, so the card tells "off" from "not in this look".
 // `places`: which lights are a ring or a matrix (drawn with a few of their pixels: it's a small picture).
-export function stageSvg(fixtures: Fixture[], looks: Record<string, Resolved>, kinds: Record<string, FixtureKind>, w = 160, h = 90, own = false, places?: (id: string) => Places | undefined): string {
+// `cellCount`: how many cells a light has (a bar's cells drawn one by one when a look sets some).
+export function stageSvg(fixtures: Fixture[], looks: Record<string, Resolved>, kinds: Record<string, FixtureKind>, w = 160, h = 90, own = false, places?: (id: string) => Places | undefined,
+  cellCount?: (id: string) => number): string {
   const parts: string[] = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`,
     `<rect width="${w}" height="${h}" rx="6" fill="#0b0f15"/>`];
   const r = Math.max(2.2, Math.min(7, 90 / Math.sqrt(fixtures.length + 4)));
@@ -52,14 +55,14 @@ export function stageSvg(fixtures: Fixture[], looks: Record<string, Resolved>, k
       const R = r * 2.1, step = Math.max(1, Math.ceil(at.n / 48));
       parts.push(`<circle cx="${x}" cy="${y}" r="${(R * 1.08).toFixed(1)}" fill="#1c232d" stroke="#3b4450" stroke-width="0.6"/>`);
       for (let i = 0; i < at.n; i += step) {
-        const cc = lookColor(l?.cells?.[i] ?? l);
+        const cc = lookColor(cellLookAt(l, i, at.n));
         if (cc.glow > 0.02) parts.push(`<circle cx="${(+x + at.x[i] * R).toFixed(1)}" cy="${(+y - at.y[i] * R).toFixed(1)}" r="${Math.max(0.5, R * 0.09).toFixed(1)}" fill="${cc.css}"/>`);
       }
       continue;
     }
     if (kinds[f.id] === 'bar') {
       // A bar is a bar: its cells side by side (one colour unless an effect gave them their own).
-      const cells = l?.cells?.length ? l.cells : [l];
+      const cells = (l && cellsOf(l, cellCount?.(f.id) ?? l.cells?.length ?? 0)) ?? [l];
       const bw = r * 4.4, cw = bw / cells.length;
       parts.push(`<rect x="${(+x - bw / 2).toFixed(1)}" y="${(+y - r * 0.6).toFixed(1)}" width="${bw.toFixed(1)}" height="${(r * 1.2).toFixed(1)}" rx="1.5" fill="#1c232d" stroke="#3b4450" stroke-width="0.6"/>`);
       cells.forEach((c, i) => {

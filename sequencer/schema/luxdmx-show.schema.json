@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luxdmx.org/schema/luxdmx-show-1.1.json",
+  "$id": "https://luxdmx.org/schema/luxdmx-show-1.2.json",
   "title": "LuxDMX show",
-  "description": "A LuxDMX Sequencer show, format 1.1. FORMAT.md explains every field. Unknown fields are allowed everywhere (readers keep them).",
+  "description": "A LuxDMX Sequencer show, format 1.2. FORMAT.md explains every field. Unknown fields are allowed everywhere (readers keep them).",
   "type": "object",
   "required": ["format", "formatVersion", "fixtures", "cueLists"],
   "properties": {
@@ -26,7 +26,7 @@
       "properties": { "devices": { "type": "array", "items": { "type": "object", "required": ["host"], "properties": { "host": { "type": "string" } } } } }
     },
     "settings": { "type": "object", "properties": { "bpm": { "type": "number", "minimum": 20, "maximum": 300 }, "marks": { "type": "array", "description": "Marks on the real stage (tape) heads are calibrated against, in metres", "items": { "type": "object", "required": ["id", "name", "p"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "p": { "type": "object", "required": ["x", "y", "z"], "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } } } } } }, "schedule": { "type": "array", "items": { "type": "object", "required": ["id", "at", "do"], "properties": { "id": { "type": "string" }, "at": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }, "days": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 6 } }, "sun": { "enum": ["rise", "set"] }, "offset": { "type": "number", "minimum": -720, "maximum": 720 }, "do": { "$ref": "#/$defs/cueAction" } } } }, "stage3d": { "type": "object", "properties": { "hideVenue": { "type": "boolean" }, "room": { "enum": ["hall", "pub", "club", "party", "truss"] }, "model": { "type": "object", "required": ["name", "store", "scale", "x", "y", "z", "yaw"], "properties": {
-      "name": { "type": "string" }, "store": { "type": "string" }, "scale": { "type": "number" }, "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" }, "yaw": { "type": "number" } } } } }, "scheduleOff": { "type": "boolean" }, "schedulePause": { "type": "number" }, "place": { "type": "object", "required": ["lat", "lon"], "properties": { "lat": { "type": "number", "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "minimum": -180, "maximum": 180 }, "name": { "type": "string" } } }, "stage": { "type": "object", "properties": { "image": { "type": "string", "pattern": "^data:image/" }, "opacity": { "$ref": "#/$defs/level" } } }, "lockPin": { "type": "string", "pattern": "^\\d{3,8}$" }, "lockPage": { "type": "string" }, "bandName": { "type": "string", "minLength": 1, "maxLength": 60 } } },
+      "name": { "type": "string" }, "store": { "type": "string" }, "scale": { "type": "number" }, "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" }, "yaw": { "type": "number" } } } } }, "scheduleOff": { "type": "boolean" }, "schedulePause": { "type": "number" }, "place": { "type": "object", "required": ["lat", "lon"], "properties": { "lat": { "type": "number", "minimum": -90, "maximum": 90 }, "lon": { "type": "number", "minimum": -180, "maximum": 180 }, "name": { "type": "string" } } }, "stage": { "type": "object", "properties": { "image": { "type": "string", "pattern": "^data:image/" }, "opacity": { "$ref": "#/$defs/level" } } }, "lockPin": { "type": "string", "pattern": "^\\d{3,8}$" }, "lockPage": { "type": "string" }, "bandName": { "type": "string", "minLength": 1, "maxLength": 60 }, "consoleMidi": { "type": "array", "items": { "type": "object", "required": ["to", "midi"], "properties": { "to": { "type": "string", "pattern": "^(grand|(list|group|light):.+)$" }, "midi": { "type": "object", "required": ["kind", "ch", "num"], "properties": { "kind": { "enum": ["note", "cc"] }, "ch": { "type": "integer", "minimum": 1, "maximum": 16 }, "num": { "type": "integer", "minimum": 0, "maximum": 127 } } } } } }, "recordChanges": { "type": "boolean" } } },
     "timeline": { "type": "object", "required": ["duration", "items"], "properties": {
       "name": { "type": "string", "maxLength": 80 },
       "duration": { "type": "number", "minimum": 0, "maximum": 86400 }, "bpm": { "type": "number", "minimum": 20, "maximum": 300 }, "offset": { "type": "number", "minimum": -60, "maximum": 86400 }, "demo": { "type": "boolean" },
@@ -63,9 +63,7 @@
     "presetRef": { "type": "object", "required": ["preset"], "properties": { "preset": { "type": "string" } } },
     "levelOrRef": { "oneOf": [{ "$ref": "#/$defs/level" }, { "$ref": "#/$defs/presetRef" }] },
     "attr": {
-      "enum": ["intensity", "red", "green", "blue", "white", "warmWhite", "coolWhite", "amber", "uv", "lime", "cyan", "magenta", "yellow",
-        "cct", "colorWheel", "pan", "tilt", "strobe", "shutter", "gobo", "goboRotation", "prism", "zoom", "focus", "iris", "frost",
-        "fog", "haze", "fan", "speed", "control", "raw", "confetti", "bubbles", "flame", "sparks", "co2", "enable"]
+      "enum": ["intensity", "red", "green", "blue", "white", "warmWhite", "coolWhite", "amber", "uv", "lime", "cyan", "magenta", "yellow", "cct", "colorWheel", "pan", "tilt", "strobe", "shutter", "gobo", "goboRotation", "prism", "zoom", "focus", "iris", "frost", "fog", "haze", "fan", "speed", "control", "raw", "confetti", "bubbles", "flame", "sparks", "co2", "enable", "gobo2", "gobo2Rotation", "prismRotation", "animation", "animationRotation", "effectMacro", "effectSpeed", "colorMacro", "panRotation", "tiltRotation", "roll", "rollRotation", "hoist"]
     },
     "channel": {
       "type": "object", "required": ["name", "attr"],
@@ -90,7 +88,7 @@
       "properties": {
         "id": { "type": "string" }, "manufacturer": { "type": "string" }, "model": { "type": "string" },
         "source": { "enum": ["generic", "ofl", "gdtf", "qxf", "user"] }, "ref": { "type": "string" },
-        "modes": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["name", "channels"], "properties": { "name": { "type": "string" }, "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } }, "layout": { "$ref": "#/$defs/pixelLayout" } } } }
+        "modes": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["name", "channels"], "properties": { "name": { "type": "string" }, "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } }, "layout": { "$ref": "#/$defs/pixelLayout" } } } }, "physical": { "type": "object", "properties": { "panDeg": { "type": "number" }, "tiltDeg": { "type": "number" }, "rollDeg": { "type": "number" }, "beamDeg": { "type": "array", "items": { "type": "number", "minimum": 0.5, "maximum": 180 }, "minItems": 2, "maxItems": 2, "description": "the beam's opening angle in degrees, narrowest and widest (the same twice: no zoom)" }, "travel": { "type": "number", "minimum": 0.1, "maximum": 100, "description": "a winch's travel in metres, from the top down" }, "hoistSpeed": { "type": "number", "minimum": 0.01, "maximum": 10, "description": "a winch's top speed in metres a second" } } }, "rdm": { "type": "object", "required": ["maker", "model"], "properties": { "maker": { "type": "integer", "minimum": 0, "maximum": 65535 }, "model": { "type": "integer", "minimum": 0, "maximum": 65535 }, "modes": { "type": "object", "additionalProperties": { "type": "string" } } } }
       }
     },
     "fixture": {
@@ -109,10 +107,10 @@
         "tiltReversed": { "type": "boolean", "description": "Its tilt turns the other way round from what its type says (the picture and Aim follow it; the DMX stays)" },
         "uid": { "type": "string", "pattern": "^[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}$", "description": "The real light's RDM UID (maker:device, hex)" },
         "layout": { "$ref": "#/$defs/pixelLayout", "description": "This light's own ring or matrix wiring (the type's pixel count)" },
-        "led": { "type": "object", "description": "How a pixel light's LEDs light, set by hand (for the stage pictures)", "properties": { "gamma": { "type": "number", "minimum": 1, "maximum": 4 }, "bright": { "type": "number", "minimum": 0, "maximum": 255 }, "maxMa": { "type": "number", "minimum": 0 }, "maPerCh": { "type": "number", "minimum": 0 }, "idleMa": { "type": "number", "minimum": 0 } } }
+        "led": { "type": "object", "description": "How a pixel light's LEDs light, set by hand (for the stage pictures)", "properties": { "gamma": { "type": "number", "minimum": 1, "maximum": 4 }, "bright": { "type": "number", "minimum": 0, "maximum": 255 }, "maxMa": { "type": "number", "minimum": 0 }, "maPerCh": { "type": "number", "minimum": 0 }, "idleMa": { "type": "number", "minimum": 0 } } }, "num": { "type": "integer", "minimum": 1 }, "beamDeg": { "type": "array", "items": { "type": "number", "minimum": 0.5, "maximum": 180 }, "minItems": 2, "maxItems": 2, "description": "the beam's opening angle in degrees, narrowest and widest (the same twice: no zoom)" }, "hoistLimits": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 2, "maxItems": 2, "description": "a winch's soft limits: the highest and the lowest it may go, as parts of its travel (0 the top, 1 the bottom)" }
       }
     },
-    "group": { "type": "object", "required": ["id", "name", "fixtures"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "fixtures": { "type": "array", "items": { "type": "string" } }, "auto": { "type": "boolean" } } },
+    "group": { "type": "object", "required": ["id", "name", "fixtures"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "fixtures": { "type": "array", "items": { "type": "string" } }, "auto": { "type": "boolean" }, "cells": { "type": "array", "items": { "type": "integer", "minimum": 0 } } } },
     "values": {
       "type": "object",
       "properties": {
@@ -124,7 +122,7 @@
         "fog": { "$ref": "#/$defs/levelOrRef" }, "haze": { "$ref": "#/$defs/levelOrRef" }, "fan": { "$ref": "#/$defs/levelOrRef" },
         "speed": { "$ref": "#/$defs/levelOrRef" },
         "color": { "oneOf": [{ "$ref": "#/$defs/color" }, { "$ref": "#/$defs/presetRef" }] },
-        "raw": { "type": "object", "patternProperties": { "^\\d+$": { "$ref": "#/$defs/dmx" } }, "additionalProperties": false }
+        "raw": { "type": "object", "patternProperties": { "^\\d+$": { "$ref": "#/$defs/dmx" } }, "additionalProperties": false }, "gobo2": { "$ref": "#/$defs/levelOrRef" }, "gobo2Rotation": { "$ref": "#/$defs/levelOrRef" }, "prismRotation": { "$ref": "#/$defs/levelOrRef" }, "animation": { "$ref": "#/$defs/levelOrRef" }, "animationRotation": { "$ref": "#/$defs/levelOrRef" }, "effectMacro": { "$ref": "#/$defs/levelOrRef" }, "effectSpeed": { "$ref": "#/$defs/levelOrRef" }, "colorMacro": { "$ref": "#/$defs/levelOrRef" }, "cells": { "type": "object", "patternProperties": { "^(0|[1-9]\\d*)$": { "$ref": "#/$defs/cellValues" } }, "additionalProperties": false }, "goboShake": { "$ref": "#/$defs/levelOrRef" }, "gobo2Shake": { "$ref": "#/$defs/levelOrRef" }, "goboScroll": { "$ref": "#/$defs/signedOrRef" }, "gobo2Scroll": { "$ref": "#/$defs/signedOrRef" }, "panRotation": { "$ref": "#/$defs/levelOrRef" }, "tiltRotation": { "$ref": "#/$defs/levelOrRef" }, "roll": { "$ref": "#/$defs/levelOrRef" }, "rollRotation": { "$ref": "#/$defs/levelOrRef" }, "hoist": { "$ref": "#/$defs/levelOrRef" }
       }
     },
     "preset": {
@@ -157,7 +155,7 @@
         "values": { "type": "object", "additionalProperties": { "$ref": "#/$defs/values" } },
         "fade": { "type": "number", "minimum": 0, "maximum": 3600 }, "fadeOut": { "type": "number", "minimum": 0, "maximum": 3600 }, "delay": { "type": "number", "minimum": 0, "maximum": 3600 },
         "advance": { "$ref": "#/$defs/advance" }, "effects": { "type": "array", "items": { "type": "string" } },
-        "actions": { "type": "array", "items": { "$ref": "#/$defs/cueAction" } }, "note": { "type": "string" }, "num": { "type": "number", "exclusiveMinimum": 0 }
+        "actions": { "type": "array", "items": { "$ref": "#/$defs/cueAction" } }, "note": { "type": "string" }, "num": { "type": "number", "exclusiveMinimum": 0 }, "times": { "type": "object", "properties": { "color": { "type": "number", "minimum": 0 }, "position": { "type": "number", "minimum": 0 }, "beam": { "type": "number", "minimum": 0 } } }
       }
     },
     "cueList": {
@@ -183,7 +181,7 @@
             "pixels": { "type": "boolean" }, "order": { "enum": ["list", "x", "y", "centre"] },
             "formula": { "type": "string", "maxLength": 500 }, "picture": { "type": "string", "pattern": "^(pic1:[0-9]+x[0-9]+:[0-9,]+:[A-Za-z0-9+/=]+)?$" }, "mapping": { "enum": ["auto", "line", "wall"] }, "text": { "type": "string", "maxLength": 200 }
           }
-        }
+        }, "cells": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
       }
     },
     "widget": {
@@ -195,6 +193,6 @@
       },
       "if": { "properties": { "type": { "const": "song" } } }, "then": { "required": ["do"], "properties": { "do": { "enum": ["play", "next", "part"] } } }
     },
-    "page": { "type": "object", "required": ["id", "name", "widgets"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "widgets": { "type": "array", "items": { "$ref": "#/$defs/widget" } }, "locked": { "type": "boolean" }, "go": { "const": false } } }
+    "page": { "type": "object", "required": ["id", "name", "widgets"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "widgets": { "type": "array", "items": { "$ref": "#/$defs/widget" } }, "locked": { "type": "boolean" }, "go": { "const": false } } }, "cellValues": { "type": "object", "properties": { "intensity": { "$ref": "#/$defs/levelOrRef" }, "white": { "$ref": "#/$defs/levelOrRef" }, "amber": { "$ref": "#/$defs/levelOrRef" }, "uv": { "$ref": "#/$defs/levelOrRef" }, "color": { "oneOf": [{ "$ref": "#/$defs/color" }, { "$ref": "#/$defs/presetRef" }] }, "pan": { "$ref": "#/$defs/levelOrRef", "description": "a moving bar's head: where it pans" }, "tilt": { "$ref": "#/$defs/levelOrRef", "description": "a moving bar's head: where it tilts" }, "hoist": { "$ref": "#/$defs/levelOrRef", "description": "one of several winches: its height" } } }, "signedLevel": { "type": "number", "minimum": -1, "maximum": 1, "description": "-1..1 (a gobo wheel running counter-clockwise .. clockwise)" }, "signedOrRef": { "oneOf": [{ "$ref": "#/$defs/signedLevel" }, { "$ref": "#/$defs/presetRef" }] }
   }
 }

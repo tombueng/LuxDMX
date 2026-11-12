@@ -1,4 +1,6 @@
 <script lang="ts">
+  import GoboIcon from './GoboIcon.svelte';
+  import { CCW_WORDS, wheelPatterns } from '../stage3d/gobos';
   import { levelOf } from '../engine/cuelook';
   import { tick } from 'svelte';
   import ValueEdit from './ValueEdit.svelte';
@@ -7,11 +9,14 @@
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
   import Channels from './Channels.svelte';
+  import CellPicker from './CellPicker.svelte';
+  import { cellLookAt } from '../engine/resolve';
   import ColorWheel from './ColorWheel.svelte';
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import type { ChannelAttr, Color, NumAttr, Values } from '../model/types';
   import { EFFECT_MAP } from '../engine/effects';
+  import { slotsOf } from '../engine/render';
 
   const sel = $derived(app.show.fixtures.filter((f) => app.selected.includes(f.id)));
   // Every attribute at least one selected light has.
@@ -25,12 +30,18 @@
     color: has('red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'colorWheel'),
     position: has('pan', 'tilt'),
   });
-  const first = $derived(sel.length ? app.look[sel[0].id] : undefined);
+  // what the controls show: the first selected light, or its first picked cell
+  const first = $derived.by(() => {
+    if (!sel.length) return undefined;
+    return app.lookFor(sel[0].id);
+  });
+  const cellLights = $derived(sel.filter((f) => app.caps(f.id).cells > 1));
+  const pickedCells = $derived(sel.reduce((a, f) => a + app.cellsPicked(f.id).length, 0));
   // Something in the selection makes light (a fog machine alone doesn't: no Intensity for it).
   const hasLight = $derived(has('intensity', 'red', 'green', 'blue', 'white', 'amber', 'uv', 'cyan', 'magenta', 'yellow', 'colorWheel', 'cct', 'warmWhite', 'coolWhite'));
   const changed = $derived(Object.keys(app.programmer).length);
   const jumps = $derived([
-    ...(hasLight ? [['pg-int', 'Intensity']] : []), ...(can.color ? [['pg-col', 'Colour']] : []),
+    ...(cellLights.length ? [['pg-cells', 'Cells']] : []), ...(hasLight ? [['pg-int', 'Intensity']] : []), ...(can.color ? [['pg-col', 'Colour']] : []),
     ...(can.position ? [['pg-pos', 'Position']] : []), ['pg-all', 'Channels'],
   ] as [string, string][]);
   // where the programmer is scrolled to (the chip for it lights up); Channels opens the list too
@@ -66,7 +77,8 @@
   // Effects running on the selection (what you see on stage may be them, not the values here).
   const running = $derived(app.effectsOn(sel.map((f) => f.id)));
   // (a pixel bar: its brightest cell, a pixel chase lights it at intensity 0)
-  const out = $derived(sel.length ? levelOf(app.stage[sel[0].id]) : undefined);
+  // (picked cells: the first one's)
+  const out = $derived.by(() => { if (!sel.length) return undefined; const s = app.stage[sel[0].id], k = app.cellsPicked(sel[0].id)[0]; return k === undefined ? levelOf(s) : cellLookAt(s, k, app.caps(sel[0].id).cells)?.intensity ?? 0; });
   const CAT: Record<string, string> = { move: 'position', color: 'colour', intensity: 'brightness' };
   const presets = $derived(app.show.presets);
   const colorPresets = $derived(presets.filter((p) => p.kind === 'color'));
@@ -76,7 +88,8 @@
   // Lights in the selection that can't mix colours (warm/cool whites, plain dimmers).
   const noColor = $derived(sel.filter((f) => { const c = app.caps(f.id); return !c.color && !c.fog && (c.intensity || c.cct || c.white); }));
   const posPresets = $derived(presets.filter((p) => p.kind === 'position'));
-  const usesPreset = (id: string) => sel.length > 0 && sel.every((f) => Object.values(app.programmer[f.id] ?? {}).some((x) => !!x && typeof x === 'object' && (x as { preset?: string }).preset === id));
+  // (picked cells: every one of them uses it)
+  const usesPreset = (id: string) => app.usesPreset(id);
 
   const css = (c: Color) => `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
   const pct = (v: number | undefined) => Math.round((v ?? 0) * 100);
@@ -85,10 +98,55 @@
     ['white', 'White', ['white']], ['amber', 'Amber', ['amber']], ['uv', 'UV', ['uv']],
     ['cct', 'Colour temperature', ['cct', 'warmWhite', 'coolWhite']], ['strobe', 'Strobe', ['strobe', 'shutter']],
     ['zoom', 'Zoom', ['zoom']], ['focus', 'Focus', ['focus']], ['iris', 'Iris', ['iris']], ['frost', 'Frost', ['frost']],
-    ['prism', 'Prism', ['prism']], ['goboRotation', 'Gobo rotation', ['goboRotation']],
+    ['prism', 'Prism', ['prism']], ['prismRotation', 'Prism rotation', ['prismRotation']], ['goboRotation', 'Gobo rotation', ['goboRotation']],
+    ['gobo2Rotation', 'Gobo 2 rotation', ['gobo2Rotation']], ['animation', 'Animation wheel', ['animation']], ['animationRotation', 'Animation rotation', ['animationRotation']],
+    ['effectSpeed', 'Effect speed', ['effectSpeed']],
+    ['panRotation', 'Pan rotation (endless)', ['panRotation']], ['tiltRotation', 'Tilt rotation (endless)', ['tiltRotation']],
+    ['roll', 'Roll (third axis)', ['roll']], ['rollRotation', 'Roll rotation (endless)', ['rollRotation']],
+    ['hoist', 'Winch height (moves only armed)', ['hoist']],
     ['fog', 'Fog', ['fog']], ['haze', 'Haze', ['haze']], ['fan', 'Fan', ['fan']], ['speed', 'Move speed', ['speed']],
     ['confetti', 'Confetti (fires past 50 %)', ['confetti']], ['bubbles', 'Bubbles', ['bubbles']], ['flame', 'Flame', ['flame']], ['sparks', 'Sparks', ['sparks']], ['co2', 'CO2', ['co2']],
   ];
+  // Picked by name: a gobo, a second gobo, the light's built-in effects, its colour programs (from
+  // the first selected light that has them; app.setSlot finds the same name on the others).
+  const PICKS: ['gobo' | 'gobo2' | 'effectMacro' | 'colorMacro', string][] = [['gobo', 'Gobo'], ['gobo2', 'Gobo 2'], ['effectMacro', 'Built-in effect'], ['colorMacro', 'Colour program']];
+  const picks = $derived(PICKS.flatMap(([k, label]) => {
+    for (const f of sel) {
+      const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine);
+      const slots = c ? slotsOf(c) : [];
+      if (slots.length) {
+        const v = app.look[f.id]?.[k];
+        const cur = typeof v === 'number' ? Math.round(v * (slots.length - 1)) : -1;
+        return [{ k, label, slots: slots.map((r) => r.label), colors: slots.map((r) => r.color), cur, wheel: wheelExtras(f.id, k) }];
+      }
+    }
+    return [];
+  }));
+  // A gobo wheel's own functions, as real heads have them on its channel's other ranges: the gobo
+  // shaking ("Shake 3 slow..fast") and the whole wheel running round ("Wheel rotation CW / CCW").
+  // Attributes like any other (goboShake, goboScroll: a cue keeps them, the next one lets them go).
+  function wheelExtras(id: string, k: string) {
+    if (k !== 'gobo' && k !== 'gobo2') return undefined;
+    const c = app.modeOf(id)?.channels.find((x) => x.attr === k && !x.fine && x.cell === undefined);
+    const others = c?.ranges?.filter((r) => r.kind === 'other') ?? [];
+    const shakes = others.filter((r) => /shake|wackel|zitter/i.test(r.label ?? ''));
+    const runs = others.filter((r) => /rotat|scroll|spin|dreh/i.test(r.label ?? '') && !/shake/i.test(r.label ?? ''));
+    if (!shakes.length && !runs.length) return undefined;
+    const look = app.look[id] as Record<string, number | undefined> | undefined;
+    return { shakes, cw: runs.some((r) => !CCW_WORDS.test(r.label ?? '')), ccw: runs.some((r) => CCW_WORDS.test(r.label ?? '')),
+      shaking: (look?.[`${k}Shake`] ?? 0) > 0, scroll: look?.[`${k}Scroll`] ?? 0 };
+  }
+  // A slider's channel with named ranges (a prism's facets, a rotation's index / CW / stop / CCW): its
+  // ranges, from the first selected light that has it (a plain channel: none)
+  function rangesOf(k: string) {
+    for (const f of sel) {
+      const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine && x.cell === undefined);
+      if (c) return c.ranges && c.ranges.length > 1 && !c.span ? c.ranges.filter((r) => r.label) : undefined;
+    }
+    return undefined;
+  }
+  const inByte = (v: number | undefined, r: { from: number; to: number }) => typeof v === 'number' && Math.round(v * 255) >= r.from && Math.round(v * 255) <= r.to;
+
   const valueLabel = (k: NumAttr, v: number | undefined) =>
     k === 'strobe' ? (v ? `${pct(v)}%` : 'off') : k === 'cct' ? ((v ?? 0.5) < 0.4 ? 'warm' : (v ?? 0.5) > 0.6 ? 'cool' : 'neutral') : `${pct(v)}%`;
 
@@ -115,10 +173,10 @@
   function record() { ui.toast(app.record() ? 'Recorded as a new cue' : 'Nothing to record yet'); }
 </script>
 
-<div class="panel prog">
+<div class="panel prog" data-marks="hide">
   <div class="row head">
     <h2>Programmer</h2>
-    {#if sel.length}<span class="chip orange">{sel.length} selected</span>{/if}
+    {#if sel.length}<span class="chip orange">{sel.length} selected{pickedCells ? `, ${pickedCells} cell${pickedCells > 1 ? 's' : ''}` : ''}</span>{/if}
     <span class="grow"></span>
     <button class="ghost hl" class:on={app.highlight} onclick={() => (app.highlight = !app.highlight)} disabled={!sel.length && !app.highlight}
             title="Highlight: the selected lights go full white so you can find them in the room (not recorded)" aria-label="Highlight" aria-pressed={app.highlight}><Icon name="sun" size={15} /></button>
@@ -183,6 +241,7 @@
       </div>
     {/if}
 
+    <CellPicker />
     {#if hasLight}
     <section id="pg-int">
       <div class="lab"><span>Intensity</span><b><ValueEdit text={`${pct(first?.intensity)}%`} value={pct(first?.intensity)} label="Intensity" onset={(v) => app.set({ intensity: v / 100 })} />{#if out !== undefined && Math.abs(out - (first?.intensity ?? 0)) > 0.02}<span class="faint" title="What the light gives right now, after effects and the masters">&nbsp;· out {pct(out)}%</span>{/if}</b></div>
@@ -237,10 +296,45 @@
       </section>
     {/if}
 
+    {#each picks as p (p.k)}
+      <section class="pick" aria-label={p.label}>
+        <div class="lab"><span>{p.label}</span><span class="faint">{p.cur >= 0 ? p.slots[p.cur] : ''}</span></div>
+        {#if p.slots.length <= 12}
+          {@const pats = p.k === 'gobo' || p.k === 'gobo2' ? wheelPatterns(p.slots) : null}
+          <div class="quick wrap">
+            {#each p.slots as s, i (i)}<button class:on={i === p.cur && !p.wheel?.scroll} onclick={() => app.setSlot(p.k, s, i)} title={s}>{#if p.colors[i]}<span class="dot" style="background:{p.colors[i]}"></span>{/if}{#if pats}<GoboIcon pattern={pats[i]} />{/if}{s}</button>{/each}
+          </div>
+          {#if p.wheel}
+            {@const w = p.wheel}
+            {@const shake = w.shakes.find((r) => new RegExp(`(^|\\D)${p.cur + 1}(\\D|$)`).test(r.label ?? ''))}
+            {@const sk = `${p.k}Shake`}
+            {@const sc = `${p.k}Scroll`}
+            <div class="quick wrap wheelfx" role="group" aria-label="{p.label}: shake and wheel">
+              {#if shake}<button class:on={w.shaking} aria-pressed={w.shaking} onclick={() => app.set({ [sk]: w.shaking ? 0 : 0.5 } as Values)} title="{shake.label}: the gobo shakes back and forth (as the light does it)">Shake</button>{/if}
+              {#if w.cw}<button class:on={w.scroll > 0} aria-pressed={w.scroll > 0} onclick={() => app.set({ [sc]: w.scroll > 0 ? 0 : 0.5 } as Values)} title="The whole wheel runs round through its gobos, clockwise">Wheel ↻</button>{/if}
+              {#if w.ccw}<button class:on={w.scroll < 0} aria-pressed={w.scroll < 0} onclick={() => app.set({ [sc]: w.scroll < 0 ? 0 : -0.5 } as Values)} title="The whole wheel runs round through its gobos, counter-clockwise">Wheel ↺</button>{/if}
+            </div>
+          {/if}
+        {:else}
+          <select aria-label={p.label} value={p.cur} onchange={(e) => { const i = +(e.target as HTMLSelectElement).value; app.setSlot(p.k, p.slots[i], i); }}>
+            {#if p.cur < 0}<option value={-1}>…</option>{/if}
+            {#each p.slots as s, i (i)}<option value={i}>{s}</option>{/each}
+          </select>
+        {/if}
+      </section>
+    {/each}
+
     {#each SLIDERS as [k, label, chs] (k)}
       {#if has(...chs)}
+        {@const named = rangesOf(k)}
         <section class="sl">
           <div class="lab"><span>{label}</span><b><ValueEdit text={valueLabel(k, first?.[k] as number | undefined)} value={pct(first?.[k] as number | undefined)} {label} onset={(v) => app.set({ [k]: v / 100 } as Values)} /></b></div>
+          <!-- (a channel with named ranges, as real heads have them: one tap on each; the slider fine-tunes within) -->
+          {#if named}
+            <div class="quick wrap ranges" role="group" aria-label="{label}: ranges">
+              {#each named as r (r.from)}<button class:on={inByte(first?.[k] as number | undefined, r)} onclick={() => app.set({ [k]: Math.round((r.from + r.to) / 2) / 255 } as Values)} title="{r.label} ({r.from}–{r.to})">{r.label}</button>{/each}
+            </div>
+          {/if}
           <input type="range" min="0" max="1" step="0.01" value={first?.[k] ?? (k === 'cct' ? 0.5 : 0)} oninput={setNum(k)} aria-label={label} class:cctbar={k === 'cct'} />
         </section>
       {/if}
@@ -294,7 +388,7 @@
   .grad { display: inline-flex; gap: .2rem; align-items: center; }
   .grad input { width: 26px; height: 24px; padding: 0; border-radius: 5px; }
   .fan { display: grid; grid-template-columns: auto 1fr; gap: .5rem; align-items: center; }
-  section { display: flex; flex-direction: column; gap: .3rem; }
+  section { display: flex; flex-direction: column; gap: .3rem; scroll-margin-top: 3rem; }   /* (clear of the jump bar when jumped to) */
   .lab { display: flex; justify-content: space-between; align-items: center; font-size: .86rem; }
   .lab b { font-weight: 600; font-size: .82rem; }
   .swatch { width: 1.1rem; height: 1.1rem; border-radius: 50%; border: 1px solid #0006; }
@@ -303,6 +397,9 @@
   .quick { display: flex; gap: .25rem; }
   .quick button { flex: 1; padding: .25rem .2rem; font-size: .8rem; }
   .quick.wrap { flex-wrap: wrap; } .quick.wrap button { flex: 1 0 28%; }
+  .pick .quick.wrap button { flex: 0 1 auto; display: inline-flex; align-items: center; gap: .25rem; }
+  .pick .quick.wrap button.on { border-color: var(--accent); color: var(--accent); }
+  .pick .dot { width: .7rem; height: .7rem; border-radius: 50%; border: 1px solid #0006; }
   .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 40px)); gap: .35rem; justify-content: start; }
   .sw { aspect-ratio: 1; padding: 0; border-radius: 50%; border: 2px solid #0006; }
   .sw.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent); }

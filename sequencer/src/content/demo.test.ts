@@ -28,8 +28,18 @@ describe('the big demo', () => {
       expect(f.address + n - 1, f.name).toBeLessThanOrEqual(512);
       for (let c = 0; c < n; c++) { const k = `${f.universe}.${f.address + c}`; expect(used.get(k), `${f.name} on ${k}`).toBeUndefined(); used.set(k, f.name); }
     }
-    for (const t of ['gen-wash', 'gen-mover16', 'gen-spotgobo', 'gen-strip60', 'gen-confetti', 'gen-flame', 'gen-sparks', 'gen-co2', 'gen-bubbles', 'gen-hazer', 'gen-blinder2', 'gen-strobe'])
+    for (const t of ['gen-wash', 'gen-profile', 'gen-mover8', 'gen-spotgobo', 'gen-strip60', 'gen-confetti', 'gen-flame', 'gen-sparks', 'gen-co2', 'gen-bubbles', 'gen-hazer', 'gen-blinder2', 'gen-strobe'])
       expect(s.fixtures.some((f) => f.typeId === t), t).toBe(true);
+  });
+  it('gobos in most of its looks: patterns on both wheels, glass in colour, prisms that turn, the animation wheel; every look sets them (nothing carries over)', () => {
+    const show = s.cueLists.find((l) => l.name === 'Show')!;
+    const goboHeads = s.fixtures.filter((f) => f.typeId === 'gen-profile' || f.typeId === 'gen-spotgobo').map((f) => f.id);
+    const dressed = show.cues.filter((c) => goboHeads.some((id) => { const v = c.values[id]; return v && (Number(v.gobo ?? 0) > 0 || Number(v.gobo2 ?? 0) > 0 || Number(v.prism ?? 0) > 0.04 || Number(v.animation ?? 0) > 0); }));
+    expect(dressed.length / show.cues.length).toBeGreaterThan(0.7);
+    // every look says every gobo head's gobos (open at least), so a look never keeps the last one's
+    for (const c of show.cues) for (const id of goboHeads) expect(c.values[id]?.gobo, `${c.name}: ${id}`).toBeDefined();
+    const any = (k: 'gobo2' | 'animation' | 'prism') => show.cues.some((c) => goboHeads.some((id) => Number(c.values[id]?.[k] ?? 0) > 0.04));
+    expect([any('gobo2'), any('animation'), any('prism')]).toEqual([true, true, true]);
   });
   it('over a hundred moving heads, more than all its other lights, in fewer than 40 universes, each where it fits in 3D', () => {
     expect(s.fixtures.length).toBeGreaterThanOrEqual(200);

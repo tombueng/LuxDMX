@@ -8,11 +8,18 @@ import { unzipSync, strFromU8 } from 'fflate';
 import type { Channel, ChannelAttr, ChannelRange, FixtureMode, FixtureType } from '../model/types';
 import { kid, kids, num, parseXml } from './xml';
 import { machineAttrs, machineSpan, needsSpan, type ChannelFacts } from './machines';
+import { matrixForGrid } from '../model/pixelLayout';
+// (attributes that make light: the ones a cell, a pixel, has)
+const CELL_LIGHT = new Set<ChannelAttr>(['intensity', 'red', 'green', 'blue', 'white', 'warmWhite', 'coolWhite', 'amber', 'uv', 'lime', 'cyan', 'magenta', 'yellow', 'cct']);
 
 function attrOf(a: string, wheelIndex: Map<string, number>): ChannelAttr {
   if (a === 'Dimmer') return 'intensity';
   if (a === 'Pan') return 'pan';
   if (a === 'Tilt') return 'tilt';
+  if (a === 'PanRotate') return 'panRotation';
+  if (a === 'TiltRotate') return 'tiltRotation';
+  if (/^(Roll|Rot|HeadRoll|Rotation)$/.test(a)) return 'roll';
+  if (/^(RollRotate|RotRotate|HeadRollRotate)$/.test(a)) return 'rollRotation';
   const add: Record<string, ChannelAttr> = {
     ColorAdd_R: 'red', ColorAdd_G: 'green', ColorAdd_B: 'blue', ColorAdd_W: 'white', ColorAdd_WW: 'warmWhite',
     ColorAdd_CW: 'coolWhite', ColorAdd_A: 'amber', ColorAdd_RY: 'amber', ColorAdd_UV: 'uv', ColorAdd_L: 'lime', ColorAdd_GY: 'lime',
@@ -21,9 +28,17 @@ function attrOf(a: string, wheelIndex: Map<string, number>): ChannelAttr {
   if (add[a]) return add[a];
   if (/^Color\d+$/.test(a)) return wheelIndex.get(a) === 0 ? 'colorWheel' : 'raw';     // only the first wheel follows the colour
   if (/^(CTO|CTC|CTB)$/.test(a)) return 'cct';
-  if (/^Gobo\d+$/.test(a)) return a === 'Gobo1' ? 'gobo' : 'raw';
+  if (/^Gobo\d+$/.test(a)) return a === 'Gobo1' ? 'gobo' : a === 'Gobo2' ? 'gobo2' : 'raw';
   if (/^Gobo1Pos(Rotate)?$/.test(a)) return 'goboRotation';
+  if (/^Gobo2Pos(Rotate)?$/.test(a)) return 'gobo2Rotation';
+  if (/^Prism\d+Pos(Rotate)?$/.test(a)) return 'prismRotation';
   if (/^Prism\d+$/.test(a)) return 'prism';
+  if (/^AnimationWheel\d*$/.test(a)) return 'animation';
+  if (/^AnimationWheel\d*Pos(Rotate)?$/.test(a) || /^AnimationIndexRotate\d*$/.test(a)) return 'animationRotation';
+  if (/^Effects\d*$/.test(a)) return 'effectMacro';
+  if (/^Effects\d*Rate$/.test(a) || /^ColorMacro\d*Rate$/.test(a)) return 'effectSpeed';
+  if (/^(ColorMacro|ColorEffects)\d*$/.test(a)) return 'colorMacro';
+  if (/^AnimationSystem\d*$/.test(a)) return 'animation';
   if (a === 'Zoom') return 'zoom';
   if (/^Focus\d+$/.test(a)) return 'focus';
   if (a === 'Iris') return 'iris';
@@ -80,7 +95,8 @@ export function fromGdtfXml(xml: string, ref?: string): FixtureType {
   for (const w of kids(kid(ft, 'Wheels'), 'Wheel'))
     wheels.set(w.getAttribute('Name') ?? '', kids(w, 'Slot').map((s) => ({ name: s.getAttribute('Name') ?? '', color: s.getAttribute('Color') ? xyYToHex(s.getAttribute('Color')!) : undefined })));
 
-  let panDeg: number | undefined, tiltDeg: number | undefined;
+  let panDeg: number | undefined, tiltDeg: number | undefined, zoomDeg: [number, number] | undefined;
+  const where = geometryPlaces(kid(ft, 'Geometries')), parents = geometryParents(kid(ft, 'Geometries'));
   const modes: FixtureMode[] = kids(kid(ft, 'DMXModes'), 'DMXMode').map((mode) => {
     const slots: Channel[] = [];
     const slotGeom: string[] = [], slotAttr: string[] = [];   // per DMX slot: geometry and GDTF attribute
@@ -121,6 +137,11 @@ export function fromGdtfXml(xml: string, ref?: string): FixtureType {
           const span = Math.abs(num(f.getAttribute('PhysicalTo')) - num(f.getAttribute('PhysicalFrom')));
           if (span > 1) { if (fAttr === 'Pan') panDeg = span; else tiltDeg = span; }
         }
+        // (a zoom in degrees: the beam's narrowest and widest)
+        if (fAttr === 'Zoom' && !zoomDeg) {
+          const a = num(f.getAttribute('PhysicalFrom')), b = num(f.getAttribute('PhysicalTo'));
+          if (a > 0 && b > 0 && a !== b && Math.max(a, b) <= 180) zoomDeg = [Math.min(a, b), Math.max(a, b)];
+        }
       });
       const def = dmx8(fns[0]?.getAttribute('Default') ?? dc.getAttribute('Default'));
       const name = attrName + (geom && geomOrder.get(attrName)!.length > 1 ? ` ${geom}` : '');
@@ -132,20 +153,41 @@ export function fromGdtfXml(xml: string, ref?: string): FixtureType {
       if (coarse.attr === 'shutter' && !coarse.ranges) coarse.attr = 'strobe';
       slots[offs[0] - 1] = coarse;
       slotGeom[offs[0] - 1] = geom; slotAttr[offs[0] - 1] = attrName;
-      offs.slice(1).forEach((o, i) => { slots[o - 1] = i === 0 ? { name: `${name} fine`, attr, fine: true } : { name: `${name} fine ${i + 1}`, attr: 'raw' }; });
+      offs.slice(1).forEach((o, i) => { slots[o - 1] = i === 0 ? { name: `${name} fine`, attr, fine: true } : { name: `${name} fine ${i + 1}`, attr: 'raw' }; slotGeom[o - 1] = geom; slotAttr[o - 1] = attrName; });
       const words = [attrName, pretty.get(attrName), ...fns.flatMap((f) => [f.getAttribute('Attribute'), f.getAttribute('Name'), f.getAttribute('CustomName')])];
       made.push({ chs: [coarse, ...(offs.length > 1 ? [slots[offs[1] - 1]] : [])], ranges, facts: {
         name: [...new Set(words.filter(Boolean))].join(' '), attr: coarse.attr, caps: ranges.map((r) => r.label), plain: /^(Fog|Haze|Fan|Blower)\d*$|^FogOutput$/.test(attrName) } });
     }
-    // Attributes repeated on several geometries are cells (pixels of a bar).
+    // Attributes repeated on several geometries are cells (pixels of a bar), numbered by geometry
+    // in the order the DMX channels first meet them: the same LED is the same cell for its red and
+    // its white, also when the main beam has a red and no white.
+    // Pan and tilt on several geometries are heads (a moving bar's): each the same cell as the light
+    // under it (its tilt sits on the head's axis, its colour on the beam below that).
     const channels: Channel[] = [];
+    const cellGeoms: string[] = [];
+    const repeated = (i: number) => { const gl = geomOrder.get(slotAttr[i]); return !!slotGeom[i] && !!gl && gl.length > 1 && !!slots[i]; };
+    const isCell = (i: number) => repeated(i) && CELL_LIGHT.has(slots[i]!.attr);
+    const isHead = (i: number) => repeated(i) && (slots[i]!.attr === 'pan' || slots[i]!.attr === 'tilt');
+    for (let i = 0; i < slots.length; i++) if (isCell(i) && !cellGeoms.includes(slotGeom[i])) cellGeoms.push(slotGeom[i]);
+    // (the cell of a head: the light geometry it holds, else one of its own)
+    const under = (head: string, g: string) => { for (let x: string | undefined = g; x; x = parents.get(x)) if (x === head) return true; return false; };
+    // (no tree in the file: the same number at the end of the name, Yoke2 with Head2)
+    const tailNum = (g: string) => /(\d+)\s*$/.exec(g)?.[1];
+    const headCell = (g: string) => {
+      let k = cellGeoms.findIndex((cg) => under(g, cg));
+      if (k < 0 && tailNum(g)) k = cellGeoms.findIndex((cg) => tailNum(cg) === tailNum(g));
+      if (k < 0) { cellGeoms.push(g); k = cellGeoms.length - 1; }
+      return k;
+    };
     for (let i = 0; i < slots.length; i++) {
       const c = slots[i] ?? { name: '(unused)', attr: 'raw' as ChannelAttr };
-      const gl = geomOrder.get(slotAttr[i]);
-      if (slotGeom[i] && gl && gl.length > 1) c.cell = gl.indexOf(slotGeom[i]);
+      if (isCell(i)) c.cell = cellGeoms.indexOf(slotGeom[i]);
+      else if (isHead(i)) c.cell = headCell(slotGeom[i]);
       channels.push(c);
     }
-    return { name: mode.getAttribute('Name') ?? 'Default', channels };
+    // (cells on a flat grid in the file's geometry: a matrix panel, laid out as it's built)
+    const layout = cellGeoms.length >= 4 ? gridLayout(cellGeoms.map((g) => where.get(g))) : undefined;
+    return { name: mode.getAttribute('Name') ?? 'Default', channels, ...(layout ? { layout } : {}) };
   });
   // The machines (no category in GDTF: a machine says what it is in its name).
   const attrs = machineAttrs('maybe', [manufacturer, ft.getAttribute('Name'), ft.getAttribute('ShortName'), ft.getAttribute('LongName')].join(' '), made.map((x) => x.facts));
@@ -156,7 +198,28 @@ export function fromGdtfXml(xml: string, ref?: string): FixtureType {
     if (needsSpan(before, attrs[i])) { const span = machineSpan(attrs[i], ranges); if (span) chs[0].span = span; }
   });
 
-  return { id: `gdtf:${manufacturer}/${model}`, manufacturer, model, source: 'gdtf', ref, modes, physical: { panDeg, tiltDeg } };
+  // RDM: its maker and model ids, and the mode each personality is (any software version: the first that says)
+  const ftrdm = ft.getElementsByTagName('FTRDM')[0];
+  let rdm: FixtureType['rdm'];
+  if (ftrdm) {
+    const hex = (v: string | null) => (v && /^(0x)?[0-9a-f]+$/i.test(v) ? parseInt(v.replace(/^0x/i, ''), 16) : NaN);
+    const maker = hex(ftrdm.getAttribute('ManufacturerID')), dev = hex(ftrdm.getAttribute('DeviceModelID'));
+    if (Number.isFinite(maker) && Number.isFinite(dev)) {
+      const map: Record<string, string> = {};
+      for (const p of Array.from(ftrdm.getElementsByTagName('DMXPersonality'))) {
+        const n = hex(p.getAttribute('Value')), m = p.getAttribute('DMXMode');
+        if (Number.isFinite(n) && m && modes.some((x) => x.name === m) && !(String(n) in map)) map[String(n)] = m;
+      }
+      rdm = { maker, model: dev, ...(Object.keys(map).length ? { modes: map } : {}) };
+    }
+  }
+  // the beam's opening angle: the zoom's degrees, else the beam's own (BeamAngle on its Beam geometry)
+  let beamDeg = zoomDeg;
+  if (!beamDeg) for (const b of Array.from(ft.getElementsByTagName('Beam'))) {
+    const a = num(b.getAttribute('BeamAngle'));
+    if (a > 0 && a <= 180) { beamDeg = [a, a]; break; }
+  }
+  return { id: `gdtf:${manufacturer}/${model}`, manufacturer, model, source: 'gdtf', ref, modes, physical: { panDeg, tiltDeg, ...(beamDeg ? { beamDeg } : {}) }, ...(rdm ? { rdm } : {}) };
 }
 
 function kind(attr: string, name: string, slot?: { color?: string }): Pick<ChannelRange, 'kind' | 'color'> {
@@ -165,4 +228,50 @@ function kind(attr: string, name: string, slot?: { color?: string }): Pick<Chann
   if (/^Shutter\d+Strobe|Strobe/.test(attr)) return { kind: 'strobe' };
   if (slot) return { kind: 'slot', color: slot.color ?? (/open|white/.test(n) ? '#ffffff' : undefined) };
   return { kind: 'other' };
+}
+
+// Where each named geometry sits (metres, its translation added up through its parents; turns are
+// left out: pixels of a panel sit side by side).
+// each geometry's parent (by name): a head's axis holds its beam
+function geometryParents(root: Element | null | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (el: Element, parent?: string) => {
+    for (const c of Array.from(el.children)) {
+      const name = c.getAttribute('Name') ?? undefined;
+      if (name && parent && !out.has(name)) out.set(name, parent);
+      walk(c, name ?? parent);
+    }
+  };
+  if (root) walk(root);
+  return out;
+}
+function geometryPlaces(root: Element | null | undefined): Map<string, [number, number, number]> {
+  const out = new Map<string, [number, number, number]>();
+  const walk = (el: Element, at: [number, number, number]) => {
+    for (const c of Array.from(el.children)) {
+      const m = /^\{[^}]*?,\s*([-\d.eE+]+)\}\s*\{[^}]*?,\s*([-\d.eE+]+)\}\s*\{[^}]*?,\s*([-\d.eE+]+)\}/.exec(c.getAttribute('Position') ?? '');
+      const p: [number, number, number] = m ? [at[0] + +m[1], at[1] + +m[2], at[2] + +m[3]] : at;
+      const name = c.getAttribute('Name');
+      if (name && !out.has(name)) out.set(name, p);
+      walk(c, p);
+    }
+  };
+  if (root) walk(root, [0, 0, 0]);
+  return out;
+}
+// Cells whose places make a full grid (columns across x, rows up z, or along y when it's flat):
+// the matrix wiring that puts each one there. Anything else (a row, rings, gaps): none.
+function gridLayout(pts: ([number, number, number] | undefined)[]) {
+  if (pts.some((p) => !p)) return undefined;
+  const ps = pts as [number, number, number][];
+  const spread = (k: number) => Math.max(...ps.map((p) => p[k])) - Math.min(...ps.map((p) => p[k]));
+  const up = spread(2) > 1e-6 ? 2 : 1;
+  if (spread(0) < 1e-6 || spread(up) < 1e-6) return undefined;
+  const ranks = (k: number) => { const vs: number[] = []; for (const p of ps) { const v = Math.round(p[k] * 1e4) / 1e4; if (!vs.includes(v)) vs.push(v); } vs.sort((a, b) => a - b); return (v: number) => vs.indexOf(Math.round(v * 1e4) / 1e4); };
+  const col = ranks(0), row = ranks(up);
+  const cols = Math.max(...ps.map((p) => col(p[0]))) + 1, rows = Math.max(...ps.map((p) => row(p[up]))) + 1;
+  if (cols < 2 || rows < 2 || cols * rows !== ps.length) return undefined;
+  const seen = new Set(ps.map((p) => `${col(p[0])},${row(p[up])}`));
+  if (seen.size !== ps.length) return undefined;
+  return matrixForGrid(cols, rows, (i) => [col(ps[i][0]), row(ps[i][up])]);
 }

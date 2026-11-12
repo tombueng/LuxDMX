@@ -64,6 +64,9 @@ export function toQxw(show: Show): { xml: string; skipped: string[] } {
     w(`   <Channels>${m.channels.length}</Channels>`);
     w('  </Fixture>');
   });
+  // (QLC+ groups are whole fixtures: a group of cells goes as its lights, said)
+  const cellGroups = show.groups.filter((g) => g.cells?.length).map((g) => g.name);
+  if (cellGroups.length) skipped.push(`${cellGroups.join(', ')}: groups of cells go to QLC+ as groups of their whole lights`);
   show.groups.forEach((g, gi) => {
     const ids = g.fixtures.filter((id) => qid.has(id));
     w(`  <FixtureGroup ID="${gi}">`);

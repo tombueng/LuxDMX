@@ -10,6 +10,7 @@
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import { lookColor } from '../engine/cuelook';
+  import { cellLookAt } from '../engine/resolve';
   import { fixtureActions, fixtureMenu } from './actions';
   import { EFFECT_MAP } from '../engine/effects';
   import type { Resolved } from '../model/types';
@@ -38,7 +39,7 @@
     return () => ro.disconnect();
   });
   let svg = $state<SVGSVGElement>();
-  let drag: { ids: string[]; start: { x: number; y: number }; orig: Record<string, { x: number; y: number }>; moved: boolean } | null = null;
+  let drag: { ids: string[]; start: { x: number; y: number }; orig: Record<string, { x: number; y: number }>; moved: boolean; cell?: number } | null = null;
   let band = $state<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   let labels = $state(true), addrs = $state(false);
 
@@ -60,7 +61,9 @@
     const ids = app.selected.includes(id) ? [...app.selected] : [id];
     const orig: Record<string, { x: number; y: number }> = {};
     for (const f of app.show.fixtures) if (ids.includes(f.id)) orig[f.id] = { x: f.x, y: f.y };
-    drag = { ids, start: pt(e), orig, moved: false };
+    // (Alt on one of its pixels: that cell, picked or let go on release if it didn't move)
+    const cell = e.altKey ? (e.target as Element).closest('[data-cell]')?.getAttribute('data-cell') : null;
+    drag = { ids, start: pt(e), orig, moved: false, ...(cell != null ? { cell: +cell } : {}) };
   }
   // Dragging snaps to the lines of the other lights (same row, same column), like the guides in a
   // drawing program; Alt drags freely. The guides show while it snaps.
@@ -86,7 +89,12 @@
   }
   function upFixture(e: PointerEvent, id: string) {
     if (readonly) return;
-    if (drag && !drag.moved && !(e.shiftKey || e.ctrlKey || e.metaKey)) app.select(id, false);
+    // Alt-click on a pixel (no drag): pick that cell on this light (and the selected ones shaped like it)
+    if (drag && !drag.moved && drag.cell !== undefined) {
+      if (!app.selected.includes(id)) app.select(id, false);
+      const now = app.cellsPicked(id), k = drag.cell;
+      app.selectCells(now.includes(k) ? now.filter((x) => x !== k) : [...now, k].sort((a, b) => a - b));
+    } else if (drag && !drag.moved && !(e.shiftKey || e.ctrlKey || e.metaKey)) app.select(id, false);
     drag = null; guides = {};
   }
   // Arrow keys nudge the selected lights on the stage (Shift: bigger steps), like any drawing tool.
@@ -242,6 +250,8 @@
   const size = $derived(Math.max(coarse ? 16 : 11, Math.min(22, 200 / Math.sqrt(app.show.fixtures.length + 3))) * px * Math.sqrt(view.k));
   const css = (l: Resolved | undefined) => lookColor(l);
   const cells = (id: string) => app.caps(id).cells;
+  // the cells picked on a light (outlined on the plan)
+  const picks = (id: string) => new Set(app.cellsPicked(id));
   // one universe: addresses as plain numbers ("73", not "0.73", which reads like a decimal)
   const oneUni = $derived(new Set(app.show.fixtures.map((f) => f.universe)).size <= 1);
 
@@ -284,7 +294,7 @@
   });
 </script>
 
-<div class="panel stage-wrap">
+<div class="panel stage-wrap" data-marks="show">
   <div class="row head">
     <h2>Stage</h2>
     <!-- the plan, or the stage in 3D (loaded when first asked for) -->
@@ -313,8 +323,8 @@
       <button class="ghost" onclick={invert} title="Invert the selection">Invert</button>
       {#if !ui.stage3d}
       <span class="sep"></span>
-      <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show names">Aa</button>
-      <button class="ghost" class:on={addrs} onclick={() => (addrs = !addrs)} title="Show DMX addresses">#</button>
+      <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show the names (with each light's number)" aria-label="Names" aria-pressed={labels}>Aa</button>
+      <button class="ghost" class:on={addrs} onclick={() => (addrs = !addrs)} title="Show each light's number (what the console goes by) and DMX address" aria-label="Numbers and DMX addresses" aria-pressed={addrs}>#</button>
       <span class="sep"></span>
       <button class="ghost" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="plus" size={14} /></button>
       <button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} disabled={view.k === 1} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>
@@ -410,8 +420,8 @@
             {/if}
             <!-- its pixels, where they really are -->
             {#each Array(at.n) as _, i (i)}
-              {@const cc = css(l?.cells?.[i] ?? l)}
-              <circle class="px" cx={x + at.x[i] * R} cy={y - at.y[i] * R} r={Math.max(0.6, at.dot * R)} fill={cc.glow > 0.02 ? cc.css : '#232a35'} pointer-events="none" />
+              {@const cc = css(cellLookAt(l, i, at.n))}
+              <circle class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} cx={x + at.x[i] * R} cy={y - at.y[i] * R} r={Math.max(0.6, at.dot * R)} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
             {/each}
           {:else if kind === 'bar'}
             {@const n = cells(f.id)}
@@ -419,8 +429,8 @@
             <rect x={x - size * 2.2} y={y - size * 0.42} width={size * 4.4} height={size * 0.84} rx="4" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
             <!-- its cells (a long pixel strip: the pixels touch, no gaps) -->
             {#each Array(n) as _, i (i)}
-              {@const cc = css(l?.cells?.[i] ?? l)}
-              <rect x={x - size * 2.05 + (i * size * 4.1) / n} y={y - size * 0.28} width={Math.max(0.5, (size * 4.1) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
+              {@const cc = css(cellLookAt(l, i, n))}
+              <rect class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} x={x - size * 2.05 + (i * size * 4.1) / n} y={y - size * 0.28} width={Math.max(0.5, (size * 4.1) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
             {/each}
           {:else if kind === 'sfx'}
             <!-- an effect machine: what it is, lit while it runs -->
@@ -444,7 +454,7 @@
             {#if kind === 'par'}<circle cx={x} cy={y} r={size * 0.38} fill="none" stroke="#00000055" stroke-width="1.5" />{/if}
             {#if kind === 'strobe'}<text x={x} y={y + size * 0.22} text-anchor="middle" class="glyph" font-size={size * 0.7}>⚡</text>{/if}
           {/if}
-          <title>{f.name} · {oneUni ? `address ${f.address}` : `universe ${f.universe}, address ${f.address}`}</title>
+          <title>{f.num ? `${f.num} ` : ''}{f.name} · {oneUni ? `address ${f.address}` : `universe ${f.universe}, address ${f.address}`}</title>
         </g>
       {/each}
       <!-- names and addresses on top of every light, beam and glow, with a dark halo -->
@@ -455,7 +465,7 @@
           {@const sel = !readonly && app.selected.includes(f.id)}
           {@const at = labels ? labelAt.get(f.id) : null}
           {#if at}<text x={at.x} y={at.y} text-anchor={at.anchor} class="lbl" class:sel font-size={12 * px}>{f.name}</text>{/if}
-          {#if addrs}<text x={x} y={y > H * 0.86 ? y + size * 1.1 + 11 * px : y - size * 0.95 - 4 * px} text-anchor="middle" class="adr" font-size={10.5 * px}>{oneUni ? f.address : `${f.universe}.${f.address}`}</text>{/if}
+          {#if addrs}<text x={x} y={y > H * 0.86 ? y + size * 1.1 + 11 * px : y - size * 0.95 - 4 * px} text-anchor="middle" class="adr" font-size={10.5 * px}>{#if f.num}<tspan class="no">#{f.num} </tspan>{/if}{oneUni ? f.address : `${f.universe}.${f.address}`}</text>{/if}
         {/each}
       </g>
 
@@ -492,6 +502,7 @@
   .area { position: relative; flex: 1; min-height: 0; }
   svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
   .fx { cursor: grab; }
+  .px.picked { stroke: #ffaa1c; stroke-width: 1.5px; }   /* (picked: orange, as selection is everywhere) */
   .fx:focus { outline: none; }
   .fx.dropping { filter: drop-shadow(0 0 6px var(--orange)); }
   .fx:active { cursor: grabbing; }
@@ -514,4 +525,5 @@
   .empty.low { top: auto; bottom: 1rem; transform: translateX(-50%); }
   .snapguide { stroke: var(--cyan); stroke-dasharray: 4 3; opacity: .8; pointer-events: none; }
   svg:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .adr .no { fill: var(--orange); }
 </style>

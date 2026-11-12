@@ -6,7 +6,7 @@
   import Hint from './Hint.svelte';
   import Help from './Help.svelte';
   import FixtureEditor from './FixtureEditor.svelte';
-  import { app } from '../app.svelte';
+  import { app, type CellMaps } from '../app.svelte';
   import { spansOf } from '../model/pixelLayout';
   import { KIND_LABEL, typeLabel } from '../model/library';
   import { RISK_HINT, RISK_LABEL, riskOf } from '../model/safety';
@@ -83,11 +83,15 @@
     ui.openMenu(e, items);
   }
   // A saved copy of a type: the selected fixtures of the old type use the new one.
-  function retype(id: string) {
+  function retype(id: string, cellMaps?: CellMaps) {
     const old = editType?.id;
     if (!old || old === id) return;
     const t = app.types.get(id);
-    for (const f of app.show.fixtures) if (f.typeId === old && app.selected.includes(f.id)) { f.typeId = id; f.mode = t?.modes.find((m) => m.name === f.mode)?.name ?? t?.modes[0]?.name ?? f.mode; }
+    const moved: string[] = [];
+    for (const f of app.show.fixtures) if (f.typeId === old && app.selected.includes(f.id)) { f.typeId = id; f.mode = t?.modes.find((m) => m.name === f.mode)?.name ?? t?.modes[0]?.name ?? f.mode; moved.push(f.id); }
+    // (the lights moved to the adjusted copy: their looks follow its cells, like the type's own)
+    if (cellMaps) app.remapCells(moved, cellMaps);
+    app.settleCells(moved);
     app.markDirty(0);
     ui.toast('The selected fixtures use the adjusted type now');
   }
@@ -116,7 +120,7 @@
   }
 </script>
 
-<div class="panel fl">
+<div class="panel fl" data-marks="show">
   <div class="row head">
     <h2>Fixtures</h2>
     <span class="chip">{app.show.fixtures.length}</span>
@@ -177,6 +181,7 @@
           <span class="ico" style="color:{lc.glow > 0.02 ? lc.css : 'var(--muted)'};background:{lc.glow > 0.02 ? lc.css.replace('rgb', 'rgba').replace(')', ',.16)') : 'transparent'}" title={KIND_LABEL[kind]}>
             <Icon name={kind} size={18} />
           </span>
+          {#if f.num}<span class="num" title="Its number: the console and typed commands go by it">{f.num}</span>{/if}
           <span class="txt">
             <span class="nm">{f.name}</span>
             <span class="faint">{t ? typeLabel(t) : f.typeId}{t && t.modes.length > 1 ? ` · ${f.mode}` : ''}{groupsOf[f.id] ? ` · ${groupsOf[f.id]}` : ''}</span>
@@ -222,4 +227,5 @@
   .risk.atmosphere { color: #9fb4c8; }
   .risk.once { color: #e8c44a; border-color: #e8c44a55; }
   .risk.hazard { color: #ff8a5c; border-color: #ff7a1c88; font-weight: 650; }
+  .num { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8rem; min-width: 1.6em; text-align: right; flex: none; }
 </style>

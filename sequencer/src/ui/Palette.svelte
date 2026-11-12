@@ -34,6 +34,8 @@
     cmd('Record a cue', 'record', () => ui.toast(app.record() ? 'Recorded' : 'Nothing to record'));
     cmd('Clear the programmer', 'close', () => app.clearProgrammer());
     cmd(app.view === 'live' ? 'Go to Program' : 'Go to Live', app.view === 'live' ? 'program' : 'live', () => (app.view = app.view === 'live' ? 'program' : 'live'));
+    if (app.view !== 'console' && !app.locked) cmd('Console: like a lighting desk (command line, faders, encoders)', 'sliders', () => (app.view = 'console'));
+    cmd(app.show.settings.recordChanges ? 'Record whole looks again (each touched light as it looks)' : 'Record only changes (what the programmer holds, as desks do)', 'record', () => { app.checkpoint(); if (app.show.settings.recordChanges) delete app.show.settings.recordChanges; else app.show.settings.recordChanges = true; app.markDirty(0); });
     cmd(app.blackout ? 'Blackout off' : 'Blackout on', 'moon', () => (app.blackout = !app.blackout));
     cmd('Release everything', 'stop', () => app.releaseAll(), undefined, 'release all stop lists fade off');
     cmd('Stop all effects', 'stop', () => app.stopAllEffects(), undefined, 'stop effects chase rainbow off');

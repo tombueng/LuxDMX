@@ -3,7 +3,7 @@
 // where the show thinks the light is and has to find the truth again.
 import { describe, expect, it } from 'vitest';
 import { aimAt, beamDir, pivotOf, type Optics, type V3 } from '../stage3d/geometry';
-import { matOf, missOf, rotOf, solvePose, type Pose, type Sighting } from './calibrate';
+import { canMeasureRanges, matOf, missOf, rotOf, solvePose, RANGE_HEIGHT, type Pose, type Sighting } from './calibrate';
 
 const O: Optics = { panDeg: 540, tiltDeg: 270, panOffset: 0, tiltOffset: 0, invertPan: false, invertTilt: false };
 const DECK = 1.2;
@@ -120,5 +120,69 @@ describe('a head found from four marks', () => {
   });
   it('two marks are not enough', () => {
     expect(solvePose(guess, O, sight(hung, MARKS.slice(0, 2)))).toBeUndefined();
+  });
+});
+
+describe('a head whose pan and tilt go further (or less far) than its profile says', () => {
+  // the real head: pan 630°, tilt 250°; the profile (and the solver's start) says 540° / 270°
+  const real = (p: Pose): Optics => ({ ...optics(p), panDeg: 630, tiltDeg: 250 });
+  const MORE: V3[] = [...MARKS, { x: 1.5, y: DECK + 1.1, z: 0.5 }, { x: 2, y: DECK, z: -1.5 }];   // one on a box, one more on the deck
+  // (a person steering by eye: a bit off each time)
+  const shaken = (truth: Pose, marks: V3[], deg: number, seed: number, opt: (p: Pose) => Optics) => {
+    let s0 = seed;
+    const rnd = () => { s0 = (s0 * 16807) % 2147483647; return s0 / 2147483647 - 0.5; };
+    return marks.map((m) => { const a = aimAt(truth.p, truth.rot, m, opt(truth))!; return { mark: m, pan: a.pan + rnd() * 2 * deg / 630, tilt: a.tilt + rnd() * 2 * deg / 250 }; });
+  };
+  const seenBy = (truth: Pose, marks: V3[]) => marks.map((m) => { const a = aimAt(truth.p, truth.rot, m, real(truth))!; return { mark: m, pan: a.pan, tilt: a.tilt }; });
+  it('from six marks or more, one at another height (40 cm or more): the real ranges, and then it meets every mark', () => {
+    const fit = solvePose(guess, O, seenBy(hung, MORE))!;
+    expect(fit.ranged).toBe(true);
+    expect(fit.panDeg).toBeGreaterThan(630 * 0.99); expect(fit.panDeg).toBeLessThan(630 * 1.01);
+    expect(fit.tiltDeg).toBeGreaterThan(250 * 0.99); expect(fit.tiltDeg).toBeLessThan(250 * 1.01);
+    expect(fit.worst).toBeLessThan(0.01);
+    expect(dist(fit.p, hung.p)).toBeLessThan(0.05);
+  });
+  it('a head that goes as far as its profile says keeps those ranges', () => {
+    const fit = solvePose(guess, O, sight(hung, MORE))!;
+    expect(fit.panDeg).toBeCloseTo(540, 0);
+    expect(fit.tiltDeg).toBeCloseTo(270, 0);
+  });
+  it('with fewer than six marks, or all at one height, the ranges stay as given', () => {
+    // 4 and 5 on the deck; 5 with one on a box (too few, at two heights); 6 all on the deck
+    for (const marks of [MARKS.slice(0, 4), MARKS, [...MARKS.slice(0, 4), { x: 1.5, y: DECK + 1.1, z: 0.5 }], [...MARKS, { x: 2, y: DECK, z: -1.5 }]]) {
+      const fit = solvePose(guess, O, seenBy(hung, marks))!;
+      expect(fit.ranged).toBe(false);
+      expect([fit.panDeg, fit.tiltDeg]).toEqual([540, 270]);
+    }
+  });
+  it('the height rule: one mark 40 cm off the others counts, 39 cm doesn\'t', () => {
+    const six = (dy: number): V3[] => [0, 1, 2, 3, 4].map((i) => ({ x: i, y: DECK, z: 0 })).concat({ x: 2, y: DECK + dy, z: 1 });
+    expect(RANGE_HEIGHT).toBe(0.4);
+    expect(canMeasureRanges(six(0.4))).toBe(true);
+    expect(canMeasureRanges(six(-0.4))).toBe(true);             // (lower counts as much as higher)
+    expect(canMeasureRanges(six(0.39))).toBe(false);
+    expect(canMeasureRanges(six(0.4).slice(1))).toBe(false);    // (five, one of them high: too few)
+    // and solvePose keeps to it: six marks, the sixth on a box only 30 cm high
+    const low = [...MARKS, { x: 1.5, y: DECK + 0.3, z: 0.5 }];
+    expect(solvePose(guess, O, seenBy(hung, low))!.ranged).toBe(false);
+  });
+  it('steered by eye on a head whose ranges are right: never "measured" wrong ones', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const fit = solvePose(guess, O, shaken(hung, MORE, 0.8, seed, optics))!;
+      expect(fit.ranged, `seed ${seed}`).toBe(false);
+      expect([fit.panDeg, fit.tiltDeg]).toEqual([540, 270]);
+    }
+  });
+  it('steered by eye on a head that really goes 630° / 250°: measured close, or said to be unsure', () => {
+    let measured = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const fit = solvePose(guess, O, shaken(hung, MORE, 0.3, seed, real))!;
+      if (fit.ranged) { measured++; expect(Math.abs(fit.panDeg - 630)).toBeLessThan(20); expect(Math.abs(fit.tiltDeg - 250)).toBeLessThan(10); }
+      else expect(fit.rangeUnsure).toBe(true);
+    }
+    expect(measured).toBeGreaterThan(0);
+  });
+  it('not asked to (ranges off): it keeps them whatever the number of marks', () => {
+    expect(solvePose(guess, O, seenBy(hung, MORE), false)!.ranged).toBe(false);
   });
 });

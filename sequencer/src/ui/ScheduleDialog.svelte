@@ -20,7 +20,7 @@
   const FULL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
   const entries = $derived(app.show.settings.schedule ?? []);
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
-  const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l)));
+  const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   const ro = $derived(app.locked);
   // what's next (and today's sun), kept current while the dialog is open
   let now = $state(new Date());

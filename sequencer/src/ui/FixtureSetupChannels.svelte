@@ -5,11 +5,12 @@
   // channel does can be changed right here, for all lights of the type or only for this one (a copy
   // of the type). A ring or a matrix shows one pixel's channels, standing for all of them. Its other
   // modes say plainly what picking one does: the channel count, and which lights after it move.
-  import { app, newId } from '../app.svelte';
+  import { app } from '../app.svelte';
+  import { ui } from './ui.svelte';
   import { ATTR_GROUPS, ATTR_LABEL } from './attrs';
   import { channelRows, modeChange, type PatchedLight } from '../model/fixtureSetup';
   import { channelAt, isWide } from '../model/pixelLayout';
-  import type { Channel, ChannelAttr, FixtureType } from '../model/types';
+  import type { Channel, ChannelAttr } from '../model/types';
 
   let { id }: { id: string } = $props();
   const f = $derived(app.show.fixtures.find((x) => x.id === id));
@@ -81,18 +82,7 @@
       if (c.ranges) c.ranges = c.ranges.filter((r) => r.to >= r.from).map((r) => ({ ...r, from: Math.max(0, Math.min(255, r.from)), to: Math.max(0, Math.min(255, r.to)) }));
       if (c.ranges && !c.ranges.length) delete c.ranges;
     }
-    const copy: FixtureType = JSON.parse(JSON.stringify(t));
-    copy.modes = copy.modes.map((x) => (x.name === m.name ? { ...x, channels } : x));
-    const inPlace = !only && t.source === 'user';
-    if (!inPlace) {
-      copy.id = newId('user:'); copy.source = 'user';
-      copy.model = `${t.model} (${only ? f.name : 'changed'})`;
-    }
-    app.saveType(copy);
-    const to = only ? [id] : same;
-    if (!inPlace) for (const x of to) { const g = app.show.fixtures.find((y) => y.id === x); if (g) g.typeId = copy.id; }
-    app.markDirty(0);
-    app.toastUndo(only ? `${f.name} has its own channels now` : inPlace ? `Saved for all ${plural(same.length, 'light')} of this type` : `${plural(same.length, 'light')} use the changed type now`);
+    app.toastUndo(app.changeChannels(id, channels, only));
     draft = null; openRanges = null;
   }
 
@@ -139,6 +129,8 @@
         <button class="ghost link" onclick={() => app.askOnStage()}>Go on stage</button></p>
     {/if}
     {#if machine}<p class="faint small">A machine's fire channels only go out while the machines are armed.</p>{/if}
+    <!-- (a light the profile says doesn't move, with channels enough to: a plain RDM profile, a file that got it wrong) -->
+    {#if !app.caps(id).position && !app.caps(id).fog && !machine && m.channels.length >= 4}<p class="faint small">Does it move? <button class="ghost link" onclick={() => (ui.panTiltFind = id)}>Find pan and tilt…</button></p>{/if}
     {#if pixels}<p class="faint small">{plural(cells, 'pixel')} with the same channels: each row stands for that channel on every pixel, and its slider sets all of them.</p>{/if}
 
     <div class="tw">

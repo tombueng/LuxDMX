@@ -3,12 +3,13 @@
   import ProgramView from './ui/ProgramView.svelte';
   import LiveView from './ui/LiveView.svelte';
   import TimelineView from './ui/TimelineView.svelte';
+  import ConsoleView from './ui/ConsoleView.svelte';
   import Overlays from './ui/Overlays.svelte';
   import Modals from './ui/Modals.svelte';
   import ConnectionBanner from './ui/ConnectionBanner.svelte';
   import { app } from './app.svelte';
   import { ui } from './ui/ui.svelte';
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   type View = typeof app.view;
   // A view is built the first time it's opened and stays (hidden) when another one is shown, so
   // going back to it is instant and it is as it was left: the timeline's scroll, the live page,
@@ -52,16 +53,22 @@
     window.addEventListener('hashchange', unlock);
     return () => window.removeEventListener('hashchange', unlock);
   });
+  // a new selection (or picked cells): the 3D frame round the lights is back, to show what it is
+  $effect(() => { void app.selected; void app.cellSel; untrack(() => { ui.selMarks = true; }); });
 </script>
+
+<!-- where the pointer (or the keyboard) is says whether the 3D selection frame shows (ui.marksFrom) -->
+<svelte:document onpointerover={(e) => ui.marksFrom(e.target)} onfocusin={(e) => ui.marksFrom(e.target)} />
 
 <div class="app" class:in-live={app.view === 'live'}>
   <TopBar />
   <ConnectionBanner />
   <!-- menus and messages sit in the main region too (they float, but a screen reader finds them) -->
-  <main class="view" aria-label={app.view === 'program' ? 'Program' : app.view === 'timeline' ? 'Timeline' : 'Live'}>
+  <main class="view" aria-label={app.view === 'program' ? 'Program' : app.view === 'timeline' ? 'Timeline' : app.view === 'console' ? 'Console' : 'Live'}>
     {#if open.has('program')}<div class="pane" class:laying={laying === 'program'} hidden={app.view !== 'program'} inert={app.view !== 'program'}><ProgramView /></div>{/if}
     {#if open.has('timeline')}<div class="pane" class:laying={laying === 'timeline'} hidden={app.view !== 'timeline'} inert={app.view !== 'timeline'}><TimelineView /></div>{/if}
     {#if open.has('live')}<div class="pane" class:laying={laying === 'live'} hidden={app.view !== 'live'} inert={app.view !== 'live'}><LiveView /></div>{/if}
+    {#if open.has('console')}<div class="pane" class:laying={laying === 'console'} hidden={app.view !== 'console'} inert={app.view !== 'console'}><ConsoleView /></div>{/if}
     <Overlays /></main>
 </div>
 <Modals />

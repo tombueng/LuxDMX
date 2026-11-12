@@ -57,6 +57,15 @@ test('a pro spot from the Open Fixture Library: CMY red, shutter open, 16-bit di
   const ch = await channels(0, 32);
   expect([ch[30], ch[31]]).toEqual([255, 255]);                 // dimmer + fine
   expect(ch[29]).toBeGreaterThanOrEqual(32);                    // shutter in an open range, not closed (0..31)
+  // its rotating gobo wheel came in as Gobo 2 (with its rotation), the prism's rotation and the
+  // effect speed as sliders: each moves its own channel
+  const prog = page.locator('.prog');
+  await expect(prog.getByRole('region', { name: 'Gobo 2', exact: true })).toBeVisible();
+  await prog.getByLabel('Gobo 2 rotation', { exact: true }).fill('1');
+  await prog.getByLabel('Prism rotation', { exact: true }).fill('1');
+  await prog.getByLabel('Effect speed', { exact: true }).fill('0.5');
+  // (the two rotations within the rotating ranges of their channels; the speed at half)
+  await expect.poll(async () => { const c = await channels(0, 32); return [c[17] > 0, c[20] > 0, c[13]]; }).toEqual([true, true, 128]);
 });
 
 test('a moving head from the QLC+ library: red comes from the colour wheel', async ({ page }) => {
@@ -83,6 +92,45 @@ test('import a GDTF file and drive it', async ({ page }) => {
   await full(page);
   await swatch(page, 'Green');
   await expect.poll(() => channels(0, 5)).toEqual([255, 0, 255, 0, 0]);   // dimmer, R, G, B, W
+});
+
+test('a GDTF matrix panel comes in laid out as a grid: Top picks its top row', async ({ page }) => {
+  const { zipSync, strToU8 } = await import('fflate');
+  // 4 x 2 pixels, red only, numbered along the rows from the top left
+  const at = [...Array(8).keys()].map((i) => [(i % 4) * 0.1 - 0.15, i < 4 ? 0.05 : -0.05]);
+  const geo = at.map(([x, z], i) => `<Geometry Name="Px${i + 1}" Position="{1,0,0,${x}}{0,1,0,0}{0,0,1,${z}}{0,0,0,1}"/>`).join('');
+  const chs = at.map((_, i) => `<DMXChannel DMXBreak="1" Offset="${i + 1}" Geometry="Px${i + 1}"><LogicalChannel Attribute="ColorAdd_R"><ChannelFunction Attribute="ColorAdd_R" DMXFrom="0/1"/></LogicalChannel></DMXChannel>`).join('');
+  const xml = `<?xml version="1.0"?><GDTF DataVersion="1.1"><FixtureType Name="Panel 8" LongName="Panel 8" Manufacturer="LuxTest">
+    <Geometries><Geometry Name="Body" Position="{1,0,0,0}{0,1,0,0}{0,0,1,1}{0,0,0,1}">${geo}</Geometry></Geometries>
+    <DMXModes><DMXMode Name="8ch" Geometry="Body"><DMXChannels>${chs}</DMXChannels></DMXMode></DMXModes></FixtureType></GDTF>`;
+  await openConnected(page);
+  await openAdd(page);
+  await addDialog(page).locator('input[type=file]').setInputFiles({ name: 'LuxTest@Panel8.gdtf', mimeType: 'application/octet-stream', buffer: Buffer.from(zipSync({ 'description.xml': strToU8(xml) })) });
+  await patchSelected(page, 1);
+  await selectAll(page);
+  const cells = page.locator('.prog #pg-cells');
+  await cells.scrollIntoViewIfNeeded();
+  await cells.getByRole('button', { name: 'Top', exact: true }).click();
+  await expect(cells).toContainText('4 of 8 picked');
+  await swatch(page, 'Red');
+  await expect.poll(() => channels(0, 8)).toEqual([255, 255, 255, 255, 0, 0, 0, 0]);
+});
+
+test('an Open Fixture Library matrix panel file comes in laid out as a grid too', async ({ page }) => {
+  const ofl = { name: 'Panel 4x2', categories: ['Matrix'], matrix: { pixelCount: [4, 2, 1] },
+    templateChannels: { 'Red $pixelKey': { capability: { type: 'ColorIntensity', color: 'Red' } } },
+    modes: [{ name: '8ch', channels: [{ insert: 'matrixChannels', repeatFor: 'eachPixel', channelOrder: 'perPixel', templateChannels: ['Red $pixelKey'] }] }] };
+  await openConnected(page);
+  await openAdd(page);
+  await addDialog(page).locator('input[type=file]').setInputFiles({ name: 'panel-4x2.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(ofl)) });
+  await patchSelected(page, 1);
+  await selectAll(page);
+  const cells = page.locator('.prog #pg-cells');
+  await cells.scrollIntoViewIfNeeded();
+  await cells.getByRole('button', { name: 'Top', exact: true }).click();
+  await expect(cells).toContainText('4 of 8 picked');
+  await swatch(page, 'Red');
+  await expect.poll(() => channels(0, 8)).toEqual([255, 255, 255, 255, 0, 0, 0, 0]);
 });
 
 test('all channels: pick a gobo by name, it is recorded and comes back', async ({ page }) => {

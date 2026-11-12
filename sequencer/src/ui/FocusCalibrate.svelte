@@ -11,7 +11,7 @@
   import { ui } from './ui.svelte';
   import { groundAt, roomOf, worldToPlan } from '../stage3d/geometry';
   import { aimHead, calMarks, motors, opticsOf, placeOf, upOf, type PanTilt } from '../model/fixtureSetup';
-  import { solvePose, type Fit } from '../model/calibrate';
+  import { canMeasureRanges, solvePose, type Fit } from '../model/calibrate';
   import type { Fixture, StageMark, Values } from '../model/types';
 
   let { ids, onclose }: { ids: string[]; onclose: () => void } = $props();
@@ -122,15 +122,24 @@
 
   // ---- working it out, and using it
   let results = $state<Record<string, Fit | undefined>>({});
+  // the measured ranges each head keeps (ticked by default when they were measured)
+  let keepRange = $state<Record<string, boolean>>({});
   const ready = $derived(heads.filter((f) => count(f.id) >= 3));
-  function workOut() {
-    const out: Record<string, Fit | undefined> = {};
-    for (const f of ready) {
+  // (a head at a time, the page breathing in between: twenty heads are a few seconds of maths)
+  let working = $state(0);
+  async function workOut() {
+    const out: Record<string, Fit | undefined> = {}, keep: Record<string, boolean> = {};
+    const list = [...ready];
+    for (const [i, f] of list.entries()) {
+      working = i + 1;
+      await new Promise((r) => setTimeout(r, 0));
       const o = optics(f), pl = placeOf(f, 'mover', room);
       const seen = marks.flatMap((m) => { const s = seenAt(f.id, m.id); if (!s) return []; const v = motors(f, s); return [{ mark: m.p, pan: v.pan, tilt: v.tilt }]; });
       out[f.id] = solvePose({ p: pl.p, rot: pl.rot, panOffset: o.panOffset, tiltOffset: o.tiltOffset, invertPan: o.invertPan, invertTilt: o.invertTilt, panReversed: !!f.panReversed, tiltReversed: !!f.tiltReversed }, o, seen);
+      keep[f.id] = !!out[f.id]?.ranged;
     }
-    results = out;
+    working = 0;
+    results = out; keepRange = keep;
   }
   // (its up, from the fit, more than 60° from where the show had it)
   const turnedOver = (f: Fixture, r: Fit) => { const a = upOf(placeOf(f, 'mover', room).rot), b = upOf(r.rot); return a.x * b.x + a.y * b.y + a.z * b.z < 0.5; };
@@ -148,6 +157,8 @@
       if (r.tiltOffset) f.tiltOffset = r.tiltOffset; else delete f.tiltOffset;
       if (r.panReversed) f.panReversed = true; else delete f.panReversed;
       if (r.tiltReversed) f.tiltReversed = true; else delete f.tiltReversed;
+      // (measured from six marks or more, at two heights: how far its pan and tilt really go, for this light)
+      if (r.ranged && keepRange[f.id]) { f.panDeg = r.panDeg; f.tiltDeg = r.tiltDeg; }
       const pl = worldToPlan(r.p.x, r.p.z, room);
       f.x = pl.x; f.y = pl.y;
     }
@@ -183,7 +194,7 @@
 <Modal title="Focus and calibrate: {heads.length === 1 ? heads[0].name : `${heads.length} heads`}" {onclose} wide>
   <div class="cal">
     <div class="left">
-      <p class="faint small">Tape the marks on the real stage, steer every head onto every mark, and the app works out where each one really hangs. Four marks, spread out, are best; three do.</p>
+      <p class="faint small">Tape the marks on the real stage, steer every head onto every mark, and the app works out where each one really hangs. Four marks, spread out, are best; three do. Six or more, one of them at another height (a box on the stage), also measure how far pan and tilt really go, for a head whose manual or profile has that wrong.</p>
       <svg viewBox="0 0 {W} {Z1 - Z0}" class="plan" role="img" aria-label="The stage from above, the audience at the bottom">
         {#if room.deck.x > 0}<rect x={px(-room.deck.x)} y={pz(room.deck.z0)} width={room.deck.x * 2} height={room.deck.z1 - room.deck.z0} class="deck" />{/if}
         {#each marks as m, i (m.id)}
@@ -261,7 +272,7 @@
       <section aria-labelledby="cal-out-h">
         <h3 id="cal-out-h">3. Where they really hang</h3>
         <div class="row">
-          <button onclick={workOut} disabled={!ready.length}>Work it out{ready.length ? ` for ${ready.length}` : ''}</button>
+          <button onclick={workOut} disabled={!ready.length || working > 0}>{working ? `Working out ${working} of ${ready.length}…` : `Work it out${ready.length ? ` for ${ready.length}` : ''}`}</button>
           <button class="ghost" onclick={presets} title="One position preset per mark, with each head's own pan and tilt: the way consoles keep a focus">Keep the marks as position presets</button>
         </div>
         {#if !ready.length}<p class="faint small">A head needs three marks (four for its tilt offset too).</p>{/if}
@@ -273,6 +284,10 @@
                 <li data-head={f.name}>
                   <b>{f.name}</b>: {placeWords(r)}. Turned {r2(r.rot.yaw)}° / {r2(r.rot.pitch)}° / {r2(r.rot.roll)}°, pan offset {r2(r.panOffset)}°, tilt offset {r2(r.tiltOffset)}°.
                   <span class={r.worst < 0.1 ? 'good' : 'bad'}>{r.worst < 0.1 ? `Fits all its marks within ${cm(r.worst)}.` : `${worstMark(f, r)} is ${cm(r.worst)} off: steer it there again, or check where that mark really is.`}</span>
+                  {#if r.ranged}<span class="bad">Its pan goes {Math.round(r.panDeg)}° and its tilt {Math.round(r.tiltDeg)}°, not the {Math.round(Math.abs(optics(f).panDeg))}° and {Math.round(Math.abs(optics(f).tiltDeg))}° its profile says.</span>
+                    <label class="ck"><input type="checkbox" bind:checked={keepRange[f.id]} /> Keep {Math.round(r.panDeg)}° and {Math.round(r.tiltDeg)}° for {f.name}</label>
+                  {:else if r.rangeUnsure}<span class="faint">Its pan or tilt may go further (or less far) than its profile says, but its marks don't say clearly how far: steer it onto another mark or two, one at least 40 cm higher or lower than the rest.</span>
+                  {:else if r.worst >= 0.1 && !canMeasureRanges(marks.filter((m) => seenAt(f.id, m.id)).map((m) => m.p))}<span class="faint">If its marks are right and it was on them: its pan and tilt may go further (or less far) than its profile says. Six marks or more, one at least 40 cm higher or lower than the rest, measure it.</span>{/if}
                   {#if !!r.panReversed !== !!f.panReversed}<span class="bad">Its pan turns the other way round from what its type says: Use it puts the picture and Aim right (nothing changes on the wire).</span>{/if}
                   {#if r.twin}<span class="bad">The marks are all at one height, so its mirror image (on the other side of them, its pan the other way round) fits them as well: this is the likelier one. Give one mark another height (a box on the stage, the riser) and steer it there to be sure.</span>{/if}
                   {#if turnedOver(f, r)}<span class="bad">It points as if it hung quite differently from what the show says (turned over): Use it puts it that way, so Aim gets it right. Worth a look at how it really hangs.</span>{/if}

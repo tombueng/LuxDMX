@@ -15,6 +15,16 @@
   const presets = $derived(new Map(app.show.presets.map((p) => [p.id, p])));
 
   function setAll<K extends keyof Cue>(k: K, v: Cue[K]) { for (const c of sel) c[k] = v; }
+  // colour, position, beam: a time of their own, or (emptied) the fade again
+  const FAMILIES = [['color', 'Colour'], ['position', 'Position'], ['beam', 'Beam']] as const;
+  function setTime(k: 'color' | 'position' | 'beam', e: Event) {
+    const raw = (e.target as HTMLInputElement).value;
+    for (const c of sel) {
+      const t = { ...(c.times ?? {}) };
+      if (raw === '') delete t[k]; else t[k] = Math.min(600, Math.max(0, +raw || 0));
+      if (Object.keys(t).length) c.times = t; else delete c.times;
+    }
+  }
   function setAdvance(mode: Advance['mode']) {
     for (const c of sel) {
       const t = 'time' in c.advance ? c.advance.time : 'beats' in c.advance ? c.advance.beats : 0;
@@ -74,8 +84,11 @@
       <div class="grid">
         <label>Delay <span><input type="number" min="0" max="600" step="0.5" value={sel[0].delay ?? 0} oninput={(e) => setAll('delay', secs(e) || undefined)} aria-label="Delay" /> s</span></label>
         <label>Fade out <span><input type="number" min="0" max="600" step="0.5" value={sel[0].fadeOut ?? sel[0].fade} oninput={(e) => setAll('fadeOut', secs(e))} aria-label="Fade out" /> s</span></label>
+        {#each FAMILIES as [k, label] (k)}
+          <label>{label} <span><input type="number" min="0" max="600" step="0.5" value={sel[0].times?.[k] ?? ''} placeholder={String(sel[0].fade)} oninput={(e) => setTime(k, e)} aria-label="{label} time" /> s</span></label>
+        {/each}
       </div>
-      <p class="faint">Delay waits before the fade starts. Fade out is used for lights getting darker, e.g. a quick blackout but a slow fade up.</p>
+      <p class="faint">Delay waits before the fade starts. Fade out is used for lights getting darker, e.g. a quick blackout but a slow fade up. Colour, Position and Beam can take times of their own (empty: the fade): a colour that changes at once while the heads take 4 s to move.</p>
     </details>
     {#if one}
       <label class="note">Note <textarea rows="2" value={one.note ?? ''} oninput={(e) => (one.note = (e.target as HTMLTextAreaElement).value || undefined)} aria-label="Note"></textarea></label>

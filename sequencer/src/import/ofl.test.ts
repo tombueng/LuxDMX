@@ -41,8 +41,24 @@ describe('Open Fixture Library import', () => {
     expect(reds.map((c) => c.cell)).toEqual([...Array(12).keys()]);
   });
 
+  it('a matrix panel: its cells laid out as the file draws them; a bar stays a row', () => {
+    const panel = (pixelCount: number[] | undefined, pixelKeys?: unknown) => fromOfl('x/panel', {
+      name: 'Panel', categories: ['Matrix'], matrix: pixelKeys ? { pixelKeys } : { pixelCount },
+      templateChannels: { 'Red $pixelKey': { capability: { type: 'ColorIntensity', color: 'Red' } } },
+      modes: [{ name: 'all', channels: [{ insert: 'matrixChannels', repeatFor: 'eachPixel', channelOrder: 'perPixel', templateChannels: ['Red $pixelKey'] }] }],
+    }, 'X');
+    expect(panel([4, 3, 1]).modes[0].layout).toEqual({ kind: 'matrix', cols: 4, rows: 3 });
+    expect(panel([8, 1, 1]).modes[0].layout).toBeUndefined();
+    expect(panel(undefined, [[['a', 'b'], ['c', 'd']]]).modes[0].layout).toEqual({ kind: 'matrix', cols: 2, rows: 2 });
+    expect(panel(undefined, [[['a', null], ['c', 'd']]]).modes[0].layout).toBeUndefined();   // (a hole: not a plain grid)
+    // a broken file (pixelCount not a list): no layout, no error
+    expect(() => panel(5 as unknown as number[])).not.toThrow();
+    expect(panel(5 as unknown as number[]).modes[0].layout).toBeUndefined();
+  });
+
   it('Robe Robin 600E Spot: 16-bit, CMY, wheels, shutter, and a sensible render', () => {
     const t = load('robe/robin-600e-spot', 'Robe');
+    expect(t.physical?.beamDeg).toEqual([10, 45]);                // (its lens: the 3D stage draws its beam so)
     const m = mode(t, '32-channel');
     expect(m.channels).toHaveLength(32);
     expect(attrs(m).slice(0, 4)).toEqual(['pan', 'pan(fine)', 'tilt', 'tilt(fine)']);
@@ -90,5 +106,20 @@ describe('Open Fixture Library import', () => {
   it('switching channels resolve to a real channel', () => {
     const t = load('eurolite/led-kls-801', 'Eurolite');
     for (const m of t.modes) expect(m.channels.length).toBeGreaterThan(0);
+  });
+});
+
+describe('OFL: a moving bar\'s heads', () => {
+  it('a tilt per pixel is a head: its tilt and its colour one cell, the bar\'s pan the whole light\'s', () => {
+    const t = fromOfl('x/headbar', {
+      name: 'Head bar 3', categories: ['Moving Head', 'Pixel Bar'], matrix: { pixelCount: [3, 1, 1] },
+      availableChannels: { Pan: { capability: { type: 'Pan', angleStart: '0deg', angleEnd: '540deg' } } },
+      templateChannels: {
+        'Tilt $pixelKey': { capability: { type: 'Tilt', angleStart: '0deg', angleEnd: '180deg' } },
+        'Red $pixelKey': { capability: { type: 'ColorIntensity', color: 'Red' } },
+      },
+      modes: [{ name: '7ch', channels: ['Pan', { insert: 'matrixChannels', repeatFor: 'eachPixelABC', channelOrder: 'perPixel', templateChannels: ['Tilt $pixelKey', 'Red $pixelKey'] }] }],
+    }, 'X');
+    expect(t.modes[0].channels.map((c) => [c.attr, c.cell ?? null])).toEqual([['pan', null], ['tilt', 0], ['red', 0], ['tilt', 1], ['red', 1], ['tilt', 2], ['red', 2]]);
   });
 });

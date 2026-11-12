@@ -173,7 +173,7 @@ describe('another mode', () => {
   });
   it("a mode's channels as the manual lists them: fine ones with their coarse channel, defaults, the gobo slots", () => {
     const spot = GENERIC.find((t) => t.id === 'gen-spotgobo')!, rows = channelRows(spot.modes[0], 20);
-    expect(rows).toHaveLength(16);
+    expect(rows).toHaveLength(17);
     expect(rows[0]).toMatchObject({ n: 1, dmx: 20, name: 'Pan', attr: 'pan', def: 128 });
     expect(rows[1]).toMatchObject({ n: 2, dmx: 21, attr: 'pan', fineOf: 1 });
     expect(rows[3]).toMatchObject({ attr: 'tilt', fineOf: 3 });

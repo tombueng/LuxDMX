@@ -32,7 +32,7 @@
     const looks = app.cueLooksOf.get(list.id) ?? [];
     const fixtures = app.plain?.fixtures ?? [];
     const own = isLooks(list);                // a look's card: what it names, the rest as outlines
-    return looks.map((l) => stageSvg(fixtures, l, app.kinds, 160, 90, own, (id) => app.placesOf(id)));
+    return looks.map((l) => stageSvg(fixtures, l, app.kinds, 160, 90, own, (id) => app.placesOf(id), (id) => app.caps(id).cells));
   });
   let settings = $state(false);
   let renaming = $state<string | null>(null);
@@ -163,7 +163,7 @@
 
 <svelte:window onkeydown={global} />
 
-<div class="panel deck">
+<div class="panel deck" data-marks="hide">
   <div class="row tabs">
     <h2>Cues</h2>
     <Help>

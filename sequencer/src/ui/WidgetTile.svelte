@@ -32,7 +32,7 @@
     const list = app.show.cueLists.find((l) => l.id === w.list);
     const i = list ? list.cues.findIndex((c) => c.id === w.cue) : -1;
     const look = i >= 0 ? app.cueLooksOf.get(w.list)?.[i] : undefined;
-    return look ? stageSvg(app.plain?.fixtures ?? [], look, app.kinds, 160, 80, false, (id) => app.placesOf(id)) : '';
+    return look ? stageSvg(app.plain?.fixtures ?? [], look, app.kinds, 160, 80, false, (id) => app.placesOf(id), (id) => app.caps(id).cells) : '';
   });
 </script>
 
