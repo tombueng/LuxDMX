@@ -87,6 +87,8 @@ const pingAfter = (() => {
   ch.port1.onmessage = () => todo.shift()?.();
   return (f: () => void) => { todo.push(f); ch.port2.postMessage(0); };
 })();
+// (said when a box connects while blind; gone the moment you go on stage)
+const BLIND_TOAST = 'Connected. You are blind';
 const HELD_KEY = 'luxdmx.seq.held';           // where the winches were last sent armed (held there over a reload)
 // (what's kept: { "fixture:hoist": { v: byte, at: ms } }; anything else isn't)
 function keptHeld(): Record<string, { v: number; at: number }> {
@@ -445,7 +447,7 @@ class App {
       const frozen = this.lastSent && this.zeroed(this.lastSent, (a) => ATMOS_AND_MACHINES.includes(a));
       if (frozen) this.engine.putHeld(frozen, this.heldWire());
       this.setFrozen(frozen);
-    } else this.setFrozen(null);
+    } else { this.setFrozen(null); ui.untoast(BLIND_TOAST); }
     this.output = o;
     this.keepOutput();
   }
@@ -2971,7 +2973,7 @@ class App {
       this.bridgeRev++;
       if (b?.state === 'ready' && this.output === 'blind' && !this.toldBlind && !this.locked) {
         this.toldBlind = true;
-        ui.toast('Connected. You are blind: the lights don\'t follow yet. Press Blind at the top to send what you do to the stage.', 8000);
+        ui.toast(`${BLIND_TOAST}: the lights don't follow yet. Press Blind at the top to send what you do to the stage.`, 8000);
       }
     };
     // LuxDMX Link on this computer: Art-Net / sACN to any node (output/link.ts)

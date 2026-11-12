@@ -181,3 +181,36 @@ test.describe('faders on a phone', () => {
     await expect(fader).not.toHaveClass(/grabbed/);
   });
 });
+
+test.describe('a laptop (1366 x 768)', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('the top bar stays one row with a machine to arm and a box connected, and doesn\'t jump on save; a big rig\'s universes fold into one line', async ({ page }) => {
+    await openConnected(page);
+    // (on stage now: the "you are blind" note from connecting is gone)
+    await expect(page.getByText('Connected. You are blind')).toHaveCount(0);
+    await patch(page, 'gen-flame', 1, 0, 'Flame');
+    for (const u of [1, 2, 3, 4, 5]) await patch(page, 'gen-dimmer', 2, u, `Dim U${u}`);
+    const bar = page.locator('header.top');
+    await expect(page.locator('.top .arm')).toBeVisible();
+    const box = await bar.boundingBox();
+    expect(box!.height).toBeLessThan(56);                                       // one row
+    expect(await bar.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+    for (const sel of ['.top .out', '.top .arm', '[role=tab][aria-label=Timeline]']) await expect(page.locator(sel)).toBeInViewport();
+    // "saved" and "…" take the same room
+    const w = await page.evaluate(async () => {
+      const s = document.querySelector('.top .saved')!, b = document.querySelector('.top .show')!;
+      const a = b.getBoundingClientRect().width, t = s.textContent;
+      s.textContent = t === 'saved' ? '…' : 'saved';
+      await new Promise((r) => requestAnimationFrame(r));
+      const z = b.getBoundingClientRect().width; s.textContent = t; return Math.abs(a - z);
+    });
+    expect(w).toBeLessThan(1);
+    // six universes: one line, the lights stay in view
+    const fl = page.locator('.fl');
+    await expect(fl.locator('.usage summary')).toHaveText(/^6 universes · \d+ channels/);
+    await expect(fl.locator('.usage .unis')).toBeHidden();
+    expect((await fl.locator('ul').first().boundingBox())!.height).toBeGreaterThan(120);   // (rows of lights, not a stub)
+    await fl.locator('.usage summary').click();
+    await expect(fl.locator('.usage .unis .chip')).toHaveCount(6);
+  });
+});

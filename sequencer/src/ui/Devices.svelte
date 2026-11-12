@@ -67,7 +67,7 @@
   // On phones and tablets the boxes fold into one button with a status dot; the pills open under it.
   let w = $state(typeof window === 'undefined' ? 1200 : window.innerWidth);
   // One button with a status dot on a tablet, and on a wider screen too when the boxes' pills don't
-  // fit on the top bar's row (they'd wrap it to two rows, and every panel loses that height): the
+  // fit on the top bar's row (they'd push it over the edge or squeeze the show's name away): the
   // width at which they didn't is kept, so it doesn't flip back and forth (more boxes look again)
   let wrapAt = $state(0), devEl = $state<HTMLDivElement>();
   const compact = $derived(w <= 1100 || w <= wrapAt);
@@ -75,7 +75,13 @@
     void app.bridges.length; void w;
     if (compact || !devEl) return;
     const el = devEl;
-    requestAnimationFrame(() => { const top = el.closest('.top'); if (top && el.isConnected && el.getBoundingClientRect().top - top.getBoundingClientRect().top > 24) wrapAt = w; });
+    // (the bar keeps one row: too little room shows as the bar running over, or the show's name
+    // squeezed down to a stub)
+    requestAnimationFrame(() => {
+      const top = el.closest('.top'), show = top?.querySelector('.show');
+      if (!top || !el.isConnected) return;
+      if (top.scrollWidth - top.clientWidth > 1 || el.getBoundingClientRect().top - top.getBoundingClientRect().top > 24 || (show && show.getBoundingClientRect().width < 110)) wrapAt = w;
+    });
   });
   let lastCount = 0;
   $effect(() => { const n = app.bridges.length; if (n !== lastCount) { lastCount = n; wrapAt = 0; } });

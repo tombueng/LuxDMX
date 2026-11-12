@@ -105,6 +105,11 @@ class Ui {
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => { this.toastText = ''; this.toastAction = null; }, action ? Math.max(ms, 6000) : ms);
   }
+  // a message that isn't true any more goes at once (one starting with `prefix`)
+  untoast(prefix: string) {
+    if (!this.toastText.startsWith(prefix)) return;
+    clearTimeout(this.toastTimer); this.toastText = ''; this.toastAction = null;
+  }
 }
 export const ui = new Ui();
 

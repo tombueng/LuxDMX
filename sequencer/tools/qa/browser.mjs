@@ -52,7 +52,20 @@ async function fresh(url = START, keep = false) {
 }
 await fresh();
 const page = () => pages[cur];
-const loc = (sel, nth) => { const l = page().locator(sel); return nth === undefined ? l.first() : nth === 'last' ? l.last() : l.nth(nth); };
+// (also label=..., placeholder=..., title=...: Playwright's getByLabel and friends; `within >> label=x`
+// looks inside the first part)
+function find(root, sel) {
+  const m = /^(label|placeholder|title)=(.*)$/s.exec(sel);
+  if (!m) return root.locator(sel);
+  const v = m[2].replace(/^"(.*)"$/, '$1');
+  return m[1] === 'label' ? root.getByLabel(v) : m[1] === 'placeholder' ? root.getByPlaceholder(v) : root.getByTitle(v);
+}
+const loc = (sel, nth) => {
+  const parts = String(sel).split(/\s+>>>\s+/);
+  let l = find(page(), parts[0]);
+  for (const p of parts.slice(1)) l = find(l.first(), p);
+  return nth === undefined ? l.first() : nth === 'last' ? l.last() : l.nth(nth);
+};
 
 // what the visible page offers: buttons, fields, links, tabs, sliders (name, role, state)
 async function controls(sel) {
