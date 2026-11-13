@@ -29,9 +29,17 @@ wheels), you just don't have to learn a pro console to use them.
    whether the site may reach devices on your local network. Choose Allow, or Link can't be
    found; the pill then says "blocked by the browser" and the site settings (the icon left of
    the address) let you allow it later. See `link/README.md`.
-2. **Add your lights** (Fixtures, Add). Most cheap PARs are one of the generic types: look at the
-   channel table in the manual ("CH1 dimmer, CH2 red...") and pick the one that matches. Anything
-   else: search the library, open a GDTF / QLC+ / OFL file, or make your own type, even by trying
+2. **Add your lights** (Fixtures, Add). The dialog opens in its search box: type a maker, a model
+   or what it is ("cameo flat", "robin spot", "moving head", "gobo") and the tiles follow as you
+   type, the built-in types first (nothing to download), then the 2400+ of the Open Fixture
+   Library and QLC+. Every tile plays its light on the 3D stage's own models: a spot sweeps, runs
+   its gobos turning and puts its prism in, a wash breathes its zoom through the colours, a PAR runs
+   the colours, a bar chases along its pixels. A library tile plays a built-in one of its kind
+   ("like this") until it's picked; then it has come down and plays the real thing. The one picked
+   is big on the right with its modes and channels (to hold next to the manual's DMX table), how
+   many, where, and Add. Most cheap PARs are one of the generic types: the channel table in the
+   manual ("CH1 dimmer, CH2 red...") says which. Anything
+   else: open a GDTF / QLC+ / OFL file, or make your own type, even by trying
    the channels on the real fixture with the channel wizard. A pixel head or bar (a bee eye, a
    37-LED wash, a 4-lite blinder) is a few head channels and then the same few channels for every
    LED: in your own type **+ Cells…** adds them in one go (red, green, blue, white per LED, or rows
@@ -1028,9 +1036,9 @@ Three more demos come with their own room on the 3D stage:
   at the next venue, steer them again and keep them again, and every cue using them follows. What
   was steered stays while the app is open, also when the dialog is closed.
 - **Big rigs**: past a dozen lights the fixture list gets a filter (name, type, group, or an
-  address: "25" finds whatever sits on channel 25). The library search works from the keyboard
-  (arrows, Enter loads, Enter again uses it) and lists each mode's channels, to hold next to the
-  manual's DMX table.
+  address: "25" finds whatever sits on channel 25). Add fixtures works from the keyboard: it opens
+  in its search box, Enter takes the first one found, Enter again goes on to How many; Down goes
+  into the tiles, the arrows move between them.
 
 ## The ideas, in one minute
 

@@ -52,6 +52,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   (the big demo's cue sheet went from 62 pages to 12), long notes wrap instead of shrinking the page.
 - A show night doesn't wear the app down: an hour of playing, switching and editing left memory,
   listeners and the output rate flat, and playing (GO, Live buttons) no longer saves after each press.
+- Add fixtures is one dialog with the search box on top, live as you type over the built-in types
+  and the 2400+ library fixtures. Every tile plays its light in 3D: spots sweep and run their gobos
+  and prisms, washes breathe, PARs run the colours, bars chase. All in one WebGL context, only the
+  tiles on the screen, so it stays smooth. The old library popup is gone.
 - The welcome is two rows of tiles: the demo shows (each with its own music menu, and they fold away
   for good once you don't need them), and the everyday starts (empty, the templates, a show file).
   Every demo and template also comes as **Lights only**: the rig placed, nothing programmed.

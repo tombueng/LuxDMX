@@ -22,17 +22,17 @@ async function openAdd(page: Page) {
   await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
   await expect(addDialog(page)).toBeVisible();
 }
+// (the search is in the Add dialog itself: a library tile picked is the one Add adds)
 async function fromLibrary(page: Page, query: string, source: 'OFL' | 'QLC+', name: RegExp) {
   await openAdd(page);
-  await addDialog(page).getByRole('button', { name: /Search .* fixtures/ }).click();
-  await page.getByLabel('Search fixtures').fill(query);
-  await page.locator('.results li[role=option]').filter({ has: page.locator('b', { hasText: name }) }).filter({ hasText: source }).first().click();
-  // in both libraries: the row opens the OFL one, the other is a click away
+  const dlg = addDialog(page);
+  await dlg.getByLabel('Search fixtures').fill(query);
+  await dlg.locator('.tcard.lib').filter({ has: page.locator('b', { hasText: name }) }).filter({ hasText: source }).first().click();
+  // in both libraries: the tile opens the OFL one, the other is a click away
   const want = source === 'OFL' ? 'ofl' : 'qlc';
-  await expect(page.locator('.detail[data-source]')).toBeVisible();
-  if (await page.locator('.detail').getAttribute('data-source') !== want) await page.getByRole('button', { name: `Use the ${source} definition instead` }).click();
-  await expect(page.locator(`.detail[data-source="${want}"] .modes`)).toBeVisible();
-  await page.getByRole('button', { name: 'Use this fixture' }).click();
+  await expect(dlg.locator('.side[data-source]')).toBeVisible();
+  if (await dlg.locator('.side').getAttribute('data-source') !== want) await dlg.getByRole('button', { name: `Use the ${source} definition instead` }).click();
+  await expect(dlg.locator(`.side[data-source="${want}"]`)).toBeVisible();
 }
 async function patchSelected(page: Page, count: number, universe = 0, mode?: string) {
   const dlg = addDialog(page);
@@ -249,16 +249,18 @@ test('re-patch a fixture, and overlapping addresses are flagged', async ({ page 
 test('the library from the keyboard, with the channels of each mode to compare with the manual', async ({ page }) => {
   await openConnected(page);
   await openAdd(page);
-  await addDialog(page).getByRole('button', { name: /Search .* fixtures/ }).click();
-  const lib = page.getByRole('dialog', { name: 'Fixture library' });
-  await lib.getByLabel('Search fixtures').fill('robin 600e spot');
-  await lib.getByLabel('Search fixtures').press('Enter');                   // loads the first hit
-  await expect(lib.getByRole('radiogroup', { name: 'Mode' })).toBeVisible();
-  await lib.getByRole('radio', { name: /32-channel/ }).click();
-  await expect(lib.locator('.chs li')).toHaveCount(32);
-  await expect(lib.locator('.chs')).toContainText('Pan');
-  await lib.getByLabel('Search fixtures').press('Enter');                   // uses it, in that mode
-  await expect(addDialog(page).getByLabel('Mode', { exact: true })).toHaveValue(/32-channel/);
+  const dlg = addDialog(page), box = dlg.getByLabel('Search fixtures');
+  await expect(box).toBeFocused();                                         // (the dialog starts in its search box)
+  await box.fill('robin 600e spot');
+  await box.press('Enter');                                                // takes the first one found
+  const mode = dlg.getByLabel('Mode', { exact: true });
+  await expect(mode).toBeVisible();
+  await mode.selectOption((await mode.locator('option', { hasText: '32-channel' }).first().getAttribute('value'))!);
+  await expect(dlg.locator('.chs li')).toHaveCount(32);
+  await expect(dlg.locator('.chs')).toContainText('Pan');
+  await box.press('Enter');                                                // again: on to How many, in that mode
+  await expect(dlg.getByLabel('How many')).toBeFocused();
+  await expect(mode).toHaveValue(/32-channel/);
 });
 
 test('the library search finds the built-in generic types too ("generic moving head")', async ({ page }) => {
@@ -266,12 +268,10 @@ test('the library search finds the built-in generic types too ("generic moving h
   await page.locator('.side .tabs').getByRole('tab', { name: 'Fixtures' }).click();
   await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
   const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
-  await dlg.getByRole('button', { name: /Search 2400/ }).click();
-  const lib = page.getByRole('dialog', { name: 'Fixture library' });
-  await lib.getByLabel('Search fixtures').fill('generic moving head');
-  await lib.locator('.builtin').getByRole('button', { name: 'Moving head, 8 ch' }).click();
-  await expect(lib).toBeHidden();
-  await expect(dlg.locator('[data-type="gen-mover8"]')).toHaveClass(/\bcur\b|\bsel\b|\bon\b/);
+  await dlg.getByLabel('Search fixtures').fill('generic moving head');
+  await dlg.locator('.builtin [data-type="gen-mover8"]').click();
+  await expect(dlg.locator('[data-type="gen-mover8"]')).toHaveClass(/\bcur\b/);
+  await expect(dlg.getByRole('button', { name: /^Add 2 × Head/ })).toBeVisible();
 });
 
 test('several lights patched in one go: a universe for all, addresses one after the other, names numbered (one undo)', async ({ page }) => {
@@ -304,4 +304,40 @@ test('exact values: the number next to a slider takes a typed value (intensity i
   await page.locator('.prog').getByRole('button', { name: /^Red value: .*type a value/ }).click();
   await page.keyboard.type('127'); await page.keyboard.press('Enter');
   await expect.poll(async () => (await channels(0, 2))[1]).toBe(127);
+});
+
+test('one dialog: the search is live as you type over the built-in types and the libraries, each tile plays its light, a pick shows big beside it', async ({ page }) => {
+  await openConnected(page);
+  await openAdd(page);
+  const dlg = addDialog(page), box = dlg.getByLabel('Search fixtures');
+  // how much light there is in a tile's picture, and a fingerprint of it
+  const look = (l: ReturnType<Page['locator']>) => l.locator('canvas').first().evaluate((c: HTMLCanvasElement) => {
+    const x = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data; let lit = 0, sum = 0;
+    for (let i = 0; i < x.length; i += 4) { const v = x[i] + x[i + 1] + x[i + 2]; if (v > 150) lit++; sum = (sum * 31 + v) % 1e9; }
+    return { lit, sum };
+  });
+  // a gobo spot plays: light in its picture, and the picture changes (it moves)
+  const spot = dlg.locator('[data-type="gen-spotgobo"]');
+  await spot.scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await look(spot)).lit, { timeout: 30000 }).toBeGreaterThan(15);
+  const a = await look(spot);
+  await expect.poll(async () => (await look(spot)).sum, { timeout: 10000 }).not.toBe(a.sum);
+  // live as you type, in this dialog (no second one)
+  await box.pressSequentially('robin 600e', { delay: 40 });
+  await expect(dlg.locator('.tcard.lib').first()).toContainText('Robin 600E');
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  // a library tile plays a built-in one of its kind until its own has come down; picked, its own
+  const tile = dlg.locator('.tcard.lib').filter({ hasText: 'Robin 600E Spot' }).first();
+  await expect(tile).toContainText('like this');
+  await tile.click();
+  await expect(dlg.locator('.side h2')).toContainText('Robin 600E Spot');
+  await expect(tile).not.toContainText('like this');
+  await expect(tile).toContainText('gobos');                               // (what it can do, from its channels)
+  await expect.poll(async () => (await look(dlg.locator('.bigpv'))).lit, { timeout: 30000 }).toBeGreaterThan(15);
+  await expect(dlg.locator('.side .chs li').first()).toBeVisible();
+  // Add puts it in
+  await dlg.getByLabel('How many').fill('1');
+  await dlg.getByRole('button', { name: /^Add 1 × / }).click();
+  await expect(dlg).toBeHidden();
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.map((f: any) => f.typeId))).toEqual([expect.stringMatching(/robe/i)]);
 });

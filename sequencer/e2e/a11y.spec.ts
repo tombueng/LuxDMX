@@ -101,8 +101,7 @@ test('live edit with a control selected; add fixtures and the library', async ({
   await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
   await page.locator('.fl').getByRole('button', { name: /Add/ }).first().click();
   await audit(page, 'add fixtures');
-  await page.getByRole('dialog', { name: 'Add fixtures' }).getByRole('button', { name: /Search .* fixtures/ }).click();
-  await page.getByLabel('Search fixtures').fill('cameo flat');
+  await page.getByLabel('Search fixtures').fill('cameo flat');            // (in the same dialog)
   await audit(page, 'library');
 });
 

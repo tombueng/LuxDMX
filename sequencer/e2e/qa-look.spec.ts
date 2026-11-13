@@ -161,23 +161,23 @@ test.describe('the fixture library on a laptop', () => {
     await openConnected(page);
     await tab(page, 'Fixtures');
     await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
-    await page.getByRole('button', { name: /^Search 2400/ }).click();
-    const lib = page.getByRole('dialog', { name: 'Fixture library' });
+    const lib = page.getByRole('dialog', { name: 'Add fixtures' });       // (the search is in the Add dialog)
     const box = lib.getByLabel('Search fixtures');
     await box.fill('robe');
-    await expect(lib.getByRole('option').first()).toContainText('Robe');
+    await expect(lib.locator('.tcard.lib').first()).toContainText('Robe');
     await expect(lib.locator('.builtin')).toHaveCount(0);                  // (no "Generic Strobe" for robe)
     const y1 = (await box.boundingBox())!.y;
     await box.fill('LEDBeam 100');
-    await expect(lib.getByRole('option')).toHaveCount(2);
+    await expect(lib.locator('.tcard.lib')).toHaveCount(2);
     expect(Math.abs((await box.boundingBox())!.y - y1)).toBeLessThan(2);   // (the box doesn't jump as the list shrinks)
-    await lib.getByRole('option', { name: /Robin LEDBeam 100 OFL/ }).click();
-    await lib.getByRole('radio', { name: /^RGBW Pixel/ }).click();
+    await lib.locator('.tcard.lib').filter({ hasText: 'Robin LEDBeam 100' }).filter({ hasText: 'OFL' }).first().click();
+    const mode = lib.getByLabel('Mode', { exact: true });
+    await mode.selectOption((await mode.locator('option', { hasText: /^RGBW Pixel/ }).first().getAttribute('value'))!);
     const d = (await lib.boundingBox())!;
     const outside = await lib.locator('.chs li').evaluateAll((els, d) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.right > d.x + d.width + 1; }).length, d);
     expect(outside).toBe(0);
     await box.fill('zzqqxx nothing');
-    await lib.getByRole('button', { name: 'Make my own…' }).click();
+    await lib.locator('.none').getByRole('button', { name: 'Make my own…' }).click();
     await expect(page.getByRole('dialog', { name: /fixture/i }).getByLabel('Model')).toBeVisible();
   });
 });

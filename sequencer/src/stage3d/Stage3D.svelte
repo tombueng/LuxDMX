@@ -49,17 +49,14 @@
   import { ui, dismiss, dialogOpen } from '../ui/ui.svelte';
   import Icon from '../ui/Icon.svelte';
   import { canRecord, clock, extOf, FPS, megabytes, pickFormat, saveVideo, stutterNote, tallFov, Take, takeSize, VIDEO_SIZES, videoBits, videoName, type VideoSize } from './recorder';
-  import { headCellsOf, capsOf } from '../model/library';
-  import { slotsOf } from '../engine/render';
-  import { ATLAS_CELLS, ATLAS_SIZE, drawAtlas, GOBOS, wheelPatterns } from './gobos';
+  import { ATLAS_CELLS, ATLAS_SIZE, drawAtlas, GOBOS } from './gobos';
   import { loadGoboFonts } from './goboFonts';
-  import { boardReach, opticsOf, restAt } from '../model/fixtureSetup';
+  import { boardReach, restAt } from '../model/fixtureSetup';
   import { buildVenue } from './venue';
-  import { Rig, type GoboWheel, type RigFixture, type Sfx } from './rig';
-  import { placesOfLight, shapeSize, shapeStanding } from '../model/pixelLayout';
-  import type { Look } from './models';
+  import { Rig, type RigFixture } from './rig';
+  import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, pivotOf, defaultPlace, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, pivotOf, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
   import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
@@ -93,59 +90,12 @@
   let houseOf: THREE.Object3D | undefined, houseMats: THREE.MeshBasicMaterial[] = [];
   let full = $state(false);
 
-  const SFX: Sfx[] = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
   // the built-in room: the big stage in a hall, or a small club / pub (geometry.ts ROOMS)
   const room = $derived(roomOf(app.show.settings.stage3d?.room));
   // every light as the 3D stage needs it (rebuilt when the lights, their types or places change)
   // (a light without a 3D place of its own goes where its plan position puts it in this room)
-  const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => {
-    const m = app.modeOf(f.id), c = capsOf(m), k = app.kinds[f.id] ?? 'other', t = app.types.get(f.typeId);
-    const def = defaultPlace(f, k, room);
-    // a ring or a matrix stands up on its lower edge, facing the audience, unless it's been placed
-    const shape = placesOfLight(f, m), size = shape && shapeSize(shape);
-    const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
-    const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
-    // which body it gets: a wash head has a zoom and no gobo; a blinder says so in its name
-    const look: Look = sfx ?? (has('hoist') ? 'winch' : c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
-      : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
-    return {
-      id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
-      p: f.p3 ? { ...f.p3 } : shape ? shapeStanding(def.p, shape).p : def.p, rot: f.rot ? { ...f.rot } : shape ? shapeStanding(def.p, shape).rot : def.rot, shape, size,
-      // (the light's own pan / tilt range first, then its type's; swapped when it says so)
-      optics: { ...opticsOf(f, t), swap: !!f.swapPanTilt },
-      // its gobo wheels: each slot's pattern from its name (gobos.ts), and its rotation channel's ranges
-      gobos: look === 'spot' ? goboWheels(m) : undefined,
-      // its prism (facets from the prism channel's ranges) and its animation wheel
-      prism: look === 'spot' ? prismOfMode(m) : undefined,
-      anim: look === 'spot' && has('animation') ? { rot: chOf(m, 'animationRotation')?.ranges } : undefined,
-      // its beam's opening angle: its own, else its type's data (else the 3D stage guesses by its kind)
-      beam: f.beamDeg ?? t?.physical?.beamDeg,
-      ...(c.heads > 1 && m ? { heads: c.heads, headCells: headCellsOf(m), headPan: c.cellMoves.includes('pan'), barPan: m.channels.some((ch) => ch.attr === 'pan' && ch.cell === undefined) } : {}),
-      // a winch: its travel and speed from its type (a guess without), its soft limits
-      ...(has('hoist') ? { winch: { travel: t?.physical?.travel ?? 4, speed: t?.physical?.hoistSpeed ?? 0.4, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}),
-      // more than two axes: endless pan and tilt, a third axis (roll) and its endless turning
-      axes: has('panRotation') || has('tiltRotation') || has('roll') || has('rollRotation') ? {
-        ...(has('panRotation') ? { panRot: chOf(m, 'panRotation')?.ranges ?? null } : {}), ...(has('tiltRotation') ? { tiltRot: chOf(m, 'tiltRotation')?.ranges ?? null } : {}),
-        ...(has('roll') || has('rollRotation') ? { rollDeg: t?.physical?.rollDeg || 360 } : {}), ...(has('rollRotation') ? { rollRot: chOf(m, 'rollRotation')?.ranges ?? null } : {}),
-      } : undefined,
-    };
-  }));
+  const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => rigFixtureFull(f, app.modeOf(f.id), app.kinds[f.id] ?? 'other', app.types.get(f.typeId), room)));
 
-  const chOf = (m: ReturnType<typeof app.modeOf>, attr: string) => m?.channels.find((ch) => ch.attr === attr && !ch.fine && ch.cell === undefined);
-  function prismOfMode(m: ReturnType<typeof app.modeOf>): RigFixture['prism'] {
-    const c = chOf(m, 'prism');
-    return c ? { ranges: c.ranges, rot: chOf(m, 'prismRotation')?.ranges } : undefined;
-  }
-  function goboWheels(m: ReturnType<typeof app.modeOf>): GoboWheel[] | undefined {
-    const out: GoboWheel[] = [];
-    for (const [attr, rotAttr] of [['gobo', 'goboRotation'], ['gobo2', 'gobo2Rotation']] as const) {
-      const c = m?.channels.find((ch) => ch.attr === attr && !ch.fine && ch.cell === undefined);
-      if (!c) continue;
-      const r = m!.channels.find((ch) => ch.attr === rotAttr && !ch.fine && ch.cell === undefined);
-      out.push({ attr, rotAttr, slots: wheelPatterns(slotsOf(c).map((x) => x.label ?? '')), rot: r?.ranges });
-    }
-    return out.length ? out : undefined;
-  }
   // The gobo patterns, drawn once for the page into one texture (gobos.ts), with the symbol fonts
   // that come with the app (until they're in, the beams have no gobos)
   let goboAtlas: { canvas: HTMLCanvasElement; tex: THREE.CanvasTexture; empty: string[] } | null = null;
