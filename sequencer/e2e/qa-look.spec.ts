@@ -282,3 +282,23 @@ test.describe('the 2D plan on a laptop', () => {
     expect(tops).toBeLessThanOrEqual(2);                                   // (the title row and one row of tools)
   });
 });
+
+test.describe('help notes on a laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('every "?" note opens on the screen, the cues\' one low down too (upwards)', async ({ page }) => {
+    await openConnected(page);
+    const qs = page.getByRole('button', { name: 'What is this?' });
+    const n = await qs.count();
+    expect(n).toBeGreaterThanOrEqual(4);
+    for (let i = 0; i < n; i++) {
+      await qs.nth(i).click();
+      const note = page.locator('.help .pop');
+      await expect(note).toBeVisible();
+      const r = (await note.boundingBox())!;
+      expect(r.y).toBeGreaterThanOrEqual(0);
+      expect(r.y + r.height).toBeLessThanOrEqual(768);
+      await page.keyboard.press('Escape');
+      await expect(note).toBeHidden();
+    }
+  });
+});
