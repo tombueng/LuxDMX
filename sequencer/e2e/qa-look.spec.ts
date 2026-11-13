@@ -609,6 +609,13 @@ test('an empty show says what to do next, the same way everywhere, with a button
   await openConnected(page);
   await expect(page.locator('.deck')).toContainText('No cues yet');
   await expect(page.locator('.prog').getByRole('button', { name: 'Add lights' })).toBeVisible();          // (the programmer)
+  // Groups: lights first; Live: where its buttons come from
+  await page.locator('.side .tabs').getByRole('tab', { name: 'Groups' }).click();
+  await expect(page.locator('.gp')).toContainText('No lights yet: add them first');
+  await expect(page.locator('.gp').getByRole('button', { name: 'Add lights' })).toBeVisible();
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  await expect(page.locator('.live .grid .empty')).toContainText('Nothing to play yet');
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
   // the effects with no lights at all
   await page.locator('.side .tabs').getByRole('tab', { name: 'Effects' }).click();
   await page.locator('.ep').getByRole('button', { name: 'Add', exact: true }).click();

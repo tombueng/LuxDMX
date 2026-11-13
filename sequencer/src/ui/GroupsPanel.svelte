@@ -61,8 +61,14 @@
   {#if !app.show.groups.length}
     <div class="empty">
       <Icon name="group" size={30} />
-      <p>No groups yet. Select lights and press <b>From selection</b>, or let the app group them by type.</p>
-      <button onclick={auto} disabled={!app.show.fixtures.length}>Group by type</button>
+      {#if app.show.fixtures.length}
+        <p>No groups yet. Select lights and press <b>From selection</b>, or let the app group them by type.</p>
+        <button onclick={auto}>Group by type</button>
+      {:else}
+        <!-- (it offered a greyed-out button: groups need lights first) -->
+        <p>No lights yet: add them first, then group them here.</p>
+        <button onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add lights</button>
+      {/if}
     </div>
   {:else}
     <!-- A plain list: each group is a button (select it; F2 renames, Delete removes) plus its ⋯. -->

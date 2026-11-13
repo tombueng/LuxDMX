@@ -40,6 +40,8 @@
   // locked for the service: the page it was locked on, and no other (also after a restart)
   const lockedOn = $derived(app.locked ? pages.find((p) => p.id === app.show.settings.lockPage) : undefined);
   const page = $derived(lockedOn ?? pages.find((p) => p.id === app.page) ?? pages[0]);
+  const PLAYS = ['cue', 'cuelist', 'list', 'effect', 'song', 'fog', 'group'];
+  const playable = $derived(page?.widgets.some((w) => PLAYS.includes(w.type)) ?? false);
   const tabs = $derived(lockedOn ? [lockedOn] : pages);
   let selW = $state<string | null>(null);
   let drag = $state<string | null>(null);
@@ -536,6 +538,11 @@
   <div class="body" class:with-stage={showStage} class:editing={app.editPage}>
     {#if showStage}<div class="stagebox">{#if shown || ui.stage3d}<StageView compact readonly blindChip={false} />{/if}</div>{/if}
     <div class="grid" style="--tile:{tile}px" role="list">
+      <!-- (a new show's page has only its masters: nothing said where the buttons would come from) -->
+      {#if built && page?.widgets.length && !playable && !app.editPage && !app.locked}
+        <div class="empty">Nothing to play yet: your cues, effects and machines get their buttons here once you make them in Program.
+          <button class="ghost link" onclick={() => (app.view = 'program')}>Go to Program</button></div>
+      {/if}
       {#each built ? (page?.widgets ?? []) : [] as w (w.id)}
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions (Alt+arrows come from the control inside it) -->
         <div class="cell" class:wide={w.size === 2} class:full={w.type === 'label' || w.type === 'cuelist'} class:drop={dropAt === w.id} class:dragging={drag === w.id} role="listitem" data-w={w.id}
