@@ -19,7 +19,15 @@ export function onMidiInputs(f: (names: string[]) => void) { watchers.add(f); f(
 export async function enableMidi(): Promise<string[]> {
   if (!midiSupported()) throw new Error('This browser has no Web MIDI (Chrome and Edge do)');
   if (!access) {
-    access = await navigator.requestMIDIAccess({ sysex: false });
+    // (the browser's own words were the message: "NotAllowedError: Permission denied" and the like)
+    try { access = await navigator.requestMIDIAccess({ sysex: false }); }
+    catch (e) {
+      const n = (e as DOMException)?.name;
+      throw new Error(n === 'NotAllowedError' || n === 'SecurityError'
+        ? 'MIDI is blocked for this page: allow it in the site settings (the icon left of the address), then try again'
+        : n === 'NotSupportedError' ? 'This browser has no Web MIDI here (Chrome and Edge do, on https or this computer)'
+        : "MIDI couldn't start here. Plug the controller in and try again");
+    }
     access.onstatechange = () => attach();
   }
   attach();

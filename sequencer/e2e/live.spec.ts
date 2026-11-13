@@ -547,3 +547,43 @@ test('in Edit with nothing picked the hint is above the controls, not over them'
     expect(overlap).toBe(false);
   }
 });
+
+// (round 16's small ones)
+test('a flash and a fog control say their levels in numbers; deleting a page shows the next one, undo brings it back; on Live a message sits in the GO bar, not over the buttons', async ({ page }) => {
+  await djShow(page);
+  const live = page.locator('.live');
+  await live.getByRole('button', { name: 'Edit', exact: true }).click();
+  await live.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Flash a group' }).click();
+  const ed = page.getByRole('complementary', { name: 'Control settings' });
+  await expect(ed.getByLabel('Flash level').locator('xpath=following-sibling::output')).toHaveText('100%');
+  await ed.getByLabel('Flash level').fill('0.5');
+  await expect(ed.getByLabel('Flash level').locator('xpath=following-sibling::output')).toHaveText('50%');
+  await expect(ed.getByLabel('Strobe').locator('xpath=following-sibling::output')).toHaveText('off');
+  await live.getByRole('button', { name: 'Done', exact: true }).click();
+  // two more pages; the middle one deleted: the next one comes up, undo brings it back
+  const tabs = live.locator('.pages [role=tab]');
+  const n0 = await tabs.count();
+  await live.getByRole('button', { name: 'New page' }).click();
+  await live.getByRole('button', { name: 'New page' }).click();
+  await expect(tabs).toHaveCount(n0 + 2);
+  const names = await tabs.allTextContents();
+  await tabs.nth(n0).click();
+  await tabs.nth(n0).click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Delete page' }).click();
+  await expect(tabs).toHaveCount(n0 + 1);
+  await expect(tabs.nth(n0)).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.nth(n0)).toHaveText(names[n0 + 1]);
+  await page.locator('body').press('Control+z');
+  await expect(tabs).toHaveCount(n0 + 2);
+  // a message: in the GO bar's gap, over none of the buttons
+  await page.evaluate(() => (window as any).__ui.toast('A message the length of a real one, roughly this long', 6000));
+  const t = (await page.locator('.toast').boundingBox())!, strip = (await live.locator('.strip').boundingBox())!;
+  expect(t.y).toBeGreaterThanOrEqual(strip.y - 1);
+  expect(t.y + t.height).toBeLessThanOrEqual(strip.y + strip.height + 1);
+  for (const b of await live.locator('.strip button, .tile').all()) {
+    const r = await b.boundingBox();
+    if (!r) continue;
+    expect(r.x + r.width <= t.x || t.x + t.width <= r.x || r.y + r.height <= t.y || t.y + t.height <= r.y).toBe(true);
+  }
+});

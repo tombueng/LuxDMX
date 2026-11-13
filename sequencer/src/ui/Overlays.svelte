@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { app } from '../app.svelte';
   // The context menu and the toast, rendered once at the top of the app. Also: a long press with a
   // finger opens the context menu, like a right-click (some touch browsers never send one).
   import Icon from './Icon.svelte';
@@ -39,6 +40,15 @@
       const bar = document.querySelector('.prog .actionbar, .prog .bottom');
       toastAt = `top:auto;bottom:${bar ? window.innerHeight - bar.getBoundingClientRect().top + 8 : 12}px`;
       return;
+    }
+    // (Live: in the GO bar's widest empty gap, when it has room; over the buttons it hid the top row)
+    const strip = app.view === 'live' && !ui.modal ? document.querySelector('.live .strip') : null;   // (Live stays laid out behind other views)
+    if (strip) {
+      // (a spacer between the controls is the gap: it has nothing in it)
+      const sr = strip.getBoundingClientRect(), kids = [...strip.children].filter((k) => k.childElementCount || k.textContent?.trim()).map((k) => k.getBoundingClientRect()).filter((r) => r.width > 0).sort((a, b) => a.left - b.left);
+      let gap = { l: 0, w: 0 };
+      for (let i = 0; i + 1 < kids.length; i++) { const w = kids[i + 1].left - kids[i].right; if (w > gap.w) gap = { l: kids[i].right, w }; }
+      if (gap.w >= 280) { toastAt = `top:${Math.round(sr.top + sr.height / 2)}px;left:${Math.round(gap.l + gap.w / 2)}px;max-width:${Math.round(gap.w - 16)}px;transform:translate(-50%,-50%)`; return; }
     }
     const at = document.querySelector('.stage-wrap svg, .live .body')?.getBoundingClientRect();
     toastAt = at && at.height > 120 ? `top:${Math.round(at.top + 10)}px;left:${Math.round(at.left + at.width / 2)}px` : '';

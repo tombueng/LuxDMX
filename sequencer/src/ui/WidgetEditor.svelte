@@ -74,7 +74,8 @@
     </select></label>
   {:else if w.type === 'fog'}
     <p class="faint">Fog only runs while the button is held, and switches off after the maximum even if it's still held.</p>
-    <label>Output <input type="range" min="0.1" max="1" step="0.05" bind:value={w.level} aria-label="Fog output" /></label>
+    <!-- (the number beside each: a slider alone didn't say how much) -->
+    <label>Output <span class="rng"><input type="range" min="0.1" max="1" step="0.05" bind:value={w.level} aria-label="Fog output" /><output>{Math.round((w.level ?? 1) * 100)}%</output></span></label>
     <!-- (emptied, it comes back with the maximum it has: it stayed blank while the button said 60 s) -->
     <label>Maximum (s) <NumField value={w.max} min={1} max={60} required label="Maximum seconds" onset={(v) => { if (v !== undefined) w.max = v; }} /></label>
     <div class="fx">
@@ -84,8 +85,8 @@
     </div>
   {:else if w.type === 'group'}
     <label>Group <select bind:value={w.group} aria-label="Group">{#each app.show.groups as g (g.id)}<option value={g.id}>{g.name}</option>{/each}</select></label>
-    <label>Level <input type="range" min="0" max="1" step="0.05" bind:value={w.level} aria-label="Flash level" /></label>
-    <label>Strobe while held <input type="range" min="0" max="1" step="0.05" value={w.strobe ?? 0} oninput={(e) => (w.strobe = +(e.target as HTMLInputElement).value || undefined)} aria-label="Strobe" /></label>
+    <label>Level <span class="rng"><input type="range" min="0" max="1" step="0.05" bind:value={w.level} aria-label="Flash level" /><output>{Math.round((w.level ?? 1) * 100)}%</output></span></label>
+    <label>Strobe while held <span class="rng"><input type="range" min="0" max="1" step="0.05" value={w.strobe ?? 0} oninput={(e) => (w.strobe = +(e.target as HTMLInputElement).value || undefined)} aria-label="Strobe" /><output>{w.strobe ? `${Math.round(w.strobe * 100)}%` : 'off'}</output></span></label>
     <label class="ck"><input type="checkbox" checked={!!w.white} onchange={(e) => { w.white = (e.target as HTMLInputElement).checked || undefined; }} /> White while held (a blinder), whatever colour they had</label>
   {:else if w.type === 'song'}
     <!-- the set list (Timeline): a name that was only the old action's goes with it -->
@@ -129,6 +130,9 @@
 </aside>
 
 <style>
+  .rng { display: flex; align-items: center; gap: .4rem; }
+  .rng input { flex: 1; min-width: 0; }
+  .rng output { min-width: 2.6em; text-align: right; font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--text); }
   .we { width: 260px; display: flex; flex-direction: column; gap: .45rem; background: var(--panel); border: 0; border-radius: var(--radius); padding: .6rem; font-size: .86rem; }
   .we :global(input:not([type=checkbox]):not([type=color])), .we :global(select) { width: 100%; min-width: 0; }
   .two > :global(*) { min-width: 0; }

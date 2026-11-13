@@ -277,7 +277,14 @@
         app.markDirty(0); app.toastUndo('Pages rebuilt from the show');
       } },
       { sep: true },
-      { label: 'Delete page', icon: 'trash', danger: true, disabled: app.show.pages.length < 2, run: () => { app.show.pages = app.show.pages.filter((x) => x.id !== id); app.page = ''; } },
+      // (the page next to it comes up, not the first; undo brings it back; it's saved: it wasn't)
+      { label: 'Delete page', icon: 'trash', danger: true, disabled: app.show.pages.length < 2, run: () => {
+        const i = app.show.pages.findIndex((x) => x.id === id), name = app.show.pages[i]?.name ?? 'The page';
+        app.checkpoint();
+        app.show.pages = app.show.pages.filter((x) => x.id !== id);
+        app.page = (app.show.pages[i] ?? app.show.pages[i - 1])?.id ?? '';
+        app.markDirty(0); app.toastUndo(`${name} deleted`);
+      } },
     ]);
   }
   function drop(e: DragEvent, target: string) {
