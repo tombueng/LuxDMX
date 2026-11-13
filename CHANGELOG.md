@@ -46,6 +46,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   and the effects on the wire stay on the same beat after the page was busy for a moment.
 - In a German browser: the cue sheet CSV opens in German Excel (';', 2,5, umlauts), decimals with a
   comma work everywhere, AltGr+Q gives @ on the console, file names keep their umlauts.
+- Colour is never the only sign: On stage and ARMED in words on a phone too, armed chips striped,
+  a patch clash marked, picked cue cards dashed, faint text lighter.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
 
