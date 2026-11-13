@@ -299,12 +299,18 @@
   const labelText = (f: Fixture) => [labels ? f.name : '', addrs ? addrOf(f) : ''].filter(Boolean).join('  ');
   // (a crowded plan, a short screen: when not even 70 % of the names fit, they're tried a size
   // smaller, and the size that fits more wins)
+  // (the names grow with the interface size like every other text: at 140 % for weak eyes they
+  // stayed 11 px; a size that doesn't fit falls back as below)
+  const lpx = $derived(px * Math.max(1, ui.zoom));
   const placed = $derived.by(() => {
-    if (!labels && !addrs) return { at: new Map<string, At | null>(), fs: 12 * px };
-    const a = placeAt(12 * px), n = app.show.fixtures.length, shown = (m: Map<string, At | null>) => [...m.values()].filter(Boolean).length;
-    if (shown(a) >= n * 0.7) return { at: a, fs: 12 * px };
-    const b = placeAt(10.5 * px);
-    return shown(b) > shown(a) ? { at: b, fs: 10.5 * px } : { at: a, fs: 12 * px };
+    if (!labels && !addrs) return { at: new Map<string, At | null>(), fs: 12 * lpx };
+    const a = placeAt(12 * lpx), n = app.show.fixtures.length, shown = (m: Map<string, At | null>) => [...m.values()].filter(Boolean).length;
+    if (shown(a) >= n * 0.7) return { at: a, fs: 12 * lpx };
+    const b = placeAt(10.5 * lpx);
+    if (shown(b) >= n * 0.7 || lpx === px) return shown(b) > shown(a) ? { at: b, fs: 10.5 * lpx } : { at: a, fs: 12 * lpx };
+    // (bigger than they fit: the normal sizes then)
+    const c = placeAt(10.5 * px);
+    return [{ at: a, fs: 12 * lpx }, { at: b, fs: 10.5 * lpx }, { at: c, fs: 10.5 * px }].reduce((x, y) => (shown(y.at) > shown(x.at) ? y : x));
   });
   const labelAt = $derived(placed.at);
   function placeAt(fs: number) {

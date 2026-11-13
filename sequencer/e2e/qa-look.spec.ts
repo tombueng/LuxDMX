@@ -798,3 +798,13 @@ test.describe('in a German browser', () => {
     expect(await page.evaluate(() => (window as any).__luxdmx.show.settings.place)).toMatchObject({ lat: 48.14, lon: 11.58 });
   });
 });
+
+test('the names on the plan grow with the interface size when there is room', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 4, 0, 'Front');
+  const h = () => page.locator('.stage-wrap text.lbl').first().evaluate((t) => t.getBoundingClientRect().height);
+  const at100 = await h();
+  await page.evaluate(async () => { const m = await import('/src/ui/ui.svelte.ts'); m.ui.setZoom(1.4); });
+  await expect.poll(h).toBeGreaterThan(at100 * 1.25);
+});
