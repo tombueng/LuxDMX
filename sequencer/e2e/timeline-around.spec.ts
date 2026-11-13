@@ -164,3 +164,10 @@ test('the Crowd chips: chatter, cheering, a roar, quiet and a cheer; no clapping
   await expect(chips).toHaveText(['Chatter', 'Cheering', 'Roar', 'Quiet', 'Cheer!']);
   await expect(pal.getByRole('button', { name: /clap/i })).toHaveCount(0);
 });
+
+test('no song yet: the ruler doesn\'t say "After the song" over everything', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await expect(page.locator('.tlv .ruler')).toBeVisible();
+  await expect(page.locator('.tlv .ruler .span.tail')).toHaveCount(0);
+});

@@ -157,7 +157,8 @@
   const around = $derived.by(() => {
     const song = P.duration || tl?.duration || 0, out: { cls: string; name: string; from: number; to: number }[] = [];
     if (span.from < 0) out.push({ cls: 'lead', name: 'Before the song', from: span.from, to: 0 });
-    if (span.to > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: span.to });
+    // (no song yet: there's no "after" it, the whole ruler said so)
+    if (song > 0 && span.to > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: span.to });
     return out;
   });
 
