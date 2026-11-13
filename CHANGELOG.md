@@ -48,6 +48,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   comma work everywhere, AltGr+Q gives @ on the console, file names keep their umlauts.
 - Colour is never the only sign: On stage and ARMED in words on a phone too, armed chips striped,
   a patch clash marked, picked cue cards dashed, faint text lighter.
+- The printed cue sheet and patch: page numbers and the show's name on every page, lights in runs
+  (the big demo's cue sheet went from 62 pages to 12), long notes wrap instead of shrinking the page.
+- A show night doesn't wear the app down: an hour of playing, switching and editing left memory,
+  listeners and the output rate flat, and playing (GO, Live buttons) no longer saves after each press.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
 
