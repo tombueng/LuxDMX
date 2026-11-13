@@ -1,8 +1,8 @@
 <script lang="ts">
   // a typed time stays in what the field allows (0 to 10 minutes); the field shows what was kept
-  const secs = (e: Event) => Math.min(600, Math.max(0, +(e.target as HTMLInputElement).value || 0));
   import { cueNum, cueNumber, takenBy, setNumber } from '../model/cuenum';
   import { ui } from './ui.svelte';
+  import NumField from './NumField.svelte';
   // Details of the selected cue(s). With several selected, timing changes apply to all of them.
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
@@ -18,11 +18,10 @@
   function setAll<K extends keyof Cue>(k: K, v: Cue[K]) { for (const c of sel) c[k] = v; }
   // colour, position, beam: a time of their own, or (emptied) the fade again
   const FAMILIES = [['color', 'Colour'], ['position', 'Position'], ['beam', 'Beam']] as const;
-  function setTime(k: 'color' | 'position' | 'beam', e: Event) {
-    const raw = (e.target as HTMLInputElement).value;
+  function setTime(k: 'color' | 'position' | 'beam', v: number | undefined) {
     for (const c of sel) {
       const t = { ...(c.times ?? {}) };
-      if (raw === '') delete t[k]; else t[k] = Math.min(600, Math.max(0, +raw || 0));
+      if (v === undefined) delete t[k]; else t[k] = Math.min(600, Math.max(0, v));
       if (Object.keys(t).length) c.times = t; else delete c.times;
     }
   }
@@ -74,22 +73,22 @@
       <b>{sel.length} cues selected</b><span class="faint"> · changes apply to all</span>
     {/if}
     <div class="grid">
-      <label>Fade <span><input type="number" min="0" max="600" step="0.5" value={sel[0].fade} oninput={(e) => setAll('fade', secs(e))} aria-label="Fade" /> s</span></label>
+      <label>Fade <span><NumField value={sel[0].fade} max={600} step={0.5} label="Fade" onset={(v) => setAll('fade', v ?? 0)} /> s</span></label>
       <label>Then <select value={sel[0].advance.mode} onchange={(e) => setAdvance((e.target as HTMLSelectElement).value as Advance['mode'])} aria-label="Next cue">
         <option value="manual">wait for GO</option><option value="wait">next cue after N seconds</option>
         <option value="follow">next cue N seconds after the fade</option><option value="beats">next cue after N beats</option></select></label>
       {#if sel[0].advance.mode !== 'manual'}
-        <label title={sel[0].advance.mode === 'wait' ? 'Counted from when the cue starts (the fade included)' : sel[0].advance.mode === 'follow' ? 'Counted from when its fade is done' : 'At the tempo (Tap, or follow the music)'}>{sel[0].advance.mode === 'beats' ? 'Beats' : 'Seconds'} <span><input type="number" min={sel[0].advance.mode === 'follow' ? 0 : sel[0].advance.mode === 'beats' ? 1 : 0.1} step="0.5" value={advVal(sel[0].advance)}
-             onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; const m = sel[0].advance.mode; if (Number.isFinite(v)) setAdvVal(Math.max(m === 'follow' ? 0 : m === 'beats' ? 1 : 0.1, v)); }} aria-label="Advance time" /></span></label>
+        <label title={sel[0].advance.mode === 'wait' ? 'Counted from when the cue starts (the fade included)' : sel[0].advance.mode === 'follow' ? 'Counted from when its fade is done' : 'At the tempo (Tap, or follow the music)'}>{sel[0].advance.mode === 'beats' ? 'Beats' : 'Seconds'} <span><NumField value={advVal(sel[0].advance)} min={sel[0].advance.mode === 'follow' ? 0 : sel[0].advance.mode === 'beats' ? 1 : 0.1} max={3600} step={0.5}
+             label="Advance time" onset={(v) => { if (v !== undefined) setAdvVal(v); }} /></span></label>
       {/if}
     </div>
     <details>
       <summary class="muted">More timing</summary>
       <div class="grid">
-        <label>Delay <span><input type="number" min="0" max="600" step="0.5" value={sel[0].delay ?? 0} oninput={(e) => setAll('delay', secs(e) || undefined)} aria-label="Delay" /> s</span></label>
-        <label>Fade out <span><input type="number" min="0" max="600" step="0.5" value={sel[0].fadeOut ?? sel[0].fade} oninput={(e) => setAll('fadeOut', secs(e))} aria-label="Fade out" /> s</span></label>
+        <label>Delay <span><NumField value={sel[0].delay ?? 0} max={600} step={0.5} label="Delay" onset={(v) => setAll('delay', v || undefined)} /> s</span></label>
+        <label>Fade out <span><NumField value={sel[0].fadeOut ?? sel[0].fade} max={600} step={0.5} label="Fade out" onset={(v) => setAll('fadeOut', v ?? 0)} /> s</span></label>
         {#each FAMILIES as [k, label] (k)}
-          <label>{label} <span><input type="number" min="0" max="600" step="0.5" value={sel[0].times?.[k] ?? ''} placeholder={String(sel[0].fade)} oninput={(e) => setTime(k, e)} aria-label="{label} time" /> s</span></label>
+          <label>{label} <span><NumField value={sel[0].times?.[k]} max={600} step={0.5} placeholder={String(sel[0].fade)} label="{label} time" onset={(v) => setTime(k, v)} /> s</span></label>
         {/each}
       </div>
       <p class="faint">Delay waits before the fade starts. Fade out is used for lights getting darker, e.g. a quick blackout but a slow fade up. Colour, Position and Beam can take times of their own (empty: the fade): a colour that changes at once while the heads take 4 s to move.</p>
@@ -110,7 +109,7 @@
               <select value={a.list} aria-label="Action list" onchange={(e) => { a.list = (e.target as HTMLSelectElement).value; a.cue = app.show.cueLists.find((l) => l.id === a.list)?.cues[0]?.id ?? ''; }}>
                 {#each app.show.cueLists.filter((l) => l.id !== list?.id) as l (l.id)}<option value={l.id}>{l.name}</option>{/each}</select>
             {:else if 'list' in a}<select bind:value={a.list} aria-label="Action list">{#each app.show.cueLists.filter((l) => l.id !== list?.id) as l (l.id)}<option value={l.id}>{l.name}</option>{/each}</select>{/if}
-            {#if a.do === 'master'}<input type="number" min="0" max="100" value={Math.round(a.level * 100)} oninput={(e) => (a.level = Math.min(100, Math.max(0, +(e.target as HTMLInputElement).value || 0)) / 100)} style="width:3.8em" />%{/if}
+            {#if a.do === 'master'}<NumField value={Math.round(a.level * 100)} max={100} label="Level" width="3.8em" onset={(v) => (a.level = (v ?? 0) / 100)} />%{/if}
             {#if a.do === 'blackout'}<select bind:value={a.on}><option value={true}>on</option><option value={false}>off</option></select>{/if}
             <button class="ghost" onclick={() => one.actions!.splice(ai, 1)} aria-label="Remove action"><Icon name="close" size={14} /></button>
           </div>
@@ -140,10 +139,10 @@
   details .grid { grid-template-columns: 1fr 1fr; }
   /* a long "Then" choice must never squeeze the number next to it */
   label select { width: 100%; min-width: 0; text-overflow: ellipsis; }
-  label span input { min-width: 3.4rem; flex: 1; }
+  label span :global(input) { min-width: 3.4rem; flex: 1; }
   label { display: flex; flex-direction: column; gap: .15rem; color: var(--muted); font-size: .82rem; }
   label span { display: flex; align-items: center; gap: .25rem; color: var(--muted); }
-  label input { width: 100%; }
+  label :global(input) { width: 100%; }
   .note textarea { resize: vertical; }
   .sec { display: flex; flex-direction: column; gap: .3rem; }
   .act { display: flex; gap: .25rem; align-items: center; flex-wrap: wrap; }

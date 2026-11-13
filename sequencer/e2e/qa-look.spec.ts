@@ -93,3 +93,24 @@ test('a box address that can\'t be one is said and not added; the text stays to 
   await expect(page.getByLabel('LuxDMX address')).toHaveValue('not a host!!');
   expect(await page.evaluate(() => (window as any).__luxdmx.show.outputs.devices.length)).toBe(1);
 });
+
+test('a cue\'s fade field takes what you type: 9999 stays until you leave it (then 600), 1,5 and 1.5 both are 1.5 s', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 1, 0, 'D');
+  await selectAll(page);
+  await page.locator('.prog').getByRole('button', { name: 'Full' }).click();
+  await page.locator('.deck .record').click();
+  await page.locator('.deck .card').first().click();
+  const fade = page.locator('.insp').getByLabel('Fade', { exact: true });
+  const stored = () => page.evaluate(() => (window as any).__luxdmx.show.cueLists[0].cues[0].fade);
+  await fade.click(); await fade.press('Control+a'); await page.keyboard.type('9999');
+  await expect(fade).toHaveValue('9999');                                  // (nothing rewritten while typing)
+  await fade.press('Tab');
+  await expect(fade).toHaveValue('600');
+  expect(await stored()).toBe(600);
+  for (const typed of ['1,5', '1.5']) {
+    await fade.click(); await fade.press('Control+a'); await page.keyboard.type(typed); await fade.press('Tab');
+    expect(await stored()).toBe(1.5);
+  }
+  await fade.click(); await fade.press('ArrowUp'); expect(await stored()).toBe(2);
+});
