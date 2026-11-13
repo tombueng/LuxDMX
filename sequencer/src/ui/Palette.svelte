@@ -21,7 +21,7 @@
   const items = $derived.by((): Item[] => {
     const s = app.show, out: Item[] = [];
     const cmd = (label: string, icon: string, run: () => unknown, keys?: string, find?: string) => out.push({ label, hint: '', icon, run, keys, find });
-    cmd('Add fixtures…', 'plus', () => (ui.modal = 'addFixtures'));
+    cmd('Add fixtures…', 'plus', () => (ui.modal = 'addFixtures'), undefined, 'add lights light lamps par patch new');
     cmd('Add an effect…', 'effect', () => (ui.modal = 'effects'));
     cmd('Shows: open, new, templates…', 'folder', () => (ui.modal = 'shows'));
     // (the welcome has the demo with its music to pick, and the song's progress as it comes down)
@@ -33,7 +33,9 @@
     cmd('Save for QLC+ (.qxw)', 'download', () => app.exportQxw(), undefined, 'export qlcplus workspace');
     cmd('Record a cue', 'record', () => ui.toast(app.record() ? 'Recorded' : 'Nothing to record'));
     cmd('Clear the programmer', 'close', () => app.clearProgrammer());
-    cmd(app.view === 'live' ? 'Go to Program' : 'Go to Live', app.view === 'live' ? 'program' : 'live', () => (app.view = app.view === 'live' ? 'program' : 'live'));
+    // (every view by its name, not just Live and back)
+    for (const [v, label, icon] of [['program', 'Program', 'program'], ['live', 'Live', 'live'], ['timeline', 'Timeline', 'music']] as const)
+      if (app.view !== v && !(app.locked && v !== 'live')) cmd(`Go to ${label}`, icon, () => (app.view = v));
     if (app.view !== 'console' && !app.locked) cmd('Console: like a lighting desk (command line, faders, encoders)', 'sliders', () => (app.view = 'console'));
     cmd(app.show.settings.recordChanges ? 'Record whole looks again (each touched light as it looks)' : 'Record only changes (what the programmer holds, as desks do)', 'record', () => { app.checkpoint(); if (app.show.settings.recordChanges) delete app.show.settings.recordChanges; else app.show.settings.recordChanges = true; app.markDirty(0); });
     cmd(app.blackout ? 'Blackout off' : 'Blackout on', 'moon', () => (app.blackout = !app.blackout));
@@ -43,6 +45,7 @@
     cmd('Phone as a remote…', 'phone', () => (ui.modal = 'remote'), undefined, 'mobile smartphone tablet qr code play from the crowd');
     out.push({ label: 'Make a fog timer…', hint: '', find: 'fog every few minutes automatic repeat loop haze', icon: 'fog', run: () => fogTimer() });
     cmd('Select all lights', 'check', () => app.selectAll());
+    if (s.fixtures.length) cmd('Groups: make one from the selected lights', 'group', () => { app.view = 'program'; app.sideTab = 'groups'; }, undefined, 'group groups make new set');
     // (things that were only on a menu somewhere: "calibrate", "aim", "channels" found nothing)
     const heads = app.selected.filter((x) => app.kinds[x] === 'mover'), movers = app.show.fixtures.filter((f) => app.kinds[f.id] === 'mover').map((f) => f.id);
     if (movers.length) cmd(heads.length ? `Focus and calibrate the ${heads.length > 1 ? `${heads.length} heads` : 'head'}…` : 'Focus and calibrate the moving heads…', 'position',

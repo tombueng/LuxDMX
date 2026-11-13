@@ -622,3 +622,19 @@ test('an empty show says what to do next, the same way everywhere, with a button
   await page.locator('.tlv .hint.empty').getByRole('button', { name: 'Go to Program' }).click();
   await expect(page.locator('.top .modes').getByRole('tab', { name: 'Program' })).toHaveAttribute('aria-selected', 'true');
 });
+
+test('Find anything goes to every view by name, finds "add light" and "group"', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 2, 0, 'P');
+  const find = page.getByRole('dialog', { name: 'Find anything' });
+  for (const [q, want] of [['timeline', /^Go to Timeline/], ['add light', /^Add fixtures/], ['group', /^Groups: make one/]] as const) {
+    await page.locator('body').press('Control+k');
+    await find.getByRole('combobox').fill(q);
+    await expect(find.getByRole('option', { name: want }).first()).toBeVisible();
+    await page.keyboard.press('Escape');
+  }
+  await page.locator('body').press('Control+k');
+  await find.getByRole('combobox').fill('go to timeline');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.top .modes').getByRole('tab', { name: 'Timeline' })).toHaveAttribute('aria-selected', 'true');
+});
