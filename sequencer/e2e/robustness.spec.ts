@@ -413,3 +413,62 @@ test('a big rig stays quick: Record and adding lights take moments, not seconds'
   await expect(page.locator('.top .saved')).toHaveText('saved');
   expect(Date.now() - t).toBeLessThan(2500);
 });
+
+// 19 different edits (lights, groups, cues, an effect, lists, moves, renames, removals), then Undo
+// until it can't and Redo until it can't: exactly the start and exactly the end, every state between
+// one the session went through.
+test('a long session: undo all the way back is the empty show, redo all the way forward the same show again', async ({ page }) => {
+  test.setTimeout(240000);
+  await fresh(page);
+  const res = await page.evaluate(async () => {
+    const a = (window as any).__luxdmx;
+    const tick = () => new Promise((r) => setTimeout(r, 30));
+    const snaps: string[] = [];
+    const snap = () => { a.checkpoint(); snaps.push(a.lastSnap); };
+    snap();
+    const steps: [string, () => unknown][] = [
+      ['add 8 RGB', () => a.addFixtures('gen-rgb', '', 8, 0, 'Par')],
+      ['add 4 dimmers', () => a.addFixtures('gen-dimmer', '', 4, 0, 'Dim')],
+      ['add 2 movers', () => a.addFixtures('gen-mover8', '', 2, 1, 'Head')],
+      ['select pars', () => { a.selected = a.show.fixtures.filter((f: any) => f.name.startsWith('Par')).map((f: any) => f.id); }],
+      ['group pars', () => a.groupFromSelection('Pars')],
+      ['red', () => a.set({ intensity: 1, color: { r: 1, g: 0, b: 0 } })],
+      ['record 1', () => a.record()],
+      ['blue', () => a.set({ intensity: 0.5, color: { r: 0, g: 0, b: 1 } })],
+      ['record 2', () => a.record()],
+      ['select all', () => a.selectAll()],
+      ['group all', () => a.groupFromSelection('All of them')],
+      ['50%', () => a.set({ intensity: 0.5 })],
+      ['record 3', () => { a.record(); a.selected = []; a.programmer = {}; }],
+      ['effect', () => a.addEffect('rainbow', { fixtures: a.show.fixtures.filter((f: any) => f.name.startsWith('Par')).map((f: any) => f.id) })],
+      ['move a light', () => a.moveFixture(a.show.fixtures[0].id, 0.2, 0.3)],
+      ['rename cue', () => { a.checkpoint(); a.show.cueLists[0].cues[0].name = 'Opening'; }],
+      ['remove a dimmer', () => a.removeFixtures([a.show.fixtures.find((f: any) => f.name === 'Dim 2').id])],
+      ['remove group', () => a.removeGroup(a.show.groups[0].id)],
+      ['new list', () => a.newList('Second')],
+      ['record into second', () => { a.selected = [a.show.fixtures[1].id]; a.set({ intensity: 0.3 }); a.record(); }],
+      ['remove cue 2 of list 1', () => a.removeCue(a.show.cueLists[0].id, 1)],
+      ['fixture rename', () => { a.checkpoint(); a.show.fixtures[2].name = 'Center'; }],
+      ['add 3 more', () => a.addFixtures('gen-rgbw', '', 3, 1, 'W')],
+      ['move another', () => a.moveFixture(a.show.fixtures[5].id, 0.7, 0.8)],
+    ];
+    const done: string[] = [];
+    for (const [name, f] of steps) { await f(); await tick(); a.checkpoint(); if (a.lastSnap !== snaps[snaps.length - 1]) { snaps.push(a.lastSnap); done.push(name); } }
+    const final = a.lastSnap;
+    const back: string[] = [];
+    let n = 0;
+    while (a.canUndo && n < 200) { a.undo(); await tick(); a.checkpoint(); back.push(a.lastSnap); n++; }
+    const atStart = a.lastSnap === snaps[0];
+    let m = 0;
+    while (a.canRedo && m < 200) { a.redo(); await tick(); m++; }
+    a.checkpoint();
+    const atEnd = a.lastSnap === final;
+    // which undo states don't match a recorded snapshot
+    const strays = back.filter((b) => !snaps.includes(b)).length;
+    const diff = (x: string, y: string) => { let i = 0; while (i < x.length && x[i] === y[i]) i++; return x.slice(Math.max(0, i - 60), i + 80) + ' ||| ' + y.slice(Math.max(0, i - 60), i + 80); };
+    return { steps: done.length, snaps: snaps.length, undos: n, redos: m, atStart, atEnd, strays, startDiff: atStart ? '' : diff(a.lastSnap === final ? back[back.length - 1] : back[back.length - 1], snaps[0]), endDiff: atEnd ? '' : diff(a.lastSnap, final) };
+  });
+  expect(res.atStart).toBe(true);
+  expect(res.atEnd).toBe(true);
+  expect(res.strays).toBe(0);
+});
