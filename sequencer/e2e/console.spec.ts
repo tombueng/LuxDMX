@@ -428,6 +428,13 @@ test('the console\'s add switch says what it does, and is the stage\'s too; Thru
   await add.click();
   await expect(add).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(async () => (await import('/src/ui/ui.svelte.ts')).ui.addSel)).toBe(true);
+  // on in Program too, so its switch is there to turn it off (with a mouse the stage has none otherwise)
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  const stageAdd = page.locator('.stage-wrap').getByRole('button', { name: /^\+ ?Add$/ });
+  await expect(stageAdd).toHaveAttribute('aria-pressed', 'true');
+  await stageAdd.click();
+  await expect(stageAdd).toHaveCount(0);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Console' }).click();
   await expect(view(page).locator('.pad').getByRole('button', { name: /^thru$/i })).toHaveText('Thru');
   await expect(view(page).locator('.pad').getByRole('button', { name: /^full$/i })).toHaveText('Full');
 });

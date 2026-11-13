@@ -41,7 +41,7 @@
   const lockedOn = $derived(app.locked ? pages.find((p) => p.id === app.show.settings.lockPage) : undefined);
   const page = $derived(lockedOn ?? pages.find((p) => p.id === app.page) ?? pages[0]);
   const PLAYS = ['cue', 'cuelist', 'list', 'effect', 'song', 'fog', 'group'];
-  const playable = $derived(page?.widgets.some((w) => PLAYS.includes(w.type)) ?? false);
+  const playable = $derived(page?.widgets.some((w) => PLAYS.includes(w.type) || (w.type === 'fader' && (w.target === 'list' || w.target === 'effect'))) ?? false);
   const tabs = $derived(lockedOn ? [lockedOn] : pages);
   let selW = $state<string | null>(null);
   let drag = $state<string | null>(null);

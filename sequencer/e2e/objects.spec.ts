@@ -292,3 +292,30 @@ test('a light dragged on the plan is one undo step back to where it started, eve
   await page.keyboard.press('Control+z');
   await expect.poll(pos).toEqual(start);
 });
+
+// A cue copied in one show and pasted into another finds its lights by name; the ones this show
+// doesn't have (and the other show's effects) are left out, and the toast says so.
+test('a cue pasted into another show says which of its lights this show doesn\'t have', async ({ page }) => {
+  await openConnected(page);
+  const tpl = async (name: string) => {
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: name }).click();
+    await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
+  };
+  await tpl('Band');
+  await cues(page).filter({ hasText: 'Chorus' }).click();
+  await page.locator('.deck .cards').press('Control+c');
+  await tpl('Theatre');
+  await expect(cues(page).first()).toBeVisible();
+  const before = await cues(page).count();
+  await cues(page).last().click();
+  await page.locator('.deck .cards').press('Control+v');
+  await expect(cues(page)).toHaveCount(before + 1);
+  const toast = page.locator('.toast').filter({ hasText: 'Pasted 1 cue' });
+  await expect(toast).toContainText("of its lights aren't in this show");
+  await expect(toast).toContainText('left out');
+  // the lights it did find: by name
+  const names = await page.evaluate(() => { const a = (window as any).__luxdmx; const c = a.list.cues.at(-1); return Object.keys(c.values).map((id) => a.show.fixtures.find((f: any) => f.id === id)?.name); });
+  expect(names).toContain('Front 1');
+  expect(names.every((n: string | undefined) => !!n)).toBe(true);
+});

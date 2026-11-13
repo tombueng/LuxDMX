@@ -419,8 +419,13 @@ class App {
     try {
       this.channel = new BroadcastChannel('luxdmx-sequencer');
       this.channel.onmessage = (e) => {
-        // (newer only when it differs: a tab just opened saves the same show once)
-        if (e.data?.saved === this.showId && e.data.tab !== this.tabId) { this.otherTab = true; if (e.data.sum !== textSum(this.lastSnap)) this.otherNewer = true; }
+        // (newer only when it differs: a tab just opened saves the same show once; and back to not
+        // newer when the other tab undid its change. Both sides fingerprint the text as written:
+        // the file fixes a few fields the live show doesn't have yet)
+        if (e.data?.saved === this.showId && e.data.tab !== this.tabId) {
+          this.otherTab = true; this.otherSaves++;
+          this.otherNewer = e.data.sum !== textSum(serializeShow(JSON.parse(this.lastSnap), false));
+        }
         // a tab starting cold asks whether this show is playing somewhere already
         if (e.data?.playing === this.showId && e.data.tab !== this.tabId && !this.quiet)
           this.channel?.postMessage({ isPlaying: this.showId, tab: this.tabId });
@@ -432,15 +437,19 @@ class App {
   // ...and the other tab's save is the newer one: what's in this tab is out of date, and its next
   // save would quietly drop what was done over there. The top bar offers to take that version.
   otherNewer = $state(false);
+  private otherSaves = 0;          // (saves heard from other tabs: one heard while a write was on its way still counts)
   async takeOtherTab() {
     clearTimeout(this.dirtyTimer);
-    const text = await readShow(this.showId);
-    if (!text) return;
-    const notes: string[] = [];
-    this.replaceShow(parseShow(text, notes));
-    this.setLocal(text);
-    this.otherNewer = false;
-    this.sayRepaired(notes);
+    const seen = this.otherSaves;
+    try {
+      const text = await readShow(this.showId);
+      if (!text) throw new Error('the other tab\'s copy is gone');
+      const notes: string[] = [];
+      this.replaceShow(parseShow(text, notes));            // (throws for a show from a newer version)
+      this.setLocal(text);
+      if (this.otherSaves === seen) this.otherNewer = false;
+      this.sayRepaired(notes);
+    } catch (e) { ui.toast(`Couldn't take the other tab's version: ${(e as Error).message}`, 8000); }
   }
   // Is what you do going to the stage? 'blind': the 2D and 3D stages show it, the boxes get nothing
   // new (they keep the look that was out, frozen, without fog and machines); 'live': everything goes
@@ -847,11 +856,12 @@ class App {
     this.saved = false;
     const text = serializeShow(JSON.parse(json), false);
     const local = this.setLocal(text);
+    const seen = this.otherSaves;
     try {
       await writeShow(this.metaOf(), text);
       if (n === this.writes) { this.saved = true; this.saveFailed = false; }    // an older write finishing late doesn't count
-      this.otherNewer = false;                           // (this one's is the newer now; the other tab hears so)
-      this.channel?.postMessage({ saved: this.showId, tab: this.tabId, sum: textSum(json) });
+      if (this.otherSaves === seen) this.otherNewer = false;    // (this one's is the newer now; the other tab hears so)
+      this.channel?.postMessage({ saved: this.showId, tab: this.tabId, sum: textSum(text) });
       this.refreshShows();
     } catch {
       // IndexedDB unavailable (private mode): the localStorage copy still holds the open show. Neither
@@ -2365,12 +2375,13 @@ class App {
     const target = (id: string) => (foreign ? byName.get(clip.names?.[id] ?? '\u0000') : known.has(id) ? id : undefined);
     const fxIds = new Set(this.show.effects.map((e) => e.id)), listIds = new Set(this.show.cueLists.map((x) => x.id));
     const added: string[] = [], made: Cue[] = [];
+    const lost = new Set<string>(); let lostFx = 0;
     for (const c of clip.items as Cue[]) {
       const values: Record<string, Values> = {};
-      for (const [id, v] of Object.entries(c.values)) { const t = target(id); if (t) values[t] = rawCells(v); }
+      for (const [id, v] of Object.entries(c.values)) { const t = target(id); if (t) values[t] = rawCells(v); else lost.add(clip.names?.[id] ?? id); }
       const { num: _n, ...rest } = c;                                    // a number of its own, here
       const cue: Cue = { ...rest, id: newId('c'), values };
-      if (cue.effects) { cue.effects = cue.effects.filter((x) => fxIds.has(x)); if (!cue.effects.length) delete cue.effects; }
+      if (cue.effects) { const n = cue.effects.length; cue.effects = cue.effects.filter((x) => fxIds.has(x)); lostFx += n - cue.effects.length; if (!cue.effects.length) delete cue.effects; }
       if (cue.actions) { cue.actions = cue.actions.filter((a) => !('list' in a) || listIds.has(a.list)); if (!cue.actions.length) delete cue.actions; }
       made.push(cue);
       added.push(cue.id);
@@ -2379,8 +2390,16 @@ class App {
     l.cues.splice(at, 0, ...made);
     this.cueSel = added;
     this.markDirty();
+    // (said, not dropped quietly: a cue from another show that came over with half its lights looked
+    // like a different cue)
+    const names = [...lost];
+    this.cuePasteNote = [
+      names.length ? `${names.length} of its light${names.length > 1 ? 's' : ''} ${names.length > 1 ? "aren't" : "isn't"} in this show (${names.slice(0, 3).join(', ')}${names.length > 3 ? ', …' : ''}), so ${names.length > 1 ? 'they were' : 'it was'} left out` : '',
+      lostFx ? `${lostFx === 1 ? 'an effect' : `${lostFx} effects`} of the other show too` : '',
+    ].filter(Boolean).join('; ');
     return added.length;
   }
+  cuePasteNote = '';
   async duplicateCues() { if (await this.copyCues()) await this.pasteCues(); }
   deleteCues(ids = this.cueSel) {
     this.checkpoint();

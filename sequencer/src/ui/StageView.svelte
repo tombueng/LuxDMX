@@ -382,7 +382,8 @@
       <button class="ghost" onclick={() => app.selectNone()} aria-label="Select none">None</button>
       <button class="ghost" onclick={invert} title="Invert the selection">Invert</button>
       <!-- (on a touch screen: a finger has no Shift to add to the selection) -->
-      {#if coarse && !readonly}<button class="ghost" class:on={ui.addSel} aria-pressed={ui.addSel} onclick={() => (ui.addSel = !ui.addSel)} title="On: a tap adds a light or a group to the selection (or takes it out), as Shift does with a mouse">+ Add</button>{/if}
+      <!-- (and whenever it's on: Console's switch is the same one, and with a mouse it stayed on here with nothing to switch it off) -->
+      {#if (coarse || ui.addSel) && !readonly}<button class="ghost" class:on={ui.addSel} aria-pressed={ui.addSel} onclick={() => (ui.addSel = !ui.addSel)} title="On: a tap adds a light or a group to the selection (or takes it out), as Shift does with a mouse">+ Add</button>{/if}
       {#if !ui.stage3d}
       <span class="sep"></span>
       <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show the names (with each light's number)" aria-label="Names" aria-pressed={labels}>Aa</button>

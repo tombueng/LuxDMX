@@ -472,3 +472,33 @@ test('a long session: undo all the way back is the empty show, redo all the way 
   expect(res.atEnd).toBe(true);
   expect(res.strays).toBe(0);
 });
+
+// The fine print of two tabs: what one tab writes is fingerprinted as written (a field the file
+// fixes doesn't count as a change), an undone change takes the warning back, and a version this
+// tab can't read is said, not swallowed.
+test('two tabs: no false alarm, the alarm goes when the change is undone, an unreadable version is said', async ({ page, context }) => {
+  await fresh(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  // a show from an older app (the file says this one's name, the live show still the old)
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.meta.app = 'LuxDMX Sequencer 0.1'; a.checkpoint(); });
+  await page.waitForTimeout(800);
+  const chip = page.locator('.top').getByRole('button', { name: 'changed in another tab' });
+  const b = await context.newPage();
+  await b.goto('/');
+  await expect(fixturesOnStage(b)).toHaveCount(2);
+  await page.waitForTimeout(1500);
+  await expect(chip).toHaveCount(0);                                          // (nothing changed)
+  // a change over there, then undone: the warning comes and goes
+  await patch(b, 'gen-dimmer', 1, 0, 'B');
+  await expect(chip).toBeVisible({ timeout: 5000 });
+  await b.evaluate(() => (window as any).__luxdmx.undo());
+  await expect(chip).toHaveCount(0, { timeout: 5000 });
+  // a version from a newer app over there: taking it is refused, with a word
+  await b.evaluate(() => { const a = (window as any).__luxdmx; a.checkpoint(); a.show.requiredFeatures = ['from-the-future']; a.show.fixtures[0].name = 'Future'; a.checkpoint(); });
+  await expect(chip).toBeVisible({ timeout: 5000 });
+  await chip.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Take it' }).click();
+  await expect(page.locator('.toast')).toContainText("Couldn't take the other tab's version");
+  await expect(fixturesOnStage(page)).toHaveCount(2);                         // (this tab's show as it was)
+  await b.close();
+});

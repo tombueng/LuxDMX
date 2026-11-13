@@ -63,7 +63,7 @@
   }
   const copy = async () => { const n = await app.copyCues(); if (n) ui.toast(`Copied ${n} cue${n > 1 ? 's' : ''}`); };
   const cut = async () => { const n = await app.cutCues(); if (n) ui.toast(`Cut ${n} cue${n > 1 ? 's' : ''}`); };
-  const paste = async () => { const n = await app.pasteCues(); ui.toast(n ? `Pasted ${n} cue${n > 1 ? 's' : ''}` : 'Nothing to paste'); };
+  const paste = async () => { const n = await app.pasteCues(); ui.toast(n ? `Pasted ${n} cue${n > 1 ? 's' : ''}${app.cuePasteNote ? `. ${app.cuePasteNote}.` : ''}` : 'Nothing to paste', app.cuePasteNote ? 8000 : undefined); };
   const dup = async () => { await app.duplicateCues(); };
   const del = () => { const n = app.cueSel.length; if (n) { app.deleteCues(); ui.toast(`Deleted ${n} cue${n > 1 ? 's' : ''} (Ctrl+Z brings ${n > 1 ? 'them' : 'it'} back)`); } };
 

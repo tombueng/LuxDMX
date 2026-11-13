@@ -122,7 +122,7 @@ test('a pixel bar lit by an effect reads its real level; a Release says the effe
   await expect(page.locator('.panel.prog')).toContainText(/out (100|[1-9]\d)%/);
   await page.evaluate(() => { const a = (window as any).__luxdmx; a.release(a.show.cueLists[0]?.id); });
   const t = page.locator('.toast').filter({ hasText: 'keeps running' });
-  await expect(t).toContainText('Theater');
+  await expect(t).toContainText('Theatre');
   await t.getByRole('button', { name: 'Stop it' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.engine.liveEffects().length)).toBe(0);
 });
