@@ -253,7 +253,28 @@
   // Symbol radius in drawing units: 11-22 screen pixels (bigger on touch screens).
   const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   // Zooming in makes them a bit bigger too (not as much as the room: they'd overlap again).
-  const size = $derived(Math.max(coarse ? 16 : 11, Math.min(22, 200 / Math.sqrt(app.show.fixtures.length + 3))) * px * Math.sqrt(view.k));
+  // (and no bigger than the room between neighbours on the screen: a tablet held upright squeezes
+  // the plan's width, and a row of heads became one blob. A quarter of the lights may be closer
+  // than that: two hung together don't shrink the rest.)
+  const room = $derived.by(() => {
+    const fx = app.show.fixtures;
+    if (fx.length < 2) return Infinity;
+    const near = fx.map((f) => { let d = Infinity; for (const o of fx) if (o !== f) d = Math.min(d, Math.hypot((o.x - f.x) * box.w, (o.y - f.y) * box.h)); return d; }).sort((a, b) => a - b);
+    return near[Math.floor(near.length / 4)];
+  });
+  const size = $derived(Math.max(coarse ? 16 : 11, Math.min(22, 200 / Math.sqrt(app.show.fixtures.length + 3), room * 0.42)) * px * Math.sqrt(view.k));
+  // A pixel bar's half length: 2.2 symbols, but not into the next light along its row (four bars
+  // in a row on a narrow plan ran together into one)
+  const barHalf = $derived.by(() => {
+    const out = new Map<string, number>();
+    for (const f of app.show.fixtures) {
+      if (app.kinds[f.id] !== 'bar') continue;
+      let gap = Infinity;
+      for (const o of app.show.fixtures) if (o !== f && Math.abs(o.y - f.y) * H < size * 1.2) gap = Math.min(gap, Math.abs(o.x - f.x) * W);
+      out.set(f.id, Math.max(size * 1.1, Math.min(size * 2.2, gap * 0.46)));
+    }
+    return out;
+  });
   const css = (l: Resolved | undefined) => lookColor(l);
   const cells = (id: string) => app.caps(id).cells;
   // the cells picked on a light (outlined on the plan)
@@ -270,7 +291,7 @@
     const out = new Map<string, At | null>();
     if (!labels) return out;
     const fs = 12 * px;
-    const halfW = (id: string) => { const k = app.kinds[id]; return size * (k === 'bar' ? 2.2 : k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72); };
+    const halfW = (id: string) => { const k = app.kinds[id]; return k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72); };
     // Boxes (the lights' bodies, then each placed name) go into columns of the stage, so a name
     // only checks what's near it: a big rig stays quick while a light is dragged around.
     type Box = { x0: number; x1: number; y0: number; y1: number; id?: string };
@@ -433,12 +454,13 @@
             {/each}
           {:else if kind === 'bar'}
             {@const n = cells(f.id)}
-            <rect x={x - size * 2.2} y={y - size * 0.55} width={size * 4.4} height={size * 1.1} rx="4" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-            <rect x={x - size * 2.2} y={y - size * 0.42} width={size * 4.4} height={size * 0.84} rx="4" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
+            {@const bw = barHalf.get(f.id) ?? size * 2.2}
+            <rect x={x - bw} y={y - size * 0.55} width={bw * 2} height={size * 1.1} rx="4" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
+            <rect x={x - bw} y={y - size * 0.42} width={bw * 2} height={size * 0.84} rx="4" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
             <!-- its cells (a long pixel strip: the pixels touch, no gaps) -->
             {#each Array(n) as _, i (i)}
               {@const cc = css(cellLookAt(l, i, n))}
-              <rect class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} x={x - size * 2.05 + (i * size * 4.1) / n} y={y - size * 0.28} width={Math.max(0.5, (size * 4.1) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
+              <rect class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} x={x - bw * 0.93 + (i * bw * 1.86) / n} y={y - size * 0.28} width={Math.max(0.5, (bw * 1.86) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
             {/each}
           {:else if kind === 'sfx'}
             <!-- an effect machine: what it is, lit while it runs -->

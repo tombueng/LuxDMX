@@ -233,3 +233,29 @@ for (const width of [768, 834]) {
     });
   });
 }
+
+test.describe('the 2D plan on a tablet held upright', () => {
+  test.use({ viewport: { width: 768, height: 1024 }, hasTouch: true });
+  test('the Band stage\'s four pixel bars stay apart, from each other and from the machines beside them', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
+    const stage = page.locator('.stage-wrap');
+    const two = stage.getByRole('button', { name: '2D', exact: true });
+    if (await two.isVisible()) await two.click();
+    await expect(stage.locator('.fx[data-name="Bar 1"]')).toBeVisible();
+    await page.waitForTimeout(500);
+    const touching = await page.evaluate(() => {
+      const bodies = [...document.querySelectorAll<SVGGElement>('.stage-wrap .fx')].flatMap((g) => { const b = g.querySelector('[stroke-width]'); return b ? [{ n: g.dataset.name ?? '', r: b.getBoundingClientRect() }] : []; });
+      const out: string[] = [];
+      for (const a of bodies.filter((x) => /^Bar /.test(x.n))) for (const b of bodies) {
+        if (a === b) continue;
+        const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+        if (w > 1 && h > 1) out.push(`${a.n}/${b.n}`);
+      }
+      return out;
+    });
+    expect(touching).toEqual([]);
+  });
+});
