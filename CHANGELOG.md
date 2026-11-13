@@ -29,6 +29,12 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   light's; the plan keeps its lights apart on a narrow screen.
 - The top bar fits an upright iPad and counts the interface size (120 % on a laptop).
 - The box's window can be reloaded: the app takes it back by itself.
+- Big rigs are quick again: a Record with 320 lights and 40 cues took 5 s, adding 200 lights to a
+  big rig froze the page for 12 s. Both take moments now.
+- The same show in two tabs: the out-of-date one says **changed in another tab** and takes the
+  newer version on a tap, instead of quietly saving over it.
+- A browser that won't keep the show (storage full or blocked) says **not saved** in red, instead
+  of "saving…" for ever.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
 
