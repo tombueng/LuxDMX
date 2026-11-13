@@ -73,6 +73,9 @@
     const p = pt(e);
     let dx = p.x - drag.start.x, dy = p.y - drag.start.y;
     if (!drag.moved && Math.hypot(dx, dy) < 0.004) return;
+    // (one undo step for the whole drag, back to where it started: no save in between makes a
+    // step out of a point on the way, as the 3D stage's handles do)
+    if (!drag.moved) { app.checkpoint(); app.holdUndo = true; }
     drag.moved = true;
     const g: { x?: number; y?: number } = {};
     if (!e.altKey) {
@@ -87,6 +90,8 @@
     guides = g;
     for (const id of drag.ids) app.moveFixture(id, drag.orig[id].x + dx, drag.orig[id].y + dy);
   }
+  // (a drag the browser broke off, a finger taken for a scroll: the undo step closes all the same)
+  function endDrag() { if (drag?.moved) { app.holdUndo = false; app.markDirty(0); } drag = null; guides = {}; }
   function upFixture(e: PointerEvent, id: string) {
     if (readonly) return;
     // Alt-click on a pixel (no drag): pick that cell on this light (and the selected ones shaped like it)
@@ -95,6 +100,7 @@
       const now = app.cellsPicked(id), k = drag.cell;
       app.selectCells(now.includes(k) ? now.filter((x) => x !== k) : [...now, k].sort((a, b) => a - b));
     } else if (drag && !drag.moved && !(e.shiftKey || e.ctrlKey || e.metaKey)) app.select(id, false);
+    if (drag?.moved) { app.holdUndo = false; app.markDirty(0); }
     drag = null; guides = {};
   }
   // Arrow keys nudge the selected lights on the stage (Shift: bigger steps), like any drawing tool.
@@ -430,7 +436,7 @@
         <g class="fx" data-name={f.name} role="button" tabindex="-1" aria-label={f.name} aria-pressed={sel}
            class:dropping={dropFx === f.id} oncontextmenu={(e) => fxMenu(e, f.id)}
            ondragover={(e) => { if (isPreset(e)) { e.preventDefault(); dropFx = f.id; } }} ondragleave={() => { if (dropFx === f.id) dropFx = null; }} ondrop={(e) => presetDrop(e, f.id)}
-           onpointerdown={(e) => downFixture(e, f.id)} onpointermove={moveFixture} onpointerup={(e) => upFixture(e, f.id)}>
+           onpointerdown={(e) => downFixture(e, f.id)} onpointermove={moveFixture} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
           {#if kind === 'mover'}
             <circle cx={x} cy={y} r={size * 1.25} fill={c.css} opacity={c.glow * 0.45} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
             <rect x={x - size * 0.9} y={y - size * 0.25} width={size * 1.8} height={size * 0.5} rx="3" fill="#2a313c" />

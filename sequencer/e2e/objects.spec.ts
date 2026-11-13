@@ -273,3 +273,22 @@ test('a clipboard prompt nobody answers holds up nothing', async ({ page }) => {
   await page.locator('.fl').getByRole('button', { name: 'Duplicate fixtures' }).click();
   await expect.poll(count, { timeout: 3000 }).toBe(4);
 });
+
+test('a light dragged on the plan is one undo step back to where it started, even with a save in the middle of the drag', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 2, 0, 'P');
+  const pos = () => page.evaluate(() => { const f = (window as any).__luxdmx.show.fixtures.find((x: any) => x.name === 'P 1'); return [f.x, f.y]; });
+  const start = await pos();
+  const body = page.locator('.stage-wrap .fx[data-name="P 1"] [stroke-width]').first();
+  const b = (await body.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 40, b.y - 30, { steps: 6 });
+  await page.evaluate(() => (window as any).__luxdmx.checkpoint(true));     // (the save timer, mid-drag)
+  await page.mouse.move(b.x + 90, b.y - 60, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  expect(await pos()).not.toEqual(start);
+  await page.keyboard.press('Control+z');
+  await expect.poll(pos).toEqual(start);
+});
