@@ -22,8 +22,8 @@ test('every template builds a working show', async ({ page }) => {
     expect(await cues(page).count()).toBeGreaterThan(3);
   }
   await openManager(page);
-  // the first, empty show plus six templates
-  await expect(manager(page).locator('.card')).toHaveCount(7);
+  // the six templates (the first, empty show went when the first template opened)
+  await expect(manager(page).locator('.card')).toHaveCount(6);
 });
 
 // Every template on the box: a look goes out, the live page has a button for each effect machine
