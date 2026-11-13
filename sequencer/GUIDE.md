@@ -301,7 +301,13 @@ Three more demos come with their own room on the 3D stage:
   `#unlock` on the end and confirm: the show unlocks and the PIN is gone. A locked show sent to
   another device opens unlocked there.
 - **When the lights stop getting anything** (the box's Wi-Fi drops, someone closes the box's little
-  window) a red bar says so at the top, with Reconnect when a tap can fix it; after a restart, the
+  window) a red bar says so at the top, with Reconnect when a tap can fix it. With two boxes it says
+  which universes get nothing, and which box (by its address too when both have the same name).
+  Once the box is back the bar turns green for 15 seconds, so a link that keeps dropping doesn't
+  push the page up and down each time. Connected but **slow** (venue Wi-Fi: the lights get a look
+  every second or so, a chase looks frozen) is said too, in orange, with how much gets through: a
+  cable, or the box nearer the router, helps. The DMX output's universe dots are green only while a
+  connected box plays that universe (orange: there's a look, but nothing goes out). After a restart, the
   same bar asks for the one tap that connects the box again while the show is locked or picked
   up. A tablet switched off and on again (within 3 hours, and only if no other tab is playing the
   show) puts back what was playing, at once, so the box gets the same look it has been holding and

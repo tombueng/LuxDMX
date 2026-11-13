@@ -502,3 +502,56 @@ test('two tabs: no false alarm, the alarm goes when the change is undone, an unr
   await expect(fixturesOnStage(page)).toHaveCount(2);                         // (this tab's show as it was)
   await b.close();
 });
+
+// Venue Wi-Fi: a box that's connected but answers slowly, or hardly at all, looked perfectly healthy
+// while the lights got a look every few seconds. It's said in orange; a box back after a drop shows
+// green in the same place for a while (a flapping link doesn't push the page up and down); the
+// DMX output's universe dot doesn't say "sending" while nothing goes out.
+test('a slow or stalled box is said; a box back stays in the same place, green; the universe dot tells the truth', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 4, 0, 'D');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.addEffect('chase', { fixtures: a.show.fixtures.map((f: any) => f.id) }); });
+  const ws = (b: object) => fetch(`http://${FAKE}/ws/test`, { method: 'POST', body: JSON.stringify(b) });
+  await expect(page.locator('.lost.slow')).toHaveCount(0);
+  await ws({ ackDelay: 1000 });
+  await expect(page.locator('.lost.slow')).toContainText('answers slowly', { timeout: 10000 });
+  await ws({ ackDelay: 0 });
+  await expect(page.locator('.lost.slow')).toHaveCount(0, { timeout: 10000 });
+  await ws({ noAck: true });
+  await expect(page.locator('.lost.slow')).toContainText(/answers slowly|hardly answers/, { timeout: 12000 });
+  await ws({ noAck: false });
+  await expect(page.locator('.lost.slow')).toHaveCount(0, { timeout: 12000 });
+  // off the network: red, the dot orange; back: green where the red was
+  await ws({ down: 3000 });
+  await expect(page.locator('.lost[role="alert"]')).toBeVisible({ timeout: 4000 });
+  await expect(page.locator('.dmx .u', { hasText: 'U0' })).toHaveAttribute('title', /no connected box plays it/);
+  const goAt = async () => (await page.locator('.side .tabs').boundingBox())!.y;
+  const yLost = await goAt();
+  await expect(page.locator('.lost.back')).toContainText('is back', { timeout: 15000 });
+  expect(Math.abs((await goAt()) - yLost)).toBeLessThan(2);                     // (nothing moved)
+  await expect(page.locator('.dmx .u', { hasText: 'U0' })).toHaveAttribute('title', /sending/);
+});
+
+// Two boxes, one off the network: the bar says which universes get nothing (not "the lights": the
+// other box's are fine), and which box, by its address too when both have the same name.
+test('two boxes, one gone: the bar names its universes and the box by its address', async ({ page }) => {
+  test.setTimeout(120_000);
+  const { spawn } = await import('node:child_process');
+  const port2 = Number(FAKE.split(':')[1]) + 40, host2 = `127.0.0.1:${port2}`;
+  const box2 = spawn('node', ['test/fake-luxdmx.mjs', String(port2), '2'], { stdio: 'ignore', detached: true });
+  try {
+    for (let i = 0; i < 50; i++) { try { await fetch(`http://${host2}/info.json`); break; } catch { await new Promise((r) => setTimeout(r, 200)); } }
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await openConnected(page);
+    await addDevice(page, host2);
+    const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('.dev').getByRole('button', { name: 'Connect' }).click()]);
+    await popup.locator('#allow').click();
+    await expect(page.locator('.dev.ready')).toHaveCount(2);
+    await fetch(`http://${FAKE}/ws/test`, { method: 'POST', body: JSON.stringify({ down: 6000 }) });
+    const bar = page.locator('.lost[role="alert"]');
+    await expect(bar).toContainText("Universes 0, 1 aren't getting anything", { timeout: 5000 });
+    await expect(bar).toContainText(`(${FAKE})`);                                // (both are "Fake LuxDMX")
+    await expect(bar).not.toContainText("The lights aren't getting anything");
+  } finally { try { process.kill(-box2.pid!); } catch { /* gone */ } }
+});

@@ -37,6 +37,11 @@ export class Bridge {
   fps = 0;
   drops = 0;
   lostAt = 0;          // when it stopped getting through, after having been live (0: it hasn't)
+  backAt = 0;          // when it came back after that (the red bar turns green for a while: see ConnectionBanner)
+  // The last few seconds as its page counted them: frames sent a second, and frames it had to
+  // replace because the box hadn't answered the one before. A link that's connected but slow or
+  // stalled (venue Wi-Fi) looked perfectly healthy while the lights got a look every few seconds.
+  recent: { fps: number; drops: number }[] = [];
   readonly origin: string;
   // messages other pages on this box sent (a phone used as a remote, see remote/host.svelte.ts)
   onRelay: ((d: unknown) => void) | null = null;
@@ -108,7 +113,7 @@ export class Bridge {
         else if (m.ws === 'open' && this.state === 'reconnecting') this.set('ready');
         else if (m.ws === 'closed') this.set(this.win?.closed ? 'closed' : 'reconnecting');
         break;
-      case 'stats': this.fps = m.fps; this.drops = m.drops; this.changed(); break;
+      case 'stats': this.fps = m.fps; this.drops = m.drops; this.recent = [...this.recent.slice(-4), { fps: m.fps, drops: m.drops }]; this.changed(); break;
       case 'relay': this.onRelay?.(m.data); break;
       case 'port': if (m.ok) { this.portTaken = true; this.changed(); } break;
       case 'rdm': this.rdmAnswer(m); break;
@@ -138,6 +143,17 @@ export class Bridge {
   // bridge) gets everything; one that says only its outputs (too old to name its pixel ports) gets
   // those: sending every pixel universe to every box slows down what it really plays.
   wants(uni: number) { return this.outputs.length === 0 || this.outputs.some((o) => o.en && o.uni === uni) || this.pixels.includes(uni); }
+
+  // 'stalled': under one frame in two seconds over 3 s (a still look alone sends about 4 a second for
+  // each universe; a box that never answers gets one every 2 to 4 s); 'slow': it had more to send
+  // than the box took (frames replaced) and got under 10 through a second, or under 2 at all. Only
+  // while connected, and only from what its page has said lately.
+  get slow(): '' | 'slow' | 'stalled' {
+    if (this.state !== 'ready' || this.recent.length < 3) return '';
+    const r = this.recent.slice(-3), fps = r.reduce((n, x) => n + x.fps, 0) / 3, drops = r.reduce((n, x) => n + x.drops, 0);
+    return fps < 0.5 ? 'stalled' : (fps < 10 && drops >= 3) || fps < 2 ? 'slow' : '';
+  }
+  get sentRate() { const r = this.recent.slice(-3); return r.length ? r.reduce((n, x) => n + x.fps, 0) / r.length : 0; }
 
   // Only what changed, plus a heartbeat so the box keeps the source (it drops one after 4 s of
   // silence). A static look costs 4 frames a second instead of 40, and a box that stalls for a
@@ -183,7 +199,8 @@ export class Bridge {
   protected set(s: BridgeState) {
     if (s !== 'ready') this.portTaken = false;
     if (this.state === 'ready' && s !== 'ready') this.lostAt = Date.now();
-    else if (s === 'ready') this.lostAt = 0;
+    else if (s === 'ready') { if (this.lostAt) this.backAt = Date.now(); this.lostAt = 0; }
+    if (s !== 'ready') this.recent = [];
     this.state = s; this.changed();
     // reconnecting: its window may say it's closed only after its socket did; look again
     clearInterval(this.recheck);
