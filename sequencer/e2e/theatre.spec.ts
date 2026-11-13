@@ -138,7 +138,8 @@ test('cue numbers: typed into a cue, on the cue sheet, Renumber puts 1, 2, 3 bac
   await page.locator('.deck .card').nth(2).click();                     // Night
   await page.getByLabel('Cue number').fill('20');
   await page.getByLabel('Cue number').press('Enter');
-  await expect(page.locator('.deck .card .num')).toHaveText(nums(n, (a) => [...a.slice(0, 2), '20', ...a.slice(3)]));
+  // (it moves to where 20 belongs, after 11: a number puts the cue in its place, as on a desk)
+  await expect(page.locator('.deck .card .num')).toHaveText(nums(n, (a) => [...a.slice(0, 2), ...a.slice(3), '20']));
   // the cue sheet carries them
   const [sheet] = await Promise.all([page.waitForEvent('popup'), page.evaluate(() => (window as any).__luxdmx.printCueSheet())]);
   await expect(sheet.locator('table').first()).toContainText('20');
