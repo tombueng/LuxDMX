@@ -353,6 +353,8 @@ test('two tabs on one show: the out-of-date one says "changed in another tab" an
   // a change in B: A's copy is out of date now
   await patch(b, 'gen-dimmer', 1, 0, 'From B');
   await expect(chip).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.top .saved')).toHaveCount(0);                   // (not "saved" beside it)
+  expect(await page.locator('.top .show .name').evaluate((n) => n.getBoundingClientRect().width)).toBeGreaterThan(20);   // (the name kept, not 0 px)
   await expect(b.locator('.top').getByRole('button', { name: 'changed in another tab' })).toHaveCount(0);
   await chip.click();
   await page.getByRole('dialog').getByRole('button', { name: 'Take it' }).click();
@@ -411,7 +413,7 @@ test('a big rig stays quick: Record and adding lights take moments, not seconds'
   await record(page);
   await expect(cues(page)).toHaveCount(41);
   await expect(page.locator('.top .saved')).toHaveText('saved');
-  expect(Date.now() - t).toBeLessThan(2500);
+  expect(Date.now() - t).toBeLessThan(4000);                                   // (it took 5 s; a busy machine running two test runs took 3.4 s)
 });
 
 // 19 different edits (lights, groups, cues, an effect, lists, moves, renames, removals), then Undo

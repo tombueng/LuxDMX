@@ -41,4 +41,8 @@ describe('the cue sheet', () => {
     expect(html).toContain('break-after: avoid');
     expect(html).toMatch(/@bottom-right \{ content: "page " counter\(page\)/);
   });
+  it('says when it was printed and when the show was saved', () => {
+    const t = structuredClone(s); t.meta.modified = '2026-11-13T21:03:00.000Z';
+    expect(cueSheetHtml(t)).toMatch(/printed .*, show saved /);
+  });
 });

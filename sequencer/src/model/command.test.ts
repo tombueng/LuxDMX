@@ -105,5 +105,7 @@ describe('numbers too big to be one', () => {
     expect(parseCommand('lowlight')).toEqual({ action: 'lowlight' });
     expect(parseCommand('cue 5 delay 2').error).toMatch(/delay is in the cue's settings/);
     expect(parseCommand('x'.repeat(3000)).error!.length).toBeLessThan(120);
+    expect(parseCommand('fade 3').error).toMatch(/goes with a cue/);
+    expect(parseCommand('redo')).toEqual({ action: 'redo' });
   });
 });

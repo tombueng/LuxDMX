@@ -30,6 +30,11 @@
   }
   // Connected but slow or hardly answering (venue Wi-Fi): it looked healthy while the lights got a
   // look every few seconds. Said in orange, with what gets through.
+  // (per universe: what the box's page counts is frames for all of them, it said 2 a second for 1)
+  function looksOf(b: Bridge) {
+    const unis = [...app.frames.keys()].filter((u) => b.wants(u)).length || 1, n = Math.max(1, Math.round(b.sentRate / unis));
+    return `about ${n} look${n === 1 ? '' : 's'} a second`;
+  }
   const slow = $derived((void app.bridgeRev, app.output === 'live' ? app.bridges.filter((b) => b.slow) : []));
   // Back after being lost: the bar stays a while, green, so a link that drops and comes back every
   // few seconds doesn't push the page up and down under the operator's finger each time.
@@ -54,7 +59,7 @@
 {#each slow as b (b.host)}
   <div class="lost slow" role="alert">
     <Icon name="warn" />
-    <span><b>{nameOf(b)} {b.slow === 'stalled' ? 'hardly answers' : 'answers slowly'}</b>: the lights get {b.slow === 'stalled' ? 'almost nothing' : `about ${Math.max(1, Math.round(b.sentRate))} looks a second`}, the network to it is slow or busy (its Wi-Fi?). A cable, or the box nearer the router, helps.</span>
+    <span><b>{nameOf(b)} {b.slow === 'stalled' ? 'hardly answers' : 'answers slowly'}</b>: the lights get {b.slow === 'stalled' ? 'almost nothing' : looksOf(b)}, the network to it is slow or busy (its Wi-Fi?). A cable, or the box nearer the router, helps.</span>
   </div>
 {/each}
 {#each back as b (b.host)}

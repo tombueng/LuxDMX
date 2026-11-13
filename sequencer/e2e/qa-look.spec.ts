@@ -614,7 +614,8 @@ test('an empty show says what to do next, the same way everywhere, with a button
   await expect(page.locator('.gp')).toContainText('No lights yet: add them first');
   await expect(page.locator('.gp').getByRole('button', { name: 'Add lights' })).toBeVisible();
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
-  await expect(page.locator('.live .grid .empty')).toContainText('Nothing to play yet');
+  await expect(page.locator('.strip')).toContainText('No cues yet');                 // (said once, by the GO bar)
+  await expect(page.locator('.live .grid .empty')).toHaveCount(0);
   await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
   // the effects with no lights at all
   await page.locator('.side .tabs').getByRole('tab', { name: 'Effects' }).click();

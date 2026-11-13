@@ -29,10 +29,12 @@ describe('Bridge', () => {
     const b = new Bridge('h', () => {});
     b.handle({ type: 'ready', name: 'x' });
     const stats = (fps: number, drops: number) => b.handle({ type: 'stats', fps, drops });
-    stats(0, 0); stats(0, 0); stats(0, 0);
+    stats(0, 2); stats(0, 2); stats(0, 2);
     expect(b.slow).toBe('');                       // (three seconds in: still warming up, said "hardly answers" here)
-    stats(0, 0);
+    stats(0, 2);
     expect(b.slow).toBe('stalled');
+    for (const f of [0, 0, 0, 0]) stats(f, 0);
+    expect(b.slow).toBe('');                       // an idle show: nothing to send, nothing skipped: fine
     for (const f of [1, 1, 1]) stats(f, 6);
     expect(b.slow).toBe('slow');                   // a look a second, frames skipped
     for (const f of [4, 4, 4]) stats(f, 0);

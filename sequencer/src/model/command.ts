@@ -17,7 +17,7 @@ export interface Command {
   steps?: Step[];
   base?: 'new' | 'current';
   level?: Level;            // on what was said, or on the selection
-  action?: 'clear' | 'record' | 'go' | 'back' | 'release' | 'releaseall' | 'blackout' | 'highlight' | 'lowlight' | 'update' | 'next' | 'prev' | 'goto' | 'delete' | 'time' | 'undo' | 'help';
+  action?: 'clear' | 'record' | 'go' | 'back' | 'release' | 'releaseall' | 'blackout' | 'highlight' | 'lowlight' | 'update' | 'next' | 'prev' | 'goto' | 'delete' | 'time' | 'undo' | 'redo' | 'help';
   list?: number;            // which list (from 1); none: the one Live plays
   cue?: number;             // a cue by its number (goto, record, update, delete, time)
   time?: number;            // a fade in seconds (cue 5 time 3, record cue 5 time 3)
@@ -33,7 +33,7 @@ const WORDS: Record<string, string> = {
   highlight: 'highlight', hl: 'highlight', list: 'list', l: 'list',
   next: 'next', prev: 'prev', previous: 'prev', last: 'prev',
   goto: 'goto', cue: 'cue', q: 'cue', time: 'time', delete: 'delete', del: 'delete',
-  undo: 'undo', oops: 'undo', help: 'help', '?': 'help',
+  undo: 'undo', oops: 'undo', redo: 'redo', help: 'help', '?': 'help',
   // (desk words from MA and Eos: store is record, fade is time, a fixture or channel number is just
   // the number, "release all" and "off" let go of everything; lowlight as the panel's button)
   store: 'record', sto: 'record', fade: 'time', lowlight: 'lowlight', ll: 'lowlight', off: 'releaseall', releaseall: 'releaseall',
@@ -72,8 +72,8 @@ function levelOf(v: string[]): Level | string {
 // (a word it doesn't know, cut short: 3000 characters ran across the panels; a delay said plainly)
 const unknown = (w: string) => w === 'delay' ? 'a delay is in the cue\'s settings (More timing), not on the command line yet'
   : `"${w.length > 24 ? `${w.slice(0, 24)}…` : w}"? Try 1 thru 4 @ 50, group 2, goto cue 5, go, clear`;
-const ACTS = ['clear', 'record', 'go', 'back', 'release', 'releaseall', 'blackout', 'highlight', 'lowlight', 'update', 'next', 'prev', 'goto', 'delete', 'undo', 'help'];
-const PLAIN = ['clear', 'releaseall', 'blackout', 'highlight', 'lowlight', 'next', 'prev', 'undo', 'help'];
+const ACTS = ['clear', 'record', 'go', 'back', 'release', 'releaseall', 'blackout', 'highlight', 'lowlight', 'update', 'next', 'prev', 'goto', 'delete', 'undo', 'redo', 'help'];
+const PLAIN = ['clear', 'releaseall', 'blackout', 'highlight', 'lowlight', 'next', 'prev', 'undo', 'redo', 'help'];
 function actionOf(t: string[]): Command {
   let action: string | undefined, list: number | undefined, cue: number | undefined, time: number | undefined, i = 0;
   // (a number, "2.5" too)
@@ -115,6 +115,8 @@ function actionOf(t: string[]): Command {
 export function parseCommand(text: string): Command {
   const t = tokens(text);
   if (!t.length) return {};
+  // (a time on its own, "fade 3": it quoted "time" back, a word not typed)
+  if (t[0] === 'time') return { error: 'a fade goes with a cue: cue 5 time 3 (or fade 3)' };
   // a word on its own, or about a list and a cue
   if (ACTS.includes(t[0]) || t[0] === 'cue' || t[0] === 'list') return actionOf(t);
   const steps: Step[] = [];

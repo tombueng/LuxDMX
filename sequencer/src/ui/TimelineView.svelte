@@ -699,7 +699,7 @@
       <button class="ghost add" onclick={newSong} title="A song at the end of the set, with its own file and cues"><Icon name="plus" size={14} />Add a song</button>
       {#if songs.length}
         <label class="opt">Count-in <select value={app.show.setlist?.countIn ?? 0} aria-label="Count-in" onchange={(e) => setCountIn(+(e.target as HTMLSelectElement).value)}>
-          <option value={0}>none (the drummer counts)</option><option value={1}>1 bar of clicks</option></select></label>
+          <option value={0}>none</option><option value={1}>1 bar of clicks</option></select></label>
         <label class="opt">Between songs <select value={between} aria-label="Between songs" onchange={(e) => setBetween((e.target as HTMLSelectElement).value)}>
           <option value="">the last look stays</option>
           {#each lists as l (l.id)}<optgroup label={l.name}>{#each l.cues as c, k (c.id)}<option value={JSON.stringify([l.id, c.id])}>{cueNumber(l, k)}. {c.name}</option>{/each}</optgroup>{/each}

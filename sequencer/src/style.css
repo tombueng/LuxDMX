@@ -94,7 +94,7 @@ h2 { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color:
 
 /* toasts */
 /* under the top bar: at the bottom they covered the cue cards, the phone's Record button and tabs */
-.toast { position: fixed; top: 3.9rem; left: 50%; transform: translateX(-50%); animation: toast-in .16s ease-out; background: var(--panel2); border: 1px solid var(--line2); border-radius: 999px; padding: .4rem .5rem .4rem 1rem; box-shadow: var(--shadow); z-index: 90; font-size: .9rem; display: flex; align-items: center; gap: .7rem; max-width: min(720px, 94vw); }
+.toast { position: fixed; top: 3.9rem; left: 50%; transform: translateX(-50%); animation: toast-in .16s ease-out; background: var(--panel2); border: 1px solid var(--line2); border-radius: 1.1rem;   /* (a pill when one line; two lines on a phone were a round blob with the words past its edge) */ padding: .4rem .5rem .4rem 1rem; box-shadow: var(--shadow); z-index: 90; font-size: .9rem; display: flex; align-items: center; gap: .7rem; max-width: min(720px, 94vw); }
 .toast button.sm { padding: .15rem .7rem; border-radius: 999px; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -6px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

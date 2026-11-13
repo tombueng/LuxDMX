@@ -152,7 +152,10 @@ export class Bridge {
     // (not from its first second: the page warming up said "hardly answers" right after connecting)
     if (this.state !== 'ready' || this.recent.length < 4) return '';
     const r = this.recent.slice(-3), fps = r.reduce((n, x) => n + x.fps, 0) / 3, drops = r.reduce((n, x) => n + x.drops, 0);
-    return fps < 0.5 ? 'stalled' : (fps < 10 && drops >= 3) || fps < 2 ? 'slow' : '';
+    // (only with frames it had to skip: an idle show sends next to nothing and is fine, it was said
+    // to be "answering slowly")
+    if (drops < 3) return '';
+    return fps < 0.5 ? 'stalled' : fps < 10 ? 'slow' : '';
   }
   get sentRate() { const r = this.recent.slice(-3); return r.length ? r.reduce((n, x) => n + x.fps, 0) / r.length : 0; }
 

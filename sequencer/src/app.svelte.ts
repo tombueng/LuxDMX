@@ -13,7 +13,7 @@ import { curveOfPort, curveTable, isPixelType, onPort, onScreen, powerScale, WS2
 import { CELL_ATTRS, CELL_MOVES, type CellMove, type CellValues, type Channel, type Color, type NumAttr, type Cue, type CueList, type Effect, type Fixture, type Group, type FixtureMode, type FixtureType, type Page, type Preset, type PresetKind, type Resolved, type Show, type Values, type Widget } from './model/types';
 import { EFFECT_MAP, hsv, paramsOf } from './engine/effects';
 import { pictureOf } from './engine/custom';
-import { isGated, isHeld, isKinetic, isMachine, listRisk } from './model/safety';
+import { cueRisk, isGated, isHeld, isKinetic, isMachine, listRisk } from './model/safety';
 import { machines } from './ui/risk';
 import { addStandardPresets, standardPresets } from './content/presets';
 import { buskingPage, isMachineList } from './content/busking';
@@ -867,7 +867,7 @@ class App {
     const seen = this.otherSaves;
     try {
       await writeShow(this.metaOf(), text);
-      if (n === this.writes) { this.saved = true; this.saveFailed = false; }    // an older write finishing late doesn't count
+      if (n === this.writes) { this.saved = true; this.saveFailed = false; this.savedAt = Date.now(); }    // an older write finishing late doesn't count
       if (this.otherSaves === seen) this.otherNewer = false;    // (this one's is the newer now; the other tab hears so)
       this.channel?.postMessage({ saved: this.showId, tab: this.tabId, sum: textSum(text) });
       this.refreshShows();
@@ -884,6 +884,13 @@ class App {
     }
   }
   saveFailed = $state(false);
+  savedAt = 0;                      // when this show was last saved (the save stamps a copy, the show on screen keeps its old meta)
+  // the show for paper: with when it was really last saved (it said when it was opened)
+  private forPaper(): Show {
+    const s = $state.snapshot(this.show) as Show;
+    if (this.savedAt) s.meta = { ...s.meta, modified: new Date(this.savedAt).toISOString() };
+    return s;
+  }
   private saidSaveFailed = false;
   // The quick copy, labelled with its show. If it doesn't fit, there's no copy at all rather than an
   // old one (IndexedDB has the show either way).
@@ -1746,6 +1753,11 @@ class App {
           // (what it undid: the last change to the show, which may not be the last command)
           return { ok: true, said: this.stepSaid ? `Undone: ${this.stepSaid}` : 'Undone' };
         }
+        case 'redo': {
+          if (!this.canRedo) return { ok: false, said: 'Nothing to redo' };
+          this.redo();
+          return { ok: true, said: this.stepSaid ? `Redone: ${this.stepSaid}` : 'Redone' };
+        }
         case 'help': return { ok: true, said: 'Try: 5 @ full · 1 thru 4 @ 50 (one digit is tens: @ 5 is 50 %, @ 05 is 5 %) · 1 - 3 · group 2 @ out · 1.3 thru 1.8 · record cue 5 · goto cue 5 · update · next · clear · release all · undo' };
         case 'next': case 'prev': {
           this.stepSel(c.action === 'next' ? 1 : -1);
@@ -1837,7 +1849,14 @@ class App {
   // a fixture that's a machine (its own programs fire it): for telling machine lists from looks
   readonly isMachineFx = (fid: string) => isMachine(this.modeOf(fid));
   // (a list that fires machines, played while they aren't armed: said, so nothing firing isn't a surprise)
-  private safeNote(listId: string) { const r = listRisk(this.show, listId, machines(this.show)); return (r === 'hazard' || r === 'once') && !this.sfxArmed ? ' (safe, nothing fires: not armed)' : ''; }
+  // (about the cue it went to: every GO in a list with a confetti cue somewhere said "nothing fires",
+  // a verse with no machine in it too)
+  private safeNote(listId: string) {
+    if (this.sfxArmed) return '';
+    const l = this.show.cueLists.find((x) => x.id === listId), id = this.engine.status(listId).cue, c = l?.cues.find((x) => x.id === id);
+    const r = c ? cueRisk(this.show, c, undefined, machines(this.show)) : listRisk(this.show, listId, machines(this.show));
+    return r === 'hazard' || r === 'once' ? ' (safe, nothing fires: not armed)' : '';
+  }
   // (the cue on stage in the list Live plays, or in `in`)
   updateOnStage(inList?: CueList): { ok: boolean; said: string } {
     const l = inList ?? this.liveList, st = l ? this.engine.status(l.id) : undefined;
@@ -3212,14 +3231,14 @@ class App {
   printCueSheet(only?: string) {
     const w = window.open('', '_blank');
     if (!w) return false;
-    w.document.write(cueSheetHtml($state.snapshot(this.show) as Show, only));
+    w.document.write(cueSheetHtml(this.forPaper(), only));
     w.document.close();
     return true;
   }
   printPatch() {
     const w = window.open('', '_blank');
     if (!w) return false;
-    w.document.write(patchSheetHtml($state.snapshot(this.show) as Show));
+    w.document.write(patchSheetHtml(this.forPaper()));
     w.document.close();
     return true;
   }

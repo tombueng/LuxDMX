@@ -115,7 +115,8 @@
   {:else}
   <button class="show" onclick={() => (ui.modal = 'shows')} title="Your shows: open, new, duplicate, templates">
     <Icon name="folder" /><span class="name">{app.show.meta.name || 'Untitled'}</span>
-    <span class="saved" class:dirty={!app.saved} class:failed={app.saveFailed} title={app.saveFailed ? "This browser isn't keeping the show (its storage is full or blocked): save it as a file" : app.saved ? 'Saved in this browser' : 'Saving…'}>{app.saveFailed ? 'not saved' : app.saved ? 'saved' : '…'}</span>
+    <!-- (not "saved" next to "changed in another tab": that one says which copy is behind) -->
+    {#if !app.otherNewer || app.saveFailed}<span class="saved" class:dirty={!app.saved} class:failed={app.saveFailed} title={app.saveFailed ? "This browser isn't keeping the show (its storage is full or blocked): save it as a file" : app.saved ? 'Saved in this browser' : 'Saving…'}>{app.saveFailed ? 'not saved' : app.saved ? 'saved' : '…'}</span>{/if}
   </button>
 
   <!-- (the other tab's save is newer: a tap takes its version; a change here would save over it) -->
@@ -200,7 +201,7 @@
   .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; white-space: nowrap; } .brand span { color: var(--green); }
   .alpha { font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1000; background: var(--orange); border-radius: 4px; padding: .05rem .3rem; vertical-align: .2em; }
   .show { background: none; border-color: transparent; max-width: 280px; min-width: 4.5rem; flex-shrink: 1 !important; overflow: hidden; }
-  .show .name { overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
+  .show .name { overflow: hidden; text-overflow: ellipsis; font-weight: 650; min-width: 2.6em; }   /* (a chip beside it squeezed it to nothing) */
   .lockedname { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .6rem; color: var(--orange); }
   .lockedname .name { color: var(--text); }
   /* (as wide saving as saved: the bar doesn't jump every time the show is saved) */
@@ -296,6 +297,7 @@
        the same colour to someone red-green blind; Blind and Safe stay just their icons) */
     .out.onair .short, .arm.armed .txt { display: inline; font-size: .78rem; font-weight: 700; }
     .top > .out.onair, .top > .arm.armed, .top > :global(.arm.armed) { flex-shrink: 0; }   /* (the show's name gives way, not these words) */
+    .gms { display: inline-block; max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }   /* (cut at its end: squeezed it read "shes 4") */
     .out, .arm { padding: .3rem .45rem; }
     .toolbar { flex-wrap: nowrap; }
     .toolbar :global(button[aria-label="Undo"]), .toolbar :global(button[aria-label="Redo"]), .toolbar :global(button[aria-label="Explanations"]),

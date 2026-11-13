@@ -544,7 +544,8 @@
     {#if showStage}<div class="stagebox">{#if shown || ui.stage3d}<StageView compact readonly blindChip={false} />{/if}</div>{/if}
     <div class="grid" style="--tile:{tile}px" role="list">
       <!-- (a new show's page has only its masters: nothing said where the buttons would come from) -->
-      {#if built && page?.widgets.length && !playable && !app.editPage && !app.locked}
+      <!-- (and only when the show has cues: with none the GO bar above already says what to do, it asked three times) -->
+      {#if built && page?.widgets.length && !playable && !app.editPage && !app.locked && app.show.cueLists.some((l) => l.cues.length)}
         <div class="empty">Nothing to play yet: your cues, effects and machines get their buttons here once you make them in Program.
           <button class="ghost link" onclick={() => (app.view = 'program')}>Go to Program</button></div>
       {/if}
