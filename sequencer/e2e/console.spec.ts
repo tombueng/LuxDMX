@@ -420,3 +420,14 @@ test.describe('the console on a laptop', () => {
     await expect(strips.first().getByRole('button', { name: /^GO / })).toBeInViewport({ ratio: 1 });
   });
 });
+
+test('the console\'s add switch says what it does, and is the stage\'s too; Thru and Full read like the other words', async ({ page }) => {
+  await rig(page);
+  const add = view(page).getByRole('button', { name: '+ Add to selection' });
+  await expect(add).toHaveAttribute('aria-pressed', 'false');
+  await add.click();
+  await expect(add).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(async () => (await import('/src/ui/ui.svelte.ts')).ui.addSel)).toBe(true);
+  await expect(view(page).locator('.pad').getByRole('button', { name: /^thru$/i })).toHaveText('Thru');
+  await expect(view(page).locator('.pad').getByRole('button', { name: /^full$/i })).toHaveText('Full');
+});

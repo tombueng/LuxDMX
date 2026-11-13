@@ -98,7 +98,8 @@
   }
   $effect(() => () => learnMidi(null));
   // (Add: a tap adds to the selection or takes out, as Shift does with a mouse; a finger has no Shift)
-  let addMode = $state(false);
+  // (the same switch as the stage's + Add on a touch screen: one way to add to the selection)
+  const addMode = $derived(ui.addSel);
   function pick(ids: string[], e: MouseEvent) {
     if (e.shiftKey || e.ctrlKey || e.metaKey || addMode) app.selected = isSel(ids) ? app.selected.filter((x) => !ids.includes(x)) : [...new Set([...app.selected, ...ids])];
     else app.selected = [...ids];
@@ -261,7 +262,8 @@
     </div>
     <p class="said" class:bad role="status" aria-live="polite">{said || `${app.selected.length} selected${changed ? `, ${changed} changed` : ''}`}</p>
     <div class="pad" aria-label="Keypad">
-      {#each keypad as k (k)}<button onclick={() => press(k)} aria-label={KEY_NAME[k]}>{k}</button>{/each}
+      <!-- (Thru and Full written as the other words on the pad are, Group, Enter; typed lowercase) -->
+      {#each keypad as k (k)}<button onclick={() => press(k)} aria-label={KEY_NAME[k]}>{k === 'thru' ? 'Thru' : k === 'full' ? 'Full' : k}</button>{/each}
       <button onclick={rubOut} aria-label="Rub out the last" title="Rub out the last digit or word">⌫</button>
       <button onclick={() => { cmd = ''; said = ''; }} aria-label="Empty the command line" title="Empty the command line">Esc</button>
       <button class="wide" onclick={() => press('group')}>Group</button>
@@ -326,7 +328,7 @@
         <button role="radio" aria-checked={mode === 'groups'} class:on={mode === 'groups'} onclick={() => { mode = 'groups'; bank = 0; }}>Groups</button>
       </div>
       <div class="seg">
-        <button class:on={addMode} aria-pressed={addMode} onclick={() => (addMode = !addMode)} title="A tap on a strip's name adds it to the selection or takes it out (Shift-click does the same)">Add</button>
+        <button class:on={addMode} aria-pressed={addMode} onclick={() => (ui.addSel = !ui.addSel)} title="A tap on a strip's name adds it to the selection or takes it out (Shift-click does the same)">+ Add to selection</button>
         {#if midiSupported()}<button class:on={midiMode} aria-pressed={midiMode} onclick={midiOnOff} title="Put faders on a MIDI controller: then a fader's MIDI button, then move a fader or knob on the controller">MIDI</button>{/if}
       </div>
       {#if banks > 1}<span class="faint">{bank * PER + 1}–{Math.min(strips.length, bank * PER + PER)} of {strips.length}</span>
