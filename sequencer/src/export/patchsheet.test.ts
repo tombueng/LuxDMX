@@ -19,7 +19,7 @@ describe('patch sheet', () => {
     const html = patchSheetHtml(s);
     expect(html.indexOf('Wash 1')).toBeLessThan(html.indexOf('Wash 2'));
     expect(html).toContain('4<span>–6</span>');
-    expect(html).toMatch(/–6<\/span>.*<span class="c">3<\/span>/s);   // address 4 = switch 3 alone
+    expect(html).toMatch(/–6<\/span>.*<span class="c sw">3<\/span>/s);   // address 4 = switch 3 alone (kept on one line)
     expect(html).toContain('aria-label="DIP switches for 4"');
   });
 });

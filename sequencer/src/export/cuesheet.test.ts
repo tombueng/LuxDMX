@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cueSheetCsv, cueSheetHtml } from './cuesheet';
+import { cueSheetCsv, cueSheetHtml, runs } from './cuesheet';
 import { emptyShow } from '../model/format';
 
 describe('the cue sheet', () => {
@@ -13,9 +13,9 @@ describe('the cue sheet', () => {
     { id: 'show', name: 'Show', end: 'stop', cues: [{ id: 'c1', name: 'Preset', values: { f1: { intensity: 0.3 } }, fade: 2, advance: { mode: 'manual' } }] },
     { id: 'play', name: 'The Play', end: 'stop', cues: [{ id: 'p1', name: 'Dawn', values: { f1: { intensity: 0.5 }, f2: { intensity: 0.5 }, b1: { intensity: 1 } }, fade: 3, advance: { mode: 'manual' } }] },
   ];
-  it('says each light\'s level, by level ("Front 1, Front 2 @ 50 %")', () => {
+  it('says each light\'s level, by level ("Front 1, 2 @ 50 %")', () => {
     const html = cueSheetHtml(s);
-    expect(html).toContain('Front 1, Front 2 @ 50 % · Back 1 @ full');
+    expect(html).toContain('Front 1, 2 @ 50 % · Back 1 @ full');
   });
   it('one list only, from its own menu', () => {
     const html = cueSheetHtml(s, 'play');
@@ -29,5 +29,16 @@ describe('the cue sheet', () => {
     expect(de[0]).toBe('List;Cue;Name;Fade (s);Delay (s);Fade out (s);Then;Lights;Effects;Also;Note');
     expect(de[1].startsWith('Show;1;"Größe; Übung";2,5;1;;')).toBe(true);
     expect(cueSheetCsv(t).split('\r\n')[1].startsWith('Show,1,Größe; Übung,2.5,1,,')).toBe(true);
+  });
+  it('names lights in runs on paper, and past a dozen, how many more (the festival was 62 pages for 67 cues)', () => {
+    expect(runs(['Boom 1', 'Boom 2', 'Boom 3', 'Boom 4', 'Spot 2', 'Hazer'])).toBe('Boom 1–4, Spot 2, Hazer');
+    expect(runs(['Par 1', 'Par 3', 'Par 4', 'Par 5', 'Par 9'])).toBe('Par 1, 3–5, 9');
+    expect(runs(Array.from({ length: 14 }, (_, i) => `Light ${String.fromCharCode(65 + i)}`))).toMatch(/and 4 more$/);
+  });
+  it('wraps every cell, keeps a heading with its table, numbers the pages with the show on each', () => {
+    const html = cueSheetHtml(s);
+    expect(html).toContain('overflow-wrap: anywhere');
+    expect(html).toContain('break-after: avoid');
+    expect(html).toMatch(/@bottom-right \{ content: "page " counter\(page\)/);
   });
 });
