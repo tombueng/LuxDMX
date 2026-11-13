@@ -292,7 +292,8 @@
       for (const t of tries) {
         const x0 = t.anchor === 'middle' ? t.x - half : t.anchor === 'start' ? t.x : t.x - 2 * half, x1 = x0 + 2 * half;
         const b: Box = { x0, x1, y0: t.y - fs * 0.9, y1: t.y + fs * 0.3, id: `label:${f.id}` };
-        if (x0 >= 0 && x1 <= W && !hits(b, f.id)) { at = t; put(b); break; }
+        // (inside the plan both ways: a name over a light in the back row stuck out of the top)
+        if (x0 >= 0 && x1 <= W && b.y0 >= -H * EDGE && b.y1 <= H * (1 + EDGE) && !hits(b, f.id)) { at = t; put(b); break; }
       }
       out.set(f.id, at ?? (sel.has(f.id) ? tries[0] : null));
     }
@@ -333,7 +334,8 @@
       <button class="ghost" class:on={addrs} onclick={() => (addrs = !addrs)} title="Show each light's number (what the console goes by) and DMX address" aria-label="Numbers and DMX addresses" aria-pressed={addrs}>#</button>
       <span class="sep"></span>
       <button class="ghost" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="plus" size={14} /></button>
-      <button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} disabled={view.k === 1} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>
+      <!-- (only while zoomed in: a greyed-out "100%" took a toolbar row of its own on a laptop) -->
+      {#if view.k > 1}<button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>{/if}
       {/if}
     </div>
     {/if}

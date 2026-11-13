@@ -181,17 +181,20 @@ test('the stage zooms with the wheel and fits again', async ({ page }) => {
   await patch(page, 'gen-rgb', 4, 0, 'P');
   const svg = page.locator('.stage-wrap svg[aria-label="Stage"]');
   const fit = page.locator('.stage-wrap').getByRole('button', { name: 'Fit the stage' });
-  await expect(fit).toHaveText('100%');
+  await expect(fit).toHaveCount(0);                    // (nothing to fit at 100 %: no button taking room)
+  const whole = await svg.getAttribute('viewBox');
   const b = (await svg.boundingBox())!;
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.wheel(0, -400);
+  await expect(fit).toHaveText(/^\d+%$/);
   await expect(fit).not.toHaveText('100%');
   expect(await svg.getAttribute('viewBox')).not.toBe('0.0 0.0 1000.0 560.0');
   // selecting by clicking still hits the right light when zoomed
   await page.locator('.stage-wrap .fx[data-name="P 2"]').click();
   await expect(page.locator('.fl li.oitem.sel .nm')).toHaveText(['P 2']);
   await fit.click();
-  await expect(fit).toHaveText('100%');
+  await expect(fit).toHaveCount(0);
+  expect(await svg.getAttribute('viewBox')).toBe(whole);
 });
 
 test('cue names: double-click renames, new cues are named after their presets', async ({ page }) => {

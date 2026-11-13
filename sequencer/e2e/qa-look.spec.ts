@@ -260,3 +260,25 @@ test('a programmer chip clicked stays lit after its scroll, even for a part that
   await page.waitForTimeout(900);
   await expect(chips.getByRole('button', { name: 'Colour' })).toHaveAttribute('aria-current', 'true');
 });
+
+test.describe('the 2D plan on a laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('every name shown stays inside the plan (the back row\'s too), and the toolbar keeps one row', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
+    const stage = page.locator('.stage-wrap');
+    if (await stage.getByRole('button', { name: '2D', exact: true }).isVisible()) await stage.getByRole('button', { name: '2D', exact: true }).click();
+    const svg = stage.locator('svg[aria-label="Stage"]');
+    await expect(svg).toBeVisible();
+    await page.waitForTimeout(500);
+    const out = await svg.evaluate((s) => {
+      const r = s.getBoundingClientRect();
+      return [...s.querySelectorAll('text')].filter((t) => { const b = t.getBoundingClientRect(); return b.width > 0 && (b.top < r.top - 0.5 || b.bottom > r.bottom + 0.5 || b.left < r.left - 0.5 || b.right > r.right + 0.5); }).map((t) => t.textContent);
+    });
+    expect(out).toEqual([]);
+    const tops = await stage.locator('.head button:visible').evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top / 8))).size);
+    expect(tops).toBeLessThanOrEqual(2);                                   // (the title row and one row of tools)
+  });
+});
