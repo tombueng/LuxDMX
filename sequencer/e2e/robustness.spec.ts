@@ -28,7 +28,7 @@ test('deleting the show that is open deletes it', async ({ page }) => {
   const m = page.getByRole('dialog', { name: 'Shows' });
   await m.locator('.tpl').filter({ hasText: 'Church' }).click();
   await page.locator('.top .show').click();
-  await expect(m.locator('.card')).toHaveCount(2);
+  await expect(m.locator('.card')).toHaveCount(1);         // (the empty first show went when the template opened)
   await m.getByRole('button', { name: 'Delete Sunday service' }).click();
   await page.getByRole('dialog', { name: 'Delete "Sunday service"?' }).getByRole('button', { name: 'Delete' }).click();
   await expect(m.locator('.card .title', { hasText: 'Sunday service' })).toHaveCount(0);
