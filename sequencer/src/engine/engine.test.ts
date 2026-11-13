@@ -320,6 +320,18 @@ describe('cue lists', () => {
     expect(steps).toBeLessThanOrEqual(120);
   });
 
+  it('an effect started on the song\'s beat is there at once; by hand it fades in', () => {
+    const r = rig([fx('a', 'gen-dimmer', 1)]);
+    r.show.effects = [{ id: 'e', name: 'e', kind: 'pulse', target: { fixtures: ['a'] }, params: {} } as never];
+    out(r, 1);
+    r.e.startEffect('e', 0);
+    const w = (r.e as unknown as { liveWeight: (id: string) => number }).liveWeight.bind(r.e);
+    expect(w('e')).toBe(1);
+    r.e.stopEffect('e', 0); out(r, 2);
+    r.e.startEffect('e');
+    expect(w('e')).toBeLessThan(0.1);
+  });
+
   it('a cue can start and release other lists', () => {
     const r = rig([fx('a', 'gen-dimmer', 1), fx('b', 'gen-dimmer', 2)], [
       list('house', [cue({ a: { intensity: 0.1 } }, 0, { actions: [{ do: 'start', list: 'pre' }] })]),

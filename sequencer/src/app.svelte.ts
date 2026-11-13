@@ -3235,7 +3235,8 @@ class App {
   }
   // ---- the timeline (timeline/player.svelte.ts plays the song and calls these on its clock)
   doTimeline(a: TimelineAction, _catchUp: boolean) {
-    if (a.do === 'effect') { if (a.on) this.engine.startEffect(a.effect); else this.engine.stopEffect(a.effect); this.liveFx = this.engine.liveEffects(); return; }
+    // (on the song's beat: at once, not faded in over 0.4 s as by hand, its first beat came in soft and late)
+    if (a.do === 'effect') { if (a.on) this.engine.startEffect(a.effect, 0); else this.engine.stopEffect(a.effect, 0.1); this.liveFx = this.engine.liveEffects(); return; }
     if (a.do === 'burst') { this.burst(a.attr, a.seconds); return; }
     if (a.do === 'goto' || a.do === 'start' || a.do === 'go') this.played(a.list);
     this.engine.act(a);

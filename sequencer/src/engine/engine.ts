@@ -255,7 +255,7 @@ export class Engine {
   forget(id?: string) { if (id) this.players.delete(id); else this.players.clear(); }
 
   // ---- effects started by hand (the Effects panel, live buttons)
-  startEffect(id: string) { this.liveFx.set(id, { from: this.liveWeight(id), to: 1, start: this.now(), dur: FX_FADE }); }
+  startEffect(id: string, fade = FX_FADE) { this.liveFx.set(id, { from: this.liveWeight(id), to: 1, start: this.now(), dur: fade }); }
   stopEffect(id: string, fade = FX_FADE) {
     if (this.liveFx.has(id)) this.liveFx.set(id, { from: this.liveWeight(id), to: 0, start: this.now(), dur: fade });
   }
