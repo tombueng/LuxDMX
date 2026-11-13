@@ -265,7 +265,7 @@ export type Widget = WidgetBase & (
   | { type: 'list'; list: string; action: ListAction }                  // a cue list button
   | { type: 'cue'; list: string; cue: string }                          // go straight to one cue
   | { type: 'effect'; effect: string; action: 'toggle' | 'flash' }
-  | { type: 'fader'; target: 'grand' | 'list' | 'effect' | 'bpm'; ref?: string }
+  | { type: 'fader'; target: 'grand' | 'list' | 'effect' | 'group' | 'bpm'; ref?: string }
   | { type: 'fog'; fixtures: string[]; level: number; burst: number; max: number }   // seconds
   | { type: 'group'; group: string; level: number; strobe?: number; white?: boolean }    // flash a group while held (white: a blinder)
   | { type: 'special'; do: 'blackout' | 'releaseAll' | 'tap' | 'stopEffects' | 'blinder' | 'drop' | 'fadeOut'; seconds?: number }   // seconds: fadeOut's time (5)

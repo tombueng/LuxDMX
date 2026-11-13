@@ -2423,6 +2423,8 @@ class App {
     // Like a file manager: the selection moves on to what's now in that place.
     const next = l.cues[Math.min(first, l.cues.length - 1)];
     this.cueSel = first >= 0 && next ? [next.id] : [];
+    // (what played them goes too, and is said: the Live buttons for them stayed as "(missing)")
+    return this.prune();
   }
   // Re-record a cue: the programmer's fixtures, with their current look, replace what the cue had
   // for them. Everything else in the cue stays.
@@ -2774,7 +2776,8 @@ class App {
   // On a page locked for the service the masters are out of reach: a slip of the thumb mustn't take
   // the room dark or stop the show (Blackout: holding the one at the top).
   lockedOut(w: Widget) {
-    return this.locked && ((w.type === 'fader' && (w.target === 'grand' || w.target === 'list' || w.target === 'bpm'))
+    // (every level fader alike: an effect's went on working while a list's was greyed)
+    return this.locked && ((w.type === 'fader' && (w.target === 'grand' || w.target === 'list' || w.target === 'bpm' || w.target === 'effect' || w.target === 'group'))
       || (w.type === 'special' && (w.do === 'fadeOut' || w.do === 'releaseAll' || w.do === 'tap' || w.do === 'blackout')));
   }
   fireWidget(w: Widget, down: boolean) {
@@ -2984,6 +2987,7 @@ class App {
     else if (w.target === 'bpm') this.show.settings.bpm = Math.round(40 + v * 160);
     else if (w.target === 'list' && w.ref) this.setMaster(w.ref, v);
     else if (w.target === 'effect') { const fx = this.show.effects.find((e) => e.id === w.ref); if (fx) fx.params = { ...fx.params, level: v }; }
+    else if (w.target === 'group' && w.ref) this.groupMasters = { ...this.groupMasters, [w.ref]: v };
   }
 
   // Held buttons (flash, fog) put values on the live layer: on top of everything, never recorded,

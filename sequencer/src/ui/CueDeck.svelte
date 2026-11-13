@@ -66,7 +66,7 @@
   const cut = async () => { const n = await app.cutCues(); if (n) ui.toast(`Cut ${n} cue${n > 1 ? 's' : ''}`); };
   const paste = async () => { const n = await app.pasteCues(); ui.toast(n ? `Pasted ${n} cue${n > 1 ? 's' : ''}${app.cuePasteNote ? `. ${app.cuePasteNote}.` : ''}` : 'Nothing to paste', app.cuePasteNote ? 8000 : undefined); };
   const dup = async () => { await app.duplicateCues(); };
-  const del = () => { const n = app.cueSel.length; if (n) { app.deleteCues(); ui.toast(`Deleted ${n} cue${n > 1 ? 's' : ''} (Ctrl+Z brings ${n > 1 ? 'them' : 'it'} back)`); } };
+  const del = () => { const n = app.cueSel.length; if (n) { const also = app.deleteCues(); ui.toast(`Deleted ${n} cue${n > 1 ? 's' : ''}${also ? ` and what played ${n > 1 ? 'them' : 'it'}: ${also}` : ''} (Ctrl+Z brings ${n > 1 ? 'them' : 'it'} back)`, also ? 6000 : undefined); } };
 
   function click(e: MouseEvent, id: string) {
     app.selectCue(id, e.shiftKey ? 'range' : e.ctrlKey || e.metaKey ? 'toggle' : 'only');

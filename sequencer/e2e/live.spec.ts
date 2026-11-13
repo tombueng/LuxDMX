@@ -486,3 +486,51 @@ test('a page made your own says what is new in the show, and adds it in one tap 
   await page.keyboard.press('Control+z');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.pages[0].widgets.length)).toBe(n);
 });
+
+// Building your own page (from round 16 of the QA): a group's level as a fader, a key pressed is the
+// key (and a clash said), Alt+Down a row, a deleted cue's buttons go with it and are said, and on a
+// phone Edit and the padlock stay on the screen.
+test('building a page: a group fader, keys that replace and clash, Alt+Down a row, a deleted cue\'s buttons, phone controls', async ({ page }) => {
+  await djShow(page);
+  await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.locator('.live .cell').first().click();
+  await page.locator('.live').getByRole('button', { name: 'Add', exact: true }).click();
+  await page.locator('.ctx').getByRole('menuitem', { name: /Fader/ }).first().click();
+  const ed = page.getByRole('complementary', { name: 'Control settings' });
+  const g = await page.evaluate(() => (window as any).__luxdmx.show.groups[0]);
+  await ed.getByLabel('Fader target').selectOption(`group:${g.id}`);
+  const fader = page.locator('.live .cell').nth(1);
+  await expect(fader).toContainText(g.name);
+  await page.evaluate((gid) => { const a = (window as any).__luxdmx; const w = a.show.pages.flatMap((p: any) => p.widgets).find((x: any) => x.type === 'fader' && x.ref === gid); a.setFader(w, 0.4); }, g.id);
+  expect(await page.evaluate((gid) => (window as any).__luxdmx.groupMasters[gid], g.id)).toBe(0.4);
+  // the key: pressed, it's the key; B is said to be Blackout's
+  const key = ed.getByLabel('Keyboard key');
+  await key.click(); await page.keyboard.press('k');
+  await expect(key).toHaveValue('k');
+  await key.click(); await page.keyboard.press('w');
+  await expect(key).toHaveValue('w');                                          // (it took nothing until Backspace)
+  await key.click(); await page.keyboard.press('b');
+  await expect(ed.locator('.clash')).toContainText('Blackout');
+  await page.keyboard.press('Escape');
+  // Alt+Down: a row, as many places as there are columns
+  const cols = await page.locator('.live .grid').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  const ids = () => page.evaluate(() => { const a = (window as any).__luxdmx; return a.show.pages.find((p: any) => p.id === (a.page || a.pages[0].id))?.widgets.map((w: any) => w.id) ?? a.pages[0].widgets.map((w: any) => w.id); });
+  const before = await ids();
+  await page.locator('.live .cell').first().locator('button, [role="button"], [role="slider"]').first().focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  const after = await ids();
+  expect(after.indexOf(before[0])).toBe(Math.min(cols, before.length - 1));
+  await page.locator('.live').getByRole('button', { name: 'Done', exact: true }).click();
+  // a cue deleted in Program: its buttons go with it, said
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  await page.locator('.deck .card').first().click();
+  await page.locator('.deck .cards').press('Delete');
+  await expect(page.locator('.toast')).toContainText(/what played it: \d+ button/);
+  // a phone: Edit and the padlock on the screen
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const name of ['Edit']) {
+    const b = (await page.locator('.live').getByRole('button', { name, exact: true }).boundingBox())!;
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+  }
+});

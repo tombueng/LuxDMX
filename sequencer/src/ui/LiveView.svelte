@@ -269,7 +269,7 @@
       { label: 'Move left', icon: 'left', disabled: pages.findIndex((x) => x.id === id) < 1, run: () => movePage(id, -1) },
       { label: 'Move right', icon: 'right', disabled: pages.findIndex((x) => x.id === id) >= pages.length - 1, run: () => movePage(id, 1) },
       { label: fresh.length ? `Add what's new from the show (${fresh.length})` : "Nothing new in the show for it", icon: 'plus', disabled: !fresh.length, run: addNew },
-      { label: 'Rebuild from the show…', icon: 'update', disabled: !app.show.pages.length, run: async () => {
+      { label: 'Rebuild all pages from the show…', icon: 'update', disabled: !app.show.pages.length, run: async () => {
         if (!(await ui.confirm('Rebuild the pages?', 'Your pages are replaced by one built from the show (your own buttons, keys and MIDI go). Undo brings them back.', 'Rebuild', false))) return;
         const lock = app.show.pages.some((x) => x.locked);
         app.checkpoint(); app.show.pages = []; app.page = ''; app.editPage = false;
@@ -299,14 +299,19 @@
     app.markDirty(0);
   }
   // one place earlier or later (the menu, Alt+arrows); the focus stays on it
+  // (Alt+Up and Alt+Down: a row, as many places as the grid has columns; they went one place, like left and right)
+  const gridCols = () => { const g = document.querySelector('.live .grid'); return g ? Math.max(1, getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length) : 1; };
   function moveBy(id: string, by: number) {
     app.ownPages();
     const p = app.show.pages.find((x) => x.id === page.id);
-    const i = p?.widgets.findIndex((x) => x.id === id) ?? -1, j = i + by;
-    if (!p || i < 0 || j < 0 || j >= p.widgets.length) return;
+    const i = p?.widgets.findIndex((x) => x.id === id) ?? -1;
+    if (!p || i < 0) return;
+    const j = Math.max(0, Math.min(p.widgets.length - 1, i + by));
+    if (j === i) return;
     app.checkpoint();
     const list = [...p.widgets];
-    [list[i], list[j]] = [list[j], list[i]];
+    const [it] = list.splice(i, 1);
+    list.splice(j, 0, it);
     p.widgets = list;
     app.markDirty(0);
     queueMicrotask(() => document.querySelector<HTMLElement>(`.live .grid [data-widget="${CSS.escape(id)}"]`)?.focus());
@@ -548,7 +553,7 @@
         <div class="cell" class:wide={w.size === 2} class:full={w.type === 'label' || w.type === 'cuelist'} class:drop={dropAt === w.id} class:dragging={drag === w.id} role="listitem" data-w={w.id}
              draggable={app.editPage} ondragstart={() => (drag = w.id)} ondragover={(e) => { if (drag) { e.preventDefault(); dropAt = w.id; } }}
              ondrop={(e) => drop(e, w.id)} ondragend={() => { drag = null; dropAt = null; }}
-             onkeydown={(e) => { if (app.editPage && e.altKey && /^Arrow/.test(e.key)) { e.preventDefault(); moveBy(w.id, e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1); } }}>
+             onkeydown={(e) => { if (app.editPage && e.altKey && /^Arrow/.test(e.key)) { e.preventDefault(); moveBy(w.id, e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : (e.key === 'ArrowUp' ? -1 : 1) * gridCols()); } }}>
           <WidgetTile {w} {manyLists} editing={app.editPage} selected={selW === w.id} onselect={(e) => pick(w.id, e)} onmenu={(e) => tileMenu(e, w)} />
           {#if app.editPage}<span class="grip" onpointerdown={(e) => gridGrip(e, w.id)} aria-hidden="true" title="Drag to move"><Icon name="grip" size={14} /></span>{/if}
         </div>
@@ -608,10 +613,12 @@
   .cell :global(.tile) { min-height: calc(var(--tile) * .72); }
   .empty { grid-column: 1 / -1; color: var(--muted); padding: 2rem; text-align: center; border: 1px dashed var(--line2); border-radius: var(--radius); }
   /* phones: the controls above the buttons in one row that scrolls sideways, no button-size slider */
+  /* (the page tabs scroll on their own and the controls stay: when the whole row scrolled, Lock and
+     Edit were past the edge with nothing to say so) */
   @media (max-width: 700px) {
-    .bar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .bar { flex-wrap: nowrap; }
     .bar > :global(*) { flex: none; }             /* nothing squeezed under its neighbour */
-    .pages { flex-wrap: nowrap; }
+    .bar > .pages { flex: 1 1 auto; min-width: 3rem; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
     .bar .zoom { display: none; }
     /* the bar scrolls: the hold-to-unlock line goes along the top of the screen instead */
     .bar.unlocking::after { position: fixed; top: 0; bottom: auto; z-index: 50; }

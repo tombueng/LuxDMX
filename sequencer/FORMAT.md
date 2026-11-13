@@ -766,7 +766,7 @@ presses a button, a control moves a fader). By `type`:
 | `list` | `list`, `action` | `go`, `back`, `toggle`, `flash` (on while held), `release`, `solo` (start it, release the other lists that aren't `high` priority), `select` (GO and Space play this list from now on: a song in a set list) |
 | `cue` | `list`, `cue` | go straight to that cue |
 | `effect` | `effect`, `action` | `toggle` or `flash` an effect by hand |
-| `fader` | `target`, `ref` | `grand` master, `bpm`, `list` level or `effect` level (`ref` is its id) |
+| `fader` | `target`, `ref` | `grand` master, `bpm`, `list` level, `effect` level or `group` level (`ref` is its id) |
 | `fog` | `fixtures`, `level`, `burst`, `max` | fog while held, switched off after `max` seconds even if still held |
 | `group` | `group`, `level`, `strobe`, `white` | flash a group while held (optionally strobing; `white`: full white, a blinder) |
 | `cuelist` | `list` | the whole list as rows (number, name, fade, what follows, note), the cue on stage lit; holding a row jumps to it |

@@ -880,7 +880,7 @@ Three more demos come with their own room on the 3D stage:
   in this browser. The same menu has **Hide the hints** (the little blue notes at the top of the
   panels) and brings them back.
 - **The live page's own controls** (top right of Live): **Button size**, **Stage** (the 2D/3D stage
-  next to the buttons, or not), **Full screen**. A page's tab menu also has **Rebuild from the show…**
+  next to the buttons, or not), **Full screen**. A page's tab menu also has **Rebuild all pages from the show…**
   for a generated page that should start over from what's in the show now.
 - **Your layout**: drag the gaps between the panels to make the lists, the programmer or the cues
   bigger (double-click a gap for the normal size, or focus it and use the arrows). Remembered in

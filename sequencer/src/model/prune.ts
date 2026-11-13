@@ -32,7 +32,7 @@ export function prune(s: Show, can: (attr: string) => boolean = () => true): Pru
       case 'cue': return !!lists.get(w.list)?.cues.some((c) => c.id === w.cue);
       case 'effect': return effects.has(w.effect);
       case 'group': return groups.has(w.group);
-      case 'fader': return w.target === 'list' ? lists.has(w.ref ?? '') : w.target === 'effect' ? effects.has(w.ref ?? '') : true;
+      case 'fader': return w.target === 'list' ? lists.has(w.ref ?? '') : w.target === 'effect' ? effects.has(w.ref ?? '') : w.target === 'group' ? groups.has(w.ref ?? '') : true;
       case 'fog': return w.fixtures.some((id) => fixtures.has(id));
       default: return true;
     }

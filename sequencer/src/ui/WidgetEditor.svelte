@@ -16,6 +16,24 @@
     ['release', 'Fade out'], ['solo', 'Solo: start it, fade the others out'], ['select', 'Make GO play it (set list)'],
   ];
   const listOf = (id: string) => app.show.cueLists.find((l) => l.id === id);
+  // the page's own keys: Space is GO, B Blackout (unless a button takes B); the others' keys
+  const RESERVED: Record<string, string> = { ' ': 'GO (Space)', b: 'Blackout (B)' };
+  function setKey(v: string) {
+    const k = v.slice(-1).toLowerCase();
+    if (k) w.key = k; else delete w.key;
+    app.markDirty(0);
+  }
+  function keyDown(e: KeyboardEvent) {
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setKey(e.key === ' ' ? '' : e.key); (e.target as HTMLInputElement).value = w.key ?? ''; }
+    else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); setKey(''); (e.target as HTMLInputElement).value = ''; }
+  }
+  const clash = $derived.by(() => {
+    const k = w?.key?.toLowerCase();
+    if (!k) return '';
+    const other = app.show.pages.find((p) => p.id === page)?.widgets.find((x) => x.id !== id && x.key?.toLowerCase() === k);
+    if (other) return `${k.toUpperCase()} is also ${other.label || 'another button'}'s key here: the first one wins.`;
+    return RESERVED[k] ? `${k.toUpperCase()} is ${RESERVED[k]} on this page; this button takes it over.` : '';
+  });
   let learning = $state(false);
   async function learn() {
     try { await enableMidi(); } catch (e) { ui.toast((e as Error).message); return; }
@@ -44,13 +62,15 @@
     <label>Effect <select bind:value={w.effect} aria-label="Effect">{#each app.show.effects as e (e.id)}<option value={e.id}>{e.name}</option>{/each}</select></label>
     <label>Does <select bind:value={w.action} aria-label="Action"><option value="toggle">On / off</option><option value="flash">Flash while held</option></select></label>
   {:else if w.type === 'fader'}
-    <label>Controls <select value={w.target === 'list' || w.target === 'effect' ? `${w.target}:${w.ref}` : w.target} aria-label="Fader target" onchange={(e) => {
+    <label>Controls <select value={w.target === 'list' || w.target === 'effect' || w.target === 'group' ? `${w.target}:${w.ref}` : w.target} aria-label="Fader target" onchange={(e) => {
       const [t, ref] = (e.target as HTMLSelectElement).value.split(':');
       w.target = t as typeof w.target; w.ref = ref;
     }}>
       <option value="grand">Grand master</option><option value="bpm">Tempo</option>
       <optgroup label="Cue list level">{#each app.show.cueLists as l (l.id)}<option value="list:{l.id}">{l.name}</option>{/each}</optgroup>
       <optgroup label="Effect level">{#each app.show.effects as e (e.id)}<option value="effect:{e.id}">{e.name}</option>{/each}</optgroup>
+      <!-- (a group's level: the dance floor, the shelves; the first fader a bar owner reaches for, and it wasn't there) -->
+      {#if app.show.groups.length}<optgroup label="Group level">{#each app.show.groups as g (g.id)}<option value="group:{g.id}">{g.name}</option>{/each}</optgroup>{/if}
     </select></label>
   {:else if w.type === 'fog'}
     <p class="faint">Fog only runs while the button is held, and switches off after the maximum even if it's still held.</p>
@@ -91,7 +111,10 @@
 
   {#if w.type !== 'label'}
     <div class="two">
-      <label>Key <input maxlength="1" bind:value={w.key} placeholder="none" aria-label="Keyboard key" /></label>
+      <!-- (a key pressed in the field is the key, replacing the one there: it took nothing until
+           Backspace; and one another button or the page's own keys use is said) -->
+      <label>Key <input maxlength="1" value={w.key ?? ''} placeholder="none" aria-label="Keyboard key" onkeydown={keyDown} oninput={(e) => setKey((e.target as HTMLInputElement).value)} /></label>
+      {#if clash}<span class="clash" role="status">{clash}</span>{/if}
       <label title="The button's own colour on this page (not the lights')">Button colour <input type="color" value={w.color ?? '#45d85c'} oninput={(e) => (w.color = (e.target as HTMLInputElement).value)} aria-label="Colour" /></label>
     </div>
     <div class="midi">
@@ -119,4 +142,5 @@
   .learn { color: var(--orange); font-size: .82rem; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
   @media (max-width: 900px) { .we { width: auto; } }
+  .clash { color: var(--orange); font-size: .8rem; }
 </style>
