@@ -860,7 +860,8 @@
   /* the time before and after the song: two small fields under the song */
   .around { display: flex; flex-wrap: wrap; gap: .2rem .6rem; font-size: .8rem; color: var(--muted); }
   .around label { display: inline-flex; align-items: center; gap: .3rem; }
-  .around input { width: 4.2em; font-size: .8rem; }
+  /* (600, the most, whole next to the spin arrows) */
+  .around input { width: calc(3ch + 3em); font-size: .8rem; padding-inline: .3rem; }
   .chip.risky { color: var(--orange); display: inline-flex; align-items: center; gap: .2rem; }
   .main { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(140px, 1fr) auto minmax(160px, auto) auto; gap: .45rem; }
   .preview { min-height: 0; display: flex; overflow: hidden; }      /* (never over the transport) */

@@ -196,3 +196,14 @@ test('a shorter song: what lies after its end is said, Move them to the end brin
   expect(Math.max(...at)).toBeLessThanOrEqual(120);
   expect(at[2] - at[1]).toBeCloseTo(10, 5);                                                       // (spaced as they were)
 });
+
+test('the before and after fields show their most (600) whole', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  for (const label of ['Seconds before the song', 'Seconds after the song']) {
+    const f = page.getByLabel(label);
+    await f.fill('99999'); await f.press('Tab');
+    await expect(f).toHaveValue('600');
+    expect(await f.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  }
+});
