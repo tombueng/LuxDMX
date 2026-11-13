@@ -24,7 +24,9 @@
     return () => {
       const i = open.indexOf(me); if (i >= 0) open.splice(i, 1);
       // (an opener that's gone, the Ctrl+K box say: where the focus was before any dialog)
-      const back = opener?.isConnected ? opener : outside?.isConnected ? outside : null;
+      // (nothing to go back to, the first start's welcome say: the main view, so the keyboard
+      // goes on from there and not from the page itself)
+      const back = opener?.isConnected && opener !== document.body ? opener : outside?.isConnected ? outside : document.querySelector<HTMLElement>('main.view');
       if (back && (!document.activeElement || document.activeElement === document.body || box?.contains(document.activeElement))) back.focus({ preventScroll: true });
     };
   });

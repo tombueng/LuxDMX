@@ -145,6 +145,9 @@
       const cues = src ? app.playAlong(app.selected, src.id) : 0;
       ui.toast(cues ? `Added ${n} × ${name}. In your ${cues} look${cues === 1 ? '' : 's'} they do what ${src!.name} does (Ctrl+Z takes it back)` : `Added ${n} × ${name}`, 5000);
       onclose();
+      // (the keyboard goes on in the fixture list, the new lights selected there: Ctrl+A, the
+      // arrows; the button that opened this may be gone, "Add your first lights")
+      setTimeout(() => document.querySelector<HTMLElement>('.fl .olist')?.focus({ preventScroll: true }));
     }
   }
   async function file() {

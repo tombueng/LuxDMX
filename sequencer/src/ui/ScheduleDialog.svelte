@@ -60,7 +60,13 @@
     ]);
   }
   const whenShort = (d: Date) => `${d.toDateString() === new Date().toDateString() ? '' : `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]} `}${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  function remove(id: string) { app.checkpoint(); app.show.settings.schedule = entries.filter((e) => e.id !== id); app.markDirty(0); }
+  // (the focus goes to the row that takes its place, else Add a time: it fell out to the page)
+  function remove(id: string) {
+    const i = entries.findIndex((e) => e.id === id), to = entries[i + 1] ?? entries[i - 1];
+    app.checkpoint(); app.show.settings.schedule = entries.filter((e) => e.id !== id); app.markDirty(0);
+    // (the row, not its time field: Delete and Ctrl+Z go on working from there)
+    setTimeout(() => (to ? document.querySelector<HTMLElement>(`[data-entry="${to.id}"]`) : [...document.querySelectorAll<HTMLElement>('[role=dialog] button')].find((b) => b.textContent?.trim() === 'Add a time'))?.focus());
+  }
   function setDo(e: ScheduleEntry, kind: string) {
     const was = e.do, l = ('list' in was ? app.show.cueLists.find((x) => x.id === was.list) : undefined) ?? lists[0];
     const a: CueAction = kind === 'goto' ? { do: 'goto', list: l?.id ?? '', cue: l?.cues[0]?.id ?? '' }
@@ -167,7 +173,7 @@
     <div class="rows">
       {#each sorted as e (e.id)}
         <!-- svelte-ignore a11y_no_static_element_interactions (the menu is also on the keyboard's Menu key, and every item has its own control in the row) -->
-        <div class="ent" data-entry={e.id} oncontextmenu={(ev) => rowMenu(ev, e)}
+        <div class="ent" data-entry={e.id} tabindex="-1" oncontextmenu={(ev) => rowMenu(ev, e)}
              onkeydown={(ev) => { if (ev.key === 'Delete' && !ro && (ev.target as HTMLElement).tagName !== 'INPUT') { ev.preventDefault(); remove(e.id); } }}>
           <div class="when">
             <select value={e.sun ?? 'time'} disabled={ro} aria-label="When" onchange={(ev) => setWhen(e, ev.currentTarget.value)}>
@@ -255,4 +261,5 @@
     .ent select { grid-column: 1 / -1; width: 100%; }
     .x { grid-row: 1; grid-column: 2; }
   }
+  .ent:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 </style>

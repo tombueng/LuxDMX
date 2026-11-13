@@ -64,7 +64,7 @@
   <TopBar />
   <ConnectionBanner />
   <!-- menus and messages sit in the main region too (they float, but a screen reader finds them) -->
-  <main class="view" aria-label={app.view === 'program' ? 'Program' : app.view === 'timeline' ? 'Timeline' : app.view === 'console' ? 'Console' : 'Live'}>
+  <main class="view" tabindex="-1" aria-label={app.view === 'program' ? 'Program' : app.view === 'timeline' ? 'Timeline' : app.view === 'console' ? 'Console' : 'Live'}>
     {#if open.has('program')}<div class="pane" class:laying={laying === 'program'} hidden={app.view !== 'program'} inert={app.view !== 'program'}><ProgramView /></div>{/if}
     {#if open.has('timeline')}<div class="pane" class:laying={laying === 'timeline'} hidden={app.view !== 'timeline'} inert={app.view !== 'timeline'}><TimelineView /></div>{/if}
     {#if open.has('live')}<div class="pane" class:laying={laying === 'live'} hidden={app.view !== 'live'} inert={app.view !== 'live'}><LiveView /></div>{/if}
@@ -95,4 +95,5 @@
   .bo-frame { position: fixed; inset: 0; pointer-events: none; z-index: 90; box-shadow: inset 0 0 0 3px var(--pink), inset 0 0 40px #f33abc33; }
   .bo-frame span { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); background: var(--pink); color: #1a0010; font-weight: 800;
     font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; padding: .1rem .7rem; border-radius: 6px 6px 0 0; }
+  .view:focus { outline: none; }
 </style>

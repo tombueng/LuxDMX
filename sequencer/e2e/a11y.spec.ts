@@ -3,7 +3,7 @@
 // with the reason.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { FAKE, openConnected, patch, test, expect } from './helpers';
+import { FAKE, fresh, openConnected, patch, test, expect } from './helpers';
 
 const AXE = fs.readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
 
@@ -160,4 +160,32 @@ test('the timetable with entries, the locked page with greyed masters, the light
   await popup.close();
   await expect(page.getByRole('alert').filter({ hasText: "aren't getting" })).toBeVisible({ timeout: 5000 });
   await audit(page, 'connection bar');
+});
+
+test('focus after a dialog closes: on the main view after the welcome, in the fixture list after Add (Ctrl+A takes the lights), on the next row after a timetable row goes', async ({ page }) => {
+  await fresh(page, true);                                          // (with the welcome)
+  await expect(page.getByRole('dialog').first()).toBeVisible();
+  await page.getByRole('button', { name: /Start with an empty stage/ }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY');
+  // Add fixtures from the keyboard's point of view: the dialog closes, focus is in the list
+  await page.locator('.fl').getByRole('button', { name: /Add/ }).first().click();
+  const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
+  await dlg.locator('[data-type="gen-rgb"]').click();
+  await dlg.getByLabel('How many').fill('3');
+  await dlg.getByRole('button', { name: /^Add 3 ×/ }).click();
+  await expect(dlg).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.classList.contains('olist'))).toBe(true);
+  await page.evaluate(() => { (window as any).__luxdmx.selected = []; });
+  await page.keyboard.press('Control+a');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(3);
+  // the timetable: a row removed, the focus on the one after it
+  await page.locator('body').press('Control+k');
+  await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('schedule');
+  await page.keyboard.press('Enter');
+  const tt = page.getByRole('dialog', { name: 'Timetable' });
+  await tt.getByRole('button', { name: 'Add a time' }).click();
+  await tt.getByRole('button', { name: 'Add a time' }).click();
+  await tt.getByRole('button', { name: /^Remove / }).first().click();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.hasAttribute('data-entry'))).toBe(true);
 });
