@@ -1,7 +1,7 @@
 // Things that must not go wrong in front of an audience (from the independent code review):
 // a show from a newer version is never overwritten, deleting the open show deletes it, a blackout
 // cue holds, a held flash can't stay on, undo brings a box back with its connection.
-import { openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, fresh, go, test, expect, addDevice, fixturesOnStage, welcomeDialog, showBoxes, boxReady } from './helpers';
+import { FAKE, jumpTo, openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, fresh, go, test, expect, addDevice, fixturesOnStage, welcomeDialog, showBoxes, boxReady } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -310,4 +310,30 @@ test('the box\'s window reloaded (F5 in it): the app takes it back by itself, th
   await resetFake();
   await expect.poll(() => channels(0, 2), { timeout: 15000 }).toEqual([255, 255]);
   await expect(page.locator('.dev.ready').or(page.locator('.top .boxes.ready')).first()).toBeVisible();
+});
+
+// Show night: the box drops off the network for a few seconds (its Wi-Fi, a cable), GO is pressed
+// while it's gone. The app says so plainly, and once the box is back the lights get the look GO
+// went to, by themselves: no click, no old frame.
+test('the box off the network mid-show: said loudly, GO still counts, and the look GO went to goes out when it\'s back', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await selectAll(page); await intensity(page, 0.6); await record(page);
+  await intensity(page, 0.2); await record(page);
+  await jumpTo(page, 0);
+  await expect.poll(async () => (await channels(0, 2))[0]).toBe(153);
+  // off the network for 6 s
+  await fetch(`http://${FAKE}/ws/test`, { method: 'POST', body: JSON.stringify({ down: 6000 }) });
+  await expect(page.locator('.lost[role="alert"]')).toContainText("The lights aren't getting anything", { timeout: 4000 });
+  await go(page);                                                             // (cue 2, while it's gone)
+  await expect(page.locator('.deck .card.cur')).toContainText('2');
+  // back: the alarm goes, and the lights get cue 2
+  await expect(page.locator('.lost[role="alert"]')).toHaveCount(0, { timeout: 15000 });
+  await expect.poll(async () => (await channels(0, 2))[0], { timeout: 5000 }).toBe(51);
+  // and Blackout pressed while it's gone holds when it's back
+  await fetch(`http://${FAKE}/ws/test`, { method: 'POST', body: JSON.stringify({ down: 4000 }) });
+  await expect(page.locator('.lost[role="alert"]')).toBeVisible({ timeout: 4000 });
+  await page.locator('.top').getByRole('button', { name: 'Blackout' }).click();
+  await expect(page.locator('.lost[role="alert"]')).toHaveCount(0, { timeout: 15000 });
+  await expect.poll(async () => (await channels(0, 2))[0], { timeout: 5000 }).toBe(0);
 });
