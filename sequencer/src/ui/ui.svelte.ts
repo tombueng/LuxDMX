@@ -20,7 +20,8 @@ class Ui {
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   modal = $state<ModalName | null>(null);   // the one big dialog that's open
   welcomeDemos = false;
-  addType: string | null = null;             // Add fixtures opens with this type picked (from the gallery)                      // the welcome opened for its demos: shown, even when folded away
+  addType: string | null = null;
+  focus3d = $state(0);                       // when the 3D stage was asked to fly to the selected lights ("Show in 3D")             // Add fixtures opens with this type picked (from the gallery)                      // the welcome opened for its demos: shown, even when folded away
   monitorUni = 0;                            // the universe the DMX monitor opens on
   fogFor: string[] | undefined;              // the machines a fog timer starts with (all when unset)
   patch = $state<string | null>(null);       // the fixture whose patch dialog is open

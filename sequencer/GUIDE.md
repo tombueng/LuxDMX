@@ -729,7 +729,9 @@ Three more demos come with their own room on the 3D stage:
   (confetti lies where it lands for half a minute and fades away, the newest burst taking the place
   of the oldest pieces when there's too much; sparks are hard white-hot points brighter than white that light up a warm glow round their fountain, flames a tight see-through column; fog spreads over the stage and is gone about half a minute after
   the machine stops).
-  Drag to look round (camera views: Front, FOH, Side, Top, from the stage; full screen for a
+  Drag to look round (camera views: Front, FOH, Side, Top, from the stage, and **Selected**: the
+  camera flies to the selected lights, near enough to see them; **Show it in 3D** in a light's
+  right-click menu, on the plan or in the fixture list, opens the 3D stage and does the same; full screen for a
   presentation; a reload keeps the camera where it was). **Camera moves**: the camera films the
   show by itself, picked from the little arrow next to Tour (the button starts and stops the one
   picked). **Tour** goes slowly round the room. **Broadcast** is a live TV director: hard cuts on

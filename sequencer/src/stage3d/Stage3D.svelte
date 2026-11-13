@@ -157,6 +157,33 @@
   let crewMem = newMemory(), grabbing = false, grabFrom: { p: THREE.Vector3; t: THREE.Vector3 } | null = null;
   function startCam(m: CamMode) { camPick = m; camMode = m; crewMem = newMemory(); camMenu = false; camSaved = 0; if (controls) keepCam(); }
   function stopCam() { if (!camMode) return; camMode = null; lensBack(); camSaved = 0; keepCam(); }
+
+  // ---- the camera to the selected lights ("Selected", a light's menu: Show in 3D): it flies there
+  // in a moment, far enough back to see them all; grabbing the stage stops it
+  let fly: { p0: THREE.Vector3; t0: THREE.Vector3; p1: THREE.Vector3; t1: THREE.Vector3; at: number; dur: number } | null = null;
+  function focusSel(ids: string[] = app.selected) {
+    const fs = fixtures.filter((f) => ids.includes(f.id));
+    if (!fs.length || !controls) return false;
+    stopCam();
+    const pts = fs.map((f) => { const p = pivotOf(f.p, f.rot); return new THREE.Vector3(p.x, p.y, p.z); });
+    const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
+    const r = Math.max(0.6, box.getSize(new THREE.Vector3()).length() / 2);
+    // (from in front and a little to the side: up at hung lights, as the audience sees them; down
+    // at ones on the floor)
+    const dir = (c.y > 2.5 ? new THREE.Vector3(0.35, -0.32, 1) : new THREE.Vector3(0.35, 0.45, 1)).normalize();
+    const d = Math.max(4.5, (r / Math.sin((camera.fov * Math.PI) / 360)) * 1.15);
+    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: c.clone().addScaledVector(dir, d), t1: c, at: performance.now(), dur: 700 };
+    return true;
+  }
+  // asked from elsewhere (a light's menu): once the stage and its lights are there
+  let focusSeen = 0;
+  $effect(() => {
+    const at = ui.focus3d;
+    if (!at || at === focusSeen || Date.now() - at > 5000) return;
+    // (after the room is built: building it puts the camera at the front)
+    const go = () => { if (!controls || !fixtures.length || !holding || builtRoom !== room.id) return void setTimeout(go, 100); focusSeen = at; requestAnimationFrame(() => focusSel()); };
+    untrack(go);
+  });
   // the list of moves (opened from the keys: onto the one running, or the first)
   function openMoves(e: MouseEvent) {
     camMenu = !camMenu;
@@ -376,7 +403,7 @@
     composer.addPass(new OutputPass());
     restoreCam();
     controls.addEventListener('change', keepCam);
-    controls.addEventListener('start', () => { grabbing = true; grabFrom = { p: camera.position.clone(), t: controls.target.clone() }; });
+    controls.addEventListener('start', () => { grabbing = true; fly = null; grabFrom = { p: camera.position.clone(), t: controls.target.clone() }; });
     controls.addEventListener('end', () => { grabbing = false; grabFrom = null; });
     controls.addEventListener('change', grabbed);
     // for the tests (dev only): what can't be read off the pixels (the shown stage's)
@@ -409,6 +436,7 @@
         return { nan, over, max, pixels: w * h };
       },
       internals: { THREE, renderer, scene, camera, controls, composer, bloom, view, meter, overlay },
+      flying: () => !!fly,
       // the room and its people, what the band's banners show; the take running (its frame count)
       venue: () => ({ room: venue.room, crowd: venue.crowdCount, group: venue.group.uuid, band: venue.bandInfo() }),
       take: () => take,
@@ -879,6 +907,11 @@
     // the camera: a crew moving it (held still while you grab the stage), or yours
     // (the controls glide out a drag frame by frame: as many steps as 60 frames a second would take,
     // so on a slow computer the camera stops as soon as on a fast one, not seconds later)
+    if (fly) {
+      const k = Math.min(1, (performance.now() - fly.at) / fly.dur), e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e);
+      if (k >= 1) fly = null;
+    }
     if (!camMode) { const steps = Math.max(1, Math.min(30, Math.round(real * 60))); for (let i = 0; i < steps; i++) controls.update(); }
     else if (!grabbing) shoot(t, energy);
     feedFrame(t, energy, real);
@@ -1178,6 +1211,7 @@
 {#snippet cameraSeg()}
   <div class="seg" role="group" aria-label="Camera">
     {#each Object.entries(VIEWS) as [k, label] (k)}<button class="ghost" onclick={() => { view(k as ViewKey); more = false; }}>{label}</button>{/each}
+    {#if !readonly}<button class="ghost" onclick={() => { focusSel(); more = false; }} disabled={!app.selected.length} title={app.selected.length ? `The camera to the ${app.selected.length === 1 ? 'selected light' : `${app.selected.length} selected lights`}` : 'Select lights first: the camera goes to them'}>Selected</button>{/if}
     <button class="ghost" class:on={!!camMode} aria-pressed={!!camMode} onclick={() => (camMode ? stopCam() : startCam(camPick))} title={camMode ? `${picked.says}. Click or drag the stage to stop` : picked.says}>{picked.name}</button>
     <button class="ghost caret" data-popover-toggle class:on={camMenu} aria-expanded={camMenu} aria-controls="cam-moves" aria-label="Pick a camera move" title="How the camera moves by itself: Tour, Broadcast, Crane, Steadicam, Drone, Band cam" onclick={openMoves}><Icon name="down" size={12} /></button>
   </div>

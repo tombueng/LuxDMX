@@ -56,6 +56,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   and the 2400+ library fixtures. Every tile plays its light in 3D: spots sweep and run their gobos
   and prisms, washes breathe, PARs run the colours, bars chase. All in one WebGL context, only the
   tiles on the screen, so it stays smooth. The old library popup is gone.
+- 3D: **Selected** next to the camera views flies the camera to the selected lights, and **Show it
+  in 3D** in a light's right-click menu opens the 3D stage and does the same.
 - A gallery, **What the 3D stage draws** (Ctrl+K "gallery", or from Add fixtures and the
   welcome): 22 live tiles, gobos turning, prisms, heads in a fan, pixel bars, discs, winches,
   flames, sparks, confetti, CO2, fog with a light through it. The README has them as animations,

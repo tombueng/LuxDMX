@@ -52,6 +52,8 @@ export function fixtureMenu(id: string, extra: MenuItem[] = []): MenuItem[] {
     app.selected.length > 1
       ? { label: `Patch the ${app.selected.length} selected…`, icon: 'edit', keys: 'Enter', run: () => (ui.patchMany = [...app.selected]) }
       : { label: 'Name, address, mode…', icon: 'edit', keys: 'Enter', run: () => { ui.patchTab = 'patch'; ui.patch = id; } },
+    // (the 3D stage opens, the camera flies to them)
+    { label: app.selected.length > 1 ? `Show the ${app.selected.length} selected in 3D` : 'Show it in 3D', icon: 'eye', run: () => { ui.stage3d = true; ui.focus3d = Date.now(); } },
     // (how it hangs and points, in 3D with just these lights: for the selection too)
     ...(app.kinds[id] === 'mover' || app.kinds[id] === 'par' || app.kinds[id] === 'strobe' ? [{ label: app.selected.length > 1 ? `Mounting of the ${app.selected.length} selected…` : 'Mounting…', icon: 'position', run: () => { ui.patchTab = 'mounting'; ui.patch = id; } } as MenuItem] : []),
     // (the moving heads in the selection: steered onto marks, where they really hang worked out)
