@@ -181,3 +181,21 @@ test.describe('the fixture library on a laptop', () => {
     await expect(page.getByRole('dialog', { name: /fixture/i }).getByLabel('Model')).toBeVisible();
   });
 });
+
+test('a start address that runs past 512 is said in the preview, with where they would fit; Add puts in none of them', async ({ page }) => {
+  await openConnected(page);
+  await tab(page, 'Fixtures');
+  await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
+  const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
+  await dlg.locator('.tcard', { hasText: 'Dimmer + RGBW + Strobe' }).first().click();     // (6 channels)
+  await dlg.getByLabel('How many').fill('2');
+  await dlg.getByLabel('Start address').fill('510');
+  await expect(dlg.getByText(/510 to 521 runs past 512/)).toBeVisible();
+  await dlg.getByRole('button', { name: /^Add 2 ×/ }).click();
+  await expect(dlg.getByText(/would run past channel 512 of universe 0: start at 501 at most/)).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBe(0);
+  await dlg.getByRole('button', { name: 'Start at 501' }).click();
+  await dlg.getByRole('button', { name: /^Add 2 ×/ }).click();
+  await expect(dlg).toBeHidden();
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.map((f: { address: number }) => f.address))).toEqual([501, 507]);
+});

@@ -1188,6 +1188,9 @@ class App {
     const same = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: (\\d+))?$`);
     const taken = this.show.fixtures.map((f) => same.exec(f.name)).filter((m): m is RegExpExecArray => !!m).map((m) => Number(m[1] ?? 1));
     const first = taken.length ? Math.max(...taken) + 1 : 1;
+    // (a start address that runs them past channel 512: said before any goes in, not half a patch)
+    if (start && !need && start + count * width - 1 > 512)
+      return `${count} × ${width} channels from ${start} would run past channel 512 of universe ${universe}: start at ${Math.max(1, 513 - count * width)} at most, or put them on another universe`;
     for (let i = 0; i < count; i++) {
       // A given start address puts them back to back from there; otherwise after what's patched.
       // Too big for one universe: from channel 1 of the first run of free universes.

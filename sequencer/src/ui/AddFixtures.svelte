@@ -222,8 +222,14 @@
         <p class="faint">Too big for one universe, so each runs on over the next ones ({wideSpans} universes, whole pixels on each), from the first free ones at or after universe {universe}. Set your box's pixel port to the same universe.</p>
       {:else}
       <label>Start address <input type="number" min="1" max="512" bind:value={address} aria-label="Start address" placeholder={nextFree > 0 ? `next free: ${nextFree}` : 'universe full'} /></label>
+      {#if address && address > 0 && address + count * width - 1 > 512}
+        <!-- (a universe ends at 512: said before Add, with where they'd fit) -->
+        <p class="err" role="status">{address} to {address + count * width - 1} runs past 512, the last channel of a universe. Start at {Math.max(1, 513 - count * width)} at most, or put them on universe {universe + 1}.
+          <button class="ghost link" onclick={() => (address = Math.max(1, 513 - count * width))}>Start at {Math.max(1, 513 - count * width)}</button></p>
+      {:else}
       <p class="faint">{address && address > 0 ? `${address} to ${address + count * width - 1}.` : nextFree > 0 ? `They get ${nextFree} to ${nextFree + count * width - 1}${universe ? ` on universe ${universe}` : ''}.` : `Universe ${universe} is full.`}
         {count} × {width} channels = {count * width}.</p>
+      {/if}
       {/if}
       {#if overlaps.length}
         <p class="err" role="status">These would share channels with {overlaps.length > 4 ? `${overlaps.slice(0, 4).join(', ')} and ${overlaps.length - 4} more` : overlaps.join(', ')}.
