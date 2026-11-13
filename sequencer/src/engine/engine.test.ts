@@ -306,6 +306,20 @@ describe('cue lists', () => {
     expect(r.e.status('L').running).toBe(false);
   });
 
+  it('a loop of 1-beat cues keeps the tempo: each step counts from when it was due, not the frame that noticed', () => {
+    const r = rig([fx('a', 'gen-dimmer', 1)], [list('L', [0.2, 0.4, 0.6, 0.8].map((v) => cue({ a: { intensity: v } }, 0, { advance: { mode: 'beats', beats: 1 } })), { end: 'loop' })]);
+    r.e.bpm = 120;                                  // a step every 0.5 s
+    r.e.go('L');
+    let steps = 0, was = 0;
+    for (let t = 0.037; t <= 60; t += 0.037) {     // (frames that don't divide the beat: each step noticed up to a frame late)
+      out(r, t);
+      const i = r.e.status('L').index;
+      if (i !== was) { steps++; was = i; }
+    }
+    expect(steps).toBeGreaterThanOrEqual(119);      // 120 steps in a minute (it made about 116: 4 % slow)
+    expect(steps).toBeLessThanOrEqual(120);
+  });
+
   it('a cue can start and release other lists', () => {
     const r = rig([fx('a', 'gen-dimmer', 1), fx('b', 'gen-dimmer', 2)], [
       list('house', [cue({ a: { intensity: 0.1 } }, 0, { actions: [{ do: 'start', list: 'pre' }] })]),

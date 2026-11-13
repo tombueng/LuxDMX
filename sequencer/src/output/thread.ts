@@ -167,6 +167,15 @@ self.onmessage = (e: MessageEvent<ToThread>) => {
     case 'inputs': Object.assign(engine, m.v); break;
     case 'call':
       if (!COMMANDS.has(m.m)) break;
+      // The page's beat count as it was when it was said: on here by how long the message took (a
+      // page busy for a moment sent it late, and the effects stepped back a frame), never back by a
+      // hair (that's a step back too), and at once when it's really another beat (a jump in a song).
+      if (m.m === 'syncBeats') {
+        const said = m.a[0] as number, late = Math.max(0, (performance.now() + performance.timeOrigin - mainOrigin) / 1000 - m.at);
+        const to = said + late * engine.bpm / 60, cur = engine.beatCount;
+        if (Number.isFinite(to) && !(to < cur && cur - to < 0.1)) engine.syncBeats(to);
+        break;
+      }
       at = m.at;
       try { (engine as unknown as Record<string, (...a: unknown[]) => unknown>)[m.m](...m.a); } catch { /* the page's engine said what happened */ } finally { at = null; }
       break;

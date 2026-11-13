@@ -84,6 +84,7 @@ export class ListPlayer {
   flashing = false;
   private tracks: Record<string, Track> = {};
   private cueAt = 0;      // when the current cue was triggered
+  dueAt = 0;              // when the auto-advance update() just returned was due (a frame before it ran)
   private fade = 0;
   private fadeOut = 0;
   private times: CueTimes | undefined;
@@ -362,7 +363,7 @@ export class ListPlayer {
     due = Math.max(due, this.cueAt + 0.05);
     if (now < due) return -1;
     const next = this.nextIndex(list);
-    if (next >= 0) return next;
+    if (next >= 0) { this.dueAt = due; return next; }
     if (list.end === 'release') this.release(list, now);
     else this.held = true;               // 'stop': hold the last cue, no more advancing
     return -1;

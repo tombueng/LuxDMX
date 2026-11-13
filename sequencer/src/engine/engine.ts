@@ -338,7 +338,10 @@ export class Engine {
     const show = this.getShow();
     const presets = this.presetMap();
     // The effect clocks: seconds, and beats at the tempo (so a tempo change doesn't jump).
-    const dt = this.last < 0 ? 0 : Math.max(0, Math.min(0.25, now - this.last));
+    // (by the clock, not capped: a page busy for half a second lost that half second here while the
+    // output thread's clock went on, and the stage and Auto GO ran half a beat off the effects on
+    // the wire from then on)
+    const dt = this.last < 0 ? 0 : Math.max(0, now - this.last);
     this.last = now;
     this.seconds += dt;
     this.beats += dt * this.bpm / 60;
@@ -351,7 +354,13 @@ export class Engine {
       const next = p.update(l, now, this.bpm);
       // (a list the timeline jumped onto stays quiet through its own waits and follow-ons: only a
       // GO, or the timeline playing into it, wakes its machines)
-      if (next >= 0) { const q = this.jumped.has(id); this.jumpTo(id, next); if (q) this.jumped.add(id); }
+      if (next >= 0) {
+        const q = this.jumped.has(id); this.jumpTo(id, next); if (q) this.jumped.add(id);
+        // (the next cue counts from when it was due, not from the frame that noticed: a loop of
+        // 1-beat cues ran 4 % slow and drifted off the beat, a frame late at every step)
+        const late = now - p.dueAt;
+        if (late > 0 && late < 0.25) p.since(late);
+      }
     }
 
     const order = [...this.players.values()].filter((p) => p.running)

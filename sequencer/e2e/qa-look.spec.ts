@@ -2,7 +2,7 @@
 // when adding fixtures, effects that suit the selection first, no on-state that hides its own text,
 // a plan that stays whole on a phone.
 import type { Page } from '@playwright/test';
-import { openConnected, patch, resetFake, selectAll, tab, test, expect } from './helpers';
+import { FAKE, openConnected, patch, resetFake, selectAll, tab, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -706,4 +706,55 @@ test('what the help says is what happens: Back, moments on Safe, Ctrl+K staff fr
   const rows = await page.getByRole('dialog', { name: 'Keyboard and mouse' }).locator('kbd, td, dt').allTextContents();
   const i = rows.findIndex((t) => /Shift\+Z/.test(t)), j = rows.findIndex((t) => /\+Y$/.test(t.trim()));
   expect(j - i).toBeLessThanOrEqual(2);
+});
+
+test('tempo: the BPM field takes only a real tempo, Tap puts the beat on the taps, an effect off the tempo keeps its speed', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 4, 0, 'D');
+  const bpm = page.locator('.top').getByLabel('BPM');
+  const set = () => page.evaluate(() => (window as any).__luxdmx.show.settings.bpm);
+  // typing 90: never through 9 (nothing under 20 is taken); emptied and left: back as it was
+  await bpm.click(); await bpm.fill('');
+  await page.keyboard.type('9');
+  expect(await set()).toBe(120);
+  await page.keyboard.type('0');
+  expect(await set()).toBe(90);
+  await bpm.fill('');
+  await page.keyboard.press('Tab');
+  expect(await set()).toBe(90);
+  await expect(bpm).toHaveValue('90');
+  // Tap: 120 and the beat on the last tap (its fraction near 0 right after)
+  const tap = page.locator('.top').getByRole('button', { name: 'Tap' });
+  for (let i = 0; i < 6; i++) { await tap.click(); if (i < 5) await page.waitForTimeout(500); }
+  const frac = await page.evaluate(() => { const b = (window as any).__luxdmx.engine.beatCount; return b - Math.floor(b); });
+  expect(Math.min(frac, 1 - frac)).toBeLessThan(0.15);
+  // an effect at 4 beats, tempo off: the same speed in seconds (4 beats at 120 = 2 s), and back
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.settings.bpm = 120; a.addEffect('chase', { fixtures: a.show.fixtures.map((f: any) => f.id) }, { params: { tempo: true, speed: 4 } }); });
+  await page.locator('.side .tabs').getByRole('tab', { name: 'Effects' }).click();
+  await page.locator('.ep .olist li').first().dblclick();
+  const tempo = page.getByRole('checkbox', { name: 'tempo' });
+  await tempo.uncheck();
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.effects[0].params.speed)).toBe(2);
+  await tempo.check();
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.effects[0].params.speed)).toBe(4);
+});
+
+test('tempo: the effects on the wire step on the same beat as the page (Auto GO, the stage here)', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 4, 0, 'D');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.settings.bpm = 60; a.addEffect('chase', { fixtures: a.show.fixtures.map((f: any) => f.id) }, { params: { tempo: true, speed: 4 } }); });
+  // a few quick tempo changes (typing a tempo, Tap): the page and the output thread take each one
+  // at a slightly different moment, and their beat counts drift apart
+  for (const b of [240, 20, 300, 25, 200, 60]) { await page.evaluate((x) => { (window as any).__luxdmx.show.settings.bpm = x; }, b); await page.waitForTimeout(170); }
+  // and the page busy for a moment (a big dialog opening): it lost that moment from its beat count
+  await page.evaluate(() => { const end = performance.now() + 700; while (performance.now() < end) { /* busy */ } });
+  await page.waitForTimeout(3000);                                         // (a sync or two)
+  const t0 = await page.evaluate(() => ({ beats: (window as any).__luxdmx.engine.beatCount as number, at: Date.now() }));
+  await page.waitForTimeout(5000);
+  const h: [number, number][] = await (await fetch(`http://${FAKE}/history.json?uni=0&ch=1`)).json();
+  // where light 1 comes on: the beat as the page counts it there (60 BPM: a beat a second)
+  const ons = h.filter(([t, v], i) => t > t0.at && i > 0 && v > 127 && h[i - 1][1] <= 127).map(([t]) => t0.beats + (t - t0.at) / 1000);
+  expect(ons.length).toBeGreaterThan(0);
+  for (const b of ons) { const f = b - Math.floor(b); expect(Math.min(f, 1 - f)).toBeLessThan(0.2); }   // (on the beat, not half a beat off)
 });

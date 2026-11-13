@@ -149,7 +149,8 @@ export class Bridge {
   // than the box took (frames replaced) and got under 10 through a second, or under 2 at all. Only
   // while connected, and only from what its page has said lately.
   get slow(): '' | 'slow' | 'stalled' {
-    if (this.state !== 'ready' || this.recent.length < 3) return '';
+    // (not from its first second: the page warming up said "hardly answers" right after connecting)
+    if (this.state !== 'ready' || this.recent.length < 4) return '';
     const r = this.recent.slice(-3), fps = r.reduce((n, x) => n + x.fps, 0) / 3, drops = r.reduce((n, x) => n + x.drops, 0);
     return fps < 0.5 ? 'stalled' : (fps < 10 && drops >= 3) || fps < 2 ? 'slow' : '';
   }

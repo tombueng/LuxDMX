@@ -5,6 +5,7 @@
   import Devices from './Devices.svelte';
   import { app } from '../app.svelte';
   import { tablist, ui, asPercent } from './ui.svelte';
+  import NumField from './NumField.svelte';
 
   // The dot blinks on every beat the microphone hears.
   async function takeOther() {
@@ -156,8 +157,12 @@
   <span class="bpm" title="Tempo: beat-based cues and effects follow it. Tap along to the music.">
     <!-- following the music: the tempo shown is the one everything runs at -->
     {#if app.bpm !== app.show.settings.bpm}<input type="number" value={app.bpm} readonly class="frommusic" aria-label="BPM" title="From the music (♪) or the song playing on the timeline. Your own tempo comes back when they stop." />
-    {:else}<input type="number" min="20" max="300" bind:value={app.show.settings.bpm} aria-label="BPM" />{/if}<span class="lab">BPM</span>
-    <button onclick={() => app.tap()} title="Tap along to the music to set the tempo">Tap</button>
+    <!-- (only a tempo that can be one goes in: typing 90 went through 9 BPM, a 1 froze the chases,
+         an emptied field stopped the beat clock dead; between 20 and 300, back as it was when left empty) -->
+    {:else}<NumField value={app.show.settings.bpm} min={20} max={300} required label="BPM" width="4.2em" onset={(v) => { if (v !== undefined) { app.show.settings.bpm = Math.round(v); app.markDirty(); } }} />{/if}<span class="lab">BPM</span>
+    <!-- (while the song or the microphone sets the tempo, Tap did nothing you could see and quietly
+         changed the show's own tempo for later) -->
+    <button onclick={() => app.tap()} disabled={app.bpm !== app.show.settings.bpm} title={app.bpm !== app.show.settings.bpm ? 'The song playing (or the music) sets the tempo now' : 'Tap along to the music to set the tempo'}>Tap</button>
   </span>
   <div class="toolbar">
     <button class="ghost" onclick={() => app.undo()} disabled={!app.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo"><Icon name="undo" /></button>
@@ -236,7 +241,7 @@
   .pulse { width: .5rem; height: .5rem; border-radius: 50%; background: var(--line2); transition: background .05s; }
   .pulse.beat { background: var(--green); box-shadow: 0 0 8px var(--green); }
   .bo.on { background: var(--pink); border-color: var(--pink); color: #1a0010; font-weight: 700; }
-  .bpm { display: inline-flex; gap: .25rem; } .bpm input { width: 5em; }
+  .bpm { display: inline-flex; gap: .25rem; } .bpm :global(input) { width: 5em !important; }
   .bpm .frommusic { color: var(--green); border-color: #45d85c66; }
   .grow { flex: 1; }
   .out { display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; padding: .25rem .65rem; font-weight: 650; color: var(--muted); }
@@ -274,7 +279,7 @@
     .modes button { padding: .3rem .42rem; gap: .25rem; }
     .modes button:not(.cur) .lbl { display: none; }
     .modes :global(svg) { display: inline-block; }
-    .bpm input { width: 4.6em; }
+    .bpm :global(input) { width: 4.6em !important; }
     .saved { display: none; }                            /* (the show's menu says it) */
     .gm input { width: 52px; }
     .show { min-width: 2.6rem; }                         /* (its folder icon at least: the shows) */

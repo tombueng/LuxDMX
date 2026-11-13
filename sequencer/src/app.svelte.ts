@@ -1015,6 +1015,7 @@ class App {
     pingAfter(() => load.did(performance.now() - t0));
   }
   private saidBroken = new Set<string>();
+  private beatSyncAt = 0;
   private frame() {
     this.engine.programmer = this.progSnap;
     this.stepFade();
@@ -1031,6 +1032,10 @@ class App {
     // (the clock, not the position: counting in, it runs before the song's start, and the beats with it)
     if (this.timeline.playing && tl && tb !== undefined && !(this.music.on && this.music.confidence >= 0.5) && this.bpm === tb)
       this.engine.syncBeats((this.timeline.clock - (tl.offset ?? 0)) * tb / 60);
+    // Otherwise the output thread's beat clock is put on this page's once a second: they started at
+    // different moments, so the effects on the wire ran up to half a beat off Auto GO and the steps
+    // the stage here shows.
+    else if (performance.now() - this.beatSyncAt > 1000) { this.beatSyncAt = performance.now(); this.engine.syncBeats(this.engine.beatCount); }
     const live = $state.snapshot(this.live) as Record<string, Values>;
     // (picked cells: just them, the rest of their light dark, so they're easy to find)
     if (this.highlight) for (const id of this.selected) {
@@ -3104,6 +3109,10 @@ class App {
       const d = (this.tapTimes[this.tapTimes.length - 1] - this.tapTimes[0]) / (this.tapTimes.length - 1);
       this.show.settings.bpm = Math.round(Math.max(20, Math.min(300, 60 / d)));
       this.markDirty();
+      // (and where the beat falls: on the tap, as with the microphone; it set only the speed, the
+      // chases' steps landed anywhere between the taps)
+      this.engine.alignBeat();
+      this.engine.syncBeats(this.engine.beatCount);
     }
   }
 

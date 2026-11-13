@@ -19,6 +19,13 @@
   const p = $derived(paramsOf(fx.kind, fx.params));
   const set = (k: string, v: unknown) => { fx.params = { ...fx.params, [k]: v }; };
   const num = (k: string) => (e: Event) => set(k, +(e.target as HTMLInputElement).value);
+  // On the tempo or off it at the same speed: 4 beats at 120 BPM became 4 seconds (twice as slow),
+  // the number kept and not the time. Seconds to the nearest beat choice, and back.
+  function setTempo(on: boolean) {
+    const bpm = app.bpm || 120, sp = Number(fx.params.speed) || 1;
+    const speed = on ? BEATS.reduce((a, b) => (Math.abs(b - sp * bpm / 60) < Math.abs(a - sp * bpm / 60) ? b : a), BEATS[0]) : Math.round(sp * 60 / bpm * 100) / 100;
+    fx.params = { ...fx.params, tempo: on, speed };
+  }
   const BEATS = [0.25, 0.5, 1, 2, 4, 8, 16, 32];
   const DIRS: [Direction, string, string][] = [
     ['forward', '→ Forward', 'Forward'], ['backward', '← Back', 'Backward'], ['bounce', '↔ Bounce', 'There and back'],
@@ -92,7 +99,7 @@
     <span class="lab">Speed</span>
     <!-- (one row of its own across the knob's columns: the beats choice was squeezed to its arrow) -->
     <div class="spd">
-    <label class="tempo" title="Follow the show tempo (Tap)"><input type="checkbox" checked={p.tempo} onchange={(e) => set('tempo', (e.target as HTMLInputElement).checked)} /> tempo</label>
+    <label class="tempo" title="Follow the show tempo (Tap)"><input type="checkbox" checked={p.tempo} onchange={(e) => setTempo((e.target as HTMLInputElement).checked)} /> tempo</label>
     {#if p.tempo}
       <select value={String(p.speed)} onchange={(e) => set('speed', +(e.target as HTMLSelectElement).value)} aria-label="Beats per cycle">
         {#each BEATS as b (b)}<option value={String(b)}>{b < 1 ? `1/${1 / b}` : b} beat{b === 1 ? '' : 's'}</option>{/each}
