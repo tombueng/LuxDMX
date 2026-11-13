@@ -586,3 +586,20 @@ test('an effect put on a part of the song runs to the end of that part', async (
   expect(it.at).toBeCloseTo(8, 1);
   expect(it.at + it.len).toBeCloseTo(21.9, 1);                                        // (to the chorus, not 8 bars)
 });
+
+test.describe('selecting several on a tablet', () => {
+  test.use({ viewport: { width: 1024, height: 768 }, hasTouch: true });
+  test('+ Add: taps add lights and groups to the selection (a finger has no Shift)', async ({ page }) => {
+    await openConnected(page);
+    await page.evaluate(() => { const a = (window as any).__luxdmx; a.addFixtures('gen-rgb', '', 3, 0, 'P'); a.selected = []; });
+    const stage = page.locator('.stage-wrap');
+    await stage.locator('.fx[data-name="P 1"] [stroke-width]').first().tap();
+    await stage.locator('.fx[data-name="P 2"] [stroke-width]').first().tap();
+    expect(await page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(1);          // (a tap picks just that one)
+    await stage.getByRole('button', { name: '+ Add' }).tap();
+    await stage.locator('.fx[data-name="P 3"] [stroke-width]').first().tap();
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(2);
+    await stage.locator('.fx[data-name="P 3"] [stroke-width]').first().tap();                     // (again: out)
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(1);
+  });
+});

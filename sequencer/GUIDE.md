@@ -58,7 +58,7 @@ wheels), you just don't have to learn a pro console to use them.
    added to a show that already has looks can **play along like one that's there** ("In the
    looks: like PAR 3" in the Add dialog, suggested for a light of the same type or kind): they get
    its part in every look, its groups and its effects. Otherwise they stay dark until you set them.
-3. **Select lights and set them** in the programmer on the right: intensity, colour (presets or
+3. **Select lights and set them** (Shift or Ctrl adds to the selection; on a touch screen, **+ Add** on the stage does) in the programmer on the right: intensity, colour (presets or
    the wheel), position for moving heads, and every other channel under "All channels". The
    number next to a slider takes a typed value too (click it: 37 %, a channel at 127). A channel
    set by hand under "All channels" shows on the stage plan and in 3D as what its value does (a

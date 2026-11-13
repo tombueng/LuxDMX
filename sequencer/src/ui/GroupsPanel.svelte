@@ -82,7 +82,7 @@
                    onkeydown={(e) => { if (e.key !== 'Enter' && e.key !== 'Escape') return; e.preventDefault(); e.stopPropagation(); if (e.key === 'Escape' || !g.name.trim()) g.name = was; const row = e.currentTarget.closest('li'); renaming = null; queueMicrotask(() => row?.querySelector<HTMLElement>('button.main')?.focus()); }} />
           {:else}
             <button class="main" aria-pressed={allSel} title="Select {g.name} (Shift or Ctrl adds)"
-                    onclick={(e) => app.selectGroup(g.id, e.shiftKey || e.ctrlKey || e.metaKey)}
+                    onclick={(e) => app.selectGroup(g.id, ui.adding(e))}
                     onkeydown={(e) => { if (e.key === 'F2') { e.preventDefault(); renaming = g.id; } else if (e.key === 'Delete') del(g.id); }}>
               <span class="txt"><span class="nm">{g.name}</span><span class="faint" title="Group {nums[i]}: &quot;group {nums[i]}&quot; on the console (it keeps it when you move it)">{nums[i]} · {g.fixtures.length} light{g.fixtures.length === 1 ? '' : 's'}{g.cells?.length ? `, ${g.cells.length} cell${g.cells.length === 1 ? '' : 's'} each` : ''}</span></span>
               <span class="dots">

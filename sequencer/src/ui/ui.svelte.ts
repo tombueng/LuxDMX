@@ -25,7 +25,11 @@ class Ui {
   patchTab = $state<'patch' | 'channels' | 'leds' | 'mounting'>('patch');   // the tab it opens on
   patchMany = $state<string[] | null>(null); // ...or the lights patched together
   focusCal = $state<string[] | null>(null);  // the heads in Focus and calibrate
-  progJump = $state('');                      // a part of the programmer to go to ('pg-all': every channel), from Find anything
+  progJump = $state('');
+  // a finger has no Shift: with this on, a tap on a light or a group adds it to the selection (or
+  // takes it out), as Shift or Ctrl does with a mouse
+  addSel = $state(false);
+  adding = (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => e.shiftKey || e.ctrlKey || e.metaKey || this.addSel;                      // a part of the programmer to go to ('pg-all': every channel), from Find anything
   panTiltFind = $state<string | null>(null);  // a light whose pan and tilt channels are being found
   // what Focus and calibrate has seen this session: per head, per mark, the pan and tilt (a cue's)
   // that put the real beam on it (kept when the dialog closes, gone with a reload)

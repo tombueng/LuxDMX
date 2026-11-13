@@ -55,7 +55,7 @@
     e.stopPropagation();
     if (e.button !== 0 || readonly) return;        // right-click: the menu, the selection stays; Live only looks
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    const multi = e.shiftKey || e.ctrlKey || e.metaKey;
+    const multi = ui.adding(e);
     if (multi) app.select(id, true);
     else if (!app.selected.includes(id)) app.select(id, false);
     const ids = app.selected.includes(id) ? [...app.selected] : [id];
@@ -99,7 +99,7 @@
       if (!app.selected.includes(id)) app.select(id, false);
       const now = app.cellsPicked(id), k = drag.cell;
       app.selectCells(now.includes(k) ? now.filter((x) => x !== k) : [...now, k].sort((a, b) => a - b));
-    } else if (drag && !drag.moved && !(e.shiftKey || e.ctrlKey || e.metaKey)) app.select(id, false);
+    } else if (drag && !drag.moved && !ui.adding(e)) app.select(id, false);
     if (drag?.moved) { app.holdUndo = false; app.markDirty(0); }
     drag = null; guides = {};
   }
@@ -170,7 +170,7 @@
     if (readonly) return;                          // Live: zoom and pan, no selecting
     const p = pt(e);
     band = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
-    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) app.selectNone();
+    if (!ui.adding(e)) app.selectNone();
   }
   function moveBg(e: PointerEvent) {
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
@@ -375,12 +375,14 @@
     {#if !compact}
     <div class="toolbar">
       {#each app.show.groups as g (g.id)}
-        <button class="grp" onclick={(e) => app.selectGroup(g.id, e.shiftKey || e.ctrlKey || e.metaKey)} title="Select the group (Shift adds)">{g.name}</button>
+        <button class="grp" onclick={(e) => app.selectGroup(g.id, ui.adding(e))} title="Select the group (Shift adds)">{g.name}</button>
       {/each}
       <span class="sep"></span>
       <button class="ghost" onclick={() => app.selectAll()} aria-label="Select all">All</button>
       <button class="ghost" onclick={() => app.selectNone()} aria-label="Select none">None</button>
       <button class="ghost" onclick={invert} title="Invert the selection">Invert</button>
+      <!-- (on a touch screen: a finger has no Shift to add to the selection) -->
+      {#if coarse && !readonly}<button class="ghost" class:on={ui.addSel} aria-pressed={ui.addSel} onclick={() => (ui.addSel = !ui.addSel)} title="On: a tap adds a light or a group to the selection (or takes it out), as Shift does with a mouse">+ Add</button>{/if}
       {#if !ui.stage3d}
       <span class="sep"></span>
       <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show the names (with each light's number)" aria-label="Names" aria-pressed={labels}>Aa</button>

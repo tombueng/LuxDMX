@@ -75,7 +75,7 @@
     if (e.shiftKey && anchor && visible().includes(anchor)) {
       const ids = visible(), a = ids.indexOf(anchor), b = ids.indexOf(id);
       app.selected = [...new Set([...app.selected, ...ids.slice(Math.min(a, b), Math.max(a, b) + 1)])];
-    } else app.select(id, e.ctrlKey || e.metaKey);
+    } else app.select(id, e.ctrlKey || e.metaKey || ui.addSel);
     anchor = id;
   }
   const { copy, cut, paste, duplicate: dup, remove: del, group } = fixtureActions;
