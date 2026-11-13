@@ -46,7 +46,11 @@
   ] as [string, string][]);
   // where the programmer is scrolled to (the chip for it lights up); Channels opens the list too
   let here = $state('');
+  // (the chip clicked stays lit until you scroll by hand: a part near the bottom can't reach the
+  // top, and "scrolled to the end" would light the last chip instead)
+  let pinned = '';
   async function jump(id: string) {
+    pinned = id; here = id;
     // the list draws once the details has told Svelte it opened (its toggle event comes a moment later)
     if (id === 'pg-all') {
       const d = document.getElementById('pg-all-ch') as HTMLDetailsElement | null;
@@ -67,11 +71,14 @@
       const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
       let cur = ids[0];
       for (const id of ids) { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top <= top) cur = id; }
-      here = atEnd && scroller.scrollTop > 0 ? ids[ids.length - 1] : cur;
+      here = pinned && ids.includes(pinned) ? pinned : atEnd && scroller.scrollTop > 0 ? ids[ids.length - 1] : cur;
     };
+    const hand = () => { pinned = ''; };
+    const hands = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
     spy();
     scroller.addEventListener('scroll', spy, { passive: true });
-    return () => scroller.removeEventListener('scroll', spy);
+    for (const h of hands) scroller.addEventListener(h, hand, { passive: true });
+    return () => { scroller.removeEventListener('scroll', spy); for (const h of hands) scroller.removeEventListener(h, hand); };
   });
   const playing = $derived(app.show.cueLists.filter((l) => app.status[l.id]?.running && !app.status[l.id]?.releasing));
   // Effects running on the selection (what you see on stage may be them, not the values here).

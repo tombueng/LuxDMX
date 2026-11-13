@@ -221,3 +221,42 @@ test('four heads added to the full Band stage land clear of the lights there and
   }, before);
   expect(near).toBeGreaterThanOrEqual(0.1);
 });
+
+test.describe('the boxes list folded on a laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('removing the only box keeps the list open (it says there is none now); closed, the bar looks again', async ({ page }) => {
+    await openConnected(page);
+    const boxes = page.locator('.top').getByRole('button', { name: /LuxDMX boxes/ });
+    await expect(boxes).toBeVisible();                                   // (folded: the pills don't fit at 1366)
+    if (!(await page.locator('.pop.list').isVisible())) await boxes.click();
+    const list = page.locator('.pop.list');
+    await list.getByRole('button', { name: /^Remove / }).click();
+    await expect(list).toBeVisible();
+    await expect(list).toContainText('No LuxDMX in this show yet');
+    await page.keyboard.press('Escape');
+    await expect(list).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Add a LuxDMX' })).toBeVisible();   // (room again: back on the bar)
+  });
+});
+
+test('Find anything says "colour preset", like the rest of the app', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('body').press('Control+k');
+  const find = page.getByRole('dialog', { name: 'Find anything' });
+  await find.getByRole('combobox').fill('red');
+  await expect(find.getByRole('option', { name: /colour preset/ }).first()).toBeVisible();
+  await expect(find).not.toContainText('color preset');
+});
+
+test('a programmer chip clicked stays lit after its scroll, even for a part that cannot reach the top', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await selectAll(page);
+  const chips = page.getByRole('navigation', { name: 'Programmer parts' });
+  await chips.getByRole('button', { name: 'Position' }).click();
+  await page.waitForTimeout(900);                                         // (the smooth scroll done)
+  await expect(chips.getByRole('button', { name: 'Position' })).toHaveAttribute('aria-current', 'true');
+  await chips.getByRole('button', { name: 'Colour' }).click();
+  await page.waitForTimeout(900);
+  await expect(chips.getByRole('button', { name: 'Colour' })).toHaveAttribute('aria-current', 'true');
+});

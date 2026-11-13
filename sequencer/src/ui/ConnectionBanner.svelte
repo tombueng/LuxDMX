@@ -35,7 +35,7 @@
 {#if unserved.length && waved !== unservedKey}
   <div class="note" role="status" data-testid="pixels-unserved">
     <Icon name="warn" />
-    <span><b>No box plays pixel universe {unservedText}.</b> Set a box's pixel port to it (its settings, Pixels), or update the box: one on v1.0.293 or older doesn't say what its ports listen to.</span>
+    <span><b>No box plays universe {unservedText}</b> (lights with cells are on it). Set a box's DMX output or pixel port to it (its settings), or update the box: one on v1.0.293 or older doesn't say what its ports listen to.</span>
     <button class="ghost" onclick={() => (waved = unservedKey)}>OK</button>
   </div>
 {/if}

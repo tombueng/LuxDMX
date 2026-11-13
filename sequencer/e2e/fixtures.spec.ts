@@ -122,6 +122,9 @@ test('the fixture editor\'s Save notes go away as soon as what they say is put r
   await expect(note).toHaveText('Every mode needs at least one channel.');
   await ed.getByRole('button', { name: '+ Channel' }).click();
   await expect(note).toHaveCount(0);
+  // (every field of the row has a name a screen reader can say)
+  await expect(ed.getByRole('checkbox', { name: 'Channel 1 is the fine one' })).toBeVisible();
+  await expect(ed.getByRole('spinbutton', { name: 'Channel 1 default' })).toBeVisible();
 });
 
 test('a GDTF matrix panel comes in laid out as a grid: Top picks its top row', async ({ page }) => {

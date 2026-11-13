@@ -1,6 +1,7 @@
 <script lang="ts">
   // The LuxDMX boxes this show plays on. Each one is a pill with its state; Connect opens the box's
   // bridge page (a popup, because only a page from the box itself may talk to it). + adds a box.
+  import { untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
   import { rig } from '../rdm/rig.svelte';
@@ -87,8 +88,10 @@
       if (top.scrollWidth - top.clientWidth > 1 || el.getBoundingClientRect().top - top.getBoundingClientRect().top > 24 || (show && show.getBoundingClientRect().width < 110)) wrapAt = w;
     });
   });
-  let lastCount = 0;
-  $effect(() => { const n = app.bridges.length; if (n !== lastCount) { lastCount = n; wrapAt = 0; } });
+  // (not while the boxes' list is open: it would fold away under the hand that just removed one)
+  let lastCount = 0, looksAgain = false;
+  $effect(() => { const n = app.bridges.length; if (n !== lastCount) { lastCount = n; if (untrack(() => list)) looksAgain = true; else wrapAt = 0; } });
+  $effect(() => { if (!list && looksAgain) { looksAgain = false; wrapAt = 0; } });
   let list = $state(false);
   // the list opens to the left of its button, or to the right where there's no room (a top bar that
   // wrapped puts the button near the left edge)

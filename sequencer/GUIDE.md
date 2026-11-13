@@ -498,8 +498,9 @@ Three more demos come with their own room on the 3D stage:
   real one, turns and mirrors it, and finds the wiring from three LEDs you click. Over 170 RGB pixels (128 RGBW) a light runs on over the next universes, whole pixels on
   each, the way a LuxDMX box's pixel port reads it: patch it on the universe the port starts at.
   A box tells the app what its ports listen on and only gets those universes. If a line under the
-  top bar says "No box plays pixel universe ...", set a pixel port to that universe, or update the
-  box: one on v1.0.293 or older doesn't say, and only gets its DMX universes.
+  top bar says "No box plays universe ..." (lights with cells are on it), set a pixel port (or, for a
+  DMX pixel bar, a DMX output) to that universe, or update the box: one on v1.0.293 or older
+  doesn't say, and only gets its DMX universes.
   Don't put them on a universe a DMX output listens to (the template starts at 10). On the 2D and
   3D stage they're drawn as what they are.
   - **Their effects** (Effects, Add, Rings and matrices) know where every LED is, so wiring order

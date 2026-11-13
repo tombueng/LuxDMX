@@ -62,7 +62,7 @@
     for (const f of s.fixtures) out.push({ label: f.name, hint: `${KIND_LABEL[app.kinds[f.id] ?? 'other']} · ${f.universe}.${f.address}`, icon: app.kinds[f.id] ?? 'other',
       run: () => { app.view = 'program'; app.sideTab = 'fixtures'; app.selected = [f.id]; } });
     for (const g of s.groups) out.push({ label: g.name, hint: `Group · ${g.fixtures.length} lights`, icon: 'group', run: () => { app.view = 'program'; app.selectGroup(g.id); } });
-    for (const p of s.presets) out.push({ label: p.name, hint: `${p.kind} preset${app.selected.length ? ' · put on the selection' : ''}`, icon: 'palette',
+    for (const p of s.presets) out.push({ label: p.name, hint: `${({ color: 'colour', position: 'position', intensity: 'intensity', beam: 'beam' } as Record<string, string>)[p.kind] ?? p.kind} preset${app.selected.length ? ' · put on the selection' : ''}`, icon: 'palette',
       run: () => { if (!app.applyPreset(p.id)) ui.toast('Select lights first'); } });
     for (const e of s.effects) out.push({ label: e.name, hint: `Effect · ${app.liveFx.includes(e.id) ? 'stop' : 'start'}`, icon: 'effect', run: () => app.toggleEffect(e.id) });
     for (const l of s.cueLists) l.cues.forEach((c, i) => out.push({ label: `${cueNumber(l, i)}. ${c.name}`, hint: `Cue in ${l.name} · go`, icon: 'play',

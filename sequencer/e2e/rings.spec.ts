@@ -289,7 +289,7 @@ test('a box gets what it plays and nothing else; when nothing plays a pixel ligh
   await expect.poll(async () => lit(await channels(11, 213)), { timeout: 8000 }).toBeGreaterThan(40);
   expect(Object.keys(await frames()).map(Number).filter((u) => u >= 20)).toEqual([]);      // not sent at all
   const note = page.getByTestId('pixels-unserved');
-  await expect(note).toContainText('No box plays pixel universe 20, 21');
+  await expect(note).toContainText('No box plays universe 20, 21');
   // patched where the port listens, the note goes
   await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.fixtures[1].universe = 10; a.markDirty(0); });
   await expect(note).toHaveCount(0);

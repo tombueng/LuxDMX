@@ -193,7 +193,7 @@
       <canvas bind:this={canvas} style="width:{cssW}px;height:{cssH}px" data-cells={n}></canvas>
       <span class="sr-only" aria-live="polite">{cursorSaid}</span>
     </div>
-    <p class="faint hint">Drag across cells, or a box from outside them. On the plan, Alt-click a pixel picks it.
+    <p class="faint hint">A click adds a cell (or takes it out again). Drag across cells, or a box from outside them. On the plan, Alt-click a pixel picks it.
       <button class="ghost link" class:on={takeOut} aria-pressed={takeOut} onclick={() => (takeOut = !takeOut)} title="Dragging takes cells out instead of adding them (Alt does the same with a mouse)">{takeOut ? 'Taking out' : 'Take out'}</button>
       {#if tiny || zoom > 1}<button class="ghost link" onclick={() => (zoom = zoom >= 4 ? 1 : zoom * 2)} title="Bigger cells: the picture scrolls, a tap picks one" aria-label="Zoom the cells, now {zoom} times">Zoom {zoom}×</button>{/if}</p>
     <div class="typed">
