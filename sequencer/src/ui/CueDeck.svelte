@@ -282,7 +282,7 @@
               {#if risk === 'hazard'}<span class="chip orange" title="Fires a machine (flames, sparks or CO2): only while armed"><Icon name="warn" size={11} /><span class="bt">machine</span></span>
               {:else if risk === 'once'}<span class="chip orange" title="Fires confetti (once): only while armed">1×</span>{/if}
               {#if c.actions?.length}<span class="chip violet" title="Also does {c.actions.length} thing{c.actions.length > 1 ? 's' : ''} when it starts"><Icon name="bolt" size={11} />{c.actions.length}</span>{/if}
-              {#if c.note}<span class="chip" title={c.note}><Icon name="note" size={11} /></span>{/if}
+              {#if c.note}<span class="chip notechip" title={c.note}><Icon name="note" size={11} /></span>{/if}
               <!-- how many lights it sets, by the chips (the picture stays clean) -->
               <!-- (a narrow card says it with a lamp and the number: "12 lights" cut to "1…" read as one) -->
               <span class="count" title={n ? `Sets ${n} light${n > 1 ? 's' : ''}` : c.effects?.length ? 'Only runs effects' : 'Sets nothing: the look before carries on'}>{#if n}<Icon name="par" size={11} />{n}<span class="w">&nbsp;light{n > 1 ? 's' : ''}</span>{:else}{c.effects?.length ? 'effects only' : 'carries on'}{/if}</span>
@@ -342,7 +342,13 @@
   .count { margin-left: auto; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .76rem; color: var(--faint); display: inline-flex; align-items: center; gap: .15rem; }
   .count :global(svg) { display: none; }
   .card { container: card / inline-size; }
-  @container card (max-width: 210px) { .count .w { display: none; } .count :global(svg) { display: inline; flex: none; } .count { flex: none; } }
+  @container card (max-width: 210px) { .count .w { display: none; } .count :global(svg) { display: inline; flex: none; } .count { flex: none; }
+    /* (the warning sign alone, its title says the rest: with the word, "Big finish"'s chips ran past
+       its edge and hid how many lights it sets) */
+    .chip.orange .bt { display: none; }
+    /* (four chips and more: the number of lights gives way, cut it read as a smaller number) */
+    .chips:has(> .chip:nth-child(4)) .count { display: none; }
+    .chips:has(> .chip:nth-child(5)) .notechip { display: none; } }
   .bt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pic.carry > .look { opacity: .45; }
   .prog { position: absolute; left: 6px; right: 6px; bottom: 3px; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }

@@ -2,7 +2,7 @@
 // when adding fixtures, effects that suit the selection first, no on-state that hides its own text,
 // a plan that stays whole on a phone.
 import type { Page } from '@playwright/test';
-import { FAKE, openConnected, patch, resetFake, selectAll, tab, test, expect } from './helpers';
+import { FAKE, fresh, openConnected, patch, resetFake, selectAll, tab, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -808,4 +808,17 @@ test('the names on the plan grow with the interface size when there is room', as
   const at100 = await h();
   await page.evaluate(async () => { const m = await import('/src/ui/ui.svelte.ts'); m.ui.setZoom(1.4); });
   await expect.poll(h).toBeGreaterThan(at100 * 1.25);
+});
+
+test('a narrow cue card keeps its chips inside: a machine is its warning sign, and with many chips the light count gives way', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await fresh(page, true);
+  await page.getByRole('dialog').getByRole('button', { name: 'Start Band' }).click();
+  await expect(page.locator('.deck .card').first()).toBeVisible();
+  const outside = await page.locator('.deck .card').evaluateAll((cards) => cards.flatMap((c) => {
+    const r = c.getBoundingClientRect();
+    return [...c.querySelectorAll('.chips > *')].some((e) => { const q = e.getBoundingClientRect(); return q.width > 0 && q.right > r.right - 2; }) ? [c.querySelector('.name')?.textContent] : [];
+  }));
+  expect(outside).toEqual([]);
+  await expect(page.locator('.deck .card', { hasText: 'Big finish' }).locator('.chip.orange')).toHaveAttribute('title', /Fires a machine/);
 });
