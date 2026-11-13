@@ -140,6 +140,11 @@ export class Engine {
   private lastStage: Record<string, Resolved> = {};
   private liveFx = new Map<string, Ramp>();   // effects started by hand
   private fxFlash = new Set<string>();
+  // Effects a cue runs, stopped by hand (its button tapped): faded out until a tap brings them back,
+  // or a cue starts again (any list's cue changing: what's on stage is new then)
+  private fxMuted = new Map<string, Ramp>();
+  private mutedFor = '';
+  private cueFx = new Set<string>();          // effects running from a cue, last frame
   private fxSince = new Map<string, { beats: number; seconds: number }>();
   private beats = 0;
   private seconds = 0;
@@ -251,7 +256,15 @@ export class Engine {
   stopEffect(id: string, fade = FX_FADE) {
     if (this.liveFx.has(id)) this.liveFx.set(id, { from: this.liveWeight(id), to: 0, start: this.now(), dur: fade });
   }
-  toggleEffect(id: string) { if (this.isEffectLive(id)) this.stopEffect(id); else this.startEffect(id); }
+  // A tap: by hand it stops; one a cue runs stops too (it did nothing: lit, and on it went); a tap on
+  // one stopped that way brings it back
+  toggleEffect(id: string) {
+    if (this.isEffectLive(id)) { this.stopEffect(id); return; }
+    const m = this.fxMuted.get(id);
+    if (m && m.to > 0) { this.fxMuted.set(id, { from: rampAt(m, this.now()), to: 0, start: this.now(), dur: FX_FADE }); return; }
+    if (this.cueFx.has(id)) { this.fxMuted.set(id, { from: m ? rampAt(m, this.now()) : 0, to: 1, start: this.now(), dur: FX_FADE }); return; }
+    this.startEffect(id);
+  }
   flashEffect(id: string, down: boolean) {
     if (down && !this.isEffectLive(id)) { this.liveFx.set(id, { from: 1, to: 1, start: this.now(), dur: 0 }); this.fxFlash.add(id); }
     else if (!down && this.fxFlash.delete(id)) this.liveFx.delete(id);
@@ -676,10 +689,18 @@ export class Engine {
       const v = rampAt(r, now);
       if (v <= 0 && r.to === 0 && now >= r.start + r.dur) this.liveFx.delete(id); else add(id, v);
     }
+    const on = players.map((p) => (p.running ? p.cueId : '')).join();
+    if (on !== this.mutedFor) { this.mutedFor = on; this.fxMuted.clear(); }
+    const cueFx = new Set<string>();
     for (const p of players) {
       const pw = p.weightAt(now) * p.master;
-      for (const [id, v] of p.effects(now)) add(id, v * pw);
+      for (const [id, v] of p.effects(now)) {
+        if (v * pw > 0) cueFx.add(id);
+        const m = this.fxMuted.get(id), mute = m ? rampAt(m, now) : 0;
+        add(id, v * pw * (1 - mute));
+      }
     }
+    this.cueFx = cueFx;
     const run: { e: Effect; def: EffectDef; p: EffectParams; f: number }[] = [];
     for (const e of show.effects) {
       const def = EFFECT_MAP.get(e.kind), f = w.get(e.id) ?? 0;

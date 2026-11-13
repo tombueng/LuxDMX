@@ -152,7 +152,7 @@ function loop() {
 
 // ---- what the page says
 const COMMANDS = new Set(['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
-  'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'stopAllEffects', 'act']);
+  'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'giveBackEffects', 'stopAllEffects', 'act']);
 self.onmessage = (e: MessageEvent<ToThread>) => {
   const m = e.data;
   switch (m.t) {

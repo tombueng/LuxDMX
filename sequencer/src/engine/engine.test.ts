@@ -643,3 +643,30 @@ describe('Lightning', () => {
     expect(dark).toBeGreaterThan(200);
   });
 });
+
+describe('an effect a cue runs, tapped on its button', () => {
+  it('stops (it went on, lit), comes back with a second tap, and with the next cue that runs it', () => {
+    const s = emptyShow();
+    s.fixtures = [{ id: 'p', name: 'P', typeId: 'gen-rgb', mode: '', universe: 0, address: 1, x: 0.5, y: 0.5 }];
+    s.effects = [{ id: 'rb', name: 'Rainbow', kind: 'rainbow', fixtures: ['p'], params: {} }];
+    s.cueLists = [{ id: 'l', name: 'L', end: 'stop', cues: [
+      { id: 'a', name: 'A', values: { p: { intensity: 1 } }, effects: ['rb'], fade: 0, advance: { mode: 'manual' } },
+      { id: 'b', name: 'B', values: { p: { intensity: 1 } }, effects: ['rb'], fade: 0, advance: { mode: 'manual' } },
+    ] }];
+    let t = 0;
+    const e = new Engine(() => s, () => t);
+    e.jumpTo('l', 0); t = 0.1; e.tick(); t = 1; e.tick();
+    expect(e.fxWeights.get('rb')).toBeGreaterThan(0);
+    e.toggleEffect('rb');                               // the button: stop it
+    t = 3; e.tick(); t = 3.1; e.tick();
+    expect(e.fxWeights.get('rb') ?? 0).toBe(0);
+    expect(e.liveEffects()).toEqual([]);                // (not started by hand on top)
+    e.toggleEffect('rb');                               // again: back
+    t = 5; e.tick(); t = 5.1; e.tick();
+    expect(e.fxWeights.get('rb')).toBeGreaterThan(0);
+    e.toggleEffect('rb');                               // stopped once more, then the next cue runs it
+    t = 7; e.tick();
+    e.jumpTo('l', 1); t = 7.1; e.tick(); t = 8; e.tick();
+    expect(e.fxWeights.get('rb')).toBeGreaterThan(0);
+  });
+});
