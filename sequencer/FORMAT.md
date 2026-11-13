@@ -407,7 +407,10 @@ a note.
 `settings.stage3d` (optional): `hideVenue: true` leaves out the built-in stage (band, truss, PA,
 crowd); `model`: `{ "name", "store", "scale", "x", "y", "z", "yaw" }`, your own venue as a glTF
 model kept in the browser that loaded it (`store` is its key there), placed in metres and turned
-in degrees about up. Another browser asks for the file again. `room`: the built-in room, `"hall"`
+in degrees about up. Another browser asks for the file again. `act`: `"none"` puts nobody on the
+hall's or the pub's stage (a play, a service, a premiere): no band, drum kit or backline, an
+audience standing calmly (no flags, no phones in the air), the banners and screens with the show's
+name (or `bandName`); `"band"` or left out, the band plays. `room`: the built-in room, `"hall"`
 (the big stage, also when it's left out) or `"pub"` (a small club or pub: a smaller deck under a
 low ceiling with two little trusses), or one of the demos' rooms: `"club"` (a DJ on a 12 m stage
 with truss on four towers and one over the dance floor), `"party"` (no stage: a 12 x 12 m square

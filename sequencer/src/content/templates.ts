@@ -416,6 +416,7 @@ export const TEMPLATES: Template[] = [
       b.cue(show, 'End', [[[...front, ...cyc, ...extra], on(0)]], { fade: 3, actions: [{ do: 'goto', list: hl.id, cue: hFull.id }], note: 'House lights up with it' });
       // the show first, house lights second (then the haze, the fog and the machines)
       [b.s.cueLists[0], b.s.cueLists[1]] = [show, hl];
+      b.s.settings.stage3d = { act: 'none' };   // (a play: nobody playing on the 3D stage, the banners say its name)
       return b.done();
     },
   },
@@ -476,6 +477,7 @@ export const TEMPLATES: Template[] = [
       b.cue(l, 'Worship concert', [...out, [front, on(0.6, undefined, { cct: 0.4 })], ...split(wash, C.blue, C.purple), [walls, on(1, C.blue)], [heads, on(1, C.white, aim(0.7, { zoom: 0.2 }))], [blinders, on(0)], [battens, on(1, C.blue)]],
         { fade: 1, effects: [sweep, drift, gradient, stars] });
       b.cue(l, 'Goodbye', [...out, [front, on(0.7, undefined, { cct: 0.35 })], [wash, on(0.6, C.warm)], [walls, on(0.5, C.warm)]], { fade: 4 });
+      b.s.settings.stage3d = { act: 'none' };   // (a service: no band on the 3D stage)
       return b.done();
     },
   },
@@ -528,6 +530,7 @@ export const TEMPLATES: Template[] = [
       b.cue(l, 'Horror night', [...out, [house, on(0)], [walls, on(0.5, C.red)], [steps, on(0.2, C.red)], [marquee, on(0.3, C.red)]], { fade: 3, effects: [flicker] });
       b.cue(l, 'Sci-fi night', [...out, [house, on(0.1)], [walls, on(0.6, C.cyan)], [marquee, on(0.8, C.cyan)], [steps, on(0.4, C.cyan)], [ceiling, on(0.8)],
         [spots, on(0.8, C.cyan, { pan: 0.5, tilt: 0.65, zoom: 0.1, gobo: gobo('Spiral'), goboRotation: turn('gen-spotgobo', 0.8) })]], { fade: 3, effects: [stars, scan, searchlight] });
+      b.s.settings.stage3d = { act: 'none' };   // (a premiere: no band on the 3D stage)
       return b.done();
     },
   },
@@ -581,6 +584,7 @@ export const TEMPLATES: Template[] = [
         { fade: 0.5, effects: [danceChase, bally, mirror], actions: fire(m.confetti, m.sparks), note: 'Confetti and sparks with the cake' });
       b.cue(l, 'Last call', [...out, [pars, on(0.6, C.amber)], [warm, on(0.8, undefined, { cct: 0.5 })], [shelves, on(0.5, C.amber)]], { fade: 5 });
       b.cue(l, 'Lights up', [...out, [pars, on(1, C.white)], [warm, on(1, undefined, { cct: 0.8 })], [shelves, on(0.6, C.white)], [dance, on(1, C.white)]], { fade: 3 });
+      b.s.settings.stage3d = { room: 'pub' };   // (a bar's music room)
       return b.done();
     },
   },

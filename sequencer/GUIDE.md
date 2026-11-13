@@ -808,6 +808,8 @@ Three more demos come with their own room on the 3D stage:
   backdrop, the banners, the screens and the kick drum (painted in the style of the band picture
   that's there by default; leave it empty for the picture; in the club and at the party it's on
   the front of the DJ booth). Both are kept with the show (the screens' live camera in this browser).
+  The theatre, church and cinema templates put nobody on that stage: no band, a calm audience, the
+  show's name on the banners and screens; the bar template is in the pub.
   Load your own venue or stage as a 3D model (.glb, or a .gltf with everything inside),
   fitted onto the floor (a model in millimetres or centimetres is scaled down), then size, place
   and turn it; the built-in stage can go. The model stays in this browser. Its panel closes with

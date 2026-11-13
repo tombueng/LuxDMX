@@ -395,7 +395,7 @@
     // three washes over the deck, coloured by what the lights do on each side (the band and the
     // backdrop take the show's colours; hundreds of real lights would be far too slow)
     wash = [-1, 0, 1].map((s) => { const l = new THREE.SpotLight(0xffffff, 0, 40, 0.55, 0.6, 1.2); l.position.set(s * 5, 11, 7); l.target.position.set(s * 3.5, DECK, -0.5); scene.add(l, l.target); return l; });
-    venue = buildVenue({ room: room.id, band: app.show.settings.bandName }); builtRoom = room.id; showRoom(room);
+    venue = buildVenue({ room: room.id, band: bandShown, act }); builtRoom = room.id; builtAct = act; showRoom(room);
     scene.add(venue.group);
     rig = new Rig(); scene.add(rig.group);
     { const r = rig; void makeGobos().then((a) => { if (rig === r) r.setGobos(a.tex); }); }
@@ -785,19 +785,24 @@
   // a show with another room: that room is built (and the camera goes to its front view); another
   // name: only the banners are painted again
   let builtRoom = '';
+  // who is on the stage (settings.stage3d.act): the band, or nobody (a play, a service, a premiere:
+  // the banners and screens show the show's own name then)
+  const act = $derived(app.show.settings.stage3d?.act ?? 'band');
+  const bandShown = $derived(app.show.settings.bandName || (act === 'none' ? app.show.meta.name : ''));
+  let builtAct: 'band' | 'none' = 'band';
   $effect(() => {
-    const r = room;
+    const r = room, a = act;
     if (!holding) return;
     untrack(() => {
-      if (!scene || !venue || r.id === builtRoom) return;
+      if (!scene || !venue || (r.id === builtRoom && a === builtAct)) return;
       scene.remove(venue.group); free(venue.group);
-      venue = buildVenue({ room: r.id, band: app.show.settings.bandName });
+      venue = buildVenue({ room: r.id, band: bandShown, act: a });
       venue.group.visible = !app.show.settings.stage3d?.hideVenue;
-      scene.add(venue.group); builtRoom = r.id; showRoom(r);
+      scene.add(venue.group); builtRoom = r.id; builtAct = a; showRoom(r);
       view('front');
     });
   });
-  $effect(() => { const n = app.show.settings.bandName ?? ''; if (holding) untrack(() => venue?.setBand(n)); });
+  $effect(() => { const n = bandShown; if (holding) untrack(() => venue?.setBand(n)); });
   // the model in the scene: loaded once per file, placed every time the numbers change
   $effect(() => {
     const m = vm, hide = !!app.show.settings.stage3d?.hideVenue;

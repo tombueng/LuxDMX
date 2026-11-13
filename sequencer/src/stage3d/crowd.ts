@@ -359,7 +359,9 @@ export interface Crowd {
 // where the crowd stands: from z0 (the front) back to z1, across -spread(z)..spread(z), not where
 // keepOut says; riders (on someone's shoulders) and flags: how many (unset: a few for a big crowd);
 // the band's banner (its picture and how wide it is for its height): on most of the flags
-export interface CrowdArea { z0: number; z1: number; spread: (z: number) => number; keepOut: (x: number, z: number) => boolean; riders?: number; flags?: number; banner?: { map: THREE.Texture; aspect: number } }
+// `calm`: an audience at a play, a service, a premiere: arms by their sides or on the hips, no phones,
+// no fists in the air
+export interface CrowdArea { z0: number; z1: number; spread: (z: number) => number; keepOut: (x: number, z: number) => boolean; riders?: number; flags?: number; banner?: { map: THREE.Texture; aspect: number }; calm?: boolean }
 
 const SKIN = [0xf1c8a8, 0xe8b896, 0xe0ac86, 0xc98d68, 0xb07850, 0x9c6544, 0x7a4e34, 0x5e3a26, 0xf6d5bb];
 const HAIR = [0x161210, 0x161210, 0x2b1d14, 0x2b1d14, 0x3a2414, 0x5a3a22, 0x7a5230, 0x9a6a34, 0xb08a50, 0xc8a060, 0xd9c08a, 0x8a8a88, 0x8a3a24], DYED = [0xd85a9a, 0x3a6ad8, 0x2aa07a, 0x8a4ad0];
@@ -399,7 +401,7 @@ export function buildCrowd(n: number, area: CrowdArea, seed = 777): Crowd {
   const person = (x: number, z: number, o: Partial<Fan> = {}): Fan => {
     const hat = weighted<Hat>([['cap', 10], ['beanie', 9], [undefined, 81]]);
     const hair = weighted<Hair>([['short', 30], ['long', 22], ['pony', 10], ['curly', 9], ['bun', 6], ['bald', hat ? 0 : 6]]);
-    const arms = weighted<{ L: ArmName; R: ArmName }>([
+    const arms = area.calm ? weighted<{ L: ArmName; R: ArmName }>([[{ L: 'down', R: 'down' }, 70], [{ L: 'hip', R: 'down' }, 12], [{ L: 'down', R: 'hip' }, 10], [{ L: 'hip', R: 'hip' }, 8]]) : weighted<{ L: ArmName; R: ArmName }>([
       [{ L: 'down', R: 'down' }, 40], [{ L: 'up', R: 'down' }, 9], [{ L: 'down', R: 'up' }, 9], [{ L: 'up', R: 'up' }, 13], [{ L: 'fist', R: 'down' }, 5], [{ L: 'down', R: 'fist' }, 6],
       [{ L: 'wave', R: 'wave' }, 5], [{ L: 'hip', R: 'down' }, 3], [{ L: 'hip', R: 'hip' }, 2], [{ L: 'phone', R: 'down' }, 4], [{ L: 'down', R: 'phone' }, 6], [{ L: 'up', R: 'phone' }, 2]]);
     const f: Fan = {
