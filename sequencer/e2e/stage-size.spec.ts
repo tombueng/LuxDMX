@@ -38,6 +38,15 @@ test('your own stage at its size: the room is built for it, heads hang on its tr
   await v.getByLabel(/On a riser/).uncheck();
   await expect.poll(async () => (await venue(page))?.key, { timeout: 20000 }).toBe('custom:6:4:0:4.5:1');
   await expect.poll(async () => (await where(page, 'Bar')).y, { timeout: 10000 }).toBeCloseTo(0, 2);
-  // kept with the show
+  // kept with the show, also after a reload (the loader used to drop a room it didn't know)
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.settings.stage3d)).toMatchObject({ room: 'custom', size: { w: 6, d: 4, riser: false, trussY: 4.5, trusses: 1 } });
+  await page.waitForTimeout(1200);                                           // (saved)
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx?.show.settings.stage3d), { timeout: 20000 }).toMatchObject({ room: 'custom', size: { w: 6, d: 4 } });
+  await expect.poll(async () => (await venue(page))?.key, { timeout: 45000 }).toBe('custom:6:4:0:4.5:1');
+  // the plan in metres: its width and depth on its edges
+  await page.locator('.stage-wrap').getByRole('button', { name: '2D' }).click();
+  await expect(page.locator('.stage-wrap g.dims')).toContainText('6 m wide');
+  await expect(page.locator('.stage-wrap g.dims')).toContainText('4 m deep');
+  expect(await page.locator('.stage-wrap g.dims line').count()).toBe(7 + 5);   // (a tick a metre, both ends)
 });

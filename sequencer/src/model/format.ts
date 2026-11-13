@@ -234,7 +234,18 @@ function mendSettings(st: Obj, note: Note) {
   }
   if (st.stage3d !== undefined && !isObj(st.stage3d)) delete st.stage3d;
   // the 3D stage's room: one it knows, or the big stage (a room from a newer version: that one)
-  if (isObj(st.stage3d) && st.stage3d.room !== undefined && !['hall', 'pub', 'club', 'party', 'truss'].includes(st.stage3d.room as string)) delete st.stage3d.room;
+  if (isObj(st.stage3d) && st.stage3d.room !== undefined && !['hall', 'pub', 'club', 'party', 'truss', 'custom'].includes(st.stage3d.room as string)) delete st.stage3d.room;
+  // your own stage's size: numbers in metres, brought into range (geometry.ts stageSize); not an
+  // object: none (8 x 5 m)
+  if (isObj(st.stage3d) && st.stage3d.size !== undefined) {
+    const z = st.stage3d.size;
+    if (!isObj(z)) delete st.stage3d.size;
+    else {
+      const num = (k: string, lo: number, hi: number, d: number) => { const v = z[k]; z[k] = typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
+      num('w', 2, 40, 8); num('d', 1.5, 25, 5); num('trussY', 2.5, 15, 5); num('trusses', 0, 4, 2); z.trusses = Math.round(z.trusses as number);
+      if (typeof z.riser !== 'boolean') z.riser = true;
+    }
+  }
   if (isObj(st.stage3d) && st.stage3d.act !== undefined && !['band', 'none'].includes(st.stage3d.act as string)) delete st.stage3d.act;
   // the band's name: words, at most 60 characters, or none (their picture)
   if (st.bandName !== undefined) { if (typeof st.bandName === 'string' && st.bandName.trim()) st.bandName = st.bandName.trim().slice(0, 60); else delete st.bandName; }

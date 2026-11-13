@@ -297,6 +297,20 @@ describe("the stage's marks", () => {
   });
 });
 
+describe('your own stage', () => {
+  it('kept through saving and opening, its size in range; a room it doesn\'t know: the big stage', () => {
+    const s: any = emptyShow('t');
+    s.settings.stage3d = { room: 'custom', size: { w: 6, d: 4, riser: false, trussY: 4.5, trusses: 1 } };
+    expect(parseShow(serializeShow(parseShow(JSON.stringify(s)))).settings.stage3d).toEqual({ room: 'custom', size: { w: 6, d: 4, riser: false, trussY: 4.5, trusses: 1 } });
+    s.settings.stage3d = { room: 'custom', size: { w: 900, d: 'x', trusses: 2.6 } };
+    expect(parseShow(JSON.stringify(s)).settings.stage3d?.size).toEqual({ w: 40, d: 5, riser: true, trussY: 5, trusses: 3 });
+    s.settings.stage3d = { room: 'custom', size: 'big' };
+    expect(parseShow(JSON.stringify(s)).settings.stage3d).toEqual({ room: 'custom' });
+    s.settings.stage3d = { room: 'stadium' };
+    expect(parseShow(JSON.stringify(s)).settings.stage3d?.room).toBeUndefined();
+  });
+});
+
 describe('a hostile file', () => {
   it('a "__proto__" key can\'t hide a flame from the risk marks: it is taken out, and said', async () => {
     const { parseShow } = await import('./format');

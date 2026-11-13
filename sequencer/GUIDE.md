@@ -863,6 +863,8 @@ Three more demos come with their own room on the 3D stage:
   towers and how high their underside is. The room, its crowd and the camera views and moves are
   built for it; your lights hang on its trusses and the plan is that stage (a quarter across the
   plan is a quarter of its width), so **Measure** gives real distances. It's kept with the show.
+  The plan (2D) shows the stage's width and depth on its edges, with a tick a metre (a longer one
+  every 5): the hall's 14 x 9 m, the pub's, or your own stage's.
   **Band name**: your band's name on the
   backdrop, the banners, the screens and the kick drum (painted in the style of the band picture
   that's there by default; leave it empty for the picture; in the club and at the party it's on

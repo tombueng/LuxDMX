@@ -14,6 +14,7 @@
   import { fixtureActions, fixtureMenu } from './actions';
   import { EFFECT_MAP } from '../engine/effects';
   import type { Fixture, Resolved } from '../model/types';
+  import { roomFor } from '../stage3d/geometry';
 
   // compact: no toolbar. readonly: only to look at (the Live page): zoom and pan, no selecting or moving.
   // blindChip: says "Blind: only here" itself (the Live page has its own, one you can press)
@@ -31,6 +32,11 @@
   let box = $state({ w: 1000, h: 560 });
   const W = $derived(Math.max(300, Math.round(H * box.w / Math.max(1, box.h))));
   const px = $derived(H / Math.max(1, box.h) / view.k);
+  // the plan in metres: the room's stage (the hall's 14 x 9 m, the pub's, your own stage's size): a
+  // tick a metre along the back edge and the side, a longer one every 5
+  const stageM = $derived(roomFor(app.show.settings.stage3d));
+  const mTicks = (n: number) => Array.from({ length: Math.floor(n + 1e-6) + 1 }, (_, i) => i);
+  const mSaid = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)} m`;
   let area = $state<HTMLDivElement>();
   $effect(() => {
     if (!area) return;
@@ -430,6 +436,12 @@
       {/if}
       <rect x="40" y={H - 30} width={W - 80} height="16" rx="4" fill="#ffffff05" stroke="#ffffff0d" />
       <text x={W / 2} y={H - 18} text-anchor="middle" class="edge" font-size={11 * px}>audience</text>
+      <g class="dims" pointer-events="none" data-w={stageM.W} data-d={stageM.D}>
+        {#each mTicks(stageM.W) as i (i)}<line x1={(i / stageM.W) * W} y1="0" x2={(i / stageM.W) * W} y2={(i % 5 ? 4 : 9) * px} />{/each}
+        {#each mTicks(stageM.D) as i (i)}<line x1="0" y1={(i / stageM.D) * H} x2={(i % 5 ? 4 : 9) * px} y2={(i / stageM.D) * H} />{/each}
+        <text x={W / 2} y={18 * px} text-anchor="middle" font-size={10 * px}>{mSaid(stageM.W)} wide</text>
+        <text transform="translate({16 * px} {H / 2}) rotate(-90)" text-anchor="middle" font-size={10 * px}>{mSaid(stageM.D)} deep</text>
+      </g>
 
       <!-- Light on the floor first (under everything, names included): a soft pool in front of each
            lit PAR or bar (all blurred in one go), the beam of each moving head. -->
@@ -581,6 +593,8 @@
   .adr { fill: var(--faint); font-family: ui-monospace, monospace; pointer-events: none; paint-order: stroke; stroke: #0b0e13; stroke-width: 3px; stroke-linejoin: round; }
   .glyph { fill: var(--muted); font-weight: 700; pointer-events: none; }
   .edge { fill: var(--faint); letter-spacing: .25em; text-transform: uppercase; }
+  .dims line { stroke: #ffffff2e; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .dims text { fill: var(--faint); opacity: .8; }
   .beam { filter: blur(2px); }
   .puff { animation: puff 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
   .puff.still { animation: none; }
