@@ -373,3 +373,25 @@ test('the stage beside the desk: a click on a light selects it, the command line
   await expect(view(page).getByRole('region', { name: 'Stage' })).toHaveCount(0);
   await expect(view(page).getByRole('button', { name: 'Show the stage' })).toHaveAttribute('aria-pressed', 'false');
 });
+
+test('a group keeps its number when the groups are reordered: "group 1" is still the same lights', async ({ page }) => {
+  await rig(page);
+  await page.getByRole('tab', { name: 'Program' }).click();
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.selected = a.show.fixtures.slice(0, 2).map((f: any) => f.id); a.groupFromSelection('Front');
+    a.selected = a.show.fixtures.slice(2, 4).map((f: any) => f.id); a.groupFromSelection('Back');
+    a.selectNone();
+  });
+  await page.locator('.side').getByRole('tab', { name: 'Groups' }).click();
+  const rows = page.locator('.side li.oitem');
+  await expect(rows).toHaveCount(2);
+  await rows.filter({ hasText: 'Back' }).dragTo(rows.filter({ hasText: 'Front' }));
+  await expect(rows.first()).toContainText('Back');
+  await expect(rows.first()).toContainText('2 ·');                  // (Back is still group 2)
+  await expect(rows.nth(1)).toContainText('1 ·');
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await command(page, 'group 1 @ 40');
+  await expect(said(page)).toHaveText('2 lights at 40%');
+  await expect.poll(async () => { const c = await channels(0, 16); return [c[0], c[4], c[8], c[12]]; }).toEqual([102, 102, 0, 0]);   // the Front PARs
+});

@@ -10,6 +10,7 @@
   import Knob from './Knob.svelte';
   import Help from './Help.svelte';
   import { cueNumber } from '../model/cuenum';
+  import { groupNumbers } from '../model/groupnum';
   import { bindingLabel, enableMidi, learnMidi, midiSupported, sameBinding } from '../input/midi';
   import Fader from './Fader.svelte';
   import { listRiskOf } from './risk';
@@ -70,7 +71,7 @@
     // (in the order of their numbers, as a desk's fixture faders: fader 7 is light 7 after a sort too)
     // (no machines: fog, flames, sparks, CO2, confetti have their buttons on Live, not a level here)
     ? app.show.fixtures.flatMap((f, i) => { const c = app.caps(f.id); return c.fog || isMachine(app.modeOf(f.id)) || !(c.intensity || c.color || c.white || c.cct) ? [] : [{ key: f.id, num: f.num ?? i + 1, name: f.name, ids: [f.id] }]; }).sort((a, b) => a.num - b.num)
-    : app.show.groups.map((g, i) => ({ key: g.id, num: i + 1, name: g.name, ids: g.fixtures })));
+    : app.show.groups.map((g, i) => ({ key: g.id, num: groupNumbers(app.show.groups)[i], name: g.name, ids: g.fixtures })));
   const banks = $derived(Math.max(1, Math.ceil(strips.length / PER)));
   const shown = $derived(strips.slice(bank * PER, bank * PER + PER));
   $effect(() => { if (bank >= banks) bank = banks - 1; });

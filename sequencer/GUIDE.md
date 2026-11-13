@@ -358,7 +358,7 @@ Three more demos come with their own room on the 3D stage:
   | `1 thru 4 @ 50`, `1>4 @ 50` | four lights at half (`@ 5` is 50 %, `@ 05` and `@ 5%` are 5 %) |
   | `1 thru 10 - 5 @ out` | nine lights out (`-` takes out, as on MA and Eos: `1-4` is light 1 without 4) |
   | `+ 7`, `@ +10` | add to what's selected; up 10 from where each light is |
-  | `group 2 @ full`, `all @ out` | a group by its number, every light |
+  | `group 2 @ full`, `all @ out` | a group by its number (shown in the Groups list; it keeps it when you drag the groups into another order), every light |
   | `1.3 thru 1.16 @ full` | cells 3 to 16 of light 1 (a desk's sub-fixtures) |
   | `record`, `record cue 5 time 3` | a new cue in the list Live plays; cue 5 where it belongs, its fade 3 s |
   | `update`, `update cue 5` | the cue on stage; cue 5 |

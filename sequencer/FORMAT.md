@@ -229,7 +229,10 @@ the deck, by its kind, under its 2D place):
 The order of `fixtures` is the order effects run in. `auto: true` marks groups the app made from
 the patch (it may rebuild them). `cells` (optional, numbers from 0) makes it a group of some cells
 of its lights ("Rim": `[0, 1, ... 59]` on discs): selecting it picks those cells, and an effect on
-the group (without `cells` of its own) runs on just them, in this order.
+the group (without `cells` of its own) runs on just them, in this order. `num` (optional, a whole
+number from 1, no two the same) is its number on the console ("group 5"); it stays when the list
+is reordered. A group without one counts by its place, after the numbers that are taken (a show
+from before has none: its groups are 1, 2, 3 in order).
 
 ## Values
 

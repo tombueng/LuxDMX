@@ -2,6 +2,7 @@
   // Groups: named, ordered sets of fixtures. One click selects them; effects run along their order.
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
+  import { freezeGroupNumbers, groupNumbers, nextGroupNumber } from '../model/groupnum';
   import { app, newId } from '../app.svelte';
   import { focusSelect, ui } from './ui.svelte';
   import { lookColor } from '../engine/cuelook';
@@ -26,7 +27,8 @@
     for (const [typeId, ids] of byType) {
       if (ids.length < 2 || app.show.groups.some((g) => g.fixtures.length === ids.length && ids.every((i) => g.fixtures.includes(i)))) continue;
       const t = app.types.get(typeId);
-      app.show.groups.push({ id: newId('g'), name: `All ${t?.model ?? 'fixtures'}`, fixtures: ids, auto: true });
+      freezeGroupNumbers(app.show.groups);
+      app.show.groups.push({ id: newId('g'), name: `All ${t?.model ?? 'fixtures'}`, fixtures: ids, auto: true, num: nextGroupNumber(app.show.groups) });
       n++;
     }
     ui.toast(n ? `Made ${n} group${n > 1 ? 's' : ''}` : 'Every fixture type is grouped already');
@@ -47,6 +49,7 @@
       { label: 'Delete group', icon: 'trash', danger: true, run: () => del(id) },
     ]);
   }
+  const nums = $derived(groupNumbers(app.show.groups));
 </script>
 
 <div class="panel gp" data-marks="show">
@@ -81,7 +84,7 @@
             <button class="main" aria-pressed={allSel} title="Select {g.name} (Shift or Ctrl adds)"
                     onclick={(e) => app.selectGroup(g.id, e.shiftKey || e.ctrlKey || e.metaKey)}
                     onkeydown={(e) => { if (e.key === 'F2') { e.preventDefault(); renaming = g.id; } else if (e.key === 'Delete') del(g.id); }}>
-              <span class="txt"><span class="nm">{g.name}</span><span class="faint" title="Group {i + 1}: &quot;group {i + 1}&quot; on the console">{i + 1} · {g.fixtures.length} light{g.fixtures.length === 1 ? '' : 's'}{g.cells?.length ? `, ${g.cells.length} cell${g.cells.length === 1 ? '' : 's'} each` : ''}</span></span>
+              <span class="txt"><span class="nm">{g.name}</span><span class="faint" title="Group {nums[i]}: &quot;group {nums[i]}&quot; on the console (it keeps it when you move it)">{nums[i]} · {g.fixtures.length} light{g.fixtures.length === 1 ? '' : 's'}{g.cells?.length ? `, ${g.cells.length} cell${g.cells.length === 1 ? '' : 's'} each` : ''}</span></span>
               <span class="dots">
                 {#each g.fixtures.slice(0, 12) as id (id)}{@const lc = lookColor(stage()[id])}<span class="d" style="background:{lc.glow > 0.02 ? lc.css : 'var(--line)'}"></span>{/each}
               </span>

@@ -4,6 +4,7 @@
 // Fixtures you didn't touch stay out of the cue, so playing it leaves them alone: that's what
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
 import { placeNew } from './model/place';
+import { freezeGroupNumbers, groupByNumber, nextGroupNumber } from './model/groupnum';
 import { hostProblem } from './model/host';
 import { emptyShow, parseShow, serializeShow, FormatError } from './model/format';
 import { GENERIC, caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
@@ -1471,6 +1472,7 @@ class App {
     for (const id of [...ids]) this.removeFixture(id);
     if (emptied.size) {
       for (const e of this.show.effects) if (e.group && emptied.has(e.group)) { delete e.group; e.fixtures = []; }
+      freezeGroupNumbers(this.show.groups);
       this.show.groups = this.show.groups.filter((g) => !emptied.has(g.id));
       for (const p of this.show.pages) p.widgets = p.widgets.filter((w) => !(w.type === 'group' && emptied.has(w.group)));
     }
@@ -1548,6 +1550,8 @@ class App {
     // (a group of cells: of the lights they're picked on)
     const inOrder = this.show.fixtures.map((f) => f.id).filter((id) => ids.includes(id));
     const g: Group = { id: newId('g'), name, fixtures: cells?.length ? this.samePicks(inOrder, cells, 'A group') : inOrder, ...(cells?.length ? { cells: [...cells] } : {}) };
+    freezeGroupNumbers(this.show.groups);
+    g.num = nextGroupNumber(this.show.groups);
     this.show.groups.push(g);
     return g.id;
   }
@@ -1565,6 +1569,7 @@ class App {
     if (!g) return '';
     for (const e of this.show.effects) if (e.group === id) { delete e.group; e.fixtures = [...g.fixtures]; }
     for (const p of this.show.pages) p.widgets = p.widgets.filter((w) => !(w.type === 'group' && w.group === id));
+    freezeGroupNumbers(this.show.groups);          // (the others keep theirs)
     this.show.groups = this.show.groups.filter((x) => x.id !== id);
     return this.prune();
   }
@@ -1575,6 +1580,7 @@ class App {
     this.checkpoint();
     const g = this.show.groups.find((x) => x.id === id);
     if (!g) return;
+    freezeGroupNumbers(this.show.groups);          // (moved, each keeps its number)
     const rest = this.show.groups.filter((x) => x.id !== id);
     rest.splice(Math.max(0, Math.min(rest.length, to)), 0, g);
     this.show.groups = rest;
@@ -1678,7 +1684,7 @@ class App {
         else gaps.push(...nums.filter((n) => !lightNo(n)));
         st.pick.fixtures = have;
         for (const n of st.pick.cells.map((x) => x.fixture)) if (!lightNo(n)) problems.push(`no light ${n}`);
-        for (const g of st.pick.groups) if (!this.show.groups[g - 1]) problems.push(`no group ${g}`);
+        for (const g of st.pick.groups) if (!groupByNumber(this.show.groups, g)) problems.push(`no group ${g}`);
         for (const x of st.pick.cells) {
           const f = lightNo(x.fixture);
           if (!f) continue;
@@ -1697,7 +1703,7 @@ class App {
         if (st.pick.all) whole.push(...fx.map((f) => f.id));
         for (const n of st.pick.fixtures) whole.push(lightNo(n)!.id);
         for (const g of st.pick.groups) {
-          const grp = this.show.groups[g - 1];
+          const grp = groupByNumber(this.show.groups, g);
           if (!grp) continue;
           if (!grp.cells?.length) { whole.push(...grp.fixtures); continue; }
           for (const id of grp.fixtures) { const n = this.caps(id).cells, cs = grp.cells.filter((k) => k < n); if (n > 1 && cs.length) picks.push({ id, cells: cs }); }

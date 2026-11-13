@@ -110,7 +110,7 @@
         "led": { "type": "object", "description": "How a pixel light's LEDs light, set by hand (for the stage pictures)", "properties": { "gamma": { "type": "number", "minimum": 1, "maximum": 4 }, "bright": { "type": "number", "minimum": 0, "maximum": 255 }, "maxMa": { "type": "number", "minimum": 0 }, "maPerCh": { "type": "number", "minimum": 0 }, "idleMa": { "type": "number", "minimum": 0 } } }, "num": { "type": "integer", "minimum": 1 }, "beamDeg": { "type": "array", "items": { "type": "number", "minimum": 0.5, "maximum": 180 }, "minItems": 2, "maxItems": 2, "description": "the beam's opening angle in degrees, narrowest and widest (the same twice: no zoom)" }, "hoistLimits": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 2, "maxItems": 2, "description": "a winch's soft limits: the highest and the lowest it may go, as parts of its travel (0 the top, 1 the bottom)" }
       }
     },
-    "group": { "type": "object", "required": ["id", "name", "fixtures"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "fixtures": { "type": "array", "items": { "type": "string" } }, "auto": { "type": "boolean" }, "cells": { "type": "array", "items": { "type": "integer", "minimum": 0 } } } },
+    "group": { "type": "object", "required": ["id", "name", "fixtures"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "fixtures": { "type": "array", "items": { "type": "string" } }, "auto": { "type": "boolean" }, "cells": { "type": "array", "items": { "type": "integer", "minimum": 0 } }, "num": { "type": "integer", "minimum": 1 } } },
     "values": {
       "type": "object",
       "properties": {

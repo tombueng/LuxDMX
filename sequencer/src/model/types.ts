@@ -183,6 +183,7 @@ export interface Group {
   fixtures: string[];     // ordered: effects run along this order
   cells?: number[];       // some cells of its lights only ("Rim": the rings' outer LEDs), in order: selecting it picks them, an effect on it runs on them
   auto?: boolean;         // made by the app from the patch (rebuilt when the patch changes)
+  num?: number;           // its number on the console ("group 5"): stays when the list is reordered (model/groupnum.ts)
 }
 
 export type PresetKind = 'color' | 'position' | 'beam' | 'intensity';

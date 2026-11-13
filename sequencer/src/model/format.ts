@@ -143,8 +143,14 @@ function withDefaults(s: any, notes: string[]): Show {
   s.groups = withIds(s.groups, 'Groups', note);
   // (numbers: whole, from 1; the app gives out missing and doubled ones when it opens the show)
   for (const f of s.fixtures) if (f.num !== undefined && !(Number.isInteger(f.num) && f.num >= 1 && f.num <= MAX_NUM)) { note(`${f.name}: its number "${String(f.num)}" isn't one, it gets a new one`); delete f.num; }
+  const groupNums = new Set<number>();
   for (const g of s.groups) {
     g.fixtures = strings(g.fixtures);
+    // (its console number: whole, from 1, its own; else it counts by its place)
+    if (g.num !== undefined) {
+      if (!(Number.isInteger(g.num) && g.num >= 1 && g.num <= MAX_NUM) || groupNums.has(g.num)) { note(`Group ${String(g.name)}: its number "${String(g.num)}" ${groupNums.has(g.num) ? 'is another group\'s' : "isn't one"}, it counts by its place`); delete g.num; }
+      else groupNums.add(g.num);
+    }
     // (a group of cells: whole numbers from 0; none that can be read: the whole lights)
     if (g.cells !== undefined) {
       const was = Array.isArray(g.cells) ? g.cells.length : 1;
