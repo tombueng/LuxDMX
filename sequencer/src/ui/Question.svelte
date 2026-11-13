@@ -9,10 +9,13 @@
   $effect(() => { input?.focus(); input?.select(); });
   // a held Enter (the one that opened this, say) doesn't answer it: only a fresh press does
   const held = (e: KeyboardEvent) => { if (e.key === 'Enter' && e.repeat) e.preventDefault(); };
+  // (a name it needs: OK waits for one instead of closing on an empty field and making nothing)
+  const blank = $derived(!!q.label && q.value !== undefined && !q.empty && !value.trim());
   function finish(ok: boolean) {
-    const { done, label, value: asked } = q;      // read before the dialog goes away
+    if (ok && blank) return;
+    const { done, label, value: asked, empty } = q;      // read before the dialog goes away
     ui.question = null;
-    done(ok ? (label && asked !== undefined ? value.trim() || (q.empty ? '' : null) : '') : null);
+    done(ok ? (label && asked !== undefined ? value.trim() || (empty ? '' : null) : '') : null);
   }
 </script>
 
@@ -29,7 +32,7 @@
     <div class="row end">
       <button type="button" onclick={() => finish(false)}>Cancel</button>
       <!-- svelte-ignore a11y_autofocus -->
-      <button type="submit" class={q.danger ? 'danger solid' : 'primary'} autofocus={!q.label} onkeydown={held}>{q.ok}</button>
+      <button type="submit" class={q.danger ? 'danger solid' : 'primary'} autofocus={!q.label} onkeydown={held} disabled={blank} title={blank ? `Type a ${q.label!.toLowerCase()} first` : undefined}>{q.ok}</button>
     </div>
   </form>
 </Modal>

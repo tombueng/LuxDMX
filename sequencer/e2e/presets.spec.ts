@@ -54,6 +54,14 @@ test('save the selection as a new preset, and the standard set comes back when i
   await tab(page, 'Presets');
   await page.locator('.pp').getByRole('button', { name: 'New Colours preset' }).click();
   const ask = page.getByRole('dialog', { name: 'New colour preset' });
+  // an empty name: OK waits for one (it used to close, make nothing and throw)
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await ask.getByLabel('Name').fill('');
+  await expect(ask.getByRole('button', { name: 'Save preset' })).toBeDisabled();
+  await ask.getByLabel('Name').press('Enter');
+  await expect(ask).toBeVisible();
+  expect(errors).toEqual([]);
   await ask.getByLabel('Name').fill('Stage blue');
   await ask.getByRole('button', { name: 'Save preset' }).click();
   await expect(tile(page, 'Stage blue')).toHaveCount(1);
