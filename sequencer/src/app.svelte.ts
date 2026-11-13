@@ -952,7 +952,10 @@ class App {
   }
   modeOf(fixtureId: string) { return this.modes.get(fixtureId); }
   // where a ring's or a matrix's pixels are: the light's own wiring when it has one, else its type's
-  placesOf(fixtureId: string) { const f = this.show.fixtures.find((x) => x.id === fixtureId); return f ? placesOfLight(f, this.modes.get(fixtureId)) : undefined; }
+  // (by id: a card's picture asks for every light, and a find through the rig for each was a few
+  // seconds of Record in a rig of 300 lights with 50 cues)
+  private layouts = $derived(new Map(this.show.fixtures.map((f) => [f.id, f.layout])));
+  placesOf(fixtureId: string) { return this.layouts.has(fixtureId) ? placesOfLight({ layout: this.layouts.get(fixtureId) }, this.modes.get(fixtureId)) : undefined; }
   caps(fixtureId: string) { return capsOf(this.modes.get(fixtureId)); }
 
   // One frame. Nothing in a show may stop the output for good: when a frame throws, the look that

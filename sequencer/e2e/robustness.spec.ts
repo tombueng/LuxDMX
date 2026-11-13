@@ -386,3 +386,30 @@ test('a browser that keeps nothing says "not saved" and how to keep the show, an
   await page.reload();
   await expect(fixturesOnStage(page)).toHaveCount(3);
 });
+
+// A big rig: 320 lights, 40 cues. A Record took seconds (each card's picture looked every light up
+// through the whole rig), adding 200 lights froze the page for 12 s. Generous bounds: a busy test
+// machine passes, the old ways don't.
+test('a big rig stays quick: Record and adding lights take moments, not seconds', async ({ page }) => {
+  test.setTimeout(180000);
+  await fresh(page);
+  const addMs = await page.evaluate(() => {
+    const a = (window as any).__luxdmx, t = performance.now();
+    a.addFixtures('gen-dimmer', '', 175, 0, 'D'); a.addFixtures('gen-rgbw', '', 145, 1, 'P');
+    return performance.now() - t;
+  });
+  expect(addMs).toBeLessThan(3000);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.selectAll();
+    for (let i = 0; i < 40; i++) { a.set({ intensity: ((i % 10) + 1) / 10 }); a.record(undefined, { fade: 0 }); }
+  });
+  await expect(cues(page)).toHaveCount(40);
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => (window as any).__luxdmx.set({ intensity: 0.33 }));
+  const t = Date.now();
+  await record(page);
+  await expect(cues(page)).toHaveCount(41);
+  await expect(page.locator('.top .saved')).toHaveText('saved');
+  expect(Date.now() - t).toBeLessThan(2500);
+});
