@@ -79,6 +79,11 @@ test.describe('a laptop (1366 x 768)', () => {
     await expect(card).toBeVisible();
     const c = await card.boundingBox();
     expect(c!.y + c!.height).toBeLessThanOrEqual(deck!.y + deck!.height);
+    // the interface at 130 %: the cards grow, the cues' share with them
+    await page.evaluate(() => { document.documentElement.style.fontSize = `${87.5 * 1.3}%`; });
+    await page.waitForTimeout(400);
+    const d2 = (await page.locator('.prog.desktop .foot').boundingBox())!, c2 = (await card.boundingBox())!;
+    expect(c2.y + c2.height).toBeLessThanOrEqual(d2.y + d2.height + 1);
   });
 });
 

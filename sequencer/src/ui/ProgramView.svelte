@@ -164,8 +164,9 @@
 <style>
   /* (the cues' share of the height unless you dragged it: less on a short laptop screen, where every
      pixel the stage gets counts and one row of cue cards still fits) */
-  .prog.desktop { --foot-normal: 38%; }
-  @media (max-height: 820px) { .prog.desktop { --foot-normal: 32.5%; } }
+  /* (never less than a whole row of cards at the interface size in use: they grow with it) */
+  .prog.desktop { --foot-normal: max(38%, 16.5rem); }
+  @media (max-height: 820px) { .prog.desktop { --foot-normal: max(32.5%, 16.5rem); } }
   .prog { flex: 1; min-height: 0; display: grid; gap: .55rem; padding: .55rem; }
   .desktop { grid-template-columns: var(--side-w) minmax(0, 1fr) var(--right-w); grid-template-rows: minmax(0, 1fr) minmax(170px, var(--foot-h)); position: relative;
     grid-template-areas: 'side center right' 'foot foot foot'; }
