@@ -118,7 +118,7 @@
     </section>
 
     <div class="tpls">
-      <span class="faint">Or start from a rig like yours:</span>
+      <span class="faint">Or start from a template:</span>
       {#each TEMPLATES as t (t.name)}<button class="tplchip" onclick={() => template(t.build)} title={t.blurb}><Icon name={t.icon} size={16} />{t.name}</button>{/each}
     </div>
     <div class="row more">
@@ -129,7 +129,7 @@
              onchange={(e) => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; i.value = ''; if (f) void open(f); }} />
     </div>
     <div class="row end">
-      <p class="hint faint">Program builds the show; Live (top) is for playing it with big buttons. This is an alpha: it works, but things change and some are rough, so keep a copy of your show (Shows, Export).</p>
+      <p class="hint faint">Program builds the show; Live (top) is for playing it with big buttons. This is an alpha: it works, but things change and some are rough, so keep a copy of your show (Shows, Save as file).</p>
       <button class="ghost" onclick={close}>Start with an empty stage</button>
     </div>
   </div>

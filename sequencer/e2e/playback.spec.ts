@@ -106,7 +106,7 @@ test('save as file and open it again, with the format header', async ({ page }, 
   const shows = page.locator('.top .show');
   await shows.click();
   const dlg = page.getByRole('dialog', { name: 'Shows' });
-  const [dl] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save current as file' }).click()]);
+  const [dl] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save as file' }).click()]);
   const file = info.outputPath('show.luxdmx.json');
   await dl.saveAs(file);
   const json = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -129,7 +129,7 @@ test('save as file and open it again, with the format header', async ({ page }, 
   await jumpTo(page, 0);
   await expect.poll(() => channels(0, 4)).toEqual([255, 0, 255, 0]);
   await shows.click();
-  const [dl2] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save current as file' }).click()]);
+  const [dl2] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save as file' }).click()]);
   const again = JSON.parse(fs.readFileSync(await dl2.path(), 'utf8'));
   expect(again.fromTheFuture).toEqual({ keep: 'me' });
 });

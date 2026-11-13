@@ -103,7 +103,7 @@
 
 <header class="top" class:witharm={app.gatedMachines.length > 0}>
   <h1 class="sr-only">LuxDMX Sequencer (alpha): {app.show.meta.name}</h1>
-  <div class="brand" aria-hidden="true">Lux<span>DMX</span> <small class="alpha" title="Alpha: it works, but it's young. Things change, some are rough, keep a copy of your show (Shows, Export).">alpha</small></div>
+  <div class="brand" aria-hidden="true">Lux<span>DMX</span> <small class="alpha" title="Alpha: it works, but it's young. Things change, some are rough, keep a copy of your show (Shows, Save as file).">alpha</small></div>
   {#if app.locked}
     <!-- Service mode: the show's name and a lock, nothing that edits or leaves the page. -->
     <span class="show lockedname" title="Locked for the show: hold the padlock on the page to unlock"><Icon name="lock" /><span class="name">{app.show.meta.name || 'Untitled'}</span></span>

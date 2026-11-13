@@ -388,7 +388,7 @@
       <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show the names (with each light's number)" aria-label="Names" aria-pressed={labels}>Aa</button>
       <button class="ghost" class:on={addrs} onclick={() => (addrs = !addrs)} title="Show each light's number (what the console goes by) and DMX address" aria-label="Numbers and DMX addresses" aria-pressed={addrs}>#</button>
       <span class="sep"></span>
-      <button class="ghost zoomin" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="plus" size={14} /></button>
+      <button class="ghost zoomin" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="search" size={14} />+</button>
       <!-- (only while zoomed in: a greyed-out "100%" took a toolbar row of its own on a laptop) -->
       {#if view.k > 1}<button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>{/if}
       {/if}

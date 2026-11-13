@@ -202,7 +202,7 @@ test('an effect on picked cells, a group of them, its flash just them; Take out;
   await picker(page).getByLabel('Cells to pick').fill('3'); await picker(page).getByLabel('Cells to pick').press('Enter');
   await swatch(page, 'Red'); await record(page);
   await page.locator('.top .show').click();
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'Save current as file' }).click()]);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'Save as file' }).click()]);
   const file = info.outputPath('cells.luxdmx.json'); await dl.saveAs(file);
   const json = JSON.parse(fs.readFileSync(file, 'utf8'));
   expect(json.requiredFeatures).toEqual(['cells']);
