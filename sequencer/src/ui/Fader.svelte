@@ -55,7 +55,8 @@
 </div>
 
 <style>
-  .fader { position: relative; width: 34px; touch-action: none; cursor: ns-resize; border-radius: 6px; flex: none; }
+  /* (room for the cap's half that sticks out at 0 and at full: it covered the name under it) */
+  .fader { position: relative; width: 34px; touch-action: none; cursor: ns-resize; border-radius: 6px; flex: none; margin-block: 9px; }
   .fader:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .fader.off { opacity: .4; }
   .slot { position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; margin-left: -3px; border-radius: 3px; background: #0b0f15; box-shadow: inset 0 0 0 1px #ffffff14; }

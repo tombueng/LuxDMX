@@ -14,7 +14,7 @@
   import { bindingLabel, enableMidi, learnMidi, midiSupported, sameBinding } from '../input/midi';
   import Fader from './Fader.svelte';
   import { listRiskOf } from './risk';
-  import { isMachine, RISK_LABEL } from '../model/safety';
+  import { isMachine, RISK_LABEL, RISK_SHORT } from '../model/safety';
   import type { ChannelAttr, Color, NumAttr } from '../model/types';
   import { slotsOf } from '../engine/render';
   import StageView from './StageView.svelte';
@@ -228,9 +228,11 @@
   function clearUndo() { const keep = $state.snapshot(app.programmer); app.clearProgrammer(); ui.toast('Cleared: the cues have their lights back', 4000, { label: 'Undo', run: () => (app.programmer = keep) }); }
   function step(d: 1 | -1) { const r = app.runCommand(d > 0 ? 'next' : 'prev'); said = r.said; bad = !r.ok; }
   function record() { const l = app.liveList, ok = app.record(l?.id); ui.toast(ok ? `Recorded as a new cue in ${l?.name ?? app.list?.name ?? 'a new list'}` : 'Nothing to record: set some lights first (5 @ full)'); }
+  // (a laptop's short screen: the cue lists' faders shorter, their GO in view)
+  let vh = $state(typeof window === 'undefined' ? 1000 : window.innerHeight);
 </script>
 
-<svelte:window onkeydown={anyKey} />
+<svelte:window onkeydown={anyKey} bind:innerHeight={vh} />
 
 <!-- (with MIDI on: a fader's control, or a button to give it one) -->
 {#snippet midiBtn(to: string, name: string)}
@@ -365,8 +367,9 @@
         <div class="strip pb" class:on={s?.running && !s?.releasing} data-list={l.name} style="--c:{l.color ?? 'var(--green)'}">
           <span class="num">{pbank * PPER + i + 1}</span>
           {@render midiBtn(`list:${l.id}`, l.name)}
-          {#if risk !== 'light'}<span class="chip risk {risk}" title="{RISK_LABEL[risk]}{risk === 'hazard' || risk === 'once' ? (app.sfxArmed ? ': armed' : ': safe, not armed') : ''}">{RISK_LABEL[risk]}</span>{/if}
-          <Fader label="{l.name} fader" dblFull={false} value={s?.running ? s.master : 0} onset={(v) => (v > 0.03 && !s?.running ? playing(l, () => app.playbackFader(l.id, v)) : app.playbackFader(l.id, v))} />
+          <!-- (a short mark on a strip this narrow, the whole of it in its title) -->
+          {#if risk !== 'light'}<span class="chip risk {risk}" class:armed={app.sfxArmed && (risk === 'hazard' || risk === 'once')} aria-label="{RISK_LABEL[risk]}{risk === 'hazard' || risk === 'once' ? (app.sfxArmed ? ', armed' : ', safe') : ''}" title="{RISK_LABEL[risk]}{risk === 'hazard' || risk === 'once' ? (app.sfxArmed ? ': armed' : ': safe, not armed') : ''}">{RISK_SHORT[risk]}</span>{/if}
+          <Fader label="{l.name} fader" height={vh <= 820 ? 76 : 130} dblFull={false} value={s?.running ? s.master : 0} onset={(v) => (v > 0.03 && !s?.running ? playing(l, () => app.playbackFader(l.id, v)) : app.playbackFader(l.id, v))} />
           <!-- (its cues, numbered: one tapped goes there, as the cue list window on a desk) -->
           <button class="name ghost" onclick={(e) => cuesOf(l, e)} title="{l.name}: its cues (pick one to go to it)" aria-label="Cues of {l.name}">{l.name}</button>
           <span class="cue faint" title="On stage">{s?.running ? (l.cues[s.index]?.name ?? '') : ''}</span>
@@ -441,6 +444,12 @@
   button.name { padding: 0 .2rem; min-height: 0; border: 0; color: var(--text); text-decoration: underline dotted; text-underline-offset: 3px; }
   .cue { font-size: .68rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1em; }
   .two { display: flex; gap: .45rem; width: 100%; }
+  /* (as in the fixture list: what the machines on it are, armed in red) */
+  .risk { font-size: .7rem; white-space: nowrap; padding-inline: .35rem; }
+  .risk.atmosphere { color: #9fb4c8; }
+  .risk.once { color: #e8c44a; border-color: #e8c44a55; }
+  .risk.hazard { color: #ff8a5c; border-color: #ff7a1c88; font-weight: 650; }
+  .risk.armed { color: #fff; background: #7a1d0c; border-color: #ff7a1c; }
   .cue.next { font-size: .68rem; } .two button { flex: 1 1 0; min-width: 0; padding-inline: .2rem; }
   .midi { font-size: .66rem; padding: .05rem .2rem; min-height: 0 !important; width: 100%; }
   .midi.bound { color: var(--green); border-color: var(--green); }

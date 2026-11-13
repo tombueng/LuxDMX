@@ -395,3 +395,27 @@ test('a group keeps its number when the groups are reordered: "group 1" is still
   await expect(said(page)).toHaveText('2 lights at 40%');
   await expect.poll(async () => { const c = await channels(0, 16); return [c[0], c[4], c[8], c[12]]; }).toEqual([102, 102, 0, 0]);   // the Front PARs
 });
+
+test.describe('the console on a laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('the cue lists\' strips: short machine marks, the name clear of the fader cap, GO in view', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.cueLists.length)).toBeGreaterThan(4);
+    await page.getByRole('tab', { name: 'Console' }).click();
+    const strips = view(page).locator('.playbacks .strip');
+    await expect(strips.first()).toBeVisible();
+    // the marks fit their strip; what they mean is in their name
+    const marks = view(page).locator('.playbacks .risk');
+    expect(await marks.count()).toBeGreaterThan(2);
+    for (const t of await marks.allTextContents()) expect(['⚠', '1×', 'fog']).toContain(t.trim());
+    await expect(marks.first()).toHaveAttribute('aria-label', /./);
+    const over = await strips.evaluateAll((els) => els.filter((s) => { const m = s.querySelector('.risk'); return m && m.getBoundingClientRect().right > s.getBoundingClientRect().right + 0.5; }).length);
+    expect(over).toBe(0);
+    // the cap at 0 stays above the list's name
+    const hit = await strips.evaluateAll((els) => els.filter((s) => { const c = s.querySelector('.cap')!.getBoundingClientRect(), n = s.querySelector('.name')!.getBoundingClientRect(); return c.bottom > n.top + 0.5; }).length);
+    expect(hit).toBe(0);
+    await expect(strips.first().getByRole('button', { name: /^GO / })).toBeInViewport({ ratio: 1 });
+  });
+});
