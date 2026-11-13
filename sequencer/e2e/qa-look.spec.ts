@@ -302,3 +302,15 @@ test.describe('help notes on a laptop', () => {
     }
   });
 });
+
+test.describe('the 2D plan on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  test('no zoom button alone on a toolbar row (a phone pinches); the plan has the room', async ({ page }) => {
+    await openConnected(page);
+    await page.evaluate(() => (window as any).__luxdmx.addFixtures('gen-rgb', '', 4, 0, 'P'));
+    const stage = page.locator('.stage-wrap');
+    await expect(stage.locator('svg[aria-label="Stage"]')).toBeVisible();
+    await expect(stage.getByRole('button', { name: 'Zoom in' })).toBeHidden();
+    await expect(stage.getByRole('button', { name: 'Invert' })).toBeVisible();
+  });
+});

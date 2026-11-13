@@ -354,7 +354,7 @@
       <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show the names (with each light's number)" aria-label="Names" aria-pressed={labels}>Aa</button>
       <button class="ghost" class:on={addrs} onclick={() => (addrs = !addrs)} title="Show each light's number (what the console goes by) and DMX address" aria-label="Numbers and DMX addresses" aria-pressed={addrs}>#</button>
       <span class="sep"></span>
-      <button class="ghost" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="plus" size={14} /></button>
+      <button class="ghost zoomin" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="plus" size={14} /></button>
       <!-- (only while zoomed in: a greyed-out "100%" took a toolbar row of its own on a laptop) -->
       {#if view.k > 1}<button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>{/if}
       {/if}
@@ -530,6 +530,8 @@
   .head { margin-bottom: .35rem; flex-wrap: wrap; }
   .grp { padding: .12rem .5rem; font-size: .8rem; border-radius: 999px; }
   .area { position: relative; flex: 1; min-height: 0; }
+  /* (a phone pinches: the button took a toolbar row of its own) */
+  @media (max-width: 760px) { .zoomin { display: none; } }
   svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
   .fx { cursor: grab; }
   .px.picked { stroke: #ffaa1c; stroke-width: 1.5px; }   /* (picked: orange, as selection is everywhere) */
