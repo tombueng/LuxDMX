@@ -491,3 +491,17 @@ test('the effect editor: the beats choice shows what it is, seconds and blocks k
   await expect(blocks).toBeVisible();
   await blocks.fill('0'); await blocks.press('Tab'); await expect(blocks).toHaveValue('1');
 });
+
+test('Find anything knows calibrate, aim and channels; "All channels" opens the programmer\'s channel list', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 2, 0, 'Head');
+  const find = page.getByRole('dialog', { name: 'Find anything' });
+  for (const [q, want] of [['calibrate', /Focus and calibrate/], ['aim', /Aim the heads/], ['channels', /All channels/]] as const) {
+    await page.locator('body').press('Control+k');
+    await find.getByRole('combobox').fill(q);
+    await expect(find.getByRole('option', { name: want }).first()).toBeVisible();
+    if (q !== 'channels') await page.keyboard.press('Escape');
+  }
+  await find.getByRole('option', { name: /All channels/ }).first().click();
+  await expect(page.locator('#pg-all-ch')).toHaveAttribute('open', '');
+});

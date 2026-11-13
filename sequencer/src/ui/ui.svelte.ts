@@ -25,6 +25,7 @@ class Ui {
   patchTab = $state<'patch' | 'channels' | 'leds' | 'mounting'>('patch');   // the tab it opens on
   patchMany = $state<string[] | null>(null); // ...or the lights patched together
   focusCal = $state<string[] | null>(null);  // the heads in Focus and calibrate
+  progJump = $state('');                      // a part of the programmer to go to ('pg-all': every channel), from Find anything
   panTiltFind = $state<string | null>(null);  // a light whose pan and tilt channels are being found
   // what Focus and calibrate has seen this session: per head, per mark, the pan and tilt (a cue's)
   // that put the real beam on it (kept when the dialog closes, gone with a reload)

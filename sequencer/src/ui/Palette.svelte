@@ -43,6 +43,12 @@
     cmd('Phone as a remote…', 'phone', () => (ui.modal = 'remote'), undefined, 'mobile smartphone tablet qr code play from the crowd');
     out.push({ label: 'Make a fog timer…', hint: '', find: 'fog every few minutes automatic repeat loop haze', icon: 'fog', run: () => fogTimer() });
     cmd('Select all lights', 'check', () => app.selectAll());
+    // (things that were only on a menu somewhere: "calibrate", "aim", "channels" found nothing)
+    const heads = app.selected.filter((x) => app.kinds[x] === 'mover'), movers = app.show.fixtures.filter((f) => app.kinds[f.id] === 'mover').map((f) => f.id);
+    if (movers.length) cmd(heads.length ? `Focus and calibrate the ${heads.length > 1 ? `${heads.length} heads` : 'head'}…` : 'Focus and calibrate the moving heads…', 'position',
+      () => (ui.focusCal = heads.length ? heads : movers), undefined, 'calibrate focus marks pan tilt offset hung where it points aim');
+    if (movers.length) cmd('Aim the heads at a spot (3D stage, Aim)', 'position', () => { app.view = 'program'; if (!heads.length) app.selected = movers; ui.stage3d = true; ui.toast('Aim (on the 3D stage\'s toolbar), then click where they should point', 5000); }, undefined, 'aim point target follow spot position');
+    if (s.fixtures.length) cmd('All channels of the selected lights', 'grid', () => { app.view = 'program'; if (!app.selected.length) app.selectAll(); ui.progJump = 'pg-all'; }, undefined, 'channels raw dmx values every channel all');
     if (s.fixtures.length) cmd('Make starter looks for this rig (warm, cool, sunset, party...)', 'palette', () => { const n = app.makeStarterLooks(); if (n) { app.view = 'program'; app.toastUndo(`${n} starter looks for your rig`); } });
     cmd('Undo', 'undo', () => app.undo(), 'Ctrl+Z');
     cmd('Redo', 'redo', () => app.redo(), 'Ctrl+Shift+Z');

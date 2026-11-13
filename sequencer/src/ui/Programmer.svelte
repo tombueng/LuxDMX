@@ -58,6 +58,8 @@
     }
     document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
+  // (Find anything's "All channels": there once it's drawn)
+  $effect(() => { const id = ui.progJump; if (id) { ui.progJump = ''; void tick().then(() => jump(id)); } });
   // the part whose top has passed the top of the scrolled panel (the last one at the very bottom)
   let jumpBar = $state<HTMLElement>();
   $effect(() => {
