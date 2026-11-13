@@ -94,6 +94,36 @@ test('import a GDTF file and drive it', async ({ page }) => {
   await expect.poll(() => channels(0, 5)).toEqual([255, 0, 255, 0, 0]);   // dimmer, R, G, B, W
 });
 
+test('a broken fixture file says so in plain words, and the note goes once a good one comes in', async ({ page }) => {
+  await openConnected(page);
+  await openAdd(page);
+  const file = addDialog(page).locator('input[type=file]');
+  await file.setInputFiles({ name: 'broken.qxf', mimeType: 'application/xml', buffer: Buffer.from('<FixtureDefinition><Model>x</Model><Mode Name="a"></FixtureDefinition>') });
+  const note = addDialog(page).locator('p.err');
+  await expect(note).toHaveText(/^broken\.qxf: not valid XML.*the file is damaged, or isn't a fixture file$/);
+  await expect(note).not.toContainText('error on line');                 // (not the browser parser's own text)
+  await file.setInputFiles('test/fixtures/qxf/Stairville-LED-PAR-36-COB-RGBW-12W.qxf');
+  await expect(addDialog(page).getByRole('button', { name: /^Add \d+ × .*PAR 36/ })).toBeVisible();
+  await expect(note).toHaveCount(0);
+});
+
+test('the fixture editor\'s Save notes go away as soon as what they say is put right', async ({ page }) => {
+  await openConnected(page);
+  await openAdd(page);
+  await addDialog(page).getByRole('button', { name: 'Make my own…' }).click();
+  const ed = page.getByRole('dialog', { name: 'New fixture type' });
+  const note = ed.locator('.err');
+  await ed.getByLabel('Model').fill('');
+  await ed.getByRole('button', { name: 'Save type' }).click();
+  await expect(note).toHaveText('Give it a name.');
+  await ed.getByLabel('Model').fill('Cheap PAR');
+  await expect(note).toHaveCount(0);
+  await ed.getByRole('button', { name: 'Save type' }).click();
+  await expect(note).toHaveText('Every mode needs at least one channel.');
+  await ed.getByRole('button', { name: '+ Channel' }).click();
+  await expect(note).toHaveCount(0);
+});
+
 test('a GDTF matrix panel comes in laid out as a grid: Top picks its top row', async ({ page }) => {
   const { zipSync, strToU8 } = await import('fflate');
   // 4 x 2 pixels, red only, numbered along the rows from the top left

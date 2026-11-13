@@ -97,6 +97,7 @@
   };
   function pick(id: string) {
     typeId = id;
+    err = '';                                   // (another type picked: an old problem doesn't stand over it)
     likePick = null;
     const t = app.types.get(id) ?? app.myTypes.find((x) => x.id === id);
     const k = kindOf(modeOf(t, ''));
@@ -150,6 +151,7 @@
     const f = fileInput?.files?.[0];
     if (fileInput) fileInput.value = '';
     if (!f) return;
+    err = '';                                   // (the last file's problem isn't this one's)
     try { pick(app.addType(await importFixtureFile(f))); } catch (e) { err = (e as Error).message; }
   }
 </script>

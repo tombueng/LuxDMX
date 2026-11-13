@@ -5,7 +5,11 @@ export function parseXml(text: string): Document {
   // one (QLC+ writes those): drop it.
   const doc = new DOMParser().parseFromString(text.replace(/^\uFEFF?\s*<\?xml[^>]*\?>/, ''), 'application/xml');
   const err = doc.getElementsByTagName('parsererror')[0];
-  if (err) throw new Error('not valid XML: ' + (err.textContent ?? '').slice(0, 120));
+  // (where it breaks, in words; the parser's own text is a browser's, cut off at random)
+  if (err) {
+    const at = /line\s+(\d+)(?:[^\d]+column\s+(\d+))?/i.exec(err.textContent ?? '');
+    throw new Error(`not valid XML${at ? ` (it breaks at line ${at[1]}${at[2] ? `, column ${at[2]}` : ''})` : ''}: the file is damaged, or isn't a fixture file`);
+  }
   return doc;
 }
 export const kids = (el: Element | null | undefined, name?: string): Element[] =>

@@ -97,6 +97,12 @@
     openRuns = new Set(); openRanges = null;
   }
 
+  // (a note from the last Save goes as soon as what it's about is put right: a name typed, a channel added)
+  $effect(() => {
+    if (!err) return;
+    const named = !!t.model.trim(), filled = t.modes.every((m) => m.channels.length > 0), apart = new Set(t.modes.map((m) => m.name)).size === t.modes.length;
+    if ((err === 'Give it a name.' && named) || (err === 'Every mode needs at least one channel.' && filled) || (err === 'Two modes have the same name.' && apart)) err = '';
+  });
   function save() {
     err = '';
     if (!t.model.trim()) { err = 'Give it a name.'; return; }
