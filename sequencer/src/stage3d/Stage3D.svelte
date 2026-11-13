@@ -1409,6 +1409,9 @@
   .tools { align-self: stretch; display: flex; gap: .4rem; align-items: center; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; pointer-events: none; }
   .tools::-webkit-scrollbar { display: none; }
   .tools > *, .more, .venue, .aimhint, .sel { pointer-events: auto; }
+  /* (an open panel above the selected lights' box: on a short 3D view the box lay over Render's
+     button, and a click on it hit the box) */
+  .venue { position: relative; z-index: 3; }
   .tools > * { flex: none; }
   .tools > .grow { flex: 1; pointer-events: none; }
   .seg { display: inline-flex; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: 2px; backdrop-filter: blur(4px); }
