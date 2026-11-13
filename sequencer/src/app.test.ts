@@ -436,3 +436,46 @@ describe('a song playing on the timeline', () => {
     expect(app.bpm).toBe(app.show.settings.bpm);                    // stopped: the show's own tempo again
   });
 });
+
+describe('Undo of a Record', () => {
+  it("into a list that wasn't playing: the list stops again, the programmer holds the look, the stage stays; no other cue says LIVE", async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    tick(1);
+    app.selected = ['p1']; app.set({ intensity: 0.6 }); tick(2);
+    expect(pct(app.stage.p1.intensity)).toBe(60);
+    expect(app.record('L')).toBe(true);
+    tick(2);
+    expect(app.status.L.cue).toBe(app.show.cueLists[0].cues[2].id);       // the new cue is live
+    expect(Object.keys(app.programmer)).toEqual([]);
+    app.undo(); tick(2);
+    expect(app.show.cueLists[0].cues).toHaveLength(2);
+    expect(app.status.L.running).toBe(false);                              // not "Late LIVE"
+    expect(pct(app.programmer.p1?.intensity)).toBe(60);
+    expect(pct(app.stage.p1.intensity)).toBe(60);                          // nothing changed on stage
+  });
+  it('into a list on cue 1: back on cue 1, with the programmer on top as before', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.engine.jumpTo('L', 0, 0); tick(2);                                 // Warm
+    app.selected = ['p2']; app.set({ intensity: 0.3 }); tick(2);
+    expect(app.record('L')).toBe(true);
+    tick(2);
+    app.undo(); tick(2);
+    expect(app.status.L.cue).toBe('c1');
+    expect([pct(app.stage.p1.intensity), pct(app.stage.p2.intensity)]).toEqual([100, 30]);
+  });
+  it('a running effect the cue took over runs by hand again', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.show.effects.push({ id: 'e1', name: 'Pulse', kind: 'sine', param: 'intensity', fixtures: ['p1', 'p2'], speed: 1, size: 1, spread: 0 } as any);
+    app.checkpoint();
+    app.toggleEffect('e1'); tick(2);
+    expect(app.liveFx).toEqual(['e1']);
+    expect(app.record('L')).toBe(true);
+    tick(1);
+    expect(app.liveFx).toEqual([]);
+    app.undo(); tick(1);
+    expect(app.liveFx).toEqual(['e1']);
+  });
+});

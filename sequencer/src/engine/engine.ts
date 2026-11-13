@@ -262,6 +262,8 @@ export class Engine {
   heldEffects(): string[] { return [...this.fxFlash]; }
   // Hand the running effects over (to a cue that was just recorded): gone from here without a fade.
   takeLiveEffects(): string[] { const ids = this.liveEffects(); for (const id of ids) this.liveFx.delete(id); return ids; }
+  // (Undo of a Record: the effects the cue took over run by hand again, at full, no fade in)
+  giveBackEffects(ids: string[]) { for (const id of ids) this.liveFx.set(id, { from: 1, to: 1, start: this.now(), dur: 0 }); }
   stopAllEffects() { for (const id of this.liveFx.keys()) this.stopEffect(id); }
   private liveWeight(id: string) { const r = this.liveFx.get(id); return r ? rampAt(r, this.now()) : 0; }
 

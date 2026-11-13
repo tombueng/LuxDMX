@@ -1139,6 +1139,8 @@ class App {
     to.push(this.lastSnap);
     const now = this.plain;                  // the version being left, for saying what changed
     const back = JSON.parse(prev) as Show;
+    const rec = verb === 'Undone' && this.recUndo?.snap === prev ? this.recUndo : null;
+    const recLive = !!rec && this.engine.status(rec.list).cue === rec.cue;     // (not moved on since)
     let said = '';
     try { said = verb === 'Undone' ? describeChange(back, now) : describeChange(now, back); } catch { /* only the message */ }
     this.show = rawTypes(back);
@@ -1158,6 +1160,16 @@ class App {
     if (!lists.some((l) => l.id === this.currentList)) this.currentList = lists[0]?.id ?? '';
     if (this.goList && !lists.some((l) => l.id === this.goList)) this.goList = '';
     if (this.page && !this.pages.some((p) => p.id === this.page)) this.page = '';
+    // a Record taken back: its programmer, its list where it was, its effects by hand again
+    if (rec && !this.show.cueLists.some((l) => l.cues.some((c) => c.id === rec.cue))) {
+      this.recUndo = null;
+      // (what was set since stays: it's newer)
+      this.programmer = { ...rec.prog, ...($state.snapshot(this.programmer) as Record<string, Values>) };
+      const l = this.show.cueLists.find((x) => x.id === rec.list), i = l ? l.cues.findIndex((c) => c.id === rec.was) : -1;
+      if (recLive && l && i >= 0) this.engine.jumpTo(l.id, i, 0);
+      else if (recLive && l) this.engine.stop(l.id);
+      if (rec.fx.length) { this.engine.giveBackEffects(rec.fx); this.liveFx = this.engine.liveEffects(); }
+    }
     this.syncBridges();
     this.persist(prev);
     this.saveUndo();
@@ -2128,8 +2140,13 @@ class App {
   // `into`: a list other than the one open in Program (Live records into the list GO plays).
   // `opt.num`: the new cue's number (it goes where that number belongs; the caller makes sure no
   // other cue has it), `opt.fade`: its fade (2 s otherwise)
+  // What a Record changed besides the show (the programmer it emptied, where its list was, the
+  // effects the cue took over): Undo puts those back as well, so after Ctrl+Z the stage and the
+  // cards say the same thing (it said the cue before was LIVE while the new one's look stayed up)
+  private recUndo: { snap: string; list: string; cue: string; prog: Record<string, Values>; was: string; fx: string[] } | null = null;
   record(into?: string, opt: { num?: number; fade?: number } = {}): boolean {
     this.checkpoint();
+    const before = this.lastSnap;
     const ids = Object.keys(this.programmer);
     if (!ids.length && !this.engine.liveEffects().length) return false;
     const list = (into ? this.show.cueLists.find((l) => l.id === into) : undefined) ?? this.list ?? this.newList('Main');
@@ -2160,6 +2177,7 @@ class App {
     let at = isPlay(list) && st.running && st.index >= 0 && st.index < list.cues.length - 1 ? st.index + 1 : list.cues.length;
     if (opt.num !== undefined) { freezeNumbers(list); const k = list.cues.findIndex((_, i) => cueNum(list, i) > opt.num!); at = k < 0 ? list.cues.length : k; }
     const named = this.suggestName(values, this.engine.liveEffects());   // (before the cue takes the effects over)
+    const was = st.running && !st.releasing ? st.cue : '', prog = $state.snapshot(this.programmer) as Record<string, Values>;
     const cue: Cue = { id: newId('c'), name: '', values, fade: opt.fade ?? 2, advance: { mode: 'manual' } };
     // Effects running by hand go into the cue too, and the cue takes them over.
     const fx = this.engine.takeLiveEffects();
@@ -2178,12 +2196,14 @@ class App {
     // stored, the play stays where it is, and the programmer keeps what it holds (nothing changes
     // on stage; Clear lets go), as on a desk.
     if (opt.num !== undefined && isPlay(list) && st.running && at !== st.index + 1) {
+      this.recUndo = null;
       this.cueSel = [cue.id];
       this.markDirty(30);
       this.recordedAside = true;
       return true;
     }
     this.recordedAside = false;
+    this.recUndo = { snap: before, list: list.id, cue: cue.id, prog, was, fx };
     // The new cue takes over what's on stage, then the programmer lets go: nothing changes on
     // stage, but the cue list owns it now.
     this.engine.programmer = {};
