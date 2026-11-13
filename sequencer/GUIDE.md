@@ -283,9 +283,9 @@ Three more demos come with their own room on the 3D stage:
   Right-click the next-up chip (or Pause in the timetable): skip tonight (until 06:00), pause for
   3 hours, or switch the timetable off; what comes meanwhile is skipped, not played late.
 - **For staff**: a page with just the looks in one go (right-click the + next to the pages, Ctrl+K
-  "staff", or on a touch screen the ⋯ next to the padlock). It has no GO, no Next and no Auto GO:
-  what's on, big, and Blackout. Lock it with the padlock (right-click it, or the ⋯ on a touch
-  screen: Lock with a PIN; the digits show while you set it, so a typo can't lock you out). Locked, only that page shows (also after a restart), the master
+  "staff", or the padlock's menu). It has no GO, no Next and no Auto GO: what's on, big, and
+  Blackout. Lock it with the padlock (a tap asks: with a PIN or without; the digits show while you
+  set a PIN, so a typo can't lock you out). Locked, only that page shows (also after a restart), the master
   slider, Release, Fade out, Release all, tempo and list levels are out of reach (shown greyed,
   on phones too), the staff page of looks has no GO to step into "All off", Blackout takes holding a
   moment (off is a tap; held Space or Enter works too), and the phone dialog only shows how many
@@ -383,7 +383,7 @@ Three more demos come with their own room on the 3D stage:
     lights up in turn while the rest of the selection stays faintly on (**Lowlight**, 15 %), **All**
     brings the whole selection back; with one light selected they go to the next light by number.
   - **Faders.** A fader, a select and a Flash button for every light in number order (20 at a time,
-    ◀ ▶ for the next; Shift-click or **Add** adds to the selection). A light's fader sets its level
+    ◀ ▶ for the next; Shift-click or **+ Add to selection** adds to it; the same switch as the stage's + Add on a touch screen). A light's fader sets its level
     in the programmer (Record keeps it, Clear lets go). Machines (fog, flames, sparks, CO2, confetti)
     have no strip. Or a **master for every group**: it scales everything its lights do (cues, the
     programmer, flashes; a group of cells just those cells), like the grand master for just them, so
