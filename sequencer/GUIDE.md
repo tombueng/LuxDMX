@@ -74,7 +74,8 @@ wheels), you just don't have to learn a pro console to use them.
    cue. Select some lights and the effects running on them light up green in the list ("on 2
    selected"), so you see what's moving them.
 6. **Live** (top bar) is for playing: a page of buttons built from your show. Edit it to make it
-   your own. Got a MIDI controller (pads, faders)? In Edit, select a button and press Learn, then
+   your own. More pages with +; right-click a page's tab to rename it, duplicate it or move it left
+   or right. Got a MIDI controller (pads, faders)? In Edit, select a button and press Learn, then
    touch the pad (Chrome and Edge; Firefox and Safari have no Web MIDI).
 
 Press `?` for every keyboard shortcut and `Ctrl+K` to find anything. No lights connected yet?
