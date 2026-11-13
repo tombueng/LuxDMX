@@ -189,3 +189,25 @@ test('focus after a dialog closes: on the main view after the welcome, in the fi
   await tt.getByRole('button', { name: /^Remove / }).first().click();
   await expect.poll(() => page.evaluate(() => document.activeElement?.hasAttribute('data-entry'))).toBe(true);
 });
+
+test('Add fixtures by keyboard: arrows between the types, Enter picks one and goes to How many, Enter there adds', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.fl').getByRole('button', { name: /Add/ }).first().click();
+  const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
+  const cards = dlg.locator('.tcard');
+  await cards.first().focus();
+  const first = await cards.first().getAttribute('data-type');
+  await page.keyboard.press('ArrowRight');
+  const second = await page.evaluate(() => document.activeElement?.getAttribute('data-type'));
+  expect(second).toBeTruthy();
+  expect(second).not.toBe(first);
+  await page.keyboard.press('ArrowDown');
+  const below = await page.evaluate(() => document.activeElement?.getAttribute('data-type'));
+  expect(below).not.toBe(second);
+  await page.keyboard.press('Enter');
+  await expect(dlg.getByLabel('How many')).toBeFocused();
+  await page.keyboard.type('2');
+  await page.keyboard.press('Enter');
+  await expect(dlg).toBeHidden();
+  expect(await page.evaluate((t) => (window as any).__luxdmx.show.fixtures.filter((f: any) => f.typeId === t).length, below)).toBe(2);
+});

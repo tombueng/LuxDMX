@@ -95,6 +95,26 @@
     }
     return l.rings.length > 1 ? `Rings of ${l.rings.join(', ')}, data in at the rim. Common as a round AliExpress disc.` : 'One light with a shape, so effects can draw on it.';
   };
+  // The keyboard: arrows move between the tiles (by where they are), Enter or Space picks one and
+  // goes on to How many (it took some 60 Tabs to get from a type to Add)
+  function cardKey(e: KeyboardEvent) {
+    const d = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, [number, number]>)[e.key];
+    if (!d) return;
+    e.preventDefault();
+    const here = e.currentTarget as HTMLElement, all = [...here.closest('[role=dialog]')!.querySelectorAll<HTMLElement>('.tcard')].filter((b) => b.offsetParent);
+    const c = (b: HTMLElement) => { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    const from = c(here);
+    let best: HTMLElement | undefined, bd = Infinity;
+    for (const b of all) {
+      if (b === here) continue;
+      const p = c(b), along = (p.x - from.x) * d[0] + (p.y - from.y) * d[1];
+      if (along <= 4) continue;
+      const dist = along + 3 * Math.abs((p.x - from.x) * d[1] - (p.y - from.y) * d[0]);
+      if (dist < bd) { bd = dist; best = b; }
+    }
+    best?.focus();
+  }
+  const toCount = () => setTimeout(() => { const el = document.querySelector<HTMLInputElement>('[role=dialog] input[aria-label="How many"]'); el?.focus(); el?.select(); });
   function pick(id: string) {
     typeId = id;
     err = '';                                   // (another type picked: an old problem doesn't stand over it)
@@ -161,7 +181,7 @@
 
 {#snippet typeCard(t: FixtureType)}
           {@const k = kindOf(modeOf(t, ''))}
-          <button class="tcard" class:cur={t.id === typeId} onclick={() => pick(t.id)} title={KIND_LABEL[k]} data-type={t.id}>
+          <button class="tcard" class:cur={t.id === typeId} onclick={(e) => { pick(t.id); if (e.detail === 0) toCount(); }} onkeydown={cardKey} title={KIND_LABEL[k]} data-type={t.id}>
             <span class="ti"><Icon name={k} size={22} /></span>
             <span class="tt"><b>{t.source === 'generic' ? t.model : typeLabel(t)}</b>
               <span class="faint">{BLURB[t.id] ?? shapeBlurb(t) ?? stripBlurb(t) ?? `${t.modes.length} mode${t.modes.length > 1 ? 's' : ''}, from ${t.source === 'ofl' ? 'the Open Fixture Library' : t.source === 'qxf' ? 'QLC+' : t.source === 'gdtf' ? 'GDTF' : t.source === 'generic' ? 'the built-in ones' : 'you'}`}</span></span>
@@ -193,7 +213,7 @@
           {#each mine as t (t.id)}
             {@const k = kindOf(modeOf(t, ''))}
             <div class="mywrap">
-              <button class="tcard" class:cur={t.id === typeId} onclick={() => pick(t.id)} title={KIND_LABEL[k]} data-type={t.id}>
+              <button class="tcard" class:cur={t.id === typeId} onclick={(e) => { pick(t.id); if (e.detail === 0) toCount(); }} onkeydown={cardKey} title={KIND_LABEL[k]} data-type={t.id}>
                 <span class="ti"><Icon name={k} size={22} /></span>
                 <span class="tt"><b>{typeLabel(t)}</b><span class="faint">{t.modes.length} mode{t.modes.length > 1 ? 's' : ''}</span></span>
                 <span class="side2"><span class="chip">{modeOf(t, '')?.channels.length} ch</span>
