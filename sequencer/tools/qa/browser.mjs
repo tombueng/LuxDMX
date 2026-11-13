@@ -2,7 +2,7 @@
 // 127.0.0.1. It keeps every console message, page error, failed request and dialog, so after
 // each step you see what the page said. Driven with tools/qa/q.mjs.
 //
-//   node tools/qa/browser.mjs [--port 9333] [--url http://127.0.0.1:5195/] [--out DIR] [--headed]
+//   node tools/qa/browser.mjs [--port 9333] [--url http://127.0.0.1:5173/] [--out DIR] [--headed]
 //
 // Selectors are Playwright's: css, `role=button[name="GO"]`, `text=Record`, `label=Tilt`, chained
 // with `>>`. Every action answers with the log entries it caused (errors first).
@@ -13,7 +13,7 @@ import { chromium } from '@playwright/test';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const PORT = Number(arg('port', 9333));
-const START = arg('url', 'http://127.0.0.1:5195/');
+const START = arg('url', 'http://127.0.0.1:5173/');
 const OUT = arg('out', path.join(process.env.HOME, 'DMX/sim/qa/out'));
 const HEADED = process.argv.includes('--headed');
 fs.mkdirSync(OUT, { recursive: true });
