@@ -862,8 +862,9 @@ Three more demos come with their own room on the 3D stage:
 - **Render a video (up to 8K)**: **Render** (next to Record) draws the video frame by frame instead
   of recording it as it plays, so it never stutters, whatever the computer: **1080p**, **9:16**
   (1080 x 1920), **4K** (3840 x 2160) or **8K** (7680 x 4320), at 25, 30, 50 or 60 frames a second.
-  It renders **the song from its start**, **the song from the playhead**, or **the look as it is**
-  for as many seconds as you say (without a song on the timeline, only that). It starts from the
+  It renders **the song from its start**, **the song from the playhead** for as many seconds as you
+  say (at most to the song's end: a short clip with its sound), or **the look as it is** for as many
+  seconds, with no sound (without a song on the timeline, only that). It starts from the
   look on stage now (the lists playing, the effects on, the masters), then the song's cues come at
   their moments; **With what's in the programmer** takes the programmer along too. The sound is the
   song's file (or the demo beat) mixed at full, not the speakers. The panel says how long the video

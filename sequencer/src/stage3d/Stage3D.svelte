@@ -1034,7 +1034,8 @@
   const renderSecs = $derived.by(() => {
     if (rOpts.what === 'look' || !songThere) return rOpts.seconds;
     const span = spanOf(app.show.timeline);
-    return Math.max(0, span.to - (rOpts.what === 'here' ? Math.max(span.from, app.timeline.position) : span.from));
+    if (rOpts.what === 'here') { const at = Math.max(span.from, app.timeline.position); return Math.max(0, Math.min(span.to, at + rOpts.seconds) - at); }
+    return Math.max(0, span.to - span.from);
   });
   function cardLimits(): CardLimits {
     const gl = renderer.getContext();
@@ -1056,7 +1057,9 @@
     const song = o.what !== 'look' && songThere && tl;
     const span = spanOf(tl);
     const from = song ? (o.what === 'here' ? Math.max(span.from, Math.min(span.to - 0.5, app.timeline.position)) : span.from) : 0;
-    const to = song ? span.to : o.seconds;
+    // (from the playhead: for the seconds asked, up to the song's end; a short clip with its sound
+    // could only be had as the look as it is, which has none)
+    const to = song ? (o.what === 'here' ? Math.min(span.to, from + o.seconds) : span.to) : o.seconds;
     const n = frameCount(to - from, o.fps), name = renderName(app.show.meta.name, o.size, new Date());
     // where it goes: asked first where the browser can (Chrome, Edge), so an 8K file goes straight
     // to disk; else it's kept as it's made and saved at the end
@@ -1326,8 +1329,10 @@
             <label class="ck"><input type="radio" name="rwhat" value="song" bind:group={rOpts.what} /> The song, from its start</label>
             <label class="ck"><input type="radio" name="rwhat" value="here" bind:group={rOpts.what} /> The song, from the playhead ({clock(Math.max(0, app.timeline.position))})</label>
           {/if}
-          <label class="ck"><input type="radio" name="rwhat" value="look" checked={rOpts.what === 'look' || !songThere} onchange={() => (rOpts.what = 'look')} /> The look as it is, for
-            <input type="number" min="1" max="3600" bind:value={rOpts.seconds} aria-label="Seconds to render" onkeydown={(e) => e.stopPropagation()} /> s</label>
+          <label class="ck"><input type="radio" name="rwhat" value="look" checked={rOpts.what === 'look' || !songThere} onchange={() => (rOpts.what = 'look')} /> The look as it is, no sound{songThere ? '' : ' (no song on the timeline)'}</label>
+          {#if rOpts.what !== 'song' || !songThere}
+            <label class="ck secs">For <input type="number" min="1" max="3600" bind:value={rOpts.seconds} aria-label="Seconds to render" onkeydown={(e) => e.stopPropagation()} /> s{rOpts.what === 'here' && songThere ? ", at most to the song's end" : ''}</label>
+          {/if}
         </div>
         <label class="ck"><input type="checkbox" bind:checked={rOpts.programmer} /> With what's in the programmer</label>
         <p class="faint note">{clock(renderSecs)} of video, about {megabytes((renderBits(RENDER_SIZES[rOpts.size].w, RENDER_SIZES[rOpts.size].h, rOpts.fps) + 256e3) * renderSecs / 8)} MB.
@@ -1452,6 +1457,7 @@
   .venue .bandname { flex: 1 1 100%; }
   .rpanel .what { flex: 1 1 100%; display: flex; flex-direction: column; gap: .2rem; }
   .rpanel .what input[type=number] { width: 4.2em; padding: .05rem .25rem; font-size: .8rem; min-height: 0; }
+  .rpanel .what .secs { padding-left: 1.4rem; }
   .rpanel .note { flex: 1 1 100%; margin: 0; font-size: .76rem; line-height: 1.35; }
   .rpanel .load { flex: 1 1 100%; }
   .rend { background: #2a5bd7; }

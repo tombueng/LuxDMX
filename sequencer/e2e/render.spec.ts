@@ -83,12 +83,14 @@ test('the song from the playhead, with its sound, straight into the file the bro
   });
   await openConnected(page);
   await patch(page, 'gen-drgb', 1, 0, 'PAR');
-  await page.evaluate(async () => { const a = (window as any).__luxdmx; a.timeline.useDemo(); await a.timeline.prepare(); a.timeline.seek(a.timeline.end - 1.2); });
+  await page.evaluate(async () => { const a = (window as any).__luxdmx; a.timeline.useDemo(); await a.timeline.prepare(); a.timeline.seek(a.timeline.end - 5); });
   await open3d(page);
   const p = await panel(page);
   await p.getByRole('button', { name: '1080p', exact: true }).click();
   await p.getByLabel('Frames a second').selectOption('30');
   await p.getByRole('radio', { name: /The song, from the playhead/ }).check();
+  await p.getByLabel('Seconds to render').fill('1.2');             // (a short clip with its sound: it went on to the song's end)
+  await expect(p.getByRole('radio', { name: /The look as it is, no sound/ })).toBeVisible();
   await p.getByRole('button', { name: 'Render 1080p' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__saved?.name ?? ''), { timeout: 200_000 }).toMatch(/ 3D 1080p .*\.mp4$/);
   const bytes = new Uint8Array(await page.evaluate(() => (window as any).__saved.bytes));

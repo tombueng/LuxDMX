@@ -52,6 +52,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   (the big demo's cue sheet went from 62 pages to 12), long notes wrap instead of shrinking the page.
 - A show night doesn't wear the app down: an hour of playing, switching and editing left memory,
   listeners and the output rate flat, and playing (GO, Live buttons) no longer saves after each press.
+- Render: "the song from the playhead" takes a length, so a short clip has its sound. The only short
+  one used to be "the look as it is", which has no sound and didn't say so.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
 
