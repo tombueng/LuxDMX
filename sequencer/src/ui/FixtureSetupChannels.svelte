@@ -149,19 +149,20 @@
                   {#each ATTR_GROUPS as g (g.label)}<optgroup label={g.label}>{#each g.attrs as [a, l] (a)}<option value={a}>{l}</option>{/each}</optgroup>{/each}
                 </select></td>
                 <td><input type="checkbox" checked={!!c.fine} aria-label="Channel {r.i + 1} is the fine one" onchange={(e) => setFine(r.i, (e.target as HTMLInputElement).checked)} disabled={r.all.length > 1} /></td>
-                <td><input type="number" min="0" max="255" value={c.default ?? 0} aria-label="Channel {r.i + 1} default" style="width:4.2em" onchange={(e) => setDefault(r.all, num(e))} /></td>
+                <td><input class="num" type="number" min="0" max="255" value={c.default ?? 0} aria-label="Channel {r.i + 1} default" onchange={(e) => setDefault(r.all, num(e))} /></td>
                 <td><button class="ghost rg" onclick={() => (openRanges = openRanges === r.i ? null : r.i)} aria-expanded={openRanges === r.i} disabled={r.all.length > 1}>{c.ranges?.length ? `${c.ranges.length} named` : 'add'}</button></td>
               {:else}
                 <td>{plain(c)}</td>
                 <td>{#if fineOf[r.i]}fine, with channel {fineOf[r.i]} (16 bit){:else}{ATTR_LABEL[c.attr] ?? c.attr}{/if}{#if c.span}<small class="faint"> (uses {c.span[0]} to {c.span[1]})</small>{/if}</td>
                 <td class="n">{c.default ?? 0}</td>
-                <td class="rg">{#each c.ranges ?? [] as g, gi (gi)}<button class="slot ghost" title="Send {g.from} to {g.to} (the middle)" onclick={() => send(r.all, Math.round((g.from + g.to) / 2))}>{#if g.color}<i style="background:{g.color}"></i>{/if}{g.label || '…'} <small class="faint">{g.from}–{g.to}</small></button>{/each}</td>
+                <td><div class="rg">{#each c.ranges ?? [] as g, gi (gi)}<button class="slot ghost" title="Send {g.from} to {g.to} (the middle)" onclick={() => send(r.all, Math.round((g.from + g.to) / 2))}>{#if g.color}<i style="background:{g.color}"></i>{/if}{g.label || '…'} <small class="faint">{g.from}–{g.to}</small></button>{/each}</div></td>
               {/if}
-              <td class="try">
+              <!-- (the cell stays a table cell: its row lines up; the flex row is inside) -->
+              <td><div class="try">
                 <input type="range" min="0" max="255" value={h ?? live(r.i)} aria-label="{plain(c)} value" oninput={(e) => send(r.all, num(e))} />
                 <input class="v" type="number" min="0" max="255" value={h ?? live(r.i)} aria-label="{plain(c)} DMX value" onchange={(e) => { const v = num(e); if (Number.isFinite(v)) send(r.all, v); }} />
                 <button class="x ghost" title="Give this channel back to the show" aria-label="Let go of {plain(c)}" disabled={h === undefined} onclick={() => send(r.all, undefined)}>×</button>
-              </td>
+              </div></td>
             </tr>
             {#if draft && openRanges === r.i}
               <tr class="ranges"><td></td><td colspan="7">
@@ -190,8 +191,9 @@
         {#if dirty}
           <button class="primary" onclick={() => save(false)}>{same.length > 1 ? `Save for all ${same.length} lights of this type` : t?.source === 'user' ? 'Save it to the type' : 'Save'}</button>
           {#if same.length > 1}<button onclick={() => save(true)}>Only for {f.name}</button>{/if}
-        {:else}<span class="faint">Change a name, what a channel does, a default or a range, then save.</span>{/if}
-        <button class="ghost" onclick={cancel}>{dirty ? 'Throw the changes away' : 'Done'}</button>
+        {:else}<span class="faint">Change a name, what a channel does, a default or a range: Save shows up here.</span>{/if}
+        <!-- ("Done" is the dialog's own button: this one only leaves the editing) -->
+        <button class="ghost" onclick={cancel}>{dirty ? 'Throw the changes away' : 'Stop editing'}</button>
       </div>
       <p class="faint small">{t?.source === 'user' ? 'This type is your own: saving for all changes it for every light that uses it.' : 'A type from the library stays as it is: the lights get a copy with your changes.'} Adding or removing channels: Change the channel layout in the fixture list's menu.</p>
     {/if}
@@ -234,7 +236,9 @@
   th { position: sticky; top: 0; z-index: 1; background: var(--panel2); text-align: left; color: var(--muted); font-weight: 600; padding: .3rem .5rem; }
   td { padding: .25rem .5rem; border-top: 1px solid var(--line); vertical-align: middle; }
   td.n { font-variant-numeric: tabular-nums; text-align: right; width: 3em; white-space: nowrap; }
-  td input:not([type=checkbox]):not([type=range]), td select { min-width: 0; width: 100%; }
+  td > input:not([type=checkbox]):not([type=range]):not([type=number]), td > select { min-width: 0; width: 100%; }
+  /* (a byte, 0 to 255, whole next to the spin arrows) */
+  .num, .try .v, .range input[type=number] { width: calc(3ch + 2.9em); min-width: calc(3ch + 2.9em); padding-inline: .3rem; }
   tr.fine td { color: var(--muted); }
   tr.held { background: #ffaa1c14; }
   .rg { display: flex; flex-wrap: wrap; gap: .2rem .4rem; }
@@ -242,10 +246,9 @@
   .slot i { display: inline-block; width: .75em; height: .75em; border-radius: 50%; margin-right: .25em; vertical-align: -.05em; border: 1px solid #fff4; }
   .try { display: flex; align-items: center; gap: .3rem; min-width: 13rem; }
   .try input[type=range] { flex: 1; min-width: 6rem; accent-color: var(--orange); padding: 0; }
-  .try .v { width: 3.6em; }
   .x { border: 0; background: none; color: var(--muted); padding: 0 .3rem; min-width: 0; }
   .range { display: flex; gap: .3rem; align-items: center; margin: .15rem 0; }
-  .range input[type=number] { width: 4em; } .range .lbl { flex: 1; }
+  .range .lbl { flex: 1; min-width: 0; }
   .save { border-top: 1px solid var(--line); padding-top: .5rem; }
   .small { margin: 0; font-size: .8rem; }
   .note { margin: 0; font-size: .85rem; color: var(--orange); }

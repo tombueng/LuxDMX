@@ -341,3 +341,29 @@ test("a light's menu has Mounting…: the setup opens on its Mounting tab; the n
   await page.locator('.fl li[data-fixture="Head 1"]').dblclick();
   await expect(dlg.getByRole('tab', { name: 'Patch' })).toHaveAttribute('aria-selected', 'true');
 });
+
+test('the channel table lines up: every row\'s Try slider in one column, a byte (255) whole in its boxes, one Done', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, ch = (name: string, attr: string, x: any = {}) => ({ name, attr, ...x });
+    const chans = [ch('Pan', 'pan', { default: 128 }), ch('Dimmer', 'intensity'), ch('Strobe', 'strobe', { ranges: [{ from: 0, to: 9, label: 'Off', kind: 'open' }, { from: 10, to: 255, label: 'Slow to fast', kind: 'strobe' }] }), ch('Red', 'red')];
+    const t = a.addType({ id: 'user-spot3', manufacturer: 'Test', model: 'Spot Three', source: 'user', modes: [{ name: 'Basic', channels: chans }] });
+    a.addFixtures(t, 'Basic', 1, 0, 'Spot', 1);
+  });
+  const dlg = await openSetup(page, 'Spot', 'Channels');
+  const lined = async () => {
+    const xs = await dlg.locator('tbody tr[data-ch] input[type=range]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+    expect(xs.length).toBe(4);
+    expect(new Set(xs).size).toBe(1);
+  };
+  const whole = (sel: string) => dlg.locator(sel).evaluateAll((els) => els.filter((e) => { const i = e as HTMLInputElement; const was = i.value; i.value = '255'; const cut = i.scrollWidth > i.clientWidth + 1; i.value = was; return cut; }).length);
+  await lined();
+  expect(await whole('input.v')).toBe(0);
+  await dlg.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await lined();
+  expect(await whole('input[aria-label$="default"]')).toBe(0);
+  await dlg.locator('tr[data-ch="3"]').getByRole('button', { name: '2 named' }).click();
+  expect(await whole('input[aria-label="From"], input[aria-label="To"]')).toBe(0);
+  await expect(dlg.getByRole('button', { name: 'Done', exact: true })).toHaveCount(1);
+  await expect(dlg.getByRole('button', { name: 'Stop editing' })).toBeVisible();
+});

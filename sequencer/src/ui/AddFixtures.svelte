@@ -251,7 +251,8 @@
         <p class="faint small">{like ? 'They get its part in every look, its groups and effects.' : 'Your looks leave them dark until you set them.'}</p>
       {/if}
       {#if err}<p class="err">{err}</p>{/if}
-      <button class="primary big" onclick={add}><Icon name="plus" />Add {count} × {name}</button>
+      <!-- (a long name ends in … inside the button, the whole of it on hover) -->
+      <button class="primary big" onclick={add} title="Add {count} × {name}"><Icon name="plus" /><span class="what">Add {count} × {name}</span></button>
     </div>
   </div>
 </Modal>
@@ -268,7 +269,8 @@
   .tt { display: flex; flex-direction: column; flex: 1; }
   .side { display: flex; flex-direction: column; gap: .45rem; position: sticky; top: 0; align-self: start; }
   .side label { display: flex; flex-direction: column; gap: .15rem; color: var(--muted); font-size: .85rem; }
-  .big { padding: .55rem; }
+  .big { padding: .55rem; max-width: 100%; min-width: 0; }
+  .big .what { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .mh { font-size: .8rem; margin: .6rem 0 .1rem; color: var(--text); font-weight: 600; }
   .types.mine { max-height: 22vh; }
   .types.mine { overflow: auto; }
