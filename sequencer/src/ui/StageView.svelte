@@ -13,7 +13,7 @@
   import { cellLookAt } from '../engine/resolve';
   import { fixtureActions, fixtureMenu } from './actions';
   import { EFFECT_MAP } from '../engine/effects';
-  import type { Resolved } from '../model/types';
+  import type { Fixture, Resolved } from '../model/types';
 
   // compact: no toolbar. readonly: only to look at (the Live page): zoom and pan, no selecting or moving.
   // blindChip: says "Blind: only here" itself (the Live page has its own, one you can press)
@@ -293,9 +293,13 @@
   // fits nowhere is left out (hover shows it; a selected light always gets its name). Like the
   // labels on a map.
   type At = { x: number; y: number; anchor: 'middle' | 'start' | 'end' };
+  // (its number and address with the name when # is on, in the same label: placed as one, so they
+  // don't land on each other's or on the names, as they did drawn on their own)
+  const addrOf = (f: Fixture) => `${f.num ? `#${f.num} ` : ''}${oneUni ? f.address : `${f.universe}.${f.address}`}`;
+  const labelText = (f: Fixture) => [labels ? f.name : '', addrs ? addrOf(f) : ''].filter(Boolean).join('  ');
   const labelAt = $derived.by(() => {
     const out = new Map<string, At | null>();
-    if (!labels) return out;
+    if (!labels && !addrs) return out;
     const fs = 12 * px;
     const halfW = (id: string) => { const k = app.kinds[id]; return k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72); };
     // Boxes (the lights' bodies, then each placed name) go into columns of the stage, so a name
@@ -308,19 +312,35 @@
     for (const f of app.show.fixtures) { const w = halfW(f.id), x = f.x * W, y = f.y * H; put({ id: f.id, x0: x - w, x1: x + w, y0: y - size * 0.7, y1: y + size * 0.7 }); }
     // the word "audience" at the front edge is in the way too
     put({ id: 'audience', x0: W / 2 - 34 * px, x1: W / 2 + 34 * px, y0: H - 30, y1: H - 12 });
+    // (a name reads as the light nearest to it: every other light clearly further from the label
+    // than its own, else it's left out rather than mistaken for that one's)
+    // (above it, the last resort, it has to be clearly its own: that's where a name read as the
+    // light in the row before)
+    const ownest = (f: Fixture, b: Box, k: number) => {
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, own = Math.hypot(cx - f.x * W, cy - f.y * H);
+      for (const o of app.show.fixtures) {
+        if (o === f) continue;
+        const dx = cx - o.x * W; if (Math.abs(dx) >= own * k) continue;
+        if (Math.hypot(dx, cy - o.y * H) < own * k) return false;
+      }
+      return true;
+    };
     const sel = new Set(app.selected);
     const order = [...app.show.fixtures].sort((a, b) => Number(sel.has(b.id)) - Number(sel.has(a.id)));
     for (const f of order) {
-      const x = f.x * W, y = f.y * H, half = f.name.length * fs * 0.3 + 2 * px, side = halfW(f.id) + 4 * px;
+      const x = f.x * W, y = f.y * H, half = labelText(f).length * fs * 0.3 + 2 * px, side = halfW(f.id) + 4 * px;
       const below = y + size * 1.15 + 13 * px, above = y - size * 1.1 - 4 * px, mid = y + fs * 0.35;
-      const vert: At[] = (y > H * 0.86 ? [above, below] : [below, above]).map((by) => ({ x, y: by, anchor: 'middle' }));
-      const tries: At[] = [...vert, { x: x + side, y: mid, anchor: 'start' }, { x: x - side, y: mid, anchor: 'end' }];
+      // under it, else beside it (level with it: it can't be read as another's), above only last
+      // (a name above sat right under the light in the row before and read as that one's); the
+      // front row the other way round, clear of the audience's edge
+      const [first, last] = y > H * 0.86 ? [above, below] : [below, above];
+      const tries: At[] = [{ x, y: first, anchor: 'middle' }, { x: x + side, y: mid, anchor: 'start' }, { x: x - side, y: mid, anchor: 'end' }, { x, y: last, anchor: 'middle' }];
       let at: At | null = null;
-      for (const t of tries) {
+      for (const [n, t] of tries.entries()) {
         const x0 = t.anchor === 'middle' ? t.x - half : t.anchor === 'start' ? t.x : t.x - 2 * half, x1 = x0 + 2 * half;
         const b: Box = { x0, x1, y0: t.y - fs * 0.9, y1: t.y + fs * 0.3, id: `label:${f.id}` };
         // (inside the plan both ways: a name over a light in the back row stuck out of the top)
-        if (x0 >= 0 && x1 <= W && b.y0 >= -H * EDGE && b.y1 <= H * (1 + EDGE) && !hits(b, f.id)) { at = t; put(b); break; }
+        if (x0 >= 0 && x1 <= W && b.y0 >= -H * EDGE && b.y1 <= H * (1 + EDGE) && !hits(b, f.id) && (n < 3 || ownest(f, b, 1.15))) { at = t; put(b); break; }
       }
       out.set(f.id, at ?? (sel.has(f.id) ? tries[0] : null));
     }
@@ -496,12 +516,9 @@
       <!-- names and addresses on top of every light, beam and glow, with a dark halo -->
       <g class="labels" pointer-events="none">
         {#each app.show.fixtures as f (f.id)}
-          {@const x = f.x * W}
-          {@const y = f.y * H}
           {@const sel = !readonly && app.selected.includes(f.id)}
-          {@const at = labels ? labelAt.get(f.id) : null}
-          {#if at}<text x={at.x} y={at.y} text-anchor={at.anchor} class="lbl" class:sel font-size={12 * px}>{f.name}</text>{/if}
-          {#if addrs}<text x={x} y={y > H * 0.86 ? y + size * 1.1 + 11 * px : y - size * 0.95 - 4 * px} text-anchor="middle" class="adr" font-size={10.5 * px}>{#if f.num}<tspan class="no">#{f.num} </tspan>{/if}{oneUni ? f.address : `${f.universe}.${f.address}`}</text>{/if}
+          {@const at = labels || addrs ? labelAt.get(f.id) : null}
+          {#if at}<text x={at.x} y={at.y} text-anchor={at.anchor} class="lbl" class:sel font-size={12 * px} data-for={f.name}>{#if labels}{f.name}{/if}{#if addrs}<tspan class="adr" font-size={10.5 * px}>{labels ? '  ' : ''}{#if f.num}<tspan class="no">#{f.num} </tspan>{/if}{oneUni ? f.address : `${f.universe}.${f.address}`}</tspan>{/if}</text>{/if}
         {/each}
       </g>
 

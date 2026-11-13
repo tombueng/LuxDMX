@@ -280,6 +280,33 @@ test.describe('the 2D plan on a laptop', () => {
     expect(out).toEqual([]);
     const tops = await stage.locator('.head button:visible').evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top / 8))).size);
     expect(tops).toBeLessThanOrEqual(2);                                   // (the title row and one row of tools)
+    // each name reads as its own light's (none nearer to another light), and none overlap, also
+    // with the numbers and addresses on
+    const check = () => svg.evaluate((s) => {
+      const body = (n: string) => { const b = s.querySelector(`.fx[data-name="${n}"] [stroke-width]`)!.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+      const names = [...s.querySelectorAll('.fx')].map((g) => (g as SVGGElement).dataset.name!);
+      const lbl = [...s.querySelectorAll<SVGTextElement>('text.lbl')].map((t) => ({ n: t.dataset.for!, r: t.getBoundingClientRect() }));
+      const wrong: string[] = [], over: string[] = [];
+      for (const l of lbl) {
+        const c = { x: l.r.x + l.r.width / 2, y: l.r.y + l.r.height / 2 };
+        const d = (n: string) => Math.hypot(body(n).x - c.x, body(n).y - c.y);
+        const near = names.reduce((a, b) => (d(b) < d(a) ? b : a));
+        if (near !== l.n) wrong.push(`${l.n} reads as ${near}`);
+      }
+      for (let i = 0; i < lbl.length; i++) for (let j = i + 1; j < lbl.length; j++) {
+        const a = lbl[i].r, b = lbl[j].r;
+        if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) over.push(`${lbl[i].n}/${lbl[j].n}`);
+      }
+      return { n: lbl.length, wrong, over };
+    });
+    const names = await check();
+    expect(names.wrong).toEqual([]);
+    expect(names.over).toEqual([]);
+    expect(names.n).toBeGreaterThan(20);
+    await stage.getByRole('button', { name: 'Numbers and DMX addresses' }).click();
+    const both = await check();
+    expect(both.wrong).toEqual([]);
+    expect(both.over).toEqual([]);
   });
 });
 
