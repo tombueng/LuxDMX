@@ -2422,7 +2422,9 @@ class App {
   // A cue list of moods made for this rig (warm, cool, sunset, ocean... and a party look), as a
   // start to change from. Returns how many looks.
   makeStarterLooks(): number {
-    const caps = (id: string) => { const c = this.caps(id); return { color: c.color, position: c.position, cct: c.cct, light: !c.fog && (c.intensity || c.color || c.white || c.cct) }; };
+    // (not strobes, not the machines: a strobe at 85 % in "Warm wash" could flash at the room;
+    // they're for their own buttons)
+    const caps = (id: string) => { const c = this.caps(id), k = this.kinds[id]; return { color: c.color, position: c.position, cct: c.cct, light: !c.fog && k !== 'strobe' && k !== 'sfx' && !this.isMachineFx(id) && (c.intensity || c.color || c.white || c.cct) }; };
     if (!this.show.fixtures.some((f) => caps(f.id).light)) return 0;
     this.checkpoint();
     const { list, effects } = starterLooks($state.snapshot(this.show) as Show, caps, newId);

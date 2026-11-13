@@ -574,3 +574,16 @@ describe('a cue recorded from an effect that switched its lights on', () => {
     expect(pct(app.stage.r2.intensity)).toBeGreaterThan(50);
   });
 });
+
+describe('starter looks', () => {
+  it('leave the strobe out (it was at 85 % in Warm wash: a real one could flash at the room)', async () => {
+    const { app } = await freshApp();
+    app.addFixtures('gen-drgb', '', 2, 0, 'PAR');
+    app.addFixtures('gen-strobe', '', 1, 0, 'Strobe');
+    const strobe = app.show.fixtures.find((f: any) => f.name === 'Strobe').id;
+    expect(app.makeStarterLooks()).toBeGreaterThan(0);
+    const cues = app.show.cueLists.flatMap((l: any) => l.cues);
+    expect(cues.length).toBeGreaterThan(0);
+    expect(cues.some((c: any) => c.values[strobe])).toBe(false);
+  });
+});
