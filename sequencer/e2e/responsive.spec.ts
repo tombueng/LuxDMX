@@ -262,3 +262,16 @@ test.describe('the 2D plan on a tablet held upright', () => {
     expect(touching).toEqual([]);
   });
 });
+
+test.describe('a bigger interface (120 %) on a wide screen', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } });
+  test('the top bar takes the bigger size into account: the show\'s name stays readable, one row, nothing off the edge', async ({ page }) => {
+    await page.addInitScript(() => { try { localStorage.setItem('luxdmx.seq.zoom', '1.2'); } catch { /* */ } });
+    await openConnected(page);
+    await patch(page, 'gen-flame', 1, 0, 'Flame');
+    await expect(page.locator('.top .arm')).toBeVisible();
+    const bar = page.locator('header.top');
+    expect(await bar.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+    expect((await page.locator('.top .show .name').boundingBox())!.width).toBeGreaterThan(30);
+  });
+});

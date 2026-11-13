@@ -60,7 +60,8 @@
     // on a phone the undo buttons don't fit the bar: they're the first thing in here
     // (on a tablet, following the music: the bar has it only while it's on)
     // (a tablet held upright, up to 900 px, has them in here too)
-    const phone = window.innerWidth <= 900, tablet = window.innerWidth <= 1100;
+    const w = window.innerWidth / ui.zoom;          // (as wide as it looks: the interface size counts)
+    const phone = w <= 900, tablet = w <= 1100;
     ui.openMenu(e, [
       ...(phone ? [{ label: 'Undo', icon: 'undo', disabled: !app.canUndo, run: () => app.undo() }, { label: 'Redo', icon: 'redo', disabled: !app.canRedo, run: () => app.redo() }] : []),
       ...(tablet ? [{ label: app.music.on ? 'Stop following the music' : 'Follow the music', icon: 'music', run: () => void music() }, { sep: true }] : []),
@@ -198,18 +199,21 @@
   .modes button.cur { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
   .modes button.tconsole { padding-inline: .55rem; }
   /* (its name only on a wide screen or while it's open: the bar stays one row on a laptop) */
-  @media (max-width: 1500px) {
+  /* (the steps below are the app's width in rem, not the window's in px: at a bigger interface size
+     the bar runs out of room sooner, and they come sooner; at 100 % a rem is 14 px, so 107.14rem
+     is the 1500 px it was) */
+  @container app (max-width: 107.14rem) {
     .modes button.tconsole:not(.cur) .lbl { display: none; }
     .gm .lab, .bpm .lab { display: none; }
     .show { max-width: 200px; }
     .top { gap: .5rem; }
   }
-  @media (max-width: 1380px) {
+  @container app (max-width: 98.57rem) {
     .modes button { padding-inline: .6rem; }
     .alpha, .gm b { display: none; }
     .gm input { width: 76px; }
   }
-  @media (max-width: 1200px) {
+  @container app (max-width: 85.71rem) {
     .modes button { padding-inline: .45rem; }
     .gm input { width: 64px; }
     .top { gap: .4rem; }
@@ -241,7 +245,7 @@
   /* touch: what goes to the stage and the machines are show controls (44 px) */
   @media (pointer: coarse) { .out, .arm { min-height: 44px; min-width: 44px; justify-content: center; } }
   /* Tablets: one row. The name, the explanations and search move out (the ⋯ menu has them). */
-  @media (max-width: 1100px) {
+  @container app (max-width: 78.57rem) {
     /* (room for Blind / On stage and the arm button: the tabs by name, no icons; Safe and ARMED
        written out, the machines' state is never just an icon) */
     .modes :global(svg) { display: none; }
@@ -257,7 +261,7 @@
   }
   /* A tablet held upright (an iPad's 768 to 834 px) with the arm button and a box: undo and redo
      go into the ⋯ menu, the tabs are icons but the one you're on */
-  @media (max-width: 900px) {
+  @container app (max-width: 64.29rem) {
     .toolbar :global(button[aria-label="Undo"]), .toolbar :global(button[aria-label="Redo"]) { display: none; }
     .modes button { padding: .3rem .42rem; gap: .25rem; }
     .modes button:not(.cur) .lbl { display: none; }
@@ -270,7 +274,7 @@
   }
   /* (after the tablets' rules: a phone is narrower than 1100 px too, and these win) */
   /* Narrow screens: one row. The grand master and tempo live on the Live page there. */
-  @media (max-width: 760px) {
+  @container app (max-width: 54.29rem) {
     .top { flex-wrap: nowrap; gap: .2rem; padding: .3rem .4rem; overflow-x: auto; }
     .top > :global(*) { flex-shrink: 1; }                 /* (as before: everything may give a little) */
     .brand, .gm, .bpm, .bo, .saved, .music, .out .txt, .arm .txt { display: none; }

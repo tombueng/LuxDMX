@@ -76,7 +76,8 @@
 {#if app.blackout}<div class="bo-frame" aria-hidden="true"><span>Blackout</span></div>{/if}
 
 <style>
-  .app { height: 100%; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  /* (a container: the top bar's steps go by its width in rem, so the interface size counts) */
+  .app { height: 100%; display: flex; flex-direction: column; min-height: 0; overflow: hidden; container: app / inline-size; }
   .view { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
   .pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* A hidden view keeps its boxes laid out (content-visibility skips drawing and laying out what's
