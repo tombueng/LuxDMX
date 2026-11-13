@@ -479,3 +479,16 @@ describe('Undo of a Record', () => {
     expect(app.liveFx).toEqual(['e1']);
   });
 });
+
+describe('a cue recorded while effects run', () => {
+  it('is named after the lights set first, then the effects; more than two effects say how many more', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.show.groups.push({ id: 'gF', name: 'Fresnels', fixtures: ['p1', 'p2'] });
+    for (const [id, name] of [['e1', 'Spots: circles'], ['e2', 'Police'], ['e3', 'Wave'], ['e4', 'Chase']]) app.show.effects.push({ id, name, kind: 'sine', param: 'intensity', fixtures: ['p1'] } as any);
+    expect(app.suggestName({ p1: { intensity: 0.6 }, p2: { intensity: 0.6 } }, ['e1'])).toBe('Fresnels 60 % + Spots: circles');
+    expect(app.suggestName({ p1: { intensity: 1 } }, ['e1'])).toBe('P1 + Spots: circles');
+    expect(app.suggestName({ p1: { intensity: 0.5 }, p2: { intensity: 0.2 }, fg: { intensity: 0.3 } }, ['e1', 'e2', 'e3', 'e4'])).toBe('3 lights + Spots: circles + Police + 2 more');
+    expect(app.suggestName({}, ['e1', 'e2'])).toBe('Spots: circles + Police');      // (effects only: as before)
+  });
+});

@@ -2237,7 +2237,22 @@ class App {
     const hazer = (id: string) => !!this.modeOf(id)?.channels.some((c) => c.attr === 'haze') && !this.modeOf(id)?.channels.some((c) => c.attr === 'fog');
     const smoke = !making.length ? '' : making.every(hazer) ? 'Haze' : 'Fog';
     const parts = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => this.show.presets.find((p) => p.id === id)?.name).filter(Boolean) as string[];
-    for (const id of effects.slice(0, 2)) { const e = this.show.effects.find((x) => x.id === id); if (e) parts.push(e.name); }
+    const fxNames = effects.map((id) => this.show.effects.find((x) => x.id === id)?.name).filter((n): n is string => !!n);
+    // Lights set by hand while effects run: the lights first ("Fresnels 60 % + Spots: circles"), not
+    // just the effect that happened to be running (a Fresnel look named "Spots: circles")
+    if (!parts.length && fxNames.length) {
+      const litIds = Object.entries(values).filter(([, v]) => typeof v.intensity === 'number' && v.intensity > 0).map(([id]) => id);
+      if (litIds.length) {
+        const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+        const who = this.show.groups.find((g) => same(g.fixtures, litIds))?.name
+          ?? (litIds.length === 1 ? this.show.fixtures.find((f) => f.id === litIds[0])?.name : undefined) ?? `${litIds.length} lights`;
+        const pcts = new Set(litIds.map((id) => Math.round((values[id].intensity as number) * 100)));
+        const pct = pcts.size === 1 ? [...pcts][0] : undefined;
+        parts.push(pct !== undefined && pct < 100 ? `${who} ${pct} %` : who);
+      }
+    }
+    parts.push(...fxNames.slice(0, 2));
+    if (fxNames.length > 2) parts.push(`${fxNames.length - 2} more`);
     // the machines it fires, by name (a cue with flames in it says so, whatever else it does)
     const MACHINE_NAME = { flame: 'Flames', sparks: 'Sparks', co2: 'CO2', confetti: 'Confetti', bubbles: 'Bubbles' } as const;
     for (const [k, name] of Object.entries(MACHINE_NAME)) if (Object.values(values).some((v) => typeof v[k as keyof Values] === 'number' && (v[k as keyof Values] as number) > 0)) parts.push(name);
