@@ -12,11 +12,13 @@
   let up = $state(false), maxH = $state<number | null>(null);
   $effect(() => {
     if (!open || !pop) { shift = 0; up = false; maxH = null; return; }
+    // (worked out in locals and only written at the end: reading `up` here made the effect depend on
+    // what it writes, run again on the moved note and put it back off the screen)
     const r = pop.getBoundingClientRect();
-    shift = r.left < 8 ? 8 - r.left : r.right > window.innerWidth - 8 ? window.innerWidth - 8 - r.right : 0;
+    const s = r.left < 8 ? 8 - r.left : r.right > window.innerWidth - 8 ? window.innerWidth - 8 - r.right : 0;
     const q = pop.parentElement!.getBoundingClientRect();
-    const below = window.innerHeight - q.bottom - 12, above = q.top - 12;
-    if (r.height > below) { up = above > below; maxH = Math.max(120, up ? above : below); }
+    const below = window.innerHeight - q.bottom - 12, above = q.top - 12, short = r.height > below, goUp = short && above > below;
+    shift = s; up = goUp; maxH = short ? Math.max(120, goUp ? above : below) : null;
   });
 </script>
 

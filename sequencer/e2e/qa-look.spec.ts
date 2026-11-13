@@ -328,6 +328,8 @@ test.describe('help notes on a laptop', () => {
       const r = (await note.boundingBox())!;
       expect(r.y).toBeGreaterThanOrEqual(0);
       expect(r.y + r.height).toBeLessThanOrEqual(768);
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.width).toBeLessThanOrEqual(1366);
       await page.keyboard.press('Escape');
       await expect(note).toBeHidden();
     }
