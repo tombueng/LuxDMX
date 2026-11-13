@@ -48,3 +48,17 @@ export function numbersFor(list: CueList, at: number, cues: Cue[]) {
 
 // Another cue in the list with this number (a typed one, or after moving things around).
 export const takenBy = (list: CueList, cue: Cue, n: number) => list.cues.find((c, i) => c !== cue && Math.abs(cueNum(list, i) - n) < 1e-9);
+// A number typed for a cue: it goes where that number says (20.5 between 20 and 21; 0.5 before 1),
+// every other cue keeps its number. A number another cue has already is said, nothing changes.
+export function setNumber(list: CueList, cue: Cue, v: number): string | undefined {
+  const n = Math.round(v * 1000) / 1000;
+  if (!(n > 0) || !Number.isFinite(n)) return 'A cue number is above 0 (like 3 or 20.5).';
+  freezeNumbers(list);
+  if (list.cues.some((c) => c !== cue && c.num === n)) return `There's a cue ${fmtNum(n)} in ${list.name} already.`;
+  cue.num = n;
+  const rest = list.cues.filter((c) => c !== cue);
+  const at = rest.findIndex((c) => (c.num ?? 0) > n);
+  rest.splice(at < 0 ? rest.length : at, 0, cue);
+  list.cues.splice(0, list.cues.length, ...rest);
+  return undefined;
+}

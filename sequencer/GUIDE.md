@@ -246,7 +246,8 @@ Three more demos come with their own room on the 3D stage:
   house lights get GO and Back. Any page can have one (Edit, Add, "A whole cue list").
 - **Cue numbers like the script's**: a cue recorded or pasted between 20 and 21 is 20.5, and the
   numbers stay with their cues from then on (on the cards, the GO bar, the cue sheet, the phone).
-  Type a number into a cue's settings to set it; the list's menu has "Renumber the cues 1, 2, 3…".
+  Type a number into a cue's settings to set it: the cue moves to where that number says (0.5 goes
+  before 1), and a number another cue has is said; the list's menu has "Renumber the cues 1, 2, 3…".
 - **Fog and haze** run only in the cue that sets them (haze one cue started doesn't drift on into the
   next ones). For haze all night, put it in a list of its own: across lists fog and haze go by the
   highest, like intensity, so the moods' "no fog" doesn't stop it (and that list's fader turns

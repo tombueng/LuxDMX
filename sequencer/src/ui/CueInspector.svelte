@@ -1,7 +1,8 @@
 <script lang="ts">
   // a typed time stays in what the field allows (0 to 10 minutes); the field shows what was kept
   const secs = (e: Event) => Math.min(600, Math.max(0, +(e.target as HTMLInputElement).value || 0));
-  import { cueNum, cueNumber, freezeNumbers, takenBy } from '../model/cuenum';
+  import { cueNum, cueNumber, takenBy, setNumber } from '../model/cuenum';
+  import { ui } from './ui.svelte';
   // Details of the selected cue(s). With several selected, timing changes apply to all of them.
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
@@ -62,7 +63,10 @@
         <input class="cnum" inputmode="decimal" value={list ? cueNumber(list, list.cues.indexOf(one)) : ''} aria-label="Cue number" title="Cue number (20.5 goes between 20 and 21)"
                onchange={(e) => { const el = e.target as HTMLInputElement, v = Number(el.value.replace(',', '.'));
                  if (!list || !(v > 0) || !Number.isFinite(v)) { if (list) el.value = cueNumber(list, list.cues.indexOf(one)); return; }
-                 app.checkpoint(); freezeNumbers(list); one.num = Math.round(v * 1000) / 1000; app.markDirty(0); }} />
+                 // (it goes where its number says; a number that's taken is said)
+                 app.checkpoint(); const bad = setNumber(list, one, v);
+                 if (bad) { ui.toast(bad, 5000); el.value = cueNumber(list, list.cues.indexOf(one)); return; }
+                 app.engine.players.get(list.id)?.sync(list); app.markDirty(0); }} />
         <input class="title" bind:value={one.name} aria-label="Cue name" />
       </div>
       {#if list}{@const dup = takenBy(list, one, cueNum(list, list.cues.indexOf(one)))}{#if dup}<p class="err small" role="status">"{dup.name}" has this number too.</p>{/if}{/if}
