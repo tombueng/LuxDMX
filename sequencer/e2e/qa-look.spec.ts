@@ -470,3 +470,24 @@ test('the programmer says which effects run on the selected lights, by what they
   await expect(note).toContainText('Bar twinkles (cells) is running on these lights');
   await expect(note).not.toContainText('undefined');
 });
+
+test('the effect editor: the beats choice shows what it is, seconds and blocks keep to what they can be', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects.length)).toBeGreaterThan(2);
+  await page.locator('.side').getByRole('tab', { name: 'Effects' }).click();
+  await page.locator('.side .ep li', { hasText: 'Back wave' }).first().click();
+  const beats = page.getByLabel('Beats per cycle');
+  await expect(beats).toBeVisible();
+  expect((await beats.boundingBox())!.width).toBeGreaterThan(60);                                    // (it was 19 px, its arrow only)
+  const tempo = page.locator('label.tempo input');
+  if (await tempo.isChecked()) await tempo.uncheck();
+  const secs = page.getByLabel('Seconds per cycle');
+  await secs.fill('-3'); await secs.press('Tab');
+  await expect(secs).toHaveValue('0.05');                                    // (it showed -3 with 0.05 kept)
+  await page.locator('.ed .morebtn').click();                                                         // (Blocks is under More)
+  const blocks = page.getByLabel('Blocks');
+  await expect(blocks).toBeVisible();
+  await blocks.fill('0'); await blocks.press('Tab'); await expect(blocks).toHaveValue('1');
+});
