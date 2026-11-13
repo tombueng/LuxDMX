@@ -99,6 +99,7 @@
       { label: 'Rename…', icon: 'edit', run: async () => { const n = await ui.ask('Rename the list', l.name); if (n) { l.name = n; app.markDirty(0); } } },
       { label: 'Settings', icon: 'gear', run: () => { settings = true; } },
       { label: l.end === 'loop' ? 'Stop looping' : 'Loop', icon: 'loop', run: () => { l.end = l.end === 'loop' ? 'stop' : 'loop'; app.markDirty(0); } },
+      { label: `Print ${l.name}'s cue sheet`, icon: 'printer', disabled: !l.cues.length, run: () => { if (!app.printCueSheet(id)) ui.toast('The browser blocked the window: allow pop-ups for this page'); } },
       ...(numbered(l) ? [{ label: 'Renumber the cues 1, 2, 3…', icon: 'note', run: () => { app.renumberCues(id); app.toastUndo('Renumbered the cues'); } }] : []),
       { sep: true },
       { label: 'Delete the list', icon: 'trash', danger: true, run: () => { const also = app.removeList(id); app.toastUndo(`Deleted the list "${l.name}"${also ? ` (and what played it: ${also})` : ''}`); } },

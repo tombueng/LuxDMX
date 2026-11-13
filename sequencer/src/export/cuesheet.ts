@@ -1,21 +1,32 @@
 // A cue sheet: every cue list with its cues, timing, what happens next, notes. As a page to print
 // (or save as PDF from the print dialog) and as CSV for a spreadsheet.
-import type { Advance, Show } from '../model/types';
+import type { Advance, Show, Values } from '../model/types';
 import { cueNumber } from '../model/cuenum';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const then = (a: Advance) => a.mode === 'manual' ? 'GO' : a.mode === 'wait' ? `auto after ${a.time} s` : a.mode === 'follow' ? (a.time ? `${a.time} s after the fade` : 'follows when the fade is done') : `after ${a.beats} beats`;
 
 interface Row { list: string; n: string; name: string; fade: string; then: string; lights: string; effects: string; actions: string; note: string }
-function rows(show: Show): Row[] {
+// The lights of a cue by their level ("Front 1, Front 2 @ 50 % · Back 1 @ full"): names alone
+// didn't say what the cue does with them. A level from a preset by the preset's name.
+function lightsOf(show: Show, values: Record<string, Values>): string {
+  const names = new Map(show.fixtures.map((f) => [f.id, f.name])), presets = new Map(show.presets.map((p) => [p.id, p.name]));
+  const by = new Map<string, string[]>();
+  for (const [id, v] of Object.entries(values)) {
+    const i = v.intensity as unknown;
+    const lvl = typeof i === 'number' ? (i <= 0 ? 'out' : i >= 1 ? 'full' : `${Math.round(i * 100)} %`) : i && typeof i === 'object' && 'preset' in i ? presets.get((i as { preset: string }).preset) ?? 'a preset' : '';
+    by.set(lvl, [...(by.get(lvl) ?? []), names.get(id) ?? '?']);
+  }
+  return [...by].map(([lvl, ns]) => `${ns.join(', ')}${lvl ? ` @ ${lvl}` : ''}`).join(' · ');
+}
+function rows(show: Show, only?: string): Row[] {
   const fx = new Map(show.effects.map((e) => [e.id, e.name]));
   const lists = new Map(show.cueLists.map((l) => [l.id, l.name]));
-  const names = new Map(show.fixtures.map((f) => [f.id, f.name]));
-  return show.cueLists.flatMap((l) => l.cues.map((c, i) => ({
+  return show.cueLists.filter((l) => !only || l.id === only).flatMap((l) => l.cues.map((c, i) => ({
     list: l.name, n: cueNumber(l, i), name: c.name,
     fade: `${c.fade} s${c.delay ? ` (delay ${c.delay} s)` : ''}${c.fadeOut !== undefined && c.fadeOut !== c.fade ? `, out ${c.fadeOut} s` : ''}`,
     then: then(c.advance),
-    lights: Object.keys(c.values).map((id) => names.get(id) ?? '?').join(', '),
+    lights: lightsOf(show, c.values),
     effects: (c.effects ?? []).map((id) => fx.get(id) ?? '?').join(', '),
     actions: (c.actions ?? []).map((a) => a.do === 'blackout' ? `blackout ${a.on ? 'on' : 'off'}` : a.do === 'off' ? 'everything off' : a.do === 'master' ? `level of ${lists.get(a.list)} to ${Math.round(a.level * 100)}%`
       : a.do === 'goto' ? `play "${show.cueLists.find((l) => l.id === a.list)?.cues.find((x) => x.id === a.cue)?.name ?? '?'}" on ${lists.get(a.list) ?? '?'}`
@@ -30,8 +41,9 @@ export function cueSheetCsv(show: Show): string {
   return [head, ...rows(show).map((r) => [r.list, r.n, r.name, r.fade, r.then, r.lights, r.effects, r.actions, r.note])].map((r) => r.map(q).join(',')).join('\r\n') + '\r\n';
 }
 
-export function cueSheetHtml(show: Show): string {
-  const all = rows(show);
+// `only`: one list's cues (a list's own menu), else every list's
+export function cueSheetHtml(show: Show, only?: string): string {
+  const all = rows(show, only);
   const lists = [...new Set(all.map((r) => r.list))];
   const tables = lists.map((l) => `
     <h2>${esc(l)}</h2>

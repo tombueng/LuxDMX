@@ -186,3 +186,14 @@ test('a play picked for GO on Live is the one the whole-list panel shows', async
   await expect(page.getByRole('region', { name: /Cue list The Play/ })).toBeVisible();
   await expect(page.getByRole('region', { name: /Cue list The Play/ }).locator('li')).toHaveCount(3);
 });
+
+test('a list\'s own cue sheet: from its tab\'s menu, that list only, with each light\'s level', async ({ page }) => {
+  await theatre(page);
+  await page.locator('.deck .tab').first().click({ button: 'right' });
+  const name = await page.evaluate(() => (window as any).__luxdmx.show.cueLists[0].name as string);
+  const [sheet] = await Promise.all([page.waitForEvent('popup'), page.locator('.ctx').getByRole('menuitem', { name: new RegExp(`^Print ${name}'s cue sheet`) }).click()]);
+  await expect(sheet.locator('h2')).toHaveCount(1);
+  await expect(sheet.locator('h2')).toHaveText(name);
+  await expect(sheet.locator('table').first()).toContainText('@');                 // (levels: "@ 30 %", "@ full")
+  await sheet.close();
+});

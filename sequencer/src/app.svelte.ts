@@ -3114,10 +3114,11 @@ class App {
     this.exportShow();
   }
   // The cue sheet, in a new tab ready to print (or save as PDF from the print dialog).
-  printCueSheet() {
+  // (`only`: one list's sheet, from its own menu: the show's other lists left out)
+  printCueSheet(only?: string) {
     const w = window.open('', '_blank');
     if (!w) return false;
-    w.document.write(cueSheetHtml($state.snapshot(this.show) as Show));
+    w.document.write(cueSheetHtml($state.snapshot(this.show) as Show, only));
     w.document.close();
     return true;
   }
