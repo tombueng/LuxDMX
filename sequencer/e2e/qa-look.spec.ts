@@ -283,13 +283,17 @@ test.describe('the 2D plan on a laptop', () => {
     // each name reads as its own light's (none nearer to another light), and none overlap, also
     // with the numbers and addresses on
     const check = () => svg.evaluate((s) => {
-      const body = (n: string) => { const b = s.querySelector(`.fx[data-name="${n}"] [stroke-width]`)!.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+      const body = (n: string) => s.querySelector(`.fx[data-name="${n}"] [stroke-width]`)!.getBoundingClientRect();
       const names = [...s.querySelectorAll('.fx')].map((g) => (g as SVGGElement).dataset.name!);
       const lbl = [...s.querySelectorAll<SVGTextElement>('text.lbl')].map((t) => ({ n: t.dataset.for!, r: t.getBoundingClientRect() }));
       const wrong: string[] = [], over: string[] = [];
+      // (a name under its light or beside it goes by where names go; one above it sits under the
+      // row before, so that one has to be nearest its own)
       for (const l of lbl) {
         const c = { x: l.r.x + l.r.width / 2, y: l.r.y + l.r.height / 2 };
-        const d = (n: string) => Math.hypot(body(n).x - c.x, body(n).y - c.y);
+        if (c.y >= body(l.n).top) continue;
+        // (to the edge of its symbol: a long bar's name at its end is next to it)
+        const d = (n: string) => { const r = body(n); return Math.hypot(Math.max(r.left - c.x, 0, c.x - r.right), Math.max(r.top - c.y, 0, c.y - r.bottom)); };
         const near = names.reduce((a, b) => (d(b) < d(a) ? b : a));
         if (near !== l.n) wrong.push(`${l.n} reads as ${near}`);
       }

@@ -316,13 +316,11 @@
     // than its own, else it's left out rather than mistaken for that one's)
     // (above it, the last resort, it has to be clearly its own: that's where a name read as the
     // light in the row before)
+    // (distances to the edge of a light's symbol: a long bar's name at its end is next to it)
+    const gapTo = (o: Fixture, cx: number, cy: number) => { const w = halfW(o.id), h = size * 0.7, x = o.x * W, y = o.y * H; return Math.hypot(Math.max(x - w - cx, 0, cx - x - w), Math.max(y - h - cy, 0, cy - y - h)); };
     const ownest = (f: Fixture, b: Box, k: number) => {
-      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, own = Math.hypot(cx - f.x * W, cy - f.y * H);
-      for (const o of app.show.fixtures) {
-        if (o === f) continue;
-        const dx = cx - o.x * W; if (Math.abs(dx) >= own * k) continue;
-        if (Math.hypot(dx, cy - o.y * H) < own * k) return false;
-      }
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, own = gapTo(f, cx, cy);
+      for (const o of app.show.fixtures) if (o !== f && Math.abs(cx - o.x * W) < own * k + halfW(o.id) && gapTo(o, cx, cy) < own * k) return false;
       return true;
     };
     const sel = new Set(app.selected);
