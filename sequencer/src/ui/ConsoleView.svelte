@@ -383,7 +383,7 @@
           </span>
         </div>
       {/each}
-      {#if !pshown.length}<p class="faint">No cue lists yet: select lights, set them, Record.</p>{/if}
+      {#if !pshown.length}<p class="faint">No cues yet: select lights (1 thru 4), set them (@ 50), then Record.</p>{/if}
     </div>
   </section>
 </div>

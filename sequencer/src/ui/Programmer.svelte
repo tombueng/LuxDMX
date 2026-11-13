@@ -201,7 +201,8 @@
   {#if sel.length === 0}
     <div class="empty">
       {#if !app.show.fixtures.length}
-      <p class="faint">Lights you select are set here: brightness, colour, position.</p>
+      <p class="faint">No lights yet. Lights you select are set here: brightness, colour, position.</p>
+      <button class="sm" onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add lights</button>
       {:else}
       <p>Select lights on the stage or in the fixture list, then set them here.</p>
       {#if app.show.groups.length}

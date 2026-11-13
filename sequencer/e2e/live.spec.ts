@@ -259,7 +259,8 @@ for (const change of ['left as it was', 'removed', 'pointed at another list'] as
 test('Live without a cue list still has its Blackout', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
-  await expect(page.locator('.strip')).toContainText('No cue list yet');
+  await expect(page.locator('.strip')).toContainText('No cues yet');
+  await expect(page.locator('.strip').getByRole('button', { name: 'Go to Program' })).toBeVisible();
   await page.locator('.strip').getByRole('button', { name: 'Blackout' }).click();
   await expect(page.locator('.strip').getByRole('button', { name: 'Blackout' })).toHaveClass(/\bon\b/);
   await page.keyboard.press('b');

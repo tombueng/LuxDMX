@@ -276,7 +276,7 @@ function kernels(t: number, id: number, n: number, colors: Color[]): Spot[] {
 // ---------------------------------------------------------------- the shows
 
 export const PIXEL_EFFECTS: EffectDef[] = [
-  { id: 'theater', name: 'Theater chase', category: 'pixel',
+  { id: 'theater', name: 'Theatre chase', category: 'pixel',
     blurb: 'Every third pixel lit, marching along like the bulbs round an old theatre sign. Size sets the gap.',
     defaults: { speed: 0.25, tempo: true, size: 0.25, spread: 1, colors: PALETTES.Rainbow },
     run: (e, p) => {

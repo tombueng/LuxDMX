@@ -484,7 +484,7 @@ Three more demos come with their own room on the 3D stage:
   it's softer and more of it glows. Dark stays dark and full stays full; Dim to and Bright to are
   still the ends.
 - **Pixel shows** (Effects, Add, Pixels): the classics from LED strip firmware like WLED, colour
-  and brightness together, on a pixel strip, a few bars or a plain row of PARs. Theater chase,
+  and brightness together, on a pixel strip, a few bars or a plain row of PARs. Theatre chase,
   Flames (rising from the start of each light), Twinkles, Juggle, Sinelon, Colour waves (Pride),
   Bouncing balls, Ripples, Fireworks (a rocket up, then a burst), Matrix rain, Aurora, Plasma,
   Rainbow with glitter, Heartbeat, Dual scanner, Meteor rain, Lightning along the strip, Rain drips,

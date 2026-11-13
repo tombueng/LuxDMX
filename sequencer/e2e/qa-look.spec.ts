@@ -604,3 +604,21 @@ test.describe('selecting several on a tablet', () => {
     await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(1);
   });
 });
+
+test('an empty show says what to do next, the same way everywhere, with a button where the next step is elsewhere', async ({ page }) => {
+  await openConnected(page);
+  await expect(page.locator('.deck')).toContainText('No cues yet');
+  await expect(page.locator('.prog').getByRole('button', { name: 'Add lights' })).toBeVisible();          // (the programmer)
+  // the effects with no lights at all
+  await page.locator('.side .tabs').getByRole('tab', { name: 'Effects' }).click();
+  await page.locator('.ep').getByRole('button', { name: 'Add', exact: true }).click();
+  const lib = page.getByRole('dialog', { name: 'Add an effect' });
+  await expect(lib).toContainText('No lights yet: add them first');
+  await expect(lib.locator('button.on', { hasText: 'the selected lights' })).toHaveCount(0);          // (no "✓ … (0)")
+  await page.keyboard.press('Escape');
+  // the timeline: no cues to drag yet
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await expect(page.locator('.tlv .hint.empty')).toContainText('No cues yet: record some in Program');
+  await page.locator('.tlv .hint.empty').getByRole('button', { name: 'Go to Program' }).click();
+  await expect(page.locator('.top .modes').getByRole('tab', { name: 'Program' })).toHaveAttribute('aria-selected', 'true');
+});

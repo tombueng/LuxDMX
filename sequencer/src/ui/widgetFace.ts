@@ -126,7 +126,7 @@ export function widgetFace(app: App, w: Widget, manyLists = false, now = perform
   else if (w.type === 'fog') { sub = on ? `${left.toFixed(1)} s left` : `hold · max ${w.max} s`; if (on) bar = left / w.max; }
   else if (w.type === 'special' && w.do === 'fadeOut') {
     const f = app.gmFade, g = app.grandMaster;     // the bar follows the master (it moves every frame of a fade)
-    sub = f ? (f.to === 0 ? 'fading out' : 'coming back') : app.fadedOut ? 'out · tap to come back' : `${w.seconds ?? 5} s to black`;
+    sub = f ? (f.to === 0 ? 'fading out' : 'coming back') : app.fadedOut ? 'out · tap to come back' : `${w.seconds ?? 5} sec to black`;   // (the face writes it in capitals: "5 S" read oddly)
     if (f) bar = Math.max(0, Math.min(1, f.to === 0 ? 1 - g / Math.max(0.01, f.from) : g / Math.max(0.01, f.to)));
   }
   else if (w.type === 'special') sub = w.do === 'tap' ? `${app.bpm} BPM` : w.do === 'blackout' ? (app.blackout ? 'ON' : '') : w.do === 'blinder' ? 'HOLD · all white' : w.do === 'drop' ? `HOLD · white, strobe${app.show.fixtures.some((f) => app.caps(f.id).fog) ? ', fog' : ''}` : '';

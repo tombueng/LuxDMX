@@ -230,10 +230,10 @@
     {#if !list || !list.cues.length}
       <div class="empty">
         {#if !app.show.fixtures.length}
-          <p class="faint">The looks you record show up here as cards.</p>
+          <p class="faint">No cues yet: add lights, set them, then press Record. Each cue shows up here as a card.</p>
         {:else}
           <Icon name="record" size={30} />
-          <p><b>No cues yet.</b> Set up a look on the stage (select lights, pick a colour), then press <b>Record</b>.</p>
+          <p><b>No cues yet.</b> Select lights, set them (a colour, a level), then press <b>Record</b>.</p>
           <p class="hint">Each Record makes one card here. GO (or Space) steps from one to the next with a fade.</p>
           <button class="sm" onclick={() => { const n = app.makeStarterLooks(); if (n) app.toastUndo(`${n} starter looks for your rig. Change them, or keep the ones you like.`); }}>
             <Icon name="palette" size={14} />Or make starter looks for my rig</button>

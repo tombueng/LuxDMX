@@ -64,7 +64,8 @@
 {:else}
   <!-- no cue list yet: Blackout still has to be here (it's the only one in Live) -->
   <div class="strip" role="group" aria-label="Playback">
-    <span class="faint empty">{app.show.cueLists.length ? 'Only fog timers so far' : 'No cue list yet'}: record a look in Program, and GO plays it here.</span>
+    <span class="faint empty">{app.show.cueLists.length ? 'Only fog timers so far' : 'No cues yet'}: select lights in Program, set them, press Record, and GO plays them here.
+      {#if !app.locked}<button class="ghost link" onclick={() => (app.view = 'program')}>Go to Program</button>{/if}</span>
     <span class="grow"></span>
     {@render bo()}
   </div>

@@ -816,7 +816,9 @@
       </div>
     </div>
     {#if credit}<p class="credit">♪ {credit.text}{#if credit.s} · <a href={credit.s.licenseUrl} target="_blank" rel="noopener noreferrer">the licence</a> · <a href={credit.s.page} target="_blank" rel="noopener noreferrer">where it's from</a>{/if}</p>{/if}
-    {#if !items.length}<p class="hint empty">Drag a cue from the left onto the tracks (or tap it), pick a song or a demo song, and press Play.</p>{/if}
+    <!-- (with no cues there's nothing in the list to drag: it said so all the same) -->
+    {#if !items.length && !lists.some((l) => l.cues.length)}<p class="hint empty">No cues yet: record some in Program, then put them on the tracks here. <button class="ghost link" onclick={() => (app.view = 'program')}>Go to Program</button></p>
+    {:else if !items.length}<p class="hint empty">Drag a cue from the list onto the tracks (or tap it), pick a song or a demo song, and press Play.</p>{/if}
   </section>
 </div>
 

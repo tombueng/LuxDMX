@@ -294,7 +294,7 @@ export const TEMPLATES: Template[] = [
       const random = b.effect('PAR random colours', 'random', gPar, { speed: 1 });
       // the pixel shows, on the battens
       const px = (name: string, kind: string, params: Record<string, unknown> = {}) => b.effect(name, kind, gBat, params);
-      const theater = px('Theater chase', 'theater'), juggle = px('Juggle', 'juggle'), sinelon = px('Sinelon', 'sinelon'), bouncing = px('Bouncing balls', 'bouncing');
+      const theater = px('Theatre chase', 'theater'), juggle = px('Juggle', 'juggle'), sinelon = px('Sinelon', 'sinelon'), bouncing = px('Bouncing balls', 'bouncing');
       const ripple = px('Ripples', 'ripple'), works = px('Fireworks', 'fireworks'), matrix = px('Matrix rain', 'matrix'), plasma = px('Plasma', 'plasma');
       const glitter = px('Rainbow glitter', 'glitter'), popcorn = px('Popcorn', 'popcorn'), gradient = px('Gradient chase', 'gradientChase'), rain = px('Rain', 'rain');
       const lights = [pars, bars, movers, strobe, beams, washes, battens, ups, blinders, sideStrobes].flat();

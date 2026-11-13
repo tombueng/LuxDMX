@@ -143,13 +143,15 @@
 <Modal title="Add an effect" {onclose} wide>
   <div class="row target">
     <span class="muted">Run it on</span>
-    <button class:on={target === 'sel'} onclick={() => (target = 'sel')} disabled={!app.selected.length}>
-      <Icon name="check" />the selected lights ({app.selected.length})</button>
+    <!-- (the tick only when it's picked and there's something selected: "✓ the selected lights (0)") -->
+    <button class:on={target === 'sel' && app.selected.length > 0} onclick={() => (target = 'sel')} disabled={!app.selected.length}>
+      {#if target === 'sel' && app.selected.length}<Icon name="check" />{/if}the selected lights ({app.selected.length})</button>
     {#each app.show.groups as g (g.id)}
       <button class:on={target === g.id} onclick={() => (target = g.id)}><Icon name="group" />{g.name} ({g.fixtures.length})</button>
     {/each}
   </div>
-  {#if !count}<p class="err">Nothing to run it on: close this, select lights on the stage (or make a group), then come back.</p>{/if}
+  {#if !count && !app.show.fixtures.length}<p class="err">No lights yet: add them first, then their effects. <button class="ghost link" onclick={() => (ui.modal = 'addFixtures')}>Add lights</button></p>
+  {:else if !count}<p class="err">Nothing to run it on: close this, select lights on the stage (or make a group), then come back.</p>{/if}
 
   <!-- (a ring or a matrix among them: their pictures first; else last, after what suits these lights) -->
   {#if shaped}{@render shapes()}{@render addonCards()}{/if}

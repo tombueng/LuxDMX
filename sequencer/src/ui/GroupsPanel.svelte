@@ -62,7 +62,7 @@
     <div class="empty">
       <Icon name="group" size={30} />
       <p>No groups yet. Select lights and press <b>From selection</b>, or let the app group them by type.</p>
-      <button onclick={auto} disabled={!app.show.fixtures.length}>Group by fixture type</button>
+      <button onclick={auto} disabled={!app.show.fixtures.length}>Group by type</button>
     </div>
   {:else}
     <!-- A plain list: each group is a button (select it; F2 renames, Delete removes) plus its ⋯. -->
