@@ -239,11 +239,22 @@
     app.page = p.id;
     app.editPage = true;
   }
+  function movePage(id: string, by: number) {
+    app.checkpoint();
+    const own = app.ownPages(), i = own.findIndex((x) => x.id === id), j = i + by;
+    if (i < 0 || j < 0 || j >= own.length) return;
+    const [p] = own.splice(i, 1);
+    own.splice(j, 0, p);
+    app.markDirty(0);
+  }
   function pageMenu(e: MouseEvent, id: string) {
     const p = pages.find((x) => x.id === id)!;
     ui.openMenu(e, [
       { label: 'Rename', icon: 'edit', run: async () => { const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === id); if (q) q.name = n; app.markDirty(0); } } },
       { label: 'Duplicate', icon: 'duplicate', run: () => { app.ownPages(); const q = app.show.pages.find((x) => x.id === id)!; const c = { ...JSON.parse(JSON.stringify(q)), id: newId('pg'), name: `${q.name} (copy)`, locked: false }; c.widgets.forEach((w: Widget) => (w.id = newId('w'))); app.show.pages.push(c); app.page = c.id; } },
+      // (the pages in another order: there was no way to)
+      { label: 'Move left', icon: 'left', disabled: pages.findIndex((x) => x.id === id) < 1, run: () => movePage(id, -1) },
+      { label: 'Move right', icon: 'right', disabled: pages.findIndex((x) => x.id === id) >= pages.length - 1, run: () => movePage(id, 1) },
       { label: fresh.length ? `Add what's new from the show (${fresh.length})` : "Nothing new in the show for it", icon: 'plus', disabled: !fresh.length, run: addNew },
       { label: 'Rebuild from the show…', icon: 'update', disabled: !app.show.pages.length, run: async () => {
         if (!(await ui.confirm('Rebuild the pages?', 'Your pages are replaced by one built from the show (your own buttons, keys and MIDI go). Undo brings them back.', 'Rebuild', false))) return;
@@ -411,7 +422,7 @@
     <div class="pages" role="tablist" aria-label="Pages" use:tablist>
       {#each tabs as p (p.id)}
         <button role="tab" aria-selected={p.id === page?.id} class:cur={p.id === page?.id} onclick={() => { app.page = p.id; selW = null; }} oncontextmenu={(e) => { if (app.locked) e.preventDefault(); else pageMenu(e, p.id); }}
-                ondblclick={async () => { if (app.locked) return; const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === p.id); if (q) q.name = n; app.markDirty(0); } }} title="Double-click to rename, right-click for more">
+                ondblclick={async () => { if (app.locked) return; const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === p.id); if (q) q.name = n; app.markDirty(0); } }} title="{p.name}: double-click to rename, right-click for more (move it, duplicate...)">
           {#if p.locked}<Icon name="lock" size={12} />{/if}{p.name}</button>
       {/each}
     </div>
@@ -550,7 +561,8 @@
   }
   .bar { flex-wrap: wrap; }
   .pages { display: flex; gap: .25rem; flex-wrap: wrap; }
-  .pages button { border-radius: 999px; padding: .25rem .8rem; }
+  /* (a long name ends in …, the whole of it on hover: it pushed the bar onto a second row) */
+  .pages button { border-radius: 999px; padding: .25rem .8rem; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
   .pages button.cur { border-color: var(--green); background: #45d85c14; }
   .zoom { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); } .zoom input { width: 90px; }
   .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; gap: .6rem; position: relative; }

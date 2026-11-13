@@ -426,3 +426,28 @@ test('the Loop button says whether it\'s on', async ({ page }) => {
   await loop.click();
   await expect(loop).toHaveAttribute('aria-pressed', 'true');
 });
+
+test.describe('Live page tabs on a laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('a long page name ends in … (the bar keeps one row); pages move left and right from their menu', async ({ page }) => {
+    await openConnected(page);
+    await patch(page, 'gen-rgb', 2, 0, 'P');
+    await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+    await page.evaluate(() => {
+      const a = (window as any).__luxdmx, own = a.ownPages();
+      own[0].name = 'A very long page name for the encore section of the show';
+      own.push({ ...JSON.parse(JSON.stringify(own[0])), id: 'pg-qa2', name: 'Second' });
+      a.checkpoint();
+    });
+    const tabs = page.getByRole('tablist', { name: 'Pages' }).getByRole('tab');
+    await expect(tabs).toHaveCount(2);
+    const first = tabs.first();
+    expect(await first.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);              // (cut, …)
+    await expect(first).toHaveAttribute('title', /^A very long page name for the encore section of the show:/);
+    const tops = await tabs.evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);
+    expect(tops).toBe(1);
+    await tabs.nth(1).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Move left' }).click();
+    await expect(tabs.first()).toHaveText('Second');
+  });
+});
