@@ -2583,8 +2583,9 @@ class App {
       plainOf(fid, v as Record<string, unknown>);
       for (const cv of Object.values(v.cells ?? {})) plainOf(fid, cv as Record<string, unknown>);
     }
-    const dropRefs = (o: Record<string, unknown>) => { for (const [k, x] of Object.entries(o)) if (x && typeof x === 'object' && ids.includes((x as { preset?: string }).preset ?? '')) delete o[k]; };
-    for (const prog of Object.values(this.programmer)) { dropRefs(prog as Record<string, unknown>); for (const cv of Object.values(prog.cells ?? {})) dropRefs(cv as Record<string, unknown>); }
+    // the programmer too: its lights keep the colour the preset gave them (they went white, and
+    // an Undo brought the preset back but not their colour)
+    for (const [fid, prog] of Object.entries(this.programmer)) { plainOf(fid, prog as Record<string, unknown>); for (const cv of Object.values(prog.cells ?? {})) plainOf(fid, cv as Record<string, unknown>); }
     this.show.presets = this.show.presets.filter((p) => !ids.includes(p.id));
   }
   movePreset(id: string, before: string | null) {

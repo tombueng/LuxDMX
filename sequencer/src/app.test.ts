@@ -492,3 +492,19 @@ describe('a cue recorded while effects run', () => {
     expect(app.suggestName({}, ['e1', 'e2'])).toBe('Spots: circles + Police');      // (effects only: as before)
   });
 });
+
+describe('a preset deleted while lights use it', () => {
+  it('the programmer\'s lights keep its colour (they went white); Undo brings the preset back, the colour stays', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.show.presets.push({ id: 'pBlue', name: 'Stage blue', kind: 'color', values: { color: { r: 0, g: 0.2, b: 1 } } } as any);
+    app.checkpoint();
+    app.programmer = { p1: { intensity: 1, color: { preset: 'pBlue' } } } as any;
+    tick(1);
+    app.removePresets(['pBlue']);
+    expect(app.programmer.p1.color).toEqual({ r: 0, g: 0.2, b: 1 });
+    app.undo(); tick(1);
+    expect(app.show.presets.some((p: any) => p.id === 'pBlue')).toBe(true);
+    expect(app.programmer.p1.color).toEqual({ r: 0, g: 0.2, b: 1 });
+  });
+});
