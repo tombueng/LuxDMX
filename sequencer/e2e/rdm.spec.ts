@@ -28,6 +28,9 @@ test('scan the rig, check it against the patch, fix it both ways, patch the new 
   await expect(dlg).toBeVisible();
   await dlg.getByRole('button', { name: 'Scan the rig' }).click();
   await expect(dlg.locator('li.row')).toHaveCount(4, { timeout: 15000 });
+  // (the names in one column: a short one doesn't sit further right than a long one)
+  const lefts = await dlg.locator('li.row .who').evaluateAll((els) => els.map((e) => Math.round((e.firstElementChild ?? e).getBoundingClientRect().left)));
+  expect(new Set(lefts).size).toBe(1);
   await expect(dlg.getByRole('button', { name: /^Scan again/ })).toBeEnabled({ timeout: 15000 });
 
   // the match, by address
