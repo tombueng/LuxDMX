@@ -42,3 +42,45 @@ test('the camera flies to the selected lights: "Selected" on the 3D stage, "Show
   await page.locator('.stage-wrap').getByRole('button', { name: 'Select none' }).click();
   await expect(cam.getByRole('button', { name: 'Selected', exact: true })).toBeDisabled();
 });
+
+test('Measure on the 3D stage: two points and how far apart; one light: how high it hangs and where its beam lands; Esc clears', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(() => page.evaluate(() => !!(window as any).__stage3d?.internals), { timeout: 45000 }).toBe(true);
+  const s3 = page.locator('.s3'), canvas = s3.locator('canvas').first();
+  await s3.getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'Front', exact: true }).click();
+  await s3.getByRole('button', { name: 'Measure', exact: true }).click();
+  await expect(s3.locator('.aimhint')).toContainText('Click two points');
+  const said = () => page.evaluate(() => (window as any).__stage3d.measure());
+  const box = (await canvas.boundingBox())!;
+  // the light: where it is in the picture (a few tries round it: its body is small)
+  const at = await page.evaluate(() => { const a = (window as any).__luxdmx; return (window as any).__stage3d.screenOf(a.show.fixtures[0].id); });
+  let hit = false;
+  for (const dy of [6, 10, 2, 14, -2]) {
+    await page.mouse.click(at.x, at.y + dy);
+    const m = await said();
+    if (m?.a?.id) { hit = true; break; }
+    await page.keyboard.press('Escape');
+  }
+  expect(hit).toBe(true);
+  const one = await said();
+  expect(one.said.big).toMatch(/^Head: \d+\.\d\d m above the (deck|floor)$/);
+  expect(one.said.small).toMatch(/Its beam reaches the (deck|floor) \d+\.\d\d m away, \d+\.\d\d m wide there/);
+  await expect(s3.locator('.meas')).toBeVisible();
+  // a second point on the stage: the distance between the two, as the numbers say
+  await page.mouse.click(box.x + box.width * 0.62, box.y + box.height * 0.6);       // (above the selected lights' panel)
+  const two = await said();
+  const d = Math.hypot(two.b.p.x - two.a.p.x, two.b.p.y - two.a.p.y, two.b.p.z - two.a.p.z);
+  expect(two.said.big).toBe(`${d.toFixed(2)} m`);
+  expect(two.said.small).toMatch(/^Head to the (deck|floor): \d+\.\d\d m across, \d+\.\d\d m down$/);
+  await expect(s3.locator('.meas')).toContainText(`${d.toFixed(2)} m`);
+  // Esc clears; another tool too
+  await page.keyboard.press('Escape');
+  await expect(s3.locator('.meas')).toHaveCount(0);
+  await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.6);
+  await expect(s3.locator('.meas')).toBeVisible();
+  await s3.getByRole('button', { name: 'Select', exact: true }).click();
+  await expect(s3.locator('.meas')).toHaveCount(0);
+});

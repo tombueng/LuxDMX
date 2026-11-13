@@ -56,6 +56,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   and the 2400+ library fixtures. Every tile plays its light in 3D: spots sweep and run their gobos
   and prisms, washes breathe, PARs run the colours, bars chase. All in one WebGL context, only the
   tiles on the screen, so it stays smooth. The old library popup is gone.
+- 3D: **Measure** next to Aim: two clicks give the distance (across, up or down); one light gives
+  its height above the deck or floor and where its beam lands, how far and how wide.
 - 3D: **Selected** next to the camera views flies the camera to the selected lights, and **Show it
   in 3D** in a light's right-click menu opens the 3D stage and does the same.
 - A gallery, **What the 3D stage draws** (Ctrl+K "gallery", or from Add fixtures and the

@@ -731,7 +731,11 @@ Three more demos come with their own room on the 3D stage:
   the machine stops).
   Drag to look round (camera views: Front, FOH, Side, Top, from the stage, and **Selected**: the
   camera flies to the selected lights, near enough to see them; **Show it in 3D** in a light's
-  right-click menu, on the plan or in the fixture list, opens the 3D stage and does the same; full screen for a
+  right-click menu, on the plan or in the fixture list, opens the 3D stage and does the same.
+  **Measure** (next to Aim): click two points, the deck, the floor or a light, and a line between
+  them says how far apart they are, how far across and how far up or down. One light alone says
+  how high it hangs above the deck or floor, and where its beam lands now: how far away and how
+  wide it is there (for the real rig: which lens, which height). Esc clears it; full screen for a
   presentation; a reload keeps the camera where it was). **Camera moves**: the camera films the
   show by itself, picked from the little arrow next to Tour (the button starts and stops the one
   picked). **Tour** goes slowly round the room. **Broadcast** is a live TV director: hard cuts on

@@ -56,7 +56,7 @@
   import { Rig, type RigFixture } from './rig';
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, pivotOf, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
   import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
@@ -69,7 +69,7 @@
   let host = $state<HTMLDivElement>();
   let cvHost = $state<HTMLDivElement>();
   let canvas = $state<HTMLCanvasElement>();
-  type Mode = 'select' | 'move' | 'turn' | 'aim' | 'calib';
+  type Mode = 'select' | 'move' | 'turn' | 'aim' | 'calib' | 'measure';
   let mode = $state<Mode>('select');
   // the glow round bright lights and the haze in the air: two sliders, kept per browser
   const stored = (k: string, d: number) => { try { const v = localStorage.getItem(k); return v === null ? d : Math.max(0, Math.min(1.5, Number(v) || 0)); } catch { return d; } };
@@ -124,7 +124,7 @@
   let wash: THREE.SpotLight[] = [];
   // (the air is never pure black: a hall has some light in it, even between looks)
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
-  const overlay = new THREE.Scene();       // drawn after the glow: the gizmo
+  const overlay = new THREE.Scene();       // drawn after the glow: the gizmo, the Measure line
   const meter = new ExposureMeter();
   // the middle brightness the exposure aims for (a dark venue: low key; measured so the Front view
   // of the demo sits at about the exposure it always had)
@@ -394,6 +394,7 @@
     });
     gizmo.addEventListener('objectChange', () => moved());
     overlay.add(gizmo.getHelper());
+    overlay.add(measGroup);
     scene.add(proxy);
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
@@ -437,6 +438,7 @@
       },
       internals: { THREE, renderer, scene, camera, controls, composer, bloom, view, meter, overlay },
       flying: () => !!fly,
+      measure: () => (meas ? { a: { ...meas.a }, b: meas.b ? { ...meas.b } : undefined, said: measSaid } : null),
       // the room and its people, what the band's banners show; the take running (its frame count)
       venue: () => ({ room: venue.room, crowd: venue.crowdCount, group: venue.group.uuid, band: venue.bandInfo() }),
       take: () => take,
@@ -664,6 +666,7 @@
     at(e);
     if (mode === 'aim' && !readonly) { aim(); return; }
     if (mode === 'calib' && !readonly) { calib(); return; }
+    if (mode === 'measure') { measure(); return; }
     if (readonly) return;                  // (a Live page or the timeline's picture: looking, not picking lights)
     const id = rig.pick(ray);
     if (id) app.select(id, e.shiftKey || e.ctrlKey || e.metaKey);
@@ -676,6 +679,72 @@
     if (!p || !onDeck(p.x, p.z, room)) p = hit(0);
     return p ? { x: p.x, y: p.y, z: p.z } : undefined;
   }
+  // ---- Measure: two clicks (the deck, the floor, a light) and how far apart they are, how far
+  // across and how far up; one light on its own: how high it hangs, where its beam lands, how wide
+  // it is there. A third click starts again; Esc or another tool clears it. The line and its dots
+  // are drawn over everything (the overlay), the numbers in a label that follows the line's middle.
+  type MPoint = { p: V3; what: string; id?: string };
+  let meas = $state<{ a: MPoint; b?: MPoint } | null>(null);
+  let measLabel = $state<HTMLDivElement>();
+  const measGroup = new THREE.Group();
+  const measMat = new THREE.LineBasicMaterial({ color: 0xffaa1c, depthTest: false, toneMapped: false });
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffaa1c, depthTest: false, toneMapped: false });
+  const m2 = (x: number) => `${x.toFixed(2)} m`;
+  function measurePick(): MPoint | undefined {
+    const id = rig.pick(ray), f = id ? fixtures.find((x) => x.id === id) : undefined;
+    if (f) return { p: pivotOf(f.p, f.rot), what: f.name, id: f.id };
+    const p = spot();
+    return p ? { p, what: p.y > 0.01 ? 'the deck' : 'the floor' } : undefined;
+  }
+  function measure() {
+    const m = measurePick();
+    if (!m) return;
+    meas = !meas || meas.b ? { a: m } : { a: meas.a, b: m };
+  }
+  // a light's throw: where its beam lands now, how far, how wide there
+  function throwOf(id: string) {
+    const f = fixtures.find((x) => x.id === id);
+    if (!f || f.sfx || f.fog) return null;
+    const v = app.stageNow[f.id], piv = pivotOf(f.p, f.rot);
+    const d = f.kind === 'mover' ? beamDir(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.rot, f.optics) : toWorld({ x: 0, y: 1, z: 0 }, f.rot);
+    const hit = hitFloor(piv, d, room);
+    if (!hit) return null;
+    const L = Math.hypot(hit.x - piv.x, hit.y - piv.y, hit.z - piv.z), deg = rig.beamOf(f.id) ?? f.beam?.[0] ?? 25;
+    return { L, w: 2 * L * Math.tan((deg / 2) * (Math.PI / 180)), on: hit.y > 0.01 ? 'the deck' : 'the floor', hit };
+  }
+  const measSaid = $derived.by(() => {
+    if (!meas) return null;
+    const { a, b } = meas;
+    if (!b) {
+      if (!a.id) return { big: a.p.y > 0.01 ? `On the deck, ${m2(a.p.y)} up` : 'On the floor', small: 'Click a second point.' };
+      const g = groundAt(a.p.x, a.p.z, room), th = throwOf(a.id);
+      return { big: `${a.what}: ${m2(a.p.y - g)} above the ${g > 0.01 ? 'deck' : 'floor'}`, small: th ? `Its beam reaches ${th.on} ${m2(th.L)} away, ${m2(th.w)} wide there. Click a second point.` : 'Click a second point.' };
+    }
+    const dx = b.p.x - a.p.x, dy = b.p.y - a.p.y, dz = b.p.z - a.p.z;
+    return { big: m2(Math.hypot(dx, dy, dz)), small: `${a.what} to ${b.what}: ${m2(Math.hypot(dx, dz))} across, ${m2(Math.abs(dy))} ${dy >= 0 ? 'up' : 'down'}` };
+  });
+  $effect(() => {
+    const m = meas;
+    untrack(() => {
+      for (const c of [...measGroup.children]) { measGroup.remove(c); (c as THREE.Mesh).geometry?.dispose(); }
+      if (!m) return;
+      const pts = [m.a, ...(m.b ? [m.b] : [])].map((x) => new THREE.Vector3(x.p.x, x.p.y, x.p.z));
+      for (const q of pts) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), dotMat); d.position.copy(q); d.renderOrder = 10; measGroup.add(d); }
+      if (pts.length === 2) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), measMat); l.renderOrder = 10; measGroup.add(l); }
+    });
+  });
+  $effect(() => { if (mode !== 'measure') untrack(() => (meas = null)); });
+  // (the label at the line's middle, or by the first point; every frame, as the camera moves)
+  function placeMeasLabel() {
+    if (!measLabel || !meas || !canvas) return;
+    const a = meas.a.p, b = meas.b?.p ?? a;
+    const v = new THREE.Vector3((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2).project(camera);
+    const r = canvas.getBoundingClientRect(), host0 = measLabel.offsetParent?.getBoundingClientRect() ?? r;
+    const x = r.left - host0.left + ((v.x + 1) / 2) * r.width, y = r.top - host0.top + ((1 - v.y) / 2) * r.height;
+    measLabel.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -130%)`;
+    measLabel.style.visibility = v.z < 1 ? 'visible' : 'hidden';
+  }
+
   // Calibrate: the real head points at a spot (moved there with the pan/tilt pad); a click on that
   // spot here works out its offsets, so the 3D stage and Aim agree with the room from then on
   function calib() {
@@ -937,7 +1006,7 @@
     if (glow > 0.02 && (load.level > 0 || taking)) composer.render(); else renderer.render(scene, camera);
     // the gizmo on top, after the glow (inside it, a bright look washed it out)
     // (not in a render: the video is the show, not the tools)
-    if (!src) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true; }
+    if (!src) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true; placeMeasLabel(); }
     gpuEnd(q);
     if (taking) take?.frame(now);          // (a take running: this frame into the video, see recorder.ts)
     if (!src) load.did(performance.now() - work0);   // (a render's slow frames aren't the screen's load)
@@ -1196,6 +1265,7 @@
   function closeVenue() { venuePanel = false; (venueBtn ?? moreBtn)?.focus(); }
   function keys(e: KeyboardEvent) {
     if (e.key === 'Escape' && venuePanel && shownNow && !dialogOpen()) { e.preventDefault(); closeVenue(); }
+    else if (e.key === 'Escape' && mode === 'measure' && meas && shownNow && !dialogOpen()) { e.preventDefault(); meas = null; }
   }
   // the selection's panel folds to its name (kept per browser)
   const FOLD_KEY = 'luxdmx.seq.sel3d';
@@ -1245,6 +1315,7 @@
 <div class="s3" class:narrow={tier === 'narrow'} bind:this={host} bind:clientWidth={() => hostW, (v) => { if (v > 0) hostW = v; }}>
   <!-- the canvas comes from the world (built here, or handed on from the last view: see the top) -->
   <div class="cv" bind:this={cvHost}></div>
+  {#if meas && measSaid}<div class="meas" bind:this={measLabel} role="status"><b>{measSaid.big}</b><span>{measSaid.small}</span></div>{/if}
   <div class="top">
     <div class="tools" role="toolbar" aria-label="3D stage">
       {#if tier !== 'narrow'}{@render cameraSeg()}{/if}
@@ -1254,6 +1325,7 @@
           <button class="ghost" class:on={mode === 'move'} aria-pressed={mode === 'move'} onclick={() => (mode = 'move')} title="Drag the arrows to move the selected light; let go near a truss and it hangs on it">Move</button>
           <button class="ghost" class:on={mode === 'turn'} aria-pressed={mode === 'turn'} onclick={() => (mode = 'turn')} title="Drag the rings to turn the selected light">Turn</button>
           <button class="ghost" class:on={mode === 'aim'} aria-pressed={mode === 'aim'} onclick={() => (mode = 'aim')} title="Click on the stage: the selected moving heads point there">Aim</button>
+          <button class="ghost" class:on={mode === 'measure'} aria-pressed={mode === 'measure'} onclick={() => (mode = 'measure')} title="Click two points (the deck, the floor, a light): how far apart they are. One light: how high it hangs and where its beam lands">Measure</button>
           {#if app.selected.length === 1 && app.kinds[app.selected[0]] === 'mover'}
             <button class="ghost" class:on={mode === 'calib'} aria-pressed={mode === 'calib'} onclick={() => (mode = 'calib')} title="Point the real head at a spot on the stage (the pan/tilt pad), then click that spot here: the 3D stage and Aim match the room">Calibrate</button>
           {/if}
@@ -1353,6 +1425,7 @@
     <!-- (up here, under the toolbar: never over the selection's numbers at the bottom) -->
     {#if mode === 'aim' && !readonly}<p class="aimhint">Click on the stage: the selected moving heads point there.</p>{/if}
     {#if mode === 'calib' && !readonly}<p class="aimhint">Point the real head at a spot on the stage (pan/tilt pad), then click that spot here.</p>{/if}
+    {#if mode === 'measure' && !meas}<p class="aimhint">Click two points: the deck, the floor or a light. One light alone: its height and its beam.</p>{/if}
   </div>
   {#if !readonly && app.selected.length}
     <div class="sel" class:folded={!selOpen} role="group" aria-label="The selected lights">
@@ -1388,6 +1461,10 @@
 
 <style>
   .s3 { position: relative; flex: 1; min-height: 0; border-radius: var(--radius-s); overflow: hidden; background: #040507; }
+  .meas { position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: .05rem; max-width: 22rem;
+          background: #0b0f15e6; border: 1px solid var(--accent); border-radius: var(--radius-s); padding: .25rem .6rem; text-align: center; visibility: hidden; }
+  .meas b { color: var(--accent); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .meas span { color: var(--text); font-size: .78rem; }
   .cv { display: contents; }
   .cv :global(canvas) { display: block; width: 100%; height: 100%; touch-action: none; }
   /* a take of another shape than the window: shown whole, with bars */
