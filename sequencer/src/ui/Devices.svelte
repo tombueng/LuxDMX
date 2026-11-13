@@ -200,7 +200,7 @@
         {@render pills()}
         {#if getOpen && hasLink}{@render getPanel()}{/if}
         {#if !app.bridges.length}<p class="faint">No LuxDMX in this show yet. The app works without one; add your box to light the room.</p>{/if}
-        {#if app.bridges.length}<button class="ghost rigbtn" onclick={() => { list = false; ui.modal = 'rig'; }}><Icon name="search" />The rig (RDM)…{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
+        {#if app.bridges.length && !app.locked}<button class="ghost rigbtn" onclick={() => { list = false; ui.modal = 'rig'; }}><Icon name="search" />The rig (RDM)…{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
         {#if !app.locked}{@render addForm()}{/if}
       </div>
     {/if}
@@ -209,7 +209,7 @@
 
 <div class="devices" bind:this={devEl}>
   {@render pills()}
-  {#if app.bridges.length}<button class="ghost rigbtn" onclick={() => (ui.modal = 'rig')} title="The rig with RDM: find the real lights, check them against the patch, watch them"><Icon name="search" />Rig{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
+  {#if app.bridges.length && !app.locked}<button class="ghost rigbtn" onclick={() => (ui.modal = 'rig')} title="The rig with RDM: find the real lights, check them against the patch, watch them"><Icon name="search" />Rig{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
   {#if getOpen && hasLink}{@render getPanel()}{/if}
   {#if !app.locked}
   <span class="wrap">

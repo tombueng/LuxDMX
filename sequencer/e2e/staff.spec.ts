@@ -1,7 +1,7 @@
 // A bar's tablet (the bar persona): a lock staff can't get out of without the PIN, Blackout that
 // takes holding, the lights-not-connected bar, and a fresh start that doesn't black out the room.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, frames, channels, test, expect } from './helpers';
+import { openConnected, resetFake, frames, channels, showBoxes, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -23,6 +23,10 @@ test('locked with a PIN: no master, no Release, Blackout by holding, the phone d
   await expect(page.locator('.live').getByRole('button', { name: /Unlock page/ })).toBeVisible();
   await expect(page.locator('.top input[aria-label="Grand master"]')).toHaveCount(0);
   await expect(page.locator('.strip').getByRole('button', { name: 'Release' })).toHaveCount(0);
+  // no way into the rig either (its Scan and Patch it changed the show behind the lock)
+  await showBoxes(page);                                              // (folded into the boxes button: open it)
+  await expect(page.locator('.top').getByRole('button', { name: /^(Rig|The rig)/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
   // a tap on Blackout only says how; holding it blacks out; a tap brings it back
   const bo = page.locator('.strip').getByRole('button', { name: 'Blackout' });
   await bo.click();

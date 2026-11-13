@@ -56,7 +56,8 @@
 {:else if ui.modal === 'patchCheck'}<PatchCheck onclose={close} />
 {:else if ui.modal === 'remote'}<RemoteDialog onclose={close} />
 {:else if ui.modal === 'schedule'}<ScheduleDialog onclose={close} />
-{:else if ui.modal === 'rig'}<RigCheck onclose={close} />{/if}
+<!-- (not on a page locked for the service: scanning and patching from the rig change the show) -->
+{:else if ui.modal === 'rig' && !app.locked}<RigCheck onclose={close} />{/if}
 {#if ui.patch}<FixturePatch id={ui.patch} onclose={() => { ui.patch = null; ui.patchTab = 'patch'; }} />{/if}
 {#if ui.focusCal}<FocusCalibrate ids={ui.focusCal} onclose={() => (ui.focusCal = null)} />{/if}
 {#if ui.panTiltFind}<PanTiltFinder id={ui.panTiltFind} onclose={() => (ui.panTiltFind = null)} />{/if}

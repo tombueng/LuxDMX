@@ -1141,11 +1141,15 @@ class App {
     const now = this.plain;                  // the version being left, for saying what changed
     const back = JSON.parse(prev) as Show;
     const rec = verb === 'Undone' && this.recUndo?.snap === prev ? this.recUndo : null;
+    const lockedNow = this.show.pages.some((p) => p.locked), lockPage = this.show.settings.lockPage;
     const recLive = !!rec && this.engine.status(rec.list).cue === rec.cue;     // (not moved on since)
     let said = '';
     try { said = verb === 'Undone' ? describeChange(back, now) : describeChange(now, back); } catch { /* only the message */ }
     this.show = rawTypes(back);
-    this.lastSnap = prev;
+    // (the lock as it is now, whatever the step had)
+    for (const p of lockedNow ? this.ownPages() : this.show.pages) { if (lockedNow) p.locked = true; else delete p.locked; }
+    if (lockedNow && lockPage) this.show.settings.lockPage = lockPage; else delete this.show.settings.lockPage;
+    this.lastSnap = JSON.stringify(this.show);
     this.rev++;
     this.canUndo = this.undoStack.length > 0; this.canRedo = this.redoStack.length > 0;
     // a selection can't point at things that are gone now
@@ -1172,7 +1176,7 @@ class App {
       if (rec.fx.length) { this.engine.giveBackEffects(rec.fx); this.liveFx = this.engine.liveEffects(); }
     }
     this.syncBridges();
-    this.persist(prev);
+    this.persist(this.lastSnap);
     this.saveUndo();
     if (said) ui.toast(`${verb}: ${said}`, 2500);
   }
@@ -1444,7 +1448,11 @@ class App {
       const id = newId('f');
       // (its own number when it's free: cut and paste keeps it, a copy next to it gets a new one)
       const num = f.num && !this.show.fixtures.some((x) => x.num === f.num) ? f.num : undefined;
-      this.show.fixtures.push({ ...f, id, name: this.uniqueName(f.name), num, universe: room.universe, address: room.address, y: Math.min(0.96, f.y + 0.08) });
+      // (the real light it's linked to over RDM likewise: a copy is another light, it would claim
+      // the original's and offer to readdress it)
+      const { uid, ...rest } = f;
+      const own = uid && !this.show.fixtures.some((x) => x.uid === uid) ? { uid } : {};
+      this.show.fixtures.push({ ...rest, ...own, id, name: this.uniqueName(f.name), num, universe: room.universe, address: room.address, y: Math.min(0.96, f.y + 0.08) });
       added.push(id);
     }
     numberFixtures(this.show.fixtures);
@@ -2625,7 +2633,10 @@ class App {
   // Pages first: with nothing locked this never reads the view, so switching views doesn't rebuild Live's GO strip.
   get locked() { return this.show.pages.some((p) => p.locked) && this.view === 'live'; }
   // Lock (or unlock) every page for the service; locking also leaves Edit mode, whoever asks.
+  // Not an undo step: Ctrl+Z never locks or unlocks (after unlocking, it locked the page again
+  // instead of taking back what was done); every step Undo restores keeps the lock as it is now.
   lockShow(on: boolean) {
+    this.checkpoint();                       // (what came before is its own step)
     const pages = this.ownPages();
     for (const p of pages) p.locked = on;
     if (on) {
@@ -2634,7 +2645,15 @@ class App {
     }
     else { if (this.show.settings.lockPage && pages.some((p) => p.id === this.show.settings.lockPage)) this.page = this.show.settings.lockPage; delete this.show.settings.lockPage; }
     this.keepOutput();
-    this.markDirty(0);
+    this.quietSave();
+  }
+  // The show saved as it is now without making an undo step of the change (the lock)
+  private quietSave() {
+    const json = JSON.stringify(this.show);
+    this.thread.showChanged(); this.thread.showJsonIs(json);
+    if (json === this.lastSnap) return;
+    this.lastSnap = json; this.rev++;
+    this.persist(json);
   }
   // A forgotten PIN (or a show someone else locked): open the app with #unlock and confirm.
   async unlockByLink() {

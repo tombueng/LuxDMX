@@ -508,3 +508,52 @@ describe('a preset deleted while lights use it', () => {
     expect(app.programmer.p1.color).toEqual({ r: 0, g: 0.2, b: 1 });
   });
 });
+
+describe('the lock for the service and Undo', () => {
+  it('Ctrl+Z never locks or unlocks: after unlocking it takes back what was done, not the unlock', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.view = 'live';
+    app.lockShow(true);
+    expect(app.locked).toBe(true);
+    app.addFixtures('gen-dimmer', '', 1, 0, 'New');                // (something done while locked, as the rig's Patch it did)
+    app.checkpoint();
+    app.lockShow(false);
+    expect(app.show.fixtures.some((f: any) => f.name === 'New')).toBe(true);
+    app.undo();
+    expect(app.show.fixtures.some((f: any) => f.name === 'New')).toBe(false);    // the patch is what goes
+    expect(app.locked).toBe(false);                                              // and it stays unlocked
+  });
+  it('locked: an undo takes back a step from before and the page stays locked', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.view = 'live';
+    app.addFixtures('gen-dimmer', '', 1, 0, 'Before');
+    app.checkpoint();
+    app.lockShow(true);
+    app.undo();
+    expect(app.show.fixtures.some((f: any) => f.name === 'Before')).toBe(false);
+    expect(app.locked).toBe(true);
+  });
+});
+
+describe('a light copied from one linked to a real light over RDM', () => {
+  it('the copy has no link (it would claim the real light); cut and paste keeps it', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.show.fixtures[0].uid = '4C55:00000001';
+    app.selected = ['p1'];
+    await app.copyFixtures();
+    await app.pasteFixtures();
+    const copy = app.show.fixtures.at(-1);
+    expect(copy.name).not.toBe('P1');
+    expect(copy.uid).toBeUndefined();
+    expect(app.show.fixtures[0].uid).toBe('4C55:00000001');
+    // cut and paste: the light moves, its link with it
+    app.selected = ['p1'];
+    await app.copyFixtures();
+    app.removeFixture('p1');
+    await app.pasteFixtures();
+    expect(app.show.fixtures.filter((f: any) => f.uid === '4C55:00000001')).toHaveLength(1);
+  });
+});
