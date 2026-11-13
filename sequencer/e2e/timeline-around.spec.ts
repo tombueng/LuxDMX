@@ -171,3 +171,28 @@ test('no song yet: the ruler doesn\'t say "After the song" over everything', asy
   await expect(page.locator('.tlv .ruler')).toBeVisible();
   await expect(page.locator('.tlv .ruler .span.tail')).toHaveCount(0);
 });
+
+test('a shorter song: what lies after its end is said, Move them to the end brings it in; Fit shows everything without a scroll', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.show.timeline = { duration: 300, items: [
+      { id: 't1', at: 10, lane: 'special', do: { do: 'blackout', on: true } },
+      { id: 't2', at: 280, lane: 'special', do: { do: 'blackout', on: true } },
+      { id: 't3', at: 290, lane: 'special', do: { do: 'blackout', on: false } },
+    ] };
+    a.checkpoint();
+  });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await expect(page.locator('.tlv .it')).toHaveCount(3);
+  await page.evaluate(() => { (window as any).__luxdmx.show.timeline.duration = 120; });     // (another song, 2:00)
+  const toast = page.locator('.toast', { hasText: '2 things are placed after the end of this song' });
+  await expect(toast).toBeVisible();
+  const tracks = page.locator('.tlv .tracks');
+  expect(await tracks.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);    // (Fit: all of it, no scroll)
+  await toast.getByRole('button', { name: 'Move them to the end' }).click();
+  const at = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items.map((i: any) => i.at));
+  expect(at[0]).toBe(10);
+  expect(Math.max(...at)).toBeLessThanOrEqual(120);
+  expect(at[2] - at[1]).toBeCloseTo(10, 5);                                                       // (spaced as they were)
+});

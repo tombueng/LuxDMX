@@ -75,7 +75,28 @@
   let tracks = $state<HTMLDivElement>();
   let width = $state(800);
   let pps = $state(0);                       // pixels a second (0: fit the song)
-  const fit = $derived(Math.max(2, (width - 8) / Math.max(10, span.to - span.from)));
+  // what the view shows: the song with its time around it, and anything placed further out (a
+  // shorter song put in afterwards leaves cues after its end: Fit still shows them)
+  const shownTo = $derived(Math.max(span.to, ...(tl?.items ?? []).map((i) => i.at + (i.len ?? 0) + 1)));
+  // (32 px kept at the end: a thing placed at the very end still shows a bit of its name)
+  const fit = $derived(Math.max(2, (width - 40) / Math.max(10, shownTo - span.from)));
+  // Another song, shorter than where things were placed: say so, and offer to bring them in (they'd
+  // never fire: the show's ending, its "all off", would be lost after the song)
+  let lastDur = -1, lastShow = '';
+  $effect(() => {
+    const d = tl?.duration ?? 0, show = app.showId;
+    if (show === lastShow && lastDur > 0 && d > 0 && d < lastDur && tl) {
+      const end = d + (tl.tail ?? 0), past = tl.items.filter((i) => i.at > end);
+      if (past.length) ui.toast(`${past.length} thing${past.length === 1 ? ' is' : 's are'} placed after the end of this song (${clockOf(end, false)}): ${past.length === 1 ? 'it' : 'they'} won't play`, 10000, {
+        label: 'Move them to the end', run: () => {
+          app.checkpoint();
+          const last = Math.max(...past.map((i) => i.at + (i.len ?? 0))), by = Math.max(0, end - 0.5) - last;
+          for (const i of past) i.at = Math.max(0, i.at + by);
+          app.markDirty(0);
+        } });
+    }
+    lastDur = d; lastShow = show;
+  });
   const scale = $derived(pps || fit);
   // (the ruler starts where the show does: before the song's 0 when there's time before it)
   const x = (t: number) => (t - span.from) * scale;
@@ -158,7 +179,7 @@
     const song = P.duration || tl?.duration || 0, out: { cls: string; name: string; from: number; to: number }[] = [];
     if (span.from < 0) out.push({ cls: 'lead', name: 'Before the song', from: span.from, to: 0 });
     // (no song yet: there's no "after" it, the whole ruler said so)
-    if (song > 0 && span.to > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: span.to });
+    if (song > 0 && shownTo > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: shownTo });
     return out;
   });
 
@@ -724,7 +745,8 @@
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions (drops from the palette; every item is a button of its own) -->
       <div class="tracks" bind:this={tracks} bind:clientWidth={() => width, (v) => { if (v > 0) width = v; }} onscroll={() => (scrolled = tracks!.scrollLeft)} ondragover={over} ondragleave={() => (dropAt = null)} ondrop={drop} onwheel={wheel}>
-        <div class="inner" style="width:{Math.max(width, x(span.to) + 40)}px">
+        <!-- (fitted: exactly the view's width, nothing to scroll) -->
+        <div class="inner" style="width:{Math.max(width, x(shownTo) + (pps ? 40 : 0))}px">
           {#each around as a (a.cls)}<span class="shade {a.cls}" style="left:{x(a.from)}px;width:{x(a.to) - x(a.from)}px" aria-hidden="true"></span>{/each}
           <!-- svelte-ignore a11y_no_static_element_interactions (the transport and the arrow keys do the same) -->
           <div class="ruler" onpointerdown={(e) => scrubDown(e, true)} onpointermove={scrubMove} onpointerup={scrubUp} onpointercancel={scrubUp} oncontextmenu={rulerMenu}>
@@ -744,7 +766,7 @@
             <div class="lane" style="--c:{ln.color}">
               {#each built ? (ln.id === 'crowd' ? crowd : items.filter((i) => i.lane === ln.id)) : [] as it (it.id)}
                 {@const mark = markOf(it)}
-                <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : ''}"
+                <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : `max-width:min(18rem, ${Math.max(28, Math.max(width, x(shownTo)) - x(it.at) - 2)}px)`}"
                   onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)}
                   aria-label="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ', fires a machine' : mark === 'once' ? ', fires once' : ''}"
                   title="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ' (fires a machine)' : mark === 'once' ? ' (fires once)' : ''}: drag to move, right-click for more">
