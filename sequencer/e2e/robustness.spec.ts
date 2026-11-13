@@ -337,3 +337,29 @@ test('the box off the network mid-show: said loudly, GO still counts, and the lo
   await expect(page.locator('.lost[role="alert"]')).toHaveCount(0, { timeout: 15000 });
   await expect.poll(async () => (await channels(0, 2))[0], { timeout: 5000 }).toBe(0);
 });
+
+// Two tabs on the same show (a bookmark opened twice): the last one to save wins. The tab whose
+// copy is out of date says so, and a tap takes the other tab's version instead of saving over it.
+test('two tabs on one show: the out-of-date one says "changed in another tab" and takes that version on a tap', async ({ page, context }) => {
+  await fresh(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await page.waitForTimeout(800);                                             // (saved)
+  const b = await context.newPage();
+  await b.goto('/');
+  await expect(fixturesOnStage(b)).toHaveCount(2);
+  const chip = page.locator('.top').getByRole('button', { name: 'changed in another tab' });
+  await page.waitForTimeout(1500);
+  await expect(chip).toHaveCount(0);                                          // (only opened there: nothing changed)
+  // a change in B: A's copy is out of date now
+  await patch(b, 'gen-dimmer', 1, 0, 'From B');
+  await expect(chip).toBeVisible({ timeout: 5000 });
+  await expect(b.locator('.top').getByRole('button', { name: 'changed in another tab' })).toHaveCount(0);
+  await chip.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Take it' }).click();
+  await expect(fixturesOnStage(page)).toHaveCount(3);                         // B's light is here too
+  await expect(chip).toHaveCount(0);
+  // the other way round: a change in A now makes B the out-of-date one
+  await patch(page, 'gen-dimmer', 1, 0, 'From A');
+  await expect(b.locator('.top').getByRole('button', { name: 'changed in another tab' })).toBeVisible({ timeout: 5000 });
+  await b.close();
+});

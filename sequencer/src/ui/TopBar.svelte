@@ -7,6 +7,10 @@
   import { tablist, ui } from './ui.svelte';
 
   // The dot blinks on every beat the microphone hears.
+  async function takeOther() {
+    const playing = !app.quiet;
+    if (await ui.confirm('Take the other tab\'s version?', `It was saved after this one. What you changed here since then is dropped${playing ? ', and what plays here stops' : ''}.`, 'Take it', false)) await app.takeOtherTab();
+  }
   let beatFlash = $state(false);
   let lastBeat = 0;
   $effect(() => {
@@ -113,7 +117,9 @@
     <span class="saved" class:dirty={!app.saved} title={app.saved ? 'Saved in this browser' : 'Saving…'}>{app.saved ? 'saved' : '…'}</span>
   </button>
 
-  {#if app.otherTab}<span class="chip orange warn" title="Another tab saved this show too. The last one to save wins: close one of them.">open in another tab</span>{/if}
+  <!-- (the other tab's save is newer: a tap takes its version; a change here would save over it) -->
+  {#if app.otherNewer}<button class="chip orange warn other" onclick={takeOther} title="Another tab saved this show after this one. A change here saves over what was done there; a tap here takes that version.">changed in another tab</button>
+  {:else if app.otherTab}<span class="chip orange warn" title="Another tab has this show open too. The last one to save wins: close one of them.">open in another tab</span>{/if}
   <div class="modes" role="tablist" aria-label="Mode" use:tablist>
     <button role="tab" aria-label="Program" aria-selected={app.view === 'program'} class:cur={app.view === 'program'} onclick={() => (app.view = 'program')}><Icon name="program" /><span class="lbl">Program</span></button>
     <button role="tab" aria-label="Live" aria-selected={app.view === 'live'} class:cur={app.view === 'live'} onclick={() => (app.view = 'live')}><Icon name="live" /><span class="lbl">Live</span></button>

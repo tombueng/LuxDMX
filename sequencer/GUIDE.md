@@ -1024,6 +1024,11 @@ there is one, and downloads it where there isn't. On the other side, "Open a sho
 drop the file on the app's window. Copy and paste works between shows too (cues find their
 lights by name).
 
+**The same show in two tabs** (a bookmark opened twice): the last tab to save wins. The top bar
+says **open in another tab**, and in the tab whose copy is out of date, **changed in another tab**:
+a tap there takes the other tab's version (what you changed in this one since is dropped). A change
+made there instead saves over the other tab's work, so take it, or close one of the two.
+
 **Coming from QLC+?** Open your `.qxw` in the show manager. Fixtures come over with their QLC+
 definitions (dimmer packs become single dimmers), fixture groups become groups, scenes become cues,
 chasers and sequences become cue lists (fades, holds, loop / single shot / ping-pong, backward),

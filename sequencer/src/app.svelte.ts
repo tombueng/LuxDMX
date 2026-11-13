@@ -419,7 +419,8 @@ class App {
     try {
       this.channel = new BroadcastChannel('luxdmx-sequencer');
       this.channel.onmessage = (e) => {
-        if (e.data?.saved === this.showId && e.data.tab !== this.tabId) this.otherTab = true;
+        // (newer only when it differs: a tab just opened saves the same show once)
+        if (e.data?.saved === this.showId && e.data.tab !== this.tabId) { this.otherTab = true; if (e.data.sum !== textSum(this.lastSnap)) this.otherNewer = true; }
         // a tab starting cold asks whether this show is playing somewhere already
         if (e.data?.playing === this.showId && e.data.tab !== this.tabId && !this.quiet)
           this.channel?.postMessage({ isPlaying: this.showId, tab: this.tabId });
@@ -428,6 +429,19 @@ class App {
     } catch { /* no BroadcastChannel: fine */ }
   }
   otherTab = $state(false);
+  // ...and the other tab's save is the newer one: what's in this tab is out of date, and its next
+  // save would quietly drop what was done over there. The top bar offers to take that version.
+  otherNewer = $state(false);
+  async takeOtherTab() {
+    clearTimeout(this.dirtyTimer);
+    const text = await readShow(this.showId);
+    if (!text) return;
+    const notes: string[] = [];
+    this.replaceShow(parseShow(text, notes));
+    this.setLocal(text);
+    this.otherNewer = false;
+    this.sayRepaired(notes);
+  }
   // Is what you do going to the stage? 'blind': the 2D and 3D stages show it, the boxes get nothing
   // new (they keep the look that was out, frozen, without fog and machines); 'live': everything goes
   // out. Live is kept over a reload of this tab; a new tab or browser starts blind, going live is a
@@ -836,7 +850,8 @@ class App {
     try {
       await writeShow(this.metaOf(), text);
       if (n === this.writes) this.saved = true;          // an older write finishing late doesn't count
-      this.channel?.postMessage({ saved: this.showId, tab: this.tabId });
+      this.otherNewer = false;                           // (this one's is the newer now; the other tab hears so)
+      this.channel?.postMessage({ saved: this.showId, tab: this.tabId, sum: textSum(json) });
       this.refreshShows();
     } catch { /* IndexedDB unavailable (private mode): the localStorage copy still holds the open show */ }
   }
@@ -897,7 +912,7 @@ class App {
   private setShowId(id: string) {
     this.showId = id;
     this.schedLast = Date.now();               // another show: its timetable goes on from now (no catching up)
-    this.otherTab = false;
+    this.otherTab = false; this.otherNewer = false;
     try { localStorage.setItem(CUR, id); } catch { /* storage blocked */ }
   }
   async duplicateShow(id: string) {
@@ -3329,6 +3344,14 @@ class App {
   }
 }
 
+// A quick fingerprint of a saved show (FNV-1a over the text): two tabs tell whether they hold the same.
+// (not counting when it was saved: a save stamps meta.modified, the show is the same)
+function textSum(text: string) {
+  const t = text.replace(/"modified":"[^"]*"/, '');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193);
+  return `${t.length}:${h >>> 0}`;
+}
 const fileName = (s: Show) => (s.meta.name || 'show').replace(/[^\w-]+/g, '_');
 function download(blob: Blob, name: string) {
   const a = document.createElement('a');
