@@ -59,7 +59,8 @@
   function more(e: MouseEvent) {
     // on a phone the undo buttons don't fit the bar: they're the first thing in here
     // (on a tablet, following the music: the bar has it only while it's on)
-    const phone = window.innerWidth <= 760, tablet = window.innerWidth <= 1100;
+    // (a tablet held upright, up to 900 px, has them in here too)
+    const phone = window.innerWidth <= 900, tablet = window.innerWidth <= 1100;
     ui.openMenu(e, [
       ...(phone ? [{ label: 'Undo', icon: 'undo', disabled: !app.canUndo, run: () => app.undo() }, { label: 'Redo', icon: 'redo', disabled: !app.canRedo, run: () => app.redo() }] : []),
       ...(tablet ? [{ label: app.music.on ? 'Stop following the music' : 'Follow the music', icon: 'music', run: () => void music() }, { sep: true }] : []),
@@ -253,6 +254,19 @@
     .show { max-width: 110px; }
     .toolbar :global(button[aria-label="Explanations"]), .toolbar :global(button[aria-label="Find anything"]) { display: none; }
     .top { gap: .45rem; }
+  }
+  /* A tablet held upright (an iPad's 768 to 834 px) with the arm button and a box: undo and redo
+     go into the ⋯ menu, the tabs are icons but the one you're on */
+  @media (max-width: 900px) {
+    .toolbar :global(button[aria-label="Undo"]), .toolbar :global(button[aria-label="Redo"]) { display: none; }
+    .modes button { padding: .3rem .42rem; gap: .25rem; }
+    .modes button:not(.cur) .lbl { display: none; }
+    .modes :global(svg) { display: inline-block; }
+    .bpm input { width: 4.6em; }
+    .saved { display: none; }                            /* (the show's menu says it) */
+    .gm input { width: 52px; }
+    .show { min-width: 2.6rem; }                         /* (its folder icon at least: the shows) */
+    .top { gap: .3rem; }
   }
   /* (after the tablets' rules: a phone is narrower than 1100 px too, and these win) */
   /* Narrow screens: one row. The grand master and tempo live on the Live page there. */

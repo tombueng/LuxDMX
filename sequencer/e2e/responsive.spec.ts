@@ -214,3 +214,22 @@ test.describe('a laptop (1366 x 768)', () => {
     await expect(fl.locator('.usage .unis .chip')).toHaveCount(6);
   });
 });
+
+for (const width of [768, 834]) {
+  test.describe(`a tablet held upright (${width} px)`, () => {
+    test.use({ viewport: { width, height: 1024 }, hasTouch: true });
+    test('every top bar control is on the screen with a machine to arm and a box connected; undo is in the ⋯ menu', async ({ page }) => {
+      await openConnected(page);
+      await patch(page, 'gen-flame', 1, 0, 'Flame');
+      const bar = page.locator('header.top');
+      await expect(page.locator('.top .arm')).toBeVisible();
+      expect(await bar.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+      const off = await bar.evaluate((t) => [...t.querySelectorAll('button, input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > innerWidth + 0.5 || r.left < -0.5); }).map((e) => e.getAttribute('aria-label') ?? e.textContent));
+      expect(off).toEqual([]);
+      const bpm = page.getByLabel('BPM', { exact: true });
+      expect(await bpm.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);        // (120 whole)
+      await page.locator('.top').getByRole('button', { name: 'More' }).click();
+      await expect(page.getByRole('menuitem', { name: 'Undo' })).toBeVisible();
+    });
+  });
+}
