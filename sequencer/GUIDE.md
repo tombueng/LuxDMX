@@ -861,9 +861,13 @@ Three more demos come with their own room on the 3D stage:
   to that part and show where you are.
 - **Room for the stage**: the top bar stays one row. When the boxes' pills don't fit on it (a laptop
   screen, several boxes) they fold into one button with a status dot, as on a tablet: its list has
-  every box, Connect and **The rig (RDM)…**. On the stage plan the names never run into each other:
-  each goes under its light, above it, or beside it; one with no room left is shown on hover (a
-  selected light always shows its name).
+  every box, Connect and **The rig (RDM)…**. On a tablet held upright (up to 900 px) Undo and
+  Redo are in the ⋯ menu, as on a phone. On the stage plan the names never run into each other
+  and stay inside the plan: each goes under its light, above it, or beside it; one with no room
+  left is shown on hover (a selected light always shows its name). On a narrow plan the symbols
+  get smaller so neighbours keep apart. Zoom with the wheel or a pinch (on a laptop also +); the
+  zoom figure next to it fits the whole stage again. New lights land clear of the ones there: a
+  row of their own where the stage has room, else each on the freest spot.
 - **A light's patch** (double-click it in the list, or "Name, address, mode…" in its menu): name,
   number (what the console goes by; one no other light has), universe, address (it says when channels are shared and offers the next free spot), the DIP
   switches to click, its type and mode. When it shares channels with the lights after it (a
