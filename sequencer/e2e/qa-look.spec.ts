@@ -382,3 +382,20 @@ test.describe('a crowded plan on a small laptop screen', () => {
     expect(r.n).toBeGreaterThanOrEqual(18);                        // (14 of 48 at the one size)
   });
 });
+
+test('a note added to the cue on stage: its row in the Live cue list stays in view, name and all', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const panel = page.getByRole('region', { name: /Cue list Show/ });
+  await expect(panel.locator('li').first()).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(panel.locator('li.live')).toHaveCount(1);
+  const i = await panel.locator('li').evaluateAll((els) => els.findIndex((e) => e.classList.contains('live')));
+  await page.evaluate((k) => { const a = (window as any).__luxdmx; const l = a.show.cueLists.find((x: any) => x.name === 'Show'); l.cues[k].note = 'Wait for the singer to walk on, then a slow fade up from the wings'; a.checkpoint(); }, i);
+  await expect(panel.locator('li.live .note')).toBeVisible();
+  await page.waitForTimeout(700);
+  const r = await panel.locator('ol').evaluate((ol) => { const b = ol.getBoundingClientRect(), row = ol.querySelector('li.live .nm')!.getBoundingClientRect(); return { rowTop: row.top, boxTop: b.top }; });
+  expect(r.rowTop).toBeGreaterThanOrEqual(r.boxTop - 1);
+});
