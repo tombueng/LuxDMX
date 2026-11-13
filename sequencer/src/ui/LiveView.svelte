@@ -543,6 +543,12 @@
   <div class="body" class:with-stage={showStage} class:editing={app.editPage}>
     {#if showStage}<div class="stagebox">{#if shown || ui.stage3d}<StageView compact readonly blindChip={false} />{/if}</div>{/if}
     <div class="grid" style="--tile:{tile}px" role="list">
+      <!-- (editing with nothing picked: what to do, in the page's flow above its controls; floating at
+           the top right it lay over the buttons there) -->
+      {#if app.editPage && !selected}
+        {#if fresh.length}<aside class="hint pick inflow">New in the show, not on a page yet: {freshNames}. <button class="ghost" onclick={addNew}>Add them here</button></aside>{/if}
+        <aside class="hint pick inflow">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</aside>
+      {/if}
       <!-- (a new show's page has only its masters: nothing said where the buttons would come from) -->
       <!-- (and only when the show has cues: with none the GO bar above already says what to do, it asked three times) -->
       {#if built && page?.widgets.length && !playable && !app.editPage && !app.locked && app.show.cueLists.some((l) => l.cues.length)}
@@ -563,15 +569,10 @@
         <div class="empty">This page is empty. {app.editPage ? 'Add controls with the Add button.' : 'Press Edit to add buttons and faders.'}</div>
       {/if}
     </div>
-    {#if app.editPage && shown}
+    {#if app.editPage && shown && selected}
       <!-- Floats over the page (the buttons don't move), on the side away from the one being changed. -->
       <div class="float" class:left={editLeft}>
-        {#if selected}
-          {#key selected.id}<WidgetEditor page={page.id} id={selected.id} onremove={() => removeW(selected.id)} onclose={closeEditor} />{/key}
-        {:else}
-          {#if fresh.length}<aside class="hint pick">New in the show, not on a page yet: {freshNames}. <button class="ghost" onclick={addNew}>Add them here</button></aside>{/if}
-          <aside class="hint pick">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</aside>
-        {/if}
+        {#key selected.id}<WidgetEditor page={page.id} id={selected.id} onremove={() => removeW(selected.id)} onclose={closeEditor} />{/key}
       </div>
     {/if}
   </div>
@@ -595,7 +596,7 @@
   .float { position: absolute; top: 0; right: 0; z-index: 20; max-height: 100%; overflow: auto; border-radius: var(--radius);
     box-shadow: 0 10px 40px #000a, 0 0 0 1px var(--line2); background: var(--panel); }
   .float.left { right: auto; left: 0; }
-  .float .pick { margin: 0; border: 0; max-width: 240px; }
+  .pick.inflow { grid-column: 1 / -1; margin: 0; }
   .stagebox { min-height: 0; display: flex; align-self: start; height: min(62vh, 460px); }
   /* (the stage's own least height is for a page of its own: in this box it fits the box, it ran
      40 px over the heading under it on a phone) */

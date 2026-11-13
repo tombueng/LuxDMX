@@ -534,3 +534,16 @@ test('building a page: a group fader, keys that replace and clash, Alt+Down a ro
     expect(b.x + b.width).toBeLessThanOrEqual(390);
   }
 });
+
+test('in Edit with nothing picked the hint is above the controls, not over them', async ({ page }) => {
+  await djShow(page);
+  await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
+  const hint = page.locator('.live .hint.pick').filter({ hasText: 'to change it' });
+  await expect(hint).toBeVisible();
+  const h = (await hint.boundingBox())!;
+  for (const c of await page.locator('.live .cell').all()) {
+    const b = (await c.boundingBox())!;
+    const overlap = !(b.x + b.width <= h.x || h.x + h.width <= b.x || b.y + b.height <= h.y || h.y + h.height <= b.y);
+    expect(overlap).toBe(false);
+  }
+});
