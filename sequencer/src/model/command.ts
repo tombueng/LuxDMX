@@ -17,7 +17,7 @@ export interface Command {
   steps?: Step[];
   base?: 'new' | 'current';
   level?: Level;            // on what was said, or on the selection
-  action?: 'clear' | 'record' | 'go' | 'back' | 'release' | 'blackout' | 'highlight' | 'update' | 'next' | 'prev' | 'goto' | 'delete' | 'time' | 'undo' | 'help';
+  action?: 'clear' | 'record' | 'go' | 'back' | 'release' | 'releaseall' | 'blackout' | 'highlight' | 'lowlight' | 'update' | 'next' | 'prev' | 'goto' | 'delete' | 'time' | 'undo' | 'help';
   list?: number;            // which list (from 1); none: the one Live plays
   cue?: number;             // a cue by its number (goto, record, update, delete, time)
   time?: number;            // a fade in seconds (cue 5 time 3, record cue 5 time 3)
@@ -34,12 +34,19 @@ const WORDS: Record<string, string> = {
   next: 'next', prev: 'prev', previous: 'prev', last: 'prev',
   goto: 'goto', cue: 'cue', q: 'cue', time: 'time', delete: 'delete', del: 'delete',
   undo: 'undo', oops: 'undo', help: 'help', '?': 'help',
+  // (desk words from MA and Eos: store is record, fade is time, a fixture or channel number is just
+  // the number, "release all" and "off" let go of everything; lowlight as the panel's button)
+  store: 'record', sto: 'record', fade: 'time', lowlight: 'lowlight', ll: 'lowlight', off: 'releaseall', releaseall: 'releaseall',
+  fixture: '', fix: '', fixt: '', chan: '', ch: '', channel: '',
 };
 
 // "-" takes out, as on MA and Eos desks ("1-4" is light 1 without 4; a run is "1 thru 4" or "1>4").
 function tokens(text: string): string[] {
   // (a comma between digits is a point: a German keypad's decimal key types one, "22,3", "@ 50,5")
-  return text.toLowerCase().replace(/(\d),(\d)/g, '$1.$2').replace(/%/g, ' % ').replace(/([@+\-.>])/g, ' $1 ').split(/\s+/).filter(Boolean).map((t) => WORDS[t] ?? t);
+  // ("go to" is goto as on Eos, "to" read as thru; "release all" one word; desk words that only name
+  // what the number is, fixture, chan, dropped)
+  return text.toLowerCase().replace(/(\d),(\d)/g, '$1.$2').replace(/\bgo\s+to\b/g, 'goto').replace(/\brel(?:ease)?\s+all\b/g, 'releaseall')
+    .replace(/%/g, ' % ').replace(/([@+\-.>])/g, ' $1 ').split(/\s+/).filter(Boolean).map((t) => WORDS[t] ?? t).filter(Boolean);
 }
 // (a number a light, a cell, a group or a cue can have: no bigger than 99999, so a typo of twenty
 // digits is said, not counted to)
@@ -62,8 +69,11 @@ function levelOf(v: string[]): Level | string {
   return bad;
 }
 
-const ACTS = ['clear', 'record', 'go', 'back', 'release', 'blackout', 'highlight', 'update', 'next', 'prev', 'goto', 'delete', 'undo', 'help'];
-const PLAIN = ['clear', 'blackout', 'highlight', 'next', 'prev', 'undo', 'help'];
+// (a word it doesn't know, cut short: 3000 characters ran across the panels; a delay said plainly)
+const unknown = (w: string) => w === 'delay' ? 'a delay is in the cue\'s settings (More timing), not on the command line yet'
+  : `"${w.length > 24 ? `${w.slice(0, 24)}…` : w}"? Try 1 thru 4 @ 50, group 2, goto cue 5, go, clear`;
+const ACTS = ['clear', 'record', 'go', 'back', 'release', 'releaseall', 'blackout', 'highlight', 'lowlight', 'update', 'next', 'prev', 'goto', 'delete', 'undo', 'help'];
+const PLAIN = ['clear', 'releaseall', 'blackout', 'highlight', 'lowlight', 'next', 'prev', 'undo', 'help'];
 function actionOf(t: string[]): Command {
   let action: string | undefined, list: number | undefined, cue: number | undefined, time: number | undefined, i = 0;
   // (a number, "2.5" too)
@@ -84,7 +94,7 @@ function actionOf(t: string[]): Command {
       }
       continue;
     }
-    return { error: `"${w}"? Try 1 thru 4 @ 50, group 2, goto cue 5, go, clear` };
+    return { error: unknown(w) };
   }
   if (action === 'go' && cue !== undefined) action = 'goto';             // ("go cue 5": to cue 5)
   if (!action) {
@@ -153,7 +163,7 @@ export function parseCommand(text: string): Command {
       put((p) => pushAll(p.fixtures, run(a, b)));
       continue;
     }
-    return { error: `"${w}"? Try 1 thru 4 @ 50, group 2, goto cue 5, go, clear` };
+    return { error: unknown(w) };
   }
   const cmd: Command = {};
   if (steps.length) { cmd.steps = steps; cmd.base = base; }

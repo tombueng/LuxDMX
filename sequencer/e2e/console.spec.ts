@@ -48,7 +48,7 @@ test('the command line: lights by number, runs, taking out, levels, words', asyn
   await command(page, '1 @ full'); await command(page, 'record');
   await expect.poll(cueCount).toBe(1);
   await command(page, 'oops');
-  await expect(said(page)).toHaveText('Undone');
+  await expect(said(page)).toContainText('Undone: ');                   // (and what: the last change to the show)
   await expect.poll(cueCount).toBe(0);
 });
 
@@ -437,4 +437,34 @@ test('the console\'s add switch says what it does, and is the stage\'s too; Thru
   await page.locator('.top .modes').getByRole('tab', { name: 'Console' }).click();
   await expect(view(page).locator('.pad').getByRole('button', { name: /^thru$/i })).toHaveText('Thru');
   await expect(view(page).locator('.pad').getByRole('button', { name: /^full$/i })).toHaveText('Full');
+});
+
+// A desk operator's habits (round 17 of the QA): Clear twice lets go, "all" while stepping is the
+// stepped selection, GO on the last cue says so, undo says what it undid, go to / release all.
+test('desk habits: clear twice, all while stepping, GO at the end, undo says what, go to, release all', async ({ page }) => {
+  await rig(page);
+  await command(page, '1 thru 3 @ 50');
+  await command(page, 'clear');
+  await expect(said(page)).toContainText('3 still selected');
+  await command(page, 'clear');
+  await expect(said(page)).toContainText('the selection let go');
+  expect(await page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(0);
+  // all while stepping: the 3, not every light
+  await command(page, '1 thru 3');
+  await command(page, 'next');
+  await command(page, 'all');
+  expect(await page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(3);
+  // two cues, GO to the end: said
+  await command(page, '@ full'); await command(page, 'record');
+  await command(page, '@ 20'); await command(page, 'record');
+  await command(page, 'clear');
+  await command(page, 'go to cue 2');
+  await expect(said(page)).toContainText('Cue 2');
+  await command(page, 'go');
+  await expect(said(page)).toContainText('is on its last cue');
+  // undo: what it undid
+  await command(page, 'undo');
+  await expect(said(page)).toContainText('Undone:');
+  await command(page, 'release all');
+  await expect(said(page)).toHaveText('Released everything');
 });

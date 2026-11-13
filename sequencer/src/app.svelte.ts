@@ -1232,7 +1232,9 @@ class App {
     this.persist(this.lastSnap);
     this.saveUndo();
     if (said) ui.toast(`${verb}: ${said}`, 2500);
+    this.stepSaid = said;
   }
+  stepSaid = '';                    // what the last undo or redo did (the console's line says it)
   // One bridge per box in the show; boxes that stay keep their connection.
   private syncBridges() {
     const hosts = this.show.outputs.devices.map((d) => d.host);
@@ -1687,7 +1689,15 @@ class App {
       if (c.list && !list) return { ok: false, said: `there's no list ${c.list} (${this.show.cueLists.length === 0 ? 'no cue lists yet' : this.show.cueLists.length === 1 ? 'there is 1' : `there are ${this.show.cueLists.length}`})` };
       const needList = () => ({ ok: false, said: 'No cue list to play yet: select lights, set them, record' });
       switch (c.action) {
-        case 'clear': this.clearProgrammer(); return { ok: true, said: 'Cleared' };
+        // (as on MA: Clear with nothing set lets go of the selection; with something set it says
+        // what stays selected, "@ 50" then went to all 47 lights without a word)
+        case 'clear': {
+          if (!Object.keys(this.programmer).length) { const n = this.selected.length; this.selectNone(); return { ok: true, said: n ? 'Nothing set: the selection let go' : 'Nothing to clear' }; }
+          this.clearProgrammer();
+          return { ok: true, said: this.selected.length ? `Cleared (${this.selected.length} still selected: clear again lets go)` : 'Cleared' };
+        }
+        case 'releaseall': this.releaseAll(); return { ok: true, said: 'Released everything' };
+        case 'lowlight': this.lowlight = this.lowlight > 0 ? 0 : 0.15; return { ok: true, said: this.lowlight > 0 ? `Lowlight on${this.highlight ? '' : ' (with Highlight)'}` : 'Lowlight off' };
         case 'record': {
           const into = c.list ? list : this.liveList;
           if (c.cue !== undefined && into) { const k = cueAt(into, c.cue); if (k >= 0) return { ok: false, said: `${into.name} has cue ${fmtNum(c.cue)} (${into.cues[k].name}): update cue ${fmtNum(c.cue)}, or another number` }; }
@@ -1713,17 +1723,30 @@ class App {
           q.fade = c.time!;
           return { ok: true, said: `Cue ${fmtNum(c.cue!)} fades in ${fmtNum(c.time!)} s` };
         }
-        case 'go': if (!list) return needList(); this.go(list.id); return { ok: true, said: `GO ${list.name}${this.safeNote(list.id)}` };
-        case 'back': if (!list) return needList(); this.back(list.id); return { ok: true, said: `Back ${list.name}` };
+        // (GO on the last cue and Back on the first did nothing and said they had)
+        case 'go': {
+          if (!list) return needList();
+          const st = this.engine.status(list.id);
+          if (st.running && !st.releasing && list.end === 'stop' && list.cues.length && st.index >= list.cues.length - 1) return { ok: false, said: `${list.name} is on its last cue: release lets it go, then GO starts it again` };
+          this.go(list.id); return { ok: true, said: `GO ${list.name}${this.safeNote(list.id)}` };
+        }
+        case 'back': {
+          if (!list) return needList();
+          const st = this.engine.status(list.id);
+          if (!st.running) return { ok: false, said: `${list.name} isn't playing` };
+          if (st.index <= 0) return { ok: false, said: `${list.name} is on its first cue` };
+          this.back(list.id); return { ok: true, said: `Back ${list.name}` };
+        }
         case 'release': if (!list) return needList(); this.release(list.id); return { ok: true, said: `Released ${list.name}` };
         case 'blackout': this.blackout = !this.blackout; return { ok: true, said: this.blackout ? 'Blackout' : 'Blackout off' };
         case 'highlight': this.highlight = !this.highlight; return { ok: true, said: this.highlight ? 'Highlight on' : 'Highlight off' };
         case 'undo': {
           if (!this.canUndo) return { ok: false, said: 'Nothing to undo' };
           this.undo();
-          return { ok: true, said: 'Undone' };
+          // (what it undid: the last change to the show, which may not be the last command)
+          return { ok: true, said: this.stepSaid ? `Undone: ${this.stepSaid}` : 'Undone' };
         }
-        case 'help': return { ok: true, said: 'Try: 5 @ full · 1 thru 4 @ 50 · 1 - 3 · group 2 @ out · 1.3 thru 1.8 · record cue 5 · goto cue 5 · update · next · clear · undo' };
+        case 'help': return { ok: true, said: 'Try: 5 @ full · 1 thru 4 @ 50 (one digit is tens: @ 5 is 50 %, @ 05 is 5 %) · 1 - 3 · group 2 @ out · 1.3 thru 1.8 · record cue 5 · goto cue 5 · update · next · clear · release all · undo' };
         case 'next': case 'prev': {
           this.stepSel(c.action === 'next' ? 1 : -1);
           const f = this.show.fixtures.find((x) => x.id === this.selected[0]), all = this.stepAll;
@@ -1761,7 +1784,8 @@ class App {
       for (const st of c.steps) {
         // whole lights, and cells by light (a group of cells: its cells on each of its lights)
         const whole: string[] = [], picks: { id: string; cells: number[] }[] = [];
-        if (st.pick.all) whole.push(...fx.map((f) => f.id));
+        // ("all" while stepping through a selection is that selection again, as on MA and MagicQ)
+        if (st.pick.all) whole.push(...(this.stepAll ?? fx.map((f) => f.id)));
         for (const n of st.pick.fixtures) whole.push(lightNo(n)!.id);
         for (const g of st.pick.groups) {
           const grp = groupByNumber(this.show.groups, g);

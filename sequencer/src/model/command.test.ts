@@ -93,4 +93,17 @@ describe('numbers too big to be one', () => {
   it('a comma between digits is a point (a German keypad types one): 22,3 @ 50,5', () => {
     expect(parseCommand('22,3 @ 50,5')).toEqual(parseCommand('22.3 @ 50.5'));
   });
+  it('desk words: go to, store, fixture/chan, release all, off, fade, lowlight; delay and long words said plainly', () => {
+    expect(parseCommand('go to cue 5')).toEqual(parseCommand('goto cue 5'));
+    expect(parseCommand('go to 5')).toEqual(parseCommand('goto 5'));
+    expect(parseCommand('store cue 9')).toEqual(parseCommand('record cue 9'));
+    expect(parseCommand('fixture 5 @ 50')).toEqual(parseCommand('5 @ 50'));
+    expect(parseCommand('chan 1 thru 4 @ full')).toEqual(parseCommand('1 thru 4 @ full'));
+    expect(parseCommand('release all')).toEqual({ action: 'releaseall' });
+    expect(parseCommand('off')).toEqual({ action: 'releaseall' });
+    expect(parseCommand('cue 5 fade 3')).toEqual(parseCommand('cue 5 time 3'));
+    expect(parseCommand('lowlight')).toEqual({ action: 'lowlight' });
+    expect(parseCommand('cue 5 delay 2').error).toMatch(/delay is in the cue's settings/);
+    expect(parseCommand('x'.repeat(3000)).error!.length).toBeLessThan(120);
+  });
 });

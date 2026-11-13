@@ -192,7 +192,9 @@ describe('undo and help by command', () => {
     run(app, '1 @ full'); r.tick(1); run(app, 'record'); r.tick(1);
     const l = app.liveList ?? app.list;
     expect(l.cues.length).toBe(1);
-    expect(run(app, 'oops')).toEqual({ ok: true, said: 'Undone' });
+    const u = run(app, 'oops');
+    expect(u.ok).toBe(true);
+    expect(u.said).toMatch(/^Undone(: .*cue)?/);                     // (and what it undid, when it can say)
     expect((app.liveList ?? app.list)?.cues.length ?? 0).toBe(0);
     expect(run(app, 'help').said).toMatch(/^Try: 5 @ full/);
   });
