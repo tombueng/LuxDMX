@@ -81,3 +81,15 @@ test.describe('a laptop (1366 x 768)', () => {
     expect(c!.y + c!.height).toBeLessThanOrEqual(deck!.y + deck!.height);
   });
 });
+
+test('a box address that can\'t be one is said and not added; the text stays to put right', async ({ page }) => {
+  await openConnected(page);
+  const add = page.getByRole('button', { name: 'Add a LuxDMX' });
+  const boxes = page.getByRole('button', { name: /^LuxDMX boxes/ });
+  if (await boxes.isVisible()) await boxes.click(); else await add.click();
+  await page.getByLabel('LuxDMX address').fill('not a host!!');
+  await page.getByRole('button', { name: 'Add LuxDMX' }).click();
+  await expect(page.getByText(/isn't an address: type the box's IP/)).toBeVisible();
+  await expect(page.getByLabel('LuxDMX address')).toHaveValue('not a host!!');
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.outputs.devices.length)).toBe(1);
+});

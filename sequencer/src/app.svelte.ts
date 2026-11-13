@@ -3,6 +3,7 @@
 // Record stores the fixtures you touched (the programmer), each with its full current look.
 // Fixtures you didn't touch stay out of the cue, so playing it leaves them alone: that's what
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
+import { hostProblem } from './model/host';
 import { emptyShow, parseShow, serializeShow, FormatError } from './model/format';
 import { GENERIC, caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
@@ -2995,7 +2996,10 @@ class App {
     return out;
   }
   private toldBlind = false;
-  addDevice(host: string) {
+  // (what's wrong with the address, when something is: nothing is added then)
+  addDevice(host: string): string | undefined {
+    const bad = host === LINK ? undefined : hostProblem(host);
+    if (bad) return bad;
     this.checkpoint();
     host = host.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     if (!host || this.show.outputs.devices.some((d) => d.host === host)) return;

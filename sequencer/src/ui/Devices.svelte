@@ -59,7 +59,11 @@
   const focusFirst = (node: HTMLElement, on: boolean) => { if (on && takeFocus) queueMicrotask(() => node.focus()); };
   // added: the focus goes on to its Connect (the next thing to do)
   function add(e: Event) {
-    e.preventDefault(); const h = host.trim(); app.addDevice(host); host = ''; open = false;
+    e.preventDefault(); const h = host.trim();
+    // (an address that can't be one: said, and left in the field to put right)
+    const bad = app.addDevice(host);
+    if (bad) { ui.toast(bad, 6000); return; }
+    host = ''; open = false;
     setTimeout(() => document.querySelector<HTMLElement>(`[data-box="${CSS.escape(h)}"] button.primary`)?.focus(), 0);
   }
   // (autofocus doesn't fire for a field that comes in later)
