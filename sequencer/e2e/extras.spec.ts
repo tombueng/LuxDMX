@@ -46,7 +46,7 @@ test('a cue sheet to print, and as CSV', async ({ page }) => {
   await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
   await page.locator('.top').getByRole('button', { name: 'More' }).click();
   const [sheet] = await Promise.all([page.waitForEvent('popup'), page.locator('.ctx').getByRole('menuitem', { name: 'Print a cue sheet' }).click()]);
-  await expect(sheet.locator('h1')).toHaveText('Play');
+  await expect(sheet.locator('h1')).toHaveText('Opening night');
   await expect(sheet.locator('table').first()).toContainText('Audience coming in');
   await expect(sheet.locator('table').first()).toContainText('play "House out" on House lights');
   await page.locator('.top').getByRole('button', { name: 'More' }).click();

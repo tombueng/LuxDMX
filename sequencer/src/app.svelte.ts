@@ -3111,6 +3111,11 @@ class App {
     // a show someone locked opens unlocked here (its PIN stays with it for locking again)
     for (const pg of s.pages) pg.locked = false;
     delete s.settings.lockPage;
+    // (one of that name already in Shows, the file opened again say: "Test truss (2)", so the two
+    // can be told apart)
+    await this.refreshShows();
+    const taken = new Set(this.shows.map((m) => m.name));
+    if (taken.has(s.meta.name)) { let k = 2; while (taken.has(`${s.meta.name} (${k})`)) k++; s.meta.name = `${s.meta.name} (${k})`; }
     await this.startShow(s);          // a show of its own in the browser, next to the one that was open
     this.sayRepaired(notes);
     return undefined;

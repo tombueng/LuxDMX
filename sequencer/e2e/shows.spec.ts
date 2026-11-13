@@ -1,6 +1,7 @@
 // Shows in the browser: templates, the show manager (open, rename, duplicate, delete), autosave
 // across a reload.
 import type { Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { openConnected, resetFake, fixturesOnStage, cues, jumpTo, channels, fresh , test, expect } from './helpers';
 
 const manager = (page: Page) => page.getByRole('dialog', { name: 'Shows' });
@@ -75,7 +76,7 @@ test('a template plays on the box, survives a reload, and the manager can rename
   await openConnected(page);
   await openManager(page);
   await manager(page).locator('.tpl', { hasText: 'Theatre' }).click();
-  await expect(page.locator('.top .show .name')).toHaveText('Play');
+  await expect(page.locator('.top .show .name')).toHaveText('Opening night');
   // Theatre: 6 front dimmers at 1-6, preset cue at 30 %
   await page.locator('.deck .tab', { hasText: 'Show' }).click();
   await jumpTo(page, 0);
@@ -84,14 +85,14 @@ test('a template plays on the box, survives a reload, and the manager can rename
   const lights = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length as number);
   await page.waitForTimeout(800);                     // autosave
   await page.reload();
-  await expect(page.locator('.top .show .name')).toHaveText('Play');
+  await expect(page.locator('.top .show .name')).toHaveText('Opening night');
   await expect(fixturesOnStage(page)).toHaveCount(lights);
 
   await openManager(page);
-  await expect(card(page, 'Play')).toHaveClass(/cur/);
-  await card(page, 'Play').getByRole('button', { name: 'Duplicate Play' }).click();
-  await expect(card(page, 'Play \\(copy\\)')).toHaveCount(1);
-  await card(page, 'Play \\(copy\\)').getByRole('button', { name: 'Rename Play (copy)' }).click();
+  await expect(card(page, 'Opening night')).toHaveClass(/cur/);
+  await card(page, 'Opening night').getByRole('button', { name: 'Duplicate Opening night' }).click();
+  await expect(card(page, 'Opening night \\(copy\\)')).toHaveCount(1);
+  await card(page, 'Opening night \\(copy\\)').getByRole('button', { name: 'Rename Opening night (copy)' }).click();
   await manager(page).getByLabel('Show name').fill('Matinee');
   await manager(page).getByLabel('Show name').press('Enter');
   await expect(card(page, 'Matinee')).toHaveCount(1);
@@ -100,9 +101,9 @@ test('a template plays on the box, survives a reload, and the manager can rename
   await expect(page.locator('.top .show .name')).toHaveText('Matinee');
   await expect(fixturesOnStage(page)).toHaveCount(lights);
   await openManager(page);
-  await card(page, 'Play').getByRole('button', { name: 'Delete Play' }).click();
-  await page.getByRole('dialog', { name: 'Delete "Play"?' }).getByRole('button', { name: 'Delete' }).click();
-  await expect(card(page, 'Play')).toHaveCount(0);
+  await card(page, 'Opening night').getByRole('button', { name: 'Delete Opening night' }).click();
+  await page.getByRole('dialog', { name: 'Delete "Opening night"?' }).getByRole('button', { name: 'Delete' }).click();
+  await expect(card(page, 'Opening night')).toHaveCount(0);
   await expect(card(page, 'Matinee')).toHaveCount(1);
 });
 
@@ -143,4 +144,16 @@ test('the demos are one click away in the Shows dialog, whatever show is open', 
   const w = page.getByRole('dialog', { name: "Let's get some light on stage" });
   await expect(w.getByRole('button', { name: 'Show me a demo' })).toBeVisible();
   await expect(w.getByRole('radio', { name: 'Festival stage' })).toBeVisible();
+});
+
+test('a show file opened twice: the second is "(2)", so the two can be told apart', async ({ page }) => {
+  await openConnected(page);
+  const text = await readFile(new URL('./data/gig-song.luxdmx.json', import.meta.url), 'utf8');
+  const name = JSON.parse(text).meta.name as string;
+  for (let i = 0; i < 2; i++) await page.evaluate(async (t) => { await (window as any).__luxdmx.importShow(new File([t], 'gig-song.luxdmx.json')); }, text);
+  await expect(page.locator('.top .show .name')).toHaveText(`${name} (2)`);
+  await openManager(page);
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await expect(card(page, esc(name))).toHaveCount(1);
+  await expect(card(page, esc(`${name} (2)`))).toHaveCount(1);
 });

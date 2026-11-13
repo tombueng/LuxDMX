@@ -346,7 +346,7 @@ export const TEMPLATES: Template[] = [
   {
     name: 'Theatre', icon: 'dimmer', blurb: 'Dimmers, a coloured cyc, booms, specials, spots with gobos, footlights, house lights on their own list. A GO cue list with fog, snow-white bubbles and a confetti finale.',
     build: () => {
-      const b = new Builder('Play');
+      const b = new Builder('Opening night');   // (not "Play": the show's name read like a button)
       const front = b.add('gen-dimmer', 6, 'Front', 0.7, { x0: 0.15, x1: 0.85 });
       const cyc = b.at(b.add('gen-rgbw', 4, 'Cyc', 0.06), 0.06, [0.18, 0.36, 0.64, 0.82]);
       // over the audience, between the footlights (so the names don't meet)
