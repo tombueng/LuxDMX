@@ -379,8 +379,9 @@ Three more demos come with their own room on the 3D stage:
   | `record`, `record cue 5 time 3` | a new cue in the list Live plays; cue 5 where it belongs, its fade 3 s |
   | `update`, `update cue 5` | the cue on stage; cue 5 |
   | `goto cue 5`, `cue 5 time 3`, `delete cue 5` | by the cue's number, in the list Live plays or in `list 2` |
-  | `go`, `back`, `release`, `go 2` | the list Live plays, or list 2 |
-  | `next`, `prev`, `clear`, `undo`, `blackout`, `highlight` | as the buttons |
+  | `go`, `back`, `release`, `go 2` | the list Live plays, or list 2 (GO on the last cue and Back on the first say so) |
+  | `release all`, `off` | everything lets go |
+  | `next`, `prev`, `clear`, `undo`, `blackout`, `highlight`, `lowlight` | as the buttons (`clear` with nothing set lets go of the selection, as on MA; `undo` says what it undid: the last change to the show) |
 
   - **The command line.** Lights go by their number (the grey one in front of each light in the
     fixture list, on the plan with its # button). It stays when other lights come and go; the patch
@@ -389,8 +390,9 @@ Three more demos come with their own room on the 3D stage:
     whole lights in one command are refused ("1.3 + 2.5" picks cell 3 on light 1 and cell 5 on
     light 2). "record cue 5" is refused when 5 is there; in a play that's running elsewhere the cue
     is stored and the programmer keeps your changes until Clear. Typed go and goto say when a list's
-    machines are safe. Short forms: clr, rec, upd, bo, hl, q (cue), del, oops (undo), ff (full), t
-    and > (thru). Typing anywhere on the console goes to the command line, ↑ brings back the last
+    machines are safe. Short forms: clr, rec, upd, bo, hl, ll (lowlight), q (cue), del, oops (undo),
+    ff (full), t and > (thru). Desk words work too: `store` (record), `fade` (time), `go to cue 5`,
+    `fixture 5` or `chan 5` (just 5); `all` while stepping is the stepped selection again. Typing anywhere on the console goes to the command line, ↑ brings back the last
     one; the keypad keeps a phone's own keyboard down (⌫ rubs out the last digit or word, Esc empties
     the line).
   - **Next / Prev** step through the selection one light at a time; with Highlight on each one
