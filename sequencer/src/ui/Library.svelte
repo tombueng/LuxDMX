@@ -6,7 +6,8 @@
   import type { FixtureType } from '../model/types';
   import { typeLabel } from '../model/library';
 
-  let { onclose, onpick }: { onclose: () => void; onpick: (typeId: string, mode?: string) => void } = $props();
+  // `onmake`: off to the fixture editor instead (nothing found here)
+  let { onclose, onpick, onmake }: { onclose: () => void; onpick: (typeId: string, mode?: string) => void; onmake?: () => void } = $props();
   let cur = $state(0);                      // keyboard cursor in the results
   let modeName = $state('');                // the mode whose channels are shown
   let listEl = $state<HTMLElement>();
@@ -22,7 +23,8 @@
     const words = q.toLowerCase().replace(/\bgeneric\b/g, '').split(/\s+/).filter((w) => w.length > 1);
     if (!words.length) return [];
     return [...app.types.values()].filter((t) => t.source === 'generic')
-      .filter((t) => { const text = `${typeLabel(t)} ${t.modes[0]?.channels.map((c) => c.attr).join(' ')}`.toLowerCase(); return words.every((w) => text.includes(w) || text.includes(w.replace(/s$/, ''))); })
+      // (at the start of a word: "robe" isn't a strobe)
+      .filter((t) => { const text = ` ${typeLabel(t)} ${t.modes[0]?.channels.map((c) => c.attr).join(' ')}`.toLowerCase().replace(/[^a-z0-9]+/g, ' '); return words.every((w) => text.includes(' ' + w) || text.includes(' ' + w.replace(/s$/, ''))); })
       .slice(0, 6);
   });
 
@@ -63,7 +65,7 @@
   const mode = $derived(picked?.modes.find((m) => m.name === modeName) ?? picked?.modes[0]);
 </script>
 
-<Modal title="Fixture library" {onclose} wide>
+<Modal title="Fixture library" {onclose} wide top>
   <div class="row">
     <!-- svelte-ignore a11y_autofocus -->
     <input class="q" placeholder="Search: manufacturer, model, e.g. 'cameo flat' or 'robin spot'" bind:value={q} autofocus aria-label="Search fixtures" onkeydown={key}
@@ -92,7 +94,7 @@
       <div class="builtin"><span class="faint">Built in, no download:</span>
         {#each builtIn as t (t.id)}<button class="sm" onclick={() => { onpick(t.id); onclose(); }}>{typeLabel(t)}</button>{/each}</div>
     {/if}
-    {#if q && !results.length && !builtIn.length && all.length}<p class="muted">Nothing found. Not every fixture is in a library: "Make my own…" (next to the search) makes one in a minute.</p>{/if}
+    {#if q && !results.length && !builtIn.length && all.length}<p class="muted">Nothing found. Not every fixture is in a library: {#if onmake}<button class="sm" onclick={onmake}>Make my own…</button>{:else}"Make my own…" in Add fixtures{/if} makes one in a minute.</p>{/if}
     </div>
     <div class="detail" data-source={picked && chosen ? chosen.source : undefined}>
       {#if loading}<p class="muted">Loading {loading.name}…</p>
@@ -110,7 +112,8 @@
         </div>
         {#if mode}
           <p class="faint">Compare with the DMX table in the manual:</p>
-          <ol class="chs">{#each mode.channels as c, i (i)}{@const what = c.fine ? 'fine' : ATTR_LABEL[c.attr] ?? c.attr}<li><span class="n">{i + 1}</span>{c.name}{#if !what.toLowerCase().startsWith(c.name.toLowerCase()) && !c.name.toLowerCase().startsWith(what.toLowerCase())}<span class="faint">{what}</span>{/if}</li>{/each}</ol>
+          <!-- (down the first column, then the second; a long mode scrolls, it never runs out of the dialog) -->
+          <ol class="chs" style:grid-template-rows="repeat({Math.max(1, Math.ceil(mode.channels.length / 2))}, auto)">{#each mode.channels as c, i (i)}{@const what = c.fine ? 'fine' : ATTR_LABEL[c.attr] ?? c.attr}<li><span class="n">{i + 1}</span>{c.name}{#if !what.toLowerCase().startsWith(c.name.toLowerCase()) && !c.name.toLowerCase().startsWith(what.toLowerCase())}<span class="faint">{what}</span>{/if}</li>{/each}</ol>
         {/if}
         <button class="primary" onclick={use}>Use this fixture{picked.modes.length > 1 ? ` (${mode?.name})` : ''}</button>
       {:else}
@@ -136,7 +139,7 @@
   .modes button { padding: .15rem .5rem; font-size: .8rem; border-radius: 999px; }
   .modes button.on { background: var(--orange); color: #1a1000; border-color: var(--orange); }
   .modes button.on .faint { color: #1a1000b0; }
-  .chs { list-style: none; margin: 0 0 .6rem; padding: 0; max-height: 34vh; overflow: auto; font-size: .82rem; columns: 2; column-gap: 1rem; }
+  .chs { list-style: none; margin: 0 0 .6rem; padding: 0; max-height: 34vh; overflow: auto; font-size: .82rem; display: grid; grid-auto-flow: column; grid-template-columns: 1fr 1fr; column-gap: 1rem; align-content: start; }
   .chs li { display: flex; gap: .4rem; align-items: baseline; break-inside: avoid; padding: .05rem 0; }
   .chs .n { width: 1.6rem; text-align: right; color: var(--faint); font-variant-numeric: tabular-nums; }
   .chs .faint { margin-left: auto; font-size: .76rem; }

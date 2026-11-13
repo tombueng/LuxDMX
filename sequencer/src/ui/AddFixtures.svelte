@@ -167,7 +167,7 @@
           </button>
 {/snippet}
 
-{#if lib}<Library onclose={() => (lib = false)} onpick={(id, m) => { pick(id); if (m) mode = m; }} />
+{#if lib}<Library onclose={() => (lib = false)} onpick={(id, m) => { pick(id); if (m) mode = m; }} onmake={() => { lib = false; make = true; }} />
 {:else if make}<FixtureEditor onclose={() => (make = false)} onsaved={pick} />
 {:else if shapeMaker}<PixelShapeMaker onclose={() => (shapeMaker = false)} onsaved={pick} />
 {:else}

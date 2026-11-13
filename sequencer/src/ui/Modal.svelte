@@ -5,7 +5,9 @@
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
   // dock: in the bottom corner without darkening the page (for tools you use while watching the stage)
-  let { title, onclose, children, wide = false, dock = false }: { title: string; onclose: () => void; children: Snippet; wide?: boolean; dock?: boolean } = $props();
+  // `top`: held near the top of the screen instead of centred (a search whose results come and go:
+  // the field mustn't jump up and down as the list grows and shrinks)
+  let { title, onclose, children, wide = false, dock = false, top = false }: { title: string; onclose: () => void; children: Snippet; wide?: boolean; dock?: boolean; top?: boolean } = $props();
   const me = Symbol();
   const titleId = `dlg-${Math.random().toString(36).slice(2, 8)}`;
   let box = $state<HTMLDivElement>();
@@ -47,7 +49,7 @@
 
 <svelte:window onkeydown={keys} />
 
-<div class="backdrop" class:dock role="presentation" onclick={(e) => { if (e.target === e.currentTarget && !dock) onclose(); }}>
+<div class="backdrop" class:dock class:top role="presentation" onclick={(e) => { if (e.target === e.currentTarget && !dock) onclose(); }}>
   <div class="modal" class:wide role="dialog" aria-modal="true" aria-labelledby={titleId} bind:this={box}>
     <div class="head row">
       <h2 id={titleId}>{title}</h2>
@@ -66,6 +68,7 @@
   .modal.wide { width: min(1000px, 100%); }
   /* bottom left: over the lists, the stage and the programmer stay in view */
   .backdrop.dock { background: none; pointer-events: none; place-items: end start; }
+  .backdrop.top { align-items: start; padding-top: 5vh; }
   .backdrop.dock .modal { pointer-events: auto; width: min(420px, 100%); box-shadow: 0 12px 40px #000c, 0 0 0 1px var(--line2); }
   .head { padding: .7rem .9rem .3rem; } .head h2 { margin: 0; font-size: 1.05rem; color: var(--text); text-transform: none; letter-spacing: 0; }
   .body { padding: .3rem .9rem .9rem; overflow: auto; }

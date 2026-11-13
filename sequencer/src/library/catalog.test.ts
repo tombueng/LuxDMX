@@ -15,3 +15,14 @@ describe('library search', () => {
     expect(search(all, '  ')).toEqual([]);
   });
 });
+
+describe('library search: whole words first', () => {
+  const e = (manufacturer: string, name: string): Entry => ({ key: `${manufacturer}/${name}`, manufacturer, name, source: 'ofl' } as Entry);
+  it('"robe": the maker Robe first, then a word that starts so, a strobe (inside a word) last', () => {
+    const all = [e('Eurolite', 'Megastrobe 1500'), e('Robert Juliat', 'Dalis 860'), e('Robe', 'Robin LEDBeam 100'), e('Robe', 'Spiider')];
+    const got = search(all, 'robe').map((x) => x.name);
+    expect(got.slice(0, 2).sort()).toEqual(['Robin LEDBeam 100', 'Spiider']);
+    expect(got[2]).toBe('Dalis 860');
+    expect(got.at(-1)).toBe('Megastrobe 1500');
+  });
+});
