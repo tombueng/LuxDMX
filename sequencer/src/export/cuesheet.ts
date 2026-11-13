@@ -35,10 +35,18 @@ function rows(show: Show, only?: string): Row[] {
   })));
 }
 
-export function cueSheetCsv(show: Show): string {
-  const q = (s: string | number) => /[",\n]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
-  const head = ['List', 'Cue', 'Name', 'Fade', 'Then', 'Lights', 'Effects', 'Also', 'Note'];
-  return [head, ...rows(show).map((r) => [r.list, r.n, r.name, r.fade, r.then, r.lights, r.effects, r.actions, r.note])].map((r) => r.map(q).join(',')).join('\r\n') + '\r\n';
+// `decimal`: ',' for a spreadsheet that writes 2,5 (German Excel): then the columns are split by ';'
+// as it expects (with ',' each row landed in one column), and the times are numbers it can add up.
+export function cueSheetCsv(show: Show, decimal: '.' | ',' = '.'): string {
+  const sep = decimal === ',' ? ';' : ',';
+  const q = (s: string | number) => new RegExp(`["\n${sep}]`).test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
+  const num = (v: number | undefined) => (v === undefined ? '' : String(Math.round(v * 1000) / 1000).replace('.', decimal));
+  const cues = show.cueLists.flatMap((l) => l.cues);
+  const head = ['List', 'Cue', 'Name', 'Fade (s)', 'Delay (s)', 'Fade out (s)', 'Then', 'Lights', 'Effects', 'Also', 'Note'];
+  return [head, ...rows(show).map((r, i) => {
+    const c = cues[i];
+    return [r.list, r.n.replace('.', decimal), r.name, num(c.fade), num(c.delay || undefined), num(c.fadeOut !== undefined && c.fadeOut !== c.fade ? c.fadeOut : undefined), r.then, r.lights, r.effects, r.actions, r.note];
+  })].map((r) => r.map(q).join(sep)).join('\r\n') + '\r\n';
 }
 
 // `only`: one list's cues (a list's own menu), else every list's

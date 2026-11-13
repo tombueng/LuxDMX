@@ -17,7 +17,7 @@
   import GoStrip from './GoStrip.svelte';
   import { fogTimer as makeFogTimer } from './actions';
   import { app, newId } from '../app.svelte';
-  import { dialogOpen, spaceIsGo, tablist, ui } from './ui.svelte';
+  import { dialogOpen, isShortcut, spaceIsGo, tablist, ui } from './ui.svelte';
   import type { Widget } from '../model/types';
   import { enableMidi, midiReady, midiSupported, onMidiInputs } from '../input/midi';
   import { hhmm, pauseItems } from './schedulePause';
@@ -335,7 +335,7 @@
   }
   // Keyboard: a widget's key presses it (held keys hold flash and fog), Space is GO.
   function keydown(e: KeyboardEvent) {
-    if (app.view !== 'live' || app.editPage || dialogOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (app.view !== 'live' || app.editPage || dialogOpen() || isShortcut(e)) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.key === 'Enter' && (e.target as HTMLElement).closest?.('.tile')) return;   // Enter presses the focused button

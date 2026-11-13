@@ -138,10 +138,13 @@
     const v = await ui.ask('Where is the show?', place.guessed ? '' : `${place.lat}, ${place.lon}`, { label: 'Latitude, longitude', ok: 'Use it', hint: 'Like 52.52, 13.40 (a map app shows it when you hold a spot). Empty: guess from the time zone again.', empty: true });
     if (v === null) return;
     app.checkpoint();
-    const m = v.replace(/[°NE]/gi, '').match(/^\s*(-?\d+(?:[.,]\d+)?)\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)\s*$/);
+    // (with their letters as a map writes them: N/S, and E, W or the German O for Ost; S and W
+    // south and west, minus. "48,14° N, 11,58° O" was refused)
+    const m = v.replace(/°/g, '').match(/^\s*(-?\d+(?:[.,]\d+)?)\s*([NS])?\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)\s*([EOW])?\s*$/i);
+    const lat = m ? +m[1].replace(',', '.') * (m[2]?.toUpperCase() === 'S' ? -1 : 1) : NaN, lon = m ? +m[3].replace(',', '.') * (m[4]?.toUpperCase() === 'W' ? -1 : 1) : NaN;
     if (!v.trim()) delete app.show.settings.place;
-    else if (!m || Math.abs(+m[1].replace(',', '.')) > 90 || Math.abs(+m[2].replace(',', '.')) > 180) { ui.toast('That isn\'t a place: two numbers, like 52.52, 13.40', 4000); return; }
-    else app.show.settings.place = { lat: +m[1].replace(',', '.'), lon: +m[2].replace(',', '.') };
+    else if (!m || Math.abs(lat) > 90 || Math.abs(lon) > 180) { ui.toast('That isn\'t a place: two numbers, like 52.52, 13.40', 4000); return; }
+    else app.show.settings.place = { lat, lon };
     sunAt();
     app.markDirty(0);
   }

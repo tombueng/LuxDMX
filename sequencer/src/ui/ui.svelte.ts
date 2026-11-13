@@ -150,6 +150,11 @@ if (typeof window !== 'undefined') {
   window.addEventListener('focusin', (e) => { lastZone = (e.target as Element).closest?.(ZONE) ?? lastZone; }, true);
   window.addEventListener('pointerdown', () => { tabbing = false; }, true);
 }
+// A key with Ctrl, Alt or Cmd is a shortcut, not something typed: except the characters AltGr gives
+// (Ctrl+Alt on Windows: @ € { on a German keyboard) and Option on a Mac (@ is Option+L there), which
+// were swallowed ("@50" typed on the console lost its @).
+export const isShortcut = (e: KeyboardEvent) => e.metaKey || ((e.ctrlKey || e.altKey)
+  && !(e.key.length === 1 && (e.getModifierState?.('AltGraph') || (e.ctrlKey && e.altKey) || (e.altKey && !e.ctrlKey && !/^[a-z0-9]$/i.test(e.key)))));
 const PRESSABLE = 'button, summary, a[href], [role="tab"], [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"]';
 export const spaceIsGo = (e: KeyboardEvent) => e.code === 'Space' && !e.repeat
   && !(e.target as HTMLElement).closest?.('.ctx, .lockbtn, .dip, .gp .main, [data-own-space]')

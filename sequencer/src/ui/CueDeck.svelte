@@ -7,6 +7,7 @@
   // what happens next. Select like files, drag to reorder, copy / cut / paste / duplicate, right-click
   // for everything else; the selected cue's details sit on the right.
   import Icon from './Icon.svelte';
+  import NumField from './NumField.svelte';
   import Help from './Help.svelte';
   import CueInspector from './CueInspector.svelte';
   import { app } from '../app.svelte';
@@ -215,7 +216,8 @@
         <option value="stop">stay on the last cue</option><option value="loop">start over (loop)</option><option value="release">fade out</option></select></label>
       <label>Priority <select value={list.priority ?? 'normal'} onchange={(e) => (list.priority = (e.target as HTMLSelectElement).value as 'low' | 'normal' | 'high')} aria-label="Priority">
         <option value="low">low</option><option value="normal">normal</option><option value="high">high: wins over newer lists</option></select></label>
-      <label>Release time <input type="number" min="0" max="60" step="0.5" value={list.releaseTime ?? 2} oninput={(e) => (list.releaseTime = +(e.target as HTMLInputElement).value)} style="width:4.5em" aria-label="Release time" /> s</label>
+      <!-- (a German browser took "1." as no number: it wrote 0 back while you typed and "1.5" became 5 s) -->
+      <label>Release time <NumField value={list.releaseTime ?? 2} min={0} max={60} step={0.5} required label="Release time" width="4.5em" onset={(v) => { if (v !== undefined) { list.releaseTime = v; app.markDirty(0); } }} /> s</label>
       <label title="The song's tempo: picking this list in Live (or with a set list button) sets the show to it">Tempo
         <input type="number" min="20" max="300" placeholder="keep" value={list.bpm ?? ''} style="width:4.5em" aria-label="List tempo"
           onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v) && v >= 20 && v <= 300) list.bpm = Math.round(v); else delete list.bpm; app.markDirty(0); }} /> BPM</label>

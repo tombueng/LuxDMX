@@ -758,3 +758,43 @@ test('tempo: the effects on the wire step on the same beat as the page (Auto GO,
   expect(ons.length).toBeGreaterThan(0);
   for (const b of ons) { const f = b - Math.floor(b); expect(Math.min(f, 1 - f)).toBeLessThan(0.2); }   // (on the beat, not half a beat off)
 });
+
+// A browser in German: decimals with a comma, Excel that splits by ';', AltGr for @, Ost for east.
+test.describe('in a German browser', () => {
+  test.use({ locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  test('the CSV opens in German Excel, Release time takes 1.5, AltGr+Q types @ on the console, a place with O is a place', async ({ page }) => {
+    await openConnected(page);
+    await patch(page, 'gen-dimmer', 2, 0, 'D');
+    await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.meta.name = 'Bühnenshow Größe'; a.selectAll(); a.set({ intensity: 0.5 }); a.record(undefined, { fade: 2.5 }); a.show.cueLists[0].cues[0].name = 'Größe; Übung'; a.markDirty(0); });
+    // the CSV: ';', 2,5, a byte-order mark, the umlauts in the name of the file too
+    await page.locator('.top').getByRole('button', { name: 'More' }).click();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.ctx').getByRole('menuitem', { name: /CSV/ }).click()]);
+    expect(dl.suggestedFilename()).toBe('Bühnenshow_Größe-cues.csv');
+    const csv = await (await import('node:fs')).promises.readFile((await dl.path())!, 'utf8');
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    expect(csv.slice(1).split('\r\n')[0].split(';')).toContain('Fade (s)');
+    expect(csv).toContain(';"Größe; Übung";2,5;');
+    // Release time: "1.5" typed in a German browser
+    await page.locator('.deck').getByRole('button', { name: 'List settings' }).click();
+    const rel = page.locator('.deck').getByLabel('Release time');
+    await rel.click(); await rel.fill(''); await page.keyboard.type('1.5'); await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists[0].releaseTime)).toBe(1.5);
+    // the console: AltGr+Q (Ctrl+Alt on Windows) is @, not a shortcut: it goes to the command line
+    await page.locator('.top .modes').getByRole('tab', { name: 'Console' }).click();
+    await page.locator('.console').click({ position: { x: 5, y: 5 } });
+    await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+    await page.evaluate(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '@', code: 'KeyQ', ctrlKey: true, altKey: true, bubbles: true })));
+    await expect(page.locator('.console .cmd input')).toBeFocused();
+    // the timetable's place: "48,14° N, 11,58° O" (Ost) is Munich
+    await page.locator('body').press('Control+k');
+    await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('schedule');
+    await page.keyboard.press('Enter');
+    const dlg = page.getByRole('dialog', { name: 'Timetable' });
+    await dlg.getByRole('button', { name: 'Add a time' }).click();
+    await dlg.getByRole('combobox', { name: 'When' }).selectOption('set');
+    await dlg.getByRole('button', { name: 'Type it in' }).click();
+    await page.getByRole('dialog', { name: 'Where is the show?' }).getByRole('textbox').fill('48,14° N, 11,58° O');
+    await page.getByRole('dialog', { name: 'Where is the show?' }).getByRole('button', { name: 'Use it' }).click();
+    expect(await page.evaluate(() => (window as any).__luxdmx.show.settings.place)).toMatchObject({ lat: 48.14, lon: 11.58 });
+  });
+});

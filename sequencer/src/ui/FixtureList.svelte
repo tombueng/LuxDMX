@@ -192,7 +192,7 @@
           </span>
           {#if f.num}<span class="num" title="Its number: the console and typed commands go by it">{f.num}</span>{/if}
           <span class="txt">
-            <span class="nm">{f.name}</span>
+            <span class="nm" title={f.name}>{f.name}</span>
             <span class="faint">{t ? typeLabel(t) : f.typeId}{t && t.modes.length > 1 ? ` · ${f.mode}` : ''}{groupsOf[f.id] ? ` · ${groupsOf[f.id]}` : ''}</span>
           </span>
           <!-- (short on the row, so the light's name keeps its room; the whole of it in the title) -->

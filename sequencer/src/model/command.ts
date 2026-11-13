@@ -38,7 +38,8 @@ const WORDS: Record<string, string> = {
 
 // "-" takes out, as on MA and Eos desks ("1-4" is light 1 without 4; a run is "1 thru 4" or "1>4").
 function tokens(text: string): string[] {
-  return text.toLowerCase().replace(/%/g, ' % ').replace(/([@+\-.>])/g, ' $1 ').split(/\s+/).filter(Boolean).map((t) => WORDS[t] ?? t);
+  // (a comma between digits is a point: a German keypad's decimal key types one, "22,3", "@ 50,5")
+  return text.toLowerCase().replace(/(\d),(\d)/g, '$1.$2').replace(/%/g, ' % ').replace(/([@+\-.>])/g, ' $1 ').split(/\s+/).filter(Boolean).map((t) => WORDS[t] ?? t);
 }
 // (a number a light, a cell, a group or a cue can have: no bigger than 99999, so a typo of twenty
 // digits is said, not counted to)

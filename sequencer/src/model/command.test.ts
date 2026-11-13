@@ -90,4 +90,7 @@ describe('numbers too big to be one', () => {
     expect(parseCommand('99999 @ full').steps![0].pick.fixtures).toEqual([99999]);
     expect(parseCommand('100000 @ full').error).toBeTruthy();
   });
+  it('a comma between digits is a point (a German keypad types one): 22,3 @ 50,5', () => {
+    expect(parseCommand('22,3 @ 50,5')).toEqual(parseCommand('22.3 @ 50.5'));
+  });
 });

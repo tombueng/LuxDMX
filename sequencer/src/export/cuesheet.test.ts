@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cueSheetHtml } from './cuesheet';
+import { cueSheetCsv, cueSheetHtml } from './cuesheet';
 import { emptyShow } from '../model/format';
 
 describe('the cue sheet', () => {
@@ -21,5 +21,13 @@ describe('the cue sheet', () => {
     const html = cueSheetHtml(s, 'play');
     expect(html).toContain('The Play');
     expect(html).not.toContain('Preset');
+  });
+  it('as CSV for a German spreadsheet: ; between the columns, 2,5 for the times, a name with ; kept whole', () => {
+    const t = structuredClone(s);
+    t.cueLists[0].cues[0] = { ...t.cueLists[0].cues[0], fade: 2.5, delay: 1, name: 'Größe; Übung' };
+    const de = cueSheetCsv(t, ',').split('\r\n');
+    expect(de[0]).toBe('List;Cue;Name;Fade (s);Delay (s);Fade out (s);Then;Lights;Effects;Also;Note');
+    expect(de[1].startsWith('Show;1;"Größe; Übung";2,5;1;;')).toBe(true);
+    expect(cueSheetCsv(t).split('\r\n')[1].startsWith('Show,1,Größe; Übung,2.5,1,,')).toBe(true);
   });
 });

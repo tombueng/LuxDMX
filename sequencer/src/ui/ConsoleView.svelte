@@ -6,7 +6,7 @@
   // saturation, beam, effects), a fader with GO, Flash and Release for every cue list, and the
   // grand master. Everything goes through the programmer and the lists like anywhere else.
   import { app } from '../app.svelte';
-  import { dialogOpen, spaceIsGo, ui } from './ui.svelte';
+  import { dialogOpen, isShortcut, spaceIsGo, ui } from './ui.svelte';
   import Knob from './Knob.svelte';
   import Help from './Help.svelte';
   import { cueNumber } from '../model/cuenum';
@@ -53,14 +53,14 @@
   // (a fader or an encoder keeps only its own keys: arrows, Page Up/Down, Home/End, Enter)
   const OWN = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Enter']);
   function anyKey(e: KeyboardEvent) {
-    if (app.view !== 'console' || e.ctrlKey || e.metaKey || e.altKey || dialogOpen()) return;
+    if (app.view !== 'console' || isShortcut(e) || dialogOpen()) return;
     const t = e.target as HTMLElement;
     if (t.closest('input:not([type=range]), textarea, select, [contenteditable], .modal')) return;
     if (t.closest('[role="slider"], input[type=range]') && OWN.has(e.key)) return;
     // Space is GO, on the list Live plays (as there: not while it repeats; a focused button too, a
     // Flash button excepted, so Space never presses the last button clicked again)
     if (e.code === 'Space') { if (spaceIsGo(e)) { e.preventDefault(); const l = app.liveList; if (l) app.go(l.id); } else if (e.repeat) e.preventDefault(); return; }
-    if (e.key.length === 1 && /[0-9a-z@+\-.>]/i.test(e.key)) { line?.focus(); }
+    if (e.key.length === 1 && /[0-9a-z@+\-.,>]/i.test(e.key)) { line?.focus(); }
   }
 
   // ---- lights and groups: a fader, a select and a flash button each, 20 at a time
@@ -348,7 +348,7 @@
           {/if}
           <span class="pct">{Math.round((mode === 'groups' ? app.groupMasters[s.key] ?? 1 : levelOf(s.ids)) * 100)}</span>
           <!-- (a group: as the groups panel selects it, a group of cells picks its cells) -->
-          <button class="selb" aria-pressed={isSel(s.ids)} onclick={(e) => (mode === 'groups' && !(e.shiftKey || e.ctrlKey || e.metaKey || addMode) ? app.selectGroup(s.key) : pick(s.ids, e))} title="Select (Shift: add or take out)">{s.name}</button>
+          <button class="selb" aria-pressed={isSel(s.ids)} onclick={(e) => (mode === 'groups' && !(e.shiftKey || e.ctrlKey || e.metaKey || addMode) ? app.selectGroup(s.key) : pick(s.ids, e))} title="{s.name}: select (Shift: add or take out)"><span class="nm">{s.name}</span></button>
           <button class="flash" data-own-space use:holdBtn={(down) => app.flashLights(s.key, s.ids, down, mode === 'groups' ? app.show.groups.find((g) => g.id === s.key) : undefined)} aria-label="Flash {s.name}">Flash</button>
         </div>
       {/each}
@@ -441,6 +441,8 @@
   @media (pointer: coarse) { .strip button, .pad button, .acts button { min-height: 44px; } }
   .selb, .flash, .go, .strip button { width: 100%; font-size: .74rem; padding: .25rem .1rem; min-height: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .strip.sel .selb { border-color: var(--orange); color: var(--orange); }
+  /* (a long name cut at its end with an ellipsis: centred in the button it was clipped at both ends, "erfer Bühn") */
+  .selb .nm { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .go { font-weight: 700; }
   .name { font-size: .76rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   button.name { padding: 0 .2rem; min-height: 0; border: 0; color: var(--text); text-decoration: underline dotted; text-underline-offset: 3px; }

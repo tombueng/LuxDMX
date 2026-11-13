@@ -3187,7 +3187,12 @@ class App {
     w.document.close();
     return true;
   }
-  exportCsv() { download(new Blob([cueSheetCsv($state.snapshot(this.show) as Show)], { type: 'text/csv' }), `${fileName(this.show)}-cues.csv`); }
+  // (as this browser writes numbers: a German one gets ';' and 2,5; with the byte-order mark a
+  // spreadsheet reads it as UTF-8, umlauts and all)
+  exportCsv() {
+    const decimal = (1.5).toLocaleString().includes(',') ? ',' : '.';
+    download(new Blob(['\uFEFF' + cueSheetCsv($state.snapshot(this.show) as Show, decimal)], { type: 'text/csv;charset=utf-8' }), `${fileName(this.show)}-cues.csv`);
+  }
   // The show as a QLC+ workspace. Returns what couldn't go over.
   exportQxw(): string[] {
     const { xml, skipped } = toQxw($state.snapshot(this.show) as Show);
@@ -3395,7 +3400,8 @@ function textSum(text: string) {
   for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193);
   return `${t.length}:${h >>> 0}`;
 }
-const fileName = (s: Show) => (s.meta.name || 'show').replace(/[^\w-]+/g, '_');
+// (letters of any language stay: "Bühnenshow Größe" was saved as B_hnenshow_Gr_e)
+const fileName = (s: Show) => (s.meta.name || 'show').replace(/[^\p{L}\p{N}_-]+/gu, '_');
 function download(blob: Blob, name: string) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

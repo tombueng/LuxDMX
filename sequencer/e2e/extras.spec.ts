@@ -52,8 +52,9 @@ test('a cue sheet to print, and as CSV', async ({ page }) => {
   await page.locator('.top').getByRole('button', { name: 'More' }).click();
   const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.ctx').getByRole('menuitem', { name: /CSV/ }).click()]);
   const csv = await (await import('node:fs')).promises.readFile((await dl.path())!, 'utf8');
-  expect(csv.split('\r\n')[0]).toBe('List,Cue,Name,Fade,Then,Lights,Effects,Also,Note');
-  expect(csv).toContain('Show,1,Preset,3 s,GO');
+  expect(csv.charCodeAt(0)).toBe(0xfeff);                                         // (UTF-8 for a spreadsheet: umlauts)
+  expect(csv.slice(1).split('\r\n')[0]).toBe('List,Cue,Name,Fade (s),Delay (s),Fade out (s),Then,Lights,Effects,Also,Note');
+  expect(csv).toContain('Show,1,Preset,3,,,GO');
 });
 
 test('arrange the selection on the stage; a picture of the room underneath', async ({ page }) => {
