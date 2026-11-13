@@ -209,7 +209,7 @@
   .row .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--green); flex: none; }
   .row.warn .dot { background: var(--orange); } .row.bad .dot { background: var(--pink); } .row.gone .dot { background: var(--muted); }
   .row.gone { opacity: .6; }
-  .who { display: flex; gap: .5rem; align-items: center; text-align: left; padding: .1rem; min-width: 0; }
+  .who { display: flex; gap: .5rem; align-items: center; justify-content: flex-start; text-align: left; padding: .1rem; min-width: 0; }
   .nm, .where, .patch { display: flex; flex-direction: column; min-width: 0; }
   .nm b, .patch b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   small { font-size: .75rem; color: var(--muted); }
