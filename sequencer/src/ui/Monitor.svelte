@@ -73,8 +73,12 @@
       ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
       if (v) { ctx.fillStyle = `rgba(255,170,28,${0.12 + 0.6 * v / 255})`; ctx.fillRect(x + 1, y + 1 + (cell - 2) * (1 - v / 255), cell - 2, (cell - 2) * v / 255); }
       if (o && o.c === 0) { ctx.fillStyle = '#6aa2ff'; ctx.fillRect(x + 1, y + 1, 2, cell - 2); }   // a fixture starts here
+      // a clash also as a pink frame drawn over the value (its tint alone was covered by the value's
+      // fill, and dark red next to the green band is the same to someone red-green blind)
+      if (o?.clash) { ctx.strokeStyle = '#ff4d8a'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 2]); ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3); ctx.setLineDash([]); }
       if (i === hover) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3); }
-      ctx.fillStyle = v > 150 ? '#1a100099' : o ? '#6b7686' : '#3a4350';
+      // (the channel numbers lighter: 1.8:1 and 3.2:1 against the cells, too faint in a dark room)
+      ctx.fillStyle = v > 150 ? '#1a100099' : o ? '#9aa4b2' : '#6b7584';
       ctx.fillText(String(i + 1), x + 3, y + 3);
     }
     ctx.font = `600 ${Math.max(9, Math.round(cell * 0.36))}px ui-monospace, monospace`;

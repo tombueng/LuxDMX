@@ -295,3 +295,35 @@ test('keyboard: a cue on the timeline moves a beat with the arrows; sliders read
   await dlg.locator('[data-type="gen-dimmer"]').click();
   await expect(dlg.locator('[data-type="gen-dimmer"]')).toHaveAttribute('aria-pressed', 'true');
 });
+
+// Red-green colour blind (1 in 12 men): no state told by colour alone (from round 13 of the QA).
+test('colour is never the only sign: ARMED and On stage in words on a phone, U0 says blind, a clash has its mark, a picked card is dashed', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await page.evaluate(() => (window as any).__luxdmx.addFixtures('gen-confetti', '', 1, 1, 'Confetti'));   // (a machine: the Arm button)
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.armMachines(true); });
+  await expect(page.locator('.top .arm .txt')).toBeVisible();
+  await expect(page.locator('.top .arm .txt')).toHaveText('ARMED');
+  await expect(page.locator('.top .out .short')).toBeVisible();
+  await expect(page.locator('.top .out .short')).toHaveText('Live');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.armMachines(false); });
+  await expect(page.locator('.top .arm .txt')).toBeHidden();                 // (Safe: its icon is enough)
+  // the boxes button's badge: a mark, and its state in the tooltip
+  const boxes = page.locator('.top').getByRole('button', { name: /LuxDMX boxes/ });
+  await expect(boxes.locator('.badge')).toHaveText('✓');
+  await expect(boxes).toHaveAttribute('title', /connected/);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // U0 with a look while Blind: in words
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selectAll(); a.set({ intensity: 0.6 }); a.output = 'blind'; });
+  await expect(page.locator('.dmx .u', { hasText: 'U0' })).toContainText('blind');
+  // a clash: a mark on the address, not only its pink
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.fixtures[1].address = 1; a.markDirty(0); });
+  await expect(page.locator('.fl li.oitem.clash .addr').first()).toContainText('⚠');
+  // a picked cue card: dashed (live is green and says LIVE)
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.record(); a.set({ intensity: 0.2 }); a.record(); a.programmer = {}; });
+  await page.locator('.deck .card').first().click();
+  await expect(page.locator('.deck .card.sel').first()).toHaveCSS('border-top-style', 'dashed');
+  // placeholders and disabled buttons readable
+  expect(await page.evaluate(() => { const i = document.createElement('input'); i.placeholder = 'x'; document.body.append(i); const c = getComputedStyle(i, '::placeholder').color; i.remove(); return c; })).not.toBe('rgb(117, 117, 117)');
+});

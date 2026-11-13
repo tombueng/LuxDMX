@@ -177,7 +177,7 @@
   {#if !app.locked || app.output !== 'live'}
   <button class="out" class:onair={app.output === 'live'} aria-pressed={app.output === 'live'} onclick={outputClick} aria-label="On stage"
           title={app.output === 'live' ? 'On stage: what you do goes out to the lights. Click for blind (they keep the look they have).' : 'Blind: you see it here, the lights don\'t get it. Click to send it to the stage.'}>
-    <span class="dot"></span><span class="txt">{app.output === 'live' ? 'On stage' : 'Blind'}</span>
+    <span class="dot"></span><span class="txt">{app.output === 'live' ? 'On stage' : 'Blind'}</span>{#if app.output === 'live'}<span class="short">Live</span>{/if}
   </button>
   {/if}
   {#if app.gatedMachines.length && (!app.locked || app.sfxArmed)}
@@ -241,6 +241,7 @@
   .pulse { width: .5rem; height: .5rem; border-radius: 50%; background: var(--line2); transition: background .05s; }
   .pulse.beat { background: var(--green); box-shadow: 0 0 8px var(--green); }
   .bo.on { background: var(--pink); border-color: var(--pink); color: #1a0010; font-weight: 700; }
+  .out .short { display: none; }                         /* (the phone's word for On stage) */
   .bpm { display: inline-flex; gap: .25rem; } .bpm :global(input) { width: 5em !important; }
   .bpm .frommusic { color: var(--green); border-color: #45d85c66; }
   .grow { flex: 1; }
@@ -291,6 +292,10 @@
     .top { flex-wrap: nowrap; gap: .2rem; padding: .3rem .4rem; overflow-x: auto; }
     .top > :global(*) { flex-shrink: 1; }                 /* (as before: everything may give a little) */
     .brand, .gm, .bpm, .bo, .saved, .music, .out .txt, .arm .txt { display: none; }
+    /* (but the states that matter in words: on a phone ARMED and On stage were a dot and an icon,
+       the same colour to someone red-green blind; Blind and Safe stay just their icons) */
+    .out.onair .short, .arm.armed .txt { display: inline; font-size: .78rem; font-weight: 700; }
+    .top > .out.onair, .top > .arm.armed, .top > :global(.arm.armed) { flex-shrink: 0; }   /* (the show's name gives way, not these words) */
     .out, .arm { padding: .3rem .45rem; }
     .toolbar { flex-wrap: nowrap; }
     .toolbar :global(button[aria-label="Undo"]), .toolbar :global(button[aria-label="Redo"]), .toolbar :global(button[aria-label="Explanations"]),

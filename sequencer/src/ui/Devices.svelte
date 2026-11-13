@@ -109,6 +109,7 @@
     return !st.length ? 'none' : st.every((s) => s === 'ready') ? 'ready' : st.some((s) => s === 'denied' || s === 'blocked' || s === 'silent') ? 'denied'
       : st.some((s) => s === 'asking' || s === 'opening' || s === 'ready' || s === 'reconnecting') ? 'asking' : 'closed';
   });
+  const boxesSaid = $derived(overall === 'none' ? 'none yet' : overall === 'ready' ? 'connected' : overall === 'denied' ? 'a problem' : overall === 'asking' ? 'not all connected' : 'not connected');
   // what a pill shows of a box, read now (`_rev`: called again whenever a box changed)
   function view(b: (typeof app.bridges)[number], _rev: number) {
     const l = isLink(b) ? (b as LinkOutput) : undefined;
@@ -192,8 +193,9 @@
 {#if compact}
   <span class="wrap">
     <button class="ghost boxes {overall}" class:on={list} bind:this={boxesBtn} onclick={toggleList} aria-expanded={list} data-popover-toggle
-            title="Your LuxDMX boxes" aria-label="LuxDMX boxes: {overall === 'none' ? 'none yet' : overall === 'ready' ? 'connected' : overall === 'denied' ? 'a problem' : overall === 'asking' ? 'not all connected' : 'not connected'}">
-      <Icon name="link" size={18} /><span class="dot badge"></span>
+            title="Your LuxDMX boxes: {boxesSaid}" aria-label="LuxDMX boxes: {boxesSaid}">
+      <!-- (a mark in the badge, not only its colour: connected and connecting were the same to someone red-green blind) -->
+      <Icon name="link" size={18} /><span class="dot badge">{overall === 'ready' ? '✓' : overall === 'denied' ? '!' : overall === 'none' ? '' : '…'}</span>
     </button>
     {#if list}
       <div class="pop list" class:right={listRight} use:dismiss={() => (list = false)}>
@@ -238,7 +240,7 @@
   .pop { position: absolute; right: 0; top: 2.2rem; z-index: 60; width: 300px; display: flex; flex-direction: column; gap: .4rem; padding: .7rem; background: var(--panel2); border: 1px solid var(--line2); border-radius: var(--radius); box-shadow: var(--shadow); }
   .boxes { gap: .25rem; padding: .3rem .45rem; position: relative; }
   @media (pointer: coarse) { .boxes { min-height: 44px; min-width: 44px; justify-content: center; } }
-  .boxes .badge { position: absolute; right: 5px; top: 5px; width: 8px; height: 8px; border: 1.5px solid var(--bg2); }
+  .boxes .badge { position: absolute; right: 2px; top: 2px; min-width: 11px; height: 11px; border: 1.5px solid var(--bg2); font-size: 8px; line-height: 8px; font-weight: 800; color: #0b0f15; display: grid; place-items: center; }
   .boxes .dot { background: var(--muted); }
   .boxes.ready .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .boxes.asking .dot { background: var(--orange); animation: blink 1s infinite; }

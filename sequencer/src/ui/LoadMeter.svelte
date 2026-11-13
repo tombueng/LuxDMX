@@ -19,7 +19,8 @@
 <span class="lm">
   <button class="ghost chip {ok}" data-popover-toggle aria-expanded={open} onclick={() => (open = !open)}
           aria-label="Load and drawing quality" title="How hard this page works, and whether the DMX output keeps its time. Click for the drawing quality.">
-    <span class="dot"></span>{load.cpu}%{#if load.lowered}<span class="down" aria-hidden="true">▾</span>{/if}
+    <!-- (late output said with a mark, not only the dot's colour: green and orange look alike to someone red-green blind) -->
+    <span class="dot"></span>{load.cpu}%{#if load.lowered}<span class="down" aria-hidden="true">▾</span>{/if}{#if ok !== 'ok'}<span class="lt" title="Some DMX frames went out late">⚠ late</span>{/if}
   </button>
   {#if open}
     <div class="pop" role="dialog" aria-label="Load and quality" use:dismiss={() => (open = false)}>
@@ -48,6 +49,7 @@
   .dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--green); }
   .chip.some .dot { background: var(--orange); }
   .chip.late .dot { background: var(--pink, #ff4d6d); }
+  .lt { margin-left: .25rem; font-size: .72rem; color: var(--orange); } .chip.late .lt { color: var(--pink, #ff4d6d); }
   .down { color: var(--orange); }
   .pop { position: absolute; left: 0; top: 1.9rem; z-index: 60; width: 290px; display: flex; flex-direction: column; gap: .5rem; padding: .7rem; background: var(--panel2); border: 1px solid var(--line2); border-radius: var(--radius); box-shadow: var(--shadow); }
   dl { display: grid; grid-template-columns: auto 1fr; gap: .2rem .6rem; margin: 0; font-size: .85rem; }

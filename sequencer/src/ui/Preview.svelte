@@ -21,7 +21,8 @@
     <Icon name="grid" size={14} /><h2>DMX output</h2><Icon name="right" size={12} />
   </button>
   {#each unis as u (u)}
-    <button class="u" class:live={live.has(u) && served(u)} class:held={live.has(u) && !served(u)} onclick={() => open(u)} title="Universe {u}: {say(u)}"><span class="dot"></span>U{u}</button>
+    <!-- (in words when it doesn't go out: green and orange dots alone looked the same to someone red-green blind) -->
+    <button class="u" class:live={live.has(u) && served(u)} class:held={live.has(u) && !served(u)} onclick={() => open(u)} title="Universe {u}: {say(u)}"><span class="dot"></span>U{u}{#if live.has(u) && !served(u)}<span class="why">{app.output !== 'live' ? 'blind' : 'no box'}</span>{/if}</button>
   {/each}
   <span class="faint">{unis.length ? `${patched} channels patched` : 'nothing patched yet'}</span>
 </div>
@@ -33,5 +34,6 @@
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line2); }
   .u.live .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .u.held .dot { background: var(--orange); }
+  .why { margin-left: .3rem; font-size: .72rem; color: var(--orange); }
   .faint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

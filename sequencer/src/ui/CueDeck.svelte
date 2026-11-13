@@ -300,9 +300,11 @@
   .deck { height: 100%; display: flex; flex-direction: column; min-height: 0; gap: .35rem; padding: .55rem; }
   .tabs h2 { margin-right: .2rem; }
   .tab { padding: .2rem .6rem; border-radius: 999px; font-size: .86rem; }
-  .tab.cur { border-color: var(--green); background: #45d85c12; }
+  /* the list open: its name bold too; a running one: its dot a ring, not only lit (by colour alone, a grey
+     list's light dot and dark dot were all there was) */
+  .tab.cur { border-color: var(--green); background: #45d85c12; font-weight: 650; }
   .dot { display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; background: var(--line2); }
-  .dot.on { background: var(--c, var(--green)); box-shadow: 0 0 6px var(--c, var(--green)); }
+  .dot.on { background: var(--c, var(--green)); box-shadow: 0 0 0 2px var(--bg2), 0 0 0 3.5px var(--c, var(--green)), 0 0 6px var(--c, var(--green)); }
   .bar .sep { width: 1px; height: 1.4rem; background: var(--line); }
   .upd .tgt, .record .tgt { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
   .record .tgt { font-weight: 400; opacity: .8; font-size: .8rem; }
@@ -317,7 +319,8 @@
   .cards { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; align-content: start; outline: none; padding: 2px; }
   .card { border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--bg2); padding: .35rem; display: flex; flex-direction: column; gap: .25rem; position: relative; cursor: default; user-select: none; }
   .card:hover { border-color: var(--line2); }
-  .card.sel { border-color: var(--orange); background: #ffaa1c0c; }
+  /* picked: a dashed border (orange picked and green live were the same yellow to someone red-green blind; live has its LIVE tag) */
+  .card.sel { border-color: var(--orange); border-style: dashed; background: #ffaa1c0c; }
   .card.cur { border-color: var(--green); box-shadow: 0 0 0 1px var(--green), 0 0 14px #45d85c33; }
   .card:focus-visible { outline: none; }
   .tag { margin-left: auto; flex: none; font-size: .76rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);

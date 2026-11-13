@@ -453,7 +453,8 @@
   .risk.atmosphere { color: #9fb4c8; }
   .risk.once { color: #e8c44a; border-color: #e8c44a55; }
   .risk.hazard { color: #ff8a5c; border-color: #ff7a1c88; font-weight: 650; }
-  .risk.armed { color: #fff; background: #7a1d0c; border-color: #ff7a1c; }
+  /* armed: hazard stripes, not only a colour (filled and outlined in two reds read alike red-green blind) */
+  .risk.armed { color: #fff; background: repeating-linear-gradient(135deg, #7a1d0c 0 4px, #b4400f 4px 8px); border-color: #ff7a1c; }
   .cue.next { font-size: .68rem; } .two button { flex: 1 1 0; min-width: 0; padding-inline: .2rem; }
   .midi { font-size: .66rem; padding: .05rem .2rem; min-height: 0 !important; width: 100%; }
   .midi.bound { color: var(--green); border-color: var(--green); }

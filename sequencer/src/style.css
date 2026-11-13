@@ -31,7 +31,9 @@ button { cursor: pointer; display: inline-flex; align-items: center; gap: .35rem
 :root { --focus: #6aa2ff; }
 button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .olist:focus-visible, .cards:focus-visible, [role="listbox"]:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #6aa2ff66; border-radius: var(--radius-s); }
-button:disabled { opacity: .4; cursor: default; }
+button:disabled { opacity: .55; cursor: default; }   /* (.4 made a disabled button's word 2:1 against the panel: unreadable in a dark room) */
+/* placeholders as light as the faint text (the browser's grey was 3.5:1 on the fields) */
+input::placeholder, textarea::placeholder { color: var(--faint); opacity: 1; }
 button.primary { background: var(--green); color: #07150b; border-color: var(--green); font-weight: 650; }
 button.primary:hover:not(:disabled) { background: #5be070; }
 button.accent { background: var(--orange); color: #1a1000; border-color: var(--orange); font-weight: 650; }
