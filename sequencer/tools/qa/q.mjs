@@ -13,7 +13,7 @@ const POS = {
   click: ['sel'], dblclick: ['sel'], hover: ['sel'], fill: ['sel', 'value'], type: ['text'], press: ['key', 'sel'],
   select: ['sel', 'value'], check: ['sel', 'on'], goto: ['url'], reset: ['url'], eval: ['js'], shot: ['name', 'sel'],
   snap: ['sel'], text: ['sel'], count: ['sel'], controls: ['sel'], logs: ['since', 'errors'], page: ['i'], wait: ['ms'],
-  viewport: ['w', 'h'], drag: ['from', 'to'], files: ['sel', 'paths'],
+  viewport: ['w', 'h'], drag: ['from', 'to'], files: ['sel', 'paths'], download: ['sel'],
 };
 const steps = [];
 let cur = [];

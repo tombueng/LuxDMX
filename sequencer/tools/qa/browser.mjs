@@ -161,6 +161,13 @@ const actions = {
   async page(b) { cur = Math.max(0, Math.min(pages.length - 1, b.i)); await pages[cur].bringToFront(); return { cur, url: pages[cur].url() }; },
   async viewport(b) { viewport = { width: b.w, height: b.h }; for (const p of pages) await p.setViewportSize(viewport); return { viewport }; },
   async wait(b) { if (b.sel) await loc(b.sel, b.nth).waitFor({ state: b.state ?? 'visible', timeout: b.timeout ?? 10000 }); else await page().waitForTimeout(b.ms ?? 500); return {}; },
+  // click something that downloads a file: where it was saved, its name and size
+  async download(b) {
+    const [d] = await Promise.all([page().waitForEvent('download', { timeout: b.timeout ?? 15000 }), loc(b.sel, b.nth).click({ timeout: b.timeout ?? 15000 })]);
+    const file = path.join(OUT, d.suggestedFilename().replace(/[^\w. ()-]+/g, '_'));
+    await d.saveAs(file);
+    return { file, name: d.suggestedFilename(), size: fs.statSync(file).size };
+  },
   async quit() { setTimeout(() => process.exit(0), 50); return {}; },
 };
 

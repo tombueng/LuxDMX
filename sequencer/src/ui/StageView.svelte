@@ -114,7 +114,13 @@
     app.markDirty();
   }
   // ---- zoom and pan: wheel or pinch zooms around the pointer, middle button or two fingers pan.
-  const vb = $derived(`${view.x.toFixed(1)} ${view.y.toFixed(1)} ${(W / view.k).toFixed(1)} ${(H / view.k).toFixed(1)}`);
+  // (a margin round what's in view, the same share each way so nothing stretches: a light at the very
+  // edge of the plan, its label and a machine's chip, stays whole instead of half cut off)
+  const EDGE = 0.035;
+  const vb = $derived.by(() => {
+    const w = W / view.k, h = H / view.k, mx = w * EDGE, my = h * EDGE;
+    return `${(view.x - mx).toFixed(1)} ${(view.y - my).toFixed(1)} ${(w + 2 * mx).toFixed(1)} ${(h + 2 * my).toFixed(1)}`;
+  });
   function zoomAt(px: number, py: number, k: number) {     // px, py in stage units (0..W, 0..H)
     k = Math.max(1, Math.min(8, k));
     const x = px - (px - view.x) * view.k / k, y = py - (py - view.y) * view.k / k;
@@ -136,7 +142,7 @@
   let pinch: { d: number; k: number; cx: number; cy: number } | null = null;
   let pan: { x: number; y: number; vx: number; vy: number } | null = null;
   function panBy(dxPx: number, dyPx: number) {
-    const r = svg!.getBoundingClientRect(), scale = Math.max(W / r.width, H / r.height) / view.k;
+    const r = svg!.getBoundingClientRect(), scale = Math.max(W / r.width, H / r.height) * (1 + 2 * EDGE) / view.k;
     view = { ...view, x: Math.max(0, Math.min(W - W / view.k, view.x - dxPx * scale)), y: Math.max(0, Math.min(H - H / view.k, view.y - dyPx * scale)) };
   }
 

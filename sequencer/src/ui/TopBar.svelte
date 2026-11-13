@@ -258,6 +258,7 @@
   /* Narrow screens: one row. The grand master and tempo live on the Live page there. */
   @media (max-width: 760px) {
     .top { flex-wrap: nowrap; gap: .2rem; padding: .3rem .4rem; overflow-x: auto; }
+    .top > :global(*) { flex-shrink: 1; }                 /* (as before: everything may give a little) */
     .brand, .gm, .bpm, .bo, .saved, .music, .out .txt, .arm .txt { display: none; }
     .out, .arm { padding: .3rem .45rem; }
     .toolbar { flex-wrap: nowrap; }
@@ -269,6 +270,6 @@
     .modes :global(svg) { display: inline-block; }        /* (the tablets' rule hides them; here they're the tabs) */
     /* (with the arm button there too: every tab as an icon) */
     .top.witharm .modes .lbl { display: none; }
-    .show { max-width: 28vw; padding-inline: .3rem; }
+    .show { max-width: 28vw; padding-inline: .3rem; min-width: 2.2rem; }
   }
 </style>
