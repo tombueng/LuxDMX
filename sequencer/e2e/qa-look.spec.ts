@@ -528,3 +528,30 @@ test('a song part moves to the playhead from its menu (on the bar), and the part
   await page.keyboard.press('p');
   expect(errs).toEqual([]);
 });
+
+test('small things: the remote says when there\'s no address; a pasted effect lands next to the one copied; a new timeline says how long it runs before Play', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 2, 0, 'P');
+  // the timeline of a new show: as long as it's drawn (it said "/ 0:00" until Play, then "/ 4:00")
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await expect(page.locator('.tlv .clock')).toContainText('/ 4:00');
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  // two effects, the first copied and pasted: the copy right after it
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, ids = a.show.fixtures.map((f: any) => f.id);
+    a.show.effects.push({ id: 'qe1', name: 'First', kind: 'rainbow', fixtures: ids, params: {} }, { id: 'qe2', name: 'Second', kind: 'rainbow', fixtures: ids, params: {} });
+    a.checkpoint();
+  });
+  await page.locator('.side').getByRole('tab', { name: 'Effects' }).click();
+  await page.locator('.side .olist li', { hasText: 'First' }).first().click();
+  await page.locator('.side .olist').press('Control+c');
+  await page.locator('.side .olist').press('Control+v');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects.map((e: any) => e.name))).toEqual(['First', 'First (copy)', 'Second']);
+  // the remote: Add with no address says what to type
+  await page.locator('body').press('Control+k');
+  await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('phone as a remote');
+  await page.keyboard.press('Enter');
+  const rem = page.getByRole('dialog', { name: /Phone as a remote/ });
+  const add = rem.getByRole('button', { name: /^Add/ }).first();
+  if (await add.isVisible()) { await add.click(); await expect(page.locator('.toast')).toContainText("Type your LuxDMX box's address first"); }
+});

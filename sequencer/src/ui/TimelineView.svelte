@@ -302,6 +302,13 @@
   function scrubEnd() { P.scrubEnd(scrubT); }
   // a jump (a key, a click on a part of the song, Go to): a scrub that's over at once
   function jump(t: number) { scrubStart(); scrubTo(t); scrubEnd(); }
+  // A right-click on the playhead is for what's under it (a part's name, an item): it caught them
+  function underPlayhead(e: MouseEvent) {
+    const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => !el.classList.contains('playhead'));
+    if (!under) return;
+    e.preventDefault();
+    under.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY }));
+  }
   // dragging the playhead (anywhere along it) or on the ruler
   let scrubbing = $state(false);
   let toldScrub = false;
@@ -738,7 +745,7 @@
     <div class="transport" role="toolbar" aria-label="Transport">
       <button class="ghost" onclick={() => jump(P.start)} aria-label="Back to the start" title="Back to the start (Home)"><Icon name="back" /></button>
       <button class="primary play" onclick={() => P.toggle()} aria-label={P.playing ? 'Pause' : 'Play'} title="Play / pause (Space)"><Icon name={P.playing ? 'stop' : 'play'} />{P.playing ? 'Pause' : 'Play'}</button>
-      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(P.duration, false)}</span></span>
+      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(P.duration || tl?.duration || span.to, false)}</span></span>
       <label class="bpm">BPM <input type="number" min="40" max="240" value={tl?.bpm ?? app.show.settings.bpm} aria-label="Timeline BPM"
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (v >= 40 && v <= 240) { app.timeline.ensure().bpm = v; app.markDirty(0); } }} /></label>
       <span class="vol"><button class="ghost snd" class:off={!P.soundHere} aria-pressed={P.soundHere} onclick={() => P.setSoundHere(!P.soundHere)} aria-label="Sound here"
@@ -798,7 +805,7 @@
           {/each}
           {#if dropAt !== null}<span class="drop" style="left:{x(dropAt)}px"></span>{/if}
           <!-- svelte-ignore a11y_no_static_element_interactions (Home, End and the arrows move it from the keyboard) -->
-          <span class="playhead" class:held={scrubbing} style="left:{x(at)}px" onpointerdown={(e) => scrubDown(e)} onpointermove={scrubMove} onpointerup={scrubUp} onpointercancel={scrubUp}
+          <span class="playhead" class:held={scrubbing} style="left:{x(at)}px" oncontextmenu={underPlayhead} onpointerdown={(e) => scrubDown(e)} onpointermove={scrubMove} onpointerup={scrubUp} onpointercancel={scrubUp}
             title="Drag to go through the song: the looks follow, nothing fires"></span>
         </div>
       </div>

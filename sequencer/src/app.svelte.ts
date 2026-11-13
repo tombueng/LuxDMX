@@ -2483,11 +2483,14 @@ class App {
     const clip = await readClip('effects');
     if (!clip) return [];
     const added: string[] = [];
+    // (next to the effect selected, the one copied say, not at the end of a long list)
+    const sel = ui.fxSel.map((id) => this.show.effects.findIndex((x) => x.id === id)).filter((i) => i >= 0);
+    let at = sel.length ? Math.max(...sel) + 1 : this.show.effects.length;
     for (const e of clip.items as Effect[]) {
       const ok = e.group ? this.show.groups.some((g) => g.id === e.group) : (e.fixtures ?? []).some((id) => this.show.fixtures.some((f) => f.id === id));
       const n: Effect = { ...e, id: newId('e'), name: this.show.effects.some((x) => x.name === e.name) ? `${e.name} (copy)` : e.name,
         ...(ok ? {} : { group: undefined, fixtures: [...this.selected] }) };
-      this.show.effects.push(n);
+      this.show.effects.splice(at++, 0, n);
       added.push(n.id);
     }
     this.markDirty();
