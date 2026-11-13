@@ -1065,7 +1065,9 @@ generic ones as QLC+'s generic types), a scene per cue with the exact DMX values
 list, moves as EFX.
 
 **Paper and spreadsheets**: a list's tab menu prints that list's cue sheet; the menu (⋯, top right) prints one of every list (cue, fade, the lights at their levels, what
-happens next, notes; "Save as PDF" in the print dialog) or saves it as CSV. **Print the patch**
+happens next, notes; "Save as PDF" in the print dialog) or saves it as CSV (written the way this
+browser writes numbers: in a German one with ';' between the columns and 2,5 for the times, so
+German Excel opens it as it is). **Print the patch**
 gives the setup sheet for the venue: every fixture by universe and address, its mode, and the DIP
 switches drawn for fixtures that set their address with little switches (the fixture's edit row
 shows them too). Show files can be
