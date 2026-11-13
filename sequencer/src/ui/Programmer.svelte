@@ -86,7 +86,9 @@
   // (a pixel bar: its brightest cell, a pixel chase lights it at intensity 0)
   // (picked cells: the first one's)
   const out = $derived.by(() => { if (!sel.length) return undefined; const s = app.stage[sel[0].id], k = app.cellsPicked(sel[0].id)[0]; return k === undefined ? levelOf(s) : cellLookAt(s, k, app.caps(sel[0].id).cells)?.intensity ?? 0; });
-  const CAT: Record<string, string> = { move: 'position', color: 'colour', intensity: 'brightness' };
+  // (what an effect works on, said after its name; 'pixel' was missing: "Bar twinkles (undefined)")
+  const CAT: Record<string, string> = { move: 'position', color: 'colour', intensity: 'brightness', pixel: 'cells' };
+  const fxSaid = (e: { name: string; kind: string }) => { const c = CAT[EFFECT_MAP.get(e.kind)?.category ?? '']; return c ? `${e.name} (${c})` : e.name; };
   const presets = $derived(app.show.presets);
   const colorPresets = $derived(presets.filter((p) => p.kind === 'color'));
   // Whites: what a warm/cool white fixture can take from the colour presets.
@@ -243,7 +245,7 @@
     {#if running.length}
       <div class="fxnote">
         <Icon name="effect" size={14} />
-        <span>{running.map((e) => `${e.name} (${CAT[EFFECT_MAP.get(e.kind)?.category ?? 'intensity']})`).join(', ')} {running.length > 1 ? 'are' : 'is'} running on these lights, on top of what you set here.</span>
+        <span>{running.map(fxSaid).join(', ')} {running.length > 1 ? 'are' : 'is'} running on these lights, on top of what you set here.</span>
         {#each running.filter((e) => app.liveFx.includes(e.id)) as e (e.id)}<button class="ghost" onclick={() => app.toggleEffect(e.id)} title="Stop {e.name}"><Icon name="stop" size={12} /></button>{/each}
       </div>
     {/if}

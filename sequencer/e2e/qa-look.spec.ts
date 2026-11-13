@@ -316,22 +316,30 @@ test.describe('the 2D plan on a laptop', () => {
 
 test.describe('help notes on a laptop', () => {
   test.use({ viewport: { width: 1366, height: 768 } });
-  test('every "?" note opens on the screen, the cues\' one low down too (upwards)', async ({ page }) => {
+  test('every "?" note opens on the screen and whole, the cues\' one low down too (upwards), the timeline\'s in its narrow panel', async ({ page }) => {
     await openConnected(page);
-    const qs = page.getByRole('button', { name: 'What is this?' });
-    const n = await qs.count();
-    expect(n).toBeGreaterThanOrEqual(4);
-    for (let i = 0; i < n; i++) {
-      await qs.nth(i).click();
-      const note = page.locator('.help .pop');
-      await expect(note).toBeVisible();
-      const r = (await note.boundingBox())!;
-      expect(r.y).toBeGreaterThanOrEqual(0);
-      expect(r.y + r.height).toBeLessThanOrEqual(768);
-      expect(r.x).toBeGreaterThanOrEqual(0);
-      expect(r.x + r.width).toBeLessThanOrEqual(1366);
-      await page.keyboard.press('Escape');
-      await expect(note).toBeHidden();
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
+    for (const view of ['Program', 'Timeline', 'Live', 'Console']) {
+      await page.locator('.top .modes').getByRole('tab', { name: view }).click();
+      const qs = page.locator('.help > button.q:visible');                 // (every "?", whatever it's called: "About the timeline")
+      const n = await qs.count();
+      expect(n).toBeGreaterThanOrEqual(view === 'Program' ? 4 : 1);
+      for (let i = 0; i < n; i++) {
+        await qs.nth(i).click();
+        const note = page.locator('.help .pop');
+        await expect(note).toBeVisible();
+        const r = (await note.boundingBox())!;
+        expect(r.y).toBeGreaterThanOrEqual(0);
+        expect(r.y + r.height).toBeLessThanOrEqual(768);
+        expect(r.x).toBeGreaterThanOrEqual(0);
+        expect(r.x + r.width).toBeLessThanOrEqual(1366);
+        // (not cut off by its panel: its right edge is what's there)
+        expect(await note.evaluate((p) => { const b = p.getBoundingClientRect(); return p.contains(document.elementFromPoint(b.right - 6, b.top + 12)); }), `${view} ?${i}`).toBe(true);
+        await page.keyboard.press('Escape');
+        await expect(note).toBeHidden();
+      }
     }
   });
 });
@@ -450,4 +458,15 @@ test.describe('Live page tabs on a laptop', () => {
     await page.getByRole('menuitem', { name: 'Move left' }).click();
     await expect(tabs.first()).toHaveText('Second');
   });
+});
+
+test('the programmer says which effects run on the selected lights, by what they work on (a pixel effect too, no "undefined")', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects.length)).toBeGreaterThan(2);
+  await page.evaluate(() => { const a = (window as any).__luxdmx, e = a.show.effects.find((x: any) => x.name === 'Bar twinkles'); a.toggleEffect(e.id); a.selected = [a.show.fixtures.find((f: any) => f.name === 'Bar 1').id]; });
+  const note = page.locator('.prog .fxnote');
+  await expect(note).toContainText('Bar twinkles (cells) is running on these lights');
+  await expect(note).not.toContainText('undefined');
 });
