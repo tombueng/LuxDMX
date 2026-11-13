@@ -1017,7 +1017,8 @@ Three more demos come with their own room on the 3D stage:
 ## Shows and files
 
 Shows are saved in the browser as you go (the show manager lists them, with a picture of the
-stage). To move a show to another computer or keep a backup, save it as a file: that's an open,
+stage). If the browser won't keep it (its storage full, or blocked), the top bar says **not saved**
+in red: save the show as a file then. To move a show to another computer or keep a backup, save it as a file: that's an open,
 documented JSON format, see [FORMAT.md](FORMAT.md). **Send to another device** (Shows, or the More
 menu on a tablet or phone) hands the file to the share sheet (Nearby Share, AirDrop, mail) where
 there is one, and downloads it where there isn't. On the other side, "Open a show file", or just

@@ -363,3 +363,26 @@ test('two tabs on one show: the out-of-date one says "changed in another tab" an
   await expect(b.locator('.top').getByRole('button', { name: 'changed in another tab' })).toBeVisible({ timeout: 5000 });
   await b.close();
 });
+
+// The browser keeps nothing (its storage full, or blocked): said in red, with the way out, not a
+// "saving…" that never ends while the work is lost on the next reload.
+test('a browser that keeps nothing says "not saved" and how to keep the show, and "saved" once it keeps it again', async ({ page }) => {
+  await fresh(page);
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__realTx = IDBDatabase.prototype.transaction; w.__realSet = Storage.prototype.setItem;
+    IDBDatabase.prototype.transaction = function (this: IDBDatabase, s: any, m?: any) { if (m === 'readwrite') throw new DOMException('full', 'QuotaExceededError'); return w.__realTx.call(this, s, m); } as any;
+    Storage.prototype.setItem = function () { throw new DOMException('full', 'QuotaExceededError'); };
+  });
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  const saved = page.locator('.top .saved');
+  await expect(saved).toHaveText('not saved', { timeout: 5000 });
+  await expect(page.locator('.toast')).toContainText("isn't keeping the show");
+  await expect(page.locator('.toast')).toContainText('Save as file');
+  // room again: the next change is kept, and it says so
+  await page.evaluate(() => { const w = window as any; IDBDatabase.prototype.transaction = w.__realTx; Storage.prototype.setItem = w.__realSet; });
+  await patch(page, 'gen-dimmer', 1, 0, 'E');
+  await expect(saved).toHaveText('saved', { timeout: 5000 });
+  await page.reload();
+  await expect(fixturesOnStage(page)).toHaveCount(3);
+});

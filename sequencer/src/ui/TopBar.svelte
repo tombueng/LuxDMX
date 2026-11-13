@@ -114,7 +114,7 @@
   {:else}
   <button class="show" onclick={() => (ui.modal = 'shows')} title="Your shows: open, new, duplicate, templates">
     <Icon name="folder" /><span class="name">{app.show.meta.name || 'Untitled'}</span>
-    <span class="saved" class:dirty={!app.saved} title={app.saved ? 'Saved in this browser' : 'Saving…'}>{app.saved ? 'saved' : '…'}</span>
+    <span class="saved" class:dirty={!app.saved} class:failed={app.saveFailed} title={app.saveFailed ? "This browser isn't keeping the show (its storage is full or blocked): save it as a file" : app.saved ? 'Saved in this browser' : 'Saving…'}>{app.saveFailed ? 'not saved' : app.saved ? 'saved' : '…'}</span>
   </button>
 
   <!-- (the other tab's save is newer: a tap takes its version; a change here would save over it) -->
@@ -200,6 +200,7 @@
   .lockedname .name { color: var(--text); }
   /* (as wide saving as saved: the bar doesn't jump every time the show is saved) */
   .saved { font-size: .76rem; color: var(--green); display: inline-block; min-width: 2.7em; text-align: left; } .saved.dirty { color: var(--muted); }
+  .saved.failed { color: var(--pink); font-weight: 600; display: inline-block; }   /* (on a phone too) */
   .modes { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
   .modes button { border: 0; background: none; border-radius: 999px; padding: .3rem .85rem; color: var(--muted); }
   .modes button.cur { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }

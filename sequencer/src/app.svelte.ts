@@ -846,20 +846,32 @@ class App {
     const n = ++this.writes;
     this.saved = false;
     const text = serializeShow(JSON.parse(json), false);
-    this.setLocal(text);
+    const local = this.setLocal(text);
     try {
       await writeShow(this.metaOf(), text);
-      if (n === this.writes) this.saved = true;          // an older write finishing late doesn't count
+      if (n === this.writes) { this.saved = true; this.saveFailed = false; }    // an older write finishing late doesn't count
       this.otherNewer = false;                           // (this one's is the newer now; the other tab hears so)
       this.channel?.postMessage({ saved: this.showId, tab: this.tabId, sum: textSum(json) });
       this.refreshShows();
-    } catch { /* IndexedDB unavailable (private mode): the localStorage copy still holds the open show */ }
+    } catch {
+      // IndexedDB unavailable (private mode): the localStorage copy still holds the open show. Neither
+      // (the browser's storage full or blocked): nothing is kept, and that's said, not a "saving…"
+      // that never ends: a show file is the way out.
+      if (n !== this.writes) return;
+      this.saved = local; this.saveFailed = !local;
+      if (!local && !this.saidSaveFailed) {
+        this.saidSaveFailed = true;
+        ui.toast("This browser isn't keeping the show (its storage is full or blocked). Save it as a file: Shows, Save as file.", 12000);
+      }
+    }
   }
+  saveFailed = $state(false);
+  private saidSaveFailed = false;
   // The quick copy, labelled with its show. If it doesn't fit, there's no copy at all rather than an
   // old one (IndexedDB has the show either way).
   private setLocal(text: string) {
-    try { localStorage.setItem(KEY_ID, this.showId); localStorage.setItem(KEY, text); }
-    catch { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY_ID); } catch { /* blocked */ } }
+    try { localStorage.setItem(KEY_ID, this.showId); localStorage.setItem(KEY, text); return true; }
+    catch { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY_ID); } catch { /* blocked */ } return false; }
   }
   private metaOf(show = this.show, id = this.showId): ShowMeta {
     return {
