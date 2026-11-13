@@ -555,3 +555,26 @@ test('two boxes, one gone: the bar names its universes and the box by its addres
     await expect(bar).not.toContainText("The lights aren't getting anything");
   } finally { try { process.kill(-box2.pid!); } catch { /* gone */ } }
 });
+
+// Playing the show isn't editing it: GO, Space and a Live button don't book a compare of the whole
+// show afterwards (on the big demo a tenth of a second after every GO); a click that may edit does.
+test('GO, Space and Live buttons book no save; a click that may edit does', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selectAll(); for (const v of [0.3, 0.7]) { a.set({ intensity: v }); a.record(); } a.programmer = {}; a.selected = []; });
+  await page.waitForTimeout(600);
+  const pending = () => page.evaluate(() => (window as any).__luxdmx.savePending as boolean);
+  expect(await pending()).toBe(false);
+  await page.locator('.deck').getByRole('button', { name: /^GO/ }).click();
+  expect(await pending()).toBe(false);
+  await page.locator('body').press('Space');
+  expect(await pending()).toBe(false);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  await page.waitForTimeout(600);
+  await page.locator('.live .tile').filter({ hasText: 'Cue 1' }).first().click();
+  expect(await pending()).toBe(false);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  await page.waitForTimeout(600);
+  await page.locator('.fl li.oitem').first().click();
+  expect(await pending()).toBe(true);                                         // (a click that may change something)
+});

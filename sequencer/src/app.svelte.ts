@@ -391,8 +391,16 @@ class App {
     // saved, and becomes an undo step. Code that changes the show on its own calls markDirty().
     // (only the save is booked: it compares, and hands a changed show to the output thread as text.
     // Telling the thread here would turn the whole show into text on every click, GO included.)
+    // (not for what only plays the show: GO, Blackout, a Live button, Space. Each booked a compare of
+    // the whole show a moment later, a tenth of a second on the big demo after every GO)
+    const plays = (e: Event) => {
+      const t = e.target as Element | null;
+      if (!t?.closest) return false;
+      if (t.closest('[data-plays], button.go, button.bo, button.tile:not(.editing)')) return true;
+      return e.type === 'keyup' && (e as KeyboardEvent).code === 'Space' && !t.closest('input, textarea, select, [contenteditable]');
+    };
     for (const ev of ['input', 'change', 'pointerup', 'keyup', 'drop'])
-      window.addEventListener(ev, () => this.markDirty(350, false), { capture: true, passive: true });
+      window.addEventListener(ev, (e) => { if (!plays(e)) this.markDirty(350, false); }, { capture: true, passive: true });
     // Closing the tab: save what's pending (the localStorage part is immediate). No "leave the
     // page?" question: a reload picks the show up where it was, the box holds the look meanwhile,
     // and fog goes to 0 first (fogSafe).
