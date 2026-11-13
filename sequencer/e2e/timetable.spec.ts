@@ -165,3 +165,25 @@ test('a party tonight: right-click the next-up chip, skip tonight; nothing plays
   await page.locator('.ctx').getByRole('menuitem', { name: 'Play the timetable again now' }).click();
   await expect(dlg.getByRole('status').filter({ hasText: 'Paused until' })).toHaveCount(0);
 });
+
+test.describe('the timetable on a tablet held upright', () => {
+  test.use({ viewport: { width: 768, height: 1024 }, hasTouch: true });
+  test('all seven days are there to tap, Sunday too', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Church' }).click();   // (its looks' long names)
+    await expect(page.locator('.top .show .name')).toHaveText('Sunday service');
+    await page.locator('.top').getByRole('button', { name: 'More' }).click();
+    await page.getByRole('menuitem', { name: /Timetable/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Timetable' });
+    await dlg.getByRole('button', { name: 'Add a time' }).click();
+    const days = dlg.locator('.days').first().locator('.day');
+    await expect(days).toHaveCount(7);
+    for (let i = 0; i < 7; i++) await expect(days.nth(i)).toBeInViewport({ ratio: 1 });
+    const box = (await dlg.locator('.days').first().boundingBox())!;
+    const su = (await days.nth(6).boundingBox())!;
+    expect(su.x + su.width).toBeLessThanOrEqual(box.x + box.width + 1);       // (not clipped by its box)
+    await days.nth(6).click();
+    await expect(days.nth(6)).toHaveClass(/on/);
+  });
+});

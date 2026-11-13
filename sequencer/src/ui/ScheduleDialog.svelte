@@ -262,4 +262,15 @@
     .x { grid-row: 1; grid-column: 2; }
   }
   .ent:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  /* (a dialog too narrow for one line per time, a tablet held upright: the days got squeezed to
+     Mo and Tu, Sunday out of reach. By the dialog's width: the days on a line of their own, then
+     the choices; time and × on top) */
+  .rows { container-type: inline-size; }
+  @container (max-width: 52rem) {
+    .ent { grid-template-columns: 1fr auto; }
+    .days { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, 1fr); }
+    .day { min-width: 0; }
+    .ent select { grid-column: 1 / -1; width: 100%; }
+    .x { grid-row: 1; grid-column: 2; }
+  }
 </style>
