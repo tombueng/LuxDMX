@@ -123,9 +123,13 @@
     if (drag && dropAt) app.moveFixtures(drag, dropAt.index + (dropAt.after ? 1 : 0));
     drag = null; dropAt = null;
   }
+  // A short panel (a laptop with the interface at 120 % or more: the cues take the bottom half)
+  // keeps its rows: the hint goes (it's in the panel's "?" too), or there was no light left to see.
+  let flH = $state(0);
+  const short = $derived(flH > 0 && flH < 14 * ui.zoom * 26);
 </script>
 
-<div class="panel fl" data-marks="show">
+<div class="panel fl" data-marks="show" bind:clientHeight={flH}>
   <div class="row head">
     <h2>Fixtures</h2>
     <span class="chip">{app.show.fixtures.length}</span>
@@ -136,7 +140,7 @@
     </Help>
     <button class="primary" onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add</button>
   </div>
-  {#if app.show.fixtures.length}<Hint>Your lights: select them here or on the stage, then set them in the programmer.</Hint>{/if}
+  {#if app.show.fixtures.length && !short}<Hint>Your lights: select them here or on the stage, then set them in the programmer.</Hint>{/if}
 
   <!-- Always there (buttons greyed out without a selection), so the list never jumps under the mouse. -->
   {#if app.show.fixtures.length}

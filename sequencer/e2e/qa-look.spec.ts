@@ -638,3 +638,21 @@ test('Find anything goes to every view by name, finds "add light" and "group"', 
   await page.keyboard.press('Enter');
   await expect(page.locator('.top .modes').getByRole('tab', { name: 'Timeline' })).toHaveAttribute('aria-selected', 'true');
 });
+
+test('a laptop at 140 % interface size: the fixture list still shows lights, the show keeps its name', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 24, 0, 'Front');                       // (over 12: the list has its filter too)
+  await page.evaluate(async () => { const m = await import('/src/ui/ui.svelte.ts'); m.ui.help = true; m.ui.setZoom(1.4); });
+  await page.waitForTimeout(400);
+  const list = page.locator('.fl');
+  // at least one light's row whole in view inside the panel
+  expect(await list.evaluate((fl) => {
+    const ol = fl.querySelector('.olist')!; ol.scrollTop = 0;
+    const p = ol.getBoundingClientRect();         // (the list's own window: rows it clips don't count)
+    return [...fl.querySelectorAll('li.oitem')].filter((r) => { const b = r.getBoundingClientRect(); return b.height > 20 && b.top >= p.top && b.bottom <= p.bottom; }).length;
+  })).toBeGreaterThan(0);
+  // the name: more than a letter
+  const name = page.locator('.top .show .name');
+  expect(await name.evaluate((n) => n.getBoundingClientRect().width)).toBeGreaterThan(60);
+});

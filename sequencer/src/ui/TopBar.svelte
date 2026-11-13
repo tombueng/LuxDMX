@@ -262,7 +262,8 @@
     .gm input { width: 64px; }
     .brand, .gm .lab, .gm b { display: none; }          /* (the slider shows the master; its title says it) */
     .music:not(.on) { display: none; }                   /* (in the ⋯ menu; shown while it listens) */
-    .show { max-width: 110px; }
+    .show { max-width: 10rem; }
+    .saved:not(.failed) { display: none; }               /* (the name gets the room: it was "O" at 140 %; the show's menu says it) */
     .toolbar :global(button[aria-label="Explanations"]), .toolbar :global(button[aria-label="Find anything"]) { display: none; }
     .top { gap: .45rem; }
   }
