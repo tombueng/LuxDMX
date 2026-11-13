@@ -177,6 +177,7 @@ test.describe('the timetable on a tablet held upright', () => {
     await page.getByRole('menuitem', { name: /Timetable/ }).click();
     const dlg = page.getByRole('dialog', { name: 'Timetable' });
     await dlg.getByRole('button', { name: 'Add a time' }).click();
+    await expect(dlg.getByText('It runs in this tab: keep the tablet or laptop on and this page open.')).toBeVisible();
     const days = dlg.locator('.days').first().locator('.day');
     await expect(days).toHaveCount(7);
     for (let i = 0; i < 7; i++) await expect(days.nth(i)).toBeInViewport({ ratio: 1 });

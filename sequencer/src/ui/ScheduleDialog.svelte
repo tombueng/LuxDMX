@@ -157,6 +157,8 @@
     <div class="head">
       {#if next}<p class="next" role="status"><Icon name="clock" /> Next: <b>{whenShort(next.when)}</b> · {actionShort(app.show, next.entry.do)} <span class="faint">({inWords(next.when, now)})</span></p>
       {:else}<p class="faint">Looks by the clock: the opening look at 17:00, the evening one at 21:00, everything off at closing.</p>{/if}
+      <!-- (said here, not only in the help: it's what makes it work on the day) -->
+      {#if entries.length}<p class="faint small keepon">It runs in this tab: keep the tablet or laptop on and this page open.</p>{/if}
       {#if !ro && entries.length}<button class="ghost" onclick={(e) => ui.openMenu(e, pauseItems())} aria-haspopup="menu"><Icon name={off || pausedTill ? 'play' : 'stop'} />{off ? 'Off' : pausedTill ? 'Paused' : 'Pause'}</button>{/if}
       <Help label="About the timetable">
         <p>It runs while this page is open: keep the tablet or laptop on and the tab open. Switched on again later, it plays what came while it was off, at once.</p>
@@ -273,4 +275,5 @@
     .ent select { grid-column: 1 / -1; width: 100%; }
     .x { grid-row: 1; grid-column: 2; }
   }
+  .keepon { margin: 0; font-size: .82rem; }
 </style>
