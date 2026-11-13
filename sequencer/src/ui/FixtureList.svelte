@@ -9,7 +9,7 @@
   import { app, type CellMaps } from '../app.svelte';
   import { spansOf } from '../model/pixelLayout';
   import { KIND_LABEL, typeLabel } from '../model/library';
-  import { RISK_HINT, RISK_LABEL, riskOf } from '../model/safety';
+  import { RISK_HINT, RISK_LABEL, riskOf, RISK_SHORT } from '../model/safety';
   import { levelOf, lookColor } from '../engine/cuelook';
   import { ui, listKeys, navKeys, gripDrag, menuKey } from './ui.svelte';
   import { fixtureActions, fixtureMenu } from './actions';
@@ -191,7 +191,9 @@
             <span class="nm">{f.name}</span>
             <span class="faint">{t ? typeLabel(t) : f.typeId}{t && t.modes.length > 1 ? ` · ${f.mode}` : ''}{groupsOf[f.id] ? ` · ${groupsOf[f.id]}` : ''}</span>
           </span>
-          {#if risk !== 'light'}<span class="chip risk {risk}" title="{RISK_LABEL[risk]}: {RISK_HINT[risk]}{(risk === 'once' || risk === 'hazard') ? (app.sfxArmed ? ' Armed right now.' : ' Safe right now (not armed).') : ''}">{RISK_LABEL[risk]}{#if risk === 'once' || risk === 'hazard'} · {app.sfxArmed ? 'armed' : 'safe'}{/if}</span>{/if}
+          <!-- (short on the row, so the light's name keeps its room; the whole of it in the title) -->
+          <!-- (armed or safe is its colour here: the top bar says it in words) -->
+          {#if risk !== 'light'}<span class="chip risk {risk}" class:armed={app.sfxArmed && (risk === 'once' || risk === 'hazard')} aria-label="{RISK_LABEL[risk]}{(risk === 'once' || risk === 'hazard') ? (app.sfxArmed ? ', armed' : ', safe') : ''}" title="{RISK_LABEL[risk]}: {RISK_HINT[risk]}{(risk === 'once' || risk === 'hazard') ? (app.sfxArmed ? ' Armed right now.' : ' Safe right now (not armed).') : ''}">{RISK_SHORT[risk]}</span>{/if}
           <span class="chip addr" title={clash.has(f.id) ? 'Overlaps another fixture!' : `Universe ${f.universe}, DMX ${f.address} to ${f.address + width(f.id) - 1}`}>{oneUni ? f.address : `U${f.universe} · ${f.address}`}</span>
           <span class="lvl" title="Intensity right now"><span style="height:{Math.round(levelOf(l) * 100)}%"></span></span>
         </li>
@@ -248,5 +250,6 @@
   .risk.atmosphere { color: #9fb4c8; }
   .risk.once { color: #e8c44a; border-color: #e8c44a55; }
   .risk.hazard { color: #ff8a5c; border-color: #ff7a1c88; font-weight: 650; }
+  .risk.armed { color: #fff; background: #7a1d0c; border-color: #ff7a1c; }
   .num { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8rem; min-width: 1.6em; text-align: right; flex: none; }
 </style>

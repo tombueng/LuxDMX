@@ -150,9 +150,10 @@ Three more demos come with their own room on the 3D stage:
   over RDM that no library knows comes in with every channel waiting for Arm, until you tell its
   channels apart. On the box, set the output these machines are on to blackout on signal loss: a
   laptop that crashes mid-shot then can't leave one on. The
-  2D and 3D stage still show what they'd do. Fixture rows say what each machine is: fog,
-  haze or bubbles (repeatable, fog can set off smoke detectors), fires once (confetti, "· safe" or
-  "· armed"), dangerous (flames, sparks, CO2). Cues, live buttons, phone buttons and timeline
+  2D and 3D stage still show what they'd do. Fixture rows say what each machine is, short so the
+  name keeps its room (the whole of it on hover): "fog" for fog, haze or bubbles (repeatable, fog
+  can set off smoke detectors), "1×" for what fires once (confetti), "⚠" for the dangerous ones (flames, sparks, CO2),
+  filled red while the machines are armed. Cues, live buttons, phone buttons and timeline
   items that fire one carry a mark (⚠, or 1× for confetti).
 - **Winches (kinetics).** A winch's height (how far down its load is) moves only while the machines
   are armed, like a flame. Made safe (one click on ARMED, Blind, another show, closing the page, a

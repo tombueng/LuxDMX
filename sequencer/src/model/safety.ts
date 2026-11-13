@@ -104,6 +104,8 @@ export const RISK_LABEL: Record<Risk, string> = {
   once: 'Fires once',
   hazard: 'Dangerous',
 };
+// (on a fixture's row, next to its name: short, the name keeps its room)
+export const RISK_SHORT: Record<Risk, string> = { light: '', atmosphere: 'fog', once: '1×', hazard: '⚠' };
 export const RISK_HINT: Record<Risk, string> = {
   light: 'Safe to try as often as you like.',
   atmosphere: 'Repeatable. Fog can set off smoke detectors and uses fluid.',

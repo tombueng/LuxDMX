@@ -133,3 +133,19 @@ test('Mounting: angles show rounded; a beam angle typed into a filled field repl
   await narrow.click(); await wide.click(); await page.keyboard.type('4010'); await wide.press('Tab');
   await expect(wide).not.toHaveValue('4010');
 });
+
+test.describe('machines in the fixture list on a laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('their names keep their room: a short mark (⚠, 1×, fog), safe or armed in its label and colour', async ({ page }) => {
+    await openConnected(page);
+    await patch(page, 'gen-flame', 1, 0, 'Flame');
+    await patch(page, 'gen-confetti', 1, 0, 'Confetti');
+    await patch(page, 'gen-fog', 1, 0, 'Fog');
+    for (const [name, mark] of [['Flame', '⚠'], ['Confetti', '1×'], ['Fog', 'fog']] as const) {
+      const row = page.locator(`.fl li[data-fixture="${name}"]`);
+      await expect(row.locator('.risk')).toHaveText(mark);
+      expect(await row.locator('.nm').evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+    }
+    await expect(page.locator('.fl li[data-fixture="Flame"] .risk')).toHaveAttribute('aria-label', /safe$/);
+  });
+});
