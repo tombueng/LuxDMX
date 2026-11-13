@@ -104,3 +104,17 @@ test('colours from a picture: presets, and a colour fade in them on the selected
   await tile(page, 'poster 2').click();
   await expect.poll(async () => { const [r, g, b] = await channels(0, 3); return r < 30 && g < 40 && b === 255; }, { timeout: 4000 }).toBe(true);
 });
+
+test('the Beam presets are tiles like the others: their names inside them, nothing on top of them', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await tab(page, 'Presets');
+  const tiles = page.locator('.pp .tile.beam');
+  expect(await tiles.count()).toBeGreaterThan(0);
+  const colour = (await page.locator('.pp .tile.color').first().boundingBox())!;
+  for (const t of await tiles.all()) {
+    const b = (await t.boundingBox())!;
+    expect(Math.abs(b.height - colour.height)).toBeLessThan(2);                     // (it was 30 px, its name spilling out)
+    expect(await t.locator('.name').evaluate((n) => { const r = n.getBoundingClientRect(), p = n.parentElement!.getBoundingClientRect(); return r.bottom <= p.bottom + 1; })).toBe(true);
+  }
+});

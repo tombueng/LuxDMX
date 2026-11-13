@@ -60,7 +60,9 @@
   .map { width: 46px; height: 30px; }
   .lvl { width: 46px; height: 12px; margin: 9px 0; border-radius: 3px; background: var(--line); overflow: hidden; display: block; }
   .lvl span { display: block; height: 100%; background: linear-gradient(90deg, #ffaa1c88, var(--orange)); }
-  .beam { height: 30px; display: grid; place-items: center; font-size: 1rem; color: var(--muted); }
+  /* (the glyph only: the tile itself has the class 'beam' too, and got squeezed to 30 px with its
+     name spilling out over the next row) */
+  .tile > .beam { height: 30px; display: grid; place-items: center; font-size: 1rem; color: var(--muted); }
   .name { text-align: center; color: var(--text); overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   input { width: 100%; font-size: .76rem; padding: .05rem; }
   .uses { position: absolute; top: 2px; right: 3px; font-size: .76rem; color: var(--faint); }
