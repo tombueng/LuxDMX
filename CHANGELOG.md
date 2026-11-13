@@ -44,6 +44,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - On the beat: the BPM field takes only real tempos (typing 90 went through 9 BPM), Tap puts the
   beat where you tap, cues that go on after N beats don't drift any more, and the stage, Auto GO
   and the effects on the wire stay on the same beat after the page was busy for a moment.
+- In a German browser: the cue sheet CSV opens in German Excel (';', 2,5, umlauts), decimals with a
+  comma work everywhere, AltGr+Q gives @ on the console, file names keep their umlauts.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
 
