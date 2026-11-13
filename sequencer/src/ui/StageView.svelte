@@ -562,7 +562,8 @@
     {#if app.show.fixtures.length === 0}
       <div class="empty" class:compact class:low={ui.stage3d}>
         <span>Nothing on stage yet.</span>
-        <button class="primary" onclick={() => (ui.modal = 'welcome')}><Icon name="play" />Get started</button>
+        <button class="primary" onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add lights</button>
+        <button class="ghost tplbtn" onclick={() => (ui.modal = 'welcome')}>or start from a template</button>
       </div>
     {/if}
   </div>
@@ -602,6 +603,7 @@
   .flash { animation: flash .2s steps(2, jump-none) infinite; }
   @keyframes flash { 50% { opacity: 0; } }
   /* over the 3D stage too (it sits at z-index 3) */
+  .tplbtn { font-size: .85rem; color: var(--muted); padding: .2rem .45rem; }
   .empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; justify-content: center;
     background: #0f141bee; border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem 1rem; box-shadow: var(--shadow); color: var(--muted); max-width: 90%; }
   .empty.compact { padding: .4rem .6rem; font-size: .85rem; gap: .5rem; }

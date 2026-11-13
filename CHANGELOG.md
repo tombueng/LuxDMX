@@ -67,6 +67,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   welcome): 22 live tiles, gobos turning, prisms, heads in a fan, pixel bars, discs, winches,
   flames, sparks, confetti, CO2, fog with a light through it. The README has them as animations,
   made by the app itself (`tools/gallery/capture.mjs`).
+- One place to start a show: **New show…** in Shows opens the start dialog (Shows lost its own
+  template list); its **Empty stage** is a new show; an empty show has one **Add lights** on the
+  stage instead of four buttons in four places.
 - The welcome is two rows of tiles: the demo shows (each with its own music menu, and they fold away
   for good once you don't need them), and the everyday starts (empty, the templates, a show file).
   Every demo and template also comes as **Lights only**: the rig placed, nothing programmed.

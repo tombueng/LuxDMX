@@ -2,7 +2,7 @@
 // flash button per light and per group, encoders for what the selection has, playback faders with
 // GO, Flash and Release, the grand master, the keyboard. Measured on the wire (the fake box).
 import type { Page } from '@playwright/test';
-import { channels, cues, openConnected, patch, resetFake, test, expect } from './helpers';
+import { channels, cues, openConnected, patch, resetFake, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -402,7 +402,7 @@ test.describe('the console on a laptop', () => {
   test('the cue lists\' strips: short machine marks, the name clear of the fader cap, GO in view', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await startTemplate(page, 'Band');
     await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.cueLists.length)).toBeGreaterThan(4);
     await page.getByRole('tab', { name: 'Console' }).click();
     const strips = view(page).locator('.playbacks .strip');

@@ -4,7 +4,7 @@
 // a phone that goes quiet, leaves, or has its page redrawn under the finger lets go of what it held.
 import type { Browser, Page } from '@playwright/test';
 import WebSocket from 'ws';
-import { lockPage, FAKE, openConnected, resetFake, channels, fresh, test, expect } from './helpers';
+import { lockPage, FAKE, openConnected, resetFake, channels, fresh, test, expect, startTemplate } from './helpers';
 
 const tile = (page: Page, text: string) => page.locator('.live .tile', { hasText: text }).first();
 const phoneTile = (phone: Page, text: string) => phone.locator('#grid .tile', { hasText: text }).first();
@@ -13,7 +13,7 @@ const appState = <T>(page: Page, f: (a: any) => T) => page.evaluate((src) => (0,
 async function laptopWithRemote(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Phone as a remote' }).click();
   const dlg = page.getByRole('dialog', { name: 'Phone as a remote' });

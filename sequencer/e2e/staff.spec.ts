@@ -1,14 +1,14 @@
 // A bar's tablet (the bar persona): a lock staff can't get out of without the PIN, Blackout that
 // takes holding, the lights-not-connected bar, and a fresh start that doesn't black out the room.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, frames, channels, showBoxes, test, expect } from './helpers';
+import { openConnected, resetFake, frames, channels, showBoxes, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
 async function bar(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
 }
 
@@ -85,7 +85,7 @@ test('when the lights stop getting anything a red bar says so, and Reconnect bri
 test('a fresh start sends nothing until something plays: the box keeps the look it had', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.waitForTimeout(1500);
   expect(Object.keys(await frames())).toEqual([]);                  // lights patched, nothing played: no frames
   await page.keyboard.press('Space');                                // the first GO: now it sends

@@ -1,7 +1,7 @@
 // MIDI controllers on the live page, with a fake Web MIDI input (the browser's own MIDI layer can't
 // be driven from a test): learn a pad for a scene and a knob for the grand master, then play.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, test, expect } from './helpers';
+import { openConnected, resetFake, channels, test, expect, startTemplate } from './helpers';
 
 const send = (page: Page, bytes: number[]) => page.evaluate((b) => (window as any).__midiIn.onmidimessage({ data: new Uint8Array(b) }), bytes);
 
@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 test('learn a pad and a knob, then play with them', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Cinema' }).click();
+  await startTemplate(page, 'Cinema');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
   const ed = page.getByRole('complementary', { name: 'Control settings' });
@@ -50,7 +50,7 @@ test('learn a pad and a knob, then play with them', async ({ page }) => {
 test('a pad held while its button is removed still lets go', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
   await page.locator('.live [data-widget^="flash-"]').first().click();                 // flash the PARs
@@ -72,7 +72,7 @@ test('a pad held while its button is removed still lets go', async ({ page }) =>
 test('unplugging the controller while a pad is held lets go of it', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
   const ed = page.getByRole('complementary', { name: 'Control settings' });

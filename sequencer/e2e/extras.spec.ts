@@ -1,5 +1,5 @@
 // Small things that make it nicer: the demo, Highlight, group names on fixture rows.
-import { openConnected, resetFake, patch, channels, selectFixtures, tab, test, expect, full, selectAll, selectNone, go, demo } from './helpers';
+import { openConnected, resetFake, patch, channels, selectFixtures, tab, test, expect, full, selectAll, selectNone, go, demo, startTemplate, newBlankShow } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -34,7 +34,7 @@ test('Highlight puts the selected lights at full white, not into cues', async ({
 test('fixture rows say which groups a light is in', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await tab(page, 'Fixtures');
   await expect(page.locator('.fl li[data-fixture="Front 1"]')).toContainText('Front');
   await expect(page.locator('.fl li[data-fixture="Mover 2"]')).toContainText('Movers');
@@ -43,7 +43,7 @@ test('fixture rows say which groups a light is in', async ({ page }) => {
 test('a cue sheet to print, and as CSV', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.top').getByRole('button', { name: 'More' }).click();
   const [sheet] = await Promise.all([page.waitForEvent('popup'), page.locator('.ctx').getByRole('menuitem', { name: 'Print a cue sheet' }).click()]);
   await expect(sheet.locator('h1')).toHaveText('Opening night');
@@ -107,9 +107,8 @@ test('a fixture type made in one show is there in the next one (My fixtures)', a
   await page.getByRole('button', { name: 'Save type' }).click();
   await add.getByRole('button', { name: /^Add \d+ × / }).click();
   // a new, empty show: the type is offered under My fixtures
-  await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'New blank show' }).click();
-  await page.getByRole('button', { name: 'Add your first lights' }).click();
+  await newBlankShow(page);
+  await page.locator('.stage-wrap').getByRole('button', { name: 'Add lights' }).click();
   await expect(add.locator('.mine .tcard', { hasText: 'Garage PAR' })).toHaveCount(1);
   await add.locator('.mine .tcard', { hasText: 'Garage PAR' }).click();
   await add.getByLabel('How many').fill('1');
@@ -126,7 +125,7 @@ test('a fixture type made in one show is there in the next one (My fixtures)', a
 test('a big rig gets a filter on the fixture list', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await tab(page, 'Fixtures');
   const all = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length as number);
   const filter = page.getByLabel('Filter fixtures');
@@ -187,7 +186,7 @@ test('the DMX output monitor: what goes out on each channel, and whose it is', a
 test('nothing selected: the programmer offers the groups and shows what is playing', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await selectNone(page);
   const prog = page.locator('.prog');
   await prog.locator('.quick').getByRole('button', { name: 'Movers' }).click();
@@ -203,7 +202,7 @@ test('nothing selected: the programmer offers the groups and shows what is playi
 test('the patch on paper, and the DIP switches for an address', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top').getByRole('button', { name: 'More' }).click();
   const [sheet] = await Promise.all([page.waitForEvent('popup'), page.locator('.ctx').getByRole('menuitem', { name: /Print the patch/ }).click()]);
   await expect(sheet.locator('h2')).toHaveText(['Universe 0']);

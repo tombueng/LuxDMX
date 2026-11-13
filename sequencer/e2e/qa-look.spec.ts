@@ -2,7 +2,7 @@
 // when adding fixtures, effects that suit the selection first, no on-state that hides its own text,
 // a plan that stays whole on a phone.
 import type { Page } from '@playwright/test';
-import { FAKE, fresh, openConnected, patch, resetFake, selectAll, tab, test, expect } from './helpers';
+import { FAKE, fresh, openConnected, patch, resetFake, selectAll, tab, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -54,7 +54,7 @@ test.describe('a phone', () => {
   test('the plan stays whole: lights at the edges of the stage are inside its frame', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await startTemplate(page, 'Band');
     const svg = page.locator('svg[role=application]').first();
     await expect(svg.locator('g[role=button]').first()).toBeVisible();
     const out = await svg.evaluate((s) => {
@@ -71,7 +71,7 @@ test.describe('a laptop (1366 x 768)', () => {
   test('the stage gets the room: the cues take a smaller share and still show a whole row of cards', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await startTemplate(page, 'Band');
     await page.locator('[role=tab][aria-label=Program]').click();
     const stage = await page.locator('.stage-wrap').boundingBox(), deck = await page.locator('.prog.desktop .foot').boundingBox();
     expect(stage!.height).toBeGreaterThan(400);
@@ -203,7 +203,7 @@ test('a start address that runs past 512 is said in the preview, with where they
 test('four heads added to the full Band stage land clear of the lights there and of each other', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
   const before = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.map((f: { id: string }) => f.id));
   await tab(page, 'Fixtures');
@@ -266,7 +266,7 @@ test.describe('the 2D plan on a laptop', () => {
   test('every name shown stays inside the plan (the back row\'s too), and the toolbar keeps one row', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await startTemplate(page, 'Band');
     await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
     const stage = page.locator('.stage-wrap');
     if (await stage.getByRole('button', { name: '2D', exact: true }).isVisible()) await stage.getByRole('button', { name: '2D', exact: true }).click();
@@ -319,7 +319,7 @@ test.describe('help notes on a laptop', () => {
   test('every "?" note opens on the screen and whole, the cues\' one low down too (upwards), the timeline\'s in its narrow panel', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await startTemplate(page, 'Band');
     await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
     for (const view of ['Program', 'Timeline', 'Live', 'Console']) {
       await page.locator('.top .modes').getByRole('tab', { name: view }).click();
@@ -359,7 +359,7 @@ test.describe('the 2D plan on a phone', () => {
 test('every chip on the timeline\'s palette says what it does on hover (effects and moments too)', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects.length)).toBeGreaterThan(2);
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   const chips = page.locator('.tlv .pal .chip');
@@ -373,7 +373,7 @@ test.describe('a crowded plan on a small laptop screen', () => {
   test('the DJ stage: the names go a size smaller so more of them fit, still none over another', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^DJ \/ Party$/ }) }).click();
+    await startTemplate(page, 'DJ / Party');
     await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(40);
     const stage = page.locator('.stage-wrap');
     const two = stage.getByRole('button', { name: '2D', exact: true });
@@ -394,7 +394,7 @@ test.describe('a crowded plan on a small laptop screen', () => {
 test('a note added to the cue on stage: its row in the Live cue list stays in view, name and all', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   const panel = page.getByRole('region', { name: /Cue list Show/ });
   await expect(panel.locator('li').first()).toBeVisible();
@@ -463,7 +463,7 @@ test.describe('Live page tabs on a laptop', () => {
 test('the programmer says which effects run on the selected lights, by what they work on (a pixel effect too, no "undefined")', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects.length)).toBeGreaterThan(2);
   await page.evaluate(() => { const a = (window as any).__luxdmx, e = a.show.effects.find((x: any) => x.name === 'Bar twinkles'); a.toggleEffect(e.id); a.selected = [a.show.fixtures.find((f: any) => f.name === 'Bar 1').id]; });
   const note = page.locator('.prog .fxnote');
@@ -474,7 +474,7 @@ test('the programmer says which effects run on the selected lights, by what they
 test('the effect editor: the beats choice shows what it is, seconds and blocks keep to what they can be', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects.length)).toBeGreaterThan(2);
   await page.locator('.side').getByRole('tab', { name: 'Effects' }).click();
   await page.locator('.side .ep li', { hasText: 'Back wave' }).first().click();
@@ -608,7 +608,8 @@ test.describe('selecting several on a tablet', () => {
 test('an empty show says what to do next, the same way everywhere, with a button where the next step is elsewhere', async ({ page }) => {
   await openConnected(page);
   await expect(page.locator('.deck')).toContainText('No cues yet');
-  await expect(page.locator('.prog').getByRole('button', { name: 'Add lights' })).toBeVisible();          // (the programmer)
+  await expect(page.locator('.prog').first()).toContainText('Lights you select are set here');      // (the programmer says it; the stage has the one Add lights)
+  await expect(page.locator('.stage-wrap').getByRole('button', { name: 'Add lights' })).toBeVisible();
   // Groups: lights first; Live: where its buttons come from
   await page.locator('.side .tabs').getByRole('tab', { name: 'Groups' }).click();
   await expect(page.locator('.gp')).toContainText('No lights yet: add them first');

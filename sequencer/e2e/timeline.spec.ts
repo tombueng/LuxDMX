@@ -5,7 +5,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, history, patch, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, patch, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -47,7 +47,7 @@ const cueOn = (page: Page) => page.evaluate(() => { const a = (window as any).__
 async function bar(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   await expect(page.locator('.tlv')).toBeVisible();
 }

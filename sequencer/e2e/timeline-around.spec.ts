@@ -6,7 +6,7 @@
 // starts (and the sound coming out of it with it), it loads chatter and cheering only (no applause,
 // no claps), its switch in the transport silences it, and its chips have no Clapping.
 import type { Page } from '@playwright/test';
-import { channels, demo, openConnected, resetFake, test, expect } from './helpers';
+import { channels, demo, openConnected, resetFake, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -15,7 +15,7 @@ const pos = (page: Page) => page.evaluate(() => (window as any).__luxdmx.timelin
 async function bar(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   await expect(page.locator('.tlv')).toBeVisible();
 }

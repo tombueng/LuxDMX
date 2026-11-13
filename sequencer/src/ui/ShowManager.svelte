@@ -6,7 +6,6 @@
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
   import { ui, focusSelect } from './ui.svelte';
-  import { ALL_TEMPLATES as TEMPLATES } from '../content/ringMatrix';
 
   let { onclose }: { onclose: () => void } = $props();
   let renaming = $state<string | null>(null);
@@ -23,8 +22,8 @@
     return new Date(iso).toLocaleDateString();
   };
   async function open(id: string) { if (id !== app.showId) await app.openShow(id); onclose(); }
-  async function fresh() { await app.newShow(); onclose(); }
-  async function template(i: number) { await app.startShow(TEMPLATES[i].build()); onclose(); ui.toast(`Started from "${TEMPLATES[i].name}"`); }
+  // a new show: the start dialog (empty, a template, a demo, a file): one place to start a show from
+  function fresh() { ui.welcomeNew = true; ui.modal = 'welcome'; }
   async function load() {
     const f = fileInput.files?.[0];
     fileInput.value = '';
@@ -49,25 +48,13 @@
 <Modal title="Shows" {onclose} wide>
   <p class="hint">Shows are saved in this browser automatically. Save one as a file to move it to another computer or keep a backup.</p>
   <div class="row new">
-    <button class="primary" onclick={fresh}><Icon name="plus" />New blank show</button>
+    <button class="primary" onclick={fresh}><Icon name="plus" />New show…</button>
     <button onclick={() => fileInput.click()} title="A LuxDMX show (.json) or a QLC+ workspace (.qxw)"><Icon name="upload" />Open a show file…</button>
-    <!-- (the demos again, any time: not only over an empty first show) -->
-    <button onclick={() => { ui.welcomeDemos = true; ui.modal = 'welcome'; }} title="The festival, the club, the house party, the test truss: played on the 3D stage, with a song"><Icon name="play" />Demo shows…</button>
     <button onclick={() => app.exportShow()}><Icon name="download" />Save as file</button>
     <button onclick={() => app.shareShow()} title="The share sheet where there is one (tablet, phone), the download otherwise"><Icon name="upload" />Send to another device</button>
     <button onclick={() => { const s = app.exportQxw(); if (s.length) ui.toast(`Saved for QLC+. Not included: ${s.join(', ')}`, 8000); }} title="A QLC+ workspace: fixtures, a scene per cue, a chaser per cue list, moves as EFX"><Icon name="download" />Save for QLC+ (.qxw)</button>
     <input type="file" accept=".json,application/json,.qxw" bind:this={fileInput} onchange={load} hidden />
     {#if err}<span class="err">{err}</span>{/if}
-  </div>
-
-  <h2>Start from a template</h2>
-  <div class="tpls">
-    {#each TEMPLATES as t, i (t.name)}
-      <button class="tpl" onclick={() => template(i)}>
-        <span class="ti"><Icon name={t.icon} size={22} /></span>
-        <b>{t.name}</b><span class="faint">{t.blurb}</span>
-      </button>
-    {/each}
   </div>
 
   <h2>In this browser</h2>
@@ -99,9 +86,6 @@
 <style>
   h2 { margin: 1rem 0 .5rem; }
   .new { margin: .4rem 0; }
-  .tpls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; }
-  .tpl { flex-direction: column; align-items: flex-start; text-align: left; white-space: normal; padding: .6rem; gap: .2rem; min-height: 92px; justify-content: flex-start; }
-  .ti { color: var(--accent); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .7rem; }
   .card { border: 1px solid var(--line); border-radius: var(--radius); padding: .45rem; background: var(--bg2); display: flex; flex-direction: column; gap: .25rem; }
   .card.cur { border-color: #45d85c88; }

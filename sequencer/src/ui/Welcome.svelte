@@ -41,6 +41,11 @@
   // (asked for the demos, from Shows or the command palette: shown, the choice kept as it was)
   let demosHidden = $state(get(FOLD_KEY) === 'hidden' && !ui.welcomeDemos);
   ui.welcomeDemos = false;
+  // (asked for a new show, from Shows: Empty stage is a new empty show; over an empty show, the
+  // first start or Get started, it only closes: the box connected stays)
+  const forNew = ui.welcomeNew;
+  ui.welcomeNew = false;
+  async function empty() { if (forNew) await app.newShow(); onclose(); }
   function fold() { demosHidden = !demosHidden; put(FOLD_KEY, demosHidden ? 'hidden' : 'shown'); }
 
   // each demo's music: a song of the catalog, or 'beat' (the demo beat, made here); its own song
@@ -176,7 +181,7 @@
         <div class="tile plain" style:--hue="var(--muted)">
           <div class="th"><span class="ic"><Icon name="plus" size={22} /></span><b>Empty stage</b></div>
           <p class="blurb">Nothing patched. Add your lights from the library ({narrow ? 'the Lights tab below' : tablet ? 'Fixtures, on the right' : 'on the left'}), then pick colours and record cues.</p>
-          <div class="acts"><button class="primary" onclick={close} data-autofocus={demosHidden ? '' : undefined}>Start with an empty stage</button></div>
+          <div class="acts"><button class="primary" onclick={empty} data-autofocus={demosHidden ? '' : undefined}>Start with an empty stage</button></div>
         </div>
         {#each TEMPLATES as t, i (t.name)}
           <div class="tile" role="group" aria-label={t.name} style:--hue={TPL_HUES[i % TPL_HUES.length]}>

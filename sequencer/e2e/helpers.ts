@@ -55,12 +55,29 @@ export async function fresh(page: Page, keepWelcome = false) {
   }
 }
 export const welcomeDialog = (page: Page) => page.getByRole('dialog', { name: "Let's get some light on stage" });
-// the welcome again, from the empty stage
+// the welcome again, from the empty stage ("or start from a template" there)
 export async function welcome(page: Page) {
-  await page.getByRole('button', { name: 'Get started' }).click();
+  await page.getByRole('button', { name: 'or start from a template' }).click();
   const w = welcomeDialog(page);
   await expect(w).toBeVisible();
   return w;
+}
+// A new show from a template: Shows' New show… (when Shows is open) and the welcome's tile
+export async function startTemplate(page: Page, name: string) {
+  const shows = page.getByRole('dialog', { name: 'Shows' }), w = welcomeDialog(page);
+  if (!(await shows.isVisible()) && !(await w.isVisible())) await page.locator('.top .show').click();
+  if (await shows.isVisible()) await shows.getByRole('button', { name: 'New show…' }).click();
+  await w.getByRole('button', { name: `Start ${name}`, exact: true }).click();
+  await expect(w).toBeHidden();
+}
+// A new empty show (Shows, New show…, Empty stage): Shows opened when it isn't
+export async function newBlankShow(page: Page) {
+  const shows = page.getByRole('dialog', { name: 'Shows' });
+  if (!(await shows.isVisible())) await page.locator('.top .show').click();
+  await shows.getByRole('button', { name: 'New show…' }).click();
+  const w = welcomeDialog(page);
+  await w.getByRole('button', { name: 'Start with an empty stage' }).click();
+  await expect(w).toBeHidden();
 }
 // A demo show from the welcome (its tile): on the demo beat unless a song is named (a real one
 // would come down from the internet)

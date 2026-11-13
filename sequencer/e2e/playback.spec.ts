@@ -1,7 +1,7 @@
 // Several cue lists at once, masters, auto-advance, cue actions, undo, files.
 import type { Page } from '@playwright/test';
 import fs from 'node:fs';
-import { openConnected, channels, history, resetFake, patch, selectAll, selectFixtures, intensity, swatch, record, full, cues, jumpTo, release, newList, fixturesOnStage , test, expect } from './helpers';
+import { openConnected, channels, history, resetFake, patch, selectAll, selectFixtures, intensity, swatch, record, full, cues, jumpTo, release, newList, fixturesOnStage , test, expect, newBlankShow } from './helpers';
 
 const level = (page: Page, v: number) => page.locator('.deck').getByLabel('List level').fill(String(v));
 const inspector = (page: Page) => page.locator('.insp');
@@ -121,7 +121,7 @@ test('save as file and open it again, with the format header', async ({ page }, 
   json.fromTheFuture = { keep: 'me' };
   fs.writeFileSync(file, JSON.stringify(json));
 
-  await dlg.getByRole('button', { name: 'New blank show' }).click();
+  await newBlankShow(page);
   await expect(fixturesOnStage(page)).toHaveCount(0);
   await shows.click();
   await dlg.locator('input[type=file]').setInputFiles(file);

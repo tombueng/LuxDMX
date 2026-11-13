@@ -1,6 +1,6 @@
 // Finding and doing things: the command palette (Ctrl+K), the shortcuts sheet (?), the interface
 // size, and that the app keeps working with only a keyboard.
-import { openConnected, resetFake, patch, channels, test, expect, welcome } from './helpers';
+import { openConnected, resetFake, patch, channels, test, expect, welcome, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -178,7 +178,7 @@ test('Space on a menu item presses the item, it never fires GO', async ({ page }
 test('Space: tabbed to a button it presses that button; after a click it is GO again', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   const idx = () => page.evaluate(() => { const a = (window as any).__luxdmx; const st = a.engine.status(a.liveList.id); return st.running ? st.index : -1; });
   const bo = () => page.evaluate(() => (window as any).__luxdmx.blackout);

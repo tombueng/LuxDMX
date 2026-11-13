@@ -2,7 +2,7 @@
 // across a reload.
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { openConnected, resetFake, fixturesOnStage, cues, jumpTo, channels, fresh , test, expect } from './helpers';
+import { openConnected, resetFake, fixturesOnStage, cues, jumpTo, channels, fresh , test, expect, startTemplate, newBlankShow } from './helpers';
 
 const manager = (page: Page) => page.getByRole('dialog', { name: 'Shows' });
 async function openManager(page: Page) {
@@ -17,7 +17,7 @@ test('every template builds a working show', async ({ page }) => {
   await fresh(page);
   for (const name of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar']) {
     await openManager(page);
-    await manager(page).locator('.tpl').filter({ has: page.locator('b', { hasText: new RegExp(`^${name.replace('/', '\\/')}$`) }) }).click();
+    await startTemplate(page, name);
     await expect(manager(page)).toBeHidden();
     expect(await fixturesOnStage(page).count()).toBeGreaterThan(3);
     expect(await cues(page).count()).toBeGreaterThan(3);
@@ -38,7 +38,7 @@ test('every template plays on the box: its first look on the wire, a button per 
   for (const name of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar']) {
     await resetFake();
     await openManager(page);
-    await manager(page).locator('.tpl').filter({ has: page.locator('b', { hasText: new RegExp(`^${name.replace('/', '\\/')}$`) }) }).click();
+    await startTemplate(page, name);
     await expect(manager(page)).toBeHidden();
     const rig = await page.evaluate(() => {
       const a = (window as any).__luxdmx, s = a.show;
@@ -75,7 +75,7 @@ test('every template plays on the box: its first look on the wire, a button per 
 test('a template plays on the box, survives a reload, and the manager can rename, duplicate and delete', async ({ page }) => {
   await openConnected(page);
   await openManager(page);
-  await manager(page).locator('.tpl', { hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await expect(page.locator('.top .show .name')).toHaveText('Opening night');
   // Theatre: 6 front dimmers at 1-6, preset cue at 30 %
   await page.locator('.deck .tab', { hasText: 'Show' }).click();
@@ -121,29 +121,42 @@ test('the blank show a first start makes goes when a template or another show ta
   const manager = async () => { await page.locator('.top .show').click(); return page.getByRole('dialog', { name: 'Shows' }); };
   // a template over the blank first show: the list has the template only
   let dlg = await manager();
-  await dlg.getByRole('button', { name: /^Bar / }).click();
+  await startTemplate(page, 'Bar');
   await expect(page.locator('.top .show .name')).toHaveText('Bar');
   dlg = await manager();
   await expect(dlg.getByRole('button', { name: 'New show', exact: true })).toHaveCount(0);
   await expect(dlg.getByRole('button', { name: 'Bar', exact: true })).toHaveCount(1);
   // a new blank show that gets a light: kept when another template comes
-  await dlg.getByRole('button', { name: 'New blank show' }).click();
+  await newBlankShow(page);
   await expect(page.locator('.top .show .name')).toHaveText('New show');
   await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.fixtures.push({ id: 'k', name: 'Kept', typeId: 'gen-dimmer', mode: '', universe: 0, address: 1, x: 0.5, y: 0.5 }); a.checkpoint(); });
   dlg = await manager();
-  await dlg.getByRole('button', { name: /^Church / }).click();
+  await startTemplate(page, 'Church');
   await expect(page.locator('.top .show .name')).toHaveText('Sunday service');
   dlg = await manager();
   await expect(dlg.getByRole('button', { name: 'New show', exact: true })).toHaveCount(1);
 });
 
-test('the demos are one click away in the Shows dialog, whatever show is open (and folded away on the welcome)', async ({ page }) => {
+test('one place to start a show: New show… in Shows is the start dialog (no second template list); its demos are one click away even folded; its empty stage is a new show', async ({ page }) => {
   await fresh(page);
   await page.evaluate(() => localStorage.setItem('luxdmx.seq.welcomeDemos', 'hidden'));
+  await startTemplate(page, 'Bar');                                         // (from the empty stage's "or start from a template")
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'Demo shows…' }).click();
+  const shows = page.getByRole('dialog', { name: 'Shows' });
+  await expect(shows.locator('.tpl')).toHaveCount(0);
+  await expect(shows.getByRole('button', { name: 'Demo shows…' })).toHaveCount(0);
+  await shows.getByRole('button', { name: 'New show…' }).click();
   const w = page.getByRole('dialog', { name: "Let's get some light on stage" });
+  await expect(w.getByRole('group', { name: 'Festival stage' })).toHaveCount(0);           // (folded away, as asked)
+  await w.getByRole('button', { name: 'Show the 4 demos' }).click();
   await expect(w.getByRole('group', { name: 'Festival stage' }).getByRole('button', { name: /^Play the show/ })).toBeVisible();
+  // the empty stage: a new show (it used to only close the dialog, the Bar show still open)
+  await w.getByRole('button', { name: 'Start with an empty stage' }).click();
+  await expect(page.locator('.top .show .name')).toHaveText('New show');
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBe(0);
+  // an empty show: one way in, on the stage; the fixture list and the programmer only say it
+  await expect(page.locator('.stage-wrap').getByRole('button', { name: 'Add lights' })).toBeVisible();
+  await expect(page.locator('.fl .empty button, .panel.prog .empty button')).toHaveCount(0);
 });
 
 test('a show file opened twice: the second is "(2)", so the two can be told apart', async ({ page }) => {

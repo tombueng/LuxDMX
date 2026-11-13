@@ -1,7 +1,7 @@
 // Things that must not go wrong in front of an audience (from the independent code review):
 // a show from a newer version is never overwritten, deleting the open show deletes it, a blackout
 // cue holds, a held flash can't stay on, undo brings a box back with its connection.
-import { FAKE, jumpTo, openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, fresh, go, test, expect, addDevice, fixturesOnStage, welcomeDialog, showBoxes, boxReady } from './helpers';
+import { FAKE, jumpTo, openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, fresh, go, test, expect, addDevice, fixturesOnStage, welcomeDialog, showBoxes, boxReady, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -26,7 +26,7 @@ test('deleting the show that is open deletes it', async ({ page }) => {
   await fresh(page);
   await page.locator('.top .show').click();
   const m = page.getByRole('dialog', { name: 'Shows' });
-  await m.locator('.tpl').filter({ hasText: 'Church' }).click();
+  await startTemplate(page, 'Church');
   await page.locator('.top .show').click();
   await expect(m.locator('.card')).toHaveCount(1);         // (the empty first show went when the template opened)
   await m.getByRole('button', { name: 'Delete Sunday service' }).click();
@@ -60,7 +60,7 @@ test('a blackout cue action from GO holds', async ({ page }) => {
 test('a flash held while leaving the live page lets go', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.keyboard.down('z');
   await expect.poll(() => channels(0, 3)).toEqual([255, 255, 255]);
@@ -86,7 +86,7 @@ test('open a show from the manager and reload: it stays that show (no overwrite)
   const m = page.getByRole('dialog', { name: 'Shows' });
   for (const t of ['Church', 'Cinema']) {
     await page.locator('.top .show').click();
-    await m.locator('.tpl').filter({ hasText: t }).click();
+    await startTemplate(page, t);
   }
   await expect(page.locator('.top .show .name')).toHaveText('Cinema');
   await page.waitForTimeout(600);
@@ -103,7 +103,7 @@ test('open a show from the manager and reload: it stays that show (no overwrite)
 test('a show too big for the quick copy still comes back whole after a reload', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   // make localStorage refuse anything big, like a full quota would
   await page.evaluate(() => {
     const orig = Storage.prototype.setItem;
@@ -149,7 +149,7 @@ test('a newer-version show in the browser database is not saved over either', as
 test('the Undo in a message undoes that, and only while nothing else changed', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.deck .tab', { hasText: 'House lights' }).click({ button: 'right' });
   await page.locator('.ctx').getByRole('menuitem', { name: 'Delete the list' }).click();
   await expect(page.locator('.deck .tab', { hasText: 'House lights' })).toHaveCount(0);
@@ -236,7 +236,7 @@ test('a reload in the middle of a show: the cue comes back and the box reconnect
 test('a reload keeps the hands-off show going: the page, the song GO plays, Auto GO', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   const lists = await page.evaluate(() => (window as any).__luxdmx.show.cueLists.map((l: any) => l.name) as string[]);
   const song = lists.find((n, i) => i > 0 && !/fog/i.test(n))!;

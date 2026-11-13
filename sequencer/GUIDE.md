@@ -58,7 +58,8 @@ wheels), you just don't have to learn a pro console to use them.
    light ("Pixel strip, 50 RGB pixels", up to 170 RGB or 128 RGBW: a universe; rings and matrices are
    further down, see "LED rings and matrices"), so a rainbow or a
    chase runs along it.
-   Or skip all that: click the show name (top left) and start from a template. The templates
+   Or skip all that: start from a template (the show's name, top left, **New show…**: the same tiles
+   as the welcome; on an empty stage, **or start from a template**). The templates
    (Band, DJ / Party, Theatre, Church, Cinema, Bar; and Ring and matrix, for pixel rings, discs and
    matrices) are well stocked on purpose: 27 to 48 lights
    each on one universe (PARs, spot and wash heads, pixel bars, strobes, blinders, haze, fog and
@@ -102,8 +103,10 @@ many lights and cues):
 
 Every demo and template also has **Lights only**: its lights in their places (in its room, for a
 demo), with the groups and palettes, and nothing programmed: no cues, effects, live pages or song.
-A rig to program from scratch. The welcome comes up once per show; closed, **Get started** on the
-empty stage brings it back. The big demo is a festival stage with 233 lights on 22 universes, 114 of them
+A rig to program from scratch. The welcome comes up once per show; closed, an empty stage has one
+way in, **Add lights**, and next to it **or start from a template** brings the welcome back (the
+fixture list and the programmer only say what goes there). **New show…** in Shows is this same
+dialog, the one place a show starts from: its **Empty stage** is then a new empty show. The big demo is a festival stage with 233 lights on 22 universes, 114 of them
 moving heads (washes and beam heads on three trusses, beams standing on the deck, heads on the
 truss towers and in the pit, spots on the side trusses, washes at the deck's front edge; plus a
 wall of pixel strips, a pixel line along the deck edge, LED bars, blinders, strobes, confetti,

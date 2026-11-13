@@ -1,7 +1,7 @@
 // Live: the busking page built from a show, every kind of control, keys, hold-to-fog with its hard
 // maximum, flash, and editing the page (add, change, move, remove, lock).
 import type { Page } from '@playwright/test';
-import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, test, expect } from './helpers';
+import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, test, expect, startTemplate } from './helpers';
 
 const tile = (page: Page, id: string) => page.locator(`.live [data-widget="${id}"]`);
 const tileByText = (page: Page, text: string) => page.locator('.live .tile', { hasText: text }).first();
@@ -9,7 +9,7 @@ const tileByText = (page: Page, text: string) => page.locator('.live .tile', { h
 async function djShow(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.live')).toBeVisible();
 }
@@ -308,7 +308,7 @@ test('a fader tile: drag it like a fader, or use the arrow keys', async ({ page 
 test('a set list: a button makes GO play another cue list', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   // the "song" has its own tempo
   await page.locator('.deck .tab', { hasText: 'House lights' }).click();
   await page.locator('.deck').getByRole('button', { name: 'List settings' }).click();
@@ -385,7 +385,7 @@ test('the screen stays on while Live is open, and lets go after', async ({ page 
 test('the GO strip shows the note of the next cue, the standby for the operator', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.strip .nxt')).toContainText('1. Preset');
   await expect(page.locator('.strip .standby')).toHaveText('Audience coming in');       // its own line
@@ -464,7 +464,7 @@ test('Drop: everything white, the strobe going and a fog burst while held, all g
 test('a page made your own says what is new in the show, and adds it in one tap (Undo takes it back)', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Edit' }).click();
   await page.locator('.live .tile.cue').first().focus();

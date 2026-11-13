@@ -3,7 +3,7 @@
 // with the reason.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { lockPage, FAKE, fresh, openConnected, patch, test, expect } from './helpers';
+import { lockPage, FAKE, fresh, openConnected, patch, test, expect, startTemplate } from './helpers';
 
 const AXE = fs.readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
 
@@ -21,14 +21,14 @@ async function audit(page: Page, what: string) {
 test('program view, a template with everything', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await audit(page, 'program');
 });
 
 test('live view', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await audit(page, 'live');
 });
@@ -36,7 +36,7 @@ test('live view', async ({ page }) => {
 test('a play on the live page (the cue list panel) and the phone remote dialog', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.keyboard.press('Space');
   await audit(page, 'theatre live');
@@ -48,7 +48,7 @@ test('a play on the live page (the cue list panel) and the phone remote dialog',
 test('the phone remote page: joining, and playing a show', async ({ page, browser }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Phone as a remote' }).click();
   const dlg = page.getByRole('dialog', { name: 'Phone as a remote' });
@@ -81,7 +81,7 @@ test('dialogs: add fixtures, show manager, monitor', async ({ page }) => {
 test('the side tabs and their editors: presets, effects with the editor open, groups', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   for (const name of ['Presets', 'Groups', 'Effects'] as const) {
     await page.locator('.side .tabs').getByRole('tab', { name }).click();
     if (name === 'Effects') await page.locator('.ep li.oitem').first().click();
@@ -92,7 +92,7 @@ test('the side tabs and their editors: presets, effects with the editor open, gr
 test('live edit with a control selected; add fixtures and the library', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
   await page.locator('.live .tile').first().click();
@@ -110,7 +110,7 @@ test.describe('phone', () => {
   test('program panes and live', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await startTemplate(page, 'Band');
     await audit(page, 'phone stage');
     await page.getByRole('navigation', { name: 'Program panes' }).getByRole('button', { name: 'Cues' }).click();
     await audit(page, 'phone cues');
@@ -122,7 +122,7 @@ test.describe('phone', () => {
 test('the newer dialogs and rows: check the patch, fog timer, a context menu, a fixture row with DIP switches', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.fl').getByRole('button', { name: 'Check the patch' }).click();
   await audit(page, 'check the patch');
   await page.keyboard.press('Escape');
@@ -142,7 +142,7 @@ test('the newer dialogs and rows: check the patch, fog timer, a context menu, a 
 test('the timetable with entries, the locked page with greyed masters, the lights-not-getting-anything bar', async ({ page }) => {
   const popup = await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('body').press('Control+k');
   await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('schedule');

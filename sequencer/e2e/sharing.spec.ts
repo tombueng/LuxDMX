@@ -2,13 +2,13 @@
 // personas): new lights play along like one that's there, a show file dropped on the window opens,
 // and the share sheet sends the show (the download where there is none).
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, tab, test, expect } from './helpers';
+import { openConnected, resetFake, channels, tab, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
 async function template(page: Page, name: string) {
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: new RegExp(`^${name}$`) }) }).click();
+  await startTemplate(page, name);
 }
 
 test('new lights play along in every look like one that is there, and on the wire', async ({ page }) => {

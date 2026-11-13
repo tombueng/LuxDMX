@@ -2,7 +2,7 @@
 // build, serve the build, let the service worker install, go offline, reload, and it still runs,
 // with the shows that were saved in the browser.
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
-import { test, expect } from './helpers';
+import { test, expect, startTemplate } from './helpers';
 
 const PORT = 5185;
 let server: ChildProcess | undefined;
@@ -29,7 +29,7 @@ test('installable, and it starts offline with the saved show', async ({ page, co
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForTimeout(500);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Church' }).click();
+  await startTemplate(page, 'Church');
   await expect(page.locator('.top .show .name')).toHaveText('Sunday service');
   await page.waitForTimeout(800);                              // saved in the browser
 

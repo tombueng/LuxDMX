@@ -2,14 +2,14 @@
 // showing cue 9, a nervous double GO, a cue added between two at the tech, and haze that stops.
 // Measured on the wire (the fake box's frames).
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, selectFixtures, test, expect } from './helpers';
+import { openConnected, resetFake, channels, selectFixtures, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
 async function theatre(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
 }
 // the first DMX channel of a light, 0-based, and what's on it
 const chan = (page: Page, name: string) => page.evaluate((n) => (window as any).__luxdmx.show.fixtures.find((f: any) => f.name === n).address - 1, name);

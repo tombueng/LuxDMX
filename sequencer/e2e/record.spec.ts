@@ -4,7 +4,7 @@
 // browser without MediaRecorder says so.
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { openConnected, resetFake, test, expect } from './helpers';
+import { openConnected, resetFake, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 // (the 3D stage draws in software in the test browser: slow when the machine is busy)
@@ -14,7 +14,7 @@ test.describe.configure({ timeout: 150_000 });
 async function playing(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   // (the demo beat straight from the player: picking songs is the timeline's own test)
   await page.evaluate(() => (window as any).__luxdmx.timeline.useDemo());
@@ -114,7 +114,7 @@ test('a browser that can\'t record says so instead of failing', async ({ page })
 test('Record with no song playing: the video still comes out, with a silent sound track', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   await page.locator('.tlv .preview').getByRole('button', { name: '3D' }).click();
   await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 45_000 });

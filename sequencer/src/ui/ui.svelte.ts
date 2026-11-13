@@ -20,6 +20,7 @@ class Ui {
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   modal = $state<ModalName | null>(null);   // the one big dialog that's open
   welcomeDemos = false;
+  welcomeNew = false;                         // the welcome opened for a new show (Shows, New show…): Empty stage makes one
   addType: string | null = null;
   focus3d = $state(0);                       // when the 3D stage was asked to fly to the selected lights ("Show in 3D")             // Add fixtures opens with this type picked (from the gallery)                      // the welcome opened for its demos: shown, even when folded away
   monitorUni = 0;                            // the universe the DMX monitor opens on

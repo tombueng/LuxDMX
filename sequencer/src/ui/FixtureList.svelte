@@ -156,10 +156,10 @@
   {/if}
 
   {#if app.show.fixtures.length === 0}
-    <!-- quiet: the stage's welcome card is where a first-timer starts -->
+    <!-- quiet: one way in, the stage's Add lights (four "add" buttons at once on an empty show were a
+         jumble); this list's own + Add is up there -->
     <div class="empty">
-      <p class="muted">No lights yet.</p>
-      <button onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add your first lights</button>
+      <p class="muted">No lights yet: <b>Add</b> brings them in.</p>
     </div>
   {:else}
     {#if app.show.fixtures.length > 12 || filter}

@@ -1,7 +1,7 @@
 // The trouble spots a usability test with a first-time user ("Sam", covers band, 4 PARs, a moving
 // head, fog) ran into, each pinned so it stays fixed.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, tab, selectAll, swatch, record, cues, test, expect, intensity, patch, selectFixtures, full, welcome } from './helpers';
+import { openConnected, resetFake, channels, tab, selectAll, swatch, record, cues, test, expect, intensity, patch, selectFixtures, full, welcome, startTemplate } from './helpers';
 
 const add = (page: Page) => page.getByRole('dialog', { name: 'Add fixtures' });
 test.beforeEach(async () => { await resetFake(); });
@@ -73,7 +73,7 @@ test('an effect recorded on its own keeps its lights\' look, whatever played bef
 test('Live GO plays the main list, not the list last opened in Program', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await page.locator('.deck .tab', { hasText: 'Fog timer' }).click();
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.strip .go')).toContainText('Songs');
@@ -136,7 +136,7 @@ test('the selection follows GO; picking another card makes Update go there, and 
 test('adapting a template: an 8-ch PAR card, a warning before overlapping, tidy removal, change a type', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Church$/ }) }).click();
+  await startTemplate(page, 'Church');
   await page.locator('.fl').getByRole('button', { name: /Add/ }).first().click();
   const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
   await dlg.locator('[data-type="gen-drgbwsms"]').click();

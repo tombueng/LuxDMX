@@ -62,7 +62,7 @@ test('the welcome comes up over everything, the 3D stage too; closed, "Get start
   await w.getByRole('button', { name: 'Start with an empty stage' }).click();
   await expect(w).toBeHidden();
   // on the empty 3D stage, the way back: above the stage, not under it
-  const go = page.getByRole('button', { name: 'Get started' });
+  const go = page.getByRole('button', { name: 'or start from a template' });
   await expect(go).toBeVisible();
   expect(await onTop(page, go, '.empty')).toBe(true);
   await go.click();
@@ -71,7 +71,7 @@ test('the welcome comes up over everything, the 3D stage too; closed, "Get start
   await expect(w).toBeHidden();
   // once per show: a reload doesn't bring it back
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Get started' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'or start from a template' })).toBeVisible();
   await page.waitForTimeout(800);
   await expect(w).toBeHidden();
 });
@@ -179,7 +179,9 @@ test('the demos fold away and stay folded; every start stays there; Lights only 
   expect(s.name).toMatch(/\(lights only\)$/);
   // a demo's: in its room, on the 3D stage (the show isn't empty now: from Shows)
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'Demo shows…' }).click();
+  await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'New show…' }).click();
+  const unfold = page.getByRole('dialog', { name: "Let's get some light on stage" }).getByRole('button', { name: /^Show the \d demos$/ });
+  if (await unfold.isVisible()) await unfold.click();
   const w2 = welcomeDialog(page);
   await w2.getByRole('button', { name: 'DJ in a club, lights only' }).click();
   await expect(w2).toBeHidden();

@@ -1,6 +1,6 @@
 // The layouts people will actually use: a laptop, a tablet on a stand (touch), a phone in a hand.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, patch, test, expect } from './helpers';
+import { openConnected, resetFake, channels, patch, test, expect, startTemplate } from './helpers';
 
 const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
@@ -13,7 +13,7 @@ test.describe('phone', () => {
     expect(await noSideScroll(page)).toBe(true);
     const nav = page.getByRole('navigation', { name: 'Program panes' });
     await nav.getByRole('button', { name: 'Lights' }).click();
-    await page.getByRole('button', { name: 'Add your first lights' }).click();
+    await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).click();          // (the list's own Add: its empty state only says it)
     const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
     await dlg.locator('[data-type="gen-dimmer"]').click();
     await dlg.getByLabel('How many').fill('2');
@@ -98,7 +98,7 @@ test.describe('touch on the live page', () => {
   test('Edit: a finger moves a control by its grip; Alt+arrows move the focused one', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+    await startTemplate(page, 'Bar');
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     await page.locator('.live').getByRole('button', { name: 'Edit' }).click();
     const ids = () => page.evaluate(() => { const a = (window as any).__luxdmx; return a.livePage.widgets.map((w: any) => w.id); });
@@ -120,7 +120,7 @@ test.describe('touch on the live page', () => {
   test('a swipe across a look does not fire it, a tap does; holding fog never opens a menu', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     const cdp = await page.context().newCDPSession(page);
     const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
@@ -156,7 +156,7 @@ test.describe('faders on a phone', () => {
   test('a swipe over a fader scrolls the page; hold it a moment and it moves', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     const cdp = await page.context().newCDPSession(page);
     const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
@@ -242,7 +242,7 @@ test.describe('the 2D plan on a tablet held upright', () => {
   test('the Band stage\'s four pixel bars stay apart, from each other and from the machines beside them', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await startTemplate(page, 'Band');
     await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
     const stage = page.locator('.stage-wrap');
     const two = stage.getByRole('button', { name: '2D', exact: true });

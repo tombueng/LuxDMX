@@ -1,7 +1,7 @@
 // Lists of real objects: select like files, drag to reorder, copy / cut / paste / duplicate /
 // delete with the keys and the context menu. Fixtures, cues and groups.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, channels, selectAll, selectFixtures, intensity, record, cues, jumpTo, go, fixturesOnStage, tab, swatch, full , test, expect } from './helpers';
+import { openConnected, resetFake, patch, channels, selectAll, selectFixtures, intensity, record, cues, jumpTo, go, fixturesOnStage, tab, swatch, full , test, expect, startTemplate } from './helpers';
 
 const items = (page: Page) => page.locator('.fl li.oitem');
 const names = async (page: Page) => (await items(page).locator('.nm').allTextContents());
@@ -299,7 +299,7 @@ test('a cue pasted into another show says which of its lights this show doesn\'t
   await openConnected(page);
   const tpl = async (name: string) => {
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: name }).click();
+    await startTemplate(page, name);
     await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
   };
   await tpl('Band');

@@ -4,7 +4,7 @@
 // playhead, named after the one before it; on the ruler a double-click renames a part and a
 // right-click removes it. A cue played on the found grid comes on on the wire.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, test, expect } from './helpers';
+import { openConnected, resetFake, channels, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -48,7 +48,7 @@ const tl = (page: Page) => page.evaluate(() => JSON.parse(JSON.stringify((window
 async function bar(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   await expect(page.locator('.tlv')).toBeVisible();
 }
