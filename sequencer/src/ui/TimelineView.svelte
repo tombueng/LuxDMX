@@ -383,7 +383,9 @@
   function ownParts(): TimelineSection[] {
     const t = app.timeline.ensure();
     if (!t.sections?.length && t.demo && !t.audio) t.sections = sectionStarts().map((x) => ({ name: x.name, at: x.at, ...(x.energy !== undefined ? { energy: x.energy } : {}) }));
-    return (t.sections ??= []);
+    // (set, then read back: the list as the show has it, not the plain one assigned; Svelte warned)
+    if (!t.sections) t.sections = [];
+    return t.sections;
   }
   function nextName(list: TimelineSection[], base: string) {
     let n = 0;
@@ -428,11 +430,26 @@
     app.markDirty(0);
     app.toastUndo(`"${s.name}" is gone (the part before it runs on)`);
   }
+  // A part's start moved to the playhead (on the bar, as a new part is): there was no way to
+  // move one but removing it and adding it again
+  function movePart(at: number) {
+    const T = app.timeline.ensure(), bpm = T.bpm ?? app.show.settings.bpm;
+    const to = Math.round(snap(P.position, bpm, 4, T.offset ?? 0) * 100) / 100;
+    const list = ownParts(), s = list.find((x) => x.at === at);
+    if (!s || Math.abs(s.at - to) < 0.05) return;
+    const other = list.find((x) => x !== s && Math.abs(x.at - to) < 0.05);
+    if (other) { ui.toast(`"${other.name}" already starts there (${clockOf(to)})`, 3500); return; }
+    app.checkpoint();
+    s.at = to;
+    list.sort((a, b) => a.at - b.at);
+    app.markDirty(0);
+  }
   function partMenu(e: MouseEvent, s: { name: string; at: number }) {
     e.preventDefault(); e.stopPropagation();
     ui.openMenu(e, [
       { label: `Go to ${s.name}`, icon: 'play', run: () => jump(s.at) },
       { label: 'Rename…', icon: 'edit', run: () => renamePart(s.at) },
+      { label: `Move it to the playhead (${clockOf(P.position, false)})`, icon: 'right', disabled: Math.abs(P.position - s.at) < 0.05, run: () => movePart(s.at) },
       { sep: true },
       { label: 'Remove this part', icon: 'trash', danger: true, run: () => removePart(s.at) },
     ]);

@@ -505,3 +505,26 @@ test('Find anything knows calibrate, aim and channels; "All channels" opens the 
   await find.getByRole('option', { name: /All channels/ }).first().click();
   await expect(page.locator('#pg-all-ch')).toHaveAttribute('open', '');
 });
+
+test('a song part moves to the playhead from its menu (on the bar), and the parts stay in order', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await page.locator('.tlv').getByRole('button', { name: 'Demo songs…' }).click();
+  await page.getByRole('dialog', { name: 'Demo songs' }).getByRole('button', { name: 'Use Demo beat' }).click();
+  const secs = page.locator('.tlv .sec');
+  await expect(secs.first()).toBeVisible();
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(20));
+  const name = (await secs.nth(1).textContent())!.trim();
+  await secs.nth(1).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: /^Move it to the playhead/ }).click();
+  const parts = await page.evaluate(() => (window as any).__luxdmx.show.timeline.sections.map((s: any) => [s.name, s.at]));
+  const moved = parts.find(([n]: [string]) => n === name);
+  expect(moved).toBeTruthy();
+  expect(Math.abs(moved[1] - 20)).toBeLessThan(2.1);                    // (on the bar nearest 20 s)
+  const ats = parts.map((p: [string, number]) => p[1]);
+  expect(ats).toEqual([...ats].sort((x: number, y: number) => x - y));
+  const errs: string[] = [];
+  page.on('console', (m) => { if (/assignment_value_stale/.test(m.text())) errs.push(m.text()); });
+  await page.keyboard.press('p');
+  expect(errs).toEqual([]);
+});
