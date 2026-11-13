@@ -25,6 +25,9 @@ test.describe('phone', () => {
     await page.locator('.actionbar').getByRole('button', { name: 'Record' }).click();
     await nav.getByRole('button', { name: 'Cues' }).click();
     await expect(page.locator('.deck .card')).toHaveCount(1);
+    // (one Record and one GO there: the deck's, not the bottom bar's as well)
+    await expect(page.getByRole('button', { name: /^GO/ })).toHaveCount(1);
+    await expect(page.locator('.actionbar').getByRole('button', { name: 'Record' })).toHaveCount(0);
     await nav.getByRole('button', { name: 'Stage' }).click();
     await expect(page.locator('.stage-wrap .fx')).toHaveCount(2);
     expect(await noSideScroll(page)).toBe(true);

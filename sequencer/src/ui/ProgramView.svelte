@@ -150,8 +150,11 @@
       <span class="muted">{sel ? `${sel} selected` : ''}</span>
       <span class="grow"></span>
       <button class="bo" class:on={app.blackout} onclick={() => (app.blackout = !app.blackout)} aria-label="Blackout" title="Blackout"><Icon name="moon" /></button>
-      <button class="rec" onclick={record}><Icon name="record" />Record</button>
-      <button class="go" onclick={() => app.go()} disabled={!app.list?.cues.length}>GO <Icon name="play" /></button>
+      <!-- (the cues' pane has its own Record and GO, with the list they go to: not twice) -->
+      {#if pane !== 'cues'}
+        <button class="rec" onclick={record}><Icon name="record" />Record</button>
+        <button class="go" onclick={() => app.go()} disabled={!app.list?.cues.length}>GO <Icon name="play" /></button>
+      {/if}
     </div>
     <nav class="bottom" aria-label="Program panes">
       {#each [['stage', 'Stage', 'eye'], ['lists', 'Lights', 'par'], ['set', 'Set', 'sun'], ['cues', 'Cues', 'record']] as [id, label, icon] (id)}
