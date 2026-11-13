@@ -38,6 +38,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - By keyboard alone the whole thing works now without the focus getting lost: Space presses a
   Live button you tabbed to, the arrows move a cue on the timeline, Escape cancels a rename, and
   a screen reader hears percentages and headings where it heard 0.7 and buttons that did nothing.
+- A box on slow Wi-Fi is said (in orange, with how much gets through) instead of looking fine while
+  a chase stood still; a box that keeps dropping out doesn't make the page jump; with two boxes the
+  red bar says which universes and which box.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
 
