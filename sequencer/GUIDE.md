@@ -1036,7 +1036,10 @@ Three more demos come with their own room on the 3D stage:
   list, a fog timer on another, the show on a third.
 - **Effects** are chases, rainbows, circles, fire, lightning... They follow the tempo (Tap).
 - **Live pages** are grids of buttons and faders: scenes, GO, flash, fog (only while held, with a
-  hard maximum), masters.
+  hard maximum), masters. A fader can be the grand master, the tempo, a cue list's level, an
+  effect's level or a group's (the dance floor, the shelves). In Edit, a control's key is the key
+  you press in its key field (one another button or Space/B uses is said), and Alt+arrows move it
+  (up and down a row).
 
 ## Shows and files
 
