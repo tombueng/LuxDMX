@@ -24,13 +24,16 @@ export function isMachineList(l: ListLike, machine?: (fid: string) => boolean): 
 // A list that only fogs or hazes (a fog timer, haze for the night with its fan): it lives with the fog.
 const fogOnly = (l: ListLike) => isFogTimer(l) || (keysOf(l).length > 0 && keysOf(l).every((ks) => ks.every((k) => k === 'fog' || k === 'haze' || k === 'fan')) && keysOf(l).some((ks) => ks.includes('fog') || ks.includes('haze')));
 
-export function buskingPage(show: Show) {
+// `go`: the list GO plays, when it's been picked (Live's GO bar): the page is built for that one,
+// not the first (a play's list on Live said "Show" while GO played "The Play")
+export function buskingPage(show: Show, go = '') {
   const w: Widget[] = [];
   const types = typeMap(show);
   const isM = (fid: string) => { const f = show.fixtures.find((x) => x.id === fid); return !!f && isMachine(modeOf(types.get(f.typeId), f.mode)); };
   // the main looks: the first list that isn't a fog timer or a machine's shot (one made before any
   // look mustn't be it)
-  const main = show.cueLists.find((l) => !isFogTimer(l) && !isMachineList(l, isM));
+  const fits = (l: CueList) => !isFogTimer(l) && !isMachineList(l, isM);
+  const main = show.cueLists.find((l) => l.id === go && fits(l)) ?? show.cueLists.find(fits);
   const machines = show.cueLists.filter((l) => l !== main && isMachineList(l, isM));
   const others = show.cueLists.filter((l) => l !== main && !machines.includes(l));
   // A play (standby notes or follow-ons, or the list says so): the page shows the whole list the

@@ -172,3 +172,17 @@ test('a play\'s live page: the whole cue list, the cue on stage lit and next mar
   await expect(page.locator('.live [data-widget^="go-"]')).toHaveCount(1);
   await expect(page.locator('.live [data-widget^="back-"]')).toHaveCount(1);
 });
+
+test('a play picked for GO on Live is the one the whole-list panel shows', async ({ page }) => {
+  await theatre(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, show = a.show.cueLists.find((l: any) => l.name === 'Show');
+    a.show.cueLists.push({ id: 'qa-play', name: 'The Play', end: 'stop', play: true, cues: show.cues.slice(0, 3).map((c: any, i: number) => ({ ...JSON.parse(JSON.stringify(c)), id: `qa-c${i}`, name: `Scene ${i + 1}` })) });
+    a.checkpoint();
+  });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  await expect(page.getByRole('region', { name: /Cue list Show/ })).toBeVisible();
+  await page.getByLabel('Cue list for GO').selectOption({ label: 'The Play' });
+  await expect(page.getByRole('region', { name: /Cue list The Play/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: /Cue list The Play/ }).locator('li')).toHaveCount(3);
+});

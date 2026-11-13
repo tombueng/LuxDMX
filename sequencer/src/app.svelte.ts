@@ -2632,13 +2632,13 @@ class App {
   // (and `livePage`) several times a tick. Built on every read, a phone on the demo froze the laptop.
   get pages(): Page[] {
     if (this.show.pages.length) return this.show.pages;
-    const show = this.show, rev = this.rev, c = this.generated;
-    if (c && c.show === show && c.rev === rev) return c.pages;
-    const pages = [untrack(() => buskingPage(show))];
-    this.generated = { show, rev, pages };
+    const show = this.show, rev = this.rev, go = this.goList, c = this.generated;
+    if (c && c.show === show && c.rev === rev && c.go === go) return c.pages;
+    const pages = [untrack(() => buskingPage(show, go))];
+    this.generated = { show, rev, go, pages };
     return pages;
   }
-  private generated: { show: Show; rev: number; pages: Page[] } | null = null;
+  private generated: { show: Show; rev: number; go: string; pages: Page[] } | null = null;
   // A locked live page is the service mode for the whole show: only playing, nothing that edits
   // or leaves it (other pages can still be played, they're locked too).
   // Pages first: with nothing locked this never reads the view, so switching views doesn't rebuild Live's GO strip.
@@ -2704,7 +2704,7 @@ class App {
   }
   // The generated page becomes a real one the moment you edit it.
   ownPages() {
-    if (!this.show.pages.length) { this.show.pages.push(buskingPage(this.show)); this.page = this.show.pages[0].id; }
+    if (!this.show.pages.length) { this.show.pages.push(buskingPage(this.show, this.goList)); this.page = this.show.pages[0].id; }
     return this.show.pages;
   }
   // On a page locked for the service the masters are out of reach: a slip of the thumb mustn't take
