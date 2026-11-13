@@ -359,3 +359,26 @@ test('every chip on the timeline\'s palette says what it does on hover (effects 
   const bare = await chips.evaluateAll((els) => els.filter((e) => !e.getAttribute('title')).map((e) => e.textContent));
   expect(bare).toEqual([]);
 });
+
+test.describe('a crowded plan on a small laptop screen', () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+  test('the DJ stage: the names go a size smaller so more of them fit, still none over another', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^DJ \/ Party$/ }) }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(40);
+    const stage = page.locator('.stage-wrap');
+    const two = stage.getByRole('button', { name: '2D', exact: true });
+    if (await two.isVisible()) await two.click();
+    await expect(stage.locator('text.lbl').first()).toBeVisible();
+    await page.waitForTimeout(400);
+    const r = await stage.locator('text.lbl').evaluateAll((els) => {
+      const box = els.map((e) => e.getBoundingClientRect());
+      let over = 0;
+      for (let i = 0; i < box.length; i++) for (let j = i + 1; j < box.length; j++) if (Math.min(box[i].right, box[j].right) - Math.max(box[i].left, box[j].left) > 1 && Math.min(box[i].bottom, box[j].bottom) - Math.max(box[i].top, box[j].top) > 1) over++;
+      return { n: els.length, over };
+    });
+    expect(r.over).toBe(0);
+    expect(r.n).toBeGreaterThanOrEqual(18);                        // (14 of 48 at the one size)
+  });
+});

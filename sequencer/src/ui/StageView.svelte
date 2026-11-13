@@ -297,10 +297,18 @@
   // don't land on each other's or on the names, as they did drawn on their own)
   const addrOf = (f: Fixture) => `${f.num ? `#${f.num} ` : ''}${oneUni ? f.address : `${f.universe}.${f.address}`}`;
   const labelText = (f: Fixture) => [labels ? f.name : '', addrs ? addrOf(f) : ''].filter(Boolean).join('  ');
-  const labelAt = $derived.by(() => {
+  // (a crowded plan, a short screen: when not even 70 % of the names fit, they're tried a size
+  // smaller, and the size that fits more wins)
+  const placed = $derived.by(() => {
+    if (!labels && !addrs) return { at: new Map<string, At | null>(), fs: 12 * px };
+    const a = placeAt(12 * px), n = app.show.fixtures.length, shown = (m: Map<string, At | null>) => [...m.values()].filter(Boolean).length;
+    if (shown(a) >= n * 0.7) return { at: a, fs: 12 * px };
+    const b = placeAt(10.5 * px);
+    return shown(b) > shown(a) ? { at: b, fs: 10.5 * px } : { at: a, fs: 12 * px };
+  });
+  const labelAt = $derived(placed.at);
+  function placeAt(fs: number) {
     const out = new Map<string, At | null>();
-    if (!labels && !addrs) return out;
-    const fs = 12 * px;
     const halfW = (id: string) => { const k = app.kinds[id]; return k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72); };
     // Boxes (the lights' bodies, then each placed name) go into columns of the stage, so a name
     // only checks what's near it: a big rig stays quick while a light is dragged around.
@@ -343,7 +351,7 @@
       out.set(f.id, at ?? (sel.has(f.id) ? tries[0] : null));
     }
     return out;
-  });
+  }
 </script>
 
 <div class="panel stage-wrap" data-marks="show">
@@ -516,7 +524,7 @@
         {#each app.show.fixtures as f (f.id)}
           {@const sel = !readonly && app.selected.includes(f.id)}
           {@const at = labels || addrs ? labelAt.get(f.id) : null}
-          {#if at}<text x={at.x} y={at.y} text-anchor={at.anchor} class="lbl" class:sel font-size={12 * px} data-for={f.name}>{#if labels}{f.name}{/if}{#if addrs}<tspan class="adr" font-size={10.5 * px}>{labels ? '  ' : ''}{#if f.num}<tspan class="no">#{f.num} </tspan>{/if}{oneUni ? f.address : `${f.universe}.${f.address}`}</tspan>{/if}</text>{/if}
+          {#if at}<text x={at.x} y={at.y} text-anchor={at.anchor} class="lbl" class:sel font-size={placed.fs} data-for={f.name}>{#if labels}{f.name}{/if}{#if addrs}<tspan class="adr" font-size={placed.fs * 0.875}>{labels ? '  ' : ''}{#if f.num}<tspan class="no">#{f.num} </tspan>{/if}{oneUni ? f.address : `${f.universe}.${f.address}`}</tspan>{/if}</text>{/if}
         {/each}
       </g>
 
