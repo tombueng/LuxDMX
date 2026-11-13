@@ -26,4 +26,35 @@ describe('where new lights go on the plan', () => {
     const got = placeNew([], 20);
     for (let i = 0; i < got.length; i++) expect(nearest(got[i], got.filter((_, j) => j !== i))).toBeGreaterThan(0.08);
   });
+  // (the way it was: every spot against every light, each time; the same answers, just slow)
+  function before(there: Spot[], count: number): Spot[] {
+    const placed: Spot[] = [], all = [...there];
+    for (let i = 0; i < count; i++) {
+      let best: Spot = { x: 0.5, y: 0.5 }, score = -Infinity;
+      for (let x = 0.05; x <= 0.951; x += 0.025)
+        for (let y = 0.08; y <= 0.921; y += 0.03) {
+          const p = { x, y }, r = Math.min(1, ...all.map((f) => gap(f, p)));
+          const s = Math.min(r, ROOM * 1.5) - Math.abs(x - 0.5) * 0.02 - Math.abs(y - 0.5) * 0.01;
+          if (s > score) { score = s; best = p; }
+        }
+      placed.push(best); all.push(best);
+    }
+    return placed.sort((a, b) => a.x - b.x || a.y - b.y).map((p) => ({ x: Math.round(p.x * 1000) / 1000, y: Math.round(p.y * 1000) / 1000 }));
+  }
+  it('lands them where it always did, on stages full and empty', () => {
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (const [n, count] of [[0, 20], [5, 14], [30, 25], [80, 40], [150, 13]]) {
+      const there = Array.from({ length: n }, () => ({ x: rnd(), y: rnd() }));
+      expect(placeNew(there, count)).toEqual(before(there, count));
+    }
+  });
+  it('a big rig gets 200 more without the page freezing (it took 12 s)', () => {
+    const there = placeNew([], 175);
+    const t = performance.now();
+    expect(placeNew(there, 200)).toHaveLength(200);
+    expect(performance.now() - t).toBeLessThan(1500);
+    // and thousands of lights don't throw (Math.min over a spread of 100k distances did)
+    expect(placeNew(Array.from({ length: 3000 }, (_, i) => ({ x: (i % 60) / 60, y: Math.floor(i / 60) / 50 })), 10)).toHaveLength(10);
+  });
 });
