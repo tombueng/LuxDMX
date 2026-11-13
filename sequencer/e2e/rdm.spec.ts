@@ -134,3 +134,18 @@ test('a pyro device nobody\'s library knows comes in with every channel waiting 
   await page.evaluate(() => { const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => x.uid === '7A70:00000001'); a.setRawOf(f.id, [[0, 255], [1, 255]]); });
   for (let t = 0; t < 600; t += 50) { const c = await channels(0, 101); expect([c[99] ?? 0, c[100] ?? 0]).toEqual([0, 0]); await page.waitForTimeout(50); }
 });
+
+test('a light from the rig patched where other lights already are: it says so right away', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  // a light of the show's own on 0.38 to 41, over the start of the fake box's "Par 6" at 0.40
+  // (4C55:00000001; not the same address, so the check doesn't take it for that light)
+  await page.evaluate(() => (window as any).__luxdmx.addFixtures('gen-drgb', '', 1, 0, 'Already here', 38));
+  await page.locator('.top').getByRole('button', { name: 'Rig', exact: true }).or(page.locator('.top').getByRole('button', { name: /LuxDMX boxes/ })).first().click();
+  if (!(await page.getByRole('dialog', { name: 'The rig (RDM)' }).isVisible())) await page.getByRole('button', { name: /The rig \(RDM\)/ }).click();
+  const dlg = page.getByRole('dialog', { name: 'The rig (RDM)' });
+  await dlg.getByRole('button', { name: 'Scan the rig' }).click();
+  await expect(dlg.locator('li.row')).toHaveCount(4, { timeout: 15000 });
+  await dlg.getByRole('button', { name: /Patch the \d new lights/ }).click();
+  await expect(page.locator('.toast', { hasText: /where Already here is patched: they'd get the same channels/ })).toBeVisible({ timeout: 30000 });
+});

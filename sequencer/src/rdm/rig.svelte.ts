@@ -9,6 +9,8 @@ import { fromBox } from './box';
 import { checkRig, fixesFor, guessProfile, type Fix, type LibEntry, type PatchedFixture, type RigCheck } from './match';
 import { STATUS_LEVEL, type RdmDevice, type RdmReply, type RdmSource } from './types';
 import { fetchType, loadCatalog } from '../library/catalog';
+import { sharesChannels } from '../model/pixelLayout';
+import { ui } from '../ui/ui.svelte';
 import type { Channel, FixtureType } from '../model/types';
 
 export interface RigEvent { at: number; kind: 'found' | 'gone' | 'back' | 'status' | 'hot' | 'set' | 'error'; uid?: string; text: string }
@@ -209,6 +211,14 @@ class Rig {
       f.uid = uid;
       n++;
       this.log({ kind: 'set', uid, text: `Patched ${f.name} at ${d.uni}.${d.addr}${own ? ` as ${own.name}` : g ? ` as ${g.entry.manufacturer} ${g.entry.name}${g.sure ? '' : ' (by its name)'}` : ' (a plain profile)'}` });
+      // (where the real light is set, other lights may be patched already: both get the same
+      // channels on the wire. Said right away, not found later in its setup.)
+      const m = app.modeOf(f.id), shared = app.show.fixtures.filter((o) => o !== f && sharesChannels(o, app.modeOf(o.id), f, m)).map((o) => o.name);
+      if (shared.length) {
+        const who = shared.length > 3 ? `${shared.slice(0, 3).join(', ')} and ${shared.length - 3} more` : shared.join(', ');
+        this.log({ kind: 'error', uid, text: `${f.name} at ${d.uni}.${d.addr} shares channels with ${who}: give it a free address in its patch (that moves the real light too)` });
+        ui.toast(`${f.name} is set to ${d.uni}.${d.addr}, where ${who} ${shared.length === 1 ? 'is' : 'are'} patched: they'd get the same channels. Give it a free address in its patch.`, 9000);
+      }
     }
     if (n) app.markDirty(0);
     return n;
