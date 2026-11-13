@@ -107,6 +107,14 @@
   // unlocking asks for it.
   async function pinLock() { if (await app.pinLock()) selW = null; }
   // `keys`: locked from the keyboard (the focus stays on the padlock; after a click Space is GO again)
+  function lockMenu(e: MouseEvent) {
+    const keys = e.detail === 0;
+    ui.openMenu(e, [
+      { heading: 'Lock for the show: only playing' },
+      { label: app.show.settings.lockPin ? 'Lock with the PIN…' : 'Lock with a PIN…', icon: 'lock', run: pinLock },
+      { label: 'Lock without a PIN (hold the padlock to unlock)', icon: 'lock', run: () => setLocked(true, keys) },
+    ]);
+  }
   async function setLocked(on: boolean, keys = false) {
     if (!on && app.show.settings.lockPin) {
       // a wrong PIN: the question again, saying so (no holding the padlock all over)
@@ -495,14 +503,15 @@
     {/if}
     {/if}
     {#if page}
-      <!-- Locking is one click; unlocking takes holding the padlock for a second (so a stray tap
-           during the service can't do it). -->
+      <!-- Locking: a tap gives the choice, with or without a PIN (the PIN was only on a right-click,
+           which a tablet doesn't have); unlocking takes holding the padlock for a second (so a stray
+           tap during the service can't do it). -->
       <button class="ghost lockbtn" class:holding={unlockAt > 0} style="--hold:{HOLD_MS}ms"
-              onclick={(e) => { if (justUnlocked) { justUnlocked = false; return; } if (!page.locked) setLocked(true, e.detail === 0); else if (!unlockAt) ui.toast('Hold the padlock for a second to unlock', 2500); }}
+              onclick={(e) => { if (justUnlocked) { justUnlocked = false; return; } if (!page.locked) lockMenu(e); else if (!unlockAt) ui.toast('Hold the padlock for a second to unlock', 2500); }}
               onpointerdown={() => { justUnlocked = false; if (page.locked) startUnlock(); }} onpointerup={stopUnlock} onpointerleave={stopUnlock} onpointercancel={stopUnlock}
               onkeydown={(e) => { if (page.locked && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) startUnlock(false); } }} onkeyup={stopUnlock}
-              oncontextmenu={(e) => { e.preventDefault(); if (!page.locked) ui.openMenu(e, [{ label: 'Lock', icon: 'lock', run: () => setLocked(true) }, { label: app.show.settings.lockPin ? 'Lock with the PIN…' : 'Lock with a PIN…', icon: 'lock', run: pinLock }]); }}
-              title={page.locked ? 'Locked for the show: hold to unlock' : 'Lock the page for the show: only playing, no editing (right-click: with a PIN)'} aria-label={page.locked ? 'Unlock page (hold)' : 'Lock page'}>
+              oncontextmenu={(e) => { e.preventDefault(); if (!page.locked) lockMenu(e); }}
+              title={page.locked ? 'Locked for the show: hold to unlock' : 'Lock the page for the show: only playing, no editing (with a PIN or without)'} aria-label={page.locked ? 'Unlock page (hold)' : 'Lock page'}>
         <Icon name={page.locked ? 'lock' : 'unlock'} /></button>
     {/if}
     {#if !narrow}<button class="ghost" onclick={full} title="Full screen" aria-label="Full screen"><Icon name="live" /></button>{/if}

@@ -555,3 +555,18 @@ test('small things: the remote says when there\'s no address; a pasted effect la
   const add = rem.getByRole('button', { name: /^Add/ }).first();
   if (await add.isVisible()) { await add.click(); await expect(page.locator('.toast')).toContainText("Type your LuxDMX box's address first"); }
 });
+
+test.describe('the padlock on a tablet', () => {
+  test.use({ viewport: { width: 768, height: 1024 }, hasTouch: true });
+  test('a tap gives the choice: with a PIN or without (the PIN was only on a right-click)', async ({ page }) => {
+    await openConnected(page);
+    await page.evaluate(() => (window as any).__luxdmx.addFixtures('gen-rgb', '', 2, 0, 'P'));
+    await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+    await page.locator('.live').getByRole('button', { name: 'Lock page' }).tap();
+    await page.getByRole('menuitem', { name: /^Lock with a PIN/ }).tap();
+    const ask = page.getByRole('dialog', { name: 'Lock with a PIN' });
+    await ask.getByLabel(/PIN/).fill('2468');
+    await ask.getByRole('button', { name: 'Lock' }).tap();
+    await expect(page.locator('.live').getByRole('button', { name: /Unlock page/ })).toBeVisible();
+  });
+});

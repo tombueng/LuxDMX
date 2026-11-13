@@ -4,7 +4,7 @@
 // a phone that goes quiet, leaves, or has its page redrawn under the finger lets go of what it held.
 import type { Browser, Page } from '@playwright/test';
 import WebSocket from 'ws';
-import { FAKE, openConnected, resetFake, channels, fresh, test, expect } from './helpers';
+import { lockPage, FAKE, openConnected, resetFake, channels, fresh, test, expect } from './helpers';
 
 const tile = (page: Page, text: string) => page.locator('.live .tile', { hasText: text }).first();
 const phoneTile = (phone: Page, text: string) => phone.locator('#grid .tile', { hasText: text }).first();
@@ -332,7 +332,7 @@ test('a phone on a locked staff page of looks: just the looks, no GO or Back, Bl
   await page.keyboard.press('Escape');
   await page.locator('.live').getByRole('button', { name: 'New page' }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Just the looks (for staff)' }).click();
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   const phone = await phoneFor(browser, code);
   const looks = await page.evaluate(() => (window as any).__luxdmx.show.cueLists[0].cues.length);
   await expect(phone.locator('#grid .tile')).toHaveCount(looks, { timeout: 8000 });   // the locked page only

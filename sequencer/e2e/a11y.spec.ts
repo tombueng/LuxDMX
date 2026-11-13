@@ -3,7 +3,7 @@
 // with the reason.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { FAKE, fresh, openConnected, patch, test, expect } from './helpers';
+import { lockPage, FAKE, fresh, openConnected, patch, test, expect } from './helpers';
 
 const AXE = fs.readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
 
@@ -155,7 +155,7 @@ test('the timetable with entries, the locked page with greyed masters, the light
   await audit(page, 'timetable');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Space');
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await audit(page, 'locked live page');
   await popup.close();
   await expect(page.getByRole('alert').filter({ hasText: "aren't getting" })).toBeVisible({ timeout: 5000 });

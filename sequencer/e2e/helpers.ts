@@ -143,3 +143,9 @@ export const cues = (page: Page) => page.locator('.deck .card');
 export const jumpTo = (page: Page, i: number) => cues(page).nth(i).dblclick();
 export const release = (page: Page) => page.locator('.deck').getByRole('button', { name: 'Release', exact: true }).click();
 export const newList = (page: Page) => page.locator('.deck').getByRole('button', { name: 'List', exact: true }).click();
+
+// Lock the live page without a PIN: the padlock's tap gives the choice (with a PIN or without).
+export async function lockPage(page: Page) {
+  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await page.getByRole('menuitem', { name: /^Lock without a PIN/ }).click();
+}

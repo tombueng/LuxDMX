@@ -1,7 +1,7 @@
 // Live: the busking page built from a show, every kind of control, keys, hold-to-fog with its hard
 // maximum, flash, and editing the page (add, change, move, remove, lock).
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, patch, selectFixtures, test, expect } from './helpers';
+import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, test, expect } from './helpers';
 
 const tile = (page: Page, id: string) => page.locator(`.live [data-widget="${id}"]`);
 const tileByText = (page: Page, text: string) => page.locator('.live .tile', { hasText: text }).first();
@@ -123,7 +123,7 @@ test('edit a page: add a scene button, give it a key, move it, remove it; lock t
   await expect(page.locator('.live .tile', { hasText: 'Chill' })).toHaveCount(0);
   await page.locator('.live').getByRole('button', { name: 'Done', exact: true }).click();
   // lock: no editing until unlocked
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await expect(page.locator('.live').getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await page.locator('.live').getByRole('button', { name: /Unlock page/ }).click();      // a tap isn't enough
   await expect(page.locator('.toast')).toContainText('Hold the padlock');
@@ -142,7 +142,7 @@ test('locked for the service: only playing, and Program changes left behind are 
   await page.locator('.prog .sw[aria-label="Red"]').click();
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.live .held')).toContainText('1 light you changed in Program overrides the show');
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   // the service mode: no Program, no tempo, no editing, no page menu, no command palette
   await expect(page.locator('.top .modes')).toHaveCount(0);
   await expect(page.locator('.top input[aria-label="BPM"]')).toHaveCount(0);
@@ -406,7 +406,7 @@ test('the fog timer dialog takes its own defaults as they are', async ({ page })
 
 test('the service lock holds: Space on the padlock, other pages, the box, a reload', async ({ page }) => {
   await djShow(page);
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   const now = page.locator('.strip .now');
   await expect(now).toContainText('(nothing)');
   // holding Space on the padlock unlocks it, and plays nothing (no GO, no repeats)
@@ -424,7 +424,7 @@ test('the service lock holds: Space on the padlock, other pages, the box, a relo
   await space('keyDown'); for (let i = 0; i < 5; i++) await space('keyDown', true); await space('keyUp');
   await expect(now).toContainText('1.');
   // locked again: another page is locked too, the box can't be removed, a reload comes back locked in Live
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await expect(page.getByRole('button', { name: /Remove 127/ })).toHaveCount(0);
   await page.waitForTimeout(500);
   await page.reload();

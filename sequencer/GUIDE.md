@@ -336,7 +336,7 @@ Three more demos come with their own room on the 3D stage:
   the burst, and a new timer waits for you to switch it on.
 - **Blackout** puts a pink frame round the whole screen while it's on, so it's never missed. In
   Live it's the button on the GO bar (and B on the keyboard).
-- **Lock it for the service** (the padlock on a live page): only playing is left, no Program, no
+- **Lock it for the service** (the padlock on a live page: a tap asks with a PIN or without): only playing is left, no Program, no
   editing, no tempo, no page menu, no rig (RDM). Unlocking takes holding the padlock for a second, so a stray tap
   can't do it. Locking and unlocking aren't undo steps: Ctrl+Z after unlocking takes back what was
   done, it doesn't lock again. Changes made in Program that weren't recorded show as a banner on Live, with Clear.
