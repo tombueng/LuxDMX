@@ -1,10 +1,12 @@
 import { mount } from 'svelte';
 import App from './App.svelte';
 import { app } from './app.svelte';
+import { ui } from './ui/ui.svelte';
 import './style.css';
 
-// Dev builds expose the app state for debugging and the e2e tests' introspection.
-if (import.meta.env.DEV) (window as unknown as { __luxdmx: typeof app }).__luxdmx = app;
+// Dev builds expose the app state for debugging and the e2e tests' introspection (and the UI's
+// state: a module imported again by its path after a hot reload is another copy).
+if (import.meta.env.DEV) Object.assign(window, { __luxdmx: app, __ui: ui });
 
 // Offline and installable in the built app (not in development: the dev server reloads by itself).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
