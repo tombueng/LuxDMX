@@ -1196,7 +1196,10 @@
   // (wide: every tool on one row, the camera moves and the Haze/Glow/Ambient sliders too)
   // (mid needs room for the cameras, Select/Move/Turn/Aim, Venue, Record, Render and ⋯ in one row:
   // ~780 px where you can edit, less where the stage is only watched)
-  const tier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= (readonly ? 700 : 790) ? 'mid' : 'narrow');
+  // (the camera and Venue stay on the toolbar on a laptop: there Record and Render are their
+  // symbols, their words from 900 px; the mid toolbar needs ~690 px then, it was ~945 with them)
+  const tier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= (readonly ? 600 : 700) ? 'mid' : 'narrow');
+  const words = $derived(hostW >= 900);
   let more = $state(false);
   let venueBtn = $state<HTMLButtonElement>(), moreBtn = $state<HTMLButtonElement>(), venueEl = $state<HTMLDivElement>();
   // (from More, which closes: the keys go on in the panel, not lost on the page)
@@ -1276,21 +1279,21 @@
       {#if take}
         <div class="seg recseg" role="group" aria-label="Recording">
           <span class="rec" role="timer" aria-label="Recording: {clock(recSecs)}"><span class="dot"></span>REC {clock(recSecs)}</span>
-          <button class="ghost" onclick={() => void stopRecording()} aria-label="Stop and save the video" title="Stop recording and save the video file"><Icon name="stop" size={14} />{#if tier !== 'narrow'}Stop{/if}</button>
+          <button class="ghost" onclick={() => void stopRecording()} aria-label="Stop and save the video" title="Stop recording and save the video file"><Icon name="stop" size={14} />{#if tier !== 'narrow' && words}Stop{/if}</button>
         </div>
       {:else}
         <button class="ghost recbtn" class:off={!recordable} onclick={record} aria-label="Record a video"
-          title={recordable ? `Record a video of the 3D stage with the song (${SIZE_SAYS[videoSize]}); Stop saves it${webmOnly ? `. ${WEBM_NOTE}` : ''}` : 'This browser can\'t record video here'}><Icon name="record" size={14} />{#if tier !== 'narrow'}Record{/if}</button>
+          title={recordable ? `Record a video of the 3D stage with the song (${SIZE_SAYS[videoSize]}); Stop saves it${webmOnly ? `. ${WEBM_NOTE}` : ''}` : 'This browser can\'t record video here'}><Icon name="record" size={14} />{#if tier !== 'narrow' && words}Record{/if}</button>
       {/if}
       {#if rendering}
         <div class="seg recseg" role="group" aria-label="Rendering">
           <span class="rec rend" role="status" aria-label="Rendering {rendering.label}: {rendering.k} of {rendering.n} frames">{rendering.label}
             {rendering.phase === 'sound' ? 'sound…' : rendering.phase === 'saving' ? 'saving…' : `${Math.floor((rendering.k / rendering.n) * 100)} %`}{#if rendering.phase === 'frames' && rendering.left !== undefined}{' '}· {clock(rendering.left)} left{/if}</span>
-          <button class="ghost" onclick={() => (renderStop = true)} aria-label="Stop rendering" title="Stop the render (nothing is saved)"><Icon name="stop" size={14} />{#if tier !== 'narrow'}Stop{/if}</button>
+          <button class="ghost" onclick={() => (renderStop = true)} aria-label="Stop rendering" title="Stop the render (nothing is saved)"><Icon name="stop" size={14} />{#if tier !== 'narrow' && words}Stop{/if}</button>
         </div>
       {:else if !take}
         <button class="ghost" data-popover-toggle class:on={renderPanel} aria-expanded={renderPanel} class:off={!renderable} onclick={() => (renderPanel = !renderPanel)} aria-label="Render a video"
-          title={renderable ? 'Render a video frame by frame: up to 8K, never a dropped frame (slower than real time)' : 'This browser can\'t render video here'}><Icon name="film" size={14} />{#if tier !== 'narrow' && tier !== 'wide'}Render{/if}</button>
+          title={renderable ? 'Render a video frame by frame: up to 8K, never a dropped frame (slower than real time)' : 'This browser can\'t render video here'}><Icon name="film" size={14} />{#if tier !== 'narrow' && tier !== 'wide' && words}Render{/if}</button>
       {/if}
       {#if tier === 'wide'}
         {@render sizePick()}{@render fullBtn(false)}
