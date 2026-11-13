@@ -298,3 +298,16 @@ test('a reload while a flash is held does not bring the flash back latched', asy
   expect((await channels(0, 2))).toEqual([0, 0]);
   await expect(page.locator('.deck .card.cur')).toHaveCount(0);
 });
+
+test('the box\'s window reloaded (F5 in it): the app takes it back by itself, the look goes out again', async ({ page }) => {
+  await resetFake();
+  const popup = await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await selectAll(page); await intensity(page, 1);
+  await expect.poll(() => channels(0, 2)).toEqual([255, 255]);
+  await popup.reload();
+  // (it said "lost its connection and is trying again" for ever: the reloaded window waited for a hello)
+  await resetFake();
+  await expect.poll(() => channels(0, 2), { timeout: 15000 }).toEqual([255, 255]);
+  await expect(page.locator('.dev.ready').or(page.locator('.top .boxes.ready')).first()).toBeVisible();
+});

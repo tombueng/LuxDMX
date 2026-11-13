@@ -187,7 +187,13 @@ export class Bridge {
     this.state = s; this.changed();
     // reconnecting: its window may say it's closed only after its socket did; look again
     clearInterval(this.recheck);
-    if (s === 'reconnecting' && this.usesWindow) this.recheck = setInterval(() => { if (this.state !== 'reconnecting') clearInterval(this.recheck); else if (!this.win || this.win.closed) this.set('closed'); }, 1000);
+    // (and a hello every second: a popup that was reloaded (F5 in it) waits for one, and stayed
+    // waiting while this said "trying again" for ever; a live one only answers with its status)
+    if (s === 'reconnecting' && this.usesWindow) this.recheck = setInterval(() => {
+      if (this.state !== 'reconnecting') clearInterval(this.recheck);
+      else if (!this.win || this.win.closed) this.set('closed');
+      else this.win.postMessage({ luxdmx: 1, type: 'hello' }, this.origin);
+    }, 1000);
   }
   private recheck: ReturnType<typeof setInterval> | undefined;
 }
