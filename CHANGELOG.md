@@ -6,6 +6,32 @@ itself. The sequencer has no version number of its own: it's the page at
 [tombueng.github.io/LuxDMX/sequencer](https://tombueng.github.io/LuxDMX/sequencer/) and you always
 get the newest one.
 
+## Unreleased
+
+**Sequencer**
+
+A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
+a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
+
+- Recording a rainbow (or any colour or move effect that switches its lights on) gave a cue that
+  played the lights dark. It plays them lit, as they were.
+- Undo of a Record puts the stage back as it was, not just the list; the lock for the service isn't
+  an undo step any more (Ctrl+Z after unlocking locked again); a locked page has no rig.
+- Groups keep their number when you reorder them, so `group 5` stays the same group.
+- A tap on the padlock asks: with a PIN or without. On a touch screen, **+ Add** adds lights and
+  groups to the selection.
+- An effect button on Live stops the effect even when the cue on stage runs it.
+- The timeline shows what lies after a shorter song (and moves it in on a tap), Fit fits, an effect
+  dropped on a part of the song runs to the end of that part, parts move to the playhead.
+- Live's cue list follows the list GO plays; GO at the end of a list says so.
+- The cue sheet says each light's level, and a list prints its own.
+- New lights land clear of the ones on stage; names on the plan stay inside it and read as their own
+  light's; the plan keeps its lights apart on a narrow screen.
+- The top bar fits an upright iPad and counts the interface size (120 % on a laptop).
+- The box's window can be reloaded: the app takes it back by itself.
+- Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
+  notes off the screen, empty states that now say what to do, one name for saving a show file.
+
 ## 2026-11-12
 
 **Sequencer**
