@@ -9,10 +9,15 @@ let server: ChildProcess | undefined;
 
 test.beforeAll(async () => {
   execSync('npx vite build --outDir dist-offline-test --emptyOutDir', { stdio: 'ignore', env: { ...process.env, VITE_DEFAULT_DEVICE: '' } });
-  server = spawn('npx', ['vite', 'preview', '--outDir', 'dist-offline-test', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], { stdio: 'ignore' });
+  // (a process group of its own: npx starts vite as a child, and killing npx alone left vite
+  // holding the port, so the next run failed on it)
+  server = spawn('npx', ['vite', 'preview', '--outDir', 'dist-offline-test', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], { stdio: 'ignore', detached: true });
   for (let i = 0; i < 60; i++) { try { if ((await fetch(`http://127.0.0.1:${PORT}/`)).ok) break; } catch { /* not yet */ } await new Promise((r) => setTimeout(r, 250)); }
 });
-test.afterAll(() => { server?.kill(); execSync('rm -rf dist-offline-test'); });
+test.afterAll(() => {
+  if (server?.pid) { try { process.kill(-server.pid, 'SIGTERM'); } catch { server.kill(); } }
+  execSync('rm -rf dist-offline-test');
+});
 
 test('installable, and it starts offline with the saved show', async ({ page, context }) => {
   await page.goto(`http://127.0.0.1:${PORT}/`);
