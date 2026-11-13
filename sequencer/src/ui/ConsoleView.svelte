@@ -394,7 +394,9 @@
   @media (max-width: 900px) { .console.with-stage { grid-template-columns: 1fr; grid-template-areas: 'cmd' 'stage' 'enc' 'faders' 'pb' 'gm'; } }
   .stage { grid-area: stage; padding: 0; overflow: hidden; display: flex; height: min(58vh, 520px); min-height: 280px; }
   .stage :global(.stage-wrap) { flex: 1; min-width: 0; border: 0; }
-  .stagebtn.on { border-color: var(--accent); color: var(--accent); }
+  /* (an outline in the accent, the background faint: the global button.on fills it orange, and
+     orange text on orange is invisible) */
+  .stagebtn.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: .5rem; min-width: 0; }
   .cmd { grid-area: cmd; display: flex; flex-direction: column; gap: .4rem; }
   .line { display: flex; gap: .3rem; }
@@ -406,7 +408,7 @@
   .pad .wide { grid-column: span 2; }
   .acts { display: flex; flex-wrap: wrap; gap: .25rem; }
   .acts button { flex: 1 0 30%; min-height: 36px; }
-  .acts .on, .seg .on { border-color: var(--accent); color: var(--accent); }
+  .acts .on, .seg .on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .rec { background: #f33abc1a; border-color: #f33abc77; color: #ff7fd6; font-weight: 650; }
   .enc { grid-area: enc; display: flex; flex-direction: column; gap: .4rem; }
   .tabs { display: flex; gap: .25rem; flex-wrap: wrap; }
@@ -414,7 +416,7 @@
   .knobs { display: flex; gap: .8rem; flex-wrap: wrap; padding: .3rem 0; }
   .pals { display: flex; gap: .25rem; flex-wrap: wrap; }
   .pals button { display: inline-flex; align-items: center; gap: .3rem; min-height: 34px; font-size: .8rem; }
-  .pals button.on { border-color: var(--accent); color: var(--accent); }
+  .pals button.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .pals .dot { width: .8rem; height: .8rem; border-radius: 50%; border: 1px solid #0006; }
   .gm { grid-area: gm; display: flex; flex-direction: column; align-items: center; gap: .4rem; }
   .bo { min-height: 40px; }
@@ -441,5 +443,5 @@
   .cue.next { font-size: .68rem; } .two button { flex: 1 1 0; min-width: 0; padding-inline: .2rem; }
   .midi { font-size: .66rem; padding: .05rem .2rem; min-height: 0 !important; width: 100%; }
   .midi.bound { color: var(--green); border-color: var(--green); }
-  .midi.on { color: var(--orange); border-color: var(--orange); }
+  .midi.on { color: var(--orange); border-color: var(--orange); background: #ffaa1c2a; }
 </style>

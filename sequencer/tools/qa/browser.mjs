@@ -55,10 +55,13 @@ const page = () => pages[cur];
 // (also label=..., placeholder=..., title=...: Playwright's getByLabel and friends; `within >> label=x`
 // looks inside the first part)
 function find(root, sel) {
+  const part = /^label~=(.*)$/s.exec(sel);
+  if (part) return root.getByLabel(part[1].replace(/^"(.*)"$/, '$1'));
   const m = /^(label|placeholder|title)=(.*)$/s.exec(sel);
   if (!m) return root.locator(sel);
   const v = m[2].replace(/^"(.*)"$/, '$1');
-  return m[1] === 'label' ? root.getByLabel(v) : m[1] === 'placeholder' ? root.getByPlaceholder(v) : root.getByTitle(v);
+  // (exact: "Command" must not find "Command line"; label~=... for a part of it)
+  return m[1] === 'label' ? root.getByLabel(v, { exact: true }) : m[1] === 'placeholder' ? root.getByPlaceholder(v) : root.getByTitle(v);
 }
 const loc = (sel, nth) => {
   const parts = String(sel).split(/\s+>>>\s+/);
@@ -134,6 +137,25 @@ const actions = {
   async text(b) { const t = await loc(b.sel ?? 'body', b.nth).innerText({ timeout: b.timeout ?? 15000 }); return { text: t.slice(0, b.max ?? 6000) }; },
   async count(b) { return { n: await page().locator(b.sel).count() }; },
   async controls(b) { return { list: await controls(b.sel) }; },
+  // Look-checks over what's on screen: text the same colour as its background (unreadable), text cut
+  // off without an ellipsis, controls running out of their box, buttons with no name at all
+  async lint() {
+    return { found: await page().evaluate(() => {
+      const out = [], seen = new Set();
+      const vis = (e) => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 2 && r.height > 2 && s.visibility !== 'hidden' && s.display !== 'none' && +s.opacity > 0.05; };
+      const bgOf = (e) => { for (let x = e; x; x = x.parentElement) { const c = getComputedStyle(x).backgroundColor; if (c && !/rgba\(\d+, \d+, \d+, 0\)|transparent/.test(c)) return c; } return 'rgb(0, 0, 0)'; };
+      const name = (e) => (e.getAttribute('aria-label') || e.innerText || e.getAttribute('title') || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+      for (const e of document.querySelectorAll('button, a, label, [role=tab], [role=button], span, b, h2, h3, p, td, li')) {
+        if (!vis(e)) continue;
+        const own = [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+        const cs = getComputedStyle(e);
+        if (own && cs.color === bgOf(e)) out.push({ what: 'same colour as its background', el: e.tagName.toLowerCase() + '.' + [...e.classList].join('.'), text: name(e) });
+        if (own && cs.overflow !== 'visible' && cs.textOverflow !== 'ellipsis' && e.scrollWidth > e.clientWidth + 2 && cs.whiteSpace === 'nowrap') out.push({ what: 'cut off, no ellipsis', el: e.tagName.toLowerCase() + '.' + [...e.classList].join('.'), text: name(e) });
+        if (/^(BUTTON|A)$/.test(e.tagName) && !name(e) && !e.querySelector('svg title')) { const k = e.outerHTML.slice(0, 80); if (!seen.has(k)) { seen.add(k); out.push({ what: 'a button with no name', el: k, text: '' }); } }
+      }
+      return out.slice(0, 60);
+    }) };
+  },
   async logs(b) { const since = b.since ?? 0; return { seq, list: logs.filter((e) => e.seq > since && (!b.errors || e.level === 'error' || e.type === 'pageerror')) }; },
   async pages() { return { cur, list: pages.map((p, i) => ({ i, url: p.url() })) }; },
   async page(b) { cur = Math.max(0, Math.min(pages.length - 1, b.i)); await pages[cur].bringToFront(); return { cur, url: pages[cur].url() }; },

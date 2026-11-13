@@ -398,7 +398,7 @@
   .quick button { flex: 1; padding: .25rem .2rem; font-size: .8rem; }
   .quick.wrap { flex-wrap: wrap; } .quick.wrap button { flex: 1 0 28%; }
   .pick .quick.wrap button { flex: 0 1 auto; display: inline-flex; align-items: center; gap: .25rem; }
-  .pick .quick.wrap button.on { border-color: var(--accent); color: var(--accent); }
+  .pick .quick.wrap button.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .pick .dot { width: .7rem; height: .7rem; border-radius: 50%; border: 1px solid #0006; }
   .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 40px)); gap: .35rem; justify-content: start; }
   .sw { aspect-ratio: 1; padding: 0; border-radius: 50%; border: 2px solid #0006; }

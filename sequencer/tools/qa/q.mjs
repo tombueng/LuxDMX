@@ -30,6 +30,7 @@ for (const [cmd, ...rest] of steps) {
   const text = r.text; delete r.text;
   const show = (o) => { const s = JSON.stringify(o); return s.length > 12000 ? s.slice(0, 12000) + ' …' : s; };
   if (cmd === 'controls' && r.list) { console.log(r.list.map((c) => `${c.tag}${c.role ? '/' + c.role : ''} "${c.name}"${c.hint ? ` (${c.hint})` : ''}${c.dis ? ' [disabled]' : ''}${c.on !== undefined && c.on !== null ? ' on=' + c.on : ''} @${c.x},${c.y} ${c.w}x${c.h}`).join('\n')); }
+  else if (cmd === 'lint' && r.found) { console.log(r.found.map((f) => `${f.what}: ${f.el} "${f.text}"`).join('\n') || '(clean)'); }
   else if (cmd === 'logs' && r.list) { console.log(r.list.map((e) => `#${e.seq} ${e.t} p${e.page} ${e.type}/${e.level}: ${e.text}${e.at && e.level !== 'log' ? '  (' + e.at + ')' : ''}`).join('\n') || '(nothing)'); console.log(`seq ${r.seq}`); }
   else { console.log(`${cmd}: ${show(r)}`); if (text !== undefined) console.log(text); }
   if (said) console.log(said.map((e) => `  ! ${e.type}/${e.level}: ${e.text.split('\n').slice(0, 4).join(' | ')}`).join('\n'));

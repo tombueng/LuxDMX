@@ -249,7 +249,7 @@
   .typed .sm { padding: .1rem .5rem; }
   .quick { display: flex; gap: .25rem; flex-wrap: wrap; }
   .quick button { flex: 1 0 18%; padding: .2rem .2rem; font-size: .78rem; }
-  .quick button.on { border-color: var(--accent); color: var(--accent); }
+  .quick button.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .note { margin: 0; font-size: .78rem; }
   .err { margin: 0; font-size: .78rem; color: var(--pink); }
   .link { padding: 0 .2rem; font-size: .78rem; }
