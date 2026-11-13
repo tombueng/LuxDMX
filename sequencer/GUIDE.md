@@ -337,8 +337,9 @@ Three more demos come with their own room on the 3D stage:
 - **Blackout** puts a pink frame round the whole screen while it's on, so it's never missed. In
   Live it's the button on the GO bar (and B on the keyboard).
 - **Lock it for the service** (the padlock on a live page): only playing is left, no Program, no
-  editing, no tempo, no page menu. Unlocking takes holding the padlock for a second, so a stray tap
-  can't do it. Changes made in Program that weren't recorded show as a banner on Live, with Clear.
+  editing, no tempo, no page menu, no rig (RDM). Unlocking takes holding the padlock for a second, so a stray tap
+  can't do it. Locking and unlocking aren't undo steps: Ctrl+Z after unlocking takes back what was
+  done, it doesn't lock again. Changes made in Program that weren't recorded show as a banner on Live, with Clear.
 - **The live page** works with a touch screen, the keyboard (letters on the buttons, Space for GO, B for blackout)
   and MIDI pads and faders. The GO bar shows what's on, what's next, and the next cue's note (a
   theatre standby: "when the lamp goes off"). While it's open the screen doesn't dim or lock (tablets and laptops
@@ -476,7 +477,8 @@ Three more demos come with their own room on the 3D stage:
   cue list, so releasing a list leaves it running (on a pixel bar it lights the cells even when the
   bar's own intensity is 0). A Release says which ones keep running, with a button to stop them, and
   the programmer's "out" reading shows what a selected light really gives (a pixel bar: its
-  brightest cell).
+  brightest cell). An effect's button on Live stops it even when the cue on stage runs it (a second
+  tap, or the next cue that runs it, brings it back).
 - **Contrast** (in an effect's settings, for pixel shows and brightness effects): how hard the light
   falls between dark and bright. Up, what's dim gets dimmer and what's bright gets brighter; down,
   it's softer and more of it glows. Dark stays dark and full stays full; Dim to and Bright to are
