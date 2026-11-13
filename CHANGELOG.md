@@ -35,6 +35,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   newer version on a tap, instead of quietly saving over it.
 - A browser that won't keep the show (storage full or blocked) says **not saved** in red, instead
   of "saving…" for ever.
+- By keyboard alone the whole thing works now without the focus getting lost: Space presses a
+  Live button you tabbed to, the arrows move a cue on the timeline, Escape cancels a rename, and
+  a screen reader hears percentages and headings where it heard 0.7 and buttons that did nothing.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
 
