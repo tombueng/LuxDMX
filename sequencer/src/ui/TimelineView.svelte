@@ -222,7 +222,12 @@
   function chipAt(c: Chip, at: number) {
     const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
     if (c.kind === 'cue') place({ do: 'goto', list: c.list, cue: c.cue }, at, `list:${c.list}`);
-    else if (c.kind === 'fx') place({ do: 'effect', effect: c.effect, on: true }, at, 'fx', bar * 8);
+    // (an effect runs to the end of the part of the song it lands in, the chorus it's for, not a
+    // fixed 8 bars that stopped short of it; a song without parts: 8 bars)
+    else if (c.kind === 'fx') {
+      const part = sections.find((x) => x.at <= at + 0.05 && at < x.end - 0.05);
+      place({ do: 'effect', effect: c.effect, on: true }, at, 'fx', part && part.end - at > 0.5 ? part.end - at : bar * 8);
+    }
     else if (c.kind === 'burst') place({ do: 'burst', attr: c.attr, seconds: c.s }, at, 'special');
     else if (c.kind === 'crowd') placeCrowd(c.a, at, c.len);
     else place(c.a, at, 'special');

@@ -2983,6 +2983,11 @@ class App {
     // (a list fading out on its last cue: GO brings it back from the top, it doesn't just finish going)
     const st = this.engine.status(id), l = this.show.cueLists.find((x) => x.id === id);
     if (st.releasing && l && l.end !== 'loop' && st.index >= l.cues.length - 1) { this.engine.start(id); return; }
+    // (at the end of a list that stops there GO does nothing, on purpose: said, it was silent)
+    if (st.running && l && l.end === 'stop' && l.cues.length && st.index >= l.cues.length - 1) {
+      ui.toast(`That was the last cue of ${l.name}. Release lets it go, then GO starts it from the top.`, 4500);
+      return;
+    }
     this.engine.go(id);
   }
   // A look goes up by hand or by the clock: a blackout ends (the look you asked for shows), a

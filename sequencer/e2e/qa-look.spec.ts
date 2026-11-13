@@ -570,3 +570,19 @@ test.describe('the padlock on a tablet', () => {
     await expect(page.locator('.live').getByRole('button', { name: /Unlock page/ })).toBeVisible();
   });
 });
+
+test('an effect put on a part of the song runs to the end of that part', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 2, 0, 'P');
+  await page.evaluate(() => { const a = (window as any).__luxdmx, ids = a.show.fixtures.map((f: any) => f.id); a.show.effects.push({ id: 'qfx', name: 'Rainbow', kind: 'rainbow', fixtures: ids, params: {} }); a.checkpoint(); });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await page.locator('.tlv').getByRole('button', { name: 'Demo songs…' }).click();
+  await page.getByRole('dialog', { name: 'Demo songs' }).getByRole('button', { name: 'Use Demo beat' }).click();
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.show.timeline.sections = [{ name: 'Intro', at: 0 }, { name: 'Verse', at: 8 }, { name: 'Chorus', at: 21.9 }, { name: 'Outro', at: 40 }]; a.checkpoint(); });
+  await expect(page.locator('.tlv .sec')).toHaveCount(4);
+  await page.locator('.tlv .sec', { hasText: 'Verse' }).click();                     // (the playhead on the verse)
+  await page.locator('.tlv .pal .chip.fx', { hasText: 'Rainbow' }).click();
+  const it = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items.find((i: any) => i.do.do === 'effect'));
+  expect(it.at).toBeCloseTo(8, 1);
+  expect(it.at + it.len).toBeCloseTo(21.9, 1);                                        // (to the chorus, not 8 bars)
+});

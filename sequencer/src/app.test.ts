@@ -587,3 +587,18 @@ describe('starter looks', () => {
     expect(cues.some((c: any) => c.values[strobe])).toBe(false);
   });
 });
+
+describe('GO at the end of a list that stops there', () => {
+  it('says so (it did nothing, silently) and stays on the last cue', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    const ui = (await import('./ui/ui.svelte')).ui;
+    const said: string[] = [];
+    const orig = ui.toast.bind(ui);
+    ui.toast = ((t: string, ...r: unknown[]) => { said.push(t); return (orig as any)(t, ...r); }) as any;
+    app.engine.jumpTo('L', 1, 0); tick(2);                                  // the last cue
+    app.go('L'); tick(2);
+    expect(app.status.L.index).toBe(1);
+    expect(said.some((t) => /last cue of Moods/.test(t))).toBe(true);
+  });
+});
