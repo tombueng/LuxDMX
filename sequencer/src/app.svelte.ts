@@ -3,6 +3,7 @@
 // Record stores the fixtures you touched (the programmer), each with its full current look.
 // Fixtures you didn't touch stay out of the cue, so playing it leaves them alone: that's what
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
+import { placeNew } from './model/place';
 import { hostProblem } from './model/host';
 import { emptyShow, parseShow, serializeShow, FormatError } from './model/format';
 import { GENERIC, caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
@@ -1178,12 +1179,8 @@ class App {
     const m0 = modeOf(t, mode), width = m0?.channels.length ?? 1;
     const need = isWide(m0) ? spansOf({ universe: 0, address: 1 }, m0).length : 0;
     let nextUni = universe;
-    // A row of their own on the stage, clear of the lights already there: the middle first, then
-    // spreading out; on a crowded stage the row with the most room.
-    const xs = Array.from({ length: count }, (_, i) => (i + 1) / (count + 1));
-    const room = (y: number) => Math.min(1, ...this.show.fixtures.flatMap((f) => xs.map((x) => Math.hypot((f.x - x) * 1.6, f.y - y))));
-    const rows = [0.5, 0.35, 0.65, 0.25, 0.8, 0.42, 0.58, 0.15, 0.9, 0.3, 0.7, 0.2, 0.85, 0.1];
-    const row = (rows.find((y) => room(y) >= 0.09) ?? rows.reduce((a, b) => (room(b) > room(a) ? b : a))) * 10;
+    // On the stage clear of the lights already there (a row of their own, or the freest spots)
+    const spots = placeNew(this.show.fixtures, count);
     // more of a name already there carry on its numbering (Front 7 to 12, not a second Front 1)
     const same = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: (\\d+))?$`);
     const taken = this.show.fixtures.map((f) => same.exec(f.name)).filter((m): m is RegExpExecArray => !!m).map((m) => Number(m[1] ?? 1));
@@ -1199,7 +1196,7 @@ class App {
       if (address < 1 || (!need && address + width - 1 > 512)) { numberFixtures(this.show.fixtures); return `universe ${universe} is full`; }
       this.show.fixtures.push({
         id: newId('f'), name: count > 1 || taken.length ? `${name} ${first + i}` : name, typeId, mode: modeOf(t, mode)?.name ?? mode,
-        universe: need ? nextUni : universe, address, x: xs[i], y: row / 10,
+        universe: need ? nextUni : universe, address, x: spots[i].x, y: spots[i].y,
       });
       if (need) nextUni += need;
     }

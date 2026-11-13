@@ -199,3 +199,25 @@ test('a start address that runs past 512 is said in the preview, with where they
   await expect(dlg).toBeHidden();
   expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.map((f: { address: number }) => f.address))).toEqual([501, 507]);
 });
+
+test('four heads added to the full Band stage land clear of the lights there and of each other', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
+  const before = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.map((f: { id: string }) => f.id));
+  await tab(page, 'Fixtures');
+  await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
+  const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
+  await dlg.locator('.tcard', { hasText: 'Moving head' }).first().click();
+  await dlg.getByLabel('How many').fill('4');
+  await dlg.getByLabel('Name').fill('MH-X25');
+  await dlg.getByRole('button', { name: /^Add 4 ×/ }).click();
+  await expect(dlg).toBeHidden();
+  const near = await page.evaluate((old: string[]) => {
+    const all = (window as any).__luxdmx.show.fixtures as { id: string; x: number; y: number }[];
+    const fresh = all.filter((f) => !old.includes(f.id));
+    return Math.min(...fresh.map((f) => Math.min(...all.filter((o) => o !== f).map((o) => Math.hypot((f.x - o.x) * 1.6, f.y - o.y)))));
+  }, before);
+  expect(near).toBeGreaterThanOrEqual(0.1);
+});
