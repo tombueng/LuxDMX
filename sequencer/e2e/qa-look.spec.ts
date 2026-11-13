@@ -399,3 +399,30 @@ test('a note added to the cue on stage: its row in the Live cue list stays in vi
   const r = await panel.locator('ol').evaluate((ol) => { const b = ol.getBoundingClientRect(), row = ol.querySelector('li.live .nm')!.getBoundingClientRect(); return { rowTop: row.top, boxTop: b.top }; });
   expect(r.rowTop).toBeGreaterThanOrEqual(r.boxTop - 1);
 });
+
+test.describe('the Live page on a phone with its stage shown', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  test('the stage keeps to its box: the heading under it isn\'t covered', async ({ page }) => {
+    await openConnected(page);
+    await page.evaluate(() => (window as any).__luxdmx.addFixtures('gen-rgb', '', 4, 0, 'PAR'));
+    await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+    await page.getByRole('button', { name: 'More for this page' }).click();
+    await page.getByRole('menuitem', { name: 'Show the stage' }).click();
+    const box = page.locator('.stagebox');
+    await expect(box.locator('.stage-wrap')).toBeVisible();
+    const r = await box.evaluate((b) => ({ box: b.getBoundingClientRect().bottom, wrap: b.querySelector('.stage-wrap')!.getBoundingClientRect().bottom }));
+    expect(r.wrap).toBeLessThanOrEqual(r.box + 1);
+  });
+});
+
+test('the Loop button says whether it\'s on', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 2, 0, 'P');
+  await selectAll(page);
+  await page.locator('.prog').getByLabel('Intensity', { exact: true }).fill('1');
+  await page.locator('.deck').getByRole('button', { name: /^Record/ }).click();
+  const loop = page.locator('.deck').getByRole('button', { name: 'Loop', exact: true });
+  await expect(loop).toHaveAttribute('aria-pressed', 'false');
+  await loop.click();
+  await expect(loop).toHaveAttribute('aria-pressed', 'true');
+});

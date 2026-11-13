@@ -110,7 +110,7 @@
                 {#each app.show.cueLists.filter((l) => l.id !== list?.id) as l (l.id)}<option value={l.id}>{l.name}</option>{/each}</select>
             {:else if 'list' in a}<select bind:value={a.list} aria-label="Action list">{#each app.show.cueLists.filter((l) => l.id !== list?.id) as l (l.id)}<option value={l.id}>{l.name}</option>{/each}</select>{/if}
             {#if a.do === 'master'}<NumField value={Math.round(a.level * 100)} max={100} label="Level" width="3.8em" onset={(v) => (a.level = (v ?? 0) / 100)} />%{/if}
-            {#if a.do === 'blackout'}<select bind:value={a.on}><option value={true}>on</option><option value={false}>off</option></select>{/if}
+            {#if a.do === 'blackout'}<select bind:value={a.on} aria-label="Blackout on or off"><option value={true}>on</option><option value={false}>off</option></select>{/if}
             <button class="ghost" onclick={() => one.actions!.splice(ai, 1)} aria-label="Remove action"><Icon name="close" size={14} /></button>
           </div>
         {/each}

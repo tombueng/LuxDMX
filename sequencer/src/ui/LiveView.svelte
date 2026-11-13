@@ -560,6 +560,9 @@
   .float.left { right: auto; left: 0; }
   .float .pick { margin: 0; border: 0; max-width: 240px; }
   .stagebox { min-height: 0; display: flex; align-self: start; height: min(62vh, 460px); }
+  /* (the stage's own least height is for a page of its own: in this box it fits the box, it ran
+     40 px over the heading under it on a phone) */
+  .stagebox > :global(.stage-wrap) { min-height: 0; }
   .pick { align-self: start; padding: .8rem; border: 1px dashed var(--line2); border-radius: var(--radius); }
   .grid { min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr)); gap: .5rem; align-content: start; padding: 2px; }
   .cell { display: grid; position: relative; }

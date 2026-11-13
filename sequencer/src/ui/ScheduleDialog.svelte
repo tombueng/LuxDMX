@@ -84,8 +84,18 @@
   }
   // the time is taken when you're done with the field (Chrome reports every digit typed)
   function setTime(e: ScheduleEntry, el: HTMLInputElement) {
+    endTime();
     if (/^\d\d:\d\d$/.test(el.value) && el.value !== e.at) { app.checkpoint(); e.at = el.value; app.markDirty(0); }
   }
+  // (while it's typed: "Next:" follows each whole time, and all of it is one undo step)
+  let timing = false;
+  function liveTime(e: ScheduleEntry, el: HTMLInputElement) {
+    if (!/^\d\d:\d\d$/.test(el.value) || el.value === e.at) return;
+    if (!timing) { app.checkpoint(); app.holdUndo = true; timing = true; }
+    e.at = el.value;
+  }
+  function endTime() { if (timing) { timing = false; app.holdUndo = false; app.markDirty(0); } }
+  $effect(() => () => endTime());              // (closed while typing: the undo step closes too)
   // By the sun ("30 min after sunset"): the time moves with the date. `at` keeps today's, for an
   // older app that doesn't know the sun.
   const OFFSETS = [[-120, '2 h before'], [-60, '1 h before'], [-45, '45 min before'], [-30, '30 min before'], [-15, '15 min before'], [0, 'on the dot'],
@@ -167,7 +177,7 @@
                 {#each offsets(e) as [m, label] (m)}<option value={m}>{label}</option>{/each}</select>
               <span class="today" title="Today's time (it moves with the sun)">{timeOn(e, now, place) || 'not today'}</span>
             {:else}
-              <input type="time" value={e.at} disabled={ro} aria-label="Time" data-entry-time onblur={(ev) => setTime(e, ev.currentTarget)} onkeydown={(ev) => { if (ev.key === 'Enter') setTime(e, ev.currentTarget); }} />
+              <input type="time" value={e.at} disabled={ro} aria-label="Time" data-entry-time oninput={(ev) => liveTime(e, ev.currentTarget)} onblur={(ev) => setTime(e, ev.currentTarget)} onkeydown={(ev) => { if (ev.key === 'Enter') setTime(e, ev.currentTarget); }} />
             {/if}
           </div>
           <!-- one segmented control; every day (none picked) is the quiet default -->

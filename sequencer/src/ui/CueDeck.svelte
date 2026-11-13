@@ -202,7 +202,7 @@
       <button onclick={() => app.back()} disabled={!list.cues.length} title="Previous cue (Backspace)" aria-label="Back"><Icon name="back" /></button>
       <button class="go" onclick={() => app.go()} disabled={!list.cues.length} title="Next cue (Space)">GO <Icon name="play" /></button>
       <button onclick={() => app.release()} disabled={!st?.running} title="Fade this list out">Release</button>
-      <button class="ghost" class:on={list.end === 'loop'} onclick={() => (list.end = list.end === 'loop' ? 'stop' : 'loop')} title="Loop: start over after the last cue" aria-label="Loop"><Icon name="loop" /></button>
+      <button class="ghost" class:on={list.end === 'loop'} aria-pressed={list.end === 'loop'} onclick={() => (list.end = list.end === 'loop' ? 'stop' : 'loop')} title="Loop: start over after the last cue" aria-label="Loop"><Icon name="loop" /></button>
       <button class="ghost" class:on={settings} onclick={() => (settings = !settings)} title="List settings" aria-label="List settings"><Icon name="gear" /></button>
     {/if}
   </div>

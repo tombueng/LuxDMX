@@ -2,9 +2,10 @@
   // A number field that leaves you alone while you type: a comma or a point for the decimals
   // (whatever the browser's language), nothing rewritten under the cursor (9999 stays 9999 until
   // you leave the field, then it's 600 if that's the most), arrow keys step it.
-  let { value, min = 0, max = Infinity, step = 1, onset, label, placeholder = '', title = '', width = '4.5em' }: {
+  // (`required`: a field emptied comes back with its value when you leave it, nothing to leave blank)
+  let { value, min = 0, max = Infinity, step = 1, onset, label, placeholder = '', title = '', width = '4.5em', required = false }: {
     value: number | undefined; min?: number; max?: number; step?: number; onset: (v: number | undefined) => void;
-    label: string; placeholder?: string; title?: string; width?: string;
+    label: string; placeholder?: string; title?: string; width?: string; required?: boolean;
   } = $props();
   let el = $state<HTMLInputElement>();
   let editing = $state(false);
@@ -14,12 +15,12 @@
   $effect(() => { const v = value; if (el && !editing) el.value = fmt(v); });
   function input() {
     const v = parse(el!.value);
-    if (v === undefined || (Number.isFinite(v) && v >= min && v <= max)) onset(v);
+    if ((v === undefined && !required) || (v !== undefined && Number.isFinite(v) && v >= min && v <= max)) onset(v);
   }
   function done() {
     editing = false;
     const v = parse(el!.value);
-    const kept = v === undefined ? undefined : Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : value;
+    const kept = v === undefined ? (required ? value : undefined) : Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : value;
     if (kept !== value) onset(kept);
     el!.value = fmt(kept);
   }

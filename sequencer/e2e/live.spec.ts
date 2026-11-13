@@ -76,6 +76,10 @@ test('fog runs only while held, and never longer than its maximum', async ({ pag
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
   await fog.click();
   await page.getByLabel('Maximum seconds').fill('1');
+  // emptied, it comes back with its value (it stayed blank while the button said the old one)
+  await page.getByLabel('Maximum seconds').fill('');
+  await page.getByLabel('Maximum seconds').press('Tab');
+  await expect(page.getByLabel('Maximum seconds')).toHaveValue('1');
   await page.locator('.live').getByRole('button', { name: 'Done', exact: true }).click();
   // hold the key: fog on, then off after 1 s although the key is still down
   await page.keyboard.down('v');

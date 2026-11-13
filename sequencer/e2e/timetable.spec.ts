@@ -60,7 +60,10 @@ test('timetable rows stay where they are while you edit them (sorted again next 
   await dlg.getByRole('button', { name: 'Add a time' }).click();
   await dlg.getByRole('button', { name: 'Add a time' }).click();
   const times = dlg.getByLabel('Time', { exact: true });
-  await times.first().fill('23:00'); await times.first().press('Tab');
+  await times.first().fill('23:00');
+  // taken while it's typed (Next: follows), before Tab or Enter
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.settings.schedule.some((e: any) => e.at === '23:00'))).toBe(true);
+  await times.first().press('Tab');
   await expect(times.first()).toHaveValue('23:00');                         // still the first row
   await dlg.getByRole('button', { name: 'Su' }).first().click();            // and this tap lands on it
   const days = await page.evaluate(() => (window as any).__luxdmx.show.settings.schedule.map((e: any) => e.days ?? null));

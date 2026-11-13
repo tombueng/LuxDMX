@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NumField from './NumField.svelte';
   import { SONG_NAME, SPECIAL_NAME } from './widgetFace';
   // Settings of the live control selected in Edit mode.
   import Icon from './Icon.svelte';
@@ -54,7 +55,8 @@
   {:else if w.type === 'fog'}
     <p class="faint">Fog only runs while the button is held, and switches off after the maximum even if it's still held.</p>
     <label>Output <input type="range" min="0.1" max="1" step="0.05" bind:value={w.level} aria-label="Fog output" /></label>
-    <label>Maximum (s) <input type="number" min="1" max="60" value={w.max} aria-label="Maximum seconds" onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v)) w.max = Math.max(1, Math.min(60, v)); }} /></label>
+    <!-- (emptied, it comes back with the maximum it has: it stayed blank while the button said 60 s) -->
+    <label>Maximum (s) <NumField value={w.max} min={1} max={60} required label="Maximum seconds" onset={(v) => { if (v !== undefined) w.max = v; }} /></label>
     <div class="fx">
       {#each app.show.fixtures.filter((f) => app.caps(f.id).fog) as f (f.id)}
         <label class="ck"><input type="checkbox" checked={w.fixtures.includes(f.id)} onchange={(e) => { w.fixtures = (e.target as HTMLInputElement).checked ? [...w.fixtures, f.id] : w.fixtures.filter((x) => x !== f.id); }} />{f.name}</label>
