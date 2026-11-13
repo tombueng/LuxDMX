@@ -656,3 +656,21 @@ test('a laptop at 140 % interface size: the fixture list still shows lights, the
   const name = page.locator('.top .show .name');
   expect(await name.evaluate((n) => n.getBoundingClientRect().width)).toBeGreaterThan(60);
 });
+
+test('the timeline at 140 % on a laptop: Fit and Zoom in on the screen, the transport wraps', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await openConnected(page);
+  await page.evaluate(async () => { const m = await import('/src/ui/ui.svelte.ts'); m.ui.setZoom(1.4); });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  const tr = page.locator('.tlv .transport');
+  for (const name of ['Zoom in', 'Zoom out']) {
+    const b = (await tr.getByRole('button', { name }).boundingBox())!;
+    expect(b.x + b.width).toBeLessThanOrEqual(1366);
+  }
+  const fit = (await tr.getByRole('button', { name: 'Fit' }).boundingBox())!;
+  expect(fit.x + fit.width).toBeLessThanOrEqual(1366);
+  // and a wide window at 100 % keeps it on one row
+  await page.evaluate(async () => { const m = await import('/src/ui/ui.svelte.ts'); m.ui.setZoom(1); });
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await expect.poll(() => tr.evaluate((t) => getComputedStyle(t).flexWrap)).toBe('nowrap');
+});

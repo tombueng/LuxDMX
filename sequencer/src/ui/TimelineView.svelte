@@ -898,13 +898,15 @@
   .preview { min-height: 0; display: flex; overflow: hidden; }      /* (never over the transport) */
   .preview :global(.stage-wrap) { flex: 1; }
   .transport { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: .35rem .5rem; }
-  /* (one row on a laptop: the song's name gets shorter, then the volumes) */
-  @media (min-width: 1340px) {
+  /* (one row on a laptop: the song's name gets shorter, then the volumes. In rem of the app's width,
+     not px of the window: at 140 % interface size a 1366 px laptop is narrower than that, and the
+     row ran past the edge with Fit and Zoom in off the screen) */
+  @container app (min-width: 95.72rem) {
     .transport { flex-wrap: nowrap; min-width: 0; }
     .transport > :global(*) { flex-shrink: 0; }
     .transport > .name { flex-shrink: 1; min-width: 2rem; }
   }
-  @media (min-width: 1340px) and (max-width: 1500px) { .vol input { width: 4.5rem; } }
+  @container app (min-width: 95.72rem) and (max-width: 107.14rem) { .vol input { width: 4.5rem; } }
   .play { min-width: 6.5rem; }
   .clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
   .bpm input { width: 4.2em; }
