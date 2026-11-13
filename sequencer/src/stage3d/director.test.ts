@@ -16,7 +16,7 @@ import type { Stage } from './rooms';
 import { DEMOS } from '../content/demos';
 import { kindOf, modeOf, typeMap } from '../model/library';
 
-const IDS = Object.keys(ROOMS) as RoomId[];
+const IDS = Object.keys(ROOMS) as Exclude<RoomId, 'custom'>[];
 const MODES = CAM_MODES.map((m) => m.id).filter((m) => m !== 'tour') as Exclude<CamMode, 'tour'>[];
 const FPS = 30, BPM = 126;
 // how fast the real thing goes: m/s and degrees a second (Broadcast and Band cam within a shot)
@@ -32,7 +32,7 @@ const PARTS: Part[] = [{ name: 'Intro', at: 0, energy: 0.3 }, { name: 'Verse', a
   { name: 'Break', at: 99.05, energy: 0.35 }, { name: 'Chorus', at: 129.52, energy: 0.9 }, { name: 'Verse 2', at: 160, energy: 0.6 }, { name: 'Drop 2', at: 190.48, energy: 1 }, { name: 'Outro', at: 220.95, energy: 0.3 }];
 interface Frame { t: number; beat: number; s: Shot }
 function run(mode: CamMode, id: RoomId, o: { secs?: number; parts?: boolean; cast?: Cast; t0?: number; energy?: (t: number) => number } = {}) {
-  const r = ROOMS[id], cast = o.cast ?? castOf(id), mem = newMemory(), out: Frame[] = [], t0 = o.t0 ?? 500;
+  const r = ROOMS[id as Exclude<RoomId, 'custom'>], cast = o.cast ?? castOf(id), mem = newMemory(), out: Frame[] = [], t0 = o.t0 ?? 500;
   for (let i = 0; i < (o.secs ?? 240) * FPS; i++) {
     const t = t0 + i / FPS, song = i / FPS, beat = (song * BPM) / 60;
     const m: Music = { t, beat, energy: (o.energy ?? energyAt)(song), part: o.parts ? partAt(PARTS, song) : null };

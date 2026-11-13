@@ -858,7 +858,12 @@ Three more demos come with their own room on the 3D stage:
   on the room's rig. The camera views go inside the pub. The demos bring rooms of their own: a club
   (a stage framed by truss on four towers, a truss over the dance floor, a bar at the back, a
   mirror ball), a party room (a square of truss over the crowd, no stage) and an empty room with
-  one truss; the camera views go inside them too. **Band name**: your band's name on the
+  one truss; the camera views go inside them too. **Your stage**: your real stage at its size,
+  width and depth in metres, on a riser (1.2 m) or on the floor, 0 to 4 trusses across it on
+  towers and how high their underside is. The room, its crowd and the camera views and moves are
+  built for it; your lights hang on its trusses and the plan is that stage (a quarter across the
+  plan is a quarter of its width), so **Measure** gives real distances. It's kept with the show.
+  **Band name**: your band's name on the
   backdrop, the banners, the screens and the kick drum (painted in the style of the band picture
   that's there by default; leave it empty for the picture; in the club and at the party it's on
   the front of the DJ booth). Both are kept with the show (the screens' live camera in this browser).

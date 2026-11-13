@@ -103,7 +103,7 @@ const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: numb
 const both = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, what: string) => [bx(x0, x1, y0, y1, z0, z1, what), bx(-x1, -x0, y0, y1, z0, z1, what)];
 const cap = (a: P3, b: P3, r: number, what: string): Cap => ({ a: P(a), b: P(b), r: r + CLEAR, what });
 // the big things in each room that a camera could fly into (metres, as venue.ts / rooms.ts build them)
-const GEAR: Record<RoomId, Box[]> = {
+const GEAR: Record<Exclude<RoomId, 'custom'>, Box[]> = {
   hall: [
     ...both(4.55, 5.45, DECK, DECK + 1.7, -0.85, -0.15, 'an amp'), ...both(6.5, 7.4, DECK, DECK + 1.6, 0.9, 1.8, 'a side fill'),
     bx(7.5, 9.0, DECK, DECK + 1.9, 0.2, 1.5, 'monitor world'), bx(8.2, 8.9, DECK, DECK + 1.2, -0.7, 0, 'the in-ear rack'),
@@ -139,13 +139,13 @@ function trussOf(r: Room): Seg[] {
   for (const x of [xl, xr]) segs.push([[x, TRUSS[0].y + 0.6, TRUSS[0].z], [x, TRUSS[2].y + 0.6, TRUSS[2].z]]);
   return segs;
 }
-const spaces = new WeakMap<Cast, Map<RoomId, Space>>();
+const spaces = new WeakMap<Cast, Map<string, Space>>();
 export function spaceOf(r: Room, c: Cast): Space {
   let m = spaces.get(c);
   if (!m) spaces.set(c, (m = new Map()));
-  let s = m.get(r.id);
+  let s = m.get(r.key ?? r.id);
   if (s) return s;
-  const w = r.walls, caps: Cap[] = [], boxes: Box[] = [...GEAR[r.id]];
+  const w = r.walls, caps: Cap[] = [], boxes: Box[] = [...(r.id === 'custom' ? [] : GEAR[r.id])];
   for (const [a, b] of trussOf(r)) {
     caps.push(cap(a, b, 0.15, 'the truss'));
     // a level piece has lights under it (a head hangs about a metre and a quarter below its middle)
@@ -168,7 +168,7 @@ export function spaceOf(r: Room, c: Cast): Space {
   const deck = r.deck.x > 0 ? bx(-r.deck.x, r.deck.x, 0, DECK + 0.6, r.deck.z0 - (r.id === 'hall' ? 0.4 : 0), r.deck.z1, 'the deck') : null;
   // inside the walls (half a metre off them), under the ceiling's beams, over what stands on the floor
   s = { room: r, lo: v3(-w.x + 0.5, 1.3, w.z0 + 0.5), hi: v3(w.x - 0.5, r.ceiling - 0.8, w.z1 - 0.5), deck, boxes, caps, crowd: CROWDS[r.id] };
-  m.set(r.id, s);
+  m.set(r.key ?? r.id, s);
   return s;
 }
 const inBox = (b: Box, p: V3) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1 && p.z > b.z0 && p.z < b.z1;
@@ -259,7 +259,7 @@ interface Crew {
 }
 const mirror = (f: Fixed): Fixed => ({ ...f, pos: [-f.pos[0], f.pos[1], f.pos[2]], at: [-f.at[0], f.at[1], f.at[2]], move: f.move && [-f.move[0], f.move[1], f.move[2]], pan: f.pan && [-f.pan[0], f.pan[1], f.pan[2]] });
 const side = (f: Fixed): { left: Fixed; right: Fixed } => ({ left: f, right: mirror(f) });
-export const CREW: Record<RoomId, Crew> = {
+export const CREW: Record<Exclude<RoomId, 'custom'>, Crew> = {
   hall: {
     wide: { pos: [0, 4.6, 23.9], at: [0, 3.4, 0.5], fov: 30, pan: [1.6, 0, 0], zoom: 0.8 },
     high: { pos: [-15, 10.5, 16], at: [0, 2.8, 0.5], fov: 36, move: [3, 0, 0] },
@@ -336,6 +336,28 @@ export const CREW: Record<RoomId, Crew> = {
     drone: { zc: 1.5, rx: 7, rz: 10, y: 4.7, bob: 0.25, arc: 0.95, gate: 4.7, near: [1.5, 2.7, 5.0], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 3.0, 1.5], lookNear: [0, 3.3, 1.5] },
   },
 };
+// your own stage: the test truss's crew, moved and stretched to its size (the truss room's stage
+// is ~11 m wide round its truss at z 1.5, 4 m up)
+const crews = new Map<string, Crew>();
+export function crewOf(r: Room): Crew {
+  if (r.id !== 'custom') return CREW[r.id];
+  const had = crews.get(r.key ?? '');
+  if (had) return had;
+  const t = CREW.truss, kx = Math.max(0.8, r.W / 11), kz = Math.max(0.8, r.D / 6), ty = r.truss[0]?.y ?? 5, ky = Math.max(0.8, ty / 4.0);
+  const lift = r.deck.x > 0 ? DECK : 0;
+  const p = ([x, y, z]: P3): P3 => [x * kx, y * ky + lift * 0.5, (z - 1.5) * kz];
+  const v = ([x, y, z]: P3): P3 => [x * kx, y * ky, z * kz];
+  const fx = (f: Fixed): Fixed => ({ ...f, pos: p(f.pos), at: p(f.at), ...(f.move ? { move: v(f.move) } : {}), ...(f.pan ? { pan: v(f.pan) } : {}) });
+  const c: Crew = {
+    wide: fx(t.wide), high: fx(t.high), left: fx(t.left), right: fx(t.right), crowd: fx(t.crowd), back: fx(t.back), front: fx(t.front),
+    pit: { z: (t.pit.z - 1.5) * kz, y: t.pit.y * ky + lift * 0.5, x: t.pit.x * kx },
+    crane: { ...t.crane, pivot: p(t.crane.pivot), a: p(t.crane.a), b: p(t.crane.b), lookA: p(t.crane.lookA), lookB: p(t.crane.lookB) },
+    walk: { y: t.walk.y * ky + lift * 0.5, way: t.walk.way.map(([x, z]) => [x * kx, (z - 1.5) * kz] as [number, number]), look: t.walk.look.map(p) },
+    drone: { ...t.drone, zc: 0, rx: t.drone.rx * kx, rz: t.drone.rz * kz, y: t.drone.y * ky, gate: t.drone.gate * ky, near: p(t.drone.near), lookFar: p(t.drone.lookFar), lookNear: p(t.drone.lookNear) },
+  };
+  crews.set(r.key ?? '', c);
+  return c;
+}
 
 // ---- what a crew remembers between frames
 export interface Memory {
@@ -411,7 +433,7 @@ function fixedAt(f: Fixed, s: number, seed: number, t: number, cam: string): Sho
 // ---- Crane: an arm from the pivot, swinging and telescoping from over the crowd (a) to the stage (b)
 function sph(c: V3, p: V3) { const d = add(p, c, -1), r = Math.hypot(d.x, d.y, d.z); return { r, yaw: Math.atan2(d.x, d.z), pitch: Math.asin(clamp(d.y / r, -1, 1)) }; }
 function craneAt(r: Room, t: number, loud: number): Shot {
-  const c = CREW[r.id].crane, piv = P(c.pivot), A = sph(piv, P(c.a)), B = sph(piv, P(c.b));
+  const c = crewOf(r).crane, piv = P(c.pivot), A = sph(piv, P(c.a)), B = sph(piv, P(c.b));
   // out and back: slowing to a stop at each end (s 0 over the crowd, 1 at the stage)
   const s = 0.5 - 0.5 * Math.cos((TAU * t) / c.period);
   const rr = A.r + (B.r - A.r) * s, yaw = A.yaw + (B.yaw - A.yaw) * s;
@@ -428,7 +450,7 @@ interface Path { pts: V3[]; cum: Float64Array; us: Float64Array; len: number; lo
 // (what it looks at, every LOOK_STEP metres along the way, averaged over a few metres: an operator
 // turns smoothly from the drummer to the singer, not as fast as the points change)
 const LOOK_STEP = 0.1, LOOK_SPAN = 2.4;
-const paths = new Map<RoomId, Path>();
+const paths = new Map<string, Path>();
 function cr(a: number, b: number, c: number, d: number, u: number) {
   const u2 = u * u, u3 = u2 * u;
   return 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (3 * b - a - 3 * c + d) * u3);
@@ -439,9 +461,9 @@ function along(list: V3[], u: number): V3 {
   return v3(cr(a.x, b.x, c.x, d.x, f), cr(a.y, b.y, c.y, d.y, f), cr(a.z, b.z, c.z, d.z, f));
 }
 function pathOf(r: Room): Path {
-  let p = paths.get(r.id);
+  let p = paths.get(r.key ?? r.id);
   if (p) return p;
-  const w = CREW[r.id].walk, pts = w.way.map(([x, z]) => v3(x, w.y, z)), looks = w.look.map(P);
+  const w = crewOf(r).walk, pts = w.way.map(([x, z]) => v3(x, w.y, z)), looks = w.look.map(P);
   const N = 48 * (pts.length - 1), cum = new Float64Array(N + 1), us = new Float64Array(N + 1);
   let last = along(pts, 0);
   for (let i = 1; i <= N; i++) { const u = (i / N) * (pts.length - 1), q = along(pts, u); cum[i] = cum[i - 1] + Math.hypot(q.x - last.x, q.y - last.y, q.z - last.z); us[i] = u; last = q; }
@@ -458,7 +480,7 @@ function pathOf(r: Room): Path {
   const h = Math.round(LOOK_SPAN / 2 / LOOK_STEP), mid = new Float64Array(n * 3);
   box(raw, mid, h); box(mid, look, h);
   p = tmp;
-  paths.set(r.id, p);
+  paths.set(r.key ?? r.id, p);
   return p;
 }
 function lookAt(p: Path, d: number): V3 {
@@ -488,7 +510,7 @@ function steadicamAt(r: Room, t: number): Shot {
 
 // ---- Drone: big arcs out high, diving in on a drop
 function droneAt(r: Room, t: number, dive: number): Shot {
-  const c = CREW[r.id].drone, [g0, g1, x0, x1, n0, n1] = c.phase;
+  const c = crewOf(r).drone, [g0, g1, x0, x1, n0, n1] = c.phase;
   const w1 = TAU / 72, w2 = TAU / 27, a = c.arc * (0.75 * Math.sin(w1 * t) + 0.25 * Math.sin(w2 * t + 1.3));
   const da = c.arc * (0.75 * w1 * Math.cos(w1 * t) + 0.25 * w2 * Math.cos(w2 * t + 1.3));
   const far = v3(c.rx * Math.sin(a), c.y + c.bob * Math.sin((TAU * t) / 37), c.zc + c.rz * Math.cos(a));
@@ -545,7 +567,7 @@ function closeAt(c: Close, s: number, t: number, seed: number): Shot {
 }
 // Broadcast's long lens from the pit (or from in front of the DJ, or on a light)
 function pitShot(r: Room, c: Cast, pick: number): Close {
-  const crew = CREW[r.id];
+  const crew = crewOf(r);
   const ppl = c.people.filter((p) => p.who !== 'drums' || r.id !== 'hall');
   if (!ppl.length) { const s = subjects(r, c); return s[pick % s.length](pick); }
   // (the singer or the DJ half the time)
@@ -592,7 +614,7 @@ function broadcast(r: Room, m: Music, c: Cast, mem: Memory, crane: () => Shot): 
     else if (since >= 8 || (since >= 2 && since >= Math.min(mem.hold, want))) { cut(mem, bar, m.t, nextCam(mem, bar), want); did = true; }
   }
   mem.tick = bar;
-  const s = Math.max(0, m.t - mem.cutT), crew = CREW[r.id], name = CAMS[mem.cam];
+  const s = Math.max(0, m.t - mem.cutT), crew = crewOf(r), name = CAMS[mem.cam];
   const shot = name === 'crane' ? crane() : name === 'close' ? closeAt(pitShot(r, c, mem.cutAt), s, m.t, mem.seed)
     : name === 'frontL' || name === 'frontR' ? fixedAt(name === 'frontL' ? crew.front : mirror(crew.front), s, mem.seed, m.t, name) : fixedAt(crew[name], s, mem.seed, m.t, name);
   shot.cut = did;

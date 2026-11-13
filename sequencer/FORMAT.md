@@ -418,7 +418,12 @@ name (or `bandName`); `"band"` or left out, the band plays. `room`: the built-in
 low ceiling with two little trusses), or one of the demos' rooms: `"club"` (a DJ on a 12 m stage
 with truss on four towers and one over the dance floor), `"party"` (no stage: a 12 x 12 m square
 of truss over the crowd on four legs, the DJ's table on the floor) or `"truss"` (an empty room with
-one straight truss on two towers). Lights without a `p3` of their own go where their plan
+one straight truss on two towers), or `"custom"`: your own stage at the size in `size`, `{ w, d,
+riser?, trussY?, trusses? }` in metres: the deck `w` wide and `d` deep, on a 1.2 m riser
+(`riser: true`, the default) or on the floor, `trusses` spans across it (0 to 4, default 2) on
+towers at its sides, their underside `trussY` above the floor (default 5). Out of range numbers are
+brought into range on load (width 2-40, depth 1.5-25, truss 2.5-15 m); without `size` it's 8 x 5 m.
+The plan is that stage: a quarter across the plan is a quarter across its width. Lights without a `p3` of their own go where their plan
 position puts them in that room; a `p3` stays where it is in metres in either. Any other value is
 dropped on load (the big stage).
 

@@ -311,7 +311,7 @@ export interface Show {
   // bandName: the band's name on the 3D stage's banners and screens (unset: the band's picture)
   // marks: tape on the real stage, where they are (metres, the 3D stage's frame): heads are steered
   // onto them to work out where they really hang (model/calibrate.ts), and to point at
-  settings: { bpm: number; marks?: StageMark[]; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss'; act?: 'band' | 'none' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string; consoleMidi?: ConsoleMidi[]; recordChanges?: boolean };
+  settings: { bpm: number; marks?: StageMark[]; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom'; size?: { w: number; d: number; riser?: boolean; trussY?: number; trusses?: number }; act?: 'band' | 'none' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string; consoleMidi?: ConsoleMidi[]; recordChanges?: boolean };
   timeline?: Timeline;              // a song with cues, effects and moments on it (model/timeline.ts): the one that's up
   setlist?: SetList;                // the other songs of the set, before and after it, in order (model/timeline.ts)
   extensions: Record<string, unknown>;

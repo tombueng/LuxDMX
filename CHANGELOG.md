@@ -56,6 +56,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   and the 2400+ library fixtures. Every tile plays its light in 3D: spots sweep and run their gobos
   and prisms, washes breathe, PARs run the colours, bars chase. All in one WebGL context, only the
   tiles on the screen, so it stays smooth. The old library popup is gone.
+- 3D: **Your stage** in the Venue panel: your real stage at its size (width, depth, a riser or
+  not, how many trusses and how high). The room, crowd and camera moves are built for it, the
+  lights hang on its trusses, the plan is that stage.
 - 3D: **Measure** next to Aim: two clicks give the distance (across, up or down); one light gives
   its height above the deck or floor and where its beam lands, how far and how wide.
 - 3D: **Selected** next to the camera views flies the camera to the selected lights, and **Show it

@@ -33,8 +33,8 @@ export interface Stage {
   // the DJ (for the tests): the person, how far the left hand is up, the booth (the person's parent)
   dj?: { p: Person; raised: () => number; booth: THREE.Object3D };
 }
-export type DemoRoom = 'club' | 'party' | 'truss';
-export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss';
+export type DemoRoom = 'club' | 'party' | 'truss' | 'custom';
+export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss' || r === 'custom';
 
 // Is WebGL drawn in software here (no graphics chip: SwiftShader, llvmpipe)? Hundreds of people cost
 // a second a frame there.
@@ -128,8 +128,9 @@ function frame(group: THREE.Group, M: Mats, r: Room) {
   }
 }
 
-export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {}): Stage {
-  const r = ROOMS[id], M = gearMats(), group = new THREE.Group();
+// (your own stage: its room comes with it, built from its size, geometry.ts customRoom)
+export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; custom?: Room } = {}): Stage {
+  const r = id === 'custom' ? o.custom! : ROOMS[id], M = gearMats(), group = new THREE.Group();
   const soft = softwareGL();
   let crowd: Crowd | undefined, dj: Stage['dj'];
   let booth: ReturnType<typeof djBooth> | undefined, boothName = '', boothShows = '';
@@ -171,6 +172,16 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {
     }
     // the DJ's road cases against the back wall, water
     group.add(at(roadCase(M, 1.0, 0.75, 0.65, { wheels: true, stencil: 7 }), -2.4, 0, Z0 + 0.6), at(roadCase(M, 1.0, 0.75, 0.65, { stencil: 0 }), -2.4, 0.86, Z0 + 0.6), at(waterCrate(M), 2.2, 0, Z0 + 0.5, [0, 0.3, 0]));
+  } else if (id === 'custom') {
+    // your own stage: the hall's walls, its deck (or none), its spans on towers, a PA either side
+    shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x6a6a70 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ color: 0x1a1b1f })) });
+    if (r.deck.x > 0) {
+      const { x: dx, z0, z1 } = r.deck, dd = z1 - z0, top = std({ map: stageFloor(), roughness: 0.72 });
+      group.add(at(new THREE.Mesh(new THREE.BoxGeometry(2 * dx, DECK, dd), [M.black, M.black, top, M.black, M.black, M.black]), 0, DECK / 2, (z0 + z1) / 2)).name = 'deck';
+      for (let i = 0; i < 3; i++) { const h = (DECK / 4) * (3 - i); group.add(at(box(0.9, h, 0.3, [M.black, M.black, top, M.black, M.black, M.black]), -dx + 0.6, h / 2, z1 + 0.15 + 0.3 * i)); }
+    }
+    frame(group, M, r);
+    for (const sx of [-1, 1]) { const pa = paStack(M); pa.rotation.y = -sx * 0.25; group.add(at(pa, sx * (r.deck.x > 0 ? r.deck.x + 1.2 : r.W / 2 + 1.2), 0, r.D / 2 - 0.2)); }
   } else {
     shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0xa4a4a8 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ map: roofDeck(), color: 0x9a9aa0 })) });
     frame(group, M, r);
@@ -204,6 +215,12 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {
     crowd = buildCrowd(o.crowd ?? (soft ? 100 : 240), {
       z0: D / 2 + 1.0, z1: W.z1 - 3.4, spread: () => W.x - 1.4, flags: 0,
       keepOut: (x, z) => (Math.abs(x) > 7.2 && z < D / 2 + 1.4),
+    });
+  } else if (id === 'custom') {
+    // (a crowd in front of your stage, the size of the room)
+    const W = r.walls;
+    crowd = buildCrowd(o.crowd ?? Math.round((soft ? 0.4 : 1) * Math.min(260, (W.z1 - r.D / 2 - 4) * (2 * W.x - 3) * 0.9)), {
+      z0: r.D / 2 + 1.4, z1: W.z1 - 3, spread: () => W.x - 1.4, flags: 0, keepOut: () => false,
     });
   } else if (id === 'party') {
     const W = r.walls, legs: [number, number][] = [[-6, 1.5], [6, 1.5], [-6, 13.5], [6, 13.5]];

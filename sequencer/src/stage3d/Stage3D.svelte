@@ -56,7 +56,7 @@
   import { Rig, type RigFixture } from './rig';
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
   import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
@@ -91,7 +91,7 @@
   let full = $state(false);
 
   // the built-in room: the big stage in a hall, or a small club / pub (geometry.ts ROOMS)
-  const room = $derived(roomOf(app.show.settings.stage3d?.room));
+  const room = $derived(roomFor(app.show.settings.stage3d));
   // every light as the 3D stage needs it (rebuilt when the lights, their types or places change)
   // (a light without a 3D place of its own goes where its plan position puts it in this room)
   const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => rigFixtureFull(f, app.modeOf(f.id), app.kinds[f.id] ?? 'other', app.types.get(f.typeId), room)));
@@ -181,7 +181,7 @@
     const at = ui.focus3d;
     if (!at || at === focusSeen || Date.now() - at > 5000) return;
     // (after the room is built: building it puts the camera at the front)
-    const go = () => { if (!controls || !fixtures.length || !holding || builtRoom !== room.id) return void setTimeout(go, 100); focusSeen = at; requestAnimationFrame(() => focusSel()); };
+    const go = () => { if (!controls || !fixtures.length || !holding || builtRoom !== (room.key ?? room.id)) return void setTimeout(go, 100); focusSeen = at; requestAnimationFrame(() => focusSel()); };
     untrack(go);
   });
   // the list of moves (opened from the keys: onto the one running, or the first)
@@ -240,7 +240,7 @@
     // (a dozen times a second; less on a computer that draws slowly: never more than every fourth frame)
     if (t - feed.at < Math.max(load.level >= 2 ? 1 / 15 : 1 / 8, 4 * frameDt) && t >= feed.at) return;
     feed.at = t;
-    const r = roomOf(venue.room), s = direct('broadcast', r, { t, beat: app.engine.beatCount, energy, part: partNow(app.show.timeline) }, castNow(r), feed.mem), c = feed.cam;
+    const r = room, s = direct('broadcast', r, { t, beat: app.engine.beatCount, energy, part: partNow(app.show.timeline) }, castNow(r), feed.mem), c = feed.cam;
     c.position.set(s.pos.x, s.pos.y, s.pos.z); c.up.set(0, 1, 0); c.lookAt(s.at.x, s.at.y, s.at.z);
     if (s.roll) c.rotateZ(s.roll * RD);
     if (c.fov !== s.fov) { c.fov = s.fov; c.updateProjectionMatrix(); }
@@ -259,7 +259,7 @@
 
   // this frame's shot: where the crew has the camera, what it looks at, its lens and roll
   function shoot(t: number, energy: number) {
-    const r = roomOf(venue.room);
+    const r = room;
     const s = direct(camMode!, r, { t, beat: app.engine.beatCount, energy, part: partNow(app.show.timeline) }, castNow(r), crewMem);
     camera.position.set(s.pos.x, s.pos.y, s.pos.z); controls.target.set(s.at.x, s.at.y, s.at.z);
     camera.up.set(0, 1, 0); camera.lookAt(controls.target);
@@ -372,7 +372,7 @@
     // three washes over the deck, coloured by what the lights do on each side (the band and the
     // backdrop take the show's colours; hundreds of real lights would be far too slow)
     wash = [-1, 0, 1].map((s) => { const l = new THREE.SpotLight(0xffffff, 0, 40, 0.55, 0.6, 1.2); l.position.set(s * 5, 11, 7); l.target.position.set(s * 3.5, DECK, -0.5); scene.add(l, l.target); return l; });
-    venue = buildVenue({ room: room.id, band: bandShown, act }); builtRoom = room.id; builtAct = act; showRoom(room);
+    venue = buildVenue({ room: room.id, band: bandShown, act, custom: room }); builtRoom = room.key ?? room.id; builtAct = act; showRoom(room);
     scene.add(venue.group);
     rig = new Rig(); scene.add(rig.group);
     { const r = rig; void makeGobos().then((a) => { if (rig === r) r.setGobos(a.tex); }); }
@@ -440,7 +440,8 @@
       flying: () => !!fly,
       measure: () => (meas ? { a: { ...meas.a }, b: meas.b ? { ...meas.b } : undefined, said: measSaid } : null),
       // the room and its people, what the band's banners show; the take running (its frame count)
-      venue: () => ({ room: venue.room, crowd: venue.crowdCount, group: venue.group.uuid, band: venue.bandInfo() }),
+      venue: () => ({ room: venue.room, key: builtRoom, crowd: venue.crowdCount, group: venue.group.uuid, band: venue.bandInfo(), deck: { ...room.deck }, truss: room.truss.map((t) => ({ ...t })) }),
+      where: (id: string) => { const f = fixtures.find((x) => x.id === id); return f ? { ...f.p } : null; },
       take: () => take,
       // a moving head where its motors are (degrees), and the haze the beams get now
       head: (id: string) => rig.headOf(id),
@@ -813,9 +814,17 @@
   function removeModel() { app.checkpoint(); if (app.show.settings.stage3d) delete app.show.settings.stage3d.model; app.markDirty(0); }
   function setHideVenue(h: boolean) { app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, hideVenue: h || undefined }; app.markDirty(0); }
   // the built-in room: the big stage, or a small club / pub (kept with the show)
-  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss') {
+  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom') {
     if (room.id === id) return;
-    app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, room: id === 'hall' ? undefined : id }; app.markDirty(0);
+    const s3 = app.show.settings.stage3d;
+    app.checkpoint(); app.show.settings.stage3d = { ...s3, room: id === 'hall' ? undefined : id, ...(id === 'custom' && !s3?.size ? { size: { ...STAGE_SIZE } } : {}) }; app.markDirty(0);
+  }
+  // your own stage's size: each field as it's set (the room is built again for it)
+  const size = $derived(stageSize(app.show.settings.stage3d?.size));
+  function setSize(k: keyof typeof STAGE_SIZE, v: number | boolean) {
+    if (typeof v === 'number' && !Number.isFinite(v)) return;
+    const s3 = app.show.settings.stage3d;
+    app.checkpoint(); app.show.settings.stage3d = { ...s3, room: 'custom', size: stageSize({ ...s3?.size, [k]: v }) }; app.markDirty(0);
   }
   // the band's name on the banners, screens and kick drum (kept with the show; empty: their
   // picture). While typing the banners follow a moment later; Enter or leaving the field keeps it.
@@ -841,11 +850,11 @@
     const r = room, a = act;
     if (!holding) return;
     untrack(() => {
-      if (!scene || !venue || (r.id === builtRoom && a === builtAct)) return;
+      if (!scene || !venue || ((r.key ?? r.id) === builtRoom && a === builtAct)) return;
       scene.remove(venue.group); free(venue.group);
-      venue = buildVenue({ room: r.id, band: bandShown, act: a });
+      venue = buildVenue({ room: r.id, band: bandShown, act: a, custom: r });
       venue.group.visible = !app.show.settings.stage3d?.hideVenue;
-      scene.add(venue.group); builtRoom = r.id; builtAct = a; showRoom(r);
+      scene.add(venue.group); builtRoom = r.key ?? r.id; builtAct = a; showRoom(r);
       view('front');
     });
   });
@@ -1405,7 +1414,18 @@
           <button class="ghost" class:on={room.id === 'club'} aria-pressed={room.id === 'club'} onclick={() => setRoom('club')} title="A club: a DJ booth on a stage, LED strips round it, a dance floor with a bar and a mirror ball">Club</button>
           <button class="ghost" class:on={room.id === 'party'} aria-pressed={room.id === 'party'} onclick={() => setRoom('party')} title="No stage: a square of truss over the crowd on four legs, speakers in the corners, the DJ on the floor">Party</button>
           <button class="ghost" class:on={room.id === 'truss'} aria-pressed={room.id === 'truss'} onclick={() => setRoom('truss')} title="An empty room with one truss on two towers: for trying lights out">Test truss</button>
+          <button class="ghost" class:on={room.id === 'custom'} aria-pressed={room.id === 'custom'} onclick={() => setRoom('custom')} title="Your own stage at its real size: its width and depth, a riser or not, how many trusses and how high">Your stage</button>
         </div>
+        {#if room.id === 'custom'}
+          <!-- (each as it's set: the room is built again; the plan's width and depth are these too) -->
+          <div class="size" role="group" aria-label="Your stage's size">
+            <label class="fld"><span>Width m</span><input type="number" min="2" max="40" step="0.5" value={size.w} aria-label="Stage width (m)" onchange={(e) => setSize('w', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="fld"><span>Depth m</span><input type="number" min="1.5" max="25" step="0.5" value={size.d} aria-label="Stage depth (m)" onchange={(e) => setSize('d', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="fld"><span>Truss m</span><input type="number" min="2.5" max="15" step="0.1" value={size.trussY} aria-label="Truss height (m, its underside above the floor)" title="Its underside above the floor" onchange={(e) => setSize('trussY', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="fld"><span>Trusses</span><input type="number" min="0" max="4" step="1" value={size.trusses} aria-label="Trusses over the stage" onchange={(e) => setSize('trusses', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="ck"><input type="checkbox" checked={size.riser} onchange={(e) => setSize('riser', (e.target as HTMLInputElement).checked)} /> On a riser ({DECK} m up); off: on the floor</label>
+          </div>
+        {/if}
         <label class="fld bandname"><span>Band name (on the banners and screens)</span>
           <input type="text" maxlength="60" value={app.show.settings.bandName ?? ''} placeholder="Empty: the band's picture" aria-label="Band name"
             oninput={(e) => previewBand((e.target as HTMLInputElement).value)} onchange={(e) => setBandName((e.target as HTMLInputElement).value)} onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Enter') setBandName((e.target as HTMLInputElement).value); }} /></label>
@@ -1513,8 +1533,9 @@
   .venue .name { flex: 1 1 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .venue .fld input { width: 4.6em; padding: .1rem .25rem; font-size: .8rem; min-height: 0; }
   .venue .ck { flex: 1 1 100%; font-size: .8rem; display: flex; gap: .35rem; align-items: center; }
-  .venue .rooms { flex: 1 1 100%; }
-  .venue .rooms button { flex: 1; font-size: .8rem; padding: .2rem .5rem; }
+  .venue .size { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: .35rem .6rem; align-items: end; padding: .35rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .venue .rooms { flex: 1 1 100%; flex-wrap: wrap; }   /* (six rooms: two rows, never wider than the panel) */
+  .venue .rooms button { flex: 1 1 30%; font-size: .8rem; padding: .2rem .5rem; }
   .venue .bandname { flex: 1 1 100%; }
   .rpanel .what { flex: 1 1 100%; display: flex; flex-direction: column; gap: .2rem; }
   .rpanel .what input[type=number] { width: 4.2em; padding: .05rem .25rem; font-size: .8rem; min-height: 0; }

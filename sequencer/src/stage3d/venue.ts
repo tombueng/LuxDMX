@@ -22,7 +22,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { D, DECK, ROOMS, TRUSS, W, type RoomId } from './geometry';
+import { D, DECK, ROOMS, TRUSS, W, type Room, type RoomId } from './geometry';
 import { banner, boards, brick, concrete, darkWood, exitSign, grille, liveBanner, liveCanvas, nameLayout, neonSign, paintKick, pleats, rackFront, rug, screen, sparkle, stageFloor } from './textures';
 import { ARM, HIP, Person, SOLE, twoBone, type Look } from './people';
 import { bandSurface, type BandSurface } from './bandArt';
@@ -101,9 +101,9 @@ export interface Venue extends Stage {
 // service, a premiere): no band, no drum kit or backline, no flags or shoulders in the audience, the
 // banners and screens with the show's own name.
 export function buildVenue(o?: { crowd?: number; room?: 'hall' | 'pub'; band?: string; act?: 'band' | 'none' }): Venue;
-export function buildVenue(o?: { crowd?: number; room?: RoomId; band?: string; act?: 'band' | 'none' }): Stage;
-export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string; act?: 'band' | 'none' } = {}): Venue | Stage {
-  if (isDemoRoom(o.room)) return buildRoom(o.room, o);
+export function buildVenue(o?: { crowd?: number; room?: RoomId; band?: string; act?: 'band' | 'none'; custom?: Room }): Stage;
+export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string; act?: 'band' | 'none'; custom?: Room } = {}): Venue | Stage {
+  if (isDemoRoom(o.room)) return buildRoom(o.room, o);   // (your own stage: its room in o.custom)
   const room = o.room === 'pub' ? 'pub' : 'hall', pub = room === 'pub', L = LAYOUT[room];
   const M = {
     ...gearMats(),

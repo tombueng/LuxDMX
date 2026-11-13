@@ -8,7 +8,7 @@
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import { typeLabel } from '../model/library';
-  import { groundAt, roomOf, type Rot, type V3 } from '../stage3d/geometry';
+  import { groundAt, roomFor, type Rot, type V3 } from '../stage3d/geometry';
   import {
     aimHead, copySetup, DIR_LABEL, dirOf, frontOf, frontsFor, marksOf, mirrorRot, motors, mountOf, mountRot, MOUNTS, offsetsFor, opticsOf, otherSide,
     placeFor, placeOf, pointOf, pointRot, POINTS, rigFixtureOf, upOf, withFront, type Dir, type Mark, type MountId, type PanTilt, type PlaceRule, type PointId,
@@ -19,7 +19,7 @@
   const f = $derived(app.show.fixtures.find((x) => x.id === id));
   const kind = $derived(app.kinds[id] ?? 'other');
   const t = $derived(f ? app.types.get(f.typeId) : undefined);
-  const room = $derived(roomOf(app.show.settings.stage3d?.room));
+  const room = $derived(roomFor(app.show.settings.stage3d));
   const mover = $derived(kind === 'mover');
   const machine = $derived(kind === 'fog' || kind === 'sfx');
   // a winch (kinetics): its soft limits are set here
