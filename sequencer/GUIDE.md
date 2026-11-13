@@ -81,7 +81,7 @@ Press `?` for every keyboard shortcut and `Ctrl+K` to find anything. No lights c
 The app opens with a **welcome** in front of everything (the plan and the 3D stage alike) while
 the show has nothing in it: the first steps, the templates, opening a show file, and **Show me a
 demo**. It comes up once per show; closed, **Get started** on the empty stage brings it back (and
-Ctrl+K "demo"). The big demo is a festival stage with 233 lights on 22 universes, 114 of them
+Ctrl+K "demo", and **Demo shows…** in the Shows dialog, whatever show is open). The big demo is a festival stage with 233 lights on 22 universes, 114 of them
 moving heads (washes and beam heads on three trusses, beams standing on the deck, heads on the
 truss towers and in the pit, spots on the side trusses, washes at the deck's front edge; plus a
 wall of pixel strips, a pixel line along the deck edge, LED bars, blinders, strobes, confetti,

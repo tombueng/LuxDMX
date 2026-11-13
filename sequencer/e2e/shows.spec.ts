@@ -135,3 +135,12 @@ test('the blank show a first start makes goes when a template or another show ta
   dlg = await manager();
   await expect(dlg.getByRole('button', { name: 'New show', exact: true })).toHaveCount(1);
 });
+
+test('the demos are one click away in the Shows dialog, whatever show is open', async ({ page }) => {
+  await fresh(page);
+  await page.locator('.top .show').click();
+  await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'Demo shows…' }).click();
+  const w = page.getByRole('dialog', { name: "Let's get some light on stage" });
+  await expect(w.getByRole('button', { name: 'Show me a demo' })).toBeVisible();
+  await expect(w.getByRole('radio', { name: 'Festival stage' })).toBeVisible();
+});

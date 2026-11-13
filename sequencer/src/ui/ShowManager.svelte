@@ -46,6 +46,8 @@
   <div class="row new">
     <button class="primary" onclick={fresh}><Icon name="plus" />New blank show</button>
     <button onclick={() => fileInput.click()} title="A LuxDMX show (.json) or a QLC+ workspace (.qxw)"><Icon name="upload" />Open a file…</button>
+    <!-- (the demos again, any time: not only over an empty first show) -->
+    <button onclick={() => (ui.modal = 'welcome')} title="The festival, the club, the house party, the test truss: played on the 3D stage, with a song"><Icon name="play" />Demo shows…</button>
     <button onclick={() => app.exportShow()}><Icon name="download" />Save current as file</button>
     <button onclick={() => app.shareShow()} title="The share sheet where there is one (tablet, phone), the download otherwise"><Icon name="upload" />Send to another device</button>
     <button onclick={() => { const s = app.exportQxw(); if (s.length) ui.toast(`Saved for QLC+. Not included: ${s.join(', ')}`, 8000); }} title="A QLC+ workspace: fixtures, a scene per cue, a chaser per cue list, moves as EFX"><Icon name="download" />Save for QLC+ (.qxw)</button>
