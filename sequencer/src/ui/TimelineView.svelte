@@ -520,6 +520,7 @@
     t.bpm = s.bpm; t.offset = s.offset;
     t.sections = s.sections.map((x) => ({ name: x.name, at: x.at, ...(Number.isFinite(x.energy) ? { energy: x.energy } : {}) }));
     if (t.audio) { t.audio.catalog = s.id; t.audio.credit = creditOf(s); }
+    t.name = s.title;                // (the set list said the file's name: the artist first, cut off)
     app.markDirty(0);
     picking = false; pps = 0;
     ui.toast(`"${s.title}" by ${s.artist} is the song now (${s.bpm} BPM, ${clockOf(P.duration, false)}). Its parts are on the ruler.`, 4000);
@@ -690,7 +691,7 @@
       <div class="chips">
         {#each app.show.effects as e (e.id)}
           {@const chip = { kind: 'fx', effect: e.id } as Chip}
-          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => chipAt(chip, sn(P.position))}>{e.name}</button>
+          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{e.name}: a bar that runs it from where it starts to where it ends. Drag onto the timeline, or tap: at the playhead">{e.name}</button>
         {/each}
       </div>
     {/if}
@@ -699,11 +700,11 @@
     <div class="chips">
       {#each BURSTS as b (b.attr)}
         {@const chip = { kind: 'burst', attr: b.attr, s: b.s } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))}>{b.label}</button>
+        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{b.label} for {b.s} s, only while armed. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
       {/each}
       {#each [{ label: 'Blackout', a: { do: 'blackout', on: true } }, { label: 'Blackout off', a: { do: 'blackout', on: false } }, { label: 'Everything off', a: { do: 'off' } }] as m (m.label)}
         {@const chip = { kind: 'act', a: m.a as TimelineAction } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))}>{m.label}</button>
+        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{m.label} at that moment. Drag onto the timeline, or tap: at the playhead">{m.label}</button>
       {/each}
     </div>
     <h3>Crowd</h3>

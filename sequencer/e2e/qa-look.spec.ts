@@ -347,3 +347,15 @@ test.describe('the 2D plan on a phone', () => {
     await expect(stage.getByRole('button', { name: 'Invert' })).toBeVisible();
   });
 });
+
+test('every chip on the timeline\'s palette says what it does on hover (effects and moments too)', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects.length)).toBeGreaterThan(2);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  const chips = page.locator('.tlv .pal .chip');
+  await expect(chips.first()).toBeVisible();
+  const bare = await chips.evaluateAll((els) => els.filter((e) => !e.getAttribute('title')).map((e) => e.textContent));
+  expect(bare).toEqual([]);
+});

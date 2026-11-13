@@ -176,6 +176,8 @@ test('a demo song: picked, it downloads with progress, brings its tempo and part
   await expect(dlg).toHaveCount(0, { timeout: 10_000 });
   const tl = await page.evaluate(() => { const t = (window as any).__luxdmx.show.timeline; return { bpm: t.bpm, offset: t.offset, duration: t.duration, demo: t.demo, audio: t.audio, sections: t.sections.map((s: any) => s.name) }; });
   expect(tl).toMatchObject({ bpm: 120, offset: 0.5, sections: ['Intro', 'Verse', 'Chorus', 'Outro'], audio: { catalog: 'e2e-song', credit: '"Test Song" by The Testers, CC BY' } });
+  // (in the set it's called by its title, not its file's name with the artist first)
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.timeline.name)).toBe('Test Song');
   expect(tl.demo).toBeUndefined();
   expect(tl.duration).toBeGreaterThan(23.5); expect(tl.duration).toBeLessThan(24.5);
   await expect(page.locator('.tlv .sec')).toHaveText(['Intro', 'Verse', 'Chorus', 'Outro']);
