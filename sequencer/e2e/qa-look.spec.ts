@@ -65,3 +65,19 @@ test.describe('a phone', () => {
     expect(out).toBe(0);
   });
 });
+
+test.describe('a laptop (1366 x 768)', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('the stage gets the room: the cues take a smaller share and still show a whole row of cards', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+    await page.locator('[role=tab][aria-label=Program]').click();
+    const stage = await page.locator('.stage-wrap').boundingBox(), deck = await page.locator('.prog.desktop .foot').boundingBox();
+    expect(stage!.height).toBeGreaterThan(400);
+    const card = page.locator('.deck .card').first();
+    await expect(card).toBeVisible();
+    const c = await card.boundingBox();
+    expect(c!.y + c!.height).toBeLessThanOrEqual(deck!.y + deck!.height);
+  });
+});

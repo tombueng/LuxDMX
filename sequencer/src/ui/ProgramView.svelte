@@ -112,7 +112,7 @@
 {/snippet}
 
 {#if layout === 'desktop'}
-  <div class="prog desktop" bind:this={grid} style="--side-w:min({sizes.side}px, 40vw);--right-w:min({sizes.right}px, 40vw);--foot-h:{sizes.foot ? `min(${sizes.foot}px, 70vh)` : '38%'}">
+  <div class="prog desktop" bind:this={grid} style="--side-w:min({sizes.side}px, 40vw);--right-w:min({sizes.right}px, 40vw);--foot-h:{sizes.foot ? `min(${sizes.foot}px, 70vh)` : 'var(--foot-normal)'}">
     <aside class="side" aria-label="Fixtures, groups, presets, effects">
       {@render sideTabs(false)}
       <div class="tabbody">{@render sideBody(app.sideTab)}</div>
@@ -162,6 +162,10 @@
 {/if}
 
 <style>
+  /* (the cues' share of the height unless you dragged it: less on a short laptop screen, where every
+     pixel the stage gets counts and one row of cue cards still fits) */
+  .prog.desktop { --foot-normal: 38%; }
+  @media (max-height: 820px) { .prog.desktop { --foot-normal: 32.5%; } }
   .prog { flex: 1; min-height: 0; display: grid; gap: .55rem; padding: .55rem; }
   .desktop { grid-template-columns: var(--side-w) minmax(0, 1fr) var(--right-w); grid-template-rows: minmax(0, 1fr) minmax(170px, var(--foot-h)); position: relative;
     grid-template-areas: 'side center right' 'foot foot foot'; }
