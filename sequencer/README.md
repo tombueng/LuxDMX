@@ -51,7 +51,7 @@ play the show from big buttons, your phone or a song's timeline. No install, no 
 
 ## The demo
 
-"Show me a demo" on the welcome screen: a festival stage with 233 lights on 22 universes, playing
+"Play the show" on the Festival stage tile of the welcome: 233 lights on 22 universes, playing
 "Ready To Go" by Endtape. Over a hundred moving heads on the beat, hard changes on the song's
 hits, flames, sparks and confetti.
 

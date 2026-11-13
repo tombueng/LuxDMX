@@ -4,7 +4,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Locator, Page } from '@playwright/test';
-import { openConnected, resetFake, channels, fresh, welcome, welcomeDialog, test, expect } from './helpers';
+import { openConnected, resetFake, channels, demoTile, fresh, welcome, welcomeDialog, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -80,11 +80,11 @@ test('the demo on a real song: it comes down first, then the show plays to it, t
   test.setTimeout(120_000);
   await catalog(page);
   await openConnected(page);
-  const w = await welcome(page);
-  await w.getByLabel("The demo's music").selectOption('e2e-metal');
-  await expect(w).toContainText('Test Riff by The Testers: Metal, 120 BPM, 0:24, CC BY');
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
-  await expect(w.getByRole('button', { name: /Getting the song… \d+ %/ })).toBeVisible();
+  const w = await welcome(page), t = demoTile(w);
+  await t.getByLabel('Music for Festival stage').selectOption('e2e-metal');
+  await expect(t).toContainText('Metal, 120 BPM, 0:24 · CC BY');
+  await t.getByRole('button', { name: /^Play the show/ }).click();
+  await expect(t.getByRole('button', { name: /Getting the song… \d+ %/ })).toBeVisible();
   await expect(w).toBeHidden({ timeout: 15000 });
   // (said as it starts playing, for six seconds: looked at first)
   await expect(page.locator('.toast').filter({ hasText: 'cued to its parts' })).toBeVisible({ timeout: 30000 });
@@ -109,32 +109,32 @@ test("a song that can't come down: the demo plays on the demo beat and says so; 
   await catalog(page, false);
   await fresh(page, true);
   const w = welcomeDialog(page);
-  await w.getByLabel("The demo's music").selectOption('e2e-metal');
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
+  await demoTile(w).getByLabel('Music for Festival stage').selectOption('e2e-metal');
+  await demoTile(w).getByRole('button', { name: /^Play the show/ }).click();
   await expect(w).toBeHidden({ timeout: 15000 });
   await expect(page.locator('.toast')).toContainText('The demo plays on the demo beat instead');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.demo)).toBe(true);
 });
 
-test('the demo from the command palette opens the welcome (the music is picked there)', async ({ page }) => {
+test('the demo from the command palette opens the welcome with the demos (the music is picked there), folded away or not', async ({ page }) => {
   await fresh(page);
+  await page.evaluate(() => localStorage.setItem('luxdmx.seq.welcomeDemos', 'hidden'));
   await page.locator('body').press('Control+k');
   await page.getByRole('combobox', { name: 'Find anything' }).fill('big demo');
   await page.keyboard.press('Enter');
   await expect(welcomeDialog(page)).toBeVisible();
-  await expect(welcomeDialog(page).getByLabel("The demo's music")).toBeVisible();
+  await expect(welcomeDialog(page).getByLabel('Music for Festival stage')).toBeVisible();
 });
 
-test('the welcome offers four demo stages: each opens in its own room, the test truss without music to pick', async ({ page }) => {
+test('the welcome offers four demo shows, a tile each: each opens in its own room, the test truss without music to pick', async ({ page }) => {
   test.setTimeout(240_000);
   for (const [name, room, music] of [['Test truss', 'truss', false], ['DJ in a club', 'club', true], ['House party', 'party', true]] as const) {
     await fresh(page, true);
-    const w = welcomeDialog(page);
-    await w.getByRole('radio', { name }).click();
-    await expect(w.getByRole('radio', { name })).toHaveAttribute('aria-checked', 'true');
-    await expect(w.getByLabel("The demo's music")).toHaveCount(music ? 1 : 0);
-    if (music) await w.getByLabel("The demo's music").selectOption('beat');      // (no download in the test)
-    await w.getByRole('button', { name: 'Show me a demo' }).click();
+    const w = welcomeDialog(page), t = demoTile(w, name);
+    await expect(w.getByRole('group')).toHaveCount(4 + 7);                     // (four demos, seven templates)
+    await expect(t.getByLabel(`Music for ${name}`)).toHaveCount(music ? 1 : 0);
+    if (music) await t.getByLabel(`Music for ${name}`).selectOption('beat');      // (no download in the test)
+    await t.getByRole('button', { name: /^Play the show/ }).click();
     await expect(w).toBeHidden({ timeout: 30000 });
     await expect(page.locator('.toast').filter({ hasText: `${name}:` })).toBeVisible({ timeout: 30000 });
     await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue().room), { timeout: 60000 }).toBe(room);
@@ -154,17 +154,35 @@ test('on a phone the welcome fits the screen: every button and the music menu in
   expect(r.outside).toBe(0);
 });
 
-test('the demo stages are one radio group for the keyboard: arrow keys go round, one tab stop', async ({ page }) => {
+test('the demos fold away and stay folded; every start stays there; Lights only is the rig with nothing programmed', async ({ page }) => {
   await fresh(page, true);
-  const w = welcomeDialog(page), radios = w.getByRole('radio');
-  await expect(radios).toHaveCount(4);
-  await radios.first().click();
-  await expect(radios.first()).toHaveAttribute('aria-checked', 'true');
-  expect(await radios.evaluateAll((r) => r.map((x) => (x as HTMLElement).tabIndex))).toEqual([0, -1, -1, -1]);
-  await page.keyboard.press('ArrowRight');
-  await expect(radios.nth(1)).toHaveAttribute('aria-checked', 'true');
-  await expect(radios.nth(1)).toBeFocused();
-  await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowLeft');
-  await expect(radios.nth(3)).toHaveAttribute('aria-checked', 'true');      // (round from the first to the last)
-  await expect(w.getByLabel("The demo's music")).toHaveCount(0);           // the test truss: no music
+  let w = welcomeDialog(page);
+  await expect(w.getByRole('button', { name: /^Play the show: Festival stage/ })).toBeFocused();
+  await expect(w.getByRole('group', { name: 'Band' })).toContainText(/\d+ lights · \d+ cues/);      // (what's in it)
+  await w.getByRole('button', { name: 'Hide the demos' }).click();
+  await expect(demoTile(w)).toHaveCount(0);
+  await w.getByRole('button', { name: 'Start with an empty stage' }).click();
+  // the next time: still folded, one click brings them back
+  w = await welcome(page);
+  await expect(demoTile(w)).toHaveCount(0);
+  await expect(w.getByRole('button', { name: 'Start with an empty stage' })).toBeFocused();
+  await w.getByRole('button', { name: 'Show the 4 demos' }).click();
+  await expect(demoTile(w)).toBeVisible();
+  // a template's lights only
+  await w.getByRole('button', { name: 'Band, lights only' }).click();
+  await expect(w).toBeHidden();
+  await expect(page.locator('.toast')).toContainText('nothing programmed');
+  const s = await page.evaluate(() => { const x = (window as any).__luxdmx.show; return { name: x.meta.name, lights: x.fixtures.length, groups: x.groups.length, cues: x.cueLists.length, fx: x.effects.length }; });
+  expect(s).toMatchObject({ cues: 0, fx: 0 });
+  expect(s.lights).toBeGreaterThan(20);
+  expect(s.groups).toBeGreaterThan(3);
+  expect(s.name).toMatch(/\(lights only\)$/);
+  // a demo's: in its room, on the 3D stage (the show isn't empty now: from Shows)
+  await page.locator('.top .show').click();
+  await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'Demo shows…' }).click();
+  const w2 = welcomeDialog(page);
+  await w2.getByRole('button', { name: 'DJ in a club, lights only' }).click();
+  await expect(w2).toBeHidden();
+  await expect.poll(() => page.evaluate(() => { const x = (window as any).__luxdmx.show; return [x.cueLists.length, x.fixtures.length > 50, !!x.timeline, x.settings.stage3d?.room]; })).toEqual([0, true, false, 'club']);
+  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 30000 });
 });

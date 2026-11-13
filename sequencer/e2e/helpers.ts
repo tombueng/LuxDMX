@@ -1,6 +1,6 @@
 // Shared e2e helpers: the fake LuxDMX (test/fake-luxdmx.mjs), the bridge handshake, and short
 // ways to drive the UI the way a person would.
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
 // Every test fails on an uncaught error (or a Svelte warning) in the page, even if the
 // assertions happen to pass.
@@ -62,12 +62,13 @@ export async function welcome(page: Page) {
   await expect(w).toBeVisible();
   return w;
 }
-// The big demo from the welcome: on the demo beat unless a song is named (a real one would come
-// down from the internet)
-export async function demo(page: Page, song = 'beat') {
-  const w = await welcome(page);
-  await w.getByLabel("The demo's music").selectOption(song);
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
+// A demo show from the welcome (its tile): on the demo beat unless a song is named (a real one
+// would come down from the internet)
+export const demoTile = (w: Locator, name = 'Festival stage') => w.getByRole('group', { name });
+export async function demo(page: Page, song = 'beat', name = 'Festival stage') {
+  const t = demoTile(await welcome(page), name);
+  await t.getByLabel(`Music for ${name}`).selectOption(song);
+  await t.getByRole('button', { name: /^Play the show/ }).click();
 }
 
 // Fresh app, connected to a device through its bridge popup.

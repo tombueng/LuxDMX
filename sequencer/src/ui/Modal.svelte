@@ -19,7 +19,7 @@
     // after the content is there (an autofocus input may already have taken it)
     queueMicrotask(() => {
       if (!box || box.contains(document.activeElement)) return;
-      (box.querySelector<HTMLElement>('[autofocus]') ?? focusables().find((el) => !el.classList.contains('x')) ?? focusables()[0])?.focus({ preventScroll: true });
+      (box.querySelector<HTMLElement>('[autofocus], [data-autofocus]') ?? focusables().find((el) => !el.classList.contains('x')) ?? focusables()[0])?.focus({ preventScroll: true });
     });
     return () => {
       const i = open.indexOf(me); if (i >= 0) open.splice(i, 1);

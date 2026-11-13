@@ -36,7 +36,7 @@
     cmd('Add an effect…', 'effect', () => (ui.modal = 'effects'));
     cmd('Shows: open, new, templates…', 'folder', () => (ui.modal = 'shows'));
     // (the welcome has the demo with its music to pick, and the song's progress as it comes down)
-    cmd('The big demo show (3D, timeline, 233 lights)…', 'play', () => (ui.modal = 'welcome'), undefined, 'demo presentation festival example welcome start');
+    cmd('The big demo show (3D, timeline, 233 lights)…', 'play', () => { ui.welcomeDemos = true; ui.modal = 'welcome'; }, undefined, 'demo presentation festival example welcome start');
     cmd('Save the show as a file', 'download', () => app.exportShow(), 'Ctrl+Shift+S', 'export download backup json');
     cmd('Send the show to another device…', 'upload', () => void app.shareShow(), undefined, 'share tablet phone send airdrop nearby mail transfer');
     cmd('Print a cue sheet', 'printer', () => app.printCueSheet(), undefined, 'paper pdf');

@@ -7,7 +7,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Page } from '@playwright/test';
 import { CATALOG } from '../src/timeline/catalog';
-import { openConnected, resetFake, channels, welcome, test, expect } from './helpers';
+import { openConnected, resetFake, channels, demoTile, welcome, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -48,8 +48,8 @@ test('the big demo on its own song: dark on a dead stop but for spots on the ban
   await catalog(page);
   await openConnected(page);
   const w = await welcome(page);
-  await expect(w.getByLabel("The demo's music")).toHaveValue('ready-to-go');      // (the demo's own song, picked already)
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
+  await expect(demoTile(w).getByLabel('Music for Festival stage')).toHaveValue('ready-to-go');      // (the demo's own song, picked already)
+  await demoTile(w).getByRole('button', { name: /^Play the show/ }).click();
   await expect(w).toBeHidden({ timeout: 30000 });
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.audio?.catalog), { timeout: 30000 }).toBe('ready-to-go');
   expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists.find((l: any) => l.name === 'Moves')?.priority)).toBe('high');
@@ -85,7 +85,7 @@ test('the band only plays while the music does: still in the show\'s intro befor
   await catalog(page);
   await openConnected(page);
   const w = await welcome(page);
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
+  await demoTile(w).getByRole('button', { name: /^Play the show/ }).click();
   await expect(w).toBeHidden({ timeout: 30000 });
   await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 45000 });
   const hand = () => page.evaluate(() => (window as any).__stage3d?.band() as number[] | null);

@@ -3,7 +3,7 @@ import { openConnected, resetFake, patch, channels, selectFixtures, tab, test, e
 
 test.beforeEach(async () => { await resetFake(); });
 
-test('"Show me a demo" plays the big demo: 3D stage, the timeline running, light on the wire', async ({ page }) => {
+test('"Play the show" on the festival plays the big demo: 3D stage, the timeline running, light on the wire', async ({ page }) => {
   await openConnected(page);
   await demo(page);
   await expect(page.locator('.top .show .name')).toHaveText('We Are Not The Band: live');

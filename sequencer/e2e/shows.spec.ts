@@ -137,13 +137,13 @@ test('the blank show a first start makes goes when a template or another show ta
   await expect(dlg.getByRole('button', { name: 'New show', exact: true })).toHaveCount(1);
 });
 
-test('the demos are one click away in the Shows dialog, whatever show is open', async ({ page }) => {
+test('the demos are one click away in the Shows dialog, whatever show is open (and folded away on the welcome)', async ({ page }) => {
   await fresh(page);
+  await page.evaluate(() => localStorage.setItem('luxdmx.seq.welcomeDemos', 'hidden'));
   await page.locator('.top .show').click();
   await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'Demo shows…' }).click();
   const w = page.getByRole('dialog', { name: "Let's get some light on stage" });
-  await expect(w.getByRole('button', { name: 'Show me a demo' })).toBeVisible();
-  await expect(w.getByRole('radio', { name: 'Festival stage' })).toBeVisible();
+  await expect(w.getByRole('group', { name: 'Festival stage' }).getByRole('button', { name: /^Play the show/ })).toBeVisible();
 });
 
 test('a show file opened twice: the second is "(2)", so the two can be told apart', async ({ page }) => {

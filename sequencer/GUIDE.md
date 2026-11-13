@@ -81,15 +81,26 @@ wheels), you just don't have to learn a pro console to use them.
 
 Press `?` for every keyboard shortcut and `Ctrl+K` to find anything. No lights connected yet?
 The app opens with a **welcome** in front of everything (the plan and the 3D stage alike) while
-the show has nothing in it: the first steps, the templates, opening a show file, and **Show me a
-demo**. It comes up once per show; closed, **Get started** on the empty stage brings it back (and
-Ctrl+K "demo", and **Demo shows…** in the Shows dialog, whatever show is open). The big demo is a festival stage with 233 lights on 22 universes, 114 of them
+the show has nothing in it. It's two rows of tiles, each saying what it is and what's in it (how
+many lights and cues):
+- **Demo shows**: the festival, a DJ in a club, a house party and a test truss, finished shows on
+  the 3D stage. Each tile has its music (its own song, or any song from the list, or the demo beat)
+  and **Play the show**. **Hide the demos** folds them away for good in this browser (handy when
+  you start shows every day); **Show the 4 demos** brings them back, and Ctrl+K "demo" or **Demo
+  shows…** in the Shows dialog shows them anyway.
+- **Start a show**: an **empty stage**, one of the templates (band, DJ, theatre, church, cinema,
+  bar, rings and matrices), or **a show file** from another computer.
+
+Every demo and template also has **Lights only**: its lights in their places (in its room, for a
+demo), with the groups and palettes, and nothing programmed: no cues, effects, live pages or song.
+A rig to program from scratch. The welcome comes up once per show; closed, **Get started** on the
+empty stage brings it back. The big demo is a festival stage with 233 lights on 22 universes, 114 of them
 moving heads (washes and beam heads on three trusses, beams standing on the deck, heads on the
 truss towers and in the pit, spots on the side trusses, washes at the deck's front edge; plus a
 wall of pixel strips, a pixel line along the deck edge, LED bars, blinders, strobes, confetti,
 flames, sparks, CO2, bubbles, haze) on the 3D stage, playing a real song: by default a hard rock
 song ("Ready To Go" by Endtape, CC BY-SA), and you can pick any song from the list under
-**Music** (or the demo beat, ten minutes made in the app with nothing to download). Two lists
+music menu on its tile (or the demo beat, ten minutes made in the app with nothing to download). Two lists
 play it: **Show** (the looks: a new one every four bars where the music is busy) and **Moves**
 (where the heads point, above the looks: pairs of shapes taking turns on the beat, every two beats
 in a chorus, every bar in a verse). The demo song's hardest hits were measured beat by beat (the
