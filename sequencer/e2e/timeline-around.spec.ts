@@ -69,7 +69,9 @@ test('a cue placed before the song comes on before the song starts; the time aro
 });
 
 test("the big demo's intro: house lights, dark, searchlights, the backdrop, the walk-on, the band in its spots, then the song", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
+  // (the big demo is heavy: on a busy machine each look-up takes seconds, 8 s of tries weren't enough)
+  const slow = expect.configure({ timeout: 25_000 });
   await openConnected(page);
   await demo(page);
   await expect(page.locator('.tlv')).toBeVisible();
@@ -84,19 +86,19 @@ test("the big demo's intro: house lights, dark, searchlights, the backdrop, the 
   // the intro, step by step (jumps: the stage as it would be there)
   await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
   const at = async (t: number) => { await page.evaluate((x) => (window as any).__luxdmx.timeline.seek(x), t); return cueOn(page, 'Show'); };
-  await expect.poll(() => at(-lead + 6)).toBe('House lights down');
-  await expect.poll(() => at(-20)).toBe('Searchlights');
-  await expect.poll(() => cueOn(page, 'Moves')).toMatch(/^Sweep (left|right), slowly$/);
+  await slow.poll(() => at(-lead + 6)).toBe('House lights down');
+  await slow.poll(() => at(-20)).toBe('Searchlights');
+  await slow.poll(() => cueOn(page, 'Moves')).toMatch(/^Sweep (left|right), slowly$/);
   // the searchlights on the wire (the back beams on universe 0)
   await expect.poll(async () => (await channels(0, 304)).some((v) => v > 0), { timeout: 8000 }).toBe(true);
-  await expect.poll(() => at(-10)).toBe('Reveal: the backdrop');
-  await expect.poll(() => at(-6)).toBe('Walk-on: strobes');
-  await expect.poll(() => at(-1)).toBe('Stop: on the band');
-  await expect.poll(() => at(1)).toBe('Intro: blue haze');
+  await slow.poll(() => at(-10)).toBe('Reveal: the backdrop');
+  await slow.poll(() => at(-6)).toBe('Walk-on: strobes');
+  await slow.poll(() => at(-1)).toBe('Stop: on the band');
+  await slow.poll(() => at(1)).toBe('Intro: blue haze');
   // after the song: the blinders on the crowd, then the house lights
   const dur = await page.evaluate(() => (window as any).__luxdmx.show.timeline.duration);
-  await expect.poll(() => at(dur + 2)).toBe('Thank you: on the crowd');
-  await expect.poll(() => at(dur + 12)).toBe('House lights');
+  await slow.poll(() => at(dur + 2)).toBe('Thank you: on the crowd');
+  await slow.poll(() => at(dur + 12)).toBe('House lights');
 });
 
 test("the crowd: its sound node is there, louder when the music starts, and its switch in the transport silences it", async ({ page }) => {

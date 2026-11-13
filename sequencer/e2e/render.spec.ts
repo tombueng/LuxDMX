@@ -62,6 +62,7 @@ test('the look as it is, rendered: an MP4 at the size and rate asked for, frame 
 });
 
 test('the song from the playhead, with its sound, straight into the file the browser asked for; Stop stops a render and saves nothing', async ({ page }) => {
+  test.setTimeout(480_000);                 // (two 1080p renders: on a busy machine the first alone took the 240 s)
   // a save dialog that hands back a file (the bytes land here, in the page)
   await page.addInitScript(() => {
     (window as any).__saved = null;
