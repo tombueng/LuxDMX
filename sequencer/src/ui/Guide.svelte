@@ -6,7 +6,7 @@
   let { onclose }: { onclose: () => void } = $props();
   const parts: [string, string, string[]][] = [
     ['par', 'Fixtures', ['Your lights. Pick a type when you add them: most cheap PARs are one of the generic types (the manual\'s channel table says which), the library has 2400+ others, or make your own (the channel wizard finds the channels by trying them on the real light).', 'Each one sits at a DMX address on a universe, like on the fixture\'s display.']],
-    ['eye', 'Select and set', ['Click lights on the stage or in the list (Shift for a range, Ctrl to add, drag a box). The programmer on the right sets them: intensity, colour, position, everything else under "All channels".', 'Keys: 1 to 9 set 10 to 90 %, F full, 0 off.']],
+    ['eye', 'Select and set', ['Click lights on the stage or in the list (in the list Shift picks a range and Ctrl adds one; on the stage Shift or Ctrl adds, or drag a box). The programmer on the right sets them: intensity, colour, position, everything else under "All channels".', 'Keys: 1 to 9 set 10 to 90 %, F full, 0 off.']],
     ['record', 'Cues', ['Record stores what you changed as a cue: a look plus a fade time. Only the lights you touched go in; everything else keeps doing what it did. GO (or Space) steps to the next cue.', 'A cue can wait for GO or go on by itself after some seconds or beats; that\'s how a chase is made.']],
     ['loop', 'Cue lists', ['Several lists can run at once: the show on one, house lights on another, a fog timer on a third. Brightness: the highest wins. Everything else: the list that moved last wins.']],
     ['palette', 'Presets', ['Named looks (colours, positions...). Cues remember the preset, not the value: change "Warm white" once and every cue using it follows.']],

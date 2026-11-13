@@ -70,6 +70,7 @@
     { attr: 'confetti', label: 'Confetti', s: 1 }, { attr: 'flame', label: 'Flames', s: 1.5 }, { attr: 'sparks', label: 'Sparks', s: 4 },
     { attr: 'co2', label: 'CO2 jet', s: 2 }, { attr: 'bubbles', label: 'Bubbles', s: 8 }, { attr: 'fog', label: 'Fog', s: 5 },
     { attr: 'strobe', label: 'Strobe hit', s: 2 }, { attr: 'blinder', label: 'Blinder hit', s: 1 }];
+  const ARMED_ONLY: string[] = ['confetti', 'flame', 'sparks', 'co2'];
 
   // ---- scale and scrolling
   let tracks = $state<HTMLDivElement>();
@@ -673,7 +674,7 @@
         <p>A song and what happens on it: drag a cue, an effect or a moment onto the tracks (or tap it: it goes where the playhead is). Drag what's placed to move it; it snaps to the beat (Alt: free). An effect bar's end makes it longer.</p>
         <p>Play runs the show on the song: cues, effects and moments happen when the song gets there, in Live and on the 3D stage too. A click on the ruler jumps there, and the stage is as it would be at that point.</p>
         <p>Demo songs: real songs with vocals, free to use under their Creative Commons licences, downloaded when you pick one; or the demo beat made in the app. Their parts (intro, verse, chorus, drop...) show on the ruler: a click on one goes there, and cues snap to them.</p>
-        <p>A song file of your own: its tempo, first downbeat and parts are found from the sound (check them: BPM, and the parts on the ruler). P or Add a part starts a part at the bar line nearest the playhead; on the ruler a double-click renames a part, a right-click removes it.</p>
+        <p>A song file of your own: its tempo, first downbeat and parts are found from the sound (check them: BPM, and the parts on the ruler). P or <b>+ Part</b> starts a part at the bar line nearest the playhead; on the ruler a double-click renames a part, a right-click removes it.</p>
         <p>Before and after the song: give the show time before the song starts (an intro, the band walking on) and after it ends (the cheer, the house lights up). Things go there like anywhere else; Play from the start begins at the very start, and the song comes in at its own 0:00.</p>
         <p>The crowd: Chatter, Cheering, Roar and Quiet change how the crowd sounds from there on, over the length of the bar; a Cheer! swells up and dies away. Right-click one for how loud. The crowd's own volume sits next to the song's.</p>
         <p>Space plays and pauses, Home goes back to the very start, the arrows a bar, P adds a part, Del removes what's selected, Ctrl+wheel zooms. A song stays in this browser; the show file only names it.</p>
@@ -741,11 +742,12 @@
       </div>
     {/if}
     <h3>Moments</h3>
-    <p class="note">Moments only fire while playing forward, and only with the machines armed.</p>
+    <!-- (only the machines wait for Arm: a strobe, blinder, fog or bubble hit fires on Safe too; it said all of them did) -->
+    <p class="note">Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed.</p>
     <div class="chips">
       {#each BURSTS as b (b.attr)}
         {@const chip = { kind: 'burst', attr: b.attr, s: b.s } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{b.label} for {b.s} s, only while armed. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
+        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{b.label} for {b.s} s{ARMED_ONLY.includes(b.attr) ? ', only while armed' : ''}. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
       {/each}
       {#each [{ label: 'Blackout', a: { do: 'blackout', on: true } }, { label: 'Blackout off', a: { do: 'blackout', on: false } }, { label: 'Everything off', a: { do: 'off' } }] as m (m.label)}
         {@const chip = { kind: 'act', a: m.a as TimelineAction } as Chip}
@@ -778,7 +780,7 @@
       <label>Snap <select bind:value={snapTo} aria-label="Snap"><option value="bar">to the bar</option><option value="beat">to the beat</option><option value="off">off</option></select></label>
       <button class="ghost" onclick={() => addPart()} aria-label="Add a part here" title="A new part of the song starts at the bar line nearest the playhead (P)"><Icon name="plus" size={14} />Part</button>
       <span class="grow"></span>
-      <span class="chip armed" class:on={app.sfxArmed} title="Moments only fire while playing forward, and only with the machines armed (the button at the top)">{app.sfxArmed ? 'Machines armed' : 'Machines safe'}</span>
+      <span class="chip armed" class:on={app.sfxArmed} title="Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed (the button at the top)">{app.sfxArmed ? 'Machines armed' : 'Machines safe'}</span>
       {#if tl?.audio}<span class="faint name" title={tl.audio.name}>♪ {tl.audio.name}</span>{:else if tl?.demo}<span class="faint name">♪ demo beat</span>{/if}
       <button class="ghost" onclick={() => zoom(0.8)} aria-label="Zoom out"><Icon name="search" size={14} />−</button>
       <button class="ghost" onclick={() => (pps = 0)} title="The whole song">Fit</button>

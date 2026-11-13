@@ -36,7 +36,7 @@
     cmd('Add an effect…', 'effect', () => (ui.modal = 'effects'));
     cmd('Shows: open, new, templates…', 'folder', () => (ui.modal = 'shows'));
     // (the welcome has the demo with its music to pick, and the song's progress as it comes down)
-    cmd('The big demo show (3D, timeline, 230 lights)…', 'play', () => (ui.modal = 'welcome'), undefined, 'demo presentation festival example welcome start');
+    cmd('The big demo show (3D, timeline, 233 lights)…', 'play', () => (ui.modal = 'welcome'), undefined, 'demo presentation festival example welcome start');
     cmd('Save the show as a file', 'download', () => app.exportShow(), 'Ctrl+Shift+S', 'export download backup json');
     cmd('Send the show to another device…', 'upload', () => void app.shareShow(), undefined, 'share tablet phone send airdrop nearby mail transfer');
     cmd('Print a cue sheet', 'printer', () => app.printCueSheet(), undefined, 'paper pdf');
@@ -84,7 +84,11 @@
     for (const z of [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6]) cmd(`Interface size ${Math.round(z * 100)}%`, 'search', () => ui.setZoom(z), undefined, 'zoom bigger smaller text');
     if (app.view === 'live' && !app.locked) cmd('Lock the live page for the show', 'lock', () => { app.lockShow(true); ui.toast('Locked for the show: only playing. Hold the padlock to unlock.', 3000); }, undefined, 'service kiosk safe');
     if (app.view === 'live' && !app.locked) cmd('Lock with a PIN…', 'lock', () => void app.pinLock(), undefined, 'service kiosk staff pin code password safe');
-    if (app.view === 'live' && !app.locked) cmd('New page with just the looks (for staff)', 'plus', () => window.dispatchEvent(new CustomEvent('luxdmx-looks-page')), undefined, 'staff simple moods only');
+    // (from any view: it found nothing for "staff" outside Live, where the guide sends you to it)
+    if (!app.locked) cmd('New page with just the looks (for staff)', 'plus', () => {
+      const make = () => window.dispatchEvent(new CustomEvent('luxdmx-looks-page'));
+      if (app.view === 'live') make(); else { app.view = 'live'; requestAnimationFrame(() => requestAnimationFrame(make)); }
+    }, undefined, 'staff simple moods only');
     for (const f of s.fixtures) out.push({ label: f.name, hint: `${KIND_LABEL[app.kinds[f.id] ?? 'other']} · ${f.universe}.${f.address}`, icon: app.kinds[f.id] ?? 'other',
       run: () => { app.view = 'program'; app.sideTab = 'fixtures'; app.selected = [f.id]; } });
     for (const g of s.groups) out.push({ label: g.name, hint: `Group · ${g.fixtures.length} lights`, icon: 'group', run: () => { app.view = 'program'; app.selectGroup(g.id); } });

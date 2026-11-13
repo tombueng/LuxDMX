@@ -11,7 +11,7 @@ wheels), you just don't have to learn a pro console to use them.
 ## Getting started
 
 1. **Connect your LuxDMX.** Top right, `+`, type the box's address (what you'd type to open its
-   web page), then **Connect** and **Allow** in the popup. The popup has to stay open: it's the
+   web page), **Add LuxDMX**, then **Connect** on its pill and **Allow** in the popup. The popup has to stay open: it's the
    box's own page, and it's what carries the DMX (a browser page can't send Art-Net itself).
    The pill next to the box says how it's going; "no answer" means the address is wrong or the
    box's firmware is too old for the sequencer (it needs v1.0.293 or newer: update it from its
@@ -50,7 +50,8 @@ wheels), you just don't have to learn a pro console to use them.
    further down, see "LED rings and matrices"), so a rainbow or a
    chase runs along it.
    Or skip all that: click the show name (top left) and start from a template. The templates
-   (Band, DJ / Party, Theatre, Church, Cinema, Bar) are well stocked on purpose: 27 to 48 lights
+   (Band, DJ / Party, Theatre, Church, Cinema, Bar; and Ring and matrix, for pixel rings, discs and
+   matrices) are well stocked on purpose: 27 to 48 lights
    each on one universe (PARs, spot and wash heads, pixel bars, strobes, blinders, haze, fog and
    the effect machines that suit the place), groups, 9 to 28 effects (pixel shows among them) and
    11 to 17 looks, so there's something to try at once; delete what you don't own. Types you make or
@@ -58,7 +59,7 @@ wheels), you just don't have to learn a pro console to use them.
    added to a show that already has looks can **play along like one that's there** ("In the
    looks: like PAR 3" in the Add dialog, suggested for a light of the same type or kind): they get
    its part in every look, its groups and its effects. Otherwise they stay dark until you set them.
-3. **Select lights and set them** (Shift or Ctrl adds to the selection; on a touch screen, **+ Add** on the stage does) in the programmer on the right: intensity, colour (presets or
+3. **Select lights and set them** (on the stage Shift or Ctrl adds to the selection, in the fixture list Shift picks a range and Ctrl adds one; on a touch screen, **+ Add** on the stage adds) in the programmer on the right: intensity, colour (presets or
    the wheel), position for moving heads, and every other channel under "All channels". The
    number next to a slider takes a typed value too (click it: 37 %, a channel at 127). A channel
    set by hand under "All channels" shows on the stage plan and in 3D as what its value does (a
@@ -235,6 +236,12 @@ Three more demos come with their own room on the 3D stage:
   running. Change the cue's wait to make a shot longer or shorter. A look can fire them too (a cue
   action "start Confetti", like the templates' finales). Flames, sparks, CO2 and confetti only
   reach the real machines once they're armed; until then the stage shows them and the wire stays at 0.
+- **A list's settings** (the cog next to GO): its name; **At the end** (stay on the last cue,
+  start over, or fade out); **Priority**: normally the list started last wins where two lists set
+  the same light, a list set to *high* wins over newer ones (a house-lights list that mustn't be
+  taken over), *low* gives way to everything; **Release time** (how long Release fades it out);
+  **Tempo** (picking the list in Live sets the show to it); **Run as a play**; its **Colour** on
+  the tabs and the timeline. The loop button next to GO is At the end's "start over", one tap.
 - **A play** (the Theatre template, or "Run as a play" in a list's settings): a GO from any button,
   key, pad or phone is protected against a nervous double press (a second one within 0.3 s on the
   same list is ignored), "back to cue 9" shows cue 9 exactly as it plays from the top, and a
@@ -249,7 +256,8 @@ Three more demos come with their own room on the 3D stage:
 - **Cue numbers like the script's**: a cue recorded or pasted between 20 and 21 is 20.5, and the
   numbers stay with their cues from then on (on the cards, the GO bar, the cue sheet, the phone).
   Type a number into a cue's settings to set it: the cue moves to where that number says (0.5 goes
-  before 1), and a number another cue has is said; the list's menu has "Renumber the cues 1, 2, 3…".
+  before 1), and a number another cue has is said; once the numbers aren't 1, 2, 3 any more the
+  list's menu has "Renumber the cues 1, 2, 3…".
 - **Fog and haze** run only in the cue that sets them (haze one cue started doesn't drift on into the
   next ones). For haze all night, put it in a list of its own: across lists fog and haze go by the
   highest, like intensity, so the moods' "no fog" doesn't stop it (and that list's fader turns
@@ -601,8 +609,8 @@ Three more demos come with their own room on the 3D stage:
   reload of the tab.
 - **Timeline** (top, next to Program and Live): a song and what happens on it. Load an mp3/wav/ogg
   (it stays in this browser, the show file only names it) or pick one under **Demo songs…**: real
-  songs with vocals (24: rock'n'roll, techno, house, pop, hip-hop, rock/punk, metal, hard rock,
-  alternative, drum & bass and funk; credits and licences in [SONGS.md](SONGS.md)), free to use under their Creative Commons licences, listed by genre with their
+  songs with vocals (39: rock'n'roll, techno, house, pop, hip-hop, rock/punk, metal, hard rock,
+  alternative, drum & bass, electro, funk, reggae and latin; credits and licences in [SONGS.md](SONGS.md)), free to use under their Creative Commons licences, listed by genre with their
   tempo, length and credit, or the demo beat (ten minutes at 126 BPM, made in the app). Listen
   plays 15 seconds of one first. Picking a song downloads it (with a progress bar; if its own site
   is down or blocked it tries our copy, then the one on the public site, and says so in plain words
@@ -627,14 +635,17 @@ Three more demos come with their own room on the 3D stage:
   because the machines are safe, the Live page says so ("Confetti at 2:41 · safe").
   Drag a cue, an effect or a moment (confetti, flames, sparks, CO2, bubbles,
   fog, a strobe or blinder hit, blackout) onto the tracks, or tap it to put it at the playhead.
+  **Snap** (in the transport) says what a drag lands on: the beat, the bar, or nothing. Besides the
+  machines the moments have **Blackout**, **Blackout off** and **Everything off**.
   What's placed drags along the beat grid and onto the song's parts (Alt: free), or moves with the
   arrow keys once it has the focus (a beat, Shift a bar); an effect bar's end makes it longer,
   right-click or Del removes. Play runs the show on the song's clock, in Live and on the 3D stage
   too (Live has a play/pause chip with the time at the top). Going through the song is safe: grab
   the green playhead anywhere along its height (or drag on the ruler, click a part, Home, End, the
   arrows) and the stage shows the looks at that point (cues, effects, blackout) while nothing fires.
-  Moments only fire while playing forward, and only with the machines armed (the chip in the
-  transport says which); flames, CO2 and sparks carry a hazard mark on the tracks, confetti a 1×.
+  Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines
+  armed (the chip in the transport says which; a strobe, blinder, fog or bubble hit fires on Safe
+  too); flames, CO2 and sparks carry a hazard mark on the tracks, confetti a 1×.
   Let go while it was playing and it plays on from there. Space plays and pauses; the volume stays with this browser. A reload
   carries on from where the song would be by now (silently until you touch the page, if the
   browser wants a click before it plays sound).
@@ -859,6 +870,12 @@ Three more demos come with their own room on the 3D stage:
   browser's own slower encoder), VP9 last; the sound AAC, or Opus where AAC isn't there (Chrome on
   Linux). A graphics card that can't draw that big says so before anything starts, one that runs
   out of memory part way stops the render with a note. The crowd's sound isn't in a render.
+- **Interface size** (the ⋯ menu: − 100 % +, or Ctrl+K "size"): everything bigger or smaller, kept
+  in this browser. The same menu has **Hide the hints** (the little blue notes at the top of the
+  panels) and brings them back.
+- **The live page's own controls** (top right of Live): **Button size**, **Stage** (the 2D/3D stage
+  next to the buttons, or not), **Full screen**. A page's tab menu also has **Rebuild from the show…**
+  for a generated page that should start over from what's in the show now.
 - **Your layout**: drag the gaps between the panels to make the lists, the programmer or the cues
   bigger (double-click a gap for the normal size, or focus it and use the arrows). Remembered in
   the browser. The chips at the top of the programmer (Intensity, Colour, Position, Channels) jump

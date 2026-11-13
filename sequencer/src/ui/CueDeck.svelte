@@ -200,7 +200,7 @@
     {#if list}
       <label class="lvl" title="This list's level (scales its intensity)"><span class="faint">Level</span>
         <input type="range" min="0" max="1" step="0.01" value={st?.master ?? 1} use:asPercent={st?.master ?? 1} oninput={(e) => app.setMaster(list.id, +(e.target as HTMLInputElement).value)} aria-label="List level" /></label>
-      <button onclick={() => app.back()} disabled={!list.cues.length} title="Previous cue (Backspace)" aria-label="Back"><Icon name="back" /></button>
+      <button onclick={() => app.back()} disabled={!list.cues.length} title="Previous cue" aria-label="Back"><Icon name="back" /></button>
       <button class="go" onclick={() => app.go()} disabled={!list.cues.length} title="Next cue (Space)">GO <Icon name="play" /></button>
       <button onclick={() => app.release()} disabled={!st?.running} title="Fade this list out">Release</button>
       <button class="ghost" class:on={list.end === 'loop'} aria-pressed={list.end === 'loop'} onclick={() => (list.end = list.end === 'loop' ? 'stop' : 'loop')} title="Loop: start over after the last cue" aria-label="Loop"><Icon name="loop" /></button>

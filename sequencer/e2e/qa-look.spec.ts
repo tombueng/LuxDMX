@@ -681,3 +681,29 @@ test('the timeline at 140 % on a laptop: Fit and Zoom in on the screen, the tran
   await page.setViewportSize({ width: 1600, height: 1000 });
   await expect.poll(() => tr.evaluate((t) => getComputedStyle(t).flexWrap)).toBe('nowrap');
 });
+
+test('what the help says is what happens: Back, moments on Safe, Ctrl+K staff from Program, the sheet', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selectAll(); a.set({ intensity: 0.5 }); a.record(); a.programmer = {}; });
+  // Back: no key it doesn't have (Backspace deletes a selected card, as in any list)
+  await expect(page.locator('.deck').getByRole('button', { name: 'Back', exact: true })).toHaveAttribute('title', 'Previous cue');
+  // the moments: only the machines wait for Arm
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await expect(page.locator('.tlv .chip.mo', { hasText: 'Confetti' })).toHaveAttribute('title', /only while armed/);
+  await expect(page.locator('.tlv .chip.mo', { hasText: 'Strobe hit' })).not.toHaveAttribute('title', /armed/);
+  // Ctrl+K "staff" from Program: the page is made on Live
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  const before = await page.evaluate(() => (window as any).__luxdmx.show.pages.length);
+  await page.locator('body').press('Control+k');
+  await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('staff');
+  await page.getByRole('dialog', { name: 'Find anything' }).getByRole('option', { name: /just the looks/ }).click();
+  await expect(page.locator('.top .modes').getByRole('tab', { name: 'Live' })).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.pages.length)).toBeGreaterThan(before);
+  // the sheet: both Redo keys together
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  await page.locator('body').press('?');
+  const rows = await page.getByRole('dialog', { name: 'Keyboard and mouse' }).locator('kbd, td, dt').allTextContents();
+  const i = rows.findIndex((t) => /Shift\+Z/.test(t)), j = rows.findIndex((t) => /\+Y$/.test(t.trim()));
+  expect(j - i).toBeLessThanOrEqual(2);
+});
