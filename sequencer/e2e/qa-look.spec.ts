@@ -114,3 +114,22 @@ test('a cue\'s fade field takes what you type: 9999 stays until you leave it (th
   }
   await fade.click(); await fade.press('ArrowUp'); expect(await stored()).toBe(2);
 });
+
+test('Mounting: angles show rounded; a beam angle typed into a filled field replaces it, a wrong one shows what was kept', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 1, 0, 'Par');
+  await page.locator('.fl li[data-fixture="Par"]').dblclick();
+  const dlg = page.getByRole('dialog', { name: 'Patch: Par' });
+  await dlg.getByRole('tab', { name: 'Mounting' }).click();
+  for (const a of ['Turn', 'Tip', 'Roll']) expect(await dlg.getByLabel(a, { exact: true }).inputValue()).toMatch(/^-?\d+(\.\d)?$/);
+  const narrow = dlg.getByLabel('Beam angle, narrowest'), wide = dlg.getByLabel('Beam angle, widest');
+  await narrow.click(); await page.keyboard.type('40');
+  await wide.click();                                                      // (the mouse: from one field into the next)
+  await expect(wide).toHaveValue('40');
+  await page.keyboard.type('10'); await wide.press('Tab');
+  await expect(wide).toHaveValue('40');                                    // (10 and 40: the narrowest is 10 now)
+  await expect(narrow).toHaveValue('10');
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].beamDeg)).toEqual([10, 40]);
+  await narrow.click(); await wide.click(); await page.keyboard.type('4010'); await wide.press('Tab');
+  await expect(wide).not.toHaveValue('4010');
+});

@@ -229,6 +229,17 @@
     app.toastUndo(`${others.length} light${others.length === 1 ? '' : 's'} set up like ${f.name}`);
   }
   const num = (e: Event) => (e.target as HTMLInputElement).valueAsNumber;
+  // (a short number field: what's in it is picked when you click in, so typing replaces it; after a
+  // change it shows what was kept, also when what was typed couldn't be: 4010 degrees isn't a beam)
+  // (a click that brought the focus: its own mouseup would put the caret back, so that one is let go)
+  const pickAll = (e: FocusEvent) => {
+    const el = e.currentTarget as HTMLInputElement;
+    el.select();
+    const up = (m: MouseEvent) => { m.preventDefault(); el.select(); };
+    el.addEventListener('mouseup', up, { once: true });
+    el.addEventListener('blur', () => el.removeEventListener('mouseup', up), { once: true });
+  };
+  const shown = (e: Event, v: number | undefined) => { (e.target as HTMLInputElement).value = v === undefined ? '' : String(v); };
   const pct = (v: number) => `${r1(v * 100)} %`;
 </script>
 
@@ -271,8 +282,8 @@
       {/if}
       <div class="angles">
         {#each [['yaw', 'Turn °', 'Turned about the vertical'], ['pitch', 'Tip °', 'Tipped forwards (towards the audience) or back'], ['roll', 'Roll °', 'Rolled to the side; 180 is upside down']] as [k, label, tip] (k)}
-          <label title={tip}>{label}<input type="number" step="5" min="-360" max="360" aria-label={label.replace(' °', '')} value={place.rot[k as keyof Rot]}
-            onchange={(e) => setAngle(k as keyof Rot, num(e))} /></label>
+          <label title={tip}>{label}<input type="number" step="5" min="-360" max="360" aria-label={label.replace(' °', '')} value={r1(place.rot[k as keyof Rot])}
+            onfocus={pickAll} onchange={(e) => setAngle(k as keyof Rot, num(e))} /></label>
         {/each}
       </div>
       {#if machine}<p class="faint small">Machines aren't tried from here: nothing is sent to them.</p>{/if}
@@ -284,9 +295,9 @@
       <section aria-labelledby="winch-h">
         <h3 id="winch-h">Its travel</h3>
         <div class="angles">
-          <label title="The highest it may go, as a part of its travel from the top (0 % is all the way up)">Highest %<input type="number" min="0" max="100" step="1" aria-label="Winch limit, highest" value={Math.round((f.hoistLimits?.[0] ?? 0) * 100)}
+          <label title="The highest it may go, as a part of its travel from the top (0 % is all the way up)">Highest %<input type="number" onfocus={pickAll} min="0" max="100" step="1" aria-label="Winch limit, highest" value={Math.round((f.hoistLimits?.[0] ?? 0) * 100)}
             onchange={(e) => setLimit(0, num(e))} /></label>
-          <label title="The lowest it may go (100 % is all the way down): set it above the heads of the people under it">Lowest %<input type="number" min="0" max="100" step="1" aria-label="Winch limit, lowest" value={Math.round((f.hoistLimits?.[1] ?? 1) * 100)}
+          <label title="The lowest it may go (100 % is all the way down): set it above the heads of the people under it">Lowest %<input type="number" onfocus={pickAll} min="0" max="100" step="1" aria-label="Winch limit, lowest" value={Math.round((f.hoistLimits?.[1] ?? 1) * 100)}
             onchange={(e) => setLimit(1, num(e))} /></label>
         </div>
         {#if !app.modeOf(id)?.channels.some((c) => c.attr === 'enable')}
@@ -302,9 +313,9 @@
         <h3 id="beam-h">Its beam</h3>
         <div class="angles">
           <label title="The beam's opening angle at its narrowest (zoomed in), from the data sheet: the 3D stage draws it so">Narrowest °<input type="number" min="0.5" max="180" step="0.5" aria-label="Beam angle, narrowest" value={f.beamDeg?.[0] ?? ''}
-            placeholder={tb ? `${tb[0]} (its type)` : 'a guess'} onchange={(e) => setBeam(0, num(e))} /></label>
+            placeholder={tb ? `${tb[0]} (its type)` : 'a guess'} onfocus={pickAll} onchange={(e) => { setBeam(0, num(e)); shown(e, f.beamDeg?.[0]); }} /></label>
           <label title="At its widest (zoomed out); the same as the narrowest for a light without a zoom">Widest °<input type="number" min="0.5" max="180" step="0.5" aria-label="Beam angle, widest" value={f.beamDeg?.[1] ?? ''}
-            placeholder={tb ? `${tb[1]} (its type)` : 'a guess'} onchange={(e) => setBeam(1, num(e))} /></label>
+            placeholder={tb ? `${tb[1]} (its type)` : 'a guess'} onfocus={pickAll} onchange={(e) => { setBeam(1, num(e)); shown(e, f.beamDeg?.[1]); }} /></label>
         </div>
         <p class="faint small">{tb ? "From its type's fixture file; set your own if the real one differs." : "Its type doesn't say: the 3D stage guesses from what kind of light it is. The data sheet has it (beam angle, often with a zoom range)."}</p>
       </section>
@@ -345,15 +356,15 @@
         </div>
         <p class="faint small">Invert turns what a cue sends round (the real head and the picture both follow): for heads that should mirror each other. "Turns the other way round" only puts the picture right.</p>
         <div class="angles">
-          <label title="How far it pans from 0 % to 100 %, from the manual">Pan range °<input type="number" min="1" max="1080" step="1" aria-label="Pan range" value={f.panDeg ?? ''}
+          <label title="How far it pans from 0 % to 100 %, from the manual">Pan range °<input type="number" onfocus={pickAll} min="1" max="1080" step="1" aria-label="Pan range" value={f.panDeg ?? ''}
             placeholder={t?.physical?.panDeg ? `${t.physical.panDeg} (its type)` : '540 (a guess)'} onchange={(e) => setRange('panDeg', num(e))} /></label>
-          <label title="How far it tilts from 0 % to 100 %, from the manual">Tilt range °<input type="number" min="1" max="1080" step="1" aria-label="Tilt range" value={f.tiltDeg ?? ''}
+          <label title="How far it tilts from 0 % to 100 %, from the manual">Tilt range °<input type="number" onfocus={pickAll} min="1" max="1080" step="1" aria-label="Tilt range" value={f.tiltDeg ?? ''}
             placeholder={t?.physical?.tiltDeg ? `${t.physical.tiltDeg} (its type)` : '270 (a guess)'} onchange={(e) => setRange('tiltDeg', num(e))} /></label>
         </div>
         <div class="angles">
-          <label title="Where pan 50 % really points, in degrees (Aim and the 3D stage use it)">Pan offset °<input type="number" min="-360" max="360" step="1" aria-label="Pan offset" value={f.panOffset ?? 0}
+          <label title="Where pan 50 % really points, in degrees (Aim and the 3D stage use it)">Pan offset °<input type="number" onfocus={pickAll} min="-360" max="360" step="1" aria-label="Pan offset" value={f.panOffset ?? 0}
             onchange={(e) => setOffsets({ panOffset: num(e) })} /></label>
-          <label title="Where tilt 50 % really points, in degrees">Tilt offset °<input type="number" min="-180" max="180" step="1" aria-label="Tilt offset" value={f.tiltOffset ?? 0}
+          <label title="Where tilt 50 % really points, in degrees">Tilt offset °<input type="number" onfocus={pickAll} min="-180" max="180" step="1" aria-label="Tilt offset" value={f.tiltOffset ?? 0}
             onchange={(e) => setOffsets({ tiltOffset: num(e) })} /></label>
         </div>
       </section>
