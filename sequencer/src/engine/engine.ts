@@ -138,6 +138,9 @@ export class Engine {
   private seq = 0;
   private depth = 0;                          // cue actions starting lists that start lists...
   private lastStage: Record<string, Resolved> = {};
+  // how firmly a list or the programmer held each light's level, last frame (Record asks: a light
+  // only an effect lit isn't stored dark)
+  lastHeld = new Map<string, number>();
   private liveFx = new Map<string, Ramp>();   // effects started by hand
   private fxFlash = new Set<string>();
   // Effects a cue runs, stopped by hand (its button tapped): faded out until a tap brings them back,
@@ -454,6 +457,7 @@ export class Engine {
     }
 
     this.runEffects(show, order.map((o) => o.p), stage, modes, now, held, colored);
+    this.lastHeld = held;
     // what the lists and effects made, before the live layer (Highlight, flashes, the patch
     // check), the masters and the fitting to each fixture: new cues fade from this (without the
     // cells an effect drew; with the cells' own colours, and their levels to tell a lit light)

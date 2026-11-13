@@ -2181,8 +2181,15 @@ class App {
     // played before it.
     if (!onlyChanges) for (const eid of this.engine.liveEffects()) {
       const e = this.show.effects.find((x) => x.id === eid);
+      // (a colour or move effect that switches its lights on: one only it switched on keeps the
+      // level it showed. Its look's 0 was stored and held it dark when the cue played: a rainbow
+      // cue came out black. An effect on the level itself, a pulse, makes the level: not this.)
+      const lifts = !!e && paramsOf(e.kind, e.params).lightUp && EFFECT_MAP.get(e.kind)?.category !== 'intensity';
       for (const fid of e ? (e.group ? this.show.groups.find((g) => g.id === e.group)?.fixtures ?? [] : e.fixtures ?? []) : [])
-        if (!values[fid] && this.look[fid]) values[fid] = stripResolved(this.look[fid], this.caps(fid));
+        if (!values[fid] && this.look[fid]) {
+          values[fid] = stripResolved(this.look[fid], this.caps(fid));
+          if (lifts && (this.engine.lastHeld.get(fid) ?? 0) < 0.5) values[fid].intensity = Math.round((this.stage[fid]?.intensity ?? 0) * 1000) / 1000;
+        }
     }
     // In a list that's playing, the new cue goes right after the one on stage (a cue between 20 and
     // 21 at the tech, a fix mid-show): GO carries on with what was next. Otherwise at the end.
@@ -2190,7 +2197,8 @@ class App {
     const st = this.engine.status(list.id);
     let at = isPlay(list) && st.running && st.index >= 0 && st.index < list.cues.length - 1 ? st.index + 1 : list.cues.length;
     if (opt.num !== undefined) { freezeNumbers(list); const k = list.cues.findIndex((_, i) => cueNum(list, i) > opt.num!); at = k < 0 ? list.cues.length : k; }
-    const named = this.suggestName(values, this.engine.liveEffects());   // (before the cue takes the effects over)
+    // (by what was set by hand: the effects' own lights are said by the effects' names)
+    const named = this.suggestName(Object.fromEntries(ids.map((id) => [id, values[id]])), this.engine.liveEffects());   // (before the cue takes the effects over)
     const was = st.running && !st.releasing ? st.cue : '', prog = $state.snapshot(this.programmer) as Record<string, Values>;
     const cue: Cue = { id: newId('c'), name: '', values, fade: opt.fade ?? 2, advance: { mode: 'manual' } };
     // Effects running by hand go into the cue too, and the cue takes them over.

@@ -557,3 +557,20 @@ describe('a light copied from one linked to a real light over RDM', () => {
     expect(app.show.fixtures.filter((f: any) => f.uid === '4C55:00000001')).toHaveLength(1);
   });
 });
+
+describe('a cue recorded from an effect that switched its lights on', () => {
+  it('plays them lit, as they were (the cue stored their look\'s 0 and held them dark)', async () => {
+    const { app, tick } = await freshApp();
+    app.show.fixtures.push(
+      { id: 'r1', name: 'R1', typeId: 'gen-rgb', mode: '', universe: 0, address: 1, x: 0.3, y: 0.5 } as any,
+      { id: 'r2', name: 'R2', typeId: 'gen-rgb', mode: '', universe: 0, address: 4, x: 0.6, y: 0.5 } as any);
+    app.show.effects.push({ id: 'rb', name: 'Rainbow', kind: 'rainbow', fixtures: ['r1', 'r2'], params: {} } as any);
+    app.checkpoint();
+    app.toggleEffect('rb'); await new Promise((r) => setTimeout(r, 1300)); tick(2);   // (its fade in, in real time)
+    expect(pct(app.stage.r1.intensity)).toBeGreaterThan(50);              // the effect lit them
+    expect(app.record()).toBe(true);
+    await new Promise((r) => setTimeout(r, 1300)); tick(2);
+    expect(pct(app.stage.r1.intensity)).toBeGreaterThan(50);              // still lit, from the cue now
+    expect(pct(app.stage.r2.intensity)).toBeGreaterThan(50);
+  });
+});
