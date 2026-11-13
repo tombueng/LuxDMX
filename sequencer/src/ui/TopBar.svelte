@@ -4,7 +4,7 @@
   import Icon from './Icon.svelte';
   import Devices from './Devices.svelte';
   import { app } from '../app.svelte';
-  import { tablist, ui } from './ui.svelte';
+  import { tablist, ui, asPercent } from './ui.svelte';
 
   // The dot blinks on every beat the microphone hears.
   async function takeOther() {
@@ -134,7 +134,7 @@
   {#if !app.locked}
   <label class="gm" title="Grand master: scales every light">
     <span class="lab">Master</span>
-    <input type="range" min="0" max="1" step="0.01" bind:value={app.grandMaster} aria-label="Grand master" />
+    <input type="range" min="0" max="1" step="0.01" bind:value={app.grandMaster} use:asPercent={app.grandMaster} aria-label="Grand master" />
     <b>{Math.round(app.grandMaster * 100)}%</b>
   </label>
   <!-- a group's master pulled down (the console's group faders): said here, wherever you are, so
@@ -163,7 +163,7 @@
     <button class="ghost" onclick={() => app.undo()} disabled={!app.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo"><Icon name="undo" /></button>
     <button class="ghost" onclick={() => app.redo()} disabled={!app.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><Icon name="redo" /></button>
     <button class="ghost" onclick={() => (ui.modal = 'palette')} title="Find anything (Ctrl+K)" aria-label="Find anything"><Icon name="search" /></button>
-    <button class="ghost" onclick={more} title="More" aria-label="More"><Icon name="more" /></button>
+    <button class="ghost" onclick={more} title="More" aria-label="More" aria-haspopup="menu" aria-expanded={!!ui.menu}><Icon name="more" /></button>
   </div>
   {/if}
   <!-- what goes to the stage: blind (here only) or on stage; the machines that wait for arming. On a

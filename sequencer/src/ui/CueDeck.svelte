@@ -10,7 +10,7 @@
   import Help from './Help.svelte';
   import CueInspector from './CueInspector.svelte';
   import { app } from '../app.svelte';
-  import { dialogOpen, focusSelect, spaceIsGo, ui, listKeys, menuKey } from './ui.svelte';
+  import { dialogOpen, focusSelect, spaceIsGo, ui, listKeys, menuKey, asPercent } from './ui.svelte';
   import { stageSvg, svgImage } from './thumb';
   import type { Advance, Cue } from '../model/types';
   import { whileShown } from './shown.svelte';
@@ -199,7 +199,7 @@
     <span class="grow"></span>
     {#if list}
       <label class="lvl" title="This list's level (scales its intensity)"><span class="faint">Level</span>
-        <input type="range" min="0" max="1" step="0.01" value={st?.master ?? 1} oninput={(e) => app.setMaster(list.id, +(e.target as HTMLInputElement).value)} aria-label="List level" /></label>
+        <input type="range" min="0" max="1" step="0.01" value={st?.master ?? 1} use:asPercent={st?.master ?? 1} oninput={(e) => app.setMaster(list.id, +(e.target as HTMLInputElement).value)} aria-label="List level" /></label>
       <button onclick={() => app.back()} disabled={!list.cues.length} title="Previous cue (Backspace)" aria-label="Back"><Icon name="back" /></button>
       <button class="go" onclick={() => app.go()} disabled={!list.cues.length} title="Next cue (Space)">GO <Icon name="play" /></button>
       <button onclick={() => app.release()} disabled={!st?.running} title="Fade this list out">Release</button>

@@ -129,8 +129,25 @@ export const dialogOpen = () => typeof document !== 'undefined' && !!document.qu
 // presses the button, tab or switch they tabbed to. A click or a tap puts it back to GO (a mouse
 // on Blackout, then Space, is GO, not Blackout again).
 let tabbing = false;
+// Focus that falls to the page itself (the button you were on went away: Record's bar once the cue
+// is in, Back at the first cue, a command that changed the view) made the next Tab start again at
+// the top bar, or leave the page. Tab picks up in the part of the app it was in instead: its
+// first control (Shift+Tab: its last), else the main view's.
+const TABBABLE = 'button:not([disabled]), [href], input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const ZONE = '[role="dialog"], [role="menu"], .panel, .strip, .deck, main.view, .top';
+let lastZone: Element | null = null;
 if (typeof window !== 'undefined') {
-  window.addEventListener('keydown', (e) => { if (e.key === 'Tab') tabbing = true; }, true);
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    tabbing = true;
+    const at = document.activeElement;
+    if ((at && at !== document.body) || !lastZone) return;             // (a page just opened: Tab as usual, from the top)
+    const zone = lastZone.isConnected ? lastZone : document.querySelector('main.view');
+    const all = [...(zone?.querySelectorAll<HTMLElement>(TABBABLE) ?? [])].filter((el) => el.offsetParent !== null);
+    const to = e.shiftKey ? all[all.length - 1] : all[0];
+    if (to) { e.preventDefault(); to.focus(); }
+  }, true);
+  window.addEventListener('focusin', (e) => { lastZone = (e.target as Element).closest?.(ZONE) ?? lastZone; }, true);
   window.addEventListener('pointerdown', () => { tabbing = false; }, true);
 }
 const PRESSABLE = 'button, summary, a[href], [role="tab"], [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"]';
@@ -280,4 +297,11 @@ export function tablist(node: HTMLElement) {
   sync();
   node.addEventListener('keydown', key);
   return { destroy() { mo.disconnect(); node.removeEventListener('keydown', key); } };
+}
+
+// A 0..1 slider read out as a percentage ("70 %", not "0.7"): use:asPercent={value}
+export function asPercent(el: HTMLInputElement, v: number | undefined) {
+  const set = (x: number | undefined) => el.setAttribute('aria-valuetext', `${Math.round((x ?? +el.value) * 100)} %`);
+  set(v);
+  return { update: set };
 }

@@ -12,7 +12,7 @@
   import Modal from './Modal.svelte';
   import StageView from './StageView.svelte';
   import { app, newId } from '../app.svelte';
-  import { ui, dialogOpen } from './ui.svelte';
+  import { ui, dialogOpen, asPercent } from './ui.svelte';
   import { cueNumber } from '../model/cuenum';
   import { isFogTimer } from '../model/library';
   import { isMachineList } from '../content/busking';
@@ -266,6 +266,22 @@
     const t = sn(tAt(e.clientX) - drag.dx, e.altKey), crowdy = isCrowd(it), max = crowdy ? (it.do.do === 'cheer' ? CHEER_MAX : 60) : Infinity, least = crowdy && it.do.do !== 'cheer' ? 0 : 0.5;
     if (drag.end) it.len = Math.max(least, Math.min(max, span.to - it.at, t - it.at));
     else { it.at = inSpan(t); if (it.len !== undefined) it.len = Math.max(least, Math.min(it.len, span.to - it.at)); }
+  }
+  // The keyboard's way to move one (there was none): arrows, a beat (with Shift a bar; a bar each
+  // when it snaps to bars; half a second with snap off or outside the song)
+  function itemKey(e: KeyboardEvent, id: string) {
+    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || !tl) return;
+    const it = placed(id);
+    if (!it) return;
+    e.preventDefault(); e.stopPropagation();
+    const song = P.duration || tl.duration || 0, beat = 60 / (tl.bpm ?? app.show.settings.bpm);
+    const inSong = it.at >= 0 && it.at <= song && snapTo !== 'off';
+    const step = inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5;
+    app.checkpoint();
+    it.at = inSpan(Math.round((it.at + (e.key === 'ArrowRight' ? step : -step)) * 1000) / 1000);
+    if (it.len !== undefined) it.len = Math.max(0.5, Math.min(it.len, span.to - it.at));
+    if (tl.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at);
+    app.markDirty(0);
   }
   function itemUp() {
     // (the crowd's track stays in time order)
@@ -755,10 +771,10 @@
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (v >= 40 && v <= 240) { app.timeline.ensure().bpm = v; app.markDirty(0); } }} /></label>
       <span class="vol"><button class="ghost snd" class:off={!P.soundHere} aria-pressed={P.soundHere} onclick={() => P.setSoundHere(!P.soundHere)} aria-label="Sound here"
         title={P.soundHere ? "The song plays out of this device. Click for no sound here (a band playing live): the song's clock runs on" : 'No sound here: the song runs silently (a video of the 3D stage still gets it). Click for sound here'}><Icon name="music" size={14} /></button><input
-        type="range" min="0" max="1" step="0.05" value={P.volume} oninput={(e) => P.setVolume(+(e.target as HTMLInputElement).value)} aria-label="Volume" title="How loud the song is (this browser)" /></span>
+        type="range" min="0" max="1" step="0.05" value={P.volume} use:asPercent={P.volume} oninput={(e) => P.setVolume(+(e.target as HTMLInputElement).value)} aria-label="Volume" title="How loud the song is (this browser)" /></span>
       {#if crowd.length}<span class="vol crowdvol"><button class="ghost snd" class:off={!P.crowdOn} aria-pressed={P.crowdOn} onclick={() => P.setCrowd(P.crowdVolume, !P.crowdOn)} aria-label="Crowd sound"
         title={P.crowdOn ? 'The crowd cheers along with the song. Click to leave it out' : 'No crowd sound. Click to hear the crowd again'}>Crowd</button><input
-        type="range" min="0" max="1" step="0.05" value={P.crowdVolume} oninput={(e) => P.setCrowd(+(e.target as HTMLInputElement).value, true)} aria-label="Crowd volume" title="How loud the crowd is against the song (this browser)" /></span>{/if}
+        type="range" min="0" max="1" step="0.05" value={P.crowdVolume} use:asPercent={P.crowdVolume} oninput={(e) => P.setCrowd(+(e.target as HTMLInputElement).value, true)} aria-label="Crowd volume" title="How loud the crowd is against the song (this browser)" /></span>{/if}
       <label>Snap <select bind:value={snapTo} aria-label="Snap"><option value="bar">to the bar</option><option value="beat">to the beat</option><option value="off">off</option></select></label>
       <button class="ghost" onclick={() => addPart()} aria-label="Add a part here" title="A new part of the song starts at the bar line nearest the playhead (P)"><Icon name="plus" size={14} />Part</button>
       <span class="grow"></span>
@@ -797,9 +813,9 @@
               {#each built ? (ln.id === 'crowd' ? crowd : items.filter((i) => i.lane === ln.id)) : [] as it (it.id)}
                 {@const mark = markOf(it)}
                 <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : `max-width:min(18rem, ${Math.max(28, Math.max(width, x(shownTo)) - x(it.at) - 2)}px)`}"
-                  onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)}
+                  onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)} onkeydown={(e) => itemKey(e, it.id)}
                   aria-label="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ', fires a machine' : mark === 'once' ? ', fires once' : ''}"
-                  title="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ' (fires a machine)' : mark === 'once' ? ' (fires once)' : ''}: drag to move, right-click for more">
+                  title="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ' (fires a machine)' : mark === 'once' ? ' (fires once)' : ''}: drag (or the arrow keys) to move, right-click for more">
                   {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{/if}
                   <span class="t">{labelOf(it)}</span>
                   {#if it.len !== undefined}<!-- svelte-ignore a11y_no_static_element_interactions -->

@@ -13,7 +13,7 @@
   import { cellLookAt } from '../engine/resolve';
   import ColorWheel from './ColorWheel.svelte';
   import { app } from '../app.svelte';
-  import { ui } from './ui.svelte';
+  import { ui, asPercent } from './ui.svelte';
   import type { ChannelAttr, Color, NumAttr, Values } from '../model/types';
   import { EFFECT_MAP } from '../engine/effects';
   import { slotsOf } from '../engine/render';
@@ -222,7 +222,7 @@
           <div class="pl" style="--c:{l.color ?? 'var(--green)'}">
             <span class="dot"></span>
             <span class="nm"><b>{l.name}</b> <span class="faint">{l.cues[st.index]?.name ?? ''}</span></span>
-            <input type="range" min="0" max="1" step="0.01" value={st.master} oninput={(e) => app.setMaster(l.id, +(e.target as HTMLInputElement).value)} aria-label="{l.name} level" title="Level {Math.round(st.master * 100)}%" />
+            <input type="range" min="0" max="1" step="0.01" value={st.master} use:asPercent={st.master} oninput={(e) => app.setMaster(l.id, +(e.target as HTMLInputElement).value)} aria-label="{l.name} level" title="Level {Math.round(st.master * 100)}%" />
             <button class="sm" onclick={() => app.release(l.id)} title="Fade {l.name} out">Release</button>
           </div>
         {/each}
@@ -257,7 +257,7 @@
     {#if hasLight}
     <section id="pg-int">
       <div class="lab"><span>Intensity</span><b><ValueEdit text={`${pct(first?.intensity)}%`} value={pct(first?.intensity)} label="Intensity" onset={(v) => app.set({ intensity: v / 100 })} />{#if out !== undefined && Math.abs(out - (first?.intensity ?? 0)) > 0.02}<span class="faint" title="What the light gives right now, after effects and the masters">&nbsp;· out {pct(out)}%</span>{/if}</b></div>
-      <input class="big" type="range" min="0" max="1" step="0.01" value={first?.intensity ?? 0} oninput={setNum('intensity')} aria-label="Intensity" />
+      <input class="big" type="range" min="0" max="1" step="0.01" value={first?.intensity ?? 0} use:asPercent={first?.intensity ?? 0} oninput={setNum('intensity')} aria-label="Intensity" />
       <div class="quick">
         {#each [0, 0.25, 0.5, 0.75, 1] as v (v)}<button onclick={() => (v === 0 ? app.off() : app.set({ intensity: v }))}>{v === 0 ? 'Off' : v === 1 ? 'Full' : `${v * 100}`}</button>{/each}
       </div>
@@ -275,7 +275,7 @@
         <div class="lab"><span>White</span></div>
         <div class="swatches">
           {#each whitePresets as p (p.id)}
-            <button class="sw" class:on={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+            <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
           {/each}
         </div>
       </section>
@@ -287,7 +287,7 @@
           <div class="swatches">
             {#each colorPresets as p (p.id)}
               {@const c = p.values.color && !('preset' in p.values.color) ? p.values.color : { r: 1, g: 1, b: 1 }}
-              <button class="sw" class:on={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+              <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
             {/each}
           </div>
         {/if}
@@ -347,7 +347,7 @@
               {#each named as r (r.from)}<button class:on={inByte(first?.[k] as number | undefined, r)} onclick={() => app.set({ [k]: Math.round((r.from + r.to) / 2) / 255 } as Values)} title="{r.label} ({r.from}–{r.to})">{r.label}</button>{/each}
             </div>
           {/if}
-          <input type="range" min="0" max="1" step="0.01" value={first?.[k] ?? (k === 'cct' ? 0.5 : 0)} oninput={setNum(k)} aria-label={label} class:cctbar={k === 'cct'} />
+          <input type="range" min="0" max="1" step="0.01" value={first?.[k] ?? (k === 'cct' ? 0.5 : 0)} use:asPercent={first?.[k] ?? (k === 'cct' ? 0.5 : 0)} oninput={setNum(k)} aria-label={label} class:cctbar={k === 'cct'} />
         </section>
       {/if}
     {/each}

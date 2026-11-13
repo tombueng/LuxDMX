@@ -17,6 +17,17 @@
   let listEl = $state<HTMLElement>();
   let input = $state<HTMLInputElement>();
   $effect(() => { input?.focus(); });
+  // Closed: focus back where it was (Escape left it on the page itself), or, when the command took
+  // that away (another view), into the main view, so the keyboard goes on from there.
+  const opener = document.activeElement as HTMLElement | null;
+  $effect(() => () => {
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (at && at !== document.body) return;                    // (a dialog the command opened has it)
+      const back = opener && opener !== document.body && opener.isConnected && opener.offsetParent !== null ? opener : document.querySelector<HTMLElement>('main.view');
+      back?.focus({ preventScroll: true });
+    });
+  });
 
   const items = $derived.by((): Item[] => {
     const s = app.show, out: Item[] = [];
@@ -45,7 +56,13 @@
     cmd('Phone as a remote…', 'phone', () => (ui.modal = 'remote'), undefined, 'mobile smartphone tablet qr code play from the crowd');
     out.push({ label: 'Make a fog timer…', hint: '', find: 'fog every few minutes automatic repeat loop haze', icon: 'fog', run: () => fogTimer() });
     cmd('Select all lights', 'check', () => app.selectAll());
-    if (s.fixtures.length) cmd('Groups: make one from the selected lights', 'group', () => { app.view = 'program'; app.sideTab = 'groups'; }, undefined, 'group groups make new set');
+    // (it makes one, as it says: it only went to the Groups tab; with nothing selected it says so there)
+    if (s.fixtures.length) cmd('Groups: make one from the selected lights', 'group', async () => {
+      app.view = 'program'; app.sideTab = 'groups';
+      if (!app.selected.length) return ui.toast('Select some lights first, then make a group of them');
+      const name = await ui.ask('New group', `Group ${app.show.groups.length + 1}`, { ok: 'Make the group' });
+      if (name) app.groupFromSelection(name);
+    }, undefined, 'group groups make new set');
     // (things that were only on a menu somewhere: "calibrate", "aim", "channels" found nothing)
     const heads = app.selected.filter((x) => app.kinds[x] === 'mover'), movers = app.show.fixtures.filter((f) => app.kinds[f.id] === 'mover').map((f) => f.id);
     if (movers.length) cmd(heads.length ? `Focus and calibrate the ${heads.length > 1 ? `${heads.length} heads` : 'head'}…` : 'Focus and calibrate the moving heads…', 'position',

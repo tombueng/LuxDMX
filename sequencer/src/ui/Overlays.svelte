@@ -64,7 +64,8 @@
       : e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : -1;
     if (to >= 0) { e.preventDefault(); e.stopPropagation(); list[to]?.focus(); }
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(true); }
-    else if (e.key === 'Tab') closeMenu(false);
+    // (Tab: closed, and on from the button that opened it, as from any popup; it fell to the page)
+    else if (e.key === 'Tab') closeMenu(true);
     else if (i >= 0 && (e.key === 'Enter' || e.key === ' ')) e.stopPropagation();      // the item's own, not GO
     else if (i < 0 && e.key !== 'Enter' && e.key !== ' ') e.stopPropagation();   // keys meant for the menu don't reach the list behind
   }

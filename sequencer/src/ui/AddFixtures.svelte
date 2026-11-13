@@ -12,6 +12,7 @@
   import { importFixtureFile } from '../import/file';
   import { ui } from './ui.svelte';
   import type { FixtureType } from '../model/types';
+  import type { FixtureKind } from '../model/library';
 
   let { onclose }: { onclose: () => void } = $props();
   const BLURB: Record<string, string> = {
@@ -97,11 +98,22 @@
   };
   // The keyboard: arrows move between the tiles (by where they are), Enter or Space picks one and
   // goes on to How many (it took some 60 Tabs to get from a type to Add)
+  // (a ring, a disc or a matrix said "Pixel bar": its layout says what it is)
+  function kindTitle(t: FixtureType, k: FixtureKind) {
+    const lay = modeOf(t, '')?.layout;
+    return !lay ? KIND_LABEL[k] : lay.kind === 'matrix' ? 'Pixel matrix' : lay.rings.length > 1 ? 'Pixel disc' : 'Pixel ring';
+  }
   function cardKey(e: KeyboardEvent) {
+    const here0 = e.currentTarget as HTMLElement;
+    // (Home and End: the first and the last card)
+    if (e.key === 'Home' || e.key === 'End') {
+      const cards = [...here0.closest('[role=dialog]')!.querySelectorAll<HTMLElement>('.tcard')].filter((b) => b.offsetParent);
+      e.preventDefault(); (e.key === 'Home' ? cards[0] : cards[cards.length - 1])?.focus(); return;
+    }
     const d = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, [number, number]>)[e.key];
     if (!d) return;
     e.preventDefault();
-    const here = e.currentTarget as HTMLElement, all = [...here.closest('[role=dialog]')!.querySelectorAll<HTMLElement>('.tcard')].filter((b) => b.offsetParent);
+    const here = here0, all = [...here.closest('[role=dialog]')!.querySelectorAll<HTMLElement>('.tcard')].filter((b) => b.offsetParent);
     const c = (b: HTMLElement) => { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
     const from = c(here);
     let best: HTMLElement | undefined, bd = Infinity;
@@ -181,7 +193,7 @@
 
 {#snippet typeCard(t: FixtureType)}
           {@const k = kindOf(modeOf(t, ''))}
-          <button class="tcard" class:cur={t.id === typeId} onclick={(e) => { pick(t.id); if (e.detail === 0) toCount(); }} onkeydown={cardKey} title={KIND_LABEL[k]} data-type={t.id}>
+          <button class="tcard" class:cur={t.id === typeId} onclick={(e) => { pick(t.id); if (e.detail === 0) toCount(); }} onkeydown={cardKey} title={kindTitle(t, k)} aria-pressed={t.id === typeId} data-type={t.id}>
             <span class="ti"><Icon name={k} size={22} /></span>
             <span class="tt"><b>{t.source === 'generic' ? t.model : typeLabel(t)}</b>
               <span class="faint">{BLURB[t.id] ?? shapeBlurb(t) ?? stripBlurb(t) ?? `${t.modes.length} mode${t.modes.length > 1 ? 's' : ''}, from ${t.source === 'ofl' ? 'the Open Fixture Library' : t.source === 'qxf' ? 'QLC+' : t.source === 'gdtf' ? 'GDTF' : t.source === 'generic' ? 'the built-in ones' : 'you'}`}</span></span>
@@ -213,7 +225,7 @@
           {#each mine as t (t.id)}
             {@const k = kindOf(modeOf(t, ''))}
             <div class="mywrap">
-              <button class="tcard" class:cur={t.id === typeId} onclick={(e) => { pick(t.id); if (e.detail === 0) toCount(); }} onkeydown={cardKey} title={KIND_LABEL[k]} data-type={t.id}>
+              <button class="tcard" class:cur={t.id === typeId} onclick={(e) => { pick(t.id); if (e.detail === 0) toCount(); }} onkeydown={cardKey} title={kindTitle(t, k)} aria-pressed={t.id === typeId} data-type={t.id}>
                 <span class="ti"><Icon name={k} size={22} /></span>
                 <span class="tt"><b>{typeLabel(t)}</b><span class="faint">{t.modes.length} mode{t.modes.length > 1 ? 's' : ''}</span></span>
                 <span class="side2"><span class="chip">{modeOf(t, '')?.channels.length} ch</span>

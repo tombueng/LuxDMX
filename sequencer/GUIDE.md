@@ -627,8 +627,9 @@ Three more demos come with their own room on the 3D stage:
   because the machines are safe, the Live page says so ("Confetti at 2:41 · safe").
   Drag a cue, an effect or a moment (confetti, flames, sparks, CO2, bubbles,
   fog, a strobe or blinder hit, blackout) onto the tracks, or tap it to put it at the playhead.
-  What's placed drags along the beat grid and onto the song's parts (Alt: free), an effect bar's
-  end makes it longer, right-click or Del removes. Play runs the show on the song's clock, in Live and on the 3D stage
+  What's placed drags along the beat grid and onto the song's parts (Alt: free), or moves with the
+  arrow keys once it has the focus (a beat, Shift a bar); an effect bar's end makes it longer,
+  right-click or Del removes. Play runs the show on the song's clock, in Live and on the 3D stage
   too (Live has a play/pause chip with the time at the top). Going through the song is safe: grab
   the green playhead anywhere along its height (or drag on the ruler, click a part, Home, End, the
   arrows) and the stage shows the looks at that point (cues, effects, blackout) while nothing fires.

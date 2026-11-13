@@ -6,6 +6,7 @@
   import EffectPreview from './EffectPreview.svelte';
   import Icon from './Icon.svelte';
   import type { Face } from './widgetFace';
+  import { spaceIsGo } from './ui.svelte';
 
   let { face, pic = '', swatch, editing = false, selected = false, onfire, onfader, faderNow, onburst, onselect, onmenu }: {
     face: Face; pic?: string; swatch?: string[]; editing?: boolean; selected?: boolean;
@@ -99,8 +100,11 @@
     onfire(true); onfire(false);
   }
   // Keyboard: Enter presses the focused button (and holds it while held). Space stays GO, always.
+  // Enter presses it, and Space too when it was reached by Tab (Space only did nothing on a tile;
+  // clicked with the mouse, Space stays GO, as everywhere)
   function key(e: KeyboardEvent, isDown: boolean) {
-    if (editing || e.key !== 'Enter') return;
+    if (editing || (e.key !== 'Enter' && e.key !== ' ')) return;
+    if (e.key === ' ' && spaceIsGo(e)) return;
     e.preventDefault(); e.stopPropagation();
     if (isDown && !e.repeat && !pressed) { pressed = true; onfire(true); }
     else if (!isDown && pressed) { pressed = false; onfire(false); }
@@ -113,7 +117,9 @@
 </script>
 
 {#if face.type === 'label'}
-  <div class="head" class:editing class:selected style="--c:{face.color}" role="button" tabindex="-1" onclick={onselect} onkeydown={() => {}}>
+  <!-- (a section's heading: a screen reader called it a button that did nothing; a button only while editing, to select it) -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div class="head" class:editing class:selected style="--c:{face.color}" role={editing ? 'button' : 'heading'} aria-level={editing ? undefined : 2} tabindex="-1" onclick={editing ? onselect : undefined} onkeydown={() => {}}>
     <span>{face.label}</span>
   </div>
 {:else if face.type === 'fader'}

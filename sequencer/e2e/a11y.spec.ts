@@ -211,3 +211,87 @@ test('Add fixtures by keyboard: arrows between the types, Enter picks one and go
   await expect(dlg).toBeHidden();
   expect(await page.evaluate((t) => (window as any).__luxdmx.show.fixtures.filter((f: any) => f.typeId === t).length, below)).toBe(2);
 });
+
+// From a keyboard-only walk through the app (round 8 of the QA).
+test('keyboard: Space presses a Live button reached by Tab; focus that falls goes on from its part of the app', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  const a = (fn: string) => page.evaluate(fn);
+  await a(`(() => { const a = window.__luxdmx; a.selectAll(); for (const v of [0.2, 0.5, 0.9]) { a.set({ intensity: v }); a.record(); } a.programmer = {}; a.selected = []; })()`);
+  await page.locator('.deck .card').first().dblclick();                     // cue 1 on stage
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const tile = page.locator('.live .tile').filter({ hasText: 'Cue 3' }).first();
+  await tile.focus();
+  await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab');   // (got there by keys)
+  await expect(tile).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect.poll(() => page.evaluate(() => { const a = (window as any).__luxdmx; const l = a.show.cueLists[0]; return l.cues.findIndex((c: any) => c.id === a.engine.status(l.id).cue); })).toBe(2);   // (cue 3, not GO's cue 2)
+  // Program: Record from the programmer's bar takes its button away; Tab goes on in the programmer
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  await a(`(() => { const a = window.__luxdmx; a.selectAll(); a.set({ intensity: 0.3 }); })()`);
+  const rec = page.locator('.prog .foot .rec');
+  await rec.focus();
+  await page.keyboard.press('Enter');
+  await expect(rec).toHaveCount(0);
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => !!document.activeElement?.closest('.prog'))).toBe(true);
+});
+
+test('keyboard: Find anything gives the focus back, and its group command makes the group', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  const filter = page.locator('.side .tabs').getByRole('tab', { name: 'Fixtures' });
+  await filter.focus();
+  await page.keyboard.press('Control+k');
+  await expect(page.getByRole('dialog', { name: 'Find anything' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(filter).toBeFocused();
+  // the group: asked for its name, made
+  await page.evaluate(() => (window as any).__luxdmx.selectAll());
+  await page.keyboard.press('Control+k');
+  await page.keyboard.type('group');
+  await page.getByRole('dialog', { name: 'Find anything' }).getByRole('option', { name: /^Groups: make one/ }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Make the group' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.groups.length)).toBe(1);
+});
+
+test('keyboard: the Shows dialog starts on the open show, Escape cancels a rename', async ({ page }) => {
+  await fresh(page);
+  await patch(page, 'gen-dimmer', 1, 0, 'D');
+  await page.locator('.top .show').click();
+  const dlg = page.getByRole('dialog', { name: 'Shows' });
+  const name = await page.evaluate(() => (window as any).__luxdmx.show.meta.name);
+  await expect(dlg.locator('button.title', { hasText: name })).toBeFocused();         // (not New blank show)
+  await dlg.getByRole('button', { name: `Rename ${name}` }).click();
+  await page.keyboard.type('XYZ');
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeVisible();                                                    // (the dialog stays)
+  await expect(dlg.locator('button.title', { hasText: name })).toBeFocused();
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.meta.name)).toBe(name);
+});
+
+test('keyboard: a cue on the timeline moves a beat with the arrows; sliders read as percentages; a ring is called a ring', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 1, 0, 'D');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selectAll(); a.set({ intensity: 0.5 }); a.record(); a.programmer = {}; });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await page.locator('.tlv .chips button').first().click();                          // (a tap puts it at the playhead)
+  const clip = page.locator('.tlv .it').first();
+  await expect(clip).toBeVisible();
+  const at = () => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].at);
+  const t0 = await at(), beat = 60 / (await page.evaluate(() => { const a = (window as any).__luxdmx; return a.show.timeline.bpm ?? a.show.settings.bpm; }));
+  await clip.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(at).toBeCloseTo(t0 + beat, 2);
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect.poll(at).toBeCloseTo(t0 + 5 * beat, 2);
+  await expect(page.locator('.tlv').getByRole('slider', { name: 'Volume' })).toHaveAttribute('aria-valuetext', /^\d+ %$/);
+  await expect(page.locator('.top').getByRole('slider', { name: 'Grand master' })).toHaveAttribute('aria-valuetext', '100 %');
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  await page.locator('.side .tabs').getByRole('tab', { name: 'Fixtures' }).click();
+  await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
+  const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
+  await expect(dlg.locator('[data-type="gen-disc144"]')).toHaveAttribute('title', 'Pixel disc');
+  await dlg.locator('[data-type="gen-dimmer"]').click();
+  await expect(dlg.locator('[data-type="gen-dimmer"]')).toHaveAttribute('aria-pressed', 'true');
+});

@@ -1,5 +1,6 @@
 <script lang="ts">
   // Every show saved in this browser, as cards with a picture of the stage.
+  import { tick } from 'svelte';
   import { svgImage } from './thumb';
   import Modal from './Modal.svelte';
   import Icon from './Icon.svelte';
@@ -38,7 +39,11 @@
     } catch (e) { err = (e as Error).message; }
   }
   function startRename(id: string, n: string) { renaming = id; name = n; }
-  async function rename() { if (renaming) await app.renameShow(renaming, name.trim() || 'Untitled'); renaming = null; }
+  // (Escape cancels, as everywhere: it closed the whole dialog and kept the name typed so far.
+  // Either way the focus goes back to the show's name, not to the page)
+  async function rename() { const id = renaming; renaming = null; if (id) { await app.renameShow(id, name.trim() || 'Untitled'); titleOf(id); } }
+  function cancelRename(e: KeyboardEvent) { if (e.key !== 'Escape') return; e.preventDefault(); e.stopPropagation(); const id = renaming; renaming = null; if (id) titleOf(id); }
+  const titleOf = (id: string) => tick().then(() => document.querySelector<HTMLElement>(`.card button.title[data-show="${CSS.escape(id)}"]`)?.focus());
 </script>
 
 <Modal title="Shows" {onclose} wide>
@@ -69,12 +74,15 @@
   <div class="grid">
     {#each app.shows as s (s.id)}
       <div class="card" class:cur={s.id === app.showId}>
-        <button class="pic" onclick={() => open(s.id)} title="Open"><img src={svgImage(s.thumb)} alt="" draggable="false" /></button>
+        <!-- (the picture opens it too, for a mouse; the keyboard and a screen reader have the name: twenty "Open"s read badly) -->
+        <button class="pic" onclick={() => open(s.id)} title="Open" tabindex="-1" aria-hidden="true"><img src={svgImage(s.thumb)} alt="" draggable="false" /></button>
         {#if renaming === s.id}
           <form onsubmit={(e) => { e.preventDefault(); rename(); }} class="row"><!-- svelte-ignore a11y_autofocus -->
-            <input bind:value={name} use:focusSelect onblur={rename} aria-label="Show name" style="flex:1" /></form>
+            <input bind:value={name} use:focusSelect onblur={rename} onkeydown={cancelRename} aria-label="Show name" style="flex:1" /></form>
         {:else}
-          <button class="title" ondblclick={() => startRename(s.id, s.name)} onclick={() => open(s.id)}>{s.name}</button>
+          <!-- (the dialog starts on the open show, not on New blank show: one stray Enter made a new show) -->
+          <!-- svelte-ignore a11y_autofocus -->
+          <button class="title" data-show={s.id} autofocus={s.id === app.showId} ondblclick={() => startRename(s.id, s.name)} onclick={() => open(s.id)}>{s.name}</button>
         {/if}
         <div class="faint">{s.fixtures} fixtures · {s.cues} cues · {ago(s.modified)}{s.id === app.showId ? ' · open now' : ''}</div>
         <div class="toolbar">
