@@ -208,6 +208,16 @@ describe('cue lists', () => {
     r.e.jumpTo('L', 2); expect(out(r, 0.3, 2)).toEqual([128, 255]);
   });
 
+  it('Back in a list of looks is one step back: what only the cue after it switched on goes out (the look the card shows)', () => {
+    const r = rig([fx('a', 'gen-dimmer', 1), fx('b', 'gen-dimmer', 2)], [list('L', [cue({ a: { intensity: 1 } }), cue({ b: { intensity: 1 } })])]);
+    r.e.go('L'); out(r, 0.1); r.e.go('L');
+    expect(out(r, 0.2, 2)).toEqual([255, 255]);                            // the second look adds b (a stays: looks leave the rest)
+    r.e.back('L');
+    expect(out(r, 0.3, 2)).toEqual([255, 0]);                              // back: b goes out again
+    r.e.jumpTo('L', 1); expect(out(r, 0.4, 2)).toEqual([255, 255]);
+    r.e.jumpTo('L', 0); expect(out(r, 0.5, 2)).toEqual([255, 255]);       // (a tap on a look still leaves the rest as it is)
+  });
+
   it('fog and haze run only in the cue that sets them', () => {
     const r = rig([fx('h', 'gen-fog', 1), fx('d', 'gen-dimmer', 2)], [list('L', [
       cue({ h: { fog: 1 } }), cue({ d: { intensity: 1 } }), cue({ h: { fog: 0.5 } }),

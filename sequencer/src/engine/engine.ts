@@ -159,16 +159,18 @@ export class Engine {
   back(id: string) {
     const l = this.list(id), p = this.player(id);
     if (l) p.sync(l);
-    // (without the cue's actions: going back to the preset doesn't bring the house lights up again)
-    if (p.running && p.index > 0) this.jumpTo(id, p.index - 1, undefined, false);
+    // (without the cue's actions: going back to the preset doesn't bring the house lights up again;
+    // the cue as the list builds it from the top, as its card shows it: what only the cue after it
+    // switched on goes out, in a list of looks too)
+    if (p.running && p.index > 0) this.jumpTo(id, p.index - 1, undefined, false, false, true);
   }
   // `exact`: only that cue's own values (see ListPlayer.jump)
-  jumpTo(id: string, i: number, fade?: number, actions = true, exact = false) {
+  jumpTo(id: string, i: number, fade?: number, actions = true, exact = false, asPlay = false) {
     const l = this.list(id);
     if (!l) return;
     this.jumped.delete(id);
     this.wake(id);
-    const cue = this.player(id).jump(l, i, this.now(), this.presetMap(), ++this.seq, fade, this.lastStage, exact, this.fxLights(), this.getShow().presets);
+    const cue = this.player(id).jump(l, i, this.now(), this.presetMap(), ++this.seq, fade, this.lastStage, exact, this.fxLights(), this.getShow().presets, asPlay);
     // Actions can start lists whose cues start lists: a few levels deep is a show, more is a loop.
     if (actions && cue?.actions && this.depth < 8) {
       this.depth++;

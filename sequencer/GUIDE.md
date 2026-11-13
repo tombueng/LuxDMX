@@ -257,7 +257,9 @@ Three more demos come with their own room on the 3D stage:
   a look sets the lights it names and leaves the rest as they are: "Hall" lights the hall, the
   church stays as it was (an effect on the church's lights keeps going too), and its card shows
   the hall lit and the church as outlines ("not in this look", where a dark light means "off").
-  Fog and haze still stop with the next look. In a play ("Run as a play"; a list with standby notes or follow-ons when it was opened) a
+  Fog and haze still stop with the next look. **Back** is one step back in either kind of list:
+  the cue before, as the list builds it from the top, so what only the cue after it switched on
+  goes out again (tapping an earlier look still just sets what it names). In a play ("Run as a play"; a list with standby notes or follow-ons when it was opened) a
   cue is what the list adds up to at that point, so Back or a jump to cue 9 shows cue 9 whatever
   came before. So does a chase or sequence that steps by itself, so going round comes back to step
   1's look.
