@@ -18,7 +18,14 @@ test('locked with a PIN: no master, no Release, Blackout by holding, the phone d
   await page.locator('.live').getByRole('button', { name: 'Lock page' }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Lock with a PIN…' }).click();
   const ask = page.getByRole('dialog', { name: 'Lock with a PIN' });
+  // a PIN that can't be one is said there; the dialog waits (it closed, the typing lost)
+  await ask.getByLabel(/PIN/).fill('12');
+  await expect(ask.getByRole('status')).toHaveText('A PIN is 3 to 8 digits');
+  await expect(ask.getByRole('button', { name: 'Lock' })).toBeDisabled();
+  await ask.getByLabel(/PIN/).fill('ab12');
+  await expect(ask.getByRole('status')).toHaveText('Digits only');
   await ask.getByLabel(/PIN/).fill('4711');
+  await expect(ask.getByRole('status')).toHaveCount(0);
   await ask.getByRole('button', { name: 'Lock' }).click();
   await expect(page.locator('.live').getByRole('button', { name: /Unlock page/ })).toBeVisible();
   await expect(page.locator('.top input[aria-label="Grand master"]')).toHaveCount(0);

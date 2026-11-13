@@ -28,7 +28,7 @@ export const fixtureActions = {
     const ids = app.show.fixtures.map((f) => f.id).filter((id) => app.selected.includes(id));
     if (!ids.length) return;
     const first = app.show.fixtures.find((f) => f.id === ids[0])?.num ?? 1;
-    const v = await ui.ask(ids.length > 1 ? `Number the ${ids.length} lights from` : 'Its number', String(first), { ok: 'Number', digits: true, hint: ids.length > 1 ? 'They get this one and the ones after it, in the order of the list.' : 'What the console and typed commands go by.' });
+    const v = await ui.ask(ids.length > 1 ? `Number the ${ids.length} lights from` : 'Its number', String(first), { label: 'Number', ok: 'Number', digits: true, check: (s) => (/^\d+$/.test(s) && +s >= 1 ? '' : 'A whole number from 1'), hint: ids.length > 1 ? 'They get this one and the ones after it, in the order of the list.' : 'What the console and typed commands go by.' });
     if (v === null) return;
     app.checkpoint();
     const why = renumber(app.show.fixtures, ids, Math.round(Number(v)));

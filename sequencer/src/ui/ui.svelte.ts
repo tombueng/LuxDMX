@@ -56,7 +56,9 @@ class Ui {
   // The question dialog (instead of the browser's prompt / confirm).
   // pin: digits, hidden, the number pad on a tablet; empty: an empty answer counts (not a Cancel)
   // digits: the number pad and big digits, shown (setting a PIN: a typo mustn't lock you out); hint: a line under the field
-  question = $state<{ title: string; body?: string; label?: string; value?: string; ok: string; danger?: boolean; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string; done: (v: string | null) => void } | null>(null);
+  // (`check`: what's wrong with what's typed, said in the dialog, which waits for it to be right: it
+  // used to close and say so in a toast, the typing lost)
+  question = $state<{ title: string; body?: string; label?: string; value?: string; ok: string; danger?: boolean; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string; check?: (v: string) => string; done: (v: string | null) => void } | null>(null);
   toastText = $state('');
   toastAction = $state<{ label: string; run: () => unknown } | null>(null);
   // The one-line hints at the top of the panels: on until someone hides them (remembered).
@@ -77,9 +79,9 @@ class Ui {
   }
   closeMenu() { this.menu = null; }
   // Ask for a name. Resolves to the text, or null when cancelled.
-  ask(title: string, value = '', o: { label?: string; ok?: string; body?: string; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string } = {}): Promise<string | null> {
+  ask(title: string, value = '', o: { label?: string; ok?: string; body?: string; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string; check?: (v: string) => string } = {}): Promise<string | null> {
     this.question?.done(null);                // a question still open counts as cancelled
-    return new Promise((done) => (this.question = { title, value, label: o.label ?? 'Name', ok: o.ok ?? 'OK', body: o.body, pin: o.pin, digits: o.digits, empty: o.empty, hint: o.hint, done }));
+    return new Promise((done) => (this.question = { title, value, label: o.label ?? 'Name', ok: o.ok ?? 'OK', body: o.body, pin: o.pin, digits: o.digits, empty: o.empty, hint: o.hint, check: o.check, done }));
   }
   // Ask yes or no. Resolves to true for yes.
   confirm(title: string, body: string, ok = 'Delete', danger = true): Promise<boolean> {

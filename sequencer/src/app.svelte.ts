@@ -2667,6 +2667,7 @@ class App {
   async pinLock(): Promise<boolean> {
     const pin = await ui.ask('Lock with a PIN', this.show.settings.lockPin ?? '', { label: 'PIN', ok: 'Lock', digits: true, empty: true,
       hint: '3 to 8 digits. Empty: no PIN, holding the padlock unlocks.',
+      check: (v) => (!v ? '' : /\D/.test(v) ? 'Digits only' : v.length < 3 || v.length > 8 ? 'A PIN is 3 to 8 digits' : ''),
       body: 'This page only, for playing: no other pages, no editing, no masters. Holding the padlock asks for the PIN.' });
     if (pin === null) return false;
     const p = pin.trim();

@@ -86,6 +86,7 @@ test('lights keep their numbers when another goes; the patch dialog changes one'
   await page.locator('.fl li[data-fixture="PAR 3"]').click({ button: 'right' });
   await page.locator('.ctx').getByRole('menuitem', { name: /Number the 3 from/ }).click();
   const ask = page.getByRole('dialog', { name: 'Number the 3 lights from' });
+  await expect(ask.getByLabel('Number', { exact: true })).toBeVisible();     // (it said "Name")
   await ask.getByRole('textbox').fill('101');
   await ask.getByRole('button', { name: 'Number' }).click();
   await expect(page.locator('.fl li[data-fixture="PAR 4"] .num')).toHaveText('103');

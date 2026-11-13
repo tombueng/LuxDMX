@@ -11,8 +11,9 @@
   const held = (e: KeyboardEvent) => { if (e.key === 'Enter' && e.repeat) e.preventDefault(); };
   // (a name it needs: OK waits for one instead of closing on an empty field and making nothing)
   const blank = $derived(!!q.label && q.value !== undefined && !q.empty && !value.trim());
+  const problem = $derived(q.check?.(value.trim()) ?? '');
   function finish(ok: boolean) {
-    if (ok && blank) return;
+    if (ok && (blank || problem)) return;
     const { done, label, value: asked, empty } = q;      // read before the dialog goes away
     ui.question = null;
     done(ok ? (label && asked !== undefined ? value.trim() || (empty ? '' : null) : '') : null);
@@ -27,12 +28,13 @@
       <label>{q.label} <input bind:this={input} bind:value aria-label={q.label} type={q.pin ? 'password' : 'text'} inputmode={q.pin || q.digits ? 'numeric' : undefined}
         class:code={q.pin || q.digits} autocomplete={q.pin || q.digits ? 'off' : undefined} maxlength={q.pin || q.digits ? 8 : undefined} onkeydown={held}
         aria-describedby={[q.body && 'q-body', q.hint && 'q-hint'].filter(Boolean).join(' ') || undefined} /></label>
+      {#if problem}<p class="hint bad" role="status">{problem}</p>{/if}
       {#if q.hint}<p class="hint" id="q-hint">{q.hint}</p>{/if}
     {/if}
     <div class="row end">
       <button type="button" onclick={() => finish(false)}>Cancel</button>
       <!-- svelte-ignore a11y_autofocus -->
-      <button type="submit" class={q.danger ? 'danger solid' : 'primary'} autofocus={!q.label} onkeydown={held} disabled={blank} title={blank ? `Type a ${q.label!.toLowerCase()} first` : undefined}>{q.ok}</button>
+      <button type="submit" class={q.danger ? 'danger solid' : 'primary'} autofocus={!q.label} onkeydown={held} disabled={blank || !!problem} title={blank ? `Type a ${q.label!.toLowerCase()} first` : problem || undefined}>{q.ok}</button>
     </div>
   </form>
 </Modal>
@@ -46,4 +48,5 @@
   input.code { font: 600 1.6rem ui-monospace, monospace; letter-spacing: .4em; text-align: center; width: 16ch; max-width: 100%; align-self: center; padding: .35rem .2rem .35rem .6rem; }
   .hint { margin: -.4rem 0 0; font-size: .82rem; color: var(--faint); text-align: center; }
   .solid { background: var(--pink); border-color: var(--pink); color: #1a0010; font-weight: 650; }
+  .hint.bad { color: var(--orange); }
 </style>
