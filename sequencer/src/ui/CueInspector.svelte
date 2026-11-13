@@ -49,7 +49,10 @@
     c.actions![i] = d === 'blackout' ? { do: 'blackout', on: true } : d === 'off' ? { do: 'off' } : d === 'master' ? { do: 'master', list: target, level: 1 }
       : d === 'goto' ? { do: 'goto', list: target, cue: app.show.cueLists.find((l) => l.id === target)?.cues[0]?.id ?? '' } : { do: d, list: target };
   }
-  const fname = (id: string) => app.show.fixtures.find((f) => f.id === id)?.name ?? '(gone)';
+  // (a map: a find through the whole rig, three times for each light of the cue, made a GO in a
+  // rig of 300 lights stall the page)
+  const names = $derived(new Map(app.show.fixtures.map((f) => [f.id, f.name])));
+  const fname = (id: string) => names.get(id) ?? '(gone)';
 </script>
 
 <section class="insp" aria-label="Cue settings">
