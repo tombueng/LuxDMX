@@ -563,6 +563,7 @@ test.describe('the padlock on a tablet', () => {
     await page.evaluate(() => (window as any).__luxdmx.addFixtures('gen-rgb', '', 2, 0, 'P'));
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     await page.locator('.live').getByRole('button', { name: 'Lock page' }).tap();
+    await expect(page.getByRole('menuitem', { name: /a page with just the looks/ })).toBeVisible();   // (for staff: no machines, no Blackout)
     await page.getByRole('menuitem', { name: /^Lock with a PIN/ }).tap();
     const ask = page.getByRole('dialog', { name: 'Lock with a PIN' });
     await ask.getByLabel(/PIN/).fill('2468');

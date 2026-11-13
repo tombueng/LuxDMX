@@ -113,6 +113,9 @@
       { heading: 'Lock for the show: only playing' },
       { label: app.show.settings.lockPin ? 'Lock with the PIN…' : 'Lock with a PIN…', icon: 'lock', run: pinLock },
       { label: 'Lock without a PIN (hold the padlock to unlock)', icon: 'lock', run: () => setLocked(true, keys) },
+      // (a locked page still has the machines and Blackout on it: for staff, a page of just the looks)
+      { sep: true },
+      { label: 'First, a page with just the looks (for staff)', icon: 'plus', run: looksOnly },
     ]);
   }
   async function setLocked(on: boolean, keys = false) {
