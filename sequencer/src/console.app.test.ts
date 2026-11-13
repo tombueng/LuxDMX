@@ -199,3 +199,21 @@ describe('undo and help by command', () => {
     expect(run(app, 'help').said).toMatch(/^Try: 5 @ full/);
   });
 });
+
+describe('the console says what it did (round 17 minors)', () => {
+  it('a name with record and on its own, a taken cue said the second time, more than full said, "1-3" with 3 not in it said honestly', async () => {
+    const { app } = await show();
+    run(app, '1 @ full');
+    expect(run(app, 'record cue 12 "Verse one"').ok).toBe(true);
+    const l = app.liveList ?? app.list;
+    expect(l.cues.map((c: any) => [c.num, c.name])).toEqual([[12, 'Verse one']]);
+    run(app, '2 @ full');
+    expect(run(app, 'record cue 12').said).toMatch(/has cue 12 \(Verse one\): update cue 12/);   // (it said "Nothing to record yet")
+    expect(run(app, 'cue 12 "Big chorus"')).toEqual({ ok: true, said: 'Cue 12 is "Big chorus" now' });
+    expect(l.cues[0].name).toBe('Big chorus');
+    expect(run(app, 'cue 99 "x"')).toEqual({ ok: false, said: `${l.name} has no cue 99` });
+    expect(run(app, '2 @ 150').said).toBe('1 light at 100% (150 is more than full)');
+    expect(run(app, '1-3').said).toBe("1 light (3 wasn't in it; a run is 1 thru 3)");
+    expect(run(app, '1 thru 3 - 3').said).toBe('2 lights (3 taken out)');
+  });
+});

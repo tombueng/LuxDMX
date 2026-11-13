@@ -1706,9 +1706,11 @@ class App {
         case 'releaseall': this.releaseAll(); return { ok: true, said: 'Released everything' };
         case 'lowlight': this.lowlight = this.lowlight > 0 ? 0 : 0.15; return { ok: true, said: this.lowlight > 0 ? `Lowlight on${this.highlight ? '' : ' (with Highlight)'}` : 'Lowlight off' };
         case 'record': {
-          const into = c.list ? list : this.liveList;
+          // (where it goes: the list asked for, the one Live plays, else the one open; the same
+          // for the cue's number being taken: a second "record cue 12" said nothing to record)
+          const into = c.list ? list : this.liveList ?? this.list;
           if (c.cue !== undefined && into) { const k = cueAt(into, c.cue); if (k >= 0) return { ok: false, said: `${into.name} has cue ${fmtNum(c.cue)} (${into.cues[k].name}): update cue ${fmtNum(c.cue)}, or another number` }; }
-          if (!this.record(into?.id, { num: c.cue, fade: c.time })) return { ok: false, said: 'Nothing to record yet' };
+          if (!this.record(into?.id, { num: c.cue, fade: c.time, name: c.label })) return { ok: false, said: 'Nothing to record yet' };
           const l = into ?? this.list;
           return { ok: true, said: `Recorded${c.cue !== undefined ? ` cue ${fmtNum(c.cue)}` : ''} into ${l?.name ?? 'a new list'}${this.recordedAside ? ' (the play stays where it is; Clear lets go of your changes)' : ''}` };
         }
@@ -1718,6 +1720,13 @@ class App {
           const k = cueAt(list, c.cue);
           if (k < 0) return { ok: false, said: `${list.name} has no cue ${fmtNum(c.cue)}` };
           return this.updateCue(list.cues[k].id, list.id) ? { ok: true, said: `Updated cue ${fmtNum(c.cue)} in ${list.name}` } : { ok: false, said: 'Nothing changed to update' };
+        }
+        case 'label': {
+          if (!list) return needList();
+          const k = cueAt(list, c.cue!);
+          if (k < 0) return { ok: false, said: `${list.name} has no cue ${fmtNum(c.cue!)}` };
+          this.checkpoint(); list.cues[k].name = c.label!; this.markDirty(0);
+          return { ok: true, said: `Cue ${fmtNum(c.cue!)} is "${c.label}" now` };
         }
         case 'goto': case 'delete': case 'time': {
           if (!list) return needList();
@@ -1792,6 +1801,7 @@ class App {
       if (problems.length) return { ok: false, said: [...new Set(problems)].join('; ') };
       // the steps one after the other, from nothing or from what's selected; cells by light
       let ids = c.base === 'current' ? [...this.selected] : [];
+      const outHit: string[] = [], outMiss: string[] = [];
       const cells = new Map<string, number[]>(c.base === 'current' ? Object.entries(this.cellSel) : []);
       for (const st of c.steps) {
         // whole lights, and cells by light (a group of cells: its cells on each of its lights)
@@ -1814,6 +1824,7 @@ class App {
             cells.set(x.id, [...had, ...x.cells.filter((k) => !had.includes(k))]);
           }
         } else {
+          for (const id of whole) (ids.includes(id) ? outHit : outMiss).push(id);
           ids = ids.filter((id) => !whole.includes(id));
           for (const id of whole) cells.delete(id);
           for (const x of picks) {
@@ -1829,15 +1840,22 @@ class App {
       this.cellSel = Object.fromEntries([...cells].filter(([id]) => ids.includes(id)));
       const nc = [...cells.values()].reduce((a, x) => a + x.length, 0);
       said.push(ids.length ? `${ids.length} light${ids.length > 1 ? 's' : ''}${nc ? `, ${nc} cell${nc > 1 ? 's' : ''}` : ''}` : 'nothing selected');
-      // (what "-" took out, said: "1-4" is light 1 without 4 here, as on MA and Eos)
-      const out = c.steps.filter((st) => st.sign === '-').flatMap((st) => st.pick.fixtures);
-      if (out.length && out.length <= 3) tail.push(`(${out.join(', ')} taken out)`);
+      // (what "-" took out, said: "1-4" is light 1 without 4 here, as on MA and Eos; one that wasn't
+      // in it said so, with how a run is typed: "1-5" read as light 1 said "5 taken out")
+      const noOf = (id: string) => this.show.fixtures.find((f) => f.id === id)?.num ?? this.show.fixtures.findIndex((f) => f.id === id) + 1;
+      if (outHit.length && outHit.length <= 3) tail.push(`(${outHit.map(noOf).join(', ')} taken out)`);
+      if (outMiss.length && outMiss.length <= 3) {
+        const from = c.steps.find((st) => st.sign === '+')?.pick.fixtures, to = noOf(outMiss[0]);
+        const run = from?.length === 1 && outMiss.length === 1 && from[0] < to ? `; a run is ${from[0]} thru ${to}` : '';
+        tail.push(`(${outMiss.map(noOf).join(', ')} wasn't in it${run})`);
+      }
     }
     if (c.level) {
       if (!this.selected.length) return { ok: false, said: 'Select lights first (1 thru 4, group 2)' };
       if ('abs' in c.level) { if (c.level.abs === 0) this.off(); else this.set({ intensity: c.level.abs }); }
       else this.nudge('intensity', c.level.rel);
       said.push('abs' in c.level ? `at ${Math.round(c.level.abs * 100)}%` : `${c.level.rel > 0 ? '+' : ''}${Math.round(c.level.rel * 100)}%`);
+      if ('abs' in c.level && c.level.asked) tail.push(`(${c.level.asked} is more than full)`);
       // (a group master pulled down holds some of them lower: said, or "5 @ full" staying dim is a mystery)
       const down = this.show.groups.filter((g) => (this.groupMasters[g.id] ?? 1) < 0.995 && g.fixtures.some((id) => this.selected.includes(id)));
       if (down.length) tail.push(`(${down.map((g) => `${g.name}'s master at ${Math.round(this.groupMasters[g.id] * 100)}%`).join(', ')})`);
@@ -2254,7 +2272,7 @@ class App {
   // effects the cue took over): Undo puts those back as well, so after Ctrl+Z the stage and the
   // cards say the same thing (it said the cue before was LIVE while the new one's look stayed up)
   private recUndo: { snap: string; list: string; cue: string; prog: Record<string, Values>; was: string; fx: string[] } | null = null;
-  record(into?: string, opt: { num?: number; fade?: number } = {}): boolean {
+  record(into?: string, opt: { num?: number; fade?: number; name?: string } = {}): boolean {
     this.checkpoint();
     const before = this.lastSnap;
     const ids = Object.keys(this.programmer);
@@ -2303,7 +2321,7 @@ class App {
     this.liveFx = [];
     if (opt.num !== undefined) cue.num = opt.num; else numbersFor(list, at, [cue]);   // 20.5 when it goes between 20 and 21
     list.cues.splice(at, 0, cue);
-    cue.name = named || `Cue ${cueNumber(list, at)}`;
+    cue.name = opt.name || named || `Cue ${cueNumber(list, at)}`;
     // A page of your own with buttons for this list's looks gets one for the new look too, next
     // to the others (the generated page follows the list by itself).
     for (const pg of this.show.pages) {

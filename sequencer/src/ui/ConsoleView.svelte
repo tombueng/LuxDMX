@@ -48,7 +48,8 @@
   const rubOut = () => { padTyping = true; const t = cmd.trimEnd(); cmd = /\d$/.test(t) ? t.slice(0, -1) : t.replace(/\S+$/, ''); line?.focus(); };
   // (from the keypad on a touch screen the phone's own keyboard stays down: the keypad is the keyboard)
   let padTyping = $state(false);
-  const press = (k: string) => { padTyping = true; cmd = /^[0-9.]$/.test(k) ? cmd + k : `${cmd.trimEnd()} ${k} `; line?.focus(); };
+  // (Full ends the command, as on a desk: "1 thru 4 Full" is done, no Enter after it)
+  const press = (k: string) => { padTyping = true; cmd = /^[0-9.]$/.test(k) ? cmd + k : `${cmd.trimEnd()} ${k} `; line?.focus(); if (k === 'full') run(); };
   // typing anywhere on the console (not in a field) goes to the command line; Space is GO
   // (a fader or an encoder keeps only its own keys: arrows, Page Up/Down, Home/End, Enter)
   const OWN = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Enter']);

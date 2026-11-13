@@ -437,6 +437,12 @@ test('the console\'s add switch says what it does, and is the stage\'s too; Thru
   await page.locator('.top .modes').getByRole('tab', { name: 'Console' }).click();
   await expect(view(page).locator('.pad').getByRole('button', { name: /^thru$/i })).toHaveText('Thru');
   await expect(view(page).locator('.pad').getByRole('button', { name: /^full$/i })).toHaveText('Full');
+  // Full ends the command, as on a desk: 1 Thru 3 Full is done, no Enter
+  const pad = view(page).locator('.pad');
+  for (const k of ['1', 'thru', '3', 'full']) await pad.getByRole('button', { name: new RegExp(`^${k}$`, 'i') }).click();
+  await expect(said(page)).toHaveText('3 lights at 100%');
+  await expect(view(page).getByRole('textbox').first()).toHaveValue('');
+  await expect.poll(async () => { const c = await channels(0, 16); return [c[0], c[4], c[8], c[12]]; }).toEqual([255, 255, 255, 0]);   // (the dimmers of 1-3, not 4)
 });
 
 // A desk operator's habits (round 17 of the QA): Clear twice lets go, "all" while stepping is the

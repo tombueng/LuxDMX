@@ -392,11 +392,12 @@ Three more demos come with their own room on the 3D stage:
   |---|---|
   | `5 @ full`, `5 full` | light 5 at full |
   | `1 thru 4 @ 50`, `1>4 @ 50` | four lights at half (`@ 5` is 50 %, `@ 05` and `@ 5%` are 5 %) |
-  | `1 thru 10 - 5 @ out` | nine lights out (`-` takes out, as on MA and Eos: `1-4` is light 1 without 4) |
+  | `1 thru 10 - 5 @ out` | nine lights out (`-` takes out, as on MA and Eos: `1-4` is light 1 without 4; when 4 wasn't selected it says so, and that a run is `1 thru 4`) |
   | `+ 7`, `@ +10` | add to what's selected; up 10 from where each light is |
   | `group 2 @ full`, `all @ out` | a group by its number (shown in the Groups list; it keeps it when you drag the groups into another order), every light |
   | `1.3 thru 1.16 @ full` | cells 3 to 16 of light 1 (a desk's sub-fixtures) |
-  | `record`, `record cue 5 time 3` | a new cue in the list Live plays; cue 5 where it belongs, its fade 3 s |
+  | `record`, `record cue 5 time 3`, `record cue 5 "Verse"` | a new cue in the list Live plays; cue 5 where it belongs, its fade 3 s; named Verse |
+  | `cue 5 "Chorus"`, `cue 5 label Chorus` | cue 5's name |
   | `update`, `update cue 5` | the cue on stage; cue 5 |
   | `goto cue 5`, `cue 5 time 3`, `delete cue 5` | by the cue's number, in the list Live plays or in `list 2` |
   | `go`, `back`, `release`, `go 2` | the list Live plays, or list 2 (GO on the last cue and Back on the first say so) |
@@ -411,7 +412,8 @@ Three more demos come with their own room on the 3D stage:
     light 2). "record cue 5" is refused when 5 is there; in a play that's running elsewhere the cue
     is stored and the programmer keeps your changes until Clear. Typed go and goto say when a list's
     machines are safe. Short forms: clr, rec, upd, bo, hl, ll (lowlight), q (cue), del, oops (undo),
-    ff (full), t and > (thru). Desk words work too: `store` (record), `fade` (time), `go to cue 5`,
+    ff (full), t and > (thru). More than full (`@ 150`) is full and says so. On the keypad **Full**
+    ends the command, as on a desk (1 Thru 3 Full, no Enter). Desk words work too: `store` (record), `fade` (time), `go to cue 5`,
     `fixture 5` or `chan 5` (just 5); `all` while stepping is the stepped selection again. Typing anywhere on the console goes to the command line, ↑ brings back the last
     one; the keypad keeps a phone's own keyboard down (⌫ rubs out the last digit or word, Esc empties
     the line).
