@@ -57,6 +57,21 @@ hits, flames, sparks and confetti.
 
 <p align="center"><img src="docs/media/demo-moments.gif" width="720" alt="Four moments of the demo: green beams, flame columns, spark fountains, a colour wash"></p>
 
+## What the 3D stage draws
+
+Every light here is drawn by the app itself, live in the browser, with the same models, beams,
+gobos and machines your show gets on the 3D stage. The same tiles play in **Add fixtures** (each
+fixture shows what it can do) and in the gallery (Ctrl+K, "gallery").
+
+<table>
+<tr><td align="center"><img src="docs/media/gallery/gobos.webp" width="240" alt="Gobos, turning"><br><sub>Gobos, turning</sub></td><td align="center"><img src="docs/media/gallery/prism.webp" width="240" alt="Prism"><br><sub>Prism</sub></td><td align="center"><img src="docs/media/gallery/fan.webp" width="240" alt="Heads in a fan"><br><sub>Heads in a fan</sub></td><td align="center"><img src="docs/media/gallery/colours.webp" width="240" alt="Colour mixing"><br><sub>Colour mixing</sub></td></tr>
+<tr><td align="center"><img src="docs/media/gallery/zoom.webp" width="240" alt="Zoom"><br><sub>Zoom</sub></td><td align="center"><img src="docs/media/gallery/profile.webp" width="240" alt="Two gobo wheels and an animation wheel"><br><sub>Two gobo wheels and an animation wheel</sub></td><td align="center"><img src="docs/media/gallery/headbar.webp" width="240" alt="Moving bars"><br><sub>Moving bars</sub></td><td align="center"><img src="docs/media/gallery/endless.webp" width="240" alt="Endless pan and tilt"><br><sub>Endless pan and tilt</sub></td></tr>
+<tr><td align="center"><img src="docs/media/gallery/roll.webp" width="240" alt="A third axis"><br><sub>A third axis</sub></td><td align="center"><img src="docs/media/gallery/pixels.webp" width="240" alt="Pixel bars"><br><sub>Pixel bars</sub></td><td align="center"><img src="docs/media/gallery/disc.webp" width="240" alt="LED discs and rings"><br><sub>LED discs and rings</sub></td><td align="center"><img src="docs/media/gallery/matrix.webp" width="240" alt="Pixel matrix"><br><sub>Pixel matrix</sub></td></tr>
+<tr><td align="center"><img src="docs/media/gallery/pars.webp" width="240" alt="PARs"><br><sub>PARs</sub></td><td align="center"><img src="docs/media/gallery/strobe.webp" width="240" alt="Strobes"><br><sub>Strobes</sub></td><td align="center"><img src="docs/media/gallery/blinder.webp" width="240" alt="Blinders"><br><sub>Blinders</sub></td><td align="center"><img src="docs/media/gallery/winch.webp" width="240" alt="Kinetic winches"><br><sub>Kinetic winches</sub></td></tr>
+<tr><td align="center"><img src="docs/media/gallery/flame.webp" width="240" alt="Flames"><br><sub>Flames</sub></td><td align="center"><img src="docs/media/gallery/sparks.webp" width="240" alt="Cold sparks"><br><sub>Cold sparks</sub></td><td align="center"><img src="docs/media/gallery/confetti.webp" width="240" alt="Confetti"><br><sub>Confetti</sub></td><td align="center"><img src="docs/media/gallery/co2.webp" width="240" alt="CO2 jets"><br><sub>CO2 jets</sub></td></tr>
+<tr><td align="center"><img src="docs/media/gallery/bubbles.webp" width="240" alt="Bubbles"><br><sub>Bubbles</sub></td><td align="center"><img src="docs/media/gallery/fog.webp" width="240" alt="Fog"><br><sub>Fog</sub></td></tr>
+</table>
+
 ## Screenshots
 
 | | |

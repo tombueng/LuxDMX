@@ -18,6 +18,7 @@
   import RemoteDialog from './RemoteDialog.svelte';
   import ScheduleDialog from './ScheduleDialog.svelte';
   import Welcome from './Welcome.svelte';
+  import Gallery from './Gallery.svelte';
   import RigCheck from './RigCheck.svelte';
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
@@ -47,6 +48,7 @@
 {#if ui.modal === 'welcome'}<Welcome onclose={close} />
 {:else if ui.modal === 'shows'}<ShowManager onclose={close} />
 {:else if ui.modal === 'addFixtures'}<AddFixtures onclose={close} />
+{:else if ui.modal === 'gallery'}<Gallery onclose={close} />
 {:else if ui.modal === 'effects'}<EffectLibrary onclose={close} onadded={(id) => { ui.fxSel = [id]; app.sideTab = 'effects'; }} />
 {:else if ui.modal === 'shortcuts'}<Shortcuts onclose={close} />
 {:else if ui.modal === 'palette'}<Palette onclose={close} />

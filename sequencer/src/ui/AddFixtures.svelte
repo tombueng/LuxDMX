@@ -270,6 +270,8 @@
   }
   // the tile under the pointer or the keyboard plays at full speed
   let hot = $state('');
+  // (from the gallery's Add: that light picked)
+  if (ui.addType) { const id = ui.addType; ui.addType = null; queueMicrotask(() => pick(id)); }
   const picked = $derived(modeOf(type, mode));
 </script>
 
@@ -328,6 +330,7 @@
         <button onclick={() => fileInput?.click()}><Icon name="upload" />GDTF / QLC+ / OFL file…</button>
         <button onclick={() => (make = true)}><Icon name="wizard" />Make my own…</button>
         <button onclick={() => (shapeMaker = true)}><Icon name="sun" />Ring or matrix…</button>
+        <button class="ghost" onclick={() => (ui.modal = 'gallery')}><Icon name="image" />What the 3D stage draws</button>
         <input type="file" accept=".gdtf,.qxf,.json" bind:this={fileInput} onchange={file} hidden />
       </div>
       {#if libErr}<p class="err">{libErr}</p>{/if}

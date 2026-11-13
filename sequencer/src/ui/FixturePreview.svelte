@@ -5,8 +5,9 @@
   import { onDestroy } from 'svelte';
   import type { FixtureType } from '../model/types';
   import type { PreviewHandle } from '../stage3d/preview';
+  import type { Focus } from '../stage3d/microShow';
 
-  let { type, mode = '', hover = false, ondoes }: { type: FixtureType | undefined; mode?: string; hover?: boolean; ondoes?: (d: string[]) => void } = $props();
+  let { type, mode = '', hover = false, copies = 1, focus = 'all', extra, ondoes }: { type: FixtureType | undefined; mode?: string; hover?: boolean; copies?: number; focus?: Focus; extra?: FixtureType; ondoes?: (d: string[]) => void } = $props();
   let canvas = $state<HTMLCanvasElement>();
   let h: PreviewHandle | null = null, gone = false;
   let ro: ResizeObserver | undefined;
@@ -24,11 +25,11 @@
     ro = new ResizeObserver(fit); ro.observe(c);
     void import('../stage3d/preview').then((m) => {
       if (gone || !canvas || !type) return;
-      h = m.preview(canvas, { type, mode });
+      h = m.preview(canvas, { type, mode, copies, focus, extra });
       ondoes?.(h.does);
     }).catch(() => {});
   });
-  $effect(() => { const t = type, md = mode; if (h && t) { h.set({ type: t, mode: md }); ondoes?.(h.does); } });
+  $effect(() => { const t = type, md = mode, n = copies, f = focus, x = extra; if (h && t) { h.set({ type: t, mode: md, copies: n, focus: f, extra: x }); ondoes?.(h.does); } });
   $effect(() => { h?.hover(hover); });
   onDestroy(() => { gone = true; ro?.disconnect(); h?.destroy(); });
 </script>

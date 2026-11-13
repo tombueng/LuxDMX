@@ -13,3 +13,6 @@ link/link.exe
 link/dist/
 # our copies of the catalog songs (credits and sources in SONGS.md)
 public/songs/
+
+# the gallery capture's frames (tools/gallery/capture.mjs): kept to look at, not committed
+docs/media/gallery/.frames/

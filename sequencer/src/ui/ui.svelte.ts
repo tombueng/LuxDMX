@@ -12,14 +12,15 @@ export interface MenuItem {
   run?: () => unknown;
 }
 
-export type ModalName = 'welcome' | 'shows' | 'addFixtures' | 'effects' | 'shortcuts' | 'palette' | 'guide' | 'monitor' | 'fogTimer' | 'patchCheck' | 'remote' | 'schedule' | 'rig';
+export type ModalName = 'welcome' | 'shows' | 'addFixtures' | 'gallery' | 'effects' | 'shortcuts' | 'palette' | 'guide' | 'monitor' | 'fogTimer' | 'patchCheck' | 'remote' | 'schedule' | 'rig';
 const ZOOM_KEY = 'luxdmx.seq.zoom';
 const HINTS_KEY = 'luxdmx.seq.hints';
 
 class Ui {
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   modal = $state<ModalName | null>(null);   // the one big dialog that's open
-  welcomeDemos = false;                      // the welcome opened for its demos: shown, even when folded away
+  welcomeDemos = false;
+  addType: string | null = null;             // Add fixtures opens with this type picked (from the gallery)                      // the welcome opened for its demos: shown, even when folded away
   monitorUni = 0;                            // the universe the DMX monitor opens on
   fogFor: string[] | undefined;              // the machines a fog timer starts with (all when unset)
   patch = $state<string | null>(null);       // the fixture whose patch dialog is open

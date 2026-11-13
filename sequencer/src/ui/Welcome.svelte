@@ -210,7 +210,10 @@
       </ol>
       <div class="row end">
         <p class="hint">Program builds the show; Live (top) plays it with big buttons. This is an alpha: keep a copy of your show (Shows, Save as file).</p>
-        <button class="ghost" onclick={() => (ui.modal = 'guide')}><Icon name="help" />How it works, in two minutes</button>
+        <span class="row lnk">
+          <button class="ghost" onclick={() => (ui.modal = 'gallery')}><Icon name="image" />What the 3D stage draws</button>
+          <button class="ghost" onclick={() => (ui.modal = 'guide')}><Icon name="help" />How it works, in two minutes</button>
+        </span>
       </div>
     </footer>
   </div>

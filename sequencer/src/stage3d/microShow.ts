@@ -11,7 +11,11 @@ import { prismOf, rotationOf } from './gobos';
 export const SHOW_LEN = 8;          // seconds; the show loops
 
 type Ranges = { from: number; to: number; label?: string }[] | undefined;
-export interface MicroShow { len: number; at(t: number): Resolved; does: string[] }
+// at(t, i, n): light i of n in a row (the gallery's fans): its own colour round the wheel, its
+// moves a little later and fanned out
+export interface MicroShow { len: number; at(t: number, i?: number, n?: number): Resolved; does: string[] }
+// what a gallery tile shows off: everything, or one thing on its own
+export type Focus = 'all' | 'gobo' | 'prism' | 'colour' | 'zoom' | 'move';
 
 // a colour from a hue (0..1, round the wheel), full and bright
 export function hue(h: number): Color {
@@ -46,7 +50,9 @@ export function prismValue(ranges: Ranges): number | null {
   return best;
 }
 
-export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'prism' | 'anim' | 'heads' | 'winch' | 'kind'>, m: FixtureMode | undefined): MicroShow {
+const SFX_ATTRS = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
+
+export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'prism' | 'anim' | 'heads' | 'winch' | 'kind'>, m: FixtureMode | undefined, focus: Focus = 'all'): MicroShow {
   const attrs = new Set(m?.channels.map((c) => c.attr) ?? []);
   const has = (a: string) => attrs.has(a as never);
   const mixes = (has('red') && has('green') && has('blue')) || (has('cyan') && has('magenta') && has('yellow'));
@@ -54,7 +60,8 @@ export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'pri
   const coloured = mixes || wheel;
   const L = SHOW_LEN, look = rf.look, cells = Math.max(1, rf.cells);
   const does: string[] = [];
-  const colourAt = (t: number, speed = 1): Color | undefined => (mixes ? hue(t / L * speed) : wheel ? WHEEL[Math.floor((t / L) * 4 * speed) % WHEEL.length] : undefined);
+  // (light i of n: its own place round the wheel)
+  const colourAt = (t: number, speed = 1, i = 0, n = 1): Color | undefined => (mixes ? hue(t / L * speed + i / n) : wheel ? WHEEL[(Math.floor((t / L) * 4 * speed) + i) % WHEEL.length] : undefined);
   if (mixes) does.push('colour mixing'); else if (wheel) does.push('colour wheel');
 
   // ---- moving heads
@@ -69,22 +76,25 @@ export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'pri
     if (zoom) does.push('zoom');
     if (rf.anim) does.push('animation wheel');
     const n = gw ? gw.slots.length : 0;
+    const gobos = focus === 'all' || focus === 'gobo' || focus === 'prism', prismIn = (u: number) => pv !== null && (focus === 'prism' || (focus === 'all' && u >= L / 2));
     return {
       len: L, does,
-      at(t) {
-        const u = ((t % L) + L) % L, ph = (u / L) * Math.PI * 2;
-        const v: Resolved = { intensity: 1, pan: 0.5 + 0.16 * Math.sin(ph), tilt: 0.5 + 0.1 * Math.sin(ph * 2) };
-        const c = colourAt(u, look === 'wash' ? 1 : 0.5); if (c) v.color = c;
-        if (look === 'wash' && zoom) v.zoom = 0.5 + 0.5 * Math.sin(ph * 2 - Math.PI / 2);
-        else if (zoom) v.zoom = 0.45;                // (a wider beam: its gobos big enough to see)
-        if (slots.length && n > 1) {
-          // a new gobo every two seconds, turning
-          const s = slots[Math.floor(u / 2) % slots.length];
+      at(t, i = 0, k = 1) {
+        const u = ((t % L) + L) % L, ph = (u / L) * Math.PI * 2 - i * 0.5, fan = k > 1 ? (i - (k - 1) / 2) / Math.max(1, k - 1) : 0;
+        // the moves: a figure of eight (wide when that's what it shows, small under a prism)
+        const big = focus === 'move' ? 2 : focus === 'prism' || focus === 'colour' ? 0.35 : 1;
+        const v: Resolved = { intensity: 1, pan: 0.5 + fan * 0.12 + 0.16 * big * Math.sin(ph), tilt: 0.5 + 0.1 * big * Math.sin(ph * 2) };
+        const c = colourAt(u, look === 'wash' || focus === 'colour' ? 1 : 0.5, i, k); if (c) v.color = c;
+        if (zoom && (look === 'wash' || focus === 'zoom')) v.zoom = 0.5 + 0.5 * Math.sin(ph * 2 - Math.PI / 2);
+        else if (zoom) v.zoom = focus === 'colour' ? 0.8 : 0.45;   // (a wider beam: its gobos big enough to see)
+        if (gobos && slots.length && n > 1) {
+          // a new gobo every two seconds, turning (under a prism: one gobo all along)
+          const s = focus === 'prism' ? slots[Math.min(1, slots.length - 1)] : slots[(Math.floor(u / 2) + i) % slots.length];
           v[gw!.attr] = s / (n - 1);
           if (goboRot !== null) v[gw!.rotAttr] = goboRot;
         }
-        if (pv !== null && u >= L / 2) { v.prism = pv; if (prot !== null) v.prismRotation = prot; }
-        if (rf.anim && u >= L * 0.75) { v.animation = 0.6; }
+        if (prismIn(u)) { v.prism = pv!; if (prot !== null) v.prismRotation = prot; }
+        if (rf.anim && focus === 'all' && u >= L * 0.75) { v.animation = 0.6; }
         return v;
       },
     };
@@ -95,9 +105,9 @@ export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'pri
     does.push('heads tilt each on their own');
     return {
       len: L, does,
-      at(t) {
+      at(t, j = 0) {
         const u = ((t % L) + L) % L;
-        const list: Resolved[] = Array.from({ length: k }, (_, i) => ({ intensity: 1, tilt: 0.5 + 0.22 * Math.sin((u / L) * Math.PI * 4 + i * 0.9), color: coloured ? hue(u / L + i / k) : undefined }));
+        const list: Resolved[] = Array.from({ length: k }, (_, i) => ({ intensity: 1, tilt: 0.5 + 0.22 * Math.sin((u / L) * Math.PI * 4 + i * 0.9 + j * 0.6), color: coloured ? hue(u / L + i / k) : undefined }));
         return { intensity: 1, cells: list };
       },
     };
@@ -107,10 +117,10 @@ export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'pri
     does.push(`${cells} pixels`);
     return {
       len: L, does,
-      at(t) {
+      at(t, j = 0, k = 1) {
         const u = ((t % L) + L) % L;
         const list: Resolved[] = Array.from({ length: cells }, (_, i) => {
-          const x = i / cells, wave = 0.5 + 0.5 * Math.sin((x * 2 - u / L * 4) * Math.PI * 2);
+          const x = i / cells + j / Math.max(1, k), wave = 0.5 + 0.5 * Math.sin((x * 2 - u / L * 4) * Math.PI * 2);
           return { intensity: 0.25 + 0.75 * wave, color: coloured || look === 'disc' || look === 'panel' ? hue(x + u / L) : undefined };
         });
         return { intensity: 1, cells: list };
@@ -120,21 +130,31 @@ export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'pri
   // ---- a winch: up and down
   if (look === 'winch') {
     does.push('moves up and down');
-    return { len: L, does, at: (t) => ({ intensity: 1, hoist: 0.5 + 0.45 * Math.sin((t / L) * Math.PI * 2) }) };
+    return { len: L, does, at: (t, i = 0, k = 1) => ({ intensity: 1, hoist: 0.5 + 0.45 * Math.sin((t / L) * Math.PI * 2 - (i / Math.max(1, k)) * Math.PI), ...(coloured ? { color: hue(t / L + i / Math.max(1, k)) } : {}) }) };
   }
   // ---- a strobe: bursts of flashes
   if (look === 'strobe' || (has('strobe') && !coloured && look !== 'par')) {
     does.push('strobe');
-    return { len: L, does, at: (t) => { const u = ((t % L) + L) % L; return { intensity: 1, strobe: u % 4 < 2 ? 0.7 : 0, ...(coloured ? { color: colourAt(u) } : {}) }; } };
+    return { len: L, does, at: (t, i = 0) => { const u = ((t % L) + L) % L; return { intensity: 1, strobe: (u + i) % 4 < 2 ? 0.7 : 0, ...(coloured ? { color: colourAt(u) } : {}) }; } };
   }
   // ---- a blinder: warm hits
   if (look === 'blinder') {
     does.push('hits');
-    return { len: L, does, at: (t) => { const u = ((t % L) + L) % L, b = u % 2; return { intensity: b < 0.15 ? 1 : Math.max(0, 1 - (b - 0.15) * 1.4), color: { r: 1, g: 0.72, b: 0.38 } }; } };
+    return { len: L, does, at: (t, i = 0) => { const u = ((t % L) + L) % L, b = (u + i * 0.25) % 2; return { intensity: b < 0.15 ? 1 : Math.max(0, 1 - (b - 0.15) * 1.4), color: { r: 1, g: 0.72, b: 0.38 } }; } };
   }
-  // ---- machines (fog, confetti, flames...): they stand there, ready
-  if (look === 'fog' || look === 'confetti' || look === 'bubbles' || look === 'flame' || look === 'sparks' || look === 'co2') {
-    return { len: L, does, at: () => ({ intensity: 1 }) };
+  // ---- machines: a burst every few seconds (one after the other along a row); fog on and off
+  const sfx = SFX_ATTRS.find((a) => has(a));
+  if (sfx || look === 'fog') {
+    if (sfx) does.push(sfx === 'co2' ? 'CO2 jets' : sfx); else does.push(has('haze') ? 'haze' : 'fog');
+    return {
+      len: L, does,
+      at(t, i = 0, k = 1) {
+        const u = (((t - (i / Math.max(1, k)) * 0.6) % L) + L) % L;
+        if (!sfx) return { intensity: 1, fog: u < L * 0.55 ? 1 : 0, haze: u < L * 0.55 ? 1 : 0, ...(has('fan') ? { fan: 0.8 } : {}) };
+        const on = sfx === 'confetti' ? u % 4 < 0.3 : sfx === 'flame' ? u % 2.7 < 0.6 : sfx === 'bubbles' ? u < L * 0.7 : u % 4 < 1.5;
+        return { intensity: 1, [sfx]: on ? 1 : 0, ...(has('fan') ? { fan: 0.8 } : {}) };
+      },
+    };
   }
   // ---- a PAR, a fresnel, a dimmer: the colours, or breathing
   if (has('strobe')) does.push('strobe');

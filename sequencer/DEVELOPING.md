@@ -234,6 +234,18 @@ fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in
 - Budget: 60 fps with the big demo at 1600 x 900 on a modest GPU (we measure on a Radeon RX 6400:
   about 7 ms of script and 10 ms of GPU a frame). Draw calls cost more than triangles here: merge
   a person's or a prop's parts per material, instance repeated things.
+- Previews (Add fixtures' tiles, the gallery): `stage3d/preview.ts`, one WebGL renderer for all
+  of them (a page gets a dozen or so contexts at most). Each light is placed 400 m off to the side
+  in its own little room (no deck, wide walls: `showRoom()` is switched to it while a preview is
+  drawn, so `hitFloor` and the fog behave), plays its `microShow.ts` loop, and its picture is
+  copied into the tile's 2D canvas. Only tiles on the screen are drawn, the hovered one every
+  frame, the rest in turn within a few ms a frame (less when `load` says the page is busy).
+  `stage3d/rigOf.ts` is the one mapping from a fixture to what the rig draws, for the stage and
+  the previews alike.
+- The README's gallery animations: `node tools/gallery/capture.mjs` (dev server running) draws
+  each item of `src/content/gallery.ts` frame by frame with `frames()` and makes animated WebPs in
+  `docs/media/gallery/` (`--gif` for GIFs, `--only gobos,prism` for some). The frames stay in its
+  `.frames/` folder (gitignored) to look at. Run it again after changing how lights look.
 
 ## The UI
 
