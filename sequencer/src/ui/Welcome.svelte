@@ -137,9 +137,9 @@
           {#each list as c (c.id)}<option value={c.id}>{c.title} · {c.artist}{c.id === d.song ? ' (its own)' : ''}</option>{/each}
         </optgroup>
       {/each}
-      <optgroup label="Made here"><option value="beat">The demo beat (nothing to download)</option></optgroup>
+      <optgroup label="Made here"><option value="beat">The demo beat</option></optgroup>
     </select></label>
-  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clock(s.duration)} · {s.license}{:else}Builds, drops and breaks, made in the browser{/if}</p>
+  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clock(s.duration)} · {s.license}{:else}Made in the browser, nothing to download{/if}</p>
 {/snippet}
 {#snippet getting(s: CatalogSong | undefined)}
   <button class="primary" disabled aria-busy="true"><Icon name="play" />{s && dl ? `Getting the song… ${pct(dl)}` : 'Starting…'}</button>
@@ -296,7 +296,8 @@
   .meta { margin: 0; font-size: .78rem; color: var(--faint); min-height: 1.1em; font-variant-numeric: tabular-nums; }
   .music { display: flex; align-items: center; gap: .45rem; font-size: .84rem; color: var(--muted); }
   .music select { flex: 1; min-width: 0; width: 100%; }
-  .credit { margin: 0; font-size: .76rem; color: var(--faint); }
+  /* (one line, whatever the song: a line more under one tile put its row out of step) */
+  .credit { margin: 0; font-size: .76rem; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .acts { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .15rem; }
   .acts button { min-height: 2.4rem; padding: .4rem .8rem; font-size: .9rem; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; }
   .acts .primary { flex: 1 1 auto; }

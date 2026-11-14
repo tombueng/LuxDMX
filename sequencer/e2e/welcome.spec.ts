@@ -165,6 +165,17 @@ test('the templates play as shows too: their looks cued to a song, DJ / Party in
   }
 });
 
+test('the demo beat picked for one demo keeps the tiles\' rows in step (its caption one line, like a song\'s)', async ({ page }) => {
+  await fresh(page, true);
+  const w = welcomeDialog(page), pick = (n: string) => demoTile(w, n).getByLabel(`Music for ${n}`);
+  await pick('Festival stage').selectOption('beat');
+  const tops = await Promise.all(['Festival stage', 'DJ in a club', 'House party'].map(async (n) => Math.round((await pick(n).boundingBox())!.y)));
+  const row = tops.filter((y) => Math.abs(y - tops[0]) < 40);
+  expect(new Set(row).size).toBe(1);                                      // (the pickers side by side are level)
+  const credit = demoTile(w, 'Festival stage').locator('.credit');
+  expect(await credit.evaluate((e) => e.scrollHeight <= e.clientHeight + 1 && e.getBoundingClientRect().height < 22)).toBe(true);
+});
+
 test('on a phone a show played from the welcome opens on its 3D stage (the timeline has no room for the stage there)', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
