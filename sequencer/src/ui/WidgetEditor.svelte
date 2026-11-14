@@ -101,7 +101,7 @@
     <!-- a name that was only the old action's ("Blackout") goes with it: a blinder must never read Blackout -->
     <label>Does <select value={w.do} aria-label="Special action" onchange={(e) => { if (w.label === SPECIAL_NAME[w.do]) w.label = undefined; w.do = (e.target as HTMLSelectElement).value as typeof w.do; }}>
       <option value="blackout">Blackout on / off</option><option value="releaseAll">Release everything</option>
-      <option value="tap">Tap the tempo</option><option value="stopEffects">Stop effects started by hand</option>
+      <option value="tap">Tap the tempo</option><option value="stopEffects">Stop effects (the cues' own too, until the next cue)</option>
       <option value="blinder">Blinder: every light white while held</option><option value="drop">Drop: white, strobes and a fog burst while held</option>
       <option value="fadeOut">Fade out to black (and back in on the next press)</option></select></label>
     {#if w.do === 'fadeOut'}

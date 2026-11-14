@@ -46,3 +46,28 @@ describe('deleting machines', () => {
     expect(toss().actions?.length).toBeGreaterThan(0);
   }, 60000);
 });
+
+// Live's "Stop effects": everything stops moving, the effects started by hand and the ones the cue
+// on stage runs; the cue's look stays, and the next cue brings its own effects again.
+describe('Stop effects', () => {
+  it('stops the cue\'s own effects too, until the next cue', async () => {
+    const { app, tick } = await freshApp();
+    const { TEMPLATES } = await import('./content/templates');
+    app.replaceShow(TEMPLATES.find((t: any) => t.name === 'Wedding')!.build());
+    const l = app.show.cueLists.find((x: any) => x.name === 'Wedding'), i = l.cues.findIndex((c: any) => c.name === 'Dinner');
+    const own = l.cues[i].effects[0], byHand = app.show.effects.find((e: any) => e.name === 'Uplight rainbow').id;
+    for (const c of l.cues) c.fade = 0;                                 // (at once: Dinner fades in over 15 s)
+    const wait = async (ms: number) => { const t0 = performance.now(); while (performance.now() - t0 < ms) { tick(); await new Promise((r) => setTimeout(r, 25)); } };
+    app.jump(l.id, i); app.engine.startEffect(byHand);
+    await wait(600);
+    expect(app.fx[own] ?? 0).toBeGreaterThan(0.5); expect(app.fx[byHand] ?? 0).toBeGreaterThan(0.5);
+    app.fireWidget({ id: 'x', type: 'special', do: 'stopEffects', label: 'Stop effects' }, true);
+    await wait(700);
+    expect(app.fx[own] ?? 0).toBe(0); expect(app.fx[byHand] ?? 0).toBe(0);
+    // the next cue with an effect: its effect runs
+    const j = l.cues.findIndex((c: any, k: number) => k > i && c.effects?.length);
+    app.jump(l.id, j);
+    await wait(700);
+    expect(app.fx[l.cues[j].effects[0]] ?? 0).toBeGreaterThan(0.5);
+  }, 60000);
+});

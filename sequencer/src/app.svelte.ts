@@ -2981,14 +2981,13 @@ class App {
         else if (w.do === 'releaseAll') this.releaseAll();
         else if (w.do === 'tap') this.tap();
         else if (w.do === 'stopEffects') {
-          // the ones started by hand stop; the ones a playing cue runs go with their cue, say which
-          const fromCues = Object.keys(this.fx).filter((id) => !this.liveFx.includes(id));
+          // everything stops moving: the ones started by hand, and the ones the cues on stage run
+          // (their looks stay; the next cue brings its own effects again), said so
           this.stopAllEffects();
+          const fromCues = this.engine.muteCueEffects();
           if (fromCues.length) {
             const names = fromCues.map((id) => this.show.effects.find((e) => e.id === id)?.name).filter(Boolean);
-            const lists = this.show.cueLists.filter((l) => this.status[l.id]?.running && l.cues[this.status[l.id].index]?.effects?.some((e) => fromCues.includes(e))).map((l) => l.name);
-            ui.toast(`${names.join(', ')} ${names.length > 1 ? 'run' : 'runs'} from a cue${lists.length ? ` in ${lists.join(', ')}` : ''}: release that to stop ${names.length > 1 ? 'them' : 'it'}`, 6000,
-              lists.length ? { label: `Release ${lists.join(', ')}`, run: () => { for (const l of this.show.cueLists) if (lists.includes(l.name)) this.engine.release(l.id); } } : undefined);
+            ui.toast(`Stopped, ${names.join(', ')} too (${names.length > 1 ? 'they come' : 'it comes'} back with the next cue that runs ${names.length > 1 ? 'them' : 'it'})`, 5000);
           }
         }
         return;

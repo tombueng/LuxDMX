@@ -68,6 +68,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   lighting bars, booms in the wings, footlights, stalls and a full balcony) and a church (the
   chancel with altar, cross and choir, pews with the congregation, stained glass windows).
 - The gallery is in the ⋯ menu at the top and in the 3D stage's ⋯ now, not only behind Ctrl+K.
+- Live's **Stop effects** stops everything moving, the cue's own effects too (its look stays; the
+  next cue brings its effects back). It only stopped the ones started by hand.
 - Small ones from a tester's round: pressing Edit on Live moves none of the bar's buttons, "open in
   another tab" goes away when that tab is closed, Play the show on a phone opens on the 3D stage,
   the lock PIN is kept as a hash (not readable in the show file), a tab opened from an on-stage

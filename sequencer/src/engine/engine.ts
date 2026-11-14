@@ -281,6 +281,13 @@ export class Engine {
   // (Undo of a Record: the effects the cue took over run by hand again, at full, no fade in)
   giveBackEffects(ids: string[]) { for (const id of ids) this.liveFx.set(id, { from: 1, to: 1, start: this.now(), dur: 0 }); }
   stopAllEffects() { for (const id of this.liveFx.keys()) this.stopEffect(id); }
+  // and the ones the cues on stage run, until a cue changes (the next GO brings that cue's own);
+  // the ids it stopped
+  muteCueEffects(): string[] {
+    const ids = [...this.cueFx];
+    for (const id of ids) { const m = this.fxMuted.get(id); this.fxMuted.set(id, { from: m ? rampAt(m, this.now()) : 0, to: 1, start: this.now(), dur: FX_FADE }); }
+    return ids;
+  }
   private liveWeight(id: string) { const r = this.liveFx.get(id); return r ? rampAt(r, this.now()) : 0; }
 
   // a cue action (also run by the timetable: `from` '' is nobody's list)
