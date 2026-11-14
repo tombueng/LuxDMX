@@ -51,7 +51,10 @@ test('Measure on the 3D stage: two points and how far apart; one light: how high
   await expect.poll(() => page.evaluate(() => !!(window as any).__stage3d?.internals), { timeout: 45000 }).toBe(true);
   const s3 = page.locator('.s3'), canvas = s3.locator('canvas').first();
   await s3.getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'Front', exact: true }).click();
-  await s3.getByRole('button', { name: 'Measure', exact: true }).click();
+  // (in the toolbar, or in More when the toolbar has no room for it: a head selected brings Calibrate)
+  const inRow = s3.locator('.tools').getByRole('button', { name: 'Measure', exact: true });
+  if (await inRow.count()) await inRow.click();
+  else { await s3.getByRole('button', { name: 'More', exact: true }).click(); await s3.getByRole('group', { name: 'More for the 3D stage' }).getByRole('button', { name: 'Measure', exact: true }).click(); }
   await expect(s3.locator('.aimhint')).toContainText('Click two points');
   const said = () => page.evaluate(() => (window as any).__stage3d.measure());
   const box = (await canvas.boundingBox())!;

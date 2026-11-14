@@ -484,6 +484,8 @@
       lastMix: () => lastMix,
       // (where the light landed in the last frame: on the floor and the deck, or on walls)
       pools: () => ({ walls: rig?.wallPools ?? 0 }),
+      // (how the toolbar fits: its tier by the width, and how many steps smaller it had to go)
+      toolsFit: () => ({ tier, squeeze, over: toolsEl ? toolsEl.scrollWidth - toolsEl.clientWidth : 0, overWas: [...overWas] }),
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
       lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
@@ -1310,8 +1312,24 @@
   // ~780 px where you can edit, less where the stage is only watched)
   // (the camera and Venue stay on the toolbar on a laptop: there Record and Render are their
   // symbols, their words from 900 px; the mid toolbar needs ~690 px then, it was ~945 with them)
-  const tier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= (readonly ? 600 : 700) ? 'mid' : 'narrow');
-  const words = $derived(hostW >= 900);
+  // (by the width first; then, when the toolbar still doesn't fit in one row, a step smaller at a
+  // time: wide -> mid, then without the words, then Measure into More, then narrow. Measured, not
+  // guessed: a button more in the toolbar (Selected, Measure) pushed Render and More off its end)
+  const baseTier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= (readonly ? 600 : 700) ? 'mid' : 'narrow');
+  let squeeze = $state(0), toolsEl = $state<HTMLDivElement>();
+  // (the steps after the width's own tier: wide has one more, mid -> narrow comes last)
+  const step = $derived(baseTier === 'wide' ? squeeze - 1 : baseTier === 'mid' ? squeeze : 3);
+  const tier = $derived(baseTier === 'narrow' || step >= 3 ? 'narrow' : baseTier === 'wide' && squeeze === 0 ? 'wide' : 'mid');
+  const words = $derived(hostW >= 900 && !(tier === 'mid' && step >= 1));
+  const measureInMore = $derived(tier === 'narrow' || (tier === 'mid' && step >= 2));
+  $effect(() => { void hostW; untrack(() => { squeeze = 0; overWas = []; }); });
+  let overWas: number[] = [];               // (how much didn't fit at each step: for tests)
+  $effect(() => {
+    void tier; void words; void mode; void app.selected.length; void squeeze;
+    const t = toolsEl;
+    if (!t) return;
+    void tick().then(() => { const over = t.scrollWidth - t.clientWidth; overWas[squeeze] = over; if (over > 1 && squeeze < (baseTier === 'wide' ? 4 : 3)) squeeze++; });
+  });
   let more = $state(false);
   let venueBtn = $state<HTMLButtonElement>(), moreBtn = $state<HTMLButtonElement>(), venueEl = $state<HTMLDivElement>();
   // (from More, which closes: the keys go on in the panel, not lost on the page)
@@ -1374,7 +1392,7 @@
   <div class="cv" bind:this={cvHost}></div>
   {#if meas && measSaid}<div class="meas" bind:this={measLabel} role="status"><b>{measSaid.big}</b><span>{measSaid.small}</span></div>{/if}
   <div class="top">
-    <div class="tools" role="toolbar" aria-label="3D stage">
+    <div class="tools" class:tight={tier === 'mid' && step >= 1} role="toolbar" aria-label="3D stage" bind:this={toolsEl}>
       {#if tier !== 'narrow'}{@render cameraSeg()}{/if}
       {#if !readonly}
         <div class="seg" role="group" aria-label="What a click does">
@@ -1382,7 +1400,7 @@
           <button class="ghost" class:on={mode === 'move'} aria-pressed={mode === 'move'} onclick={() => (mode = 'move')} title="Drag the arrows to move the selected light; let go near a truss and it hangs on it">Move</button>
           <button class="ghost" class:on={mode === 'turn'} aria-pressed={mode === 'turn'} onclick={() => (mode = 'turn')} title="Drag the rings to turn the selected light">Turn</button>
           <button class="ghost" class:on={mode === 'aim'} aria-pressed={mode === 'aim'} onclick={() => (mode = 'aim')} title="Click on the stage: the selected moving heads point there">Aim</button>
-          <button class="ghost" class:on={mode === 'measure'} aria-pressed={mode === 'measure'} onclick={() => (mode = 'measure')} title="Click two points (the deck, the floor, a light): how far apart they are. One light: how high it hangs and where its beam lands">Measure</button>
+          {#if !measureInMore}<button class="ghost" class:on={mode === 'measure'} aria-pressed={mode === 'measure'} onclick={() => (mode = 'measure')} title="Click two points (the deck, the floor, a light): how far apart they are. One light: how high it hangs and where its beam lands">Measure</button>{/if}
           {#if app.selected.length === 1 && app.kinds[app.selected[0]] === 'mover'}
             <button class="ghost" class:on={mode === 'calib'} aria-pressed={mode === 'calib'} onclick={() => (mode = 'calib')} title="Point the real head at a spot on the stage (the pan/tilt pad), then click that spot here: the 3D stage and Aim match the room">Calibrate</button>
           {/if}
@@ -1399,7 +1417,7 @@
         </div>
       {:else}
         <button class="ghost recbtn" class:off={!recordable} onclick={record} aria-label="Record a video"
-          title={recordable ? `Record a video of the 3D stage with the song (${SIZE_SAYS[videoSize]}); Stop saves it${webmOnly ? `. ${WEBM_NOTE}` : ''}` : 'This browser can\'t record video here'}><Icon name="record" size={14} />{#if tier !== 'narrow' && words}Record{/if}</button>
+          title={recordable ? `Record a video of the 3D stage with the song (${SIZE_SAYS[videoSize]}); Stop saves it${webmOnly ? `. ${WEBM_NOTE}` : ''}` : 'This browser can\'t record video here'}><Icon name="record" size={14} />{#if tier === 'mid' && words}Record{/if}</button>
       {/if}
       {#if rendering}
         <div class="seg recseg" role="group" aria-label="Rendering">
@@ -1427,6 +1445,8 @@
           {@render sizePick()}
           {@render fullBtn(true)}
         </div>
+        <!-- (when the tools row has no room for Measure: it's here) -->
+        {#if measureInMore && !readonly}<div class="row"><button class="ghost" class:on={mode === 'measure'} aria-pressed={mode === 'measure'} onclick={() => { mode = 'measure'; more = false; }}>Measure</button></div>{/if}
         <!-- (the gallery of what this stage draws: every kind of light and machine, live) -->
         <div class="row"><button class="ghost" onclick={() => { more = false; ui.modal = 'gallery'; }}><Icon name="image" size={14} />What the 3D stage draws (gallery)</button></div>
       </div>
@@ -1558,14 +1578,17 @@
   .tools > .grow { flex: 1; pointer-events: none; }
   .seg { display: inline-flex; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: 2px; backdrop-filter: blur(4px); }
   .seg button, .tools > button, .more .row > button { font-size: .8rem; padding: .2rem .55rem; }
+  /* (a step smaller when it didn't fit: closer together before anything goes into More) */
+  .tools.tight :global(.seg button), .tools.tight > button { padding: .2rem .4rem; }
+  .tools.tight { gap: .3rem; }
   .tools > button, .more .row > button { background: #0b0f15cc; border: 1px solid var(--line); }
   .slide { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; color: var(--muted); background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .35rem; }
   .slide input { width: 4.2rem; }
   /* on the toolbar: the four sliders share one frame, a little narrower (so Record, Render and the
      video size fit the one row too) */
-  .slides { display: inline-flex; align-items: center; gap: .55rem; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .45rem; }
+  .slides { display: inline-flex; align-items: center; gap: .3rem; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .45rem; }
   .slides .slide { background: none; border: 0; padding: 0; gap: .25rem; }
-  .slides .slide input { width: 3.5rem; }
+  .slides .slide input { width: 2.2rem; }   /* (narrow: with Selected and Measure the wide toolbar has to fit them all in one row) */
   .slide select { font-size: .78rem; padding: .05rem .2rem; background: transparent; border-color: transparent; }
   /* Record: a red dot; while it records, the red REC chip with the time and Stop */
   .recbtn :global(svg) { color: #ff4d55; fill: #ff4d55; }

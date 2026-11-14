@@ -616,6 +616,8 @@
   .empty.compact { padding: .4rem .6rem; font-size: .85rem; gap: .5rem; }
   /* (over the 3D stage: at the bottom, clear of its toolbar's panels at the top) */
   .empty.low { top: auto; bottom: 1rem; transform: translateX(-50%); }
+  /* (and out of the way while one of those panels is open: a tall Venue panel reached down under it) */
+  .stage-wrap:has(:global(.s3 .venue), :global(.s3 .more)) .empty.low { display: none; }
   .snapguide { stroke: var(--cyan); stroke-dasharray: 4 3; opacity: .8; pointer-events: none; }
   svg:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
   .adr .no { fill: var(--orange); }
