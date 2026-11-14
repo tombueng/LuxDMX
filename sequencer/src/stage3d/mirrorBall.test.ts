@@ -92,3 +92,35 @@ describe('its motion and its motor', () => {
     expect(Math.hypot(f.p3!.x - (-3.2), f.p3!.z - 3.6)).toBeLessThan(0.01);
   });
 });
+
+describe('a light aimed at the ball', () => {
+  // (the bar's ball on its motor and a pinspot on it from the side, as the Bar template hangs them)
+  it('stops on it: the beam ends at the mirrors and lays no pool on the wall behind; with the ball gone, it would', async () => {
+    const { Rig, hitBall } = await import('./rig');
+    const { rigFixtureFull } = await import('./rigOf');
+    const { GENERIC, kindOf } = await import('../model/library');
+    const { aimRot, HALL, showRoom } = await import('./geometry');
+    showRoom(room);
+    const rf = (typeId: string, id: string, p: { x: number; y: number; z: number }, to?: { x: number; y: number; z: number }) => {
+      const t = GENERIC.find((g) => g.id === typeId)!, m = t.modes[0];
+      const f = rigFixtureFull({ id, name: id, typeId, mode: m.name, universe: 0, address: 1, x: 0.5, y: 0.5 } as never, m, kindOf(m), t, HALL);
+      f.p = p; if (to) f.rot = aimRot(p, to);
+      return f;
+    };
+    const ballAt = { x: -3.2, y: 3.88, z: 3.6 }, mid = { x: -3.2, y: 3.23, z: 3.6 };
+    const pools = (withBall: boolean) => {
+      const rig = new Rig(), pin = rf('gen-dimmer', 'pin', { x: -5.4, y: 3.4, z: 5.0 }, mid);
+      const list = withBall ? [rf('gen-mirrorball', 'ball', ballAt), pin] : [pin];
+      rig.build(list); rig.place(list);
+      for (let t = 0; t < 0.2; t += 1 / 30) rig.update({ pin: { intensity: 1 }, ball: { rollRotation: 0 } }, t, 0.3, new Set());
+      return (rig as unknown as { pools: THREE.InstancedMesh }).pools.count;
+    };
+    expect(pools(false)).toBe(1);
+    expect(pools(true)).toBe(0);
+    // (the arithmetic: straight at it, it meets the near side; beside it, never)
+    const p = new THREE.Vector3(0, 0, 0), d = new THREE.Vector3(1, 0, 0);
+    expect(hitBall(p, d, new THREE.Vector3(5, 0, 0), 0.3)).toBeCloseTo(4.7);
+    expect(hitBall(p, d, new THREE.Vector3(5, 0.5, 0), 0.3)).toBe(Infinity);
+    expect(hitBall(p, d, new THREE.Vector3(-5, 0, 0), 0.3)).toBe(Infinity);
+  });
+});

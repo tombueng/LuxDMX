@@ -90,6 +90,12 @@ const LP = new THREE.Vector3(), DIR = new THREE.Vector3(), CP = new THREE.Vector
 const CQ = new THREE.Quaternion(), UPY = new THREE.Vector3(0, 1, 0);
 const PU = new THREE.Vector3(), PW = new THREE.Vector3(), PD = new THREE.Vector3(), XAX = new THREE.Vector3(1, 0, 0);
 const NV = new THREE.Vector3(), PZ = new THREE.Vector3(), PX = new THREE.Vector3(), BASIS = new THREE.Matrix4();
+// How far along a beam (from p, dir a unit vector) it meets a ball of radius r at c; Infinity: it misses
+export function hitBall(p: THREE.Vector3, dir: THREE.Vector3, c: THREE.Vector3, r: number) {
+  const vx = c.x - p.x, vy = c.y - p.y, vz = c.z - p.z, along = vx * dir.x + vy * dir.y + vz * dir.z;
+  const off2 = vx * vx + vy * vy + vz * vz - along * along;
+  return along <= 0 || off2 > r * r ? Infinity : along - Math.sqrt(r * r - off2);
+}
 
 export interface Lit { key: number; p: THREE.Vector3; d: THREE.Vector3; c: THREE.Color; level: number; deg: number }
 // The gobo atlas read in the shaders (gobos.ts drawAtlas: CELLS x CELLS patterns, each on a round
@@ -180,6 +186,9 @@ export class Rig {
   private cloths = new Map<string, THREE.Mesh[]>();
   // the mirror balls on their motors: the ball and its chain, hung under the motor
   private balls = new Map<string, { holder: THREE.Group; ball: THREE.Mesh }>();
+  // their middles this frame: a beam aimed at a ball stops on it (a pinspot's light goes into the
+  // mirrors, not on through to the wall behind)
+  private ballMids: THREE.Vector3[] = [];
   get mirrorBalls(): Ball[] { return [...this.balls.values()].map((b) => ({ obj: b.ball, r: BALL_R })); }
   private clothMats: THREE.Material[] = [];
   readonly scenery = new THREE.Group();
@@ -500,6 +509,10 @@ export class Rig {
     this.sel.visible = selMat.opacity > 0.02;
     const marked = this.marks > 0.5;
     this.beamMat.uniforms.uHaze.value = haze;
+    // (where the balls hung last frame: they move only when their light does)
+    let bi = 0;
+    for (const { ball } of this.balls.values()) this.group.worldToLocal(ball.getWorldPosition(this.ballMids[bi++] ??= new THREE.Vector3()));
+    this.ballMids.length = bi;
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
     const counts = new Map<string, number>();
     const put = (key: string, m: THREE.Matrix4) => { const mesh = this.parts.get(key); if (!mesh) return; const i = counts.get(key) ?? 0; if (i >= mesh.instanceMatrix.count) return; mesh.setMatrixAt(i, m); counts.set(key, i + 1); };
@@ -521,7 +534,9 @@ export class Rig {
     let lastSoft = 0;
     const beamAt = (p: THREE.Vector3, dir: THREE.Vector3, deg: number, level: number, c: THREE.Color, maxLen = MAX_BEAM, pool = true, gobo: readonly number[] = NO_GOBO) => {
       if (level < 0.01 || nb >= this.beams.instanceMatrix.count) return;
-      const hit = hitRoom(p, dir), L = Math.max(0.05, hit ? Math.min(maxLen, Math.hypot(hit.x - p.x, hit.y - p.y, hit.z - p.z)) : maxLen), r = Math.max(0.01, L * Math.tan((deg / 2) * RAD));
+      let hit = hitRoom(p, dir), L = Math.max(0.05, hit ? Math.min(maxLen, Math.hypot(hit.x - p.x, hit.y - p.y, hit.z - p.z)) : maxLen);
+      for (const c of this.ballMids) { const b = hitBall(p, dir, c, BALL_R); if (b < L) { L = Math.max(0.05, b); hit = undefined; } }
+      const r = Math.max(0.01, L * Math.tan((deg / 2) * RAD));
       // the picture's blur: the frost, and how far the focus is off for this throw
       const soft = Math.min(1, gobo[6] + (gobo[7] >= 0 ? Math.abs(gobo[7] - Math.max(0, Math.min(1, (L - FOCUS_NEAR) / (FOCUS_FAR - FOCUS_NEAR)))) * 1.6 : 0));
       lastSoft = soft;

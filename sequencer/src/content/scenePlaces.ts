@@ -70,7 +70,8 @@ const BAR_PLACES: Table = {
   Head: (i, n) => hung({ x: spread(i, n, -3.6, 3.6), y: rail, z: 7.4 }),
   Beam: (i) => hung({ x: i ? 1.2 : -1.2, y: rail, z: 2.4 }),
   // pinspots on the mirror ball
-  Pinspot: (i) => { const p = i ? { x: -5.4, y: rail, z: 5.0 } : { x: -1.2, y: rail, z: 2.4 }; return aim(p, { x: B.ball.x, y: B.ball.y, z: B.ball.z }); },
+  // (both on the ball, from either side; the first between the PARs, clear of the beams)
+  Pinspot: (i) => { const p = i ? { x: -5.4, y: rail, z: 5.0 } : { x: -3.9, y: rail, z: 2.4 }; return aim(p, { x: B.ball.x, y: B.ball.y, z: B.ball.z }); },
   // the mirror ball's motor at the ceiling, the ball on its chain where the room's own hung
   'Mirror ball': () => ({ p: { x: B.ball.x, y: B.ceiling - 0.02, z: B.ball.z }, rot: { yaw: 0, pitch: 0, roll: 0 } }),
   Strobe: (i) => aim({ x: i ? 0.6 : -0.6, y: rail, z: 5.0 }, { x: i ? 0.6 : -0.6, y: 0, z: 5.0 }),
