@@ -3289,8 +3289,7 @@ class App {
   // what LuxDMX Link sends: Art-Net, sACN or both (kept with the show)
   setLinkProto(p: 'artnet' | 'sacn' | 'both') {
     const d = this.show.outputs.devices.find((x) => x.host === LINK);
-    if (d) { this.checkpoint(); d.proto = p; this.markDirty(0); }
-    (this.bridges.find((b) => b.host === LINK) as LinkOutput | undefined)?.setProto(p);   // (now; the next frame would too)
+    if (d) { this.checkpoint(); d.proto = p; this.markDirty(0); }      // (Link's routes follow on the next frame)
   }
   removeDevice(host: string) {
     this.checkpoint();

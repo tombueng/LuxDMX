@@ -10,6 +10,7 @@
 import { Engine } from '../engine/engine';
 import { modeOf as modeIn, typeMap } from '../model/library';
 import { atmosAndMachines, zeroedFrames } from './safe';
+import { dmxMessage, due, linkFrame, linkRoutes as routesOf, type LinkProto, type Sent } from './wire';
 import type { Fixture, FixtureMode, Show, Values } from '../model/types';
 
 export type ToThread =
@@ -22,14 +23,14 @@ export type ToThread =
   | { t: 'port'; key: string; port: MessagePort; outputs: { en: boolean; uni: number }[] }
   | { t: 'outputs'; key: string; outputs: { en: boolean; uni: number }[] }
   | { t: 'drop'; key: string }
-  | { t: 'link'; on: boolean; url: string; proto: 'artnet' | 'sacn' | 'both' };
+  | { t: 'link'; on: boolean; url: string; proto: LinkProto };
 export type FromThread =
   | { t: 'held'; held: Record<string, number> }
   | { t: 'stats'; rate: number; worst: number; late: number; quiet: boolean; link: boolean }
   | { t: 'broken'; why: string };
 export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; fxOver: Engine['fxOver']; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
 
-const PERIOD = 25, HEARTBEAT_MS = 250, LATE = 10;
+const PERIOD = 25, LATE = 10;
 // The page says something at least once a second (the beat's sync). Not heard from for this long
 // (frozen, or gone without a word): fog, haze and the machines go off on the wire, the look stays.
 // Their time limits (a held fog button, a flash) live on the page: without it they'd run on.
@@ -52,20 +53,12 @@ let last: Map<number, Uint8Array> | null = null;
 const recent = new Map<number, number>();
 
 // ---- where frames go
-interface Port { port: MessagePort; outputs: { en: boolean; uni: number }[]; sent: Map<number, { data: Uint8Array; at: number }> }
+interface Port { port: MessagePort; outputs: { en: boolean; uni: number }[]; sent: Sent }
 const ports = new Map<string, Port>();
-const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
-// only what changed, plus a heartbeat (as the page's bridge does: output/bridge.ts)
-function due(sent: Map<number, { data: Uint8Array; at: number }>, uni: number, data: Uint8Array, t: number, beat = HEARTBEAT_MS) {
-  const l = sent.get(uni);
-  if (l && t - l.at < beat && sameBytes(l.data, data)) return false;
-  sent.set(uni, { data: data.slice(), at: t });
-  return true;
-}
 // LuxDMX Link: a socket of its own (Link takes frames from any of its pages; the page's socket shows
 // the nodes and the state)
 let pageId = '';                  // the page's, for Link (output/link.ts PAGE_ID)
-const link = { on: false, url: '', proto: 'artnet' as 'artnet' | 'sacn' | 'both', ws: null as WebSocket | null, ready: false, unis: new Set<number>(), sentProto: '', sent: new Map<number, { data: Uint8Array; at: number }>(), retry: 0 };
+const link = { on: false, url: '', proto: 'artnet' as LinkProto, ws: null as WebSocket | null, ready: false, unis: new Set<number>(), sentProto: '', sent: new Map() as Sent, retry: 0 };
 function linkOpen() {
   if (!link.on || (link.ws && link.ws.readyState <= 1)) return;
   let ws: WebSocket;
@@ -79,23 +72,19 @@ function linkOpen() {
 function linkRoutes() {
   if (!link.ready || link.ws?.readyState !== 1) return;
   link.sentProto = link.proto;
-  link.ws.send(JSON.stringify({ type: 'routes', routes: [...link.unis].map((uni) => ({ uni, proto: link.proto, to: 'auto' })) }));
+  link.ws.send(routesOf(link.unis, link.proto));
 }
 function linkSend(uni: number, data: Uint8Array, t: number) {
   if (!link.ready || link.ws?.readyState !== 1) return;
   if (link.proto !== link.sentProto) linkRoutes();
   if (!link.unis.has(uni)) { link.unis.add(uni); linkRoutes(); }
-  if (!due(link.sent, uni, data, t)) return;
-  const f = new Uint8Array(6 + data.length);
-  f.set([68, 1, uni & 0xff, (uni >> 8) & 0x7f, 100, 0]);
-  f.set(data, 6);
-  link.ws.send(f);
+  if (due(link.sent, uni, data, t)) link.ws.send(linkFrame(uni, data));
 }
 
 function send(frames: Map<number, Uint8Array>, t: number) {
   for (const p of ports.values()) for (const [uni, data] of frames) {
     if (p.outputs.length && !p.outputs.some((o) => o.en && o.uni === uni)) continue;
-    if (due(p.sent, uni, data, t)) p.port.postMessage({ luxdmx: 1, type: 'dmx', uni, prio: 100, data });
+    if (due(p.sent, uni, data, t)) p.port.postMessage(dmxMessage(uni, data));
   }
   if (link.on) for (const [uni, data] of frames) linkSend(uni, data, t);
 }

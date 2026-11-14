@@ -7,13 +7,7 @@ import type { RdmReply, RdmRequest } from '../rdm/types';
 import type { PortInfo } from '../model/ledCurve';
 import { BOX_INFO, BOX_NAME } from '../store/kept';
 
-const HEARTBEAT_MS = 250;
-
-function sameBytes(a: Uint8Array, b: Uint8Array) {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
+import { dmxMessage, due, type Sent } from './wire';
 
 // silent: the popup opened but nothing answered for a while (wrong address, or a box whose
 // firmware has no /bridge yet). It keeps trying.
@@ -46,7 +40,7 @@ export class Bridge {
   onRelay: ((d: unknown) => void) | null = null;
   private win: Window | null = null;
   private hello: ReturnType<typeof setInterval> | undefined;
-  protected sent = new Map<number, { data: Uint8Array; at: number }>();
+  protected sent: Sent = new Map();
   protected usesWindow = true;     // a popup that may be closed (LuxDMX Link isn't one)
   // RDM: asked of the box's own RDM controller through its page, answered by id (rdm/types.ts)
   protected rdmWaiting = new Map<number, { done: (r: RdmReply) => void; timer: ReturnType<typeof setTimeout> }>();
@@ -161,16 +155,10 @@ export class Bridge {
   // Its window closed (the popup shut by hand): said at once, whoever sends to it (this page or the
   // output thread), so the red bar comes up. Called every frame.
   watch() { if (this.usesWindow && (this.state === 'ready' || this.state === 'reconnecting') && (!this.win || this.win.closed)) this.set('closed'); }
-  // Only what changed, plus a heartbeat so the box keeps the source (it drops one after 4 s of
-  // silence). A static look costs 4 frames a second instead of 40, and a box that stalls for a
-  // moment on WiFi doesn't build up seconds of stale frames in the TCP buffer.
+  // only what changed, plus a heartbeat so the box keeps the source (wire.ts)
   send(uni: number, data: Uint8Array, now = performance.now()) {
     if (this.state !== 'ready' || !this.win || this.win.closed) { this.watch(); return; }
-    if (!this.wants(uni)) return;
-    const last = this.sent.get(uni);
-    if (last && now - last.at < HEARTBEAT_MS && sameBytes(last.data, data)) return;
-    this.sent.set(uni, { data: data.slice(), at: now });
-    this.win.postMessage({ luxdmx: 1, type: 'dmx', uni, prio: 100, data }, this.origin);
+    if (this.wants(uni) && due(this.sent, uni, data, now)) this.win.postMessage(dmxMessage(uni, data), this.origin);
   }
 
   // RDM through the box (rdm/rig.svelte.ts): what the page asks, answered within `wait` ms (a box

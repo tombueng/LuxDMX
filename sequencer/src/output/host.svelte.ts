@@ -10,6 +10,7 @@ import type { Engine } from '../engine/engine';
 import type { Bridge } from './bridge';
 import { LINK, LINK_URL, PAGE_ID } from './link';
 import type { FromThread, Inputs, ToThread } from './thread';
+import type { LinkProto } from './wire';
 import type { Show } from '../model/types';
 
 const COMMANDS = ['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
@@ -121,7 +122,7 @@ export class OutputThread {
   }
 
   // Each of the page's frames: what's set by hand, the show, what goes out at all, the boxes.
-  sync(engine: Engine, show: Show, quiet: boolean, blind: Map<number, Uint8Array> | null, bridges: Bridge[], linkProto: 'artnet' | 'sacn' | 'both') {
+  sync(engine: Engine, show: Show, quiet: boolean, blind: Map<number, Uint8Array> | null, bridges: Bridge[], linkProto: LinkProto) {
     if (!this.w) return;
     const t = performance.now();
     const v: Partial<Inputs> = {};
