@@ -51,7 +51,7 @@ describe('on the 3D stage', () => {
   }
   it('closed: the two halves meet in the middle; open: each drawn back to its side, gathered there', () => {
     const shut = run({ curtain: 0, fly: 0 }, 1).cloths;
-    expect(shut.length).toBe(3);
+    expect(shut.length).toBe(7);                                                          // (two halves, the valance, three fringes; the drop)
     const [l, r] = shut;
     expect(l.scale.x + r.scale.x).toBeCloseTo(18, 1);                                 // (the whole width)
     expect(l.position.x + l.scale.x / 2).toBeCloseTo(0, 1);                           // (meeting in the middle)
@@ -62,10 +62,17 @@ describe('on the 3D stage', () => {
     const part = run({ curtain: 1, fly: 0 }, 3.5).cloths;
     expect(part[0].scale.x).toBeGreaterThan(3); expect(part[0].scale.x).toBeLessThan(7.5);
   });
+  it('the curtain\'s velvet hangs in real folds, deeper than a flat cloth; its valance stays across the top as it opens', () => {
+    const open = run({ curtain: 1, fly: 0 }, 12).cloths, half = open[0].geometry as THREE.BufferGeometry, z = half.attributes.position;
+    let lo = 0, hi = 0;
+    for (let i = 0; i < z.count; i++) { lo = Math.min(lo, z.getZ(i)); hi = Math.max(hi, z.getZ(i)); }
+    expect(hi - lo).toBeGreaterThan(0.15);
+    expect(open[2].scale.x).toBeGreaterThan(18);                                           // (the valance: the whole width)
+  });
   it('a drop flown out hangs high above the opening; flown in, it stands on the deck', () => {
-    const out = run({ curtain: 0, fly: 0 }, 1).cloths[2];
+    const out = run({ curtain: 0, fly: 0 }, 1).cloths.at(-1)!;
     expect(out.position.y - out.scale.y / 2).toBeGreaterThan(11);                      // (its bottom over the 10 m opening)
-    const inn = run({ curtain: 0, fly: 1 }, 12).cloths[2];
+    const inn = run({ curtain: 0, fly: 1 }, 12).cloths.at(-1)!;
     expect(inn.position.y - inn.scale.y / 2).toBeLessThan(1.4);
     expect(inn.position.y - inn.scale.y / 2).toBeGreaterThan(0.9);
     expect((inn.material as THREE.MeshStandardMaterial).side).toBe(THREE.DoubleSide);

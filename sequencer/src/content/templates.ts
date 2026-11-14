@@ -23,6 +23,9 @@ export const C = {
 } satisfies Record<string, Color>;
 
 // The gobo wheel of the generic spot (library.ts, gen-spotgobo): a cue stores the slot as a fraction.
+// The templates' stage machinery (curtains, fly bars) on a universe of its own that no box plays
+// until someone gives it one: it moves on the 3D stage with the show, a real motor gets nothing
+export const MACHINERY_UNIVERSE = 15;
 const GOBOS = ['Open', 'Dots', 'Star', 'Ring', 'Bars', 'Flower', 'Triangles', 'Spiral'] as const;
 export const gobo = (name: (typeof GOBOS)[number]) => GOBOS.indexOf(name) / (GOBOS.length - 1);
 
@@ -434,10 +437,10 @@ export const TEMPLATES: Template[] = [
       b.add('gen-sparks', 2, 'Sparks', 0.7, { x0: 0.05, x1: 0.95 });
       b.at(b.add('gen-flame', 2, 'Flame', 0.22), 0.22, [0.375, 0.625]);
       b.add('gen-bubbles', 1, 'Bubbles', 0.06, { x0: 0.06, x1: 0.06 });
-      // the stage machinery: the house curtain and four fly bars, each with a painted drop (they move
-      // the real motors only while the machines are armed; the 3D stage shows them either way)
-      const curtain = b.add('gen-curtain', 1, 'House curtain', 0.7, { x0: 0.5, x1: 0.5 });
-      const flys = b.add('gen-flybar', 4, 'Fly', 0.3);
+      // the stage machinery: the house curtain and four fly bars, each with a painted drop
+      // (on MACHINERY_UNIVERSE: moving on the 3D stage, nothing to a real motor until a box plays it)
+      const curtain = b.add('gen-curtain', 1, 'House curtain', 0.7, { x0: 0.5, x1: 0.5, universe: MACHINERY_UNIVERSE });
+      const flys = b.add('gen-flybar', 4, 'Fly', 0.3, { universe: MACHINERY_UNIVERSE });
       b.place(curtain, (f) => { f.cloth = { w: THEATRE.arch.w + 0.6, h: THEATRE.arch.h + 0.25 }; });
       b.place(flys, (f, i) => { f.cloth = { w: THEATRE.drop.w, h: THEATRE.drop.h, picture: ['forest', 'castle', 'stars', 'city'][i] }; });
       // (which drop is in: the others flown out; none: all out)
@@ -480,34 +483,34 @@ export const TEMPLATES: Template[] = [
       b.haze(hazer, 0.25);
       const fogShot = b.shot('Fog burst', fog, { fog: 1 }, 5, '5 s of fog', '#8a94a3');
       const m = b.machines();
-      b.cue(show, 'Preset', [...out, open(0), ...drop(null), [front, on(0.3)], [cyc, on(0.4, C.deepBlue)], [ground, on(0.3, C.deepBlue)]], { fade: 3, note: 'Audience coming in', actions: [{ do: 'goto', list: hl.id, cue: hFull.id }] });
-      b.cue(show, 'Curtain up', [...out, open(1), ...drop(0), [front, on(0.5)], [cyc, on(0.6, C.warm)], [side, on(0.4, C.warm)], [foot, on(0.5, C.warm)]], { fade: 8, effects: [footPulse], actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights out, the curtain goes' });
-      b.cue(show, 'Scene 1', [...out, open(1), ...drop(0), [front, on(0.85)], [cyc, on(0.7, C.warm)], [side, on(0.6, C.warm)], [ground, on(0.5, C.amber)]], { fade: 4, actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights fade out with it' });
-      b.cue(show, 'Forest', [...out, open(1), ...drop(0), [front, on(0.5)], [cyc, on(0.7, C.green)], [side, on(0.5, C.green)], [ground, on(0.6, C.teal)],
+      b.cue(show, 'Preset', [...out, open(0), ...drop(null), [front, on(0.18)], [cyc, on(0.4, C.deepBlue)], [ground, on(0.3, C.deepBlue)]], { fade: 3, note: 'Audience coming in', actions: [{ do: 'goto', list: hl.id, cue: hFull.id }] });
+      b.cue(show, 'Curtain up', [...out, open(1), ...drop(0), [front, on(0.3)], [cyc, on(0.6, C.warm)], [side, on(0.4, C.warm)], [foot, on(0.5, C.warm)]], { fade: 8, effects: [footPulse], actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights out, the curtain goes' });
+      b.cue(show, 'Scene 1', [...out, open(1), ...drop(0), [front, on(0.51)], [cyc, on(0.7, C.warm)], [side, on(0.6, C.warm)], [ground, on(0.5, C.amber)]], { fade: 4, actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights fade out with it' });
+      b.cue(show, 'Forest', [...out, open(1), ...drop(0), [front, on(0.3)], [cyc, on(0.7, C.green)], [side, on(0.5, C.green)], [ground, on(0.6, C.teal)],
         [gobos, on(1, C.white, gb({ gobo: 'Leaves', spin: 0.15 }))], [washes, on(0.4, C.green, down({ zoom: 1 }))]], { fade: 6, effects: [wander] });
-      b.cue(show, 'Night', [...out, open(1), ...drop(2), [front, on(0.3)], [cyc, on(0.6, C.blue)], [side, on(0.3, C.deepBlue)], [ground, on(0.6)], [washes, on(0.3, C.deepBlue, down({ zoom: 1 }))], [specials, on(0.3)]], { fade: 6, effects: [stars, twinkleSpecials] });
-      b.cue(show, 'Moonlight', [...out, open(1), ...drop(2), [front, on(0.2)], [cyc, on(0.5, C.ice)], [side, on(0.4, C.ice)], [gobos, on(0.8, C.ice, gb({ gobo: 'Water', spin: 0.1 }))], [ground, on(0.4, C.blue)]], { fade: 8, effects: [cycSea] });
-      b.cue(show, 'Sunrise', [...out, open(1), ...drop(1), [front, on(0.8)], [cyc, on(1, C.orange)], [side, on(0.7, C.gold)], [ground, on(1, C.orange)], [washes, on(0.5, C.amber, down({ zoom: 1 }))]], { fade: 10, effects: [cycWaves] });
-      b.cue(show, 'Castle', [...out, open(1), ...drop(1), [front, on(0.7)], [cyc, on(0.8, C.gold)], [side, on(0.8, C.gold)], [ground, on(0.7, C.amber)], [foot, on(0.6, C.gold)],
-        [spots, on(1, C.gold, down({ tilt: 0.6, gobo: gobo('Bars'), zoom: 0.4 }))]], { fade: 5, effects: [marquee] });
-      b.cue(show, 'Storm', [...out, open(1), ...drop(null), [front, on(0.25)], [cyc, on(0.35, C.deepBlue)], [side, on(0.4, C.ice)], [ground, on(0.5)], [lightningStrobe, on(0)], [washes, on(0.4, C.deepBlue, down({ zoom: 0.8 }))]],
+      b.cue(show, 'Night', [...out, open(1), ...drop(2), [front, on(0.18)], [cyc, on(0.6, C.blue)], [side, on(0.3, C.deepBlue)], [ground, on(0.6)], [washes, on(0.3, C.deepBlue, down({ zoom: 1 }))], [specials, on(0.3)]], { fade: 6, effects: [stars, twinkleSpecials] });
+      b.cue(show, 'Moonlight', [...out, open(1), ...drop(2), [front, on(0.12)], [cyc, on(0.5, C.ice)], [side, on(0.4, C.ice)], [gobos, on(0.8, C.ice, gb({ gobo: 'Water', spin: 0.1 }))], [ground, on(0.4, C.blue)]], { fade: 8, effects: [cycSea] });
+      b.cue(show, 'Sunrise', [...out, open(1), ...drop(1), [front, on(0.48)], [cyc, on(1, C.orange)], [side, on(0.7, C.gold)], [ground, on(1, C.orange)], [washes, on(0.5, C.amber, down({ zoom: 1 }))]], { fade: 10, effects: [cycWaves] });
+      b.cue(show, 'Castle', [...out, open(1), ...drop(1), [front, on(0.42)], [cyc, on(0.8, C.gold)], [side, on(0.8, C.gold)], [ground, on(0.7, C.amber)], [foot, on(0.6, C.gold)],
+        [spots, on(1, C.gold, down({ tilt: 0.42, gobo: gobo('Flower'), zoom: 0.4 }))]], { fade: 5, effects: [marquee] });
+      b.cue(show, 'Storm', [...out, open(1), ...drop(null), [front, on(0.15)], [cyc, on(0.35, C.deepBlue)], [side, on(0.4, C.ice)], [ground, on(0.5)], [lightningStrobe, on(0)], [washes, on(0.4, C.deepBlue, down({ zoom: 0.8 }))]],
         { fade: 2, effects: [storm, flash, rain, sway], actions: [{ do: 'start', list: fogShot.id }], note: 'Thunder on the sound cue, fog with it' });
-      b.cue(show, 'Escape', [...out, open(1), ...drop(3), [front, on(0.15)], [cyc, on(0.3, C.deepBlue)], [spots, on(1, C.white, down({ tilt: 0.6, zoom: 0 }))], [side, on(0.3, C.blue)]], { fade: 2, effects: [search] });
-      b.cue(show, 'Dream', [...out, open(1), ...drop(2), [front, on(0.2, undefined)], [cyc, on(0.6, C.lavender)], [ground, on(0.8)], [specials, on(0.5)],
+      b.cue(show, 'Escape', [...out, open(1), ...drop(3), [front, on(0.09)], [cyc, on(0.3, C.deepBlue)], [spots, on(1, C.white, down({ tilt: 0.6, zoom: 0 }))], [side, on(0.3, C.blue)]], { fade: 2, effects: [search] });
+      b.cue(show, 'Dream', [...out, open(1), ...drop(2), [front, on(0.12, undefined)], [cyc, on(0.6, C.lavender)], [ground, on(0.8)], [specials, on(0.5)],
         [spots, on(0.8, C.lavender, down({ tilt: 0.55, gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.4), zoom: 0.4, focus: 0.5 }))], [washes, on(0.5, C.purple, down({ zoom: 1 }))]],
       { fade: 8, effects: [aurora, drift, waltz, spotKnot], actions: fire(m.bubbles), note: 'Bubbles with the music' });
-      b.cue(show, 'Snow', [...out, open(1), ...drop(2), [front, on(0.4, undefined)], [cyc, on(0.7, C.ice)], [side, on(0.5, C.cool)], [gobos, on(1, C.white, gb({ gobo2: 'Snowflake', gobo: 'Stars', spin: 0.2 }))], [ground, on(0.5, C.ice)]], { fade: 6, effects: [stars, wander] });
-      b.cue(show, 'Ballroom', [...out, open(1), ...drop(3), [front, on(0.7)], [cyc, on(0.8, C.gold)], [side, on(0.8, C.warm)], [ground, on(0.6, C.amber)],
+      b.cue(show, 'Snow', [...out, open(1), ...drop(2), [front, on(0.24, undefined)], [cyc, on(0.7, C.ice)], [side, on(0.5, C.cool)], [gobos, on(1, C.white, gb({ gobo2: 'Snowflake', gobo: 'Stars', spin: 0.2 }))], [ground, on(0.5, C.ice)]], { fade: 6, effects: [stars, wander] });
+      b.cue(show, 'Ballroom', [...out, open(1), ...drop(3), [front, on(0.42)], [cyc, on(0.8, C.gold)], [side, on(0.8, C.warm)], [ground, on(0.6, C.amber)],
         [spots, on(1, C.white, down({ tilt: 0.6, gobo: gobo('Dots'), prism: 1, zoom: 0.5 }))], [washes, on(0.6, C.gold, down({ zoom: 0.7 }))]], { fade: 4, effects: [waltz, spotStar] });
-      b.cue(show, 'Underwater', [...out, open(1), ...drop(null), [front, on(0.2)], [cyc, on(0.8, C.teal)], [side, on(0.4, C.cyan)], [gobos, on(1, C.cyan, gb({ gobo: 'Water', spin: 0.3 }))], [washes, on(0.5, C.blue, down({ zoom: 1 }))]], { fade: 6, effects: [cycSea, wander] });
-      b.cue(show, 'Fireside', [...out, open(1), ...drop(0), [front, on(0.35, undefined)], [cyc, on(0.3, C.red)], [specials, on(0.6)], [ground, on(1)], [side, on(0.4, C.orange)]],
+      b.cue(show, 'Underwater', [...out, open(1), ...drop(null), [front, on(0.12)], [cyc, on(0.8, C.teal)], [side, on(0.4, C.cyan)], [gobos, on(1, C.cyan, gb({ gobo: 'Water', spin: 0.3 }))], [washes, on(0.5, C.blue, down({ zoom: 1 }))]], { fade: 6, effects: [cycSea, wander] });
+      b.cue(show, 'Fireside', [...out, open(1), ...drop(0), [front, on(0.21, undefined)], [cyc, on(0.3, C.red)], [specials, on(0.6)], [ground, on(1)], [side, on(0.4, C.orange)]],
         { fade: 5, effects: [hearth], actions: fire(m.flame), note: 'Flames on the bang' });
-      b.cue(show, 'Battle', [...out, open(1), ...drop(1), [front, on(0.5)], [cyc, on(1, C.red)], [side, on(1, C.red)], [ground, on(1, C.red)], [lightningStrobe, on(0)],
+      b.cue(show, 'Battle', [...out, open(1), ...drop(1), [front, on(0.3)], [cyc, on(1, C.red)], [side, on(1, C.red)], [ground, on(1, C.red)], [lightningStrobe, on(0)],
         [washes, on(1, C.red, down({ tilt: 0.6, zoom: 0.3 }))], [spots, on(1, C.white, down({ tilt: 0.65, zoom: 0.05 }))]], { fade: 0.5, effects: [boomChase, flash, search, groundFireworks], actions: fire(m.co2, m.sparks), note: 'CO2 and sparks on the charge' });
-      b.cue(show, 'Finale', [...out, open(1), ...drop(null), [front, on(1)], [cyc, on(1, C.magenta)], [side, on(1, C.white)], [ground, on(1)], [foot, on(1, C.gold)], [blinders, on(1)],
+      b.cue(show, 'Finale', [...out, open(1), ...drop(null), [front, on(0.6)], [cyc, on(1, C.magenta)], [side, on(1, C.white)], [ground, on(1)], [foot, on(1, C.gold)], [blinders, on(1)],
         [spots, on(1, C.white, down({ tilt: 0.7, zoom: 0.1 }))], [washes, on(1, C.pink, down({ tilt: 0.6, zoom: 0.4 }))]],
       { fade: 1, effects: [marquee, waltz, groundFireworks], actions: fire(m.confetti, m.sparks), note: 'Confetti and sparks on the last note: the one confetti shot' });
-      b.cue(show, 'Bows', [...out, open(1), [front, on(1)], [cyc, on(0.8, C.warm)], [side, on(0.8, C.warm)], [foot, on(1, C.gold)], [ground, on(0.6, C.amber)]], { fade: 2, effects: [marquee] });
+      b.cue(show, 'Bows', [...out, open(1), [front, on(0.6)], [cyc, on(0.8, C.warm)], [side, on(0.8, C.warm)], [foot, on(1, C.gold)], [ground, on(0.6, C.amber)]], { fade: 2, effects: [marquee] });
       b.cue(show, 'End', [[[...front, ...cyc, ...extra], on(0)], open(0), ...drop(null)], { fade: 3, actions: [{ do: 'goto', list: hl.id, cue: hFull.id }], note: 'House lights up with it' });
       // the show first, house lights second (then the haze, the fog and the machines)
       [b.s.cueLists[0], b.s.cueLists[1]] = [show, hl];
@@ -607,8 +610,8 @@ export const TEMPLATES: Template[] = [
       b.add('gen-co2', 2, 'CO2', 0.22, { x0: 0.05, x1: 0.95 });
       b.add('gen-sparks', 4, 'Sparks', 0.38, { x0: 0.4, x1: 0.6 });
       b.add('gen-bubbles', 1, 'Bubbles', 0.86, { x0: 0.5, x1: 0.5 });
-      // the screen's curtain (its motor moves only armed on the wire; the 3D stage shows it either way)
-      const curtain = b.add('gen-curtain', 1, 'Screen curtain', 0.1, { x0: 0.5, x1: 0.5 });
+      // the screen's curtain
+      const curtain = b.add('gen-curtain', 1, 'Screen curtain', 0.1, { x0: 0.5, x1: 0.5, universe: MACHINERY_UNIVERSE });
       b.place(curtain, (f) => { f.cloth = { w: CINEMA.curtain.w, h: CINEMA.screenY + CINEMA.screenH + 0.45 - DECK }; });
       const open = (v: number): [string[], Values] => [curtain, { hoist: v }];
       b.group('House', house); const gWall = b.group('Walls', walls);

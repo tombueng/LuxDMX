@@ -9,7 +9,7 @@ import { slotsOf } from '../engine/render';
 import { wheelPatterns } from './gobos';
 import { opticsOf } from '../model/fixtureSetup';
 import { placesOfLight, shapeSize, shapeStanding } from '../model/pixelLayout';
-import { defaultPlace, type Room } from './geometry';
+import { DECK, defaultPlace, type Room } from './geometry';
 import type { GoboWheel, RigFixture, Sfx } from './rig';
 import type { Look } from './models';
 import { isDropPicture } from './drops';
@@ -63,8 +63,10 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
     ...(c.heads > 1 && m ? { heads: c.heads, headCells: headCellsOf(m), headPan: c.cellMoves.includes('pan'), barPan: m.channels.some((ch) => ch.attr === 'pan' && ch.cell === undefined) } : {}),
     // a winch: its travel and speed from its type (a guess without), its soft limits
     ...(has('hoist') ? { winch: { travel: t?.physical?.travel ?? 4, speed: t?.physical?.hoistSpeed ?? 0.4, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}),
-    // a curtain: each half travels half its width; a fly bar: its type's travel
-    ...(cloth ? { cloth, ...(look === 'curtain' ? { winch: { travel: cloth.w / 2, speed: t?.physical?.hoistSpeed ?? 0.7, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}) } : {}),
+    // a curtain: each half travels half its width; a fly bar hung somewhere: as far as takes its drop
+    // from there down to the deck (else its type's travel)
+    ...(cloth ? { cloth, ...(look === 'curtain' ? { winch: { travel: cloth.w / 2, speed: t?.physical?.hoistSpeed ?? 0.7, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } }
+      : f.p3 ? { winch: { travel: Math.max(1, f.p3.y - 0.03 - cloth.h - DECK), speed: t?.physical?.hoistSpeed ?? 0.7, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}) } : {}),
     // more than two axes: endless pan and tilt, a third axis (roll) and its endless turning
     axes: has('panRotation') || has('tiltRotation') || has('roll') || has('rollRotation') ? {
       ...(has('panRotation') ? { panRot: chOf(m, 'panRotation')?.ranges ?? null } : {}), ...(has('tiltRotation') ? { tiltRot: chOf(m, 'tiltRotation')?.ranges ?? null } : {}),

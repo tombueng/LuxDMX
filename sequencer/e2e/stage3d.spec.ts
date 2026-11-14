@@ -4,6 +4,7 @@
 // The page offers a small hook in dev (window.__stage3d) for what can't be read off pixels.
 import type { Page } from '@playwright/test';
 import { openConnected, resetFake, channels, patch, selectAll, full, test, expect, demo, startTemplate, cues } from './helpers';
+import { THEATRE } from '../src/stage3d/sceneSizes';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -250,7 +251,7 @@ test('Aim at the theatre\'s cyc: the spot points there (not at the floor behind 
     await cam.getByRole('button', { name: view, exact: true }).click();
     await page.waitForTimeout(1500);
     await s3.getByRole('button', { name: 'Aim', exact: true }).click();
-    const spot = { x: 1.5, y: 6, z: -13.29 };                                  // (on the cyc, a little off centre)
+    const spot = { x: 1.5, y: 6, z: THEATRE.cycZ + 0.01 };                     // (on the cyc, a little off centre)
     const xy = await page.evaluate((p) => (window as any).__stage3d.screenOfPoint(p), spot);
     await page.mouse.click(xy.x, xy.y);
     await expect.poll(() => page.evaluate((p) => (window as any).__stage3d.aimError(p), spot), { timeout: 5000, message: view }).toBeLessThan(0.15);
@@ -261,7 +262,7 @@ test('Aim at the theatre\'s cyc: the spot points there (not at the floor behind 
   const inRow = s3.locator('.tools').getByRole('button', { name: 'Measure', exact: true });
   if (await inRow.count()) await inRow.click();
   else { await s3.getByRole('button', { name: 'More', exact: true }).click(); await s3.getByRole('group', { name: 'More for the 3D stage' }).getByRole('button', { name: 'Measure', exact: true }).click(); }
-  const c = await page.evaluate(() => (window as any).__stage3d.screenOfPoint({ x: -3, y: 7, z: -13.29 }));
+  const c = await page.evaluate((z) => (window as any).__stage3d.screenOfPoint({ x: -3, y: 7, z }), THEATRE.cycZ + 0.01);
   await page.mouse.click(c.x, c.y);
   expect(await page.evaluate(() => (window as any).__stage3d.measure()?.a?.what)).toBe('the cyc');
 });
@@ -289,7 +290,7 @@ test('Ctrl+Z in a light\'s Height field undoes the move (the light goes back), C
   expect(await y()).toBe(5);
 });
 
-test('the theatre\'s machinery: live and safe it holds; in Blind the house curtain opens and the forest drop flies in on Scene 1, the stars swap in on Night', async ({ page }) => {
+test('the theatre\'s machinery: on its own universe it moves with the show, live too; given to a box, live and safe it holds; in Blind it follows the show again', async ({ page }) => {
   test.setTimeout(150_000);
   await openConnected(page);
   await startTemplate(page, 'Theatre');
@@ -298,16 +299,26 @@ test('the theatre\'s machinery: live and safe it holds; in Blind the house curta
   const mach = () => page.evaluate(() => Object.fromEntries((window as any).__stage3d.machinery().map((m: any) => [m.name, +(m.at / m.travel).toFixed(2)])));
   await cues(page).filter({ hasText: 'Preset' }).first().dblclick();
   await expect.poll(async () => (await mach())['House curtain'], { timeout: 20000 }).toBe(0);
+  // live: the template's machinery is on a universe of its own no box plays, nothing goes out to a
+  // real motor, so the 3D stage shows the show: the curtain opens, the forest drop flies in
+  expect(await page.evaluate(() => (window as any).__luxdmx.output)).toBe('live');
   await cues(page).filter({ hasText: 'Scene 1' }).first().dblclick();
-  // live and the machines safe: the motors hold where they are (on the wire and in 3D, like a winch)
-  await page.waitForTimeout(2500);
-  expect((await mach())['House curtain']).toBe(0);
-  // Blind (working on the show without the room): the 3D stage shows what the show does
-  await page.locator('.top').getByRole('button', { name: 'On stage', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.output)).not.toBe('live');
   // (the motors take their time: the curtain is part way a moment later, open in the end)
   await expect.poll(async () => (await mach())['House curtain'], { timeout: 4000 }).toBeGreaterThan(0.05);
   await expect.poll(async () => { const m = await mach(); return [m['House curtain'], m['Fly 1']]; }, { timeout: 25000 }).toEqual([1, 1]);
+  // the curtain on a universe the box plays (a real motor on it): live and safe it holds where it is
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => x.name === 'House curtain');
+    const end = Math.max(...a.show.fixtures.filter((x: any) => x.universe === 1).map((x: any) => x.address + a.modeOf(x.id).channels.length));
+    a.checkpoint(); f.universe = 1; f.address = end; a.checkpoint();
+  });
+  await cues(page).filter({ hasText: 'Preset' }).first().dblclick();
+  await page.waitForTimeout(2500);
+  expect((await mach())['House curtain']).toBe(1);
+  // Blind (working on the show without the room): the 3D stage shows what the show does again
+  await page.locator('.top').getByRole('button', { name: 'On stage', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.output)).not.toBe('live');
+  await expect.poll(async () => (await mach())['House curtain'], { timeout: 25000 }).toBe(0);
   await cues(page).filter({ hasText: 'Night' }).first().dblclick();
   await expect.poll(async () => { const m = await mach(); return [m['Fly 1'], m['Fly 3']]; }, { timeout: 25000 }).toEqual([0, 1]);
   const pics = await page.evaluate(() => (window as any).__stage3d.machinery().filter((m: any) => m.look === 'flybar').map((m: any) => m.picture));

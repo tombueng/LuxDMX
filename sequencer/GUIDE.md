@@ -205,11 +205,15 @@ Three more demos come with their own room on the 3D stage:
   **Stage machinery** runs on a winch channel too, with the same safety: a **Curtain track** (a
   house curtain or a screen curtain: its two halves part from the middle, 0 closed, 1 open) and a
   **Fly bar** with a painted drop (0 flown out above the opening, 1 in, standing on the deck). The 3D
-  stage draws them as what they are and moves them at their motors' speed; live and safe they hold,
-  like any winch (Blind shows what the show does). The Theatre has a house curtain and four drops
+  stage draws them as what they are (the house curtain in folded velvet with a valance and gold
+  fringes) and moves them at their motors' speed; live and safe they hold, like any winch (Blind
+  shows what the show does). A winch on a universe no connected box plays sends nothing to a motor,
+  so the 3D stage moves it with the show, live too. The Theatre has a house curtain and four drops
   (a forest, a castle at sunset, a starry sky, a city by night) that its cues open and fly in and
-  out; the Cinema's screen curtain opens for the feature. A cloth's size and a drop's picture are
-  the light's own (`cloth` in the show file).
+  out; the Cinema's screen curtain opens for the feature. The templates put their machinery on
+  universe 15, which no box plays until you give it one. A cloth's size and a drop's picture are
+  the light's own (`cloth` in the show file); a fly bar travels as far as takes its drop from where
+  it hangs down to the deck.
   A controller with several winches as cells: each is its own, pick them in the cell picker like a
   bar's heads, each held on its own (two height channels without cells are one height, a truss
   lifted at both ends). A jump or a scrub on the timeline never moves a winch: it waits until the

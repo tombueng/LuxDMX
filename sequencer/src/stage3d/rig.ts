@@ -18,6 +18,14 @@ import { pleats } from './textures';
 import { ballMotion, mirrorBall, type Ball } from './mirrorBall';
 // (a curtain's pleats: many across its width, the same texture for every curtain)
 let pleatTex: THREE.Texture | undefined;
+// A curtain's cloth: a metre square with real folds (a fold every 1/n of its width, `depth` deep), so
+// light rakes across them; scaled to its half's width the folds bunch up as it's drawn back
+function pleated(n: number, depth: number) {
+  const g = new THREE.PlaneGeometry(1, 1, n * 6, 1), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setZ(i, depth * Math.sin((p.getX(i) + 0.5) * n * Math.PI * 2));
+  g.computeVertexNormals();
+  return g;
+}
 const pleatsRepeat = () => { if (!pleatTex) { pleatTex = pleats().clone(); pleatTex.wrapS = THREE.RepeatWrapping; pleatTex.repeat.set(10, 1); pleatTex.needsUpdate = true; } return pleatTex; };
 
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
@@ -298,10 +306,16 @@ export class Rig {
       holder.add(chain, ball); this.scenery.add(holder); this.balls.set(f.id, { holder, ball });
     }
     const velvet = list.some((f) => f.look === 'curtain') ? new THREE.MeshStandardMaterial({ map: pleatsRepeat(), color: 0x8a0f1c, roughness: 0.85, emissive: 0x2a0306, emissiveIntensity: 0.9, side: THREE.DoubleSide }) : undefined;
-    if (velvet) this.clothMats.push(velvet);
+    const gold = velvet ? new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.75, roughness: 0.35 }) : undefined;
+    if (velvet && gold) this.clothMats.push(velvet, gold);
     for (const f of list) {
       if (!f.cloth) continue;
-      if (f.look === 'curtain' && velvet) this.cloths.set(f.id, [0, 1].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), velvet); this.scenery.add(m); return m; }));
+      if (f.look === 'curtain' && velvet && gold) {
+        // its two halves (folded velvet), the valance across the top, a gold fringe along each one's hem
+        const mk = (g: THREE.BufferGeometry, m: THREE.Material) => { const x = new THREE.Mesh(g, m); this.scenery.add(x); return x; };
+        this.cloths.set(f.id, [mk(pleated(40, 0.12), velvet), mk(pleated(40, 0.12), velvet), mk(pleated(70, 0.1), velvet),
+          mk(new THREE.BoxGeometry(1, 0.22, 0.05), gold), mk(new THREE.BoxGeometry(1, 0.22, 0.05), gold), mk(new THREE.BoxGeometry(1, 0.26, 0.05), gold)]);
+      }
       else if (f.look === 'flybar') {
         const tex = dropTexture(f.cloth.picture ?? 'forest'), mat = new THREE.MeshStandardMaterial({ map: tex ?? undefined, color: tex ? 0xffffff : 0x4a6a4a, roughness: 0.95, side: THREE.DoubleSide });
         this.clothMats.push(mat);
@@ -653,6 +667,11 @@ export class Rig {
           put('curtain', TMP.compose(pos, yq, sc.set(cl.w, 1, 1)));
           const half = cl.w / 2, gather = Math.min(half, 0.4 + half * 0.08), pw = Math.max(gather, half - moved);
           hang(ms[0], -half + pw / 2, -cl.h / 2, pw, cl.h); hang(ms[1], half - pw / 2, -cl.h / 2, pw, cl.h);
+          // (the valance stays: a band across the top, in front of the halves; the fringes on the hems)
+          const vh = Math.min(1.8, cl.h * 0.12);
+          hang(ms[2], 0, -vh / 2, cl.w + 0.3, vh); if (ms[2]) ms[2].position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
+          hang(ms[3], -half + pw / 2, -cl.h + 0.11, pw, 1); hang(ms[4], half - pw / 2, -cl.h + 0.11, pw, 1); hang(ms[5], 0, -vh + 0.13, cl.w + 0.3, 1);
+          if (ms[5]) ms[5].position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
         } else {
           put('flybar', TMP.compose(CP.set(0, -moved, 0).applyQuaternion(yq).add(pos), yq, sc.set(cl.w, 1, 1)));
           hang(ms[0], 0, -moved - cl.h / 2 - 0.03, cl.w, cl.h);

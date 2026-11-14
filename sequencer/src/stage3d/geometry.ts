@@ -145,13 +145,13 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   theatre: {
     // (the plan: the stage and the stalls, the front-of-house bar and the house lights out over them;
     // the balcony at the back is left off, the stage would be a sliver)
-    id: 'theatre', W: 30, D: 33, zc: 1,
-    truss: [...THEATRE.electrics.map((e) => ({ z: e.z, y: e.y })), { z: THEATRE.foh.z, y: THEATRE.foh.y }], deck: { x: THEATRE.stage.x, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, ceiling: THEATRE.ceiling,
-    band: { x: 12, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, walls: { x: THEATRE.wallX, z0: THEATRE.stage.z0 - 0.4, z1: THEATRE.backZ }, screens: [{ z: THEATRE.cycZ, x: THEATRE.cyc.w / 2, y0: DECK, y1: DECK + THEATRE.cyc.h }],
+    id: 'theatre', W: 42, D: 38, zc: -2.5,
+    truss: [...THEATRE.electrics.map((e) => ({ z: e.z, y: e.y })), { z: THEATRE.foh2.z, y: THEATRE.foh2.y }, { z: THEATRE.foh.z, y: THEATRE.foh.y }], deck: { x: THEATRE.stage.x, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, ceiling: THEATRE.ceiling,
+    band: { x: THEATRE.arch.w / 2, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, walls: { x: THEATRE.wallX, z0: THEATRE.stage.z0 - 0.4, z1: THEATRE.backZ }, screens: [{ z: THEATRE.cycZ, x: THEATRE.cyc.w / 2, y0: DECK, y1: DECK + THEATRE.cyc.h }],
     floor: (_x, z) => theatreFloor(z),
-    frame: [...THEATRE.electrics.map((e) => span(12, e.y, e.z)), span(12, THEATRE.foh.y, THEATRE.foh.z)],
-    views: { front: { pos: [0, 11.5, 25], at: [0, 5, -4] }, foh: { pos: [4, 4.4, 14.5], at: [0, 5, -4] }, side: { pos: [-14, 11, 16], at: [0, 4.5, -4] }, top: { pos: [0, 44, -4.01], at: [0, 0, -4] }, band: { pos: [0, 3.4, -8], at: [0, 4.5, 20] } },
-    tour: { rx: 11, rz: 9, z0: 7, y: 4.8, dy: 0.4, at: [0, 4.8, -4] },
+    frame: [...THEATRE.electrics.map((e) => span(THEATRE.arch.w / 2 + 3, e.y, e.z)), span(THEATRE.arch.w / 2 + 2, THEATRE.foh2.y, THEATRE.foh2.z), span(THEATRE.arch.w / 2 + 2, THEATRE.foh.y, THEATRE.foh.z)],
+    views: { front: { pos: [0, 14, 27.5], at: [0, 7, -6] }, foh: { pos: [6, 5.5, 19], at: [0, 7, -6] }, side: { pos: [-20, 15, 21], at: [0, 6.5, -6] }, top: { pos: [0, 64, -6.01], at: [0, 0, -6] }, band: { pos: [0, 4.6, -12], at: [0, 6, 26] } },
+    tour: { rx: 16, rz: 12, z0: 9, y: 6.5, dy: 0.5, at: [0, 6.5, -6] },
   },
   // a church (scenes.ts buildChurch): the chancel is the deck; the plan is the whole church, wall to
   // wall, the chancel at its top (its lights are all over it: over the nave, on the walls); the lights

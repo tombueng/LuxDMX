@@ -13,6 +13,13 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **The Theatre's curtain opens, live too.** The templates' curtains and fly bars sit on universe 15,
+  which no box plays: a winch nobody's box plays sends nothing to a motor, so the 3D stage moves it
+  with the show. A real one on a box still holds until the machines are armed.
+- **An opera house's stage**: the theatre's opening is 26 x 14.5 m now, the stage 40 m wide and 23 m
+  deep, the cyc 32 x 19 m, two front-of-house bars, the fly tower up to 32 m. The house curtain is
+  folded velvet with a valance and gold fringes; the front light is softer and the deck dark, so
+  the scenes don't glare white, and the castle lost its zebra stripes.
 - **A mirror ball on a DMX motor**: a new generic type with one motor channel (stop, either way,
   slow to fast). The ball never hangs dead still, it sways and twists a little on its chain. The
   Bar has one: slow all evening, faster for the disco.

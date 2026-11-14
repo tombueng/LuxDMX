@@ -264,7 +264,8 @@ export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
   add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), house(new THREE.MeshBasicMaterial({ color: 0x120a0c }))), 0, H, zc, [Math.PI / 2, 0, 0]);
   add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), carpet), 0, 0.002, zc, [-Math.PI / 2, 0, 0]);
   // the stage and its apron (the deck), black; the cyclorama at the back, pale, for the lights to colour
-  const { x: dx, z0, z1 } = r.deck, top = std({ map: stageFloor(), roughness: 0.72 });
+  // (a stage floor is painted dark: the light's pools show their colour, they don't glare white)
+  const { x: dx, z0, z1 } = r.deck, top = std({ map: stageFloor(), color: 0x5a5a5a, roughness: 0.72 });
   add(new THREE.Mesh(new THREE.BoxGeometry(2 * dx, DECK, z1 - z0), [M.black, M.black, top, M.black, M.black, M.black]), 0, DECK / 2, (z0 + z1) / 2);
   add(box(2 * dx, 0.05, 0.04, gold), 0, DECK - 0.03, z1 + 0.01);
   // (a cyc in a dark theatre is dark until it's lit: grey, so the light's colour is what you see, a

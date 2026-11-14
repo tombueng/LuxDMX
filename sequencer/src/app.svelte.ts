@@ -290,9 +290,12 @@ class App {
   // height back). Written when it changes, at most ten times a second.
   private heldMine: Record<string, { v: number; at: number }> = {};
   // A winch's height as the wire holds it while it's live and not armed (part of its travel; null:
-  // nobody knows where it is); undefined when it isn't held (blind, or armed: the show's height)
+  // nobody knows where it is); undefined when it isn't held (blind, or armed: the show's height; or
+  // no box connected plays its universe: nothing goes out to a motor, the 3D stage shows the show)
   winchHeldAt(id: string): number | null | undefined {
     if (this.output !== 'live' || this.sfxArmed) return undefined;
+    const f = this.show.fixtures.find((x) => x.id === id);
+    if (f && !this.bridges.some((b) => b.state === 'ready' && b.wants(f.universe))) return undefined;
     const h = { ...this.engine.heldSeed, ...this.heldWire() }, k = h[`${id}:hoist`] !== undefined ? `${id}:hoist` : `${id}:hoist@0`;
     if (h[k] === undefined) return null;
     const fine = h[`${k}:fine`];
