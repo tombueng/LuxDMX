@@ -355,3 +355,50 @@ test('Loop this part: the part plays over and over, its chip stops it; L loops t
   await expect(tr.getByRole('status').filter({ hasText: 'Looping' })).toHaveCount(0);
   await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
 });
+
+test('the Effects track opened: a row per knob; the line drags the effect\'s own value, a double-click makes a curve that plays along the bar; the wheel zooms', async ({ page }) => {
+  await bar(page);
+  const fx = page.locator('.tlv .pal .chip.fx').first();
+  await fx.dragTo(page.locator('.tlv .tracks .lane').first(), { targetPosition: { x: 60, y: 15 } });
+  const it0 = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0]);
+  const fxId = it0.do.effect;
+  await page.locator('.tlv').getByRole('button', { name: /Open the effects/ }).click();
+  await expect(page.locator('.tlv .nl.sub')).not.toHaveCount(0);
+  const kinds = await page.locator('.tlv .nl.sub').allTextContents();
+  expect(kinds).toContain('speed');
+  const row = (k: string) => page.locator('.tlv .lane.sub').nth(kinds.indexOf(k)).locator('svg.curve').first();
+  // the effect's own size, dragged up: the effect itself changes (every bar of it)
+  if (kinds.includes('size')) {
+    const s = await row('size').boundingBox(), line = await row('size').locator('line.hit').boundingBox();
+    await page.mouse.move(s!.x + s!.width / 2, line!.y + line!.height / 2); await page.mouse.down();
+    await page.mouse.move(s!.x + s!.width / 2, s!.y + s!.height * 0.75, { steps: 4 }); await page.mouse.up();
+    await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.show.effects.find((x: any) => x.id === e).params.size, fxId)).toBeLessThan(0.7);
+  }
+  // a double-click on the speed line: a point there, a curve over this bar (its ends the effect's own)
+  const sp = await row('speed').boundingBox(), sl = await row('speed').locator('line.hit').boundingBox();
+  await page.mouse.dblclick(sp!.x + sp!.width / 2, sl!.y + sl!.height / 2);
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves?.[0]?.pts.length)).toBe(3);
+  // dragged to the top: much slower there (the top of the speed row is 32 beats a round)
+  const pt = row('speed').locator('circle.pt').nth(1), pb = await pt.boundingBox();
+  await page.mouse.move(pb!.x + pb!.width / 2, pb!.y + pb!.height / 2); await page.mouse.down();
+  await page.mouse.move(pb!.x + pb!.width / 2, sp!.y + 1, { steps: 4 }); await page.mouse.up();
+  const curve = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves[0]);
+  expect(curve.knob).toBe('speed'); expect(curve.pts[1][1]).toBeGreaterThan(16);
+  // playing through the bar: the effect runs with the curve's speed where the song is, its own after
+  const it = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0]);
+  await page.evaluate((t) => { const p = (window as any).__luxdmx.timeline; p.seek(t); void p.play(); }, it.at + it.len * curve.pts[1][0]);
+  await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.engine.fxOver[e]?.speed ?? 0, fxId), { timeout: 8000 }).toBeGreaterThan(8);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+  await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.engine.fxOver[e], fxId)).toBeUndefined();
+  // a double-click on a point takes it away; down to one, the curve goes (the playhead off it first)
+  await page.evaluate((t) => (window as any).__luxdmx.timeline.seek(t), it.at + it.len + 2);
+  await row('speed').locator('circle.pt').nth(1).dblclick();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves?.[0]?.pts.length)).toBe(2);
+  await row('speed').locator('circle.pt').nth(0).dblclick();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves)).toBeUndefined();
+  // the wheel zooms the tracks round the pointer
+  const w0 = await page.locator('.tlv .it').first().boundingBox();
+  const tr = await page.locator('.tlv .tracks').boundingBox();
+  await page.mouse.move(tr!.x + 200, tr!.y + 60); await page.mouse.wheel(0, -300);
+  await expect.poll(async () => (await page.locator('.tlv .it').first().boundingBox())!.width).toBeGreaterThan(w0!.width * 1.3);
+});

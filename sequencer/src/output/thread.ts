@@ -28,7 +28,7 @@ export type FromThread =
   | { t: 'held'; held: Record<string, number> }
   | { t: 'stats'; rate: number; worst: number; late: number; ms: number; sent: number; to: number; quiet: boolean; unis: number }
   | { t: 'broken'; why: string };
-export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
+export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; fxOver: Engine['fxOver']; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
 
 const PERIOD = 25, HEARTBEAT_MS = 250, LATE = 10;
 const post = (m: FromThread, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(m, transfer);

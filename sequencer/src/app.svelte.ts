@@ -58,7 +58,7 @@ import { LINK, LinkOutput } from './output/link';
 import { RemoteHost } from './remote/host.svelte';
 import { TimelinePlayer } from './timeline/player.svelte';
 import type { BurstAttr, TimelineAction, TimelineItem } from './model/timeline';
-import { firstLook, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
+import { curvesAt, firstLook, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
 
 // What a group's flash puts on one of its lights: the whole light, or for a group of cells ("Rim")
 // just those cells (the light itself left as it is)
@@ -99,6 +99,7 @@ const pingAfter = (() => {
 })();
 // (said when a box connects while blind; gone the moment you go on stage)
 const BLIND_TOAST = 'Connected. You are blind';
+const NO_OVER: Record<string, Record<string, number>> = {};
 // where the winches were last sent armed (held there over a reload): { "fixture:hoist": { v: byte,
 // at: ms } }, anything else isn't kept
 function keptHeld(): Record<string, { v: number; at: number }> {
@@ -1097,6 +1098,10 @@ class App {
       for (const id of this.stepAll) if (!this.selected.includes(id) && !live[id]) live[id] = { intensity: this.lowlight, color: { r: 1, g: 1, b: 1 }, strobe: 0 };
     this.engine.live = live;
     this.engine.overlay = this.testOverlay;      // (the channel wizard: under the machines' gate)
+    // the timeline's curves: its effect bars' knobs where the song is (only while it plays; the same
+    // object while nothing changes, so the output thread isn't told again)
+    const song = this.show.timeline, over = this.timeline.playing && song?.items.some((i) => i.curves) ? curvesAt(song.items, this.timeline.position) : NO_OVER;
+    if (JSON.stringify(over) !== JSON.stringify(this.engine.fxOver)) this.engine.fxOver = over;
     // the output thread gets what changed (its own engine works out the frames that go out)
     // (blind with nothing frozen, a tab that started blind: the thread sends nothing either)
     const blindOut = this.output === 'live' ? null : this.blindFrames();

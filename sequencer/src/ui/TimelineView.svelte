@@ -17,6 +17,9 @@
   import { isFogTimer } from '../model/library';
   import { isMachineList } from '../content/busking';
   import { cueMarkOf, listMarkOf, MARK_SHORT } from './risk';
+  import TimelineCurves from './TimelineCurves.svelte';
+  import { CURVE_KNOBS } from '../model/timeline';
+  import { LIVE_KNOBS } from '../engine/knobs';
   import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
   import { BAR_S, DEMO_SECONDS, playDemo, sectionStarts } from '../timeline/beat';
   import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
@@ -50,6 +53,10 @@
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
   const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   // one lane per list that's on the timeline or could be, then effects, then moments
+  // the Effects track opened: a row for each knob its effects have, their values over the bars
+  let fxOpen = $state(false);
+  const fxBars = $derived(items.filter((i) => i.lane === 'fx' && i.len !== undefined && i.do.do === 'effect' && i.do.on));
+  const fxKnobs = $derived(CURVE_KNOBS.filter((k) => fxBars.some((i) => { const e = app.show.effects.find((x) => x.id === (i.do as { effect: string }).effect); return !!e && (LIVE_KNOBS[e.kind] ?? CURVE_KNOBS).includes(k as never); })));
   const lanes = $derived([...lists.map((l) => ({ id: `list:${l.id}`, name: l.name, color: l.color ?? '#45d85c' })),
     { id: 'fx', name: 'Effects', color: '#ffaa1c' }, { id: 'crowd', name: 'Crowd', color: '#7fc8ff' }, { id: 'special', name: 'Moments', color: '#f33abc' }]);
   // the crowd's moments: how it sounds from there on (got to over the bar's length), or a cheer
@@ -168,10 +175,13 @@
     app.markDirty(0);
     return s;
   }
+  // The wheel zooms, round the pointer (a trackpad's pinch too, gently); sideways (Shift, or a
+  // trackpad swiped across) it scrolls, as the browser does it
   function wheel(e: WheelEvent) {
-    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || !e.deltaY) return;
     e.preventDefault();
-    zoom(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - tracks!.getBoundingClientRect().left + tracks!.scrollLeft);
+    const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    zoom(Math.exp(-Math.max(-300, Math.min(300, px)) * 0.0022), e.clientX - tracks!.getBoundingClientRect().left + tracks!.scrollLeft);
   }
   // follow the playhead while it plays (from what's known: reading the scroll position each frame
   // would make the browser lay the page out again every frame)
@@ -710,7 +720,7 @@
         <p>A song file of your own: its tempo, first downbeat and parts are found from the sound (check them: BPM, and the parts on the ruler). P or <b>+ Part</b> starts a part at the bar line nearest the playhead; on the ruler a double-click renames a part, a right-click removes it.</p>
         <p>Before and after the song: give the show time before the song starts (an intro, the band walking on) and after it ends (the cheer, the house lights up). Things go there like anywhere else; Play from the start begins at the very start, and the song comes in at its own 0:00.</p>
         <p>The crowd: Chatter, Cheering, Roar and Quiet change how the crowd sounds from there on, over the length of the bar; a Cheer! swells up and dies away. Right-click one for how loud. The crowd's own volume sits next to the song's.</p>
-        <p>Space plays and pauses, Home goes back to the very start, the arrows a bar, P adds a part, L loops the part the playhead is in (right-click a part: Loop this part; L again or its chip's × stops it), Del removes what's selected, Ctrl+wheel zooms. A song stays in this browser; the show file only names it.</p>
+        <p>Space plays and pauses, Home goes back to the very start, the arrows a bar, P adds a part, L loops the part the playhead is in (right-click a part: Loop this part; L again or its chip's × stops it), Del removes what's selected, the wheel zooms (Shift+wheel scrolls sideways). A song stays in this browser; the show file only names it.</p>
         <p>A gig: put every song in the set list, in order, each with its own file and cues (the lights, cues and effects are the whole set's). On Live, Next song gets the next one ready without the lights going dark, and Play from the start comes in on the first downbeat.</p>
       </Help>
     </div>
@@ -824,7 +834,12 @@
     <div class="board">
       <div class="names">
         <div class="nr" title={songs.length > 1 ? `Song ${cur + 1} of ${songs.length}: ${songName(tl, cur)}` : undefined}>{songs.length > 1 ? `${cur + 1}. ${songName(tl, cur)}` : 'Song'}</div>
-        {#each lanes as ln (ln.id)}<div class="nl" style="--c:{ln.color}" title={ln.name}>{ln.name}</div>{/each}
+        {#each lanes as ln (ln.id)}
+          {#if ln.id === 'fx' && fxBars.length}
+            <div class="nl" style="--c:{ln.color}" title={ln.name}><button class="ghost open" aria-expanded={fxOpen} onclick={() => (fxOpen = !fxOpen)} aria-label="{fxOpen ? 'Close' : 'Open'} the effects' knobs" title="The effects' knobs over time: speed, size and the rest, as lines and curves under the bars">{fxOpen ? '▾' : '▸'}</button>{ln.name}</div>
+            {#if fxOpen}{#each fxKnobs as k (k)}<div class="nl sub" style="--c:{ln.color}">{k}</div>{/each}{/if}
+          {:else}<div class="nl" style="--c:{ln.color}" title={ln.name}>{ln.name}</div>{/if}
+        {/each}
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions (drops from the palette; every item is a button of its own) -->
       <div class="tracks" bind:this={tracks} bind:clientWidth={() => width, (v) => { if (v > 0) width = v; }} onscroll={() => (scrolled = tracks!.scrollLeft)} ondragover={over} ondragleave={() => (dropAt = null)} ondrop={drop} onwheel={wheel}>
@@ -861,6 +876,9 @@
                 </button>
               {/each}
             </div>
+            {#if ln.id === 'fx' && fxOpen && built}
+              {#each fxKnobs as k (k)}<div class="lane sub" style="--c:{ln.color}"><TimelineCurves knob={k} bars={fxBars} {x} {scale} /></div>{/each}
+            {/if}
           {/each}
           {#if dropAt !== null}<span class="drop" style="left:{x(dropAt)}px"></span>{/if}
           <!-- svelte-ignore a11y_no_static_element_interactions (Home, End and the arrows move it from the keyboard) -->
@@ -998,6 +1016,10 @@
   .vol .snd:not(:has(svg)) { font-size: .78rem; }
   .wave path { fill: #6aa2ff55; stroke: #6aa2ff; stroke-width: .5; }
   .lane { height: 38px; position: relative; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(90deg, transparent 0 1px, transparent 1px 100%); }
+  /* (the Effects track opened: a thinner row per knob under it, named in small type) */
+  .lane.sub { height: 34px; background: #ffffff05; }
+  .nl.sub { height: 34px; line-height: 33px; padding-left: 1.6rem; font-size: .74rem; color: var(--muted); border-left-style: dotted; }
+  .nl .open { padding: 0 .25rem; margin-right: .2rem; font-size: .8rem; min-height: 0; line-height: 1; }
   .it { position: absolute; top: 5px; height: 28px; transform: translateX(-1px); min-width: 0; max-width: 18rem; padding: 0 .45rem 0 .5rem; border-radius: 6px; border: 1px solid var(--c);
     background: color-mix(in srgb, var(--c) 22%, var(--panel2)); color: var(--text); font-size: .74rem; display: flex; align-items: center; cursor: grab; touch-action: none; overflow: hidden; }
   .it::before { content: ''; position: absolute; left: -1px; top: -5px; bottom: -5px; width: 2px; background: var(--c); }

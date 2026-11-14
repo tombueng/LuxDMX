@@ -119,7 +119,7 @@ export class OutputThread {
     const t = performance.now();
     const v: Partial<Inputs> = {};
     for (const k of ['grandMaster', 'blackout', 'bpm', 'sound', 'armed'] as const) if (engine[k] !== this.prev[k]) { (v as Record<string, unknown>)[k] = engine[k]; this.prev[k] = engine[k]; }
-    for (const k of ['programmer', 'live', 'overlay', 'groupMasters', 'heldSeed'] as const) {
+    for (const k of ['programmer', 'live', 'fxOver', 'overlay', 'groupMasters', 'heldSeed'] as const) {
       // (the programmer's copy is the same object until it changes: nothing to compare then)
       if (k === 'programmer') { if (engine.programmer === this.progRef) continue; this.progRef = engine.programmer; }
       const s = JSON.stringify(engine[k] ?? null);

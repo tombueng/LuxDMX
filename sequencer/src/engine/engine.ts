@@ -109,6 +109,9 @@ function gatedChannels(m: FixtureMode | undefined): { i: number; max: number; of
 export class Engine {
   readonly players = new Map<string, ListPlayer>();
   programmer: Record<string, Values> = {};
+  // effects' knobs as the timeline's curves have them right now (an effect's id: its knobs), over the
+  // effects' own values; nothing in the show changes
+  fxOver: Record<string, Record<string, number>> = {};
   grandMaster = 1;
   // keep each list's tracked look from one GO to the next: only where the show is a new copy after
   // every edit (the output thread), so an edit can never leave an old look in it
@@ -725,7 +728,8 @@ export class Engine {
     for (const e of show.effects) {
       const def = EFFECT_MAP.get(e.kind), f = w.get(e.id) ?? 0;
       if (!def || f <= 0) continue;
-      run.push({ e, def, p: { ...paramsOf(e.kind, e.params), sound: this.sound }, f });
+      const over = this.fxOver[e.id];
+      run.push({ e, def, p: { ...paramsOf(e.kind, over ? { ...e.params, ...over } : e.params), sound: this.sound }, f });
     }
     run.sort((a, b) => FX_ORDER[a.def.category] - FX_ORDER[b.def.category]);
     const base = run.some((r) => r.p.lightUp) ? new Map(Object.entries(stage).map(([id, s]) => [id, s.intensity ?? 0])) : undefined;

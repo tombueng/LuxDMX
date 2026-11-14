@@ -24,6 +24,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   deep, the cyc 32 x 19 m, two front-of-house bars, the fly tower up to 32 m. The house curtain is
   folded velvet with a valance and gold fringes; the front light is softer and the deck dark, so
   the scenes don't glare white, and the castle lost its zebra stripes.
+- **Curves on the timeline**: the Effects track opens into a row per knob (speed, size, spread...);
+  drag the line to change the effect's own value, double-click for a curve that changes the knob
+  along the bar while the song plays (the output thread plays it too; nothing in the show is
+  rewritten as it plays). And the wheel zooms the timeline now, without Ctrl.
 - **Round LEDs** on the 3D stage: a matrix's, a ring's and a strip's pixels are little discs now, not
   boxes (as cheap: they're still drawn all at once).
 - **LED strips of your own**: the LED maker makes strips too (how many LEDs, how long, the colour

@@ -469,7 +469,11 @@ are cut to 60 on load, an empty one is dropped.
   one per moment. The demo beat has its own and needs none here.
 - `bpm` and `offset` (seconds before the first beat) draw the grid things snap to.
 - An item's `do` is a cue action (see above), `{ "do": "effect", "effect", "on" }` (with `len`: it
-  runs that long), or `{ "do": "burst", "attr", "seconds" }`: the effect machines with that channel
+  runs that long; with `curves`, `[{ "knob": "speed", "pts": [[0, 4], [0.5, 16], [1, 4]] }]`, its
+  knobs change along the bar while the song plays: each point is where along the bar (0 its start,
+  1 its end) and the knob's value there, straight lines between them, the first and last values
+  before and after; knobs `speed`, `size`, `spread`, `width`, `low`, `high`, `contrast`; a curve
+  with fewer than two good points is left out), or `{ "do": "burst", "attr", "seconds" }`: the effect machines with that channel
   (`confetti`, `flame`, `sparks`, `co2`, `bubbles`), the fog machines (`fog`), or every light
   (`strobe`, `blinder`) for that long (30 s at most). `lane` says which track it's drawn on
   (`list:<id>`, `fx`, `special`).
