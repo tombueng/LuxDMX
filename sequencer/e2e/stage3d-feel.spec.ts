@@ -4,7 +4,7 @@
 // drawing quality starts at High, a pixel bar lit by an effect reads its real level, and a Release
 // says which effects go on running.
 import type { Page } from '@playwright/test';
-import { channels, full, openConnected, resetFake, patch, fresh, selectAll, test, expect } from './helpers';
+import { channels, full, openConnected, resetFake, patch, fresh, selectAll, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -145,7 +145,7 @@ test('the Ambient slider sets the room\'s own light: starts low, 0 is a dark ven
   await slider.fill('0.1');
   await expect.poll(async () => (await amb()).sky, { timeout: 5000 }).toBeLessThan(0.4375 * 0.01);
   await slider.fill('0');
-  await expect.poll(amb, { timeout: 5000 }).toEqual({ sky: 0, key: 0, env: 0, walls: 0 });
+  await expect.poll(amb, { timeout: 5000 }).toEqual({ sky: 0, key: 0, env: 0, walls: 0, glass: null });
   await slider.fill('1');
   await expect.poll(async () => (await amb()).sky, { timeout: 5000 }).toBeCloseTo(0.4375, 3);
   expect((await amb()).walls).toBeGreaterThan(0.1);
@@ -274,4 +274,22 @@ test('a beam as wide as the light\'s data says: a wash from the library 7° to 5
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].beamDeg ?? null)).toBeNull();
   await page.keyboard.press('Escape');
   await expect.poll(beam).toBeCloseTo(7, 1);
+});
+
+test('the church\'s stained glass glows with the Ambient slider: faintly by night (its default), bright by day', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Church');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('church');
+  const glass = () => page.evaluate(() => (window as any).__stage3d.ambient().glass as number);
+  // (linear light: its full colour is 0.32; by night a sixth of that)
+  await expect.poll(glass, { timeout: 10000 }).toBeLessThan(0.08);
+  expect(await glass()).toBeGreaterThan(0.02);                 // (still there: the street outside)
+  const slider = page.getByLabel('Ambient light'), more = page.locator('.s3').getByRole('button', { name: 'More', exact: true });
+  await expect(slider.or(more).first()).toBeVisible({ timeout: 30000 });
+  if (!(await slider.isVisible())) { await more.click(); await expect(slider).toBeVisible(); }
+  await slider.fill('1');
+  await expect.poll(glass, { timeout: 5000 }).toBeGreaterThan(0.3);
+  await slider.fill('0.6');
 });

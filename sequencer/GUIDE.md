@@ -856,7 +856,9 @@ Three more demos come with their own room on the 3D stage:
   lenses. **Ambient** is the room's own light besides yours (the sky, the house,
   reflections, how much of the walls and roof you see): on a curve like the eye's, so most of the
   slider is the dark end; low to start with (the walls near black), 0 for a black venue where only
-  your lights show anything (the camera then doesn't lift a dark look either), kept in this browser. The band plays along on the beat: the guitarists' left hands round the necks (sliding
+  your lights show anything (the camera then doesn't lift a dark look either), kept in this browser.
+  The church's stained glass goes with it too: daylight at the top, only faintly lit from the street
+  by night. The band plays along on the beat: the guitarists' left hands round the necks (sliding
   to the next chord at the bar line), strumming across the strings, hands on the keys, the
   drummer's sticks in his fists hitting the drums, his feet on the kick and hi-hat pedals. The
   more your lights do, the more they move: the singer steps back from the mic at the end of a

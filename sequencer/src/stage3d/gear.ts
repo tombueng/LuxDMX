@@ -497,7 +497,9 @@ export function ledWall(M: Mats, w: number, h: number, face: THREE.Material, roo
 // itself when the camera is above the roof (the top view looks down into the hall).
 // An unlit wall or ceiling of a room: its colour at full house light, kept, so the 3D stage scales
 // it with the Ambient slider (dark by default, black at 0: the house light is off at a show).
-export function house<T extends THREE.MeshBasicMaterial>(m: T): T { m.userData.house = m.color.getHex(); return m; }
+// (`least`: how much of its colour it keeps at no ambient at all: a stained-glass window lit from the
+// street at night)
+export function house<T extends THREE.MeshBasicMaterial>(m: T, least = 0): T { m.userData.house = m.color.getHex(); if (least) m.userData.houseLeast = least; return m; }
 export const HALL = { x: 24, z0: -10, z1: 31, h: 15 };
 export function hall(M: Mats) {
   const g = new THREE.Group(), { x: X, z0, z1, h: H } = HALL, L = z1 - z0, zc = (z0 + z1) / 2;

@@ -88,6 +88,7 @@
   const ambLight = (s: number) => 1.25 * Math.pow(s, 2.2);
   let hemi: THREE.HemisphereLight | undefined, keyLight: THREE.DirectionalLight | undefined;
   let houseOf: THREE.Object3D | undefined, houseMats: THREE.MeshBasicMaterial[] = [];
+  const lightest = (ms: THREE.MeshBasicMaterial[]) => (ms.length ? Math.max(...ms.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null);
   let full = $state(false);
 
   // the built-in room: the big stage in a hall, or a small club / pub (geometry.ts ROOMS)
@@ -505,7 +506,7 @@
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
       lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
-      ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: houseMats.length ? Math.max(...houseMats.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null }),
+      ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: lightest(houseMats.filter((m) => m.userData.houseLeast === undefined)), glass: lightest(houseMats.filter((m) => m.userData.houseLeast !== undefined)) }),
     };
   }
   let devHook: unknown;
@@ -1090,7 +1091,7 @@
     if (houseOf !== venue.group) { houseOf = venue.group; houseMats = []; venue.group.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined; if (m?.userData?.house !== undefined && !houseMats.includes(m)) houseMats.push(m); }); }
     // (at the top of the slider as the room always looked; the default near black)
     const hk = Math.pow(amb / 1.25, 3);
-    for (const m of houseMats) m.color.setHex(m.userData.house).multiplyScalar(hk);
+    for (const m of houseMats) { const f = m.userData.houseLeast ?? 0; m.color.setHex(m.userData.house).multiplyScalar(f + (1 - f) * hk); }
     if (keyLight) keyLight.intensity = 0.35 * amb;
     scene.environmentIntensity = 0.28 * amb;
     // exposure like a camera's: down when looking into the lights, up a little for a dark look (less

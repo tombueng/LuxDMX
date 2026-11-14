@@ -313,7 +313,9 @@ export function buildChurch(group: THREE.Group, M: Mats, r: Room) {
   const Ch = CHURCH, X = r.walls.x, Z0 = r.walls.z0, Z1 = r.walls.z1, H = r.ceiling, L = Z1 - Z0, zc = (Z0 + Z1) / 2;
   const stone = house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x8a8478 }));
   const slab = std({ map: concrete(), color: 0x9a948a, roughness: 0.85 }), oak = std({ map: darkWood(), color: 0x8a6a4a, roughness: 0.5 });
-  const cloth = std({ color: 0xf2efe6, roughness: 0.8 }), gold = std({ color: 0xc8a046, metalness: 0.85, roughness: 0.28 });
+  // (the altar cloth a linen white, not paper white: under the two altar lights at full it was a
+  // blown-out block)
+  const cloth = std({ color: 0xb8b2a4, roughness: 0.9 }), gold = std({ color: 0xc8a046, metalness: 0.85, roughness: 0.28 });
   add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), stone), -X, H / 2, zc, [0, Math.PI / 2, 0]);
   add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), stone), X, H / 2, zc, [0, -Math.PI / 2, 0]);
   add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, H), stone), 0, H / 2, Z1, [0, Math.PI, 0]);
@@ -322,7 +324,8 @@ export function buildChurch(group: THREE.Group, M: Mats, r: Room) {
   add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), slab), 0, 0.002, zc, [-Math.PI / 2, 0, 0]);
   // the roof's beams across the nave
   for (let z = Z0 + 2; z < Z1; z += 4) { add(box(2 * X, 0.4, 0.3, oak), 0, H - 0.6, z); for (const sx of [-1, 1]) add(box(0.3, 2.4, 0.3, oak), sx * (X - 0.2), H - 1.8, z); }
-  // stained glass: tall windows down both walls, a round one over the altar (their colours glow)
+  // stained glass: tall windows down both walls, a round one over the altar. Their colours glow with
+  // the daylight, the Ambient slider: by night (its default) only faintly, from the street outside
   const glass = (w: number, h: number, round: boolean, seed: number) => {
     const c = document.createElement('canvas'); c.width = 128; c.height = round ? 128 : 256;
     const g = c.getContext('2d');
@@ -335,7 +338,7 @@ export function buildChurch(group: THREE.Group, M: Mats, r: Room) {
       for (let x = 0; x <= c.width; x += 16) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, c.height); g.stroke(); }
     }
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0x9a9a9a, toneMapped: false });
+    const mat = house(new THREE.MeshBasicMaterial({ map: tex, color: 0x9a9a9a, toneMapped: false }), 0.14);
     return new THREE.Mesh(round ? new THREE.CircleGeometry(w / 2, 32) : new THREE.PlaneGeometry(w, h), mat);
   };
   Ch.windows.forEach((z, i) => {
