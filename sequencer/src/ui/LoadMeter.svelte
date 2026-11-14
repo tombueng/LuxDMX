@@ -28,7 +28,7 @@
         <dt>DMX output</dt>
         <dd class={ok}>{out.rate} frames a second{#if out.worst}, longest gap {out.worst} ms{/if}{#if out.late} · {out.late} late in 5 s{/if}{#if !sending} (no box: worked out all the same){/if}</dd>
         <dt></dt>
-        <dd class="faint">{threaded ? 'On a thread of its own: drawing can\'t hold it up.' : 'Sent by this page (no thread here): drawing gives way to it.'}</dd>
+        <dd class="faint">{threaded && load.outputSafe ? 'On a thread of its own: drawing can\'t hold it up (it gives way when the thread itself runs late).' : threaded ? 'On a thread of its own; a box on older firmware still gets its frames from this page, so drawing gives way to it.' : 'Sent by this page (no thread here): drawing gives way to it.'}</dd>
         <dt>This page</dt>
         <dd>{load.cpu}% of its time</dd>
         <dt>Graphics card</dt>

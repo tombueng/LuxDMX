@@ -26,11 +26,16 @@ export type ToThread =
   | { t: 'final' };
 export type FromThread =
   | { t: 'held'; held: Record<string, number> }
-  | { t: 'stats'; rate: number; worst: number; late: number; ms: number; sent: number; to: number; quiet: boolean; unis: number }
+  | { t: 'stats'; rate: number; worst: number; late: number; ms: number; sent: number; to: number; quiet: boolean; unis: number; link: boolean }
   | { t: 'broken'; why: string };
 export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; fxOver: Engine['fxOver']; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
 
 const PERIOD = 25, HEARTBEAT_MS = 250, LATE = 10;
+// The page says something at least once a second (the beat's sync). Not heard from for this long
+// (frozen, or gone without a word): fog, haze and the machines go off on the wire, the look stays.
+// Their time limits (a held fog button, a flash) live on the page: without it they'd run on.
+export const PAGE_SILENT_MS = 5000;
+let heardAt = performance.now();
 const post = (m: FromThread, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(m, transfer);
 
 let show: Show | null = null;
@@ -120,6 +125,7 @@ function frame() {
     if (!failing) { failing = true; post({ t: 'broken', why: (e as Error)?.message ?? String(e) }); }
     frames = last && zeroedFrames(last, show.fixtures, (f) => modes.get(f.id), atmosAndMachines);
   }
+  if (frames && t0 - heardAt > PAGE_SILENT_MS) frames = zeroedFrames(frames, show.fixtures, (f) => modes.get(f.id), atmosAndMachines);
   if (frames) {
     // a universe nothing drives any more gets zeros for a couple of seconds (as the page does)
     for (const u of frames.keys()) recent.set(u, t0);
@@ -136,7 +142,7 @@ function frame() {
     const span = ticks.length > 1 ? ticks[ticks.length - 1] - ticks[0] : 0;
     const dt = Math.max(1, t0 - statAt);
     post({ t: 'stats', rate: span > 500 ? Math.round(((ticks.length - 1) / span) * 1000) : 0, worst: Math.round(worst), late, ms: Math.round((work / dt) * 1000) / 10, sent: Math.round((sentN / dt) * 1000),
-      to: ports.size + (link.ready ? 1 : 0), quiet, unis: last?.size ?? 0 });
+      to: ports.size + (link.ready ? 1 : 0), quiet, unis: last?.size ?? 0, link: link.ready });
     work = 0; statAt = t0; sentN = 0;
   }
 }
@@ -155,6 +161,7 @@ const COMMANDS = new Set(['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 
   'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'giveBackEffects', 'stopAllEffects', 'act']);
 self.onmessage = (e: MessageEvent<ToThread>) => {
   const m = e.data;
+  heardAt = performance.now();
   switch (m.t) {
     case 'init': mainOrigin = m.origin; pageId = m.page ?? ''; loop(); break;
     case 'show': {

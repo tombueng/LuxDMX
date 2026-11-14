@@ -44,6 +44,20 @@ describe('the drawing gives way to the DMX output', () => {
     t = run(l, t, t + 40_000, 25);
     expect([l.level, l.level2d, l.uiEvery]).toEqual([2, 2, 1]);
   });
+  it('the thread itself late (the same computer, busy): the 3D gives way to it too, and comes back when it\'s on time', () => {
+    const l = new Load(); l.setQuality(2); l.outputSafe = true; l.threadLate = 6;
+    let t = run(l, 0, 6000, 25);              // (the page's own frames on time)
+    expect(l.level).toBeLessThan(2);
+    l.threadLate = 0;
+    t = run(l, t, t + 40_000, 25);
+    expect([l.level, l.level2d, l.uiEvery]).toEqual([2, 2, 1]);
+  });
+  it('starts at the quality chosen (not at High and brought down later)', () => {
+    localStorage.setItem('luxdmx.seq.quality', '1');
+    const l = new Load();
+    expect([l.quality, l.level, l.level2d]).toEqual([1, 1, 1]);
+    localStorage.removeItem('luxdmx.seq.quality');
+  });
   it('nothing chosen yet: High (not Low)', () => {
     localStorage.removeItem('luxdmx.seq.quality');
     expect(new Load().quality).toBe(2);

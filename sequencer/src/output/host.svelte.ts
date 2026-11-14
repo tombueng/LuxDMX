@@ -14,7 +14,8 @@ import type { Show } from '../model/types';
 
 const COMMANDS = ['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
   'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'giveBackEffects', 'stopAllEffects', 'act'];
-const ASK_MS = 1500;          // a box's page that doesn't take a channel by then: the page sends to it
+const ASK_MS = 1500;
+const SHOW_EVERY_MS = 150;    // a show that keeps changing goes over at most this often          // a box's page that doesn't take a channel by then: the page sends to it
 const QUIET_MS = 1500;        // the thread not heard from for this long: the page sends again
 
 export class OutputThread {
@@ -22,14 +23,15 @@ export class OutputThread {
   private heardAt = 0;
   private depth = 0;
   private prev: Record<string, unknown> = {};
-  private progRef: unknown = undefined;
+  private refs: Record<string, unknown> = {};
+  private showSentAt = -1e9;
   private showJson = '';
   private showDirty = true;
   private policyKey = '';
   private boxes = new Map<Bridge, { mode: 'asking' | 'port' | 'page'; since: number; outputs: string; port?: MessagePort }>();
   private linkKey = '';
   // the thread's own timing (shown by the load display)
-  stats = $state({ rate: 0, worst: 0, late: 0, ms: 0, sent: 0, to: 0, quiet: true, unis: 0 });
+  stats = $state({ rate: 0, worst: 0, late: 0, ms: 0, sent: 0, to: 0, quiet: true, unis: 0, link: false });
   onBroken?: (why: string) => void;
   // the winches' heights as the output thread holds them (what's on the wire)
   held: Record<string, number> | null = null;
@@ -53,7 +55,7 @@ export class OutputThread {
   private post(m: ToThread, transfer: Transferable[] = []) { try { this.w?.postMessage(m, transfer); } catch (e) { this.postError = `${m.t}: ${(e as Error).message}`; } }
   private heard(m: FromThread) {
     this.heardAt = performance.now();
-    if (m.t === 'stats') this.stats = { rate: m.rate, worst: m.worst, late: m.late, ms: m.ms, sent: m.sent, to: m.to, quiet: m.quiet, unis: m.unis };
+    if (m.t === 'stats') this.stats = { rate: m.rate, worst: m.worst, late: m.late, ms: m.ms, sent: m.sent, to: m.to, quiet: m.quiet, unis: m.unis, link: m.link };
     else if (m.t === 'broken') this.onBroken?.(m.why);
     else if (m.t === 'held') { this.held = m.held; this.onHeld?.(); }
   }
@@ -80,6 +82,11 @@ export class OutputThread {
         }
       };
     }
+    // What the engine does by itself within a frame (a cue that follows or waits its turn, a chase's
+    // step) the thread's engine does in its own frame: it isn't told. (Told, it ran a cue's actions
+    // twice and moved the wire's cue clock to the page's moment, late when the page was busy.)
+    const tick = e.tick.bind(engine);
+    e.tick = (...a: unknown[]) => { this.depth++; try { return tick(...a); } finally { this.depth--; } };
     // the lists a jump put on a cue (they keep their machines quiet): a set that tells
     const j = engine.jumped, add = j.add.bind(j), del = j.delete.bind(j), clear = j.clear.bind(j);
     j.add = (id: string) => { add(id); if (!this.depth) this.post({ t: 'jumped', op: 'add', id }); return j; };
@@ -120,13 +127,16 @@ export class OutputThread {
     const v: Partial<Inputs> = {};
     for (const k of ['grandMaster', 'blackout', 'bpm', 'sound', 'armed'] as const) if (engine[k] !== this.prev[k]) { (v as Record<string, unknown>)[k] = engine[k]; this.prev[k] = engine[k]; }
     for (const k of ['programmer', 'live', 'fxOver', 'overlay', 'groupMasters', 'heldSeed'] as const) {
-      // (the programmer's copy is the same object until it changes: nothing to compare then)
-      if (k === 'programmer') { if (engine.programmer === this.progRef) continue; this.progRef = engine.programmer; }
+      // (these are only ever replaced whole: the same object, nothing to compare. The live layer and
+      // the curves' knobs are made anew every frame: compared as text)
+      if (k !== 'live' && k !== 'fxOver') { if (engine[k] === this.refs[k]) continue; this.refs[k] = engine[k]; }
       const s = JSON.stringify(engine[k] ?? null);
       if (s !== this.prev[k]) { this.prev[k] = s; (v as Record<string, unknown>)[k] = engine[k] ? JSON.parse(s) : engine[k]; }
     }
     if (Object.keys(v).length) this.post({ t: 'inputs', v });
-    if (this.showDirty) this.flushShow(show);
+    // (a show changing at a fader's or a held key's pace goes over a few times a second: as text it's
+    // the whole show, made on the page and read on the thread. A command sends it first anyway.)
+    if (this.showDirty && t - this.showSentAt >= SHOW_EVERY_MS) { this.flushShow(show); this.showSentAt = t; }
     const pk = `${quiet}`;
     if (pk !== this.policyKey || blind !== this.blindSent) { this.policyKey = pk; this.blindSent = blind; this.post({ t: 'policy', quiet, blind: blind ? [...blind].map(([u, d]) => [u, d.slice()]) : null }); }
     this.boxesNow(bridges, t);
@@ -158,7 +168,8 @@ export class OutputThread {
   }
   // Does the thread send to this one (so the page mustn't: a late frame from the page would put an
   // older look back for a moment)? Link and the boxes with a channel, while the thread runs.
-  serves(b: Bridge) { return this.running && (b.host === LINK || this.boxes.get(b)?.mode === 'port'); }
+  // (Link: only once the thread's own socket to it is up; till then the page sends, as it did)
+  serves(b: Bridge) { return this.running && (b.host === LINK ? this.stats.link : this.boxes.get(b)?.mode === 'port'); }
 
   // The page is going: the thread stops sending at once (the page sends the safe look itself).
   final() { this.post({ t: 'final' }); this.w?.terminate(); this.w = null; }

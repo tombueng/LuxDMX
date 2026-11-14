@@ -1100,8 +1100,8 @@ class App {
     this.engine.overlay = this.testOverlay;      // (the channel wizard: under the machines' gate)
     // the timeline's curves: its effect bars' knobs where the song is (only while it plays; the same
     // object while nothing changes, so the output thread isn't told again)
-    const song = this.show.timeline, over = this.timeline.playing && song?.items.some((i) => i.curves) ? curvesAt(song.items, this.timeline.position) : NO_OVER;
-    if (JSON.stringify(over) !== JSON.stringify(this.engine.fxOver)) this.engine.fxOver = over;
+    const song = this.show.timeline;
+    this.engine.fxOver = this.timeline.playing && song?.items.some((i) => i.curves) ? curvesAt(song.items, this.timeline.position) : NO_OVER;
     // the output thread gets what changed (its own engine works out the frames that go out)
     // (blind with nothing frozen, a tab that started blind: the thread sends nothing either)
     const blindOut = this.output === 'live' ? null : this.blindFrames();
@@ -1110,7 +1110,10 @@ class App {
     const { frames, stage, look } = this.engine.tick();
     if (this.engine.armed) this.keepHeld();
     this.stageNow = stage;
-    load.outputSafe = this.thread.running;
+    // (nothing from this page reaches a box: the thread serves every one that's there, or nothing goes
+    // out; and how late the thread itself is)
+    load.outputSafe = this.quiet || (this.output !== 'live' && !blindOut) || this.bridges.every((b) => b.state !== 'ready' || this.thread.serves(b));
+    load.threadLate = this.thread.running && !this.thread.stats.quiet ? this.thread.stats.late : 0;
     // ---- the output first: nothing the screen does comes before it
     // A universe nothing drives any more (last fixture removed, wizard closed) gets zeros for a
     // couple of seconds, so the box doesn't keep showing the last value until its source timeout.
@@ -3097,7 +3100,9 @@ class App {
   }
   setFader(w: Widget, v: number) {
     if (w.type !== 'fader' || this.lockedOut(w)) return;
-    if (w.target === 'bpm' || w.target === 'effect') this.markDirty();
+    // (the tempo goes to the output thread as it is, not in the show: only a save then)
+    if (w.target === 'bpm') this.markDirty(350, false);
+    else if (w.target === 'effect') this.markDirty();
     v = Math.max(0, Math.min(1, v));
     if (w.target === 'grand') this.grandMaster = v;
     else if (w.target === 'bpm') this.show.settings.bpm = Math.round(40 + v * 160);
