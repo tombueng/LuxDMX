@@ -265,3 +265,26 @@ test('Aim at the theatre\'s cyc: the spot points there (not at the floor behind 
   await page.mouse.click(c.x, c.y);
   expect(await page.evaluate(() => (window as any).__stage3d.measure()?.a?.what)).toBe('the cyc');
 });
+
+test('Ctrl+Z in a light\'s Height field undoes the move (the light goes back), Ctrl+Shift+Z redoes it; while typing it\'s the field\'s own undo', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 1, 0, 'PAR');
+  await open3d(page);
+  await selectAll(page);
+  const h = page.locator('.s3 .sel').getByLabel('Height m', { exact: true });
+  const y = () => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].p3?.y);
+  const before = await y();
+  await h.fill('5'); await h.press('Enter');
+  await expect.poll(y).toBe(5);
+  await h.press('Control+z');
+  await expect.poll(y).toBe(before);
+  await expect(h).not.toHaveValue('5');
+  await h.press('Control+Shift+z');
+  await expect.poll(y).toBe(5);
+  await expect(h).toHaveValue('5');
+  // (typing, not sent yet: the field's own undo, the show untouched)
+  await h.fill('6');
+  await h.press('Control+z');
+  await expect(h).toHaveValue('5');
+  expect(await y()).toBe(5);
+});

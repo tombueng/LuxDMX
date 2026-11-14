@@ -6,6 +6,8 @@
   import { app } from '../app.svelte';
   import { tablist, ui, asPercent } from './ui.svelte';
   import NumField from './NumField.svelte';
+  import { fieldUndo } from './fieldUndo';
+  $effect(() => fieldUndo());
 
   // The dot blinks on every beat the microphone hears.
   async function takeOther() {

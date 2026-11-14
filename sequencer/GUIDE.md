@@ -649,7 +649,9 @@ Three more demos come with their own room on the 3D stage:
   a reload of that tab within a minute; a copy of the tab starts dark, and opening the app fresh
   puts back what was playing only within 3 hours (see "When the lights stop getting anything").
 - **Undo says what it undid** ("Undone: light “Par 3” removed"), and the last steps survive a
-  reload of the tab.
+  reload of the tab. Ctrl+Z works in a number field, a slider or a checkbox too (a light's
+  height, a fade time): the change is undone, the light goes back. Only while you're still typing
+  a number does Ctrl+Z undo your typing.
 - **Timeline** (top, next to Program and Live): a song and what happens on it. Load an mp3/wav/ogg
   (it stays in this browser, the show file only names it) or pick one under **Demo songs…**: real
   songs with vocals (39: rock'n'roll, techno, house, pop, hip-hop, rock/punk, metal, hard rock,
