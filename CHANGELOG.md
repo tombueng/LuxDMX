@@ -68,6 +68,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   lighting bars, booms in the wings, footlights, stalls and a full balcony) and a church (the
   chancel with altar, cross and choir, pews with the congregation, stained glass windows).
 - The gallery is in the ⋯ menu at the top and in the 3D stage's ⋯ now, not only behind Ctrl+K.
+- Small ones from a tester's round: pressing Edit on Live moves none of the bar's buttons, "open in
+  another tab" goes away when that tab is closed, Play the show on a phone opens on the 3D stage,
+  the lock PIN is kept as a hash (not readable in the show file), a tab opened from an on-stage
+  tab starts blind, the bar's guests stopped sitting with their arms crossed.
 - The templates play as shows: each has a song of its own (Band to hard rock, DJ / Party to house,
   the theatre to a pop number, and so on; any other can be picked) and **Play the show** runs its
   looks on that song's parts with the machines on the drops. DJ / Party moved into the club, DJ
@@ -76,8 +80,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   would (a concert on every chorus, a theatre only at the end, a bar chatting all along).
   The club and house party demos get theirs as well (they had hundreds of people and no sound).
 - Undo on a big show is quicker: it changes only what differs instead of swapping in the whole
-  show, so the screen redraws just that (the festival: 0.86 s frozen per undo, now 0.6, the same
-  as any edit there).
+  show, so the screen redraws just that (the festival: 0.86 s frozen per undo, now about 0.5). An
+  edit there redraws only the cue pictures it changed and works out the risk marks in one go
+  (0.56 s down to about 0.42; most of what's left is the show being written out to save it).
 - 3D: light lands on walls now, not only on the floor: wall washers and uplights paint the walls
   (the church between its windows, the cinema's side walls), a gobo shows on the theatre's cyc or
   the cinema's screen, a head pointed up lights the ceiling.
@@ -91,9 +96,11 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - 3D: **Measure** next to Aim: two clicks give the distance (across, up or down); one light gives
   its height above the deck or floor and where its beam lands, how far and how wide.
 - 3D: **Selected** next to the camera views flies the camera to the selected lights, and **Show it
-  in 3D** in a light's right-click menu opens the 3D stage and does the same.
+  in 3D** in a light's right-click menu opens the 3D stage and does the same. The camera finds a
+  clear spot (never inside the rows, the tables or the people; checked on every light of every
+  template).
 - A gallery, **What the 3D stage draws** (Ctrl+K "gallery", or from Add fixtures and the
-  welcome): 22 live tiles, gobos turning, prisms, heads in a fan, pixel bars, discs, winches,
+  welcome): 23 live tiles, uplights on a wall, gobos turning, prisms, heads in a fan, pixel bars, discs, winches,
   flames, sparks, confetti, CO2, fog with a light through it. The README has them as animations,
   made by the app itself (`tools/gallery/capture.mjs`).
 - One place to start a show: **New show…** in Shows opens the start dialog (Shows lost its own
