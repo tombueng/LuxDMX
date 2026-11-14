@@ -539,7 +539,12 @@ test('in Edit with nothing picked the hint is in the bar: not over the controls,
   await djShow(page);
   const spots = () => page.locator('.live .grid .cell').evaluateAll((els) => els.slice(0, 12).map((e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y + e.parentElement!.scrollTop)}`; }));
   const before = await spots();
+  // (and the bar's own buttons on the right: Edit becoming Done, Add coming, moved them all)
+  const barRight = () => page.locator('.live .bar > button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
+  const barBefore = await barRight();
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
+  expect(await barRight()).toEqual(barBefore);
+  await expect(page.locator('.live .bar').getByRole('button', { name: 'Add', exact: true })).toBeVisible();
   const hint = page.locator('.live .bar .ehint').filter({ hasText: 'to change it' });
   await expect(hint).toBeVisible();
   expect(await spots()).toEqual(before);                               // (pressing Edit moves nothing)

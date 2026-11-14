@@ -457,7 +457,7 @@
     <!-- (editing with nothing picked: what to do, here in the bar's free room: above the controls it
          pushed them all down as Edit was pressed, floating over them it covered some; on a phone,
          where the bar has no room, above the controls) -->
-    <span class="grow">{#if app.editPage && !selected && !narrow}<span class="ehint">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</span>{#if fresh.length}<button class="chip" onclick={addNew} title="New in the show, not on a page yet: {freshNames}">Add the {fresh.length} new here</button>{/if}{/if}</span>
+    <span class="grow">{#if app.editPage && !narrow}<button onclick={addMenu} aria-label="Add"><Icon name="plus" />Add</button>{/if}{#if app.editPage && !selected && !narrow}<span class="ehint">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</span>{#if fresh.length}<button class="chip" onclick={addNew} title="New in the show, not on a page yet: {freshNames}">Add the {fresh.length} new here</button>{/if}{/if}</span>
     {#if app.output === 'blind' && app.bridges.length}
       <!-- blind: said here too (on a phone the top bar only has a dot), one tap asks to go on stage -->
       <button class="chip nextup blind" onclick={() => void app.askOnStage()} title="Blind: you see it here, the lights don't get it. Click to send it to the stage.">
@@ -536,8 +536,10 @@
         <Icon name={page.locked ? 'lock' : 'unlock'} /></button>
     {/if}
     {#if !narrow}<button class="ghost" onclick={full} title="Full screen" aria-label="Full screen"><Icon name="live" /></button>{/if}
-    {#if app.editPage}<button onclick={addMenu} aria-label="Add"><Icon name="plus" />{#if !narrow}Add{/if}</button>{/if}
-    {#if !app.locked}<button class:on={app.editPage} onclick={edit}><Icon name="edit" />{app.editPage ? 'Done' : 'Edit'}</button>{/if}
+    <!-- (on a phone Add sits by Done; elsewhere it's in the bar's free room with the hint, so pressing
+         Edit moves none of the buttons on the right) -->
+    {#if app.editPage && narrow}<button onclick={addMenu} aria-label="Add"><Icon name="plus" /></button>{/if}
+    {#if !app.locked}<button class="editbtn" class:on={app.editPage} onclick={edit}><Icon name="edit" />{app.editPage ? 'Done' : 'Edit'}</button>{/if}
   </div>
 
   {#if built}<GoStrip />{/if}
@@ -608,6 +610,7 @@
   .float.left { right: auto; left: 0; }
   .pick.inflow { grid-column: 1 / -1; margin: 0; }
   .grow { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+  .editbtn { min-width: 5.4rem; justify-content: center; }     /* (Edit and Done the same width: nothing next to it moves) */
   .ehint { color: var(--muted); font-size: .82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ehint :global(b) { color: var(--text); }
   .stagebox { min-height: 0; display: flex; align-self: start; height: min(62vh, 460px); }
