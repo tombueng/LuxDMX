@@ -64,29 +64,30 @@ const BAR_PLACES: Table = {
 // ---- the theatre: the front-of-house bar, the electrics over the stage, the cyc bar, booms in the
 // wings, footlights on the apron, a ground row before the cyc
 const Th = THEATRE, hang = (y: number) => y - TRUSS_HANG;
+const E = Th.electrics, FOH = Th.foh, cycE = E[E.length - 1];
 const THEATRE_PLACES: Table = {
-  // (the front-of-house bar is out over the stalls: on the plan it's at the front edge, a gap in its
-  // middle where the plan says "audience")
-  Front: (i, n) => { const x = n === 6 ? [-5.2, -3.6, -2.0, 2.0, 3.6, 5.2][i] : spread(i, n, -5, 5); return aim({ x, y: hang(10.4), z: 8.4 }, { x: x * 0.5, y: DECK + 1.6, z: 0.5 }); },
-  Cyc: (i, n) => { const x = spread(i, n, -5.25, 5.25); return aim({ x, y: hang(9.0), z: -4.8 }, { x, y: DECK + 3.5, z: Th.cycZ }); },
+  // (the front-of-house bar out over the stalls: on the plan out in the house, in front of the stage)
+  Front: (i, n) => { const x = n === 6 ? [-7.5, -5, -2.5, 2.5, 5, 7.5][i] : spread(i, n, -7.5, 7.5); return aim({ x, y: hang(FOH.y), z: FOH.z }, { x: x * 0.5, y: DECK + 1.6, z: 0 }); },
+  Cyc: (i, n) => { const x = spread(i, n, -8.5, 8.5); return aim({ x, y: hang(cycE.y), z: cycE.z }, { x, y: DECK + 6, z: Th.cycZ }); },
   // (over the stalls, behind the front-of-house bar)
-  House: (i) => { const x = i ? 4 : -4; return aim({ x, y: Th.ceiling - 0.4, z: 11.5 }, { x, y: 0, z: 11.7 }); },
-  Boom: (i) => { const sx = i < 2 ? -1 : 1, low = i % 2 === 1, z = low ? 1.0 : -1.2, x = sx * 7.2, y = DECK + (low ? 1.4 : 2.6); return aim({ x, y, z }, { x: -sx * 1.5, y: DECK + 1.4, z }); },
-  Special: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: hang(7.8), z: -0.2 }, { x: x * 0.6, y: DECK, z: -1.5 }); },
-  Spot: (i, n) => hung({ x: spread(i, n, -4.5, 4.5), y: hang(7.8), z: -2.6 }),
-  Wash: (i, n) => hung({ x: [-6, -3, 3, 6][i] ?? spread(i, n, -6, 6), y: hang(7.8), z: -0.2 }),
-  Footlight: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: DECK, z: Th.stage.z1 - 0.15 }, { x, y: DECK + 1.8, z: 0 }); },
-  'Ground row': (i, n) => { const x = spread(i, n, -4, 4); return aim({ x, y: DECK, z: Th.cycZ + 0.5 }, { x, y: DECK + 5, z: Th.cycZ }); },
-  Lightning: () => aim({ x: 0, y: hang(9.0), z: -4.8 }, { x: 0, y: DECK + 4, z: Th.cycZ }),
-  Blinder: (i) => { const sx = i ? 1 : -1; return aim({ x: sx * 6.5, y: DECK + 5, z: Th.arch.z + 0.45 }, { x: sx * 3, y: 2, z: 12 }); },
-  Fog: () => stand({ x: -6.5, y: DECK, z: -3.5 }, 90),
-  Hazer: () => stand({ x: 6.5, y: DECK, z: -4.5 }, -90),
-  Confetti: () => stand({ x: 0, y: DECK, z: 3.0 }),
+  House: (i, n) => { const x = spread(i, n, -6, 6); return aim({ x, y: Th.ceiling - 0.4, z: 14 }, { x, y: 0, z: 14.2 }); },
+  Boom: (i) => { const sx = i < 2 ? -1 : 1, low = i % 2 === 1, z = Th.booms.z[low ? 1 : 0], x = sx * Th.booms.x, y = DECK + (low ? 1.6 : 3.4); return aim({ x, y, z }, { x: -sx * 2, y: DECK + 1.6, z }); },
+  Special: (i, n) => { const x = spread(i, n, -6, 6); return aim({ x, y: hang(E[0].y), z: E[0].z }, { x: x * 0.6, y: DECK, z: -2.5 }); },
+  Spot: (i, n) => hung({ x: spread(i, n, -7, 7), y: hang(E[1].y), z: E[1].z }),
+  Wash: (i, n) => hung({ x: [-9, -4.5, 4.5, 9][i] ?? spread(i, n, -9, 9), y: hang(E[2].y), z: E[2].z }),
+  Footlight: (i, n) => { const x = spread(i, n, -7, 7); return aim({ x, y: DECK, z: Th.stage.z1 - 0.15 }, { x, y: DECK + 1.8, z: 0 }); },
+  'Ground row': (i, n) => { const x = spread(i, n, -8, 8); return aim({ x, y: DECK, z: Th.cycZ + 0.6 }, { x, y: DECK + 8, z: Th.cycZ }); },
+  Lightning: () => aim({ x: 0, y: hang(cycE.y), z: cycE.z }, { x: 0, y: DECK + 7, z: Th.cycZ }),
+  // (on the proscenium, either side of the opening, turned out to the audience)
+  Blinder: (i) => { const sx = i ? 1 : -1; return aim({ x: sx * (Th.arch.w / 2 - 0.6), y: DECK + 7, z: Th.arch.z + 0.45 }, { x: sx * 4, y: 2, z: 16 }); },
+  Fog: () => stand({ x: -9, y: DECK, z: -6 }, 90),
+  Hazer: () => stand({ x: 12, y: DECK, z: -9.5 }, -90),
+  Confetti: () => stand({ x: 0, y: DECK, z: 3.2 }),
   // (the machines apart from the booms and each other: on the plan they sat on top of them)
-  CO2: () => stand({ x: -5.8, y: DECK, z: -2.4 }),
-  Sparks: (i) => stand({ x: i ? 5.5 : -5.5, y: DECK, z: 3.1 }),
-  Flame: (i) => stand({ x: i ? 3 : -3, y: DECK, z: -4.2 }),
-  Bubbles: () => stand({ x: 5.8, y: DECK, z: -2.4 }, -30),
+  CO2: () => stand({ x: -9.5, y: DECK, z: -4.6 }),
+  Sparks: (i) => stand({ x: i ? 8 : -8, y: DECK, z: 3.2 }),
+  Flame: (i) => stand({ x: i ? 5 : -5, y: DECK, z: -9.5 }),
+  Bubbles: () => stand({ x: 9.5, y: DECK, z: -4.6 }, -30),
 };
 
 // ---- the church: hung from the roof's beams (over the chancel, over the nave), uplights on the walls

@@ -266,7 +266,7 @@ export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
   add(box(2 * dx, 0.05, 0.04, gold), 0, DECK - 0.03, z1 + 0.01);
   // (a cyc in a dark theatre is dark until it's lit: grey, so the light's colour is what you see, a
   // deep blue deep, not a pale lavender over a white cloth)
-  add(new THREE.Mesh(new THREE.PlaneGeometry(14, 8.4), std({ color: 0x5c6068, roughness: 0.95 })), 0, DECK + 4.2, T.cycZ);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(T.cyc.w, T.cyc.h), std({ color: 0x5c6068, roughness: 0.95 })), 0, DECK + T.cyc.h / 2, T.cycZ);
   // the proscenium: a deep frame round the opening, gold mouldings; the house curtain gathered at
   // the sides, its valance across the top; black legs in the wings
   const aw = T.arch.w, ah = T.arch.h, az = T.arch.z, side = X - aw / 2;
@@ -278,9 +278,9 @@ export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
     add(box(side, H, 0.8, creamA), sx * (aw / 2 + side / 2), H / 2, az);
     add(box(0.14, ah, 0.86, gold), sx * (aw / 2 + 0.07), DECK + ah / 2, az);
     add(box(1.1, ah, 0.4, velvet), sx * (aw / 2 - 0.5), DECK + ah / 2, az - 0.5);
-    for (const z of [-1.2, -3.6]) add(box(1.4, ah + 1, 0.1, M.black), sx * (aw / 2 - 0.3), DECK + (ah + 1) / 2, z);
+    for (const z of T.legs) add(box(2.2, ah + 2, 0.1, M.black), sx * (aw / 2 - 0.2), DECK + (ah + 2) / 2, z);
     // the booms in the wings: a pipe on a base plate each (their lights clamped on, scenePlaces.ts)
-    for (const z of [-1.2, 1.0]) { add(cyl(0.025, 0.025, 3.2, M.black, 8), sx * 7.2, DECK + 1.6, z); add(cyl(0.22, 0.22, 0.03, M.black, 16), sx * 7.2, DECK + 0.015, z); }
+    for (const z of T.booms.z) { add(cyl(0.03, 0.03, 4.2, M.black, 8), sx * T.booms.x, DECK + 2.1, z); add(cyl(0.25, 0.25, 0.03, M.black, 16), sx * T.booms.x, DECK + 0.015, z); }
   }
   add(box(aw, H - DECK - ah, 0.8, creamA), 0, DECK + ah + (H - DECK - ah) / 2, az);
   add(box(aw + 0.28, 0.16, 0.86, goldA), 0, DECK + ah + 0.08, az);
@@ -304,8 +304,9 @@ export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
   for (const sx of [-1, 1]) for (const z of [Bc.z0 + 1, Bc.z0 + 5]) add(cyl(0.18, 0.2, by, cream, 16), sx * (X - 2.4), by / 2, z);
   // a chandelier in the middle of the ceiling
   const glow = new THREE.MeshBasicMaterial({ color: 0xffd9a0, toneMapped: false });
-  add(cyl(0.01, 0.01, 1.6, gold, 4), 0, H - 0.8, 9); add(cyl(0.9, 0.3, 0.5, gold, 20), 0, H - 1.8, 9);
-  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; add(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), glow), Math.cos(a) * 0.95, H - 1.55, 9 + Math.sin(a) * 0.95); }
+  const cz = (T.stalls.z0 + T.balcony.z0) / 2;
+  add(cyl(0.01, 0.01, 2.4, gold, 4), 0, H - 1.2, cz); add(cyl(1.4, 0.4, 0.7, gold, 24), 0, H - 2.7, cz);
+  for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2; add(new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), glow), Math.cos(a) * 1.45, H - 2.4, cz + Math.sin(a) * 1.45); }
   return { animate: () => {} };
 }
 

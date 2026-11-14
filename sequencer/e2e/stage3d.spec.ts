@@ -250,7 +250,7 @@ test('Aim at the theatre\'s cyc: the spot points there (not at the floor behind 
     await cam.getByRole('button', { name: view, exact: true }).click();
     await page.waitForTimeout(1500);
     await s3.getByRole('button', { name: 'Aim', exact: true }).click();
-    const spot = { x: 0.6, y: 4.2, z: -5.69 };                                  // (on the cyc, a little off centre)
+    const spot = { x: 1.5, y: 6, z: -13.29 };                                  // (on the cyc, a little off centre)
     const xy = await page.evaluate((p) => (window as any).__stage3d.screenOfPoint(p), spot);
     await page.mouse.click(xy.x, xy.y);
     await expect.poll(() => page.evaluate((p) => (window as any).__stage3d.aimError(p), spot), { timeout: 5000, message: view }).toBeLessThan(0.15);
@@ -261,7 +261,7 @@ test('Aim at the theatre\'s cyc: the spot points there (not at the floor behind 
   const inRow = s3.locator('.tools').getByRole('button', { name: 'Measure', exact: true });
   if (await inRow.count()) await inRow.click();
   else { await s3.getByRole('button', { name: 'More', exact: true }).click(); await s3.getByRole('group', { name: 'More for the 3D stage' }).getByRole('button', { name: 'Measure', exact: true }).click(); }
-  const c = await page.evaluate(() => (window as any).__stage3d.screenOfPoint({ x: -2, y: 5, z: -5.69 }));
+  const c = await page.evaluate(() => (window as any).__stage3d.screenOfPoint({ x: -3, y: 7, z: -13.29 }));
   await page.mouse.click(c.x, c.y);
   expect(await page.evaluate(() => (window as any).__stage3d.measure()?.a?.what)).toBe('the cyc');
 });

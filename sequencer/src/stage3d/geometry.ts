@@ -11,7 +11,7 @@
 // then pitch about x, then roll about z (hanging = roll 180: up is down, front still the audience).
 import type { Fixture } from '../model/types';
 import type { FixtureKind } from '../model/library';
-import { cinemaFloor, theatreFloor } from './sceneSizes';
+import { THEATRE, cinemaFloor, theatreFloor } from './sceneSizes';
 
 export const W = 14, D = 9, DECK = 1.2;
 export const TRUSS = [{ z: -3.3, y: 8.2 }, { z: 0, y: 7.6 }, { z: 3.4, y: 7.0 }];   // back, mid, front (bottom chord heights)
@@ -145,12 +145,13 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   theatre: {
     // (the plan: the stage and the stalls, the front-of-house bar and the house lights out over them;
     // the balcony at the back is left off, the stage would be a sliver)
-    id: 'theatre', W: 18, D: 19.4, zc: 3.3, truss: [{ z: -4.8, y: 9.0 }, { z: -2.6, y: 7.8 }, { z: -0.2, y: 7.8 }, { z: 8.4, y: 10.4 }], deck: { x: 8, z0: -6, z1: 3.4 }, ceiling: 12,
-    band: { x: 7, z0: -6, z1: 3.4 }, walls: { x: 11, z0: -6.4, z1: 21 }, screens: [{ z: -5.7, x: 7, y0: DECK, y1: DECK + 8.4 }],
+    id: 'theatre', W: 30, D: 33, zc: 1,
+    truss: [...THEATRE.electrics.map((e) => ({ z: e.z, y: e.y })), { z: THEATRE.foh.z, y: THEATRE.foh.y }], deck: { x: THEATRE.stage.x, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, ceiling: THEATRE.ceiling,
+    band: { x: 12, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, walls: { x: THEATRE.wallX, z0: THEATRE.stage.z0 - 0.4, z1: THEATRE.backZ }, screens: [{ z: THEATRE.cycZ, x: THEATRE.cyc.w / 2, y0: DECK, y1: DECK + THEATRE.cyc.h }],
     floor: (_x, z) => theatreFloor(z),
-    frame: [span(7.4, 9.0, -4.8), span(7.4, 7.8, -2.6), span(7.4, 7.8, -0.2), span(8.4, 10.4, 8.4)],
-    views: { front: { pos: [0, 8.8, 19.6], at: [0, 4, -1] }, foh: { pos: [2.8, 3.4, 11], at: [0, 3.4, -1] }, side: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1] }, top: { pos: [0, 30, 1.01], at: [0, 0, 1] }, band: { pos: [0, 2.9, -3.5], at: [0, 3.5, 14] } },
-    tour: { rx: 7.5, rz: 6, z0: 6, y: 3.6, dy: 0.3, at: [0, 3.6, -1] },
+    frame: [...THEATRE.electrics.map((e) => span(12, e.y, e.z)), span(12, THEATRE.foh.y, THEATRE.foh.z)],
+    views: { front: { pos: [0, 11.5, 25], at: [0, 5, -4] }, foh: { pos: [4, 4.4, 14.5], at: [0, 5, -4] }, side: { pos: [-14, 11, 16], at: [0, 4.5, -4] }, top: { pos: [0, 44, -4.01], at: [0, 0, -4] }, band: { pos: [0, 3.4, -8], at: [0, 4.5, 20] } },
+    tour: { rx: 11, rz: 9, z0: 7, y: 4.8, dy: 0.4, at: [0, 4.8, -4] },
   },
   // a church (scenes.ts buildChurch): the chancel is the deck; the plan is the whole church, wall to
   // wall, the chancel at its top (its lights are all over it: over the nave, on the walls); the lights

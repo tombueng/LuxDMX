@@ -99,7 +99,7 @@ export const CROWDS: Partial<Record<RoomId, CrowdArea>> = {
   // bar's dance floor
   cinema: { z0: 4.2, z1: 7.4, half: () => 9.6, top: 2.3 },
   bar: { z0: 2.6, z1: 7.2, half: () => 3.6, top: 1.9 },
-  theatre: { z0: 4.4, z1: 8.4, half: () => 10, top: 2.0 },
+  theatre: { z0: 5, z1: 9, half: () => 14.5, top: 2.0 },
   church: { z0: 1.0, z1: 8.5, half: () => 7.4, top: 1.6 },
   ballroom: { z0: 3.0, z1: 10.0, half: () => 4, top: 1.9 },
 };
@@ -136,8 +136,8 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
   // the cinema's rows, three at a time, up to the heads of the audience in them (scenes.ts CINEMA)
   cinema: [0, 1, 2, 3, 4, 5].map((k) => bx(-10.6, 10.6, 0, (3 * k + 3) * 0.32 + 1.3, 4.2 + 3 * k * 1.05, 4.2 + (3 * k + 3) * 1.05, 'the rows')),
   // the theatre: its stalls four rows at a time, the balcony, the proscenium's walls round the opening
-  theatre: [...[0, 1, 2, 3].map((k) => bx(-11, 11, 0, (4 * k + 4) * 0.16 + 1.3, 4.4 + 4 * k, 8.4 + 4 * k, 'the stalls')), bx(-11, 11, 4.2, 8.7, 12.6, 21, 'the balcony'),
-    bx(-11, -6, 0, 12, 1.8, 2.6, 'the proscenium'), bx(6, 11, 0, 12, 1.8, 2.6, 'the proscenium'), bx(-6, 6, 8.7, 12, 1.8, 2.6, 'the proscenium')],
+  theatre: [...[0, 1, 2, 3].map((k) => bx(-16, 16, 0, (4 * k + 4) * 0.16 + 1.3, 5 + 4 * k, 9 + 4 * k, 'the stalls')), bx(-16, 16, 5.0, 9.7, 15.5, 26, 'the balcony'),
+    bx(-16, -9, 0, 20, 1.8, 2.6, 'the proscenium'), bx(9, 16, 0, 20, 1.8, 2.6, 'the proscenium'), bx(-9, 9, 11.2, 20, 1.8, 2.6, 'the proscenium')],
   // the church: its pews six rows at a time, the altar, the choir benches, the lectern
   church: [...[0, 1, 2].map((k) => bx(-7.6, 7.6, 0, 1.75, 1.0 + 6.3 * k, 7.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
     bx(-5.2, -3.6, 0, 2.2, -6.5, -2.7, 'the choir'), bx(3.6, 5.2, 0, 2.2, -6.5, -2.7, 'the choir'), bx(-4.6, -3.8, 0, 2.6, -2.8, -2.0, 'the lectern')],
@@ -387,19 +387,19 @@ export const CREW: Partial<Record<RoomId, Crew>> = {
   // the theatre: from the stalls (under the balcony's front), its front corner, the front of the
   // stalls; the audience from the stage
   theatre: {
-    wide: { pos: [0, 3.4, 11.6], at: [0, 3.6, -1], fov: 32, pan: [1.4, 0, 0], zoom: 0.8 },
-    high: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1], fov: 36, move: [2, 0, 0] },
-    ...side({ pos: [-6.6, 3.2, 3.8], at: [-1.0, 3.0, -1], fov: 32, move: [0.8, 0, -0.2], pan: [0.8, 0, 0], shake: 0.025 }),
-    crowd: { pos: [-2.0, 3.1, 9.6], at: [0, 3.2, -1], fov: 34, move: [1.0, 0, 0.6], pan: [0.8, 0, 0], shake: 0.02 },
-    front: { pos: [-8.6, 3.6, 7.5], at: [0, 3.6, -0.5], fov: 40, move: [1.5, 0, 0], pan: [0.8, 0, 0] },
-    back: { pos: [2.0, 3.6, -3.5], at: [0, 2.2, 7], fov: 50, move: [-2.4, 0, 0], pan: [-2, 0, 0] },
-    pit: { z: 3.9, y: 2.3, x: 3 },
-    crane: { pivot: [-8.0, 1.8, 3.9], a: [-3.0, 3.6, 7.0], b: [-1.0, 3.0, 3.8], rise: 0.3, lookA: [0, 2.0, 5.5], lookB: [0, 3.4, -1.0], period: 32 },
+    wide: { pos: [0, 4.2, 14], at: [0, 4.8, -4], fov: 34, pan: [2, 0, 0], zoom: 0.8 },
+    high: { pos: [-13, 11, 15], at: [0, 4.2, -4], fov: 38, move: [3, 0, 0] },
+    ...side({ pos: [-9.5, 3.6, 3.3], at: [-1.5, 3.4, -3], fov: 34, move: [1.0, 0, -0.2], pan: [1.0, 0, 0], shake: 0.025 }),
+    crowd: { pos: [-3.0, 3.4, 11.5], at: [0, 4.0, -4], fov: 36, move: [1.4, 0, 0.6], pan: [1.0, 0, 0], shake: 0.02 },
+    front: { pos: [-12.5, 4.4, 8], at: [0, 4.4, -2], fov: 42, move: [2, 0, 0], pan: [1, 0, 0] },
+    back: { pos: [2.5, 4.2, -6], at: [0, 2.6, 10], fov: 52, move: [-3, 0, 0], pan: [-2.5, 0, 0] },
+    pit: { z: 4.3, y: 2.3, x: 4 },
+    crane: { pivot: [-11, 1.8, 4.3], a: [-4.0, 4.4, 8.0], b: [-1.5, 3.6, 4.3], rise: 0.4, lookA: [0, 2.4, 7], lookB: [0, 4.2, -3], period: 32 },
     walk: {
-      y: 1.65, way: [[-5.6, 3.8], [-2.8, 3.72], [0, 3.76], [2.8, 3.72], [5.6, 3.8]],
-      look: [[-5.0, 3.2, -1], [-2.5, 3.3, -1], [0, 3.4, -1], [2.5, 3.3, -1], [5.0, 3.2, -1]],
+      y: 1.65, way: [[-8, 4.3], [-4, 4.22], [0, 4.25], [4, 4.22], [8, 4.3]],
+      look: [[-7, 3.8, -3], [-3.5, 4.0, -3], [0, 4.2, -3], [3.5, 4.0, -3], [7, 3.8, -3]],
     },
-    drone: { zc: 6, rx: 7, rz: 5.5, y: 3.5, bob: 0.12, arc: 0.8, gate: 3.4, near: [1.5, 3.0, 3.9], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 3.2, -1], lookNear: [0, 3.4, -1] },
+    drone: { zc: 7.5, rx: 9, rz: 6.5, y: 4.6, bob: 0.12, arc: 0.8, gate: 4.4, near: [2, 3.6, 4.3], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 4, -3], lookNear: [0, 4.2, -3] },
   },
   // the church: from the back of the nave, high over the pews, the side aisle, the central aisle;
   // the congregation from behind the altar

@@ -163,13 +163,16 @@ describe('the theatre from above', () => {
     const v = room('theatre'), r = ROOMS.theatre, cam = V(...r.views.top.pos);
     v.group.updateMatrixWorld(true);
     const ray = new THREE.Raycaster();
-    for (const x of [-4, 0, 4]) for (const z of [-4, 0, 2.2, 2.8]) {
-      const p = V(x, 1.2, z), d = p.clone().sub(cam), far = d.length() - 0.05;
+    // (the deck, and over the front rows of the stalls: past the proscenium's header from up there)
+    for (const [x, y, z] of [[-4, 1.2, -4], [0, 1.2, 0], [4, 1.2, 2.2], [0, 1.2, 3.3], [0, 3.5, 6], [-4, 3.5, 5.5], [4, 3.5, 5.5]]) {
+      const p = V(x, y, z), d = p.clone().sub(cam), far = d.length() - 0.05;
       ray.set(cam, d.normalize()); ray.far = far;
       const hits = ray.intersectObject(v.group, true).filter((h) => {
         const m = (h.object as THREE.Mesh).material as THREE.Material | THREE.Material[];
         const mat = Array.isArray(m) ? m[(h.face?.materialIndex ?? 0)] : m;
         if (!mat?.visible || (mat.transparent && mat.opacity < 0.5)) return false;
+        // (the bars over the stage are seen from above, as they should be: not what's checked here)
+        if (r.truss.some((t) => Math.abs(h.point.y - (t.y + 0.2)) < 0.7 && Math.abs(h.point.z - t.z) < 0.6)) return false;
         return !(typeof mat.userData.hideAbove === 'number' && cam.y > mat.userData.hideAbove);
       });
       expect(hits.map((h) => h.object.name || h.object.type), `${x}, ${z}`).toEqual([]);

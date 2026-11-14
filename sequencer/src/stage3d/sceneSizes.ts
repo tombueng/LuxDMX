@@ -18,12 +18,17 @@ export const BAR = {
   dance: { x: 3.6, z0: 2.6, z1: 7.2 }, ball: { x: -3.2, y: 3.2, z: 3.6 }, rail: 3.55, ceiling: 3.9,
 };
 
-// a theatre: the stage behind the proscenium (z 2.2), its apron in front; the stalls rising gently,
-// a balcony over their back half
+// a theatre: a big stage behind the proscenium (z 2.2: an 18 m opening, 16 m deep behind it, wide
+// wings), its apron in front; the stalls rising gently, a balcony over their back half; a fly
+// tower over the stage (the ceiling at 20 m), so drops can fly out of sight
 export const THEATRE = {
-  arch: { z: 2.2, w: 12, h: 7.5 }, stage: { x: 8, z0: -6, z1: 3.4 }, cycZ: -5.7,
-  stalls: { z0: 4.4, rows: 13, d: 1.0, rise: 0.16 }, balcony: { z0: 12.6, y: 4.6, rows: 7, d: 1.05, rise: 0.38 },
-  wallX: 11, backZ: 21, ceiling: 12,
+  arch: { z: 2.2, w: 18, h: 10 }, stage: { x: 14, z0: -14, z1: 3.6 }, cycZ: -13.3, cyc: { w: 22, h: 13 },
+  stalls: { z0: 5, rows: 16, d: 1.0, rise: 0.16 }, balcony: { z0: 15.5, y: 5.4, rows: 8, d: 1.05, rise: 0.38 },
+  wallX: 16, backZ: 26, ceiling: 20,
+  // the electrics over the stage (front to back) and the front-of-house bar over the stalls
+  electrics: [{ z: 0.8, y: 11.2 }, { z: -3.5, y: 11.2 }, { z: -7.5, y: 11.8 }, { z: -11.5, y: 12.6 }], foh: { z: 11, y: 13 },
+  // the booms in the wings (either side, two each), the black legs masking them
+  booms: { x: 10.8, z: [-2.4, 1.0] }, legs: [-2.4, -6, -10],
 };
 // the floor of the stalls at z (gently raked)
 export function theatreFloor(z: number) {
