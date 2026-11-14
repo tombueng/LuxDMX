@@ -2,7 +2,7 @@
 // it's on, its fader value. Worked out in one place, so the live page and a phone used as a remote
 // (which only ever gets these, never the show) draw the same tile.
 import type { Widget } from '../model/types';
-import { cueRiskOf, listRiskOf } from './risk';
+import { cueMarkOf, listMarkOf } from './risk';
 import { clockOf, songIndex, songName, songsOf } from '../model/timeline';
 import { partAfter, partsOf } from '../timeline/gig';
 import type { app as theApp } from '../app.svelte';
@@ -26,7 +26,7 @@ export interface Face {
   fader?: { v: number; text: string };
   burst?: number;                 // fog: seconds of the burst button next to it
   fx?: { kind: string; params: Record<string, unknown>; bpm: number };   // an effect's preview
-  risk?: 'once' | 'hazard';       // it fires confetti (once) or flames, sparks or CO2 (model/safety.ts)
+  risk?: 'once' | 'hazard' | 'winch';  // it fires confetti (once), flames, sparks or CO2, or moves a winch (ui/risk.ts)
   safe?: boolean;                 // on, but the machines aren't armed: nothing fires (it lit up as if it did)
 }
 
@@ -146,7 +146,7 @@ export function widgetFace(app: App, w: Widget, manyLists = false, now = perform
   if (w.type === 'fog' && !on) face.burst = Math.min(w.burst, w.max);
   if (w.type === 'effect' && fx) face.fx = { kind: fx.kind, params: fx.params, bpm: app.bpm };
   // what it sets off, marked on the tile: a cue's own values and the lists it plays, a list's cues
-  const risk = cue ? cueRiskOf(app.show, cue, app.showRev) : list && (w.type === 'cuelist' || (w.type === 'list' && w.action !== 'select' && w.action !== 'release')) ? listRiskOf(app.show, list, app.showRev) : 'light';
-  if (risk === 'once' || risk === 'hazard') { face.risk = risk; if (face.on && !app.sfxArmed) face.safe = true; }
+  const risk = cue ? cueMarkOf(app.show, cue, app.showRev) : list && (w.type === 'cuelist' || (w.type === 'list' && w.action !== 'select' && w.action !== 'release')) ? listMarkOf(app.show, list, app.showRev) : '';
+  if (risk) { face.risk = risk; if (face.on && !app.sfxArmed) face.safe = true; }
   return face;
 }

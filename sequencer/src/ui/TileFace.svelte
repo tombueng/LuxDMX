@@ -7,6 +7,7 @@
   import Icon from './Icon.svelte';
   import type { Face } from './widgetFace';
   import { spaceIsGo } from './ui.svelte';
+  import { MARK_TITLE } from '../model/safety';
 
   let { face, pic = '', swatch, editing = false, selected = false, onfire, onfader, faderNow, onburst, onselect, onmenu }: {
     face: Face; pic?: string; swatch?: string[]; editing?: boolean; selected?: boolean;
@@ -153,7 +154,8 @@
     <span class="t">{face.label}</span>
     {#if face.safe}<span class="sub safe-note">Safe: not firing</span>{:else if face.sub}<span class="sub">{face.sub}</span>{/if}
     {#if face.bar !== undefined}<span class="bar"><span style="width:{Math.max(0, Math.min(1, face.bar)) * 100}%"></span></span>{/if}
-    {#if face.risk === 'hazard'}<span class="risk hazard" title="Fires a machine (flames, sparks or CO2): only while armed"><Icon name="warn" size={12} /><span class="sr">fires a machine</span></span>
+    {#if face.risk === 'hazard'}<span class="risk hazard" title={MARK_TITLE.hazard}><Icon name="warn" size={12} /><span class="sr">fires a machine</span></span>
+    {:else if face.risk === 'winch'}<span class="risk winch" title={MARK_TITLE.winch}>⇅<span class="sr">moves a winch</span></span>
     {:else if face.risk === 'once'}<span class="risk once" title="Fires confetti (once): only while armed">1×<span class="sr">fires once</span></span>{/if}
     {#if face.key}<span class="key">{face.key}</span>{/if}
   </button>

@@ -59,10 +59,11 @@ export function enableValue(ranges?: { from: number; to: number; label: string }
 }
 
 const ORDER: Risk[] = ['light', 'atmosphere', 'once', 'hazard'];
-// the most serious of a fixture's attributes
-export function riskOf(attrs: Iterable<string>): Risk {
+// the most serious of a fixture's attributes (`still`: leaving out what moves a winch, to tell a
+// cue that only moves scenery from one that fires a machine: the marks say which)
+export function riskOf(attrs: Iterable<string>, still = false): Risk {
   let r: Risk = 'light';
-  for (const a of attrs) { const x = ATTR_RISK[a as ChannelAttr]; if (x && ORDER.indexOf(x) > ORDER.indexOf(r)) r = x; }
+  for (const a of attrs) { if (still && isHeld(a)) continue; const x = ATTR_RISK[a as ChannelAttr]; if (x && ORDER.indexOf(x) > ORDER.indexOf(r)) r = x; }
   return r;
 }
 const worse = (a: Risk, b: Risk): Risk => (ORDER.indexOf(b) > ORDER.indexOf(a) ? b : a);
@@ -74,27 +75,37 @@ const worse = (a: Risk, b: Risk): Risk => (ORDER.indexOf(b) > ORDER.indexOf(a) ?
 // `channel`: what one of a fixture's channels fires, by number (a cue's raw values: "channel 1 at
 // 255" on a flame projector is its fire)
 export interface MachineOf { (fixtureId: string): Risk | undefined; channel?: (fixtureId: string, ch: number) => Risk | undefined }
-export function cueRisk(show: Pick<Show, 'cueLists'>, cue: Pick<Cue, 'values' | 'actions'>, seen = new Set<string>(), machineOf?: MachineOf): Risk {
+export function cueRisk(show: Pick<Show, 'cueLists'>, cue: Pick<Cue, 'values' | 'actions'>, seen = new Set<string>(), machineOf?: MachineOf, still = false): Risk {
   let r: Risk = 'light';
   for (const [fid, v] of Object.entries(cue.values ?? {})) {
-    r = worse(r, riskOf(Object.keys(v ?? {})));
+    r = worse(r, riskOf(Object.keys(v ?? {}), still));
     // (one of several winches moved by a cell of its own)
-    for (const c of Object.values(v?.cells ?? {})) if (c) r = worse(r, riskOf(Object.keys(c)));
+    for (const c of Object.values(v?.cells ?? {})) if (c) r = worse(r, riskOf(Object.keys(c), still));
     if (machineOf && v && MACHINE_PROGRAMS.some((k) => (v as Record<string, unknown>)[k] !== undefined)) { const m = machineOf(fid); if (m) r = worse(r, m); }
     if (machineOf?.channel && v?.raw) for (const [ch, x] of Object.entries(v.raw)) { if (!(Number(x) > 0)) continue; const c = machineOf.channel(fid, +ch); if (c) r = worse(r, c); }
   }
-  for (const a of cue.actions ?? []) r = worse(r, actionRisk(show, a, seen, machineOf));
+  for (const a of cue.actions ?? []) r = worse(r, actionRisk(show, a, seen, machineOf, still));
   return r;
 }
-export function actionRisk(show: Pick<Show, 'cueLists'>, a: CueAction, seen = new Set<string>(), machineOf?: MachineOf): Risk {
+export function actionRisk(show: Pick<Show, 'cueLists'>, a: CueAction, seen = new Set<string>(), machineOf?: MachineOf, still = false): Risk {
   if (a.do !== 'start' && a.do !== 'go' && a.do !== 'goto') return 'light';
   const l = show.cueLists.find((x) => x.id === a.list);
   if (!l || seen.has(l.id)) return 'light';
   seen.add(l.id);
   const cues = a.do === 'goto' ? l.cues.filter((c) => c.id === a.cue) : l.cues;
-  return cues.reduce<Risk>((r, c) => worse(r, cueRisk(show, c, seen, machineOf)), 'light');
+  return cues.reduce<Risk>((r, c) => worse(r, cueRisk(show, c, seen, machineOf, still)), 'light');
 }
-export function listRisk(show: Pick<Show, 'cueLists'>, id: string, machineOf?: MachineOf): Risk { return actionRisk(show, { do: 'start', list: id }, undefined, machineOf); }
+export function listRisk(show: Pick<Show, 'cueLists'>, id: string, machineOf?: MachineOf, still = false): Risk { return actionRisk(show, { do: 'start', list: id }, undefined, machineOf, still); }
+// What a card, a tile or a moment is marked with: confetti (1×), a machine that fires (flames,
+// sparks, CO2), or a winch that moves scenery (a curtain, a drop, a hoist: dangerous too, it waits
+// for Arm as well, but nothing goes bang, and a play's every scene change moves one)
+export type Mark = '' | 'once' | 'hazard' | 'winch';
+export const MARK_TITLE: Record<Exclude<Mark, ''>, string> = {
+  hazard: 'Fires a machine (flames, sparks or CO2): only while armed',
+  once: 'Fires confetti (once): only while armed',
+  winch: 'Moves scenery on a winch (a curtain, a drop, a hoist): only while armed',
+};
+export const MARK_SHORT: Record<Exclude<Mark, ''>, string> = { hazard: 'fires a machine', once: 'fires once', winch: 'moves a winch' };
 // a short mark for it ('' for plain light and atmosphere): a warning sign, or 1× for confetti
 export const MARK_HINT: Record<Risk, string> = { light: '', atmosphere: '', once: 'fires once (confetti)', hazard: 'fires a machine (flames, sparks or CO2)' };
 

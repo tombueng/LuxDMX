@@ -24,6 +24,30 @@ describe('the risk marks', () => {
   }, 60000);
 });
 
+// A cue that only moves scenery on a winch (a curtain, a drop) is marked as that, not as a machine
+// that fires: the Theatre's every scene change moves a drop, and a client read pyro on all of them.
+// It's still a hazard for the wire (it waits for Arm); a cue that also fires sparks says machine.
+describe('the winch mark', () => {
+  it('a scene change that flies a drop: "winch"; with sparks too: "machine"; still a hazard for Arm', async () => {
+    const { app } = await freshApp();
+    const { TEMPLATES } = await import('./content/templates');
+    const { cueMarkOf, listMarkOf } = await import('./ui/risk');
+    app.replaceShow(TEMPLATES.find((t) => t.name === 'Theatre')!.build()); app.checkpoint();
+    const show = app.show.cueLists.find((l: any) => l.name === 'Show'), cue = (n: string) => show.cues.find((c: any) => c.name === n);
+    expect(cueMarkOf(app.show, cue('Forest'), app.showRev)).toBe('winch');
+    expect(cueMarkOf(app.show, cue('Battle'), app.showRev)).toBe('hazard');          // (CO2 and sparks on the charge)
+    expect(cueMarkOf(app.show, cue('Finale'), app.showRev)).toBe('hazard');
+    expect(listMarkOf(app.show, show, app.showRev)).toBe('hazard');
+    const { cueRiskOf } = await import('./ui/risk');
+    expect(cueRiskOf(app.show, cue('Forest'), app.showRev)).toBe('hazard');          // (the wire still waits for Arm)
+    // a list of nothing but the curtain: winch
+    const curtain = app.show.fixtures.find((f: any) => f.name === 'House curtain');
+    app.checkpoint(); show.cues.push({ ...cue('Forest'), id: 'only-curtain', name: 'Only the curtain', values: { [curtain.id]: { hoist: 1 } }, actions: [] }); app.checkpoint();
+    expect(cueMarkOf(app.show, cue('Only the curtain'), app.showRev)).toBe('winch');
+    expect(cueMarkOf(app.show, cue('Bows'), app.showRev)).toBe('winch');
+  }, 60000);
+});
+
 // The cards' looks and pictures: a list nobody changed keeps its looks (the same objects, its
 // pictures not drawn again); a changed cue gets a new look and a new picture; moving a light on the
 // plan draws the pictures again (where the lights are is in them).

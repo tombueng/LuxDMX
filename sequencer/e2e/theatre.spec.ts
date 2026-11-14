@@ -13,7 +13,8 @@ async function theatre(page: Page) {
 }
 // the first DMX channel of a light, 0-based, and what's on it
 const chan = (page: Page, name: string) => page.evaluate((n) => (window as any).__luxdmx.show.fixtures.find((f: any) => f.name === n).address - 1, name);
-const level = async (page: Page, name: string) => (await channels(0, 64))[await chan(page, name)];
+// (the big stage's rig fills the first universe: read all of it)
+const level = async (page: Page, name: string) => (await channels(0, 512))[await chan(page, name)];
 const lists = (page: Page) => page.evaluate(() => (window as any).__luxdmx.show.cueLists.map((l: any) => l.id) as string[]);
 const status = (page: Page, i: number) => page.evaluate((i) => { const a = (window as any).__luxdmx; return a.engine.status(a.show.cueLists[i].id); }, i);
 // the play's cues, and their numbers as the deck shows them (1 to n, with `at` replaced or put in)
@@ -26,7 +27,7 @@ test('the house lights come up with the last cue and go out with the first scene
   await page.keyboard.press('Space');                                  // Preset: house full
   await expect.poll(() => level(page, 'House 1'), { timeout: 6000 }).toBe(255);
   await page.waitForTimeout(450);
-  await page.keyboard.press('Space');                                  // Scene 1: house out (8 s)
+  await page.keyboard.press('Space');                                  // Curtain up: house out (8 s)
   await expect.poll(() => level(page, 'House 1'), { timeout: 12000 }).toBe(0);
   const n = await cueCount(page);
   for (let i = 0; i < n - 2; i++) { await page.waitForTimeout(450); await page.keyboard.press('Space'); }   // to the End
@@ -38,13 +39,14 @@ test('back to a cue shows that cue; a double GO plays one cue and leaves nothing
   await theatre(page);
   const [show] = await lists(page);
   // play to Sunrise (cyc orange), then jump back to Night: the cyc is Night's blue, not Sunrise's orange
-  await page.evaluate((id) => (window as any).__luxdmx.jump(id, 3), show);
+  const at = (n: string) => page.evaluate((n) => (window as any).__luxdmx.show.cueLists[0].cues.findIndex((c: any) => c.name === n), n);
+  await page.evaluate(([id, i]) => (window as any).__luxdmx.jump(id, i), [show, await at('Sunrise')] as const);
   await page.waitForTimeout(11000);
   const cyc = await chan(page, 'Cyc 1');
-  const sunrise = (await channels(0, 64)).slice(cyc, cyc + 4);
-  await page.evaluate((id) => (window as any).__luxdmx.jump(id, 2), show);
+  const sunrise = (await channels(0, 512)).slice(cyc, cyc + 4);
+  await page.evaluate(([id, i]) => (window as any).__luxdmx.jump(id, i), [show, await at('Night')] as const);
   await page.waitForTimeout(6500);
-  const night = (await channels(0, 64)).slice(cyc, cyc + 4);
+  const night = (await channels(0, 512)).slice(cyc, cyc + 4);
   expect(night).not.toEqual(sunrise);
   expect(night[2]).toBeGreaterThan(night[0]);                           // blue over red
   // two GOs a quarter of a second apart: one cue
@@ -62,27 +64,27 @@ test('back to a cue shows that cue; a double GO plays one cue and leaves nothing
 test('a cue recorded mid-show goes after the one on stage; GO carries on; undo puts the stage back on its cue', async ({ page }) => {
   await theatre(page);
   const [show] = await lists(page);
-  await page.evaluate((id) => (window as any).__luxdmx.jump(id, 1, 0), show);           // Scene 1
+  await page.evaluate((id) => (window as any).__luxdmx.jump(id, 2, 0), show);           // Scene 1 (after Preset and Curtain up)
   await selectFixtures(page, ['Front 1']);
   await page.locator('.prog .quick').getByRole('button', { name: 'Full' }).click();
   await page.locator('.deck').getByRole('button', { name: /^Record/ }).click();
   const names = await page.evaluate(() => (window as any).__luxdmx.show.cueLists[0].cues.map((c: any) => c.name) as string[]);
-  expect(names[1]).toBe('Scene 1');
-  expect(names[3]).toBe('Night');                                        // the new one goes between Scene 1 and Night...
-  // ...numbered like the script: 2.5, and Night is still 3
+  expect(names[2]).toBe('Scene 1');
+  expect(names[4]).toBe('Forest');                                       // the new one goes between Scene 1 and the Forest...
+  // ...numbered like the script: 3.5, and the Forest is still 4
   const n = names.length - 1;
-  await expect(page.locator('.deck .card .num')).toHaveText(nums(n, (a) => [...a.slice(0, 2), '2.5', ...a.slice(2)]));
+  await expect(page.locator('.deck .card .num')).toHaveText(nums(n, (a) => [...a.slice(0, 3), '3.5', ...a.slice(3)]));
   // (the deck here in Program; the Live strip is kept hidden once Live has been built)
-  await expect(page.locator('.strip .now, .deck').filter({ visible: true })).toContainText('2.5');
-  expect((await status(page, 0)).index).toBe(2);
+  await expect(page.locator('.strip .now, .deck').filter({ visible: true })).toContainText('3.5');
+  expect((await status(page, 0)).index).toBe(3);
   await page.waitForTimeout(450);
   await page.locator('body').press('Control+z');
-  await expect.poll(async () => (await status(page, 0)).index).toBe(1);   // back on Scene 1, not the last cue
+  await expect.poll(async () => (await status(page, 0)).index).toBe(2);   // back on Scene 1, not the last cue
   await expect(page.locator('.deck .card .num')).toHaveText(nums(n));
   await page.waitForTimeout(450);
   await page.locator('.deck').getByRole('button', { name: /^GO/ }).click();   // and GO carries on with what was next
-  await expect.poll(async () => (await status(page, 0)).index).toBe(2);
-  expect(await page.evaluate(() => { const a = (window as any).__luxdmx; return a.show.cueLists[0].cues[a.engine.status(a.show.cueLists[0].id).index].name; })).toBe('Night');
+  await expect.poll(async () => (await status(page, 0)).index).toBe(3);
+  expect(await page.evaluate(() => { const a = (window as any).__luxdmx; return a.show.cueLists[0].cues[a.engine.status(a.show.cueLists[0].id).index].name; })).toBe('Forest');
 });
 
 test('Off on a hazer stops its haze, Record keeps a running haze out of other cues, and Live offers to stop haze', async ({ page }) => {
@@ -159,15 +161,15 @@ test('a play\'s live page: the whole cue list, the cue on stage lit and next mar
   await expect(page.locator('.live .tile.cue')).toHaveCount(0);                 // no look buttons with number keys
   await page.keyboard.press('Space');
   await expect(panel.locator('li.live .nm')).toContainText('Preset');
-  await expect(panel.locator('li.next .nm')).toContainText('Scene 1');
+  await expect(panel.locator('li.next .nm')).toContainText('Curtain up');
   // a tap on a row does nothing; holding it jumps there
   await panel.locator('li').nth(3).locator('.row').click();
   await page.waitForTimeout(300);
   await expect(panel.locator('li.live .nm')).toContainText('Preset');
   const row = panel.locator('li').nth(3).locator('.row');
   await row.hover(); await page.mouse.down(); await page.waitForTimeout(750); await page.mouse.up();
-  await expect(panel.locator('li.live .nm')).toContainText('Sunrise');
-  await expect(page.locator('.strip .now')).toContainText('4. Sunrise');
+  await expect(panel.locator('li.live .nm')).toContainText('Forest');
+  await expect(page.locator('.strip .now')).toContainText('4. Forest');
   // the house lights step with GO and Back
   await expect(page.locator('.live [data-widget^="go-"]')).toHaveCount(1);
   await expect(page.locator('.live [data-widget^="back-"]')).toHaveCount(1);
@@ -196,4 +198,15 @@ test('a list\'s own cue sheet: from its tab\'s menu, that list only, with each l
   await expect(sheet.locator('h2')).toHaveText(name);
   await expect(sheet.locator('table').first()).toContainText('@');                 // (levels: "@ 30 %", "@ full")
   await sheet.close();
+});
+
+test('a scene change that flies a drop is marked as a winch, not as a machine that fires; the battle\'s sparks still say machine', async ({ page }) => {
+  await theatre(page);
+  const card = (n: string) => page.locator('.deck .card', { has: page.locator('.name', { hasText: new RegExp(`^${n}$`) }) });
+  await expect(card('Forest').locator('.chip.winch')).toHaveAttribute('title', /Moves scenery on a winch/);
+  await expect(card('Forest').locator('.chip.orange')).toHaveCount(0);
+  await expect(card('Battle').locator('.chip.orange')).toHaveAttribute('title', /Fires a machine/);
+  await expect(card('Battle').locator('.chip.winch')).toHaveCount(0);
+  // (the preset shuts the curtain and flies the drops out: a winch too)
+  await expect(card('Preset').locator('.chip.winch')).toHaveCount(1);
 });

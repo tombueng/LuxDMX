@@ -1,6 +1,6 @@
 <script lang="ts">
   import { isLooks, isPlay } from '../model/library';
-  import { cueRiskOf } from './risk';
+  import { cueMarkOf, MARK_TITLE } from './risk';
   import { revealIn } from './reveal';
   import { cueNumber, numbered } from '../model/cuenum';
   // Cue lists as decks of cards. Every card shows a picture of the look at that cue, its timing and
@@ -250,7 +250,7 @@
           {@const sel = app.cueSel.includes(c.id)}
           {@const next = !!st?.running && st.index + 1 === i}
           {@const n = Object.keys(c.values).length}
-          {@const risk = cueRiskOf(app.show, c, app.showRev)}
+          {@const risk = cueMarkOf(app.show, c, app.showRev)}
           <!-- svelte-ignore a11y_click_events_have_key_events (the listbox handles the keys) -->
           <div class="card" class:sel class:cur class:next
                class:drop-before={dropAt?.index === i && !dropAt.after} class:drop-after={dropAt?.index === i && dropAt.after}
@@ -280,7 +280,8 @@
             <div class="chips">
               <span class="chip" title="Fades in {c.fade} s">{c.fade} s</span>
               <span class="chip" class:blue={c.advance.mode !== 'manual'} title={advTitle(c.advance)}>{adv(c.advance)}</span>
-              {#if risk === 'hazard'}<span class="chip orange" title="Fires a machine (flames, sparks or CO2): only while armed"><Icon name="warn" size={11} /><span class="bt">machine</span></span>
+              {#if risk === 'hazard'}<span class="chip orange" title={MARK_TITLE.hazard}><Icon name="warn" size={11} /><span class="bt">machine</span></span>
+              {:else if risk === 'winch'}<span class="chip winch" title={MARK_TITLE.winch}>⇅<span class="bt">winch</span></span>
               {:else if risk === 'once'}<span class="chip orange" title="Fires confetti (once): only while armed">1×</span>{/if}
               {#if c.actions?.length}<span class="chip violet" title="Also does {c.actions.length} thing{c.actions.length > 1 ? 's' : ''} when it starts"><Icon name="bolt" size={11} />{c.actions.length}</span>{/if}
               {#if c.note}<span class="chip notechip" title={c.note}><Icon name="note" size={11} /></span>{/if}
@@ -346,7 +347,7 @@
   @container card (max-width: 210px) { .count .w { display: none; } .count :global(svg) { display: inline; flex: none; } .count { flex: none; }
     /* (the warning sign alone, its title says the rest: with the word, "Big finish"'s chips ran past
        its edge and hid how many lights it sets) */
-    .chip.orange .bt { display: none; }
+    .chip.orange .bt, .chip.winch .bt { display: none; }
     /* (four chips and more: the number of lights gives way, cut it read as a smaller number) */
     .chips:has(> .chip:nth-child(4)) .count { display: none; }
     .chips:has(> .chip:nth-child(5)) .notechip { display: none; } }

@@ -2,7 +2,7 @@
 // the show. cueRisk reads every value of every light in a cue: for a deck of tiles on a 300-light
 // rig that was a quarter of a second on every render of Live.
 import { untrack } from 'svelte';
-import { cueRisk, isMachine, listRisk, MACHINE_PROGRAMS, riskOf, type MachineOf, type Risk } from '../model/safety';
+import { cueRisk, isMachine, listRisk, MACHINE_PROGRAMS, MARK_SHORT, MARK_TITLE, riskOf, type MachineOf, type Mark, type Risk } from '../model/safety';
 import { modeOf, typeMap } from '../model/library';
 import type { Cue, CueList, Show } from '../model/types';
 
@@ -54,6 +54,29 @@ function allAt(rev: number): Map<string, Risk> | undefined {
   for (const l of p.cueLists) for (const c of l.cues) risk.set(c.id, cueRisk(p, c, undefined, of));
   all = { rev, risk };
   return risk;
+}
+
+export { MARK_TITLE, MARK_SHORT, type Mark };
+const winches = new WeakMap<object, { rev: number; mark: Mark }>();
+// (a hazard that's gone with the winches left out: only scenery moves)
+const markFor = (risk: Risk, still: () => Risk): Mark => (risk === 'hazard' ? (still() === 'hazard' ? 'hazard' : 'winch') : risk === 'once' ? 'once' : '');
+export function cueMarkOf(show: Show, cue: Cue, rev: number): Mark {
+  const risk = cueRiskOf(show, cue, rev);
+  if (risk !== 'hazard') return markFor(risk, () => risk);
+  const c = winches.get(cue);
+  if (c && c.rev === rev) return c.mark;
+  const mark = markFor(risk, () => untrack(() => cueRisk(show, cue, undefined, machinesAt(show, rev), true)));
+  winches.set(cue, { rev, mark });
+  return mark;
+}
+export function listMarkOf(show: Show, list: CueList, rev: number): Mark {
+  const risk = listRiskOf(show, list, rev);
+  if (risk !== 'hazard') return markFor(risk, () => risk);
+  const c = winches.get(list);
+  if (c && c.rev === rev) return c.mark;
+  const mark = markFor(risk, () => untrack(() => listRisk(show, list.id, machinesAt(show, rev), true)));
+  winches.set(list, { rev, mark });
+  return mark;
 }
 
 const cues = new WeakMap<object, { rev: number; risk: Risk }>();

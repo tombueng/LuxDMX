@@ -16,7 +16,7 @@
   import { cueNumber } from '../model/cuenum';
   import { isFogTimer } from '../model/library';
   import { isMachineList } from '../content/busking';
-  import { cueRiskOf, listRiskOf } from './risk';
+  import { cueMarkOf, listMarkOf, MARK_SHORT } from './risk';
   import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
   import { BAR_S, DEMO_SECONDS, playDemo, sectionStarts } from '../timeline/beat';
   import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
@@ -376,8 +376,7 @@
     if (a.do === 'burst') return HAZARD.has(a.attr) ? 'hazard' : a.attr === 'confetti' ? 'once' : '';
     if (a.do !== 'goto' && a.do !== 'start' && a.do !== 'go') return '';
     const l = app.show.cueLists.find((x) => x.id === a.list), c = a.do === 'goto' ? l?.cues.find((x) => x.id === a.cue) : undefined;
-    const r = c ? cueRiskOf(app.show, c, app.showRev) : l && a.do !== 'goto' ? listRiskOf(app.show, l, app.showRev) : 'light';
-    return r === 'hazard' || r === 'once' ? r : '';
+    return c ? cueMarkOf(app.show, c, app.showRev) : l && a.do !== 'goto' ? listMarkOf(app.show, l, app.showRev) : '';
   };
 
   // ---- the song
@@ -759,9 +758,9 @@
       <div class="chips">
         {#each l.cues as c, i (c.id)}
           {@const chip = { kind: 'cue', list: l.id, cue: c.id } as Chip}
-          {@const risk = cueRiskOf(app.show, c, app.showRev)}
-          <button class="chip" class:risky={risk === 'hazard' || risk === 'once'} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)}
-                  title="{cueNumber(l, i)}. {c.name}: drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {/if}<span class="t">{cueNumber(l, i)}. {c.name}</span></button>
+          {@const risk = cueMarkOf(app.show, c, app.showRev)}
+          <button class="chip" class:risky={!!risk} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)}
+                  title="{cueNumber(l, i)}. {c.name}: drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : risk === 'winch' ? '. Moves a winch (scenery) while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {:else if risk === 'winch'}⇅ {/if}<span class="t">{cueNumber(l, i)}. {c.name}</span></button>
         {/each}
         {#if !l.cues.length}<span class="faint">No cues yet</span>{/if}
       </div>
@@ -853,9 +852,9 @@
                 {@const mark = markOf(it)}
                 <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : `max-width:min(18rem, ${Math.max(28, Math.max(width, x(shownTo)) - x(it.at) - 2)}px)`}"
                   onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)} onkeydown={(e) => itemKey(e, it.id)}
-                  aria-label="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ', fires a machine' : mark === 'once' ? ', fires once' : ''}"
-                  title="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ' (fires a machine)' : mark === 'once' ? ' (fires once)' : ''}: drag (or the arrow keys) to move, right-click for more">
-                  {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{/if}
+                  aria-label="{labelOf(it)} at {clockOf(it.at)}{mark ? `, ${MARK_SHORT[mark]}` : ''}"
+                  title="{labelOf(it)} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move, right-click for more">
+                  {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{:else if mark === 'winch'}<span class="mark winch" aria-hidden="true">⇅</span>{/if}
                   <span class="t">{labelOf(it)}</span>
                   {#if it.len !== undefined}<!-- svelte-ignore a11y_no_static_element_interactions -->
                     <span class="end" onpointerdown={(e) => itemDown(e, it, true)} onpointermove={itemMove} onpointerup={itemUp}></span>{/if}
@@ -1012,7 +1011,7 @@
   .playhead::before { content: ''; position: absolute; top: 0; bottom: 0; left: -7px; width: 16px; }
   .playhead.held, .playhead:hover { box-shadow: 0 0 0 1px #45d85c66, 0 0 12px #45d85caa; }
   .mark { flex: none; display: inline-flex; align-items: center; margin-right: .25rem; pointer-events: none; }
-  .mark.hazard { color: var(--orange); }
+  .mark.hazard, .mark.winch { color: var(--orange); }
   .mark.once { font-size: .64rem; font-weight: 700; padding: 0 .2rem; border-radius: 3px; background: #ffffff1c; }
   .note { margin: 0; font-size: .74rem; color: var(--faint); }
   .armed.on { color: var(--pink); border-color: #f33abc88; background: #f33abc1a; }
