@@ -31,6 +31,7 @@ export interface EffectParams {
   script: string;         // an add-on: its program and knobs (JSON, see engine/custom.ts and ADDONS.md)
   vals: Record<string, unknown>;   // an add-on's own knobs by id
   look?: boolean;         // run only to be looked at (a preview): an add-on that's too slow there rests on its own
+  untimed?: boolean;      // a picture made once (a package's preview): no time limit a frame (its step limit holds)
 }
 
 // Where one element is, for the shape functions.

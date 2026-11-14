@@ -18,6 +18,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and
   "Throw the changes away" is the way to drop it. A channel called just "Red" that you make green is
   called "Green" too.
+- **Sharing an add-on works on a slow computer too.** Its little preview was made under the same
+  30 ms a frame limit as the stage, so a busy laptop got "it takes too long to work out" instead of
+  the file. The preview is made once, so it isn't timed any more (the step limit still holds).
 - **The Theatre's curtain flies out, its scenery hangs at the back.** The house curtain is a fly
   curtain now (a new type: its winch lifts the whole cloth up into the tower, the valance stays), in
   front of the stage; the four painted drops hang upstage behind where the actors play, the first

@@ -187,6 +187,13 @@ describe('a repository someone else made (the second review)', () => {
 });
 
 describe('an add-on that takes too long to work out', () => {
+  it('its package\'s preview is still made (once, on a slow machine too: no time limit a frame)', async () => {
+    const { previewOf } = await import('./preview');
+    const { theme, s: src } = ALL[1];
+    const pkg = themePackage(theme, src, ['level']);
+    PROGRAM_LIMITS.ms = -1;           // (every frame counts as too long)
+    try { expect(previewOf(pkg)).toMatch(/^pic1:32x32:/); } finally { PROGRAM_LIMITS.ms = 1e9; }
+  });
   it('is stopped within its frame and rests (the frame goes on without it)', () => {
     const { theme, s: src } = ALL[0];
     const { params } = effectOfPackage(readPackage(JSON.stringify(themePackage(theme, src, ['level']))));
