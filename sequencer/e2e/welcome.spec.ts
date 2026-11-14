@@ -158,7 +158,9 @@ test('the templates play as shows too: their looks cued to a song, DJ / Party in
     expect(tl.view).toBe('timeline');
     expect(tl.items).toBeGreaterThan(10);
     expect(tl.gotos.every((g: any) => !!g[2])).toBe(true);                  // (every look one of its own)
-    if (name === 'Theatre') { const house = tl.lists.find((l: any) => l[1] === 'House lights')[0]; expect(tl.gotos.find((g: any) => g[1] === house)).toEqual([0, house, 'House out']); }
+    // the audience on its own track: waiting before the song (the show starts there), cheering after it
+    expect(await page.evaluate(() => { const t = (window as any).__luxdmx.show.timeline; return [t.lead, t.crowd.length > 3, t.crowd[0].at]; })).toEqual([8, true, -8]);
+    if (name === 'Theatre') { const house = tl.lists.find((l: any) => l[1] === 'House lights')[0]; expect(tl.gotos.find((g: any) => g[1] === house && g[0] === 0)).toEqual([0, house, 'House out']); }
     await expect(page.locator('.transport').getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 20000 });   // (playing)
   }
 });

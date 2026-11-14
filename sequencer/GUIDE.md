@@ -103,7 +103,10 @@ many lights and cues):
   bar, rings and matrices), or **a show file** from another computer. The templates play as shows
   too: each has its own song (any other, or the demo beat, picked on its tile) and **Play the
   show** runs its looks cued to that song's parts on the 3D stage, the machines on the drops (as
-  many as the room takes: no CO2 in the church). **Start** gives the template to work on, its
+  many as the room takes: no CO2 in the church), and the audience on the crowd track: chatting
+  for the eight seconds before the song, then as the room has it (a concert cheers the band on and
+  every chorus, a party its drops, a theatre, church or cinema is quiet until the end, a bar chats
+  all along), cheering at the end. **Start** gives the template to work on, its
   lights and looks, no music. The DJ / Party template is in the club, with the DJ at the decks.
 
 Every demo and template also has **Lights only**: its lights in their places (in its room, for a
