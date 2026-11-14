@@ -771,7 +771,7 @@ Three more demos come with their own room on the 3D stage:
   lifts a little. A click selects a light (an orange frame round each selected one), the same
   selection as the plan. **Move** and **Turn** put it where it really hangs (let go near a truss and it hangs on it,
   near the deck and it stands on it); Hang, On the deck and In front mount the whole selection.
-  **Aim**: click a spot and the selected moving heads point there (it works out pan and tilt from
+  **Aim**: click a spot (the deck, the floor, a wall, the theatre's cyc, the cinema's screen) and the selected moving heads point there (it works out pan and tilt from
   how each one hangs and its pan/tilt range; Record keeps it). **Calibrate** (one head selected):
   point the real head at a spot on the stage with the pan/tilt pad, click that spot in 3D, and its
   pan and tilt offsets are set so the 3D stage and Aim agree with the room. A head that points

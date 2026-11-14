@@ -3,7 +3,7 @@
 // heads at the spot clicked (measured on the wire), and the effect machines throw particles.
 // The page offers a small hook in dev (window.__stage3d) for what can't be read off pixels.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, patch, selectAll, full, test, expect, demo } from './helpers';
+import { openConnected, resetFake, channels, patch, selectAll, full, test, expect, demo, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -236,4 +236,32 @@ test('a reload keeps the 3D view where it was, and the song playing on from wher
   // still playing, further on than before the reload (not back at 0:00)
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 8000 }).toBe(true);
   expect(await page.evaluate(() => (window as any).__luxdmx.timeline.position)).toBeGreaterThan(before);
+});
+
+test('Aim at the theatre\'s cyc: the spot points there (not at the floor behind it), from the front and from FOH; Measure says "the cyc"', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue().room), { timeout: 45000 }).toBe('theatre');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = [a.show.fixtures.find((f: any) => f.name === 'Spot 2').id]; });
+  const s3 = page.locator('.s3'), cam = s3.getByRole('group', { name: 'Camera' });
+  for (const view of ['Front', 'FOH']) {
+    await cam.getByRole('button', { name: view, exact: true }).click();
+    await page.waitForTimeout(1500);
+    await s3.getByRole('button', { name: 'Aim', exact: true }).click();
+    const spot = { x: 0.6, y: 4.2, z: -5.69 };                                  // (on the cyc, a little off centre)
+    const xy = await page.evaluate((p) => (window as any).__stage3d.screenOfPoint(p), spot);
+    await page.mouse.click(xy.x, xy.y);
+    await expect.poll(() => page.evaluate((p) => (window as any).__stage3d.aimError(p), spot), { timeout: 5000, message: view }).toBeLessThan(0.15);
+    await page.evaluate(() => { const a = (window as any).__luxdmx, id = a.selected[0]; a.programmer[id] = { ...a.programmer[id], pan: 0.5, tilt: 0.5 }; });
+  }
+  // Measure: a point on the cyc is "the cyc"
+  await s3.getByRole('button', { name: 'Select', exact: true }).click();
+  const inRow = s3.locator('.tools').getByRole('button', { name: 'Measure', exact: true });
+  if (await inRow.count()) await inRow.click();
+  else { await s3.getByRole('button', { name: 'More', exact: true }).click(); await s3.getByRole('group', { name: 'More for the 3D stage' }).getByRole('button', { name: 'Measure', exact: true }).click(); }
+  const c = await page.evaluate(() => (window as any).__stage3d.screenOfPoint({ x: -2, y: 5, z: -5.69 }));
+  await page.mouse.click(c.x, c.y);
+  expect(await page.evaluate(() => (window as any).__stage3d.measure()?.a?.what)).toBe('the cyc');
 });

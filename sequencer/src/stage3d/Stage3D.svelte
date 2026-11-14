@@ -56,7 +56,7 @@
   import { Rig, type RigFixture } from './rig';
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
   import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
@@ -445,8 +445,10 @@
       screenOf: (id: string) => { const f = fixtures.find((x) => x.id === id)!; const v = new THREE.Vector3(f.p.x, f.p.y, f.p.z).project(camera), r = canvas!.getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height }; },
       aimError: (p: V3) => Math.max(0, ...fixtures.filter((f) => f.kind === 'mover' && app.selected.includes(f.id)).map((f) => {
         // (from the head's pivot, where the beam really turns from)
-        const v = app.stageNow[f.id], d = beamDir(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.rot, f.optics), o = pivotOf(f.p, f.rot), k = (p.y - o.y) / d.y;
-        return Math.hypot(o.x + d.x * k - p.x, o.z + d.z * k - p.z);
+        // (how far p is from the beam's line: on the deck, on the cyc or on a wall alike)
+        const v = app.stageNow[f.id], d = beamDir(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.rot, f.optics), o = pivotOf(f.p, f.rot);
+        const w = { x: p.x - o.x, y: p.y - o.y, z: p.z - o.z }, t = w.x * d.x + w.y * d.y + w.z * d.z;
+        return Math.hypot(w.x - d.x * t, w.y - d.y * t, w.z - d.z * t);
       })),
       // the scene as the bloom gets it (linear light, before tone mapping), in full floats: NaN and
       // values past what the half-float buffers hold (65504) turn into black blocks after the blur
@@ -713,10 +715,20 @@
     else if (!e.shiftKey && mode === 'select') app.selectNone();
   }
   // where the click meets the deck (or the floor in front of it)
+  // (the first thing in the room the click's ray meets: the deck, the floor, a wall, the ceiling, the
+  // theatre's cyc or the cinema's screen; a gobo is focused on the cyc as on the deck. `on`: what)
+  let spotOn = '';
   function spot(): V3 | undefined {
-    const hit = (y: number) => { const t = (y - ray.ray.origin.y) / ray.ray.direction.y; return t > 0 ? ray.ray.origin.clone().addScaledVector(ray.ray.direction, t) : undefined; };
+    const o = ray.ray.origin, d = ray.ray.direction;
+    const h = hitRoom({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, room);
+    if (h) {
+      spotOn = h.n.y > 0.5 ? (h.y > 0.01 ? 'the deck' : 'the floor') : h.n.y < -0.5 ? 'the ceiling' : (room.screens ?? []).some((s) => Math.abs(h.z - s.z) < 0.02 && h.n.z > 0.5) ? (room.id === 'cinema' ? 'the screen' : 'the cyc') : 'the wall';
+      return { x: h.x, y: h.y, z: h.z };
+    }
+    const hit = (y: number) => { const t = (y - o.y) / d.y; return t > 0 ? o.clone().addScaledVector(d, t) : undefined; };
     let p = hit(DECK);
     if (!p || !onDeck(p.x, p.z, room)) p = hit(0);
+    spotOn = p && p.y > 0.01 ? 'the deck' : 'the floor';
     return p ? { x: p.x, y: p.y, z: p.z } : undefined;
   }
   // ---- Measure: two clicks (the deck, the floor, a light) and how far apart they are, how far
@@ -734,7 +746,7 @@
     const id = rig.pick(ray), f = id ? fixtures.find((x) => x.id === id) : undefined;
     if (f) return { p: pivotOf(f.p, f.rot), what: f.name, id: f.id };
     const p = spot();
-    return p ? { p, what: p.y > 0.01 ? 'the deck' : 'the floor' } : undefined;
+    return p ? { p, what: spotOn } : undefined;
   }
   function measure() {
     const m = measurePick();
