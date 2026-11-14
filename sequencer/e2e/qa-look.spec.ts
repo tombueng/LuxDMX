@@ -855,3 +855,14 @@ test('an open effect gets the room on a laptop (1440 x 900): the list two rows a
   const h = await ed.evaluate((el) => ({ shown: el.clientHeight, all: el.scrollHeight }));
   expect(h.shown).toBeGreaterThan(280);                      // (it was 205 of 399)
 });
+
+test('the LuxDMX logo sits top left, in front of the name, and loads', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await openConnected(page);
+  const logo = page.locator('.top .brand img.logo');
+  await expect(logo).toBeVisible();
+  expect(await logo.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
+  const [l, b] = await Promise.all([logo.boundingBox(), page.locator('.top .brand').boundingBox()]);
+  expect(l!.x - b!.x).toBeLessThan(2);                           // (first in the brand)
+  expect(l!.x).toBeLessThan(30);                                 // (top left)
+});

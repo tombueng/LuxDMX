@@ -2,7 +2,7 @@
 // kept, and served from here when the network isn't there (and refreshed when it is). Fixture
 // definitions from the libraries are kept the same way once used. Nothing here sends anything.
 const CACHE = 'luxdmx-sequencer-v1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './ofl/index.json', './qlc/index.json'];
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './luxdmx-logo.png', './ofl/index.json', './qlc/index.json'];
 const LIBRARIES = ['https://cdn.jsdelivr.net/gh/OpenLightingProject/', 'https://raw.githubusercontent.com/mcallegari/qlcplus/'];
 
 self.addEventListener('install', (e) => {

@@ -111,7 +111,7 @@
 
 <header class="top" class:witharm={app.gatedMachines.length > 0}>
   <h1 class="sr-only">LuxDMX Sequencer (alpha): {app.show.meta.name}</h1>
-  <div class="brand" aria-hidden="true">Lux<span>DMX</span> <small class="alpha" title="Alpha: it works, but it's young. Things change, some are rough, keep a copy of your show (Shows, Save as file).">alpha</small></div>
+  <div class="brand" aria-hidden="true"><img class="logo" src="./luxdmx-logo.png" alt="" width="22" height="22" />Lux<span>DMX</span> <small class="alpha" title="Alpha: it works, but it's young. Things change, some are rough, keep a copy of your show (Shows, Save as file).">alpha</small></div>
   {#if app.locked}
     <!-- Service mode: the show's name and a lock, nothing that edits or leaves the page. -->
     <span class="show lockedname" title="Locked for the show: hold the padlock on the page to unlock"><Icon name="lock" /><span class="name">{app.show.meta.name || 'Untitled'}</span></span>
@@ -201,7 +201,8 @@
      1366 px with the arm button and a box connected still fits) */
   .top { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; background: var(--bg2); border-bottom: 1px solid var(--line); flex-wrap: nowrap; min-width: 0; }
   .top > :global(*) { flex-shrink: 0; }
-  .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; white-space: nowrap; } .brand span { color: var(--green); }
+  .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; white-space: nowrap; display: inline-flex; align-items: center; } .brand span { color: var(--green); }
+  .brand .logo { width: 22px; height: 22px; border-radius: 5px; margin-right: .4rem; flex: none; }
   .alpha { font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1000; background: var(--orange); border-radius: 4px; padding: .05rem .3rem; vertical-align: .2em; }
   .show { background: none; border-color: transparent; max-width: 280px; min-width: 4.5rem; flex-shrink: 1 !important; overflow: hidden; }
   .show .name { overflow: hidden; text-overflow: ellipsis; font-weight: 650; min-width: 2.6em; }   /* (a chip beside it squeezed it to nothing) */
