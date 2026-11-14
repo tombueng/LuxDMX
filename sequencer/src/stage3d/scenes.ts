@@ -179,14 +179,14 @@ export function buildBar(group: THREE.Group, M: Mats, r: Room) {
     if (i % 2 === 0 || i === 7) {
       // (sitting on it, facing the bar, elbows on the counter, a drink in front)
       const look = LOOKS[i % LOOKS.length];
-      const c = crewMember(look, x, 0, z + 0.05, Math.PI, { L: V(x + 0.18, B.counterH + 0.05, B.counterZ + 0.12), R: V(x - 0.2, B.counterH + 0.05, B.counterZ + 0.15) }, 0.12);
+      const c = crewMember(look, x, 0, z + 0.05, Math.PI, { L: V(x - 0.18, B.counterH + 0.05, B.counterZ + 0.12), R: V(x + 0.2, B.counterH + 0.05, B.counterZ + 0.15) }, 0.12);   // (facing -z: their left is -x)
       c.p.pose({ seat: 0.83, feet: { L: V(0.13, 0.25, 0.3), R: V(-0.13, 0.25, 0.32) } });
       group.add(c.p.group); people.push(c.p);
       add(cyl(0.035, 0.03, 0.15, i % 4 ? beer : wine, 10), x + 0.05, B.counterH + 0.075, B.counterZ - 0.05);
     }
   });
   for (const [x, k] of [[-2.9, 3], [3.2, 5], [5.6, 6]] as const) {
-    const c = crewMember(LOOKS[k], x, 0, B.counterZ + 0.7, Math.PI + 0.15, { R: V(x - 0.15, B.counterH + 0.04, B.counterZ + 0.2) }, 0.04);
+    const c = crewMember(LOOKS[k], x, 0, B.counterZ + 0.7, Math.PI + 0.15, { R: V(x + 0.15, B.counterH + 0.04, B.counterZ + 0.2) }, 0.04);
     group.add(c.p.group); people.push(c.p);
   }
   for (const [x, k] of [[-1.6, 2], [2.4, 0]] as const) {
@@ -201,7 +201,7 @@ export function buildBar(group: THREE.Group, M: Mats, r: Room) {
     add(cyl(0.03, 0.03, 0.06, std({ color: 0xf0e8d8, roughness: 0.5 }), 8), tx, 0.79, z); add(new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4), candle), tx, 0.83, z);
     for (const dz of [-0.62, 0.62]) { add(box(0.42, 0.04, 0.42, wood), tx, 0.46, z + dz); add(box(0.42, 0.5, 0.04, wood), tx, 0.72, z + dz + Math.sign(dz) * 0.2); for (const [ex, ez] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) add(box(0.03, 0.45, 0.03, M.black), tx + ex, 0.225, z + dz + ez); }
     if ((sx > 0) !== (z > 3)) {
-      const c = crewMember(LOOKS[(Math.round(z) + (sx > 0 ? 3 : 0)) % LOOKS.length], tx, 0, z + 0.62, Math.PI, { L: V(tx + 0.15, 0.78, z + 0.2), R: V(tx - 0.15, 0.78, z + 0.22) }, 0.1);
+      const c = crewMember(LOOKS[(Math.round(z) + (sx > 0 ? 3 : 0)) % LOOKS.length], tx, 0, z + 0.62, Math.PI, { L: V(tx - 0.15, 0.78, z + 0.2), R: V(tx + 0.15, 0.78, z + 0.22) }, 0.1);
       c.p.pose({ seat: 0.48, feet: { L: V(0.12, 0.09, 0.36), R: V(-0.12, 0.09, 0.38) } });
       group.add(c.p.group); people.push(c.p);
     }
@@ -419,12 +419,12 @@ export function buildBallroom(group: THREE.Group, M: Mats, r: Room) {
   const pipe = std({ color: 0x1a1b1e, metalness: 0.6, roughness: 0.45 });
   for (const z of B.pipes) { group.add(rod(V(-D.x - 0.6, B.pipeY, z), V(D.x + 0.6, B.pipeY, z), 0.03, pipe, 8)); for (const sx of [-1, 1]) add(cyl(0.012, 0.012, H - B.pipeY, M.chrome, 5), sx * (D.x + 0.3), (H + B.pipeY) / 2, z); }
   // a few couples dancing, swaying with the music
-  const dancers: THREE.Object3D[] = [];
+  const dancers: THREE.Object3D[] = [], people: Person[] = [];
   // (three couples: every person is a few dozen moving parts)
   [[-1.6, 5.2], [1.6, 6.2], [-0.2, 8.2]].forEach(([x, z], i) => {
     const pair = new THREE.Group(); group.add(at(pair, x, 0, z));
-    for (const s of [-1, 1]) { const c = crewMember(LOOKS[(i * 2 + (s > 0 ? 1 : 0)) % LOOKS.length], s * 0.22, 0, 0, s > 0 ? -Math.PI / 2 : Math.PI / 2, { L: V(0, 1.25, 0.05), R: V(0, 1.1, -0.1) }, 0.05); pair.add(c.p.group); }
+    for (const s of [-1, 1]) { const c = crewMember(LOOKS[(i * 2 + (s > 0 ? 1 : 0)) % LOOKS.length], s * 0.22, 0, 0, s > 0 ? -Math.PI / 2 : Math.PI / 2, { L: V(0, 1.25, 0.05 * s), R: V(0, 1.1, -0.1 * s) }, 0.05); pair.add(c.p.group); people.push(c.p); }   // (each one's left hand on their own left)
     pair.userData.live = true; dancers.push(pair);
   });
-  return { animate: (t: number) => { dancers.forEach((d, i) => { d.rotation.y = t * 0.35 + i * 1.7; d.position.y = Math.abs(Math.sin(t * 2.1 + i)) * 0.02; }); } };
+  return { people, animate: (t: number) => { dancers.forEach((d, i) => { d.rotation.y = t * 0.35 + i * 1.7; d.position.y = Math.abs(Math.sin(t * 2.1 + i)) * 0.02; }); } };
 }
