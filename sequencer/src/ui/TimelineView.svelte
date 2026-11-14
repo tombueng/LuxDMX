@@ -233,6 +233,15 @@
     else if (c.kind === 'crowd') placeCrowd(c.a, at, c.len);
     else place(c.a, at, 'special');
   }
+  // A tap on a chip: at the playhead, or, when its lane already has something there (the last tap),
+  // a bar after it, so taps in a row go one after the other instead of on top of each other
+  function tapChip(c: Chip) {
+    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4, lane = c.kind === 'cue' ? `list:${c.list}` : c.kind === 'fx' ? 'fx' : c.kind === 'crowd' ? null : 'special';
+    const taken = (t: number) => (lane === null ? (tl?.crowd ?? []).some((i) => Math.abs(i.at - t) < 0.05) : (tl?.items ?? []).some((i) => i.lane === lane && Math.abs(i.at - t) < 0.05));
+    let at = sn(P.position);
+    for (let k = 0; k < 64 && taken(at); k++) at = sn(at + bar);
+    chipAt(c, at);
+  }
   // anything on the tracks (a crowd moment has no lane of its own in the file: it's the crowd's)
   type Placed = TimelineItem | (CrowdItem & { lane?: undefined });
   const placed = (id: string): Placed | undefined => tl?.items.find((i) => i.id === id) ?? tl?.crowd?.find((i) => i.id === id);
@@ -726,7 +735,7 @@
         {#each l.cues as c, i (c.id)}
           {@const chip = { kind: 'cue', list: l.id, cue: c.id } as Chip}
           {@const risk = cueRiskOf(app.show, c, app.showRev)}
-          <button class="chip" class:risky={risk === 'hazard' || risk === 'once'} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))}
+          <button class="chip" class:risky={risk === 'hazard' || risk === 'once'} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)}
                   title="{cueNumber(l, i)}. {c.name}: drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {/if}<span class="t">{cueNumber(l, i)}. {c.name}</span></button>
         {/each}
         {#if !l.cues.length}<span class="faint">No cues yet</span>{/if}
@@ -737,7 +746,7 @@
       <div class="chips">
         {#each app.show.effects as e (e.id)}
           {@const chip = { kind: 'fx', effect: e.id } as Chip}
-          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{e.name}: a bar that runs it from where it starts to where it ends. Drag onto the timeline, or tap: at the playhead">{e.name}</button>
+          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => tapChip(chip)} title="{e.name}: a bar that runs it from where it starts to where it ends. Drag onto the timeline, or tap: at the playhead">{e.name}</button>
         {/each}
       </div>
     {/if}
@@ -747,18 +756,18 @@
     <div class="chips">
       {#each BURSTS as b (b.attr)}
         {@const chip = { kind: 'burst', attr: b.attr, s: b.s } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{b.label} for {b.s} s{ARMED_ONLY.includes(b.attr) ? ', only while armed' : ''}. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
+        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{b.label} for {b.s} s{ARMED_ONLY.includes(b.attr) ? ', only while armed' : ''}. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
       {/each}
       {#each [{ label: 'Blackout', a: { do: 'blackout', on: true } }, { label: 'Blackout off', a: { do: 'blackout', on: false } }, { label: 'Everything off', a: { do: 'off' } }] as m (m.label)}
         {@const chip = { kind: 'act', a: m.a as TimelineAction } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{m.label} at that moment. Drag onto the timeline, or tap: at the playhead">{m.label}</button>
+        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{m.label} at that moment. Drag onto the timeline, or tap: at the playhead">{m.label}</button>
       {/each}
     </div>
     <h3>Crowd</h3>
     <div class="chips">
       {#each CROWD as c (c.label)}
         {@const chip = { kind: 'crowd', a: c.a, len: c.len } as Chip}
-        <button class="chip cr" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{c.tip}. Drag onto the timeline, or tap: at the playhead">{c.label}</button>
+        <button class="chip cr" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{c.tip}. Drag onto the timeline, or tap: at the playhead">{c.label}</button>
       {/each}
     </div>
   </aside>

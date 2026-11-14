@@ -73,6 +73,17 @@ test('cues tapped onto the timeline play on its clock; a jump puts the stage whe
   await expect.poll(() => cueOn(page)).toBe(names[0]);
 });
 
+test('cues tapped in a row without moving the playhead go one after the other, a bar apart, not on top of each other', async ({ page }) => {
+  await bar(page);
+  const chips = page.locator('.tlv .pal .chip');
+  for (const i of [0, 1, 2]) await chips.nth(i).click();
+  const at = await page.evaluate(() => { const t = (window as any).__luxdmx.show.timeline; return { at: t.items.map((i: any) => i.at), bpm: t.bpm ?? (window as any).__luxdmx.show.settings.bpm }; });
+  const len = (60 / at.bpm) * 4;
+  expect(at.at.length).toBe(3);
+  expect(at.at[0]).toBe(0);
+  expect(at.at[1]).toBeCloseTo(len, 1); expect(at.at[2]).toBeCloseTo(2 * len, 1);
+});
+
 test('an effect dragged on runs as a bar; Del removes what is selected and Undo brings it back', async ({ page }) => {
   await bar(page);
   const fx = page.locator('.tlv .pal .chip.fx').first();
