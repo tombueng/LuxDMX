@@ -191,8 +191,11 @@ export function isLooks(l: { play?: boolean; cues: { note?: string; advance: { m
 }
 
 export function isFogTimer(l: { cues: { values: Record<string, Record<string, unknown>> }[] }): boolean {
-  const vals = l.cues.flatMap((c) => Object.values(c.values));
-  return vals.some((v) => 'fog' in v || 'haze' in v) && vals.every((v) => Object.keys(v).every((k) => k === 'fog' || k === 'haze'));
+  // (out at the first value that's anything else: a list of looks says so at once; going through
+  // every value of every cue took 30 ms a change on the festival, read through the show's proxies)
+  let fog = false;
+  for (const c of l.cues) for (const id in c.values) for (const k in c.values[id]) { if (k !== 'fog' && k !== 'haze') return false; fog = true; }
+  return fog;
 }
 
 export function typeMap(show: Pick<Show, 'fixtureTypes'>): Map<string, FixtureType> {

@@ -16,7 +16,7 @@ import { CELL_ATTRS, CELL_MOVES, type CellMove, type CellValues, type Channel, t
 import { EFFECT_MAP, hsv, paramsOf } from './engine/effects';
 import { pictureOf } from './engine/custom';
 import { cueRisk, isGated, isHeld, isKinetic, isMachine, listRisk } from './model/safety';
-import { machines } from './ui/risk';
+import { machines, plainFrom } from './ui/risk';
 import { addStandardPresets, standardPresets } from './content/presets';
 import { buskingPage, isMachineList } from './content/busking';
 import { fromQxw, type QxwReport } from './import/qxw';
@@ -364,6 +364,7 @@ class App {
   loadError = loadError;
 
   constructor() {
+    plainFrom(() => this.plain);       // (the cards' risk marks, all at once from the plain copy)
     listen(() => this.bridges, () => this.started);
     // phones: say when one joins (a guest who scanned the code shows up here), and when one is
     // waiting for a remote that's off (this tab was closed and opened again)
