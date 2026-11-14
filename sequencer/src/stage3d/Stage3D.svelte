@@ -476,9 +476,10 @@
         const gl = renderer.getContext() as WebGL2RenderingContext;
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
         const px = new Float32Array(w * h * 4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, px); rt.dispose();
-        let nan = 0, over = 0, max = 0;
-        for (let i = 0; i < px.length; i++) { const v = px[i]; if (v !== v) nan++; else if (v > 65504) over++; else if (v > max) max = v; }
-        return { nan, over, max, pixels: w * h };
+        let nan = 0, over = 0, max = 0, sum = 0;
+        for (let i = 0; i < px.length; i++) { const v = px[i]; if (v !== v) nan++; else if (v > 65504) over++; else { if (v > max) max = v; if ((i & 3) !== 3) sum += v; } }
+        // (mean: the picture's average light, red, green and blue alike: how dark a dark stage is)
+        return { nan, over, max, mean: sum / (w * h * 3), pixels: w * h };
       },
       internals: { THREE, renderer, scene, camera, controls, composer, bloom, view, meter, overlay },
       flying: () => !!fly,

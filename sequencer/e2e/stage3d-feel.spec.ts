@@ -293,3 +293,17 @@ test('the church\'s stained glass glows with the Ambient slider: faintly by nigh
   await expect.poll(glass, { timeout: 5000 }).toBeGreaterThan(0.3);
   await slider.fill('0.6');
 });
+
+test('a dark theatre is dark: every light out, at the default Ambient the picture averages under a few percent', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('theatre');
+  await page.locator('.s3').getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'Front', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.flying()), { timeout: 20000 }).toBe(false);
+  // (the cream proscenium and the pale cyc lit by the room alone made it 0.053; now 0.024)
+  const h = await page.evaluate(() => (window as any).__stage3d.hdr(320));
+  expect(h.nan).toBe(0);
+  expect(h.mean).toBeLessThan(0.035);
+});

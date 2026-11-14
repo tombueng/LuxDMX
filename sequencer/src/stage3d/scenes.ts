@@ -250,7 +250,9 @@ export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
   const wallMat = house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x3a1a1e }));
   const carpet = std({ map: rug(), color: 0x6a1a24, roughness: 0.95 });
   const velvet = std({ map: pleats(), color: 0x8a0f1c, roughness: 0.85, emissive: 0x2a0306, emissiveIntensity: 0.9 });
-  const gold = std({ color: 0xc8a046, metalness: 0.8, roughness: 0.3 }), cream = std({ color: 0xd8ccb0, roughness: 0.6 });
+  // (the proscenium a deep, warm stone: in a cream one the dark theatre's own light made it the
+  // brightest thing in the picture with every light out)
+  const gold = std({ color: 0xc8a046, metalness: 0.8, roughness: 0.3 }), cream = std({ color: 0x8a7e66, roughness: 0.6 });
   const fabric = std({ color: 0x7a1018, roughness: 0.9 }), back = std({ color: 0x5e0c14, roughness: 0.9 }), A = audienceMats();
   add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), wallMat), -X, H / 2, zc, [0, Math.PI / 2, 0]);
   add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), wallMat), X, H / 2, zc, [0, -Math.PI / 2, 0]);
