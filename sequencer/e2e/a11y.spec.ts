@@ -326,3 +326,24 @@ test('colour is never the only sign: ARMED and On stage in words on a phone, U0 
   // placeholders and disabled buttons readable
   expect(await page.evaluate(() => { const i = document.createElement('input'); i.placeholder = 'x'; document.body.append(i); const c = getComputedStyle(i, '::placeholder').color; i.remove(); return c; })).not.toBe('rgb(117, 117, 117)');
 });
+
+test('the newest screens: the welcome\'s tiles with their music pickers, folded demos, the gallery, the 3D stage\'s Venue panel with its rooms', async ({ page }) => {
+  test.setTimeout(150_000);
+  await fresh(page, true);
+  const w = page.getByRole('dialog', { name: "Let's get some light on stage" });
+  await expect(w.getByRole('group', { name: 'Wedding' })).toBeVisible();
+  await audit(page, 'welcome');
+  await w.getByRole('button', { name: 'Hide the demos' }).click();
+  await audit(page, 'welcome, demos folded');
+  await w.getByRole('button', { name: 'Start Wedding', exact: true }).click();
+  await expect(w).toBeHidden();
+  await page.evaluate(() => { (window as any).__ui.modal = 'gallery'; });
+  await expect(page.getByRole('dialog', { name: 'What the 3D stage draws' })).toBeVisible();
+  await audit(page, 'gallery');
+  await page.keyboard.press('Escape');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 45000 });
+  await page.locator('.s3').getByRole('button', { name: 'Venue', exact: true }).click();
+  await expect(page.locator('.s3').getByRole('group', { name: 'Room' })).toBeVisible();
+  await audit(page, 'venue panel');
+});
