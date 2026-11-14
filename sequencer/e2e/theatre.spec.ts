@@ -207,6 +207,29 @@ test('a scene change that flies a drop is marked as a winch, not as a machine th
   await expect(card('Forest').locator('.chip.orange')).toHaveCount(0);
   await expect(card('Battle').locator('.chip.orange')).toHaveAttribute('title', /Fires a machine/);
   await expect(card('Battle').locator('.chip.winch')).toHaveCount(0);
-  // (the preset shuts the curtain and flies the drops out: a winch too)
+  // (the preset shuts the curtain and sets the first drop: a winch too)
   await expect(card('Preset').locator('.chip.winch')).toHaveCount(1);
+});
+
+test('on the plan the curtain and the drops are cloths across the stage: the curtain solid while shut, a drop solid while it\'s in', async ({ page }) => {
+  await theatre(page);
+  await page.locator('.stage-wrap').getByRole('button', { name: '2D' }).click();
+  const cloth = (name: string) => page.locator(`.stage-wrap g.fx[data-name="${name}"]`);
+  const box = async (name: string) => (await cloth(name).locator('rect.cloth').boundingBox())!;
+  const plan = (await page.locator('.stage-wrap svg').first().boundingBox())!;
+  // (as wide as their cloth: the curtain the opening and a bit, a drop 30 m of the 42 m plan)
+  expect((await box('House curtain')).width).toBeGreaterThan(plan.width * 0.4);
+  expect((await box('Fly 1')).width).toBeGreaterThan(plan.width * 0.4);
+  // (the drops hang upstage, behind the curtain's line)
+  expect((await box('Fly 1')).y).toBeLessThan((await box('House curtain')).y);
+  // (how solid the cloth is drawn: 1 hanging in view, faint when it's out of the way)
+  const solid = (name: string) => cloth(name).evaluate((g) => Math.max(0, ...[...g.querySelectorAll('rect:not(.cloth)')].map((r) => +(r.getAttribute('opacity') ?? 1))));
+  const l = (await lists(page))[0];
+  await page.evaluate((id) => (window as any).__luxdmx.jump(id, 0), l);          // Preset: shut, the forest in
+  await expect.poll(() => solid('House curtain')).toBeGreaterThan(0.9);
+  await expect.poll(() => solid('Fly 1')).toBeGreaterThan(0.9);
+  await expect.poll(() => solid('Fly 3')).toBeLessThan(0.3);
+  await page.evaluate((id) => { const a = (window as any).__luxdmx; a.jump(id, a.show.cueLists[0].cues.findIndex((c: any) => c.name === 'Night')); }, l);
+  await expect.poll(() => solid('Fly 3'), { timeout: 15000 }).toBeGreaterThan(0.9);       // the stars in
+  await expect.poll(() => solid('House curtain'), { timeout: 15000 }).toBeLessThan(0.3);  // the curtain out
 });

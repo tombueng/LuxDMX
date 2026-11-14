@@ -99,6 +99,13 @@ const BEAMS: Record<string, [number, number]> = {
   'gen-mover8': [14, 14], 'gen-mover16': [12, 12], 'gen-wash': [7, 50], 'gen-spotgobo': [13, 30], 'gen-profile': [5, 50],
   'gen-endless': [3, 42], 'gen-roll': [2, 18], 'gen-headbar4': [4, 4],
 };
+// Stage machinery on a winch channel, by its type's model name: a curtain track (its halves part),
+// a fly curtain (flown out, up), a fly bar with a painted drop (flown in, down); else none
+export type Machinery = 'curtain' | 'flycurtain' | 'flybar';
+export function machineryOf(model = ''): Machinery | undefined {
+  return /fly curtain|flies out/i.test(model) ? 'flycurtain' : /curtain/i.test(model) ? 'curtain' : /fly bar/i.test(model) ? 'flybar' : undefined;
+}
+
 export const GENERIC: FixtureType[] = [
   gen('gen-dimmer', 'Dimmer', [I]),
   gen('gen-rgb', 'RGB', [R, G, B]),

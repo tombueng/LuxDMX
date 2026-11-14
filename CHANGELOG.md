@@ -18,6 +18,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and
   "Throw the changes away" is the way to drop it. A channel called just "Red" that you make green is
   called "Green" too.
+- **Curtains and drops on the plan are cloths, not dots.** The 2D stage draws them as wide as they
+  are, across the stage: solid while they hang in view (a curtain shut, a drop flown in), faint and
+  dashed when they're out of the way; a curtain track's halves part.
 - **Sharing an add-on works on a slow computer too.** Its little preview was made under the same
   30 ms a frame limit as the stage, so a busy laptop got "it takes too long to work out" instead of
   the file. The preview is made once, so it isn't timed any more (the step limit still holds).

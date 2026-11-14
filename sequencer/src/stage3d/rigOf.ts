@@ -4,7 +4,7 @@
 // shows what the stage will.
 import type { Fixture, FixtureMode, FixtureType } from '../model/types';
 import type { FixtureKind } from '../model/library';
-import { capsOf, headCellsOf } from '../model/library';
+import { capsOf, headCellsOf, machineryOf } from '../model/library';
 import { slotsOf } from '../engine/render';
 import { wheelPatterns } from './gobos';
 import { opticsOf } from '../model/fixtureSetup';
@@ -44,7 +44,8 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
   const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
   const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
   // (stage machinery on a winch channel: a curtain track, a fly bar with its drop; else a kinetic winch)
-  const machinery: Look | undefined = has('hoist') ? (/curtain/i.test(t?.model ?? '') ? 'curtain' : /fly bar/i.test(t?.model ?? '') ? 'flybar' : 'winch')
+  const mach = machineryOf(t?.model);
+  const machinery: Look | undefined = has('hoist') ? (mach === 'flybar' ? 'flybar' : mach ? 'curtain' : 'winch')
     : /mirror ?ball|disco ?ball|spiegelkugel/i.test(t?.model ?? '') ? 'mirrorball' : undefined;
   // a real fixture drawn as what it is (profiles.ts), when its type is one
   const profile = profileOf(t?.manufacturer, t?.model);
@@ -89,7 +90,7 @@ export function clothOf(f: Pick<Fixture, 'cloth'>, look: Look, t: FixtureType | 
   if (look !== 'curtain' && look !== 'flybar') return undefined;
   const own = f.cloth ?? {}, num = (v: unknown, d: number, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
   if (look === 'curtain') {
-    const rises = /fly curtain|flies out/i.test(t?.model ?? '');
+    const rises = machineryOf(t?.model) === 'flycurtain';
     return rises ? { w: num(own.w, 18, 1, 60), h: num(own.h, t?.physical?.travel ?? 10.4, 0.5, 30), rises } : { w: num(own.w, t?.physical?.travel ?? 18, 1, 60), h: num(own.h, 10.4, 0.5, 30) };
   }
   return { w: num(own.w, 18, 1, 60), h: num(own.h, 10.2, 0.5, 30), picture: isDropPicture(own.picture) ? own.picture : 'forest' };

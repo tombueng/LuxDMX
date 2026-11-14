@@ -15,6 +15,7 @@
   import { EFFECT_MAP } from '../engine/effects';
   import type { Fixture, Resolved } from '../model/types';
   import { roomFor } from '../stage3d/geometry';
+  import { machineryOf, type Machinery } from '../model/library';
 
   // compact: no toolbar. readonly: only to look at (the Live page): zoom and pan, no selecting or moving.
   // blindChip: says "Blind: only here" itself (the Live page has its own, one you can press)
@@ -287,6 +288,19 @@
     }
     return out;
   });
+  // Stage machinery drawn as what it is on the plan: its cloth as wide as it really is (a drop, a
+  // curtain: a line across the stage), not a dot
+  const machines = $derived.by(() => {
+    const out = new Map<string, { how: Machinery; half: number }>();
+    for (const f of app.show.fixtures) {
+      const t = app.types.get(f.typeId), how = machineryOf(t?.model);
+      if (!how || !app.modeOf(f.id)?.channels.some((c) => c.attr === 'hoist')) continue;
+      // (its cloth's width: its own, else a curtain track spans its travel, as on the 3D stage)
+      const w = f.cloth?.w ?? (how === 'curtain' ? t?.physical?.travel ?? 18 : 18);
+      out.set(f.id, { how, half: Math.max(size, (w / 2 / stageM.W) * W) });
+    }
+    return out;
+  });
   const css = (l: Resolved | undefined) => lookColor(l);
   const cells = (id: string) => app.caps(id).cells;
   // the cells picked on a light (outlined on the plan)
@@ -321,7 +335,7 @@
   const labelAt = $derived(placed.at);
   function placeAt(fs: number) {
     const out = new Map<string, At | null>();
-    const halfW = (id: string) => { const k = app.kinds[id]; return k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72); };
+    const halfW = (id: string) => { const k = app.kinds[id]; return machines.get(id)?.half ?? (k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72)); };
     // Boxes (the lights' bodies, then each placed name) go into columns of the stage, so a name
     // only checks what's near it: a big rig stays quick while a light is dragged around.
     type Box = { x0: number; x1: number; y0: number; y1: number; id?: string };
@@ -494,7 +508,23 @@
            class:dropping={dropFx === f.id} oncontextmenu={(e) => fxMenu(e, f.id)}
            ondragover={(e) => { if (isPreset(e)) { e.preventDefault(); dropFx = f.id; } }} ondragleave={() => { if (dropFx === f.id) dropFx = null; }} ondrop={(e) => presetDrop(e, f.id)}
            onpointerdown={(e) => downFixture(e, f.id)} onpointermove={moveFixture} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
-          {#if kind === 'mover'}
+          {#if machines.has(f.id)}
+            <!-- a curtain or a drop: its cloth across the stage, solid where it hangs in view (a curtain
+                 closed, a drop flown in), dashed where it's out of the way; a track's halves part -->
+            {@const mc = machines.get(f.id)!}
+            {@const v = Math.max(0, Math.min(1, (l as { hoist?: number } | undefined)?.hoist ?? 0))}
+            {@const shown = mc.how === 'flybar' ? v : 1 - v}
+            {@const th = size * 0.36}
+            {@const fill = mc.how === 'flybar' ? '#4f6a4a' : '#7a1420'}
+            <rect class="cloth" x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill="none" stroke="#4a5463" stroke-width={1.2 * px} stroke-dasharray="{4 * px} {3 * px}" />
+            {#if mc.how === 'curtain'}
+              {@const part = mc.half * Math.max(0.08, 1 - v)}
+              <rect x={x - mc.half} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
+              <rect x={x + mc.half - part} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
+            {:else}
+              <rect x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill={fill} opacity={0.15 + 0.85 * shown} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
+            {/if}
+          {:else if kind === 'mover'}
             <circle cx={x} cy={y} r={size * 1.25} fill={c.css} opacity={c.glow * 0.45} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
             <rect x={x - size * 0.9} y={y - size * 0.25} width={size * 1.8} height={size * 0.5} rx="3" fill="#2a313c" />
             <circle cx={x} cy={y} r={size * 0.62} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
