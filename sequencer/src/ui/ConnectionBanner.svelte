@@ -35,7 +35,9 @@
     const unis = [...app.frames.keys()].filter((u) => b.wants(u)).length || 1, n = Math.max(1, Math.round(b.sentRate / unis));
     return `about ${n} look${n === 1 ? '' : 's'} a second`;
   }
-  const slow = $derived((void app.bridgeRev, app.output === 'live' ? app.bridges.filter((b) => b.slow) : []));
+  // (what it says worked out here, each time the box's page reports: a box keeps its row, and the row
+  // its words follow from "hardly answers" to "answers slowly" and back)
+  const slow = $derived((void app.bridgeRev, app.output === 'live' ? app.bridges.filter((b) => b.slow).map((b) => ({ b, stalled: b.slow === 'stalled', looks: looksOf(b) })) : []));
   // Back after being lost: the bar stays a while, green, so a link that drops and comes back every
   // few seconds doesn't push the page up and down under the operator's finger each time.
   const BACK_MS = 15000;
@@ -56,10 +58,10 @@
     {#if b.state !== 'reconnecting' && b.state !== 'opening'}<button class="primary" onclick={() => b.open()}>{b.lostAt > 0 ? 'Reconnect' : 'Connect'}</button>{/if}
   </div>
 {/each}
-{#each slow as b (b.host)}
+{#each slow as { b, stalled, looks } (b.host)}
   <div class="lost slow" role="alert">
     <Icon name="warn" />
-    <span><b>{nameOf(b)} {b.slow === 'stalled' ? 'hardly answers' : 'answers slowly'}</b>: the lights get {b.slow === 'stalled' ? 'almost nothing' : looksOf(b)}, the network to it is slow or busy (its Wi-Fi?). A cable, or the box nearer the router, helps.</span>
+    <span><b>{nameOf(b)} {stalled ? 'hardly answers' : 'answers slowly'}</b>: the lights get {stalled ? 'almost nothing' : looks}, the network to it is slow or busy (its Wi-Fi?). A cable, or the box nearer the router, helps.</span>
   </div>
 {/each}
 {#each back as b (b.host)}
