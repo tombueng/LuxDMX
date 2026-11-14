@@ -8,13 +8,17 @@ test('"Play the show" on the festival plays the big demo: 3D stage, the timeline
   await demo(page);
   await expect(page.locator('.top .show .name')).toHaveText('We Are Not The Band: live');
   await expect(page.locator('.tlv')).toBeVisible();
-  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 30000 });
-  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing)).toBe(true);
+  // (the biggest scene there is: in a headless browser its 3D stage is built and drawn on the CPU,
+  // and on a busy machine the page doesn't answer for half a minute while it builds (measured: 30 s,
+  // then it plays in real time; on a graphics card it's a third of a second): time enough for that)
+  test.setTimeout(180_000);
+  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 90000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 60000 }).toBe(true);
   expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThanOrEqual(200);
-  await expect.poll(async () => (await channels(0, 304)).some((v) => v > 0), { timeout: 8000 }).toBe(true);
+  await expect.poll(async () => (await channels(0, 304)).some((v) => v > 0), { timeout: 20000 }).toBe(true);
   // (it starts with the show's intro, before the song's 0: the clock runs on from wherever it is)
   const p0: number = await page.evaluate(() => (window as any).__luxdmx.timeline.position);
-  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.position), { timeout: 8000 }).toBeGreaterThan(p0 + 1);
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.position), { timeout: 30000 }).toBeGreaterThan(p0 + 1);
 });
 
 test('Highlight puts the selected lights at full white, not into cues', async ({ page }) => {
