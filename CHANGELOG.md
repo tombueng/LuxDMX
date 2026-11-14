@@ -70,6 +70,7 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   included. Folded demos stay as a row of play buttons now, so the festival show can't get lost.
   Each has its audience on the crowd track too: waiting before the song, cheering as the room
   would (a concert on every chorus, a theatre only at the end, a bar chatting all along).
+  The club and house party demos get theirs as well (they had hundreds of people and no sound).
 - A render has the crowd in its sound now, as you hear it when the show plays: the chatting before
   the band comes on, the cheers on the big moments, at the Crowd volume.
 - The plans of the church and the cinema cover the whole room now, not just the stage: their lights

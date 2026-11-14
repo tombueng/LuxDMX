@@ -149,7 +149,7 @@ export function buildParty(song?: DemoSong): Show {
   mk('end', look('The end', [], [], 6));
 
   s.timeline = cueParts(song, {
-    list: L.id, looks, end: 'end', haze: { list: haze.id, cue: haze.cues[0].id },
+    list: L.id, looks, end: 'end', crowd: 'party', haze: { list: haze.id, cue: haze.cues[0].id },
     sets: {
       intro: [['intro']], verse: [['sunset', 'teal'], ['juggle', 'sunset'], ['teal', 'juggle']], build: [['build']],
       chorus: [['drop', 'dropGold'], ['dropWaves', 'popcorn', 'drop'], ['fireworks', 'dropGold', 'dropWaves']], solo: [['strobe', 'fireworks']],

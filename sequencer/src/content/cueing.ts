@@ -3,7 +3,7 @@
 // the big moments where the kind of part asks for them (`moments`), haze all along, and at the end
 // a last hit where the outro starts and the stage going dark as the music rings out. On a song from
 // the catalog (its tempo, first downbeat and parts as measured) or, without one, on the demo beat.
-import type { BurstAttr, Timeline, TimelineAction, TimelineItem } from '../model/timeline';
+import type { BurstAttr, CrowdAction, CrowdItem, Timeline, TimelineAction, TimelineItem } from '../model/timeline';
 import type { Show } from '../model/types';
 import type { RoomId } from '../stage3d/geometry';
 import { BAR_S, DEMO_BPM, DEMO_SECONDS, sectionStarts } from '../timeline/beat';
@@ -29,7 +29,43 @@ export interface CueOpts {
   haze?: { list: string; cue: string };            // a haze list's cue, on from the start
   end: string;                                     // the key of the look the show ends on (dark)
   moments: (p: Part, c: Cuer) => void;             // the machines and the hits for a part
+  crowd?: CrowdKind;                               // the audience on the crowd track (and SHOW_LEAD s of show before the song)
 }
+// a concert crowd cheers the band on and on every chorus; a party's on the drops; a theatre, church
+// or cinema audience murmurs before, is quiet through it and cheers at the end; a bar chats all along
+export type CrowdKind = 'concert' | 'party' | 'calm' | 'bar';
+// seconds of show before the song (the audience waiting) and after it (cheering, then chatting)
+export const SHOW_LEAD = 8, SHOW_TAIL = 6;
+
+// The audience's sound for a show of `kind` on the song's parts (the crowd track, audio/crowd.ts
+// plays it, and a render has it too)
+export function crowdTrack(kind: CrowdKind, parts: Part[], duration: number): CrowdItem[] {
+  const out: CrowdItem[] = [];
+  const cr = (at: number, a: CrowdAction, len = 0) => out.push({ id: `tc${out.length + 1}`, at: +at.toFixed(3), do: a, ...(len ? { len } : {}) });
+  const mood = (at: number, m: 'chatter' | 'cheer', level: number, len = 0) => cr(at, { do: 'crowd', mood: m, level }, len);
+  const cheer = (at: number, level: number, len = 4) => cr(at, { do: 'cheer', level }, len);
+  const lead = -SHOW_LEAD, choruses = parts.filter((p) => p.kind === 'chorus');
+  // waiting: chatting (a bar's a little louder, a church's hushed)
+  mood(lead, 'chatter', kind === 'bar' ? 0.55 : kind === 'calm' ? 0.4 : 0.5);
+  if (kind === 'concert' || kind === 'party') {
+    // the music starts: a cheer, cheering that dies away into the first part
+    cheer(-0.3, kind === 'concert' ? 1 : 0.7, 6); mood(-0.3, 'cheer', kind === 'concert' ? 0.8 : 0.55, 0.5); mood(4, 'cheer', 0, 8);
+    // every chorus (a drop at the party) gets its cheer, the last one the biggest
+    for (const p of choruses) { const big = p.lastChorus; cheer(p.at, big ? 0.9 : kind === 'party' ? 0.65 : 0.5, big ? 6 : 4); if (kind === 'party' || big) { mood(p.at, 'cheer', big ? 0.6 : 0.4, 0.5); mood(p.at + 6, 'cheer', 0, 6); } }
+  } else if (kind === 'calm') {
+    mood(-2, 'chatter', 0, 3);                      // (hushed as it starts)
+  } else {
+    // a bar: the chatting goes on under the music, someone cheers on a chorus
+    mood(0, 'chatter', 0.4, 4);
+    for (const p of choruses) cheer(p.at, p.lastChorus ? 0.5 : 0.3, 3);
+  }
+  // the end: cheering, then chatting as they get up
+  const last = [...parts].reverse().find((p) => p.kind === 'outro');
+  const end = Math.max(0, (last ? last.end : duration) - 0.5);
+  cheer(end, kind === 'bar' ? 0.6 : 1, 6); mood(end, 'cheer', kind === 'bar' ? 0.5 : 0.8, 1); mood(end + 3, 'chatter', 0.4, 4);
+  return out.sort((a, b) => a.at - b.at);
+}
+
 
 // The room the 3D stage shows the show in. (The show file's type names only the hall and the pub
 // so far; the 3D stage knows every room in geometry.ts ROOMS.)
@@ -85,7 +121,9 @@ export function cueParts(song: DemoSong | undefined, o: CueOpts): Timeline {
     put(Math.max(0, duration - 6), `list:${o.haze.list}`, { do: 'release', list: o.haze.list });
   }
   items.sort((a, b) => a.at - b.at);
+  // the audience: waiting before the song, then as the room has it (crowdTrack)
+  const crowd = o.crowd ? { lead: SHOW_LEAD, tail: SHOW_TAIL, crowd: crowdTrack(o.crowd, parts, duration) } : {};
   return song
-    ? { duration, bpm: song.bpm, offset: song.offset, items, sections: song.sections.map((x) => ({ name: x.name, at: x.at, ...(Number.isFinite(x.energy) ? { energy: x.energy } : {}) })) }
-    : { demo: true, duration, bpm: DEMO_BPM, offset: 0, items };
+    ? { duration, bpm: song.bpm, offset: song.offset, items, sections: song.sections.map((x) => ({ name: x.name, at: x.at, ...(Number.isFinite(x.energy) ? { energy: x.energy } : {}) })), ...crowd }
+    : { demo: true, duration, bpm: DEMO_BPM, offset: 0, items, ...crowd };
 }

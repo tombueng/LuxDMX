@@ -266,3 +266,16 @@ describe('the test truss', () => {
     expect(t.items.some((i) => i.do.do === 'goto' && i.do.list === chase.id)).toBe(true);
   });
 });
+
+describe('the audience at the club and the party', () => {
+  it('chatting before the song, cheering the drops and at the end (the festival has its own)', async () => {
+    const { crowdAt, loudness } = await import('../audio/crowd');
+    for (const id of ['club', 'party']) {
+      const tl = DEMOS.find((d) => d.id === id)!.build().timeline!;
+      expect(tl.lead, id).toBeGreaterThan(0);
+      expect(crowdAt(tl.crowd, -4).chatter, id).toBeGreaterThan(0.2);
+      expect(tl.crowd!.some((c) => c.do.do === 'cheer' && c.at > 0 && c.at < tl.duration - 10), id).toBe(true);
+      expect(loudness(crowdAt(tl.crowd, tl.duration + 1)), id).toBeGreaterThan(0.4);
+    }
+  });
+});

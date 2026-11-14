@@ -55,7 +55,7 @@ describe('the templates play as shows', () => {
   it('a template\'s show is a show file as any other (the format\'s check finds nothing to drop)', () => {
     for (const t of TEMPLATES) {
       const s = templatePlayable(t.name)!.build(song(TEMPLATE_SHOWS[t.name].song));
-      const r = upgrade(JSON.parse(JSON.stringify({ format: 'luxdmx-show', version: '1.2.0', ...s, name: s.meta?.name ?? 'x' })));
+      const r = upgrade(JSON.parse(JSON.stringify(s)));
       expect(r.timeline?.items.length, t.name).toBe(s.timeline!.items.length);
       expect(r.timeline?.crowd?.length, t.name).toBe(s.timeline!.crowd!.length);
     }

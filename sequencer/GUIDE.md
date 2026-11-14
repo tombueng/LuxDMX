@@ -106,7 +106,7 @@ many lights and cues):
   many as the room takes: no CO2 in the church), and the audience on the crowd track: chatting
   for the eight seconds before the song, then as the room has it (a concert cheers the band on and
   every chorus, a party its drops, a theatre, church or cinema is quiet until the end, a bar chats
-  all along), cheering at the end. **Start** gives the template to work on, its
+  all along), cheering at the end (the club and party demos have that party crowd too). **Start** gives the template to work on, its
   lights and looks, no music. The DJ / Party template is in the club, with the DJ at the decks.
 
 Every demo and template also has **Lights only**: its lights in their places (in its room, for a
