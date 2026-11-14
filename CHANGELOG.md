@@ -71,6 +71,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   Each has its audience on the crowd track too: waiting before the song, cheering as the room
   would (a concert on every chorus, a theatre only at the end, a bar chatting all along).
   The club and house party demos get theirs as well (they had hundreds of people and no sound).
+- Undo on a big show is quicker: it changes only what differs instead of swapping in the whole
+  show, so the screen redraws just that (the festival: 0.86 s frozen per undo, now 0.6, the same
+  as any edit there).
 - 3D: light lands on walls now, not only on the floor: wall washers and uplights paint the walls
   (the church between its windows, the cinema's side walls), a gobo shows on the theatre's cyc or
   the cinema's screen, a head pointed up lights the ceiling.

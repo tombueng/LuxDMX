@@ -383,3 +383,13 @@ lists and effects a hand-made live page doesn't have yet.)
 - Per-mode facts (which channels are 16 bit, gated, the shutter's ranges) are worked out once per
   mode in a `WeakMap` (`capsOf`, `planOf`, `gatedChannels`). That's only right because a fixture
   type is never edited in place: saving one makes a new object. Keep it that way.
+
+## Undo keeps what didn't change
+
+Undo and redo don't swap in a new show object: `model/reconcile.ts` brings the live show (a
+Svelte `$state` proxy) to the step's text by changing only what differs, so unchanged fixtures,
+cues and lists keep their identity and only what changed is drawn again. Two rules come with it:
+objects with their own prototype (the raw fixture types and cell maps) and an effect's `params`
+are never changed in place (a changed one is a new object: the engine caches by them); and the
+show's text after an undo is the step's own unless a field came back into an object that was
+there (then it's made again, as its key order may differ). `src/undo.app.test.ts` checks both.

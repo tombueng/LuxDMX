@@ -3,6 +3,7 @@
 // Record stores the fixtures you touched (the programmer), each with its full current look.
 // Fixtures you didn't touch stay out of the cue, so playing it leaves them alone: that's what
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
+import { reconcile } from './model/reconcile';
 import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
 import { freezeGroupNumbers, groupByNumber, nextGroupNumber } from './model/groupnum';
@@ -1212,11 +1213,16 @@ class App {
     const recLive = !!rec && this.engine.status(rec.list).cue === rec.cue;     // (not moved on since)
     let said = '';
     try { said = verb === 'Undone' ? describeChange(back, now) : describeChange(now, back); } catch { /* only the message */ }
-    this.show = rawTypes(back);
+    // (only what differs changes: the rest keeps its identity, so only that is drawn again; the whole
+    // show replaced took most of a second on a big rig, H8)
+    const lockedBack = back.pages.some((p) => p.locked) || !!back.settings.lockPage, note = { moved: false };
+    reconcile(this.show, rawTypes(back), note);
     // (the lock as it is now, whatever the step had)
     for (const p of lockedNow ? this.ownPages() : this.show.pages) { if (lockedNow) p.locked = true; else delete p.locked; }
     if (lockedNow && lockPage) this.show.settings.lockPage = lockPage; else delete this.show.settings.lockPage;
-    this.lastSnap = JSON.stringify(this.show);
+    // (the show's text is the step's, unless the lock changed it or a field came back in another
+    // place: making it again from the live show is most of the undo's time on a big rig)
+    this.lastSnap = lockedNow || lockedBack || note.moved ? JSON.stringify(this.show) : prev;
     this.rev++;
     this.canUndo = this.undoStack.length > 0; this.canRedo = this.redoStack.length > 0;
     // a selection can't point at things that are gone now
