@@ -3,6 +3,7 @@
 // Record stores the fixtures you touched (the programmer), each with its full current look.
 // Fixtures you didn't touch stay out of the cue, so playing it leaves them alone: that's what
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
+import { planToWorld, roomFor } from './stage3d/geometry';
 import { reconcile } from './model/reconcile';
 import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
@@ -1493,9 +1494,17 @@ class App {
     if (c.color && !c.cct && typeof v.cct === 'number') { if (!v.color) v.color = cctColor(v.cct); delete v.cct; }
     else if (c.cct && !c.color && v.cct === undefined && v.color && 'r' in v.color) { const w = whiteTemperature(v.color); if (w !== undefined) v.cct = w; delete v.color; }
   }
+  // (a light with its own place in 3D moves there too, by as much as on the plan, at the same height
+  // and turned the same: the plan is that place seen from above; a template's lights all have one)
   moveFixture(id: string, x: number, y: number) {
     const f = this.show.fixtures.find((g) => g.id === id);
-    if (f) { f.x = Math.max(0.02, Math.min(0.98, x)); f.y = Math.max(0.04, Math.min(0.96, y)); }
+    if (!f) return;
+    const nx = Math.max(0.02, Math.min(0.98, x)), ny = Math.max(0.04, Math.min(0.96, y));
+    if (f.p3 && (nx !== f.x || ny !== f.y)) {
+      const r = roomFor(this.show.settings.stage3d), a = planToWorld(f.x, f.y, r), b = planToWorld(nx, ny, r);
+      f.p3 = { ...f.p3, x: +(f.p3.x + b.x - a.x).toFixed(3), z: +(f.p3.z + b.z - a.z).toFixed(3) };
+    }
+    f.x = nx; f.y = ny;
   }
 
   // ---- fixture order, copy / paste

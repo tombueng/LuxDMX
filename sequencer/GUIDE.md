@@ -872,7 +872,8 @@ Three more demos come with their own room on the 3D stage:
   it, a PA on poles, TVs on the walls, a bar at the back with its bartender, a few dozen people.
   Your lights move onto its rig (where the plan puts them: a quarter across the plan is a quarter
   across that stage); lights you placed by hand in 3D stay where you put them, and Reset puts them
-  on the room's rig. The camera views go inside the pub. The demos bring rooms of their own: a club
+  on the room's rig. Dragging a light on the plan moves it in 3D too (by as much, at its height).
+  The camera views go inside the pub. The demos bring rooms of their own: a club
   (a stage framed by truss on four towers, a truss over the dance floor, a bar at the back, a
   mirror ball), a party room (a square of truss over the crowd, no stage) and an empty room with
   one truss; the camera views go inside them too. The Cinema, Bar, Theatre, Church and Wedding templates bring theirs: a

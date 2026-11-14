@@ -109,3 +109,22 @@ test('light lands on the walls: the church\'s uplights wash its walls; with the 
   await box.check();
   await expect.poll(walls, { timeout: 20000 }).toBeGreaterThanOrEqual(6);
 });
+
+test('a light dragged on the plan moves in 3D too (the template\'s lights have their own 3D places)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Wedding');
+  const id = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.find((f: any) => f.name === 'Sparks 2').id);
+  const before = await page.evaluate((id) => ({ ...(window as any).__luxdmx.show.fixtures.find((f: any) => f.id === id).p3 }), id);
+  // (dragged over to where Pinspot 9 is: across the dance floor to its far side)
+  const sym = (await page.locator('.stage-wrap .fx[data-name="Sparks 2"]').boundingBox())!, to = (await page.locator('.stage-wrap .fx[data-name="Pinspot 9"]').boundingBox())!;
+  await page.mouse.move(sym.x + sym.width / 2, sym.y + sym.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 45000 }).toBe('ballroom');
+  const now = await where(page, 'Sparks 2');
+  expect(before.x - now.x).toBeGreaterThan(5);                  // (across the dance floor: metres to the left)
+  expect(now.y).toBeCloseTo(before.y, 2);                         // (on the floor still)
+});
