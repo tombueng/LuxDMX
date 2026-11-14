@@ -34,7 +34,28 @@ export function mirrorTiles(): THREE.Texture | null {
   return t;
 }
 
-export interface Ball { obj: THREE.Object3D; r: number }
+// a mirror ball: a sphere of small mirror tiles, sparkling a little in any light (rig light makes it
+// sparkle more: Stage3D). A room's own ball turns at BALL_SPIN radians a second (about five turns a
+// minute); one on a DMX motor as its channel says (rig.ts).
+export const BALL_SPIN = 0.5;
+export function mirrorBall(r: number) {
+  const tex = mirrorTiles();
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), new THREE.MeshStandardMaterial({ color: 0xe8ecf2, map: tex ?? undefined, metalness: 0.9, roughness: 0.18, flatShading: true, emissive: 0xffffff, emissiveMap: tex ?? undefined, emissiveIntensity: 0.12 }));
+  m.name = 'mirror ball'; m.userData.live = true;
+  return m;
+}
+
+export interface Ball { obj: THREE.Object3D; r: number; holder?: THREE.Object3D }
+
+// A mirror ball never hangs dead still: on its chain it sways a little and twists back and forth a
+// few degrees, and its motor, when it runs, turns it round on top of that. `speed`: the motor's
+// radians a second (0: stopped). Called every frame with the time in seconds.
+export function ballMotion(o: THREE.Object3D, t: number, speed: number) {
+  const u = o.userData as { spun?: number; at?: number };
+  const dt = u.at === undefined ? 0 : Math.min(0.1, Math.max(0, t - u.at));
+  u.at = t; u.spun = ((u.spun ?? 0) + speed * dt) % (Math.PI * 2);
+  o.rotation.set(0.02 * Math.sin(t * 0.43), u.spun + 0.07 * Math.sin(t * 0.31) + 0.03 * Math.sin(t * 0.77 + 1), 0.016 * Math.sin(t * 0.57 + 2));
+}
 export class MirrorDots {
   readonly group = new THREE.Group();
   private dots: THREE.InstancedMesh;

@@ -336,4 +336,20 @@ test('the bar\'s mirror ball turns (no music needed) and throws its dots round t
   await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures.filter((x: any) => /^Pinspot/.test(x.name))) a.programmer[f.id] = { intensity: 1, color: { r: 1, g: 1, b: 1 } }; });
   await expect.poll(async () => (await mirror()).dots, { timeout: 8000 }).toBeGreaterThan(100);
   expect((await mirror()).hit[0]).toBeGreaterThan(0.9);
+  // one ball: the show's own on its DMX motor (the room's gives way to it). Its motor stopped, it
+  // only sways and twists a little; at speed it goes round
+  expect((await mirror()).spin.length).toBe(1);
+  const motor = (v: number) => page.evaluate((v) => { const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => x.name === 'Mirror ball'); a.programmer[f.id] = { rollRotation: v }; }, v);
+  await motor(0);
+  await page.waitForTimeout(500);
+  const still = [(await mirror()).spin[0]];
+  for (let i = 0; i < 4; i++) { await page.waitForTimeout(500); still.push((await mirror()).spin[0]); }
+  expect(Math.max(...still) - Math.min(...still)).toBeGreaterThan(0.001);                  // (never dead still)
+  expect(Math.max(...still) - Math.min(...still)).toBeLessThan(0.3);
+  expect(Math.abs((await mirror()).tilt[0])).toBeLessThan(0.05);
+  await motor(120 / 255);                                                                 // (clockwise, fast)
+  const a0 = (await mirror()).spin[0];
+  await page.waitForTimeout(1500);
+  const turned = Math.abs((((await mirror()).spin[0] - a0) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+  expect(turned).toBeGreaterThan(0.4);
 });

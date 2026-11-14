@@ -168,6 +168,10 @@ export const GENERIC: FixtureType[] = [
     ch('Height', 'hoist'), ch('Height fine', 'hoist', { fine: true }), ch('Speed', 'speed'),
     ch('Motion enable', 'enable', { ranges: [{ from: 0, to: 99, label: 'Safe' }, { from: 100, to: 255, label: 'Motion enabled' }] }),
     I, R, G, B]), physical: { travel: 4, hoistSpeed: 0.5 } },
+  // a mirror ball's motor: the ball turns one way or the other, slow to fast (0 and the middle: stopped)
+  gen('gen-mirrorball', 'Mirror ball with a DMX motor (1 ch)', [ch('Motor', 'rollRotation', { ranges: [
+    { from: 0, to: 9, label: 'Stop' }, { from: 10, to: 127, label: 'Turning clockwise slow..fast' },
+    { from: 128, to: 137, label: 'Stop' }, { from: 138, to: 255, label: 'Turning anticlockwise slow..fast' }] })]),
   // stage machinery, driven by a winch channel each (kinetics: only armed on the wire): a curtain
   // track, its two halves parting from the middle (0 closed, 1 open; travel: the width it spans),
   // and a fly bar lowering a painted drop in (0 flown out, 1 in; travel: how far it flies)

@@ -700,6 +700,9 @@ export const TEMPLATES: Template[] = [
       const pins = b.add('gen-dimmer', 2, 'Pinspot', 0.62, { x0: 0.42, x1: 0.58 });
       // (a pinspot's beam is a pencil, about 6°: a dimmer's 30° lit half the room past the mirror ball)
       b.place(pins, (f) => { f.beamDeg = [6, 6]; });
+      // the mirror ball on a DMX motor: turning slowly all evening, faster on the party nights
+      const ball = b.add('gen-mirrorball', 1, 'Mirror ball', 0.62, { x0: 0.5, x1: 0.5 });
+      const spin = (s: number): [string[], Values] => [ball, { rollRotation: s ? (10 + s * 117) / 255 : 0 }];
       const strobes = b.add('gen-strobe', 2, 'Strobe', 0.5, { x0: 0.45, x1: 0.55 });
       // the neon sign over the back bar (an LED matrix on the box's pixel port)
       const sign = b.add('gen-matrix32x8', 1, 'Neon sign', 0.02, { universe: 10, x0: 0.5, x1: 0.5 });
@@ -746,7 +749,7 @@ export const TEMPLATES: Template[] = [
       const signHearts = b.effect('Neon: hearts', 'risingHearts', gSign, {});
       const goal = b.effect('Neon: goal!', 'fallingLetters', gSign, { text: 'GOAL', speed: 2 });
       const extra = [shelves, strip, dance, heads, beams, pins, strobes, sign].flat();
-      const out: [string[], Values][] = [[extra, { intensity: 0 }]];
+      const out: [string[], Values][] = [[extra, { intensity: 0 }], spin(0.12)];
       const signOn = (lvl = 1): [string[], Values] => [sign, on(lvl)];
       const l = b.list('Moods', { play: false });
       const m = b.machines();
@@ -761,21 +764,21 @@ export const TEMPLATES: Template[] = [
       b.cue(l, 'Rooftop sunset', [...out, [pars, on(0.8)], [warm, on(0.5, undefined, { cct: 0.15 })], [shelves, on(0.8, C.orange)], [strip, on(0.7, C.pink)], signOn()], { fade: 12, effects: [parSunset, shelfFire, cheers] });
       b.cue(l, 'Quiz night', [...out, [pars, on(0.7, C.cool)], [warm, on(0.9, undefined, { cct: 0.7 })], [shelves, on(0.6, C.cyan)], signOn()], { fade: 4, effects: [stripScan, open] });
       b.cue(l, 'Football', [...out, ...split(pars, C.red, C.white), [warm, on(0.8, undefined, { cct: 0.6 })], [shelves, on(1, C.red)], [strip, on(1)], signOn()], { fade: 1, effects: [parChase, stripScan, goal] });
-      b.cue(l, 'Karaoke', [...out, [pars, on(0.7, C.magenta)], [warm, on(0.5, undefined, { cct: 0.3 })], [shelves, on(0.8)], [dance, on(1, C.white)], [heads, on(1, C.white, { pan: 0.5, tilt: 0.6 })], signOn()],
+      b.cue(l, 'Karaoke', [...out, spin(0.25), [pars, on(0.7, C.magenta)], [warm, on(0.5, undefined, { cct: 0.3 })], [shelves, on(0.8)], [dance, on(1, C.white)], [heads, on(1, C.white, { pan: 0.5, tilt: 0.6 })], signOn()],
         { fade: 2, effects: [gradient, mirror, party] });
-      b.cue(l, 'Latin night', [...out, [pars, on(0.8, C.orange)], [shelves, on(1, C.red)], [dance, on(1, C.yellow)], [heads, on(1, C.orange, { pan: 0.5, tilt: 0.62 })], [strip, on(1)], signOn()], { fade: 1, effects: [parChase, flower, danceChase, shelfFire, party] });
-      b.cue(l, 'Disco', [...out, [pars, on(0.8)], [shelves, on(1)], [dance, on(1)], [heads, on(1, C.white, { pan: 0.5, tilt: 0.65 })], [beams, on(1, C.white, { pan: 0.5, tilt: 0.62, zoom: 0, prism: 1 })], [pins, on(1)], [strip, on(1)]],
+      b.cue(l, 'Latin night', [...out, spin(0.35), [pars, on(0.8, C.orange)], [shelves, on(1, C.red)], [dance, on(1, C.yellow)], [heads, on(1, C.orange, { pan: 0.5, tilt: 0.62 })], [strip, on(1)], signOn()], { fade: 1, effects: [parChase, flower, danceChase, shelfFire, party] });
+      b.cue(l, 'Disco', [...out, spin(0.55), [pars, on(0.8)], [shelves, on(1)], [dance, on(1)], [heads, on(1, C.white, { pan: 0.5, tilt: 0.65 })], [beams, on(1, C.white, { pan: 0.5, tilt: 0.62, zoom: 0, prism: 1 })], [pins, on(1)], [strip, on(1)]],
         { fade: 1, effects: [parRainbow, danceRainbow, beamCircles, stripWaves, mirror] });
-      b.cue(l, 'Party', [...out, [pars, on(0.8, C.purple)], [warm, on(0.3, undefined, { cct: 0.2 })], [shelves, on(1)], [dance, on(1, C.magenta)], [heads, on(1, C.cyan, { pan: 0.5, tilt: 0.65 })], [pins, on(1)],
+      b.cue(l, 'Party', [...out, spin(0.4), [pars, on(0.8, C.purple)], [warm, on(0.3, undefined, { cct: 0.2 })], [shelves, on(1)], [dance, on(1, C.magenta)], [heads, on(1, C.cyan, { pan: 0.5, tilt: 0.65 })], [pins, on(1)],
         [beams, on(1, C.magenta, { pan: 0.5, tilt: 0.62, zoom: 0 })], [strip, on(1)], signOn()], { fade: 1, effects: [danceChase, bally, plasma, mirror, beamFan, party] });
-      b.cue(l, 'Shots!', [...out, [pars, on(1, C.red)], [shelves, on(1, C.red)], [dance, on(1, C.white)], [strobes, on(1, undefined, { strobe: 0.6 })], [heads, on(1, C.red, { pan: 0.5, tilt: 0.62 })], [strip, on(1, C.red)], signOn()],
+      b.cue(l, 'Shots!', [...out, spin(0.7), [pars, on(1, C.red)], [shelves, on(1, C.red)], [dance, on(1, C.white)], [strobes, on(1, undefined, { strobe: 0.6 })], [heads, on(1, C.red, { pan: 0.5, tilt: 0.62 })], [strip, on(1, C.red)], signOn()],
         { fade: 0, effects: [strobeHit, weave, shots, meteors] });
-      b.cue(l, 'Ladies\' night', [...out, [pars, on(0.8, C.pink)], [shelves, on(0.9, C.magenta)], [dance, on(1, C.pink)], [heads, on(1, C.pink, { pan: 0.5, tilt: 0.62 })], [strip, on(0.9, C.pink)], signOn()], { fade: 2, effects: [weave, danceChase, signHearts, stripWaves] });
-      b.cue(l, 'Birthday!', [...out, [pars, on(1, C.pink)], [warm, on(0.6, undefined, { cct: 0.4 })], [shelves, on(1)], [dance, on(1, C.gold)], [heads, on(1, C.gold, { pan: 0.5, tilt: 0.6 })], [pins, on(1)], signOn()],
+      b.cue(l, 'Ladies\' night', [...out, spin(0.35), [pars, on(0.8, C.pink)], [shelves, on(0.9, C.magenta)], [dance, on(1, C.pink)], [heads, on(1, C.pink, { pan: 0.5, tilt: 0.62 })], [strip, on(0.9, C.pink)], signOn()], { fade: 2, effects: [weave, danceChase, signHearts, stripWaves] });
+      b.cue(l, 'Birthday!', [...out, spin(0.45), [pars, on(1, C.pink)], [warm, on(0.6, undefined, { cct: 0.4 })], [shelves, on(1)], [dance, on(1, C.gold)], [heads, on(1, C.gold, { pan: 0.5, tilt: 0.6 })], [pins, on(1)], signOn()],
         { fade: 0.5, effects: [danceChase, bally, mirror, cheers], actions: fire(m.confetti, m.sparks), note: 'Confetti and sparks with the cake: the one confetti shot' });
       b.cue(l, 'Lock-in', [...out, [pars, on(0.2, C.red)], [warm, on(0.2, undefined, { cct: 0.05 })], [shelves, on(0.5, C.red)], [strip, on(0.3, C.red)]], { fade: 10, effects: [shelfFire] });
       b.cue(l, 'Last call', [...out, [pars, on(0.6, C.amber)], [warm, on(0.8, undefined, { cct: 0.5 })], [shelves, on(0.5, C.amber)], signOn()], { fade: 5, effects: [cheers] });
-      b.cue(l, 'Lights up', [...out, [pars, on(1, C.white)], [warm, on(1, undefined, { cct: 0.8 })], [shelves, on(0.6, C.white)], [dance, on(1, C.white)]], { fade: 3 });
+      b.cue(l, 'Lights up', [...out, spin(0), [pars, on(1, C.white)], [warm, on(1, undefined, { cct: 0.8 })], [shelves, on(0.6, C.white)], [dance, on(1, C.white)]], { fade: 3 });
       // (in its own room, a bar: the counter, the back bar, the dance floor; scenePlaces.ts)
       const done = b.done();
       placeIn(done, 'bar');

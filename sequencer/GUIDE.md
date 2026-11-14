@@ -937,7 +937,10 @@ Three more demos come with their own room on the 3D stage:
   the front of the DJ booth). Both are kept with the show (the screens' live camera in this browser).
   A mirror ball (the bar's, the club's) turns on its own motor, music or not; light it with the
   pinspots aimed at it and it throws its dots round the room, walls, ceiling and floor, sweeping
-  round as it turns, with thin rays through the haze.
+  round as it turns, with thin rays through the haze. It never hangs dead still: on its chain it
+  sways and twists a little. Add **Mirror ball with a DMX motor** (generic types) and its one
+  channel sets the motor: stopped, turning one way or the other, slow to fast; that ball takes the
+  room's place (the Bar template has one, slow all evening and faster for the disco).
   The theatre, church and cinema templates put nobody on stage: no band, a calm audience (on
   your own stage too). Lights keep their places when you change the room; the ones that end up
   outside it (a church's lights 11.85 m up, on a stage with a 9.6 m ceiling) are said: select

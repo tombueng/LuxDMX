@@ -13,6 +13,9 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A mirror ball on a DMX motor**: a new generic type with one motor channel (stop, either way,
+  slow to fast). The ball never hangs dead still, it sways and twists a little on its chain. The
+  Bar has one: slow all evening, faster for the disco.
 - **Offline, properly.** The app keeps all of itself when it's first opened (before, only what had
   been loaded), and a Wi-Fi without internet no longer holds the start up. Catalog songs played once
   stay for offline; the demos' songs all come down as soon as one is used.

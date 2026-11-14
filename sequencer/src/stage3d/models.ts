@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch' | 'curtain' | 'flybar';
+export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch' | 'curtain' | 'flybar' | 'mirrorball';
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 
 // moving heads: the head turns about the yoke's arms at PIVOT; its lens is HEAD_LENS above that
@@ -72,6 +72,8 @@ export function body(look: Look): { geo: THREE.BufferGeometry; lensR: number; le
     case 'flame': return { geo: merge([new THREE.BoxGeometry(0.42, 0.34, 0.42).translate(0, 0.17, 0), new THREE.CylinderGeometry(0.04, 0.06, 0.18, 8).translate(0, 0.43, 0)]), lensR: 0 };
     case 'sparks': return { geo: merge([new THREE.BoxGeometry(0.4, 0.22, 0.4).translate(0, 0.11, 0), new THREE.CylinderGeometry(0.1, 0.05, 0.12, 10).translate(0, 0.28, 0)]), lensR: 0 };
     case 'co2': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.2, 10).translate(0, 0.1, 0), new THREE.CylinderGeometry(0.035, 0.05, 0.6, 8).translate(0, 0.5, 0)]), lensR: 0 };
+    // a mirror ball's motor: a small box at the top of its chain (the ball is the rig's own, rig.ts)
+    case 'mirrorball': return { geo: new THREE.BoxGeometry(0.12, 0.1, 0.12).translate(0, -0.05, 0), lensR: 0.01 };
     default: return { geo: new THREE.BoxGeometry(0.3, 0.3, 0.3).translate(0, -0.15, 0), lensR: 0.1 };
   }
 }

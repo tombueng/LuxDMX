@@ -15,6 +15,7 @@ import { body, headBarParts, headParts, HEADBAR_LENS, HEADBAR_PITCH, HEADBAR_PIV
 import { ATLAS_CELLS, PLAIN_WHEEL, prismOf, rotationOf } from './gobos';
 import { dropTexture } from './drops';
 import { pleats } from './textures';
+import { ballMotion, mirrorBall, type Ball } from './mirrorBall';
 // (a curtain's pleats: many across its width, the same texture for every curtain)
 let pleatTex: THREE.Texture | undefined;
 const pleatsRepeat = () => { if (!pleatTex) { pleatTex = pleats().clone(); pleatTex.wrapS = THREE.RepeatWrapping; pleatTex.repeat.set(10, 1); pleatTex.needsUpdate = true; } return pleatTex; };
@@ -65,6 +66,9 @@ const goboAttr = (n: number) => { const a = new THREE.InstancedBufferAttribute(n
 const fxAttr = (n: number) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4); a.setUsage(THREE.DynamicDrawUsage); return a; };
 // the throw a focus value is sharp at: near at 0, far at 1 (a head focused for the floor is soft on a
 // wall twice as close)
+// a mirror ball on a motor: its radius, its chain, and its motor's top speed (radians a second: six
+// turns a minute, as the faster motors go)
+const BALL_R = 0.3, BALL_CHAIN = 0.35, BALL_TOP = 0.65;
 const FOCUS_NEAR = 2, FOCUS_FAR = 22;
 const MAX_BEAM = 26;           // metres: a beam that hits nothing fades out by then
 const LENS_GAP = 0.018;        // the glowing lens sits this far in front of its face (no flicker against it)
@@ -163,6 +167,9 @@ export class Rig {
   private winchNow = new Map<string, number>();
   // the curtains' and the drops' cloths (each its own size and picture: not instanced)
   private cloths = new Map<string, THREE.Mesh[]>();
+  // the mirror balls on their motors: the ball and its chain, hung under the motor
+  private balls = new Map<string, { holder: THREE.Group; ball: THREE.Mesh }>();
+  get mirrorBalls(): Ball[] { return [...this.balls.values()].map((b) => ({ obj: b.ball, r: BALL_R })); }
   private clothMats: THREE.Material[] = [];
   readonly scenery = new THREE.Group();
   winchOf(id: string) { return this.winchNow.get(id); }
@@ -277,7 +284,19 @@ export class Rig {
     for (const ms of this.cloths.values()) for (const m of ms) { this.scenery.remove(m); m.geometry.dispose(); }
     for (const m of this.clothMats) m.dispose();
     this.cloths.clear(); this.clothMats = [];
+    for (const { holder, ball } of this.balls.values()) {
+      this.scenery.remove(holder); holder.traverse((o) => { if (o instanceof THREE.Mesh && o !== ball) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
+      ball.geometry.dispose(); const bm = ball.material as THREE.MeshStandardMaterial; bm.map?.dispose(); bm.dispose();
+    }
+    this.balls.clear();
     if (!this.scenery.parent) this.group.add(this.scenery);
+    for (const f of list) {
+      if (f.look !== 'mirrorball') continue;
+      const holder = new THREE.Group(), ball = mirrorBall(BALL_R);
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, BALL_CHAIN, 5).translate(0, -0.1 - BALL_CHAIN / 2, 0), new THREE.MeshStandardMaterial({ color: 0xc8ccd4, metalness: 0.9, roughness: 0.25 }));
+      ball.position.y = -0.1 - BALL_CHAIN - BALL_R;
+      holder.add(chain, ball); this.scenery.add(holder); this.balls.set(f.id, { holder, ball });
+    }
     const velvet = list.some((f) => f.look === 'curtain') ? new THREE.MeshStandardMaterial({ map: pleatsRepeat(), color: 0x8a0f1c, roughness: 0.85, emissive: 0x2a0306, emissiveIntensity: 0.9, side: THREE.DoubleSide }) : undefined;
     if (velvet) this.clothMats.push(velvet);
     for (const f of list) {
@@ -637,6 +656,16 @@ export class Rig {
         } else {
           put('flybar', TMP.compose(CP.set(0, -moved, 0).applyQuaternion(yq).add(pos), yq, sc.set(cl.w, 1, 1)));
           hang(ms[0], 0, -moved - cl.h / 2 - 0.03, cl.w, cl.h);
+        }
+      } else if (f.look === 'mirrorball') {
+        // its motor at the top, the ball under it on its chain: turning as the motor channel says
+        // (slow to fast either way, stopped), and never dead still (mirrorBall.ts)
+        put('mirrorball', TMP.makeTranslation(pos.x, pos.y, pos.z));
+        const b = this.balls.get(f.id);
+        if (b) {
+          b.holder.position.copy(pos);
+          const r = typeof v?.rollRotation === 'number' ? rotationOf(f.axes?.rollRot ?? undefined, v.rollRotation) : { speed: 0 };
+          ballMotion(b.ball, t, 'speed' in r ? (r.speed / (2 * Math.PI)) * BALL_TOP : 0);
         }
       } else if (f.look === 'winch' && f.winch) {
         // a winch: the cable straight down from its box (whichever way the box is hung), the ball

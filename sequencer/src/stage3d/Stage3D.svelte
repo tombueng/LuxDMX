@@ -128,6 +128,13 @@
   const audCol = new THREE.Color();
   const deckFront = () => room.deck.z1;          // (the stage's front edge, where the crowd light hangs)
   const roomNow = () => room;
+  // the mirror balls: the show's own on their DMX motors, else the room's (its ball and chain hidden
+  // while one of the show's hangs, so there are never two)
+  function ballsNow(): Ball[] {
+    const own = rig.mirrorBalls, room = (venue as { mirrorBalls?: Ball[] }).mirrorBalls ?? [];
+    for (const b of room) if (b.holder) b.holder.visible = !own.length;
+    return own.length ? own : app.show.settings.stage3d?.hideVenue ? [] : room;
+  }
   let mirrorDots: MirrorDots | undefined;
   // (the air is never pure black: a hall has some light in it, even between looks)
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
@@ -517,7 +524,7 @@
       toolsFit: () => ({ tier, squeeze, over: toolsEl ? toolsEl.scrollWidth - toolsEl.clientWidth : 0, overWas: [...overWas] }),
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
       // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
-      mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ((venue as { mirrorBalls?: Ball[] }).mirrorBalls ?? []).map((b) => +b.obj.rotation.y.toFixed(3)) }),
+      mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ballsNow().map((b) => +b.obj.rotation.y.toFixed(3)), tilt: ballsNow().map((b) => +b.obj.rotation.x.toFixed(4)) }),
       machinery: () => fixtures.filter((f) => f.cloth).map((f) => ({ name: f.name, look: f.look, at: rig.winchOf(f.id) ?? 0, travel: f.winch?.travel ?? 0, picture: f.cloth?.picture })),
       lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
@@ -1072,7 +1079,7 @@
     wash.forEach((w, i) => { const n = Math.max(1e-3, lv[i]); w.color.setRGB(sideCol[i].r / n, sideCol[i].g / n, sideCol[i].b / n); w.intensity = Math.min(1, lv[i] / 4) * 140 * spill; });
     // the mirror balls' dots round the room, from the lights on them (none with the room hidden)
     mirrorDots ??= scene.getObjectByName('mirror dots')?.userData.dots as MirrorDots | undefined;
-    mirrorDots?.update(app.show.settings.stage3d?.hideVenue ? [] : (venue as { mirrorBalls?: Ball[] }).mirrorBalls ?? [], rig.lit, roomNow(), haze);
+    mirrorDots?.update(ballsNow(), rig.lit, roomNow(), haze);
     // (the lights turned out to the audience: their level and colour on the crowd light)
     crowdLamp ??= scene.getObjectByName('crowd light') as THREE.SpotLight | undefined;
     if (crowdLamp) {

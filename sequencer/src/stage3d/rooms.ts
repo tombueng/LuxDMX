@@ -14,7 +14,8 @@ import { at, bake, box, cyl, gearMats, movingMeshes, roadCase, std, waterCrate, 
 import { concrete, exitSign, hallWall, neonSign, pleats, roofDeck, screen, stageFloor } from './textures';
 import { buildCrowd, type Crowd } from './crowd';
 import { beatClock, djBooth, djPerson } from './dj';
-import { BALL_SPIN, buildBallroom, buildBar, buildChurch, buildCinema, buildTheatre, mirrorBall } from './scenes';
+import { buildBallroom, buildBar, buildChurch, buildCinema, buildTheatre } from './scenes';
+import { ballMotion, BALL_SPIN, mirrorBall } from './mirrorBall';
 import type { Ball } from './mirrorBall';
 import type { Person } from './people';
 
@@ -166,9 +167,11 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
     group.add(at(new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: neonSign('Bar', '#36d6e7'), toneMapped: false })), -2.5, 2.9, r.walls.z1 - 0.03, [0, Math.PI, 0]));
     for (let i = 0; i < 7; i++) { const x = -6.8 + i * 1.4; group.add(at(cyl(0.18, 0.16, 0.05, M.black, 14), x, 0.78, bz - 0.7), at(cyl(0.025, 0.025, 0.76, M.steel, 8), x, 0.38, bz - 0.7), at(cyl(0.2, 0.22, 0.02, M.steel, 14), x, 0.01, bz - 0.7)); }
     // a mirror ball over the dance floor, turning
-    const ball = mirrorBall(0.32);
-    group.add(at(ball, 0, r.ceiling - 1.1, 12), at(cyl(0.008, 0.008, 0.78, M.chrome, 5), 0, r.ceiling - 0.39, 12));
-    balls.push({ obj: ball, r: 0.32 }); sceneAnim = (t) => { ball.rotation.y = t * BALL_SPIN; };
+    // (ball and chain together: a mirror ball on a DMX motor in the show takes its place, Stage3D)
+    const ball = mirrorBall(0.32), holder = new THREE.Group();
+    holder.add(at(ball, 0, r.ceiling - 1.1, 12), at(cyl(0.008, 0.008, 0.78, M.chrome, 5), 0, r.ceiling - 0.39, 12));
+    group.add(holder);
+    balls.push({ obj: ball, r: 0.32, holder }); sceneAnim = (t) => ballMotion(ball, t, BALL_SPIN);
   } else if (id === 'party') {
     shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x9a9aa0 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ map: roofDeck(), color: 0x8a8a90 })) });
     frame(group, M, r);

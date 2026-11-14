@@ -59,3 +59,36 @@ it('the bar\'s mirror ball turns on its own motor, music or not', () => {
   v.animate(3, 6, 0.5, new THREE.Color(1, 1, 1), false);
   expect(b.rotation.y).not.toBe(r0);
 });
+
+// A mirror ball never hangs dead still: stopped, it still sways and twists a few degrees back and
+// forth; its motor turns it on top of that, at the speed its DMX channel says.
+describe('its motion and its motor', () => {
+  it('stopped: never still, but only a few degrees either way; running: round and round', async () => {
+    const { ballMotion } = await import('./mirrorBall');
+    const o = new THREE.Object3D(), ys: number[] = [], xs: number[] = [];
+    for (let t = 0; t < 30; t += 0.1) { ballMotion(o, t, 0); ys.push(o.rotation.y); xs.push(o.rotation.x); }
+    const spread = (a: number[]) => Math.max(...a) - Math.min(...a);
+    expect(spread(ys)).toBeGreaterThan(0.05); expect(spread(ys)).toBeLessThan(0.25);         // (a twist of a few degrees)
+    expect(spread(xs)).toBeGreaterThan(0.01); expect(spread(xs)).toBeLessThan(0.06);         // (a little sway)
+    const m = new THREE.Object3D();
+    for (let t = 0; t <= 4; t += 0.05) ballMotion(m, t, 0.5);
+    expect((m.userData as { spun: number }).spun).toBeCloseTo(2, 1);                        // (0.5 rad/s for 4 s)
+  });
+  it('the Bar\'s ball is on a DMX motor: slow all evening, faster for the disco, stopped for the lights up', async () => {
+    const { TEMPLATES } = await import('../content/templates');
+    const { rigFixtureFull } = await import('./rigOf');
+    const { GENERIC, kindOf } = await import('../model/library');
+    const { rotationOf } = await import('./gobos');
+    const s = TEMPLATES.find((t) => t.name === 'Bar')!.build(), f = s.fixtures.find((x) => x.name === 'Mirror ball')!;
+    expect(f.typeId).toBe('gen-mirrorball');
+    const t = GENERIC.find((g) => g.id === f.typeId)!, m = t.modes[0];
+    const rf = rigFixtureFull(f, m, kindOf(m), t, ROOMS.bar);
+    expect(rf.look).toBe('mirrorball');
+    const speed = (cue: string) => { const v = s.cueLists[0].cues.find((c) => c.name === cue)!.values[f.id]?.rollRotation as number; const r = rotationOf(rf.axes?.rollRot ?? undefined, v ?? 0); return 'speed' in r ? r.speed : NaN; };
+    expect(speed('Daytime')).toBeGreaterThan(0);
+    expect(speed('Disco')).toBeGreaterThan(speed('Daytime') * 2);
+    expect(speed('Lights up')).toBe(0);
+    // (hung where the room's own ball was: that one gives way to it on the 3D stage)
+    expect(Math.hypot(f.p3!.x - (-3.2), f.p3!.z - 3.6)).toBeLessThan(0.01);
+  });
+});

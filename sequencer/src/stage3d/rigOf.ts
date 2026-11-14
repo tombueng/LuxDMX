@@ -43,7 +43,8 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
   const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
   const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
   // (stage machinery on a winch channel: a curtain track, a fly bar with its drop; else a kinetic winch)
-  const machinery: Look | undefined = has('hoist') ? (/curtain/i.test(t?.model ?? '') ? 'curtain' : /fly bar/i.test(t?.model ?? '') ? 'flybar' : 'winch') : undefined;
+  const machinery: Look | undefined = has('hoist') ? (/curtain/i.test(t?.model ?? '') ? 'curtain' : /fly bar/i.test(t?.model ?? '') ? 'flybar' : 'winch')
+    : /mirror ?ball|disco ?ball|spiegelkugel/i.test(t?.model ?? '') ? 'mirrorball' : undefined;
   const look: Look = sfx ?? (machinery ?? (c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
     : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel'));
   const cloth = clothOf(f, look, t);

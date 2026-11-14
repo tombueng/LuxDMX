@@ -68,6 +68,8 @@ const BAR_PLACES: Table = {
   Beam: (i) => hung({ x: i ? 1.2 : -1.2, y: rail, z: 2.4 }),
   // pinspots on the mirror ball
   Pinspot: (i) => { const p = i ? { x: -5.4, y: rail, z: 5.0 } : { x: -1.2, y: rail, z: 2.4 }; return aim(p, { x: B.ball.x, y: B.ball.y, z: B.ball.z }); },
+  // the mirror ball's motor at the ceiling, the ball on its chain where the room's own hung
+  'Mirror ball': () => ({ p: { x: B.ball.x, y: B.ceiling - 0.02, z: B.ball.z }, rot: { yaw: 0, pitch: 0, roll: 0 } }),
   Strobe: (i) => aim({ x: i ? 0.6 : -0.6, y: rail, z: 5.0 }, { x: i ? 0.6 : -0.6, y: 0, z: 5.0 }),
   // the LED sign over the bottles, on the back wall beside the bar's own neon, facing the room
   'Neon sign': () => ({ p: { x: 3.4, y: 3.32, z: B.backZ + 0.12 }, rot: { yaw: 0, pitch: 90, roll: 0 } }),
