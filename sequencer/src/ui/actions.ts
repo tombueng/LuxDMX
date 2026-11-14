@@ -16,6 +16,7 @@ export const fixtureActions = {
     if (!k) return;
     const r = app.removeFixtures();
     const also = [r.cues ? `${k > 1 ? 'they were' : 'it was'} in ${r.cues} cue${r.cues > 1 ? 's' : ''}` : '', r.groups ? `${r.groups} empty group${r.groups > 1 ? 's' : ''} went too` : '',
+      r.lists.length ? `the list${r.lists.length > 1 ? 's' : ''} only for ${k > 1 ? 'them' : 'it'} went too (${r.lists.join(', ')})` : '',
       r.also ? `${r.also} with nothing left to work on went too` : ''].filter(Boolean).join('; ');
     app.toastUndo(`Removed ${n(k)}${also ? ` (${also})` : ''}`);
   },

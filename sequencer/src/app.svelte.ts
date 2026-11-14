@@ -1575,19 +1575,28 @@ class App {
     this.liveFx = this.engine.liveEffects();
     return prunedText(p);
   }
-  removeFixtures(ids = this.selected): { cues: number; groups: number; also: string } {
+  removeFixtures(ids = this.selected): { cues: number; groups: number; lists: string[]; also: string } {
     this.checkpoint();
     const gone = new Set(ids);
     const cues = this.show.cueLists.flatMap((l) => l.cues).filter((c) => Object.keys(c.values).some((id) => gone.has(id))).length;
     const emptied = new Set(this.show.groups.filter((g) => g.fixtures.length && g.fixtures.every((f) => gone.has(f))).map((g) => g.id));
+    // (a list that only ever set the lights going, a machine's shot: it goes with them, and with it
+    // what started it, a cue's "start Confetti" and its button. A list that does anything else stays)
+    const deadLists = this.show.cueLists.filter((l) => l.cues.length && l.cues.every((c) => !c.effects?.length && !c.actions?.length && Object.keys(c.values).length > 0 && Object.keys(c.values).every((id) => gone.has(id))));
     for (const id of [...ids]) this.removeFixture(id);
+    if (deadLists.length) {
+      for (const l of deadLists) { this.engine.stop(l.id); this.engine.forget(l.id); }
+      const dead = new Set(deadLists.map((l) => l.id));
+      this.show.cueLists = this.show.cueLists.filter((l) => !dead.has(l.id));
+      if (dead.has(this.currentList)) this.currentList = this.show.cueLists[0]?.id ?? '';
+    }
     if (emptied.size) {
       for (const e of this.show.effects) if (e.group && emptied.has(e.group)) { delete e.group; e.fixtures = []; }
       freezeGroupNumbers(this.show.groups);
       this.show.groups = this.show.groups.filter((g) => !emptied.has(g.id));
       for (const p of this.show.pages) p.widgets = p.widgets.filter((w) => !(w.type === 'group' && emptied.has(w.group)));
     }
-    return { cues, groups: emptied.size, also: this.prune() };
+    return { cues, groups: emptied.size, lists: deadLists.map((l) => l.name), also: this.prune() };
   }
   private uniqueName(name: string) {
     const names = new Set(this.show.fixtures.map((f) => f.name));

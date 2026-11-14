@@ -83,15 +83,15 @@ test('Ctrl+S says it saved; templates are on the empty stage; help stays on scre
   await openConnected(page);
   await page.locator('body').press('Control+s');
   await expect(page.locator('.toast')).toContainText('Saved in this browser');
-  await welcome(page);
-  await expect(page.locator('.welcome .tpls').getByRole('button')).toHaveCount(7);
+  const w = await welcome(page);
+  // (every template a tile with its Start: Band, DJ / Party, Theatre, Church, Cinema, Bar, Wedding, Ring and matrix)
+  await expect(w.getByRole('button', { name: /^Start (?!with)/ })).toHaveCount(8);
   await page.keyboard.press('Escape');
   await page.locator('.deck').getByRole('button', { name: 'What is this?' }).click();
   const pop = (await page.locator('.deck .pop').boundingBox())!;
   expect(pop.x).toBeGreaterThanOrEqual(0);
   expect(pop.x + pop.width).toBeLessThanOrEqual(1400);
-  await welcome(page);
-  await page.locator('.welcome .tpls').getByRole('button', { name: 'Church' }).click();
+  await startTemplate(page, 'Church');
   await expect(page.locator('.top .show .name')).toHaveText('Sunday service');
 });
 

@@ -285,3 +285,15 @@ test('a cue card\'s picture follows its cue: updated, it shows the new look; the
   expect(await pic(0)).toBe(a0);
   expect(decodeURIComponent((await pic(1))!)).toMatch(/fill="rgb\(0, ?255, ?0\)|#00ff00|hsl\(1[12]\d/i);
 });
+
+test('removing machines takes their shot lists with them (and the cue actions that started them); the toast says so', async ({ page }) => {
+  await openConnected(page);
+  await startTemplate(page, 'Wedding');
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists.map((l: any) => l.name))).toContain('Confetti');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = a.show.fixtures.filter((f: any) => /^(Confetti|Bubbles)$/.test(f.name)).map((f: any) => f.id); });
+  await page.locator('.fl').getByRole('button', { name: 'Remove fixtures' }).click();
+  await expect(page.locator('.toast')).toContainText(/the lists only for them went too \((Confetti, Bubbles|Bubbles, Confetti)\)/);
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists.map((l: any) => l.name))).not.toContain('Confetti');
+  const toss = await page.evaluate(() => (window as any).__luxdmx.show.cueLists.find((l: any) => l.name === 'Wedding').cues.find((c: any) => c.name === 'Bouquet toss').actions ?? []);
+  expect(toss).toEqual([]);
+});
