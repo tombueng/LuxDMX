@@ -61,7 +61,7 @@ hits, flames, sparks and confetti.
 
 Every light here is drawn by the app itself, live in the browser, with the same models, beams,
 gobos and machines your show gets on the 3D stage. The same tiles play in **Add fixtures** (each
-fixture shows what it can do) and in the gallery (Ctrl+K, "gallery").
+fixture shows what it can do) and in the gallery (the ⋯ menu at the top, the 3D stage's ⋯, or Ctrl+K "gallery").
 
 <table>
 <tr><td align="center"><img src="docs/media/gallery/gobos.webp" width="240" alt="Gobos, turning"><br><sub>Gobos, turning</sub></td><td align="center"><img src="docs/media/gallery/prism.webp" width="240" alt="Prism"><br><sub>Prism</sub></td><td align="center"><img src="docs/media/gallery/fan.webp" width="240" alt="Heads in a fan"><br><sub>Heads in a fan</sub></td><td align="center"><img src="docs/media/gallery/colours.webp" width="240" alt="Colour mixing"><br><sub>Colour mixing</sub></td></tr>

@@ -14,9 +14,9 @@
 // ball, a ceiling rail for the lights.
 import * as THREE from 'three';
 import { at, box, cyl, rod, std, house, crewMember, type Mats } from './gear';
-import { darkWood, hallWall, neonSign, pleats, rug, stageFloor, brick, boards } from './textures';
+import { darkWood, hallWall, neonSign, pleats, rug, stageFloor, brick, boards, concrete } from './textures';
 import { DECK, type Room } from './geometry';
-import { BAR, CINEMA, cinemaFloor } from './sceneSizes';
+import { BAR, CHURCH, CINEMA, cinemaFloor, THEATRE } from './sceneSizes';
 import type { Person } from './people';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -215,4 +215,149 @@ export function buildBar(group: THREE.Group, M: Mats, r: Room) {
   add(ball, B.ball.x, B.ball.y, B.ball.z); add(cyl(0.006, 0.006, H - B.ball.y - 0.28, M.chrome, 5), B.ball.x, (H + B.ball.y + 0.28) / 2, B.ball.z);
   ball.userData.live = true;
   return { people, animate: (t: number) => { ball.rotation.y = t * 0.6; } };
+}
+
+// ---- seats and the people in them (the cinema's way, for the theatre's stalls and balcony too) ----
+type Add = (o: THREE.Object3D, x: number, y: number, z: number, rot?: [number, number, number]) => void;
+function audienceMats() {
+  return {
+    skin: [0xe8b896, 0xc98d68, 0xf1c8a8, 0x9c6544, 0x7a4e34].map((c) => std({ color: c, roughness: 0.6 })),
+    tops: [0x1f2f3b, 0x8a1f1f, 0xd8d8d0, 0x2a6a8a, 0x3b1f2b, 0x203a5a, 0xe0a030, 0x141418].map((c) => std({ color: c, roughness: 0.9 })),
+    hairs: [0x161210, 0x2b1d14, 0x5a3a22, 0xb08a50, 0x8a8a88].map((c) => std({ color: c, roughness: 0.8 })),
+  };
+}
+// a person sitting at (x, y = the seat's floor, z), facing the front (-z); `taken` decides who
+function sitter(add: Add, A: ReturnType<typeof audienceMats>, x: number, y: number, z: number, k: number, seat = 0.42) {
+  add(box(0.38, 0.5, 0.24, A.tops[k % A.tops.length]), x, y + seat + 0.36, z + 0.05);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), A.skin[k % A.skin.length]), x, y + seat + 0.75, z + 0.02);
+  add(new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), A.hairs[(k >> 3) % A.hairs.length]), x, y + seat + 0.77, z + 0.05);
+}
+const taken = (x: number, r: number, share: number) => { const h = Math.abs(Math.sin(x * 12.9898 + r * 78.233) * 43758.5453) % 1; return h < share ? Math.floor(h * 1000) + 1 : 0; };
+function seatRow(add: Add, M: Mats, A: ReturnType<typeof audienceMats>, mats: { seat: THREE.Material; back: THREE.Material }, y: number, z: number, blocks: [number, number][], r: number, share = 0.6) {
+  for (const [a, b] of blocks) for (let x = a + 0.3; x <= b - 0.25; x += 0.6) {
+    add(box(0.52, 0.12, 0.48, mats.seat), x, y + 0.42, z);
+    add(box(0.54, 0.62, 0.09, mats.back), x, y + 0.72, z + 0.27, [-0.12, 0, 0]);
+    add(box(0.06, 0.24, 0.5, M.black), x + 0.29, y + 0.52, z);
+    const k = taken(x, r, share);
+    if (k) sitter(add, A, x, y, z, k);
+  }
+}
+
+// ---- the theatre ----------------------------------------------------------------------------
+export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
+  const add: Add = (o, x, y, z, rot) => { group.add(at(o, x, y, z, rot)); };
+  const T = THEATRE, X = r.walls.x, Z0 = r.walls.z0, Z1 = r.walls.z1, H = r.ceiling, L = Z1 - Z0, zc = (Z0 + Z1) / 2;
+  const wallMat = house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x3a1a1e }));
+  const carpet = std({ map: rug(), color: 0x6a1a24, roughness: 0.95 });
+  const velvet = std({ map: pleats(), color: 0x8a0f1c, roughness: 0.85, emissive: 0x2a0306, emissiveIntensity: 0.9 });
+  const gold = std({ color: 0xc8a046, metalness: 0.8, roughness: 0.3 }), cream = std({ color: 0xd8ccb0, roughness: 0.6 });
+  const fabric = std({ color: 0x7a1018, roughness: 0.9 }), back = std({ color: 0x5e0c14, roughness: 0.9 }), A = audienceMats();
+  add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), wallMat), -X, H / 2, zc, [0, Math.PI / 2, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), wallMat), X, H / 2, zc, [0, -Math.PI / 2, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, H), wallMat), 0, H / 2, Z1, [0, Math.PI, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, H), M.black), 0, H / 2, Z0 + 0.01);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), house(new THREE.MeshBasicMaterial({ color: 0x120a0c }))), 0, H, zc, [Math.PI / 2, 0, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), carpet), 0, 0.002, zc, [-Math.PI / 2, 0, 0]);
+  // the stage and its apron (the deck), black; the cyclorama at the back, pale, for the lights to colour
+  const { x: dx, z0, z1 } = r.deck, top = std({ map: stageFloor(), roughness: 0.72 });
+  add(new THREE.Mesh(new THREE.BoxGeometry(2 * dx, DECK, z1 - z0), [M.black, M.black, top, M.black, M.black, M.black]), 0, DECK / 2, (z0 + z1) / 2);
+  add(box(2 * dx, 0.05, 0.04, gold), 0, DECK - 0.03, z1 + 0.01);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(14, 8.4), std({ color: 0xd8dce4, roughness: 0.95 })), 0, DECK + 4.2, T.cycZ);
+  // the proscenium: a deep frame round the opening, gold mouldings; the house curtain gathered at
+  // the sides, its valance across the top; black legs in the wings
+  const aw = T.arch.w, ah = T.arch.h, az = T.arch.z, side = X - aw / 2;
+  for (const sx of [-1, 1]) {
+    add(box(side, H, 0.8, cream), sx * (aw / 2 + side / 2), H / 2, az);
+    add(box(0.14, ah, 0.86, gold), sx * (aw / 2 + 0.07), DECK + ah / 2, az);
+    add(box(1.1, ah, 0.4, velvet), sx * (aw / 2 - 0.5), DECK + ah / 2, az - 0.5);
+    for (const z of [-1.2, -3.6]) add(box(1.4, ah + 1, 0.1, M.black), sx * (aw / 2 - 0.3), DECK + (ah + 1) / 2, z);
+    // the booms in the wings: a pipe on a base plate each (their lights clamped on, scenePlaces.ts)
+    for (const z of [-1.2, 1.0]) { add(cyl(0.025, 0.025, 3.2, M.black, 8), sx * 7.2, DECK + 1.6, z); add(cyl(0.22, 0.22, 0.03, M.black, 16), sx * 7.2, DECK + 0.015, z); }
+  }
+  add(box(aw, H - DECK - ah, 0.8, cream), 0, DECK + ah + (H - DECK - ah) / 2, az);
+  add(box(aw + 0.28, 0.16, 0.86, gold), 0, DECK + ah + 0.08, az);
+  add(box(aw, 1.0, 0.4, velvet), 0, DECK + ah - 0.5, az - 0.5);
+  // the stalls: gently raked rows, an aisle down the middle
+  const S = T.stalls;
+  for (let rr = 0; rr < S.rows; rr++) {
+    const z = S.z0 + rr * S.d, y = (rr + 1) * S.rise;
+    add(box(2 * X, y, S.d, carpet), 0, y / 2, z + S.d / 2);
+    seatRow(add, M, A, { seat: fabric, back }, y, z + 0.5, [[-X + 1.2, -0.7], [0.7, X - 1.2]], rr, 0.7);
+  }
+  // the balcony over the back of the stalls: its floor stepping up, a gold-railed front, its seats
+  const Bc = T.balcony, by = Bc.y;
+  add(box(2 * X, 0.4, Z1 - Bc.z0, cream), 0, by - 0.2, (Bc.z0 + Z1) / 2);
+  add(box(2 * X, 1.0, 0.25, cream), 0, by + 0.5, Bc.z0 + 0.12); add(box(2 * X, 0.08, 0.3, gold), 0, by + 1.02, Bc.z0 + 0.12);
+  for (let rr = 0; rr < Bc.rows; rr++) {
+    const z = Bc.z0 + 0.4 + rr * Bc.d, y = by + rr * Bc.rise;
+    if (rr) add(box(2 * X, Bc.rise * rr, Bc.d, carpet), 0, by + (Bc.rise * rr) / 2, z + Bc.d / 2);
+    seatRow(add, M, A, { seat: fabric, back }, y, z + 0.5, [[-X + 1.0, -0.7], [0.7, X - 1.0]], rr + 30, 0.55);
+  }
+  for (const sx of [-1, 1]) for (const z of [Bc.z0 + 1, Bc.z0 + 5]) add(cyl(0.18, 0.2, by, cream, 16), sx * (X - 2.4), by / 2, z);
+  // a chandelier in the middle of the ceiling
+  const glow = new THREE.MeshBasicMaterial({ color: 0xffd9a0, toneMapped: false });
+  add(cyl(0.01, 0.01, 1.6, gold, 4), 0, H - 0.8, 9); add(cyl(0.9, 0.3, 0.5, gold, 20), 0, H - 1.8, 9);
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; add(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), glow), Math.cos(a) * 0.95, H - 1.55, 9 + Math.sin(a) * 0.95); }
+  return { animate: () => {} };
+}
+
+// ---- the church -----------------------------------------------------------------------------
+export function buildChurch(group: THREE.Group, M: Mats, r: Room) {
+  const add: Add = (o, x, y, z, rot) => { group.add(at(o, x, y, z, rot)); };
+  const Ch = CHURCH, X = r.walls.x, Z0 = r.walls.z0, Z1 = r.walls.z1, H = r.ceiling, L = Z1 - Z0, zc = (Z0 + Z1) / 2;
+  const stone = house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x8a8478 }));
+  const slab = std({ map: concrete(), color: 0x9a948a, roughness: 0.85 }), oak = std({ map: darkWood(), color: 0x8a6a4a, roughness: 0.5 });
+  const cloth = std({ color: 0xf2efe6, roughness: 0.8 }), gold = std({ color: 0xc8a046, metalness: 0.85, roughness: 0.28 });
+  add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), stone), -X, H / 2, zc, [0, Math.PI / 2, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), stone), X, H / 2, zc, [0, -Math.PI / 2, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, H), stone), 0, H / 2, Z1, [0, Math.PI, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, H), stone), 0, H / 2, Z0 + 0.01);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), house(new THREE.MeshBasicMaterial({ color: 0x2a2018 }))), 0, H, zc, [Math.PI / 2, 0, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), slab), 0, 0.002, zc, [-Math.PI / 2, 0, 0]);
+  // the roof's beams across the nave
+  for (let z = Z0 + 2; z < Z1; z += 4) { add(box(2 * X, 0.4, 0.3, oak), 0, H - 0.6, z); for (const sx of [-1, 1]) add(box(0.3, 2.4, 0.3, oak), sx * (X - 0.2), H - 1.8, z); }
+  // stained glass: tall windows down both walls, a round one over the altar (their colours glow)
+  const glass = (w: number, h: number, round: boolean, seed: number) => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = round ? 128 : 256;
+    const g = c.getContext('2d');
+    if (g) {
+      const cols = ['#1d4fb0', '#c0242a', '#e0b030', '#2a8a4a', '#7a2ab0', '#e07020'];
+      let s = seed;
+      for (let y = 0; y < c.height; y += 16) for (let x = 0; x < c.width; x += 16) { s = (s * 16807) % 2147483647; g.fillStyle = cols[s % cols.length]; g.fillRect(x, y, 16, 16); }
+      g.strokeStyle = '#111'; g.lineWidth = 3;
+      for (let y = 0; y <= c.height; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(c.width, y); g.stroke(); }
+      for (let x = 0; x <= c.width; x += 16) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, c.height); g.stroke(); }
+    }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0x9a9a9a, toneMapped: false });
+    return new THREE.Mesh(round ? new THREE.CircleGeometry(w / 2, 32) : new THREE.PlaneGeometry(w, h), mat);
+  };
+  Ch.windows.forEach((z, i) => {
+    add(glass(1.4, 5.2, false, 11 + i), -X + 0.02, 6.4, z, [0, Math.PI / 2, 0]);
+    add(glass(1.4, 5.2, false, 23 + i), X - 0.02, 6.4, z, [0, -Math.PI / 2, 0]);
+  });
+  add(glass(3.2, 3.2, true, 7), 0, 9.4, Z0 + 0.03);
+  // the chancel (the deck): stone steps up to it from the nave; the altar with its cloth, candles and
+  // the cross over it; the lectern; choir benches either side
+  const { x: dx, z0, z1 } = r.deck;
+  add(new THREE.Mesh(new THREE.BoxGeometry(2 * dx, DECK, z1 - z0), slab), 0, DECK / 2, (z0 + z1) / 2);
+  for (let i = 0; i < 4; i++) { const h = (DECK / 4) * (4 - i); add(box(2 * dx - 2, h, 0.32, slab), 0, h / 2, z1 + 0.16 + 0.32 * i); }
+  add(box(2.6, 1.0, 1.0, oak), 0, DECK + 0.5, Ch.altarZ); add(box(2.8, 0.04, 1.1, cloth), 0, DECK + 1.02, Ch.altarZ); add(box(2.8, 0.6, 0.02, cloth), 0, DECK + 0.72, Ch.altarZ + 0.56);
+  const flame = new THREE.MeshBasicMaterial({ color: 0xffb050, toneMapped: false });
+  for (const x of [-0.9, 0.9]) { add(cyl(0.03, 0.04, 0.5, gold, 10), x, DECK + 1.29, Ch.altarZ - 0.2); add(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), flame), x, DECK + 1.58, Ch.altarZ - 0.2); }
+  add(box(0.18, 2.6, 0.12, gold), 0, DECK + 4.4, Z0 + 0.2); add(box(1.4, 0.18, 0.12, gold), 0, DECK + 5.1, Z0 + 0.2);
+  add(box(0.7, 1.15, 0.5, oak), Ch.lecternX, DECK + 0.58, -2.4); add(box(0.8, 0.05, 0.6, oak), Ch.lecternX, DECK + 1.2, -2.45, [0.3, 0, 0]);
+  for (const sx of [-1, 1]) for (let k = 0; k < 2; k++) { const x = sx * (3.9 + k * 0.8); add(box(0.5, 0.45, 3.6, oak), x, DECK + 0.23, -4.6); add(box(0.08, 0.9, 3.6, oak), x + sx * 0.25, DECK + 0.45, -4.6); }
+  // the pews down the nave, an aisle in the middle, people in some
+  const A = audienceMats(), P = Ch.pews;
+  for (let rr = 0; rr < P.rows; rr++) {
+    const z = P.z0 + rr * P.d;
+    for (const [a, b] of P.blocks) {
+      const w = b - a, cx = (a + b) / 2;
+      add(box(w, 0.06, 0.42, oak), cx, 0.45, z); add(box(w, 0.6, 0.06, oak), cx, 0.78, z + 0.24); add(box(w, 0.4, 0.04, oak), cx, 0.95, z - 0.36);
+      for (const ex of [a + 0.05, b - 0.05]) add(box(0.08, 0.95, 0.5, oak), ex, 0.47, z);
+      for (let x = a + 0.4; x < b - 0.3; x += 0.62) { const k = taken(x, rr + 60, 0.45); if (k) sitter(add, A, x, 0, z, k, 0.45); }
+    }
+  }
+  return { animate: () => {} };
 }

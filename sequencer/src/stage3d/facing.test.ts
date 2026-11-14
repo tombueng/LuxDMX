@@ -11,13 +11,15 @@ import type { Show } from '../model/types';
 
 // where the audience is: in front of the stage, at head height
 const AUDIENCE = { x: 0, y: DECK + 0.5, z: D / 2 + 8 };
-const CROWD: Record<string, V3> = { club: { x: 0, y: 1.7, z: 12 }, party: { x: 0, y: 1.7, z: 8 }, truss: { x: 0, y: 1.7, z: 9 }, cinema: { x: 0, y: 5, z: 14 }, bar: { x: 0, y: 1.7, z: 4 } };
+const CROWD: Record<string, V3> = { club: { x: 0, y: 1.7, z: 12 }, party: { x: 0, y: 1.7, z: 8 }, truss: { x: 0, y: 1.7, z: 9 }, cinema: { x: 0, y: 5, z: 14 }, bar: { x: 0, y: 1.7, z: 4 }, theatre: { x: 0, y: 2.8, z: 10 }, church: { x: 0, y: 1.6, z: 8 } };
+// (bars that light the room's own things, as they do there: the bar's uplights under the bottles, the
+// theatre's footlights on the actors and its ground row on the cyc, the church's battens on the cross)
+const OWN: Record<string, RegExp> = { bar: /^Shelf /, theatre: /^(Footlight|Ground row) /, church: /^Batten / };
 function wrong(show: Show, aud: V3 = AUDIENCE) {
   const types = typeMap(show), bad: string[] = [];
   for (const f of show.fixtures) {
     if (kindOf(modeOf(types.get(f.typeId), f.mode)) !== 'bar') continue;
-    // (the bar's back bar: its uplights light the bottles from under the shelves, as a bar's do)
-    if (show.settings.stage3d?.room === 'bar' && /^Shelf /.test(f.name)) continue;
+    if (OWN[show.settings.stage3d?.room ?? '']?.test(f.name)) continue;
     // (its own place, or where the 3D stage puts a bar that has none)
     const def = defaultPlace(f, 'bar', roomOf(show.settings.stage3d?.room)), p = f.p3 ?? def.p, rot = f.rot ?? def.rot;
     const d = toWorld({ x: 0, y: 1, z: 0 }, rot);             // a bar's cells shine along its up

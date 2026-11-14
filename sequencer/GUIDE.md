@@ -863,12 +863,17 @@ Three more demos come with their own room on the 3D stage:
   on the room's rig. The camera views go inside the pub. The demos bring rooms of their own: a club
   (a stage framed by truss on four towers, a truss over the dance floor, a bar at the back, a
   mirror ball), a party room (a square of truss over the crowd, no stage) and an empty room with
-  one truss; the camera views go inside them too. The Cinema and Bar templates bring theirs: a
+  one truss; the camera views go inside them too. The Cinema, Bar, Theatre and Church templates bring theirs: a
   **Cinema** (a big screen between red curtains, a stage in front of it for premieres, raked rows of
   red seats with an audience, step lights in the aisles, wall washers, house lights and a starry
   ceiling, the projection booth at the back) and a **Bar** (a long counter, a back bar of bottles on
   lit shelves in front of a mirror, pendant lamps, people on the stools and two bartenders, tables
-  along the walls, a little dance floor with a mirror ball); every light of those templates is
+  along the walls, a little dance floor with a mirror ball), a **Theatre** (a proscenium stage with
+  its gold frame and red house curtain, a cyclorama at the back, lighting bars over the stage,
+  booms in the wings, footlights, raked stalls and a balcony full of people, a chandelier) and a
+  **Church** (the chancel up its steps with the altar, candles, the cross and the choir benches,
+  the lectern, pews down the nave with the congregation, stained glass down both walls and a round
+  window over the altar, the roof's beams); every light of those templates is
   installed where such a room has it, and the camera moves film them as they are. **Your stage**: your real stage at its size,
   width and depth in metres, on a riser (1.2 m) or on the floor, 0 to 4 trusses across it on
   towers and how high their underside is. The room, its crowd and the camera views and moves are
@@ -880,8 +885,7 @@ Three more demos come with their own room on the 3D stage:
   backdrop, the banners, the screens and the kick drum (painted in the style of the band picture
   that's there by default; leave it empty for the picture; in the club and at the party it's on
   the front of the DJ booth). Both are kept with the show (the screens' live camera in this browser).
-  The theatre, church and cinema templates put nobody on that stage: no band, a calm audience, the
-  show's name on the banners and screens; the bar template is in the pub.
+  The theatre, church and cinema templates put nobody on stage: no band, a calm audience.
   Load your own venue or stage as a 3D model (.glb, or a .gltf with everything inside),
   fitted onto the floor (a model in millimetres or centimetres is scaled down), then size, place
   and turn it; the built-in stage can go. The model stays in this browser. Its panel closes with

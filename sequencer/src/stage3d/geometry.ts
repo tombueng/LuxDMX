@@ -48,7 +48,7 @@ export const toLocal = (v: V3, r: Rot) => rz(rx(ry(v, -r.yaw), -r.pitch), -r.rol
 // rooms are (a deck or none, spans of truss on towers over it, walls round it).
 // The Cinema and Bar templates bring rooms of their own too (scenes.ts): a cinema with its screen,
 // stage and raked seats; a bar with a long counter, a back bar and a little dance floor.
-export type RoomId = 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar';
+export type RoomId = 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church';
 export type ViewKey = 'front' | 'foh' | 'side' | 'top' | 'band';
 type P3 = [number, number, number];
 // a piece of truss: the middle line of the box from one end to the other
@@ -127,6 +127,23 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     band: { x: 6, z0: -4.4, z1: -1.0 }, walls: { x: 8, z0: -4.6, z1: 9.2 },
     views: { front: { pos: [0, 1.75, 8.6], at: [0, 1.6, -3] }, foh: { pos: [5.6, 2.2, 6.4], at: [-1, 1.5, -2.6] }, side: { pos: [-7.3, 2.5, 4], at: [2, 1.4, -2] }, top: { pos: [0, 24, 2.31], at: [0, 0, 2.3] }, band: { pos: [0, 1.7, -3.7], at: [0, 1.5, 8] } },
     tour: { rx: 5.6, rz: 4.6, z0: 2.6, y: 2.2, dy: 0.35, at: [0, 1.5, -1.5] },
+  },
+  // a theatre (scenes.ts buildTheatre): the stage behind the proscenium and its apron are the deck
+  // and the plan; the lighting bars over the stage, one front-of-house bar over the stalls
+  theatre: {
+    id: 'theatre', W: 14, D: 9.4, zc: -1.3, truss: [{ z: -4.8, y: 9.0 }, { z: -2.6, y: 7.8 }, { z: -0.2, y: 7.8 }, { z: 8.4, y: 10.4 }], deck: { x: 8, z0: -6, z1: 3.4 }, ceiling: 12,
+    band: { x: 7, z0: -6, z1: 3.4 }, walls: { x: 11, z0: -6.4, z1: 21 },
+    frame: [span(7.4, 9.0, -4.8), span(7.4, 7.8, -2.6), span(7.4, 7.8, -0.2), span(8.4, 10.4, 8.4)],
+    views: { front: { pos: [0, 8.8, 19.6], at: [0, 4, -1] }, foh: { pos: [2.8, 3.4, 11], at: [0, 3.4, -1] }, side: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -3.5], at: [0, 3.5, 14] } },
+    tour: { rx: 7.5, rz: 6, z0: 6, y: 3.6, dy: 0.3, at: [0, 3.6, -1] },
+  },
+  // a church (scenes.ts buildChurch): the chancel is the deck and the plan; the lights hang from the
+  // roof's beams
+  church: {
+    id: 'church', W: 12, D: 6.2, zc: -4.3, truss: [{ z: -5.8, y: 12.2 }, { z: -1.8, y: 12.2 }, { z: 2.2, y: 12.2 }, { z: 6.2, y: 12.2 }], deck: { x: 6, z0: -7.4, z1: -1.2 }, ceiling: 13,
+    band: { x: 6, z0: -7.4, z1: -1.2 }, walls: { x: 9, z0: -7.8, z1: 22 },
+    views: { front: { pos: [0, 2.6, 20.6], at: [0, 3, -4] }, foh: { pos: [3.2, 2.3, 10], at: [0, 2.6, -4] }, side: { pos: [-7.6, 7.5, 12], at: [0, 2.6, -4] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -6.6], at: [0, 2, 12] } },
+    tour: { rx: 6.2, rz: 8, z0: 6, y: 4.5, dy: 0.8, at: [0, 2.6, -4] },
   },
   truss: {
     id: 'truss', W: 11, D: 6, zc: 3, truss: [{ z: 1.5, y: 4.0 }], deck: { x: -1, z0: -1.7, z1: -1.7 }, ceiling: 6,

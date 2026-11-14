@@ -418,7 +418,10 @@ export const TEMPLATES: Template[] = [
       // the show first, house lights second (then the haze, the fog and the machines)
       [b.s.cueLists[0], b.s.cueLists[1]] = [show, hl];
       b.s.settings.stage3d = { act: 'none' };   // (a play: nobody playing on the 3D stage, the banners say its name)
-      return b.done();
+      // (in its own room, a real theatre: every light where a theatre has it, scenePlaces.ts)
+      const done = b.done();
+      placeIn(done, 'theatre');
+      return done;
     },
   },
   {
@@ -479,7 +482,10 @@ export const TEMPLATES: Template[] = [
         { fade: 1, effects: [sweep, drift, gradient, stars] });
       b.cue(l, 'Goodbye', [...out, [front, on(0.7, undefined, { cct: 0.35 })], [wash, on(0.6, C.warm)], [walls, on(0.5, C.warm)]], { fade: 4 });
       b.s.settings.stage3d = { act: 'none' };   // (a service: no band on the 3D stage)
-      return b.done();
+      // (in its own room, a real church: every light where a church has it, scenePlaces.ts)
+      const done = b.done();
+      placeIn(done, 'church');
+      return done;
     },
   },
   {

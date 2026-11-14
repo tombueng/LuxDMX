@@ -60,6 +60,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   big cinema (screen, curtains, a premiere stage, raked rows with an audience, step lights, wall
   washers, a starry ceiling) and a bar (a long counter, a back bar of lit bottles, people on the
   stools, bartenders, tables, a dance floor with a mirror ball), every light installed there.
+- 3D: the Theatre and Church templates too: a theatre (proscenium with the house curtain, a cyc,
+  lighting bars, booms in the wings, footlights, stalls and a full balcony) and a church (the
+  chancel with altar, cross and choir, pews with the congregation, stained glass windows).
+- The gallery is in the ⋯ menu at the top and in the 3D stage's ⋯ now, not only behind Ctrl+K.
 - 3D: **Your stage** in the Venue panel: your real stage at its size (width, depth, a riser or
   not, how many trusses and how high). The room, crowd and camera moves are built for it, the
   lights hang on its trusses, the plan is that stage.

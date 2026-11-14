@@ -234,7 +234,7 @@ function mendSettings(st: Obj, note: Note) {
   }
   if (st.stage3d !== undefined && !isObj(st.stage3d)) delete st.stage3d;
   // the 3D stage's room: one it knows, or the big stage (a room from a newer version: that one)
-  if (isObj(st.stage3d) && st.stage3d.room !== undefined && !['hall', 'pub', 'club', 'party', 'truss', 'custom', 'cinema', 'bar'].includes(st.stage3d.room as string)) delete st.stage3d.room;
+  if (isObj(st.stage3d) && st.stage3d.room !== undefined && !['hall', 'pub', 'club', 'party', 'truss', 'custom', 'cinema', 'bar', 'theatre', 'church'].includes(st.stage3d.room as string)) delete st.stage3d.room;
   // your own stage's size: numbers in metres, brought into range (geometry.ts stageSize); not an
   // object: none (8 x 5 m)
   if (isObj(st.stage3d) && st.stage3d.size !== undefined) {

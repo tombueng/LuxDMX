@@ -99,6 +99,8 @@ export const CROWDS: Partial<Record<RoomId, CrowdArea>> = {
   // bar's dance floor
   cinema: { z0: 4.2, z1: 7.4, half: () => 9.6, top: 2.3 },
   bar: { z0: 2.6, z1: 7.2, half: () => 3.6, top: 1.9 },
+  theatre: { z0: 4.4, z1: 8.4, half: () => 10, top: 2.0 },
+  church: { z0: 1.0, z1: 8.5, half: () => 7.4, top: 1.6 },
 };
 export interface Space { room: Room; lo: V3; hi: V3; deck: Box | null; boxes: Box[]; caps: Cap[]; crowd?: CrowdArea }
 const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, what: string, c = CLEAR): Box =>
@@ -132,6 +134,12 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
   truss: [bx(6.2, 7.0, 0, 1.0, 6.2, 7.8, 'the table'), bx(-7.4, -6.6, 0, 1.7, 7.4, 9.9, 'road cases')],
   // the cinema's rows, three at a time, up to the heads of the audience in them (scenes.ts CINEMA)
   cinema: [0, 1, 2, 3, 4, 5].map((k) => bx(-10.6, 10.6, 0, (3 * k + 3) * 0.32 + 1.3, 4.2 + 3 * k * 1.05, 4.2 + (3 * k + 3) * 1.05, 'the rows')),
+  // the theatre: its stalls four rows at a time, the balcony, the proscenium's walls round the opening
+  theatre: [...[0, 1, 2, 3].map((k) => bx(-11, 11, 0, (4 * k + 4) * 0.16 + 1.3, 4.4 + 4 * k, 8.4 + 4 * k, 'the stalls')), bx(-11, 11, 4.2, 8.7, 12.6, 21, 'the balcony'),
+    bx(-11, -6, 0, 12, 1.8, 2.6, 'the proscenium'), bx(6, 11, 0, 12, 1.8, 2.6, 'the proscenium'), bx(-6, 6, 8.7, 12, 1.8, 2.6, 'the proscenium')],
+  // the church: its pews six rows at a time, the altar, the choir benches, the lectern
+  church: [...[0, 1, 2].map((k) => bx(-7.6, 7.6, 0, 1.75, 1.0 + 6.3 * k, 7.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
+    bx(-5.2, -3.6, 0, 2.2, -6.5, -2.7, 'the choir'), bx(3.6, 5.2, 0, 2.2, -6.5, -2.7, 'the choir'), bx(-4.6, -3.8, 0, 2.6, -2.8, -2.0, 'the lectern')],
   // the bar: its counter, the stools and the people on them, the back counter, the tables at the
   // sides, the mirror ball (scenes.ts BAR)
   bar: [bx(-6.1, 6.1, 0, 1.2, -2.7, -1.9, 'the counter'), bx(-6.0, 6.0, 0, 1.85, -1.9, -1.0, 'the stools'), bx(-6.2, 6.2, 0, 3.4, -4.6, -3.8, 'the back bar'),
@@ -140,7 +148,9 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
 // the truss pieces of a room (the hall's and the pub's are built in venue.ts from `truss`)
 function trussOf(r: Room): Seg[] {
   if (r.frame) return r.frame;
-  if (r.id === 'pub') return r.truss.map((t) => [[-r.walls.x, t.y + 0.15, t.z], [r.walls.x, t.y + 0.15, t.z]] as Seg);
+  // (a room's own spans from wall to wall: the pub's, the bar's rail, the church's beams; the hall's
+  // truss on its towers below)
+  if (r.id !== 'hall') return r.truss.map((t) => [[-r.walls.x, t.y + 0.15, t.z], [r.walls.x, t.y + 0.15, t.z]] as Seg);
   const xl = -W / 2 - 0.9, xr = W / 2 + 0.9, segs: Seg[] = [];
   for (const t of TRUSS) {
     segs.push([[xl, t.y + 0.15, t.z], [xr, t.y + 0.15, t.z]]);
@@ -158,9 +168,10 @@ export function spaceOf(r: Room, c: Cast): Space {
   const w = r.walls, caps: Cap[] = [], boxes: Box[] = [...(GEAR[r.id] ?? [])];
   for (const [a, b] of trussOf(r)) {
     caps.push(cap(a, b, 0.15, 'the truss'));
-    // a level piece has lights under it (a head hangs about a metre and a quarter below its middle)
+    // a level piece has lights under it (a head hangs about a metre and a quarter below its middle;
+    // under a low room's rail, the bar's, about half a metre)
     if (Math.abs(a[1] - b[1]) < 0.01) {
-      const lo = a[1] - 1.25, x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), z0 = Math.min(a[2], b[2]), z1 = Math.max(a[2], b[2]);
+      const lo = a[1] - (r.ceiling < 5 ? 0.6 : 1.25), x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), z0 = Math.min(a[2], b[2]), z1 = Math.max(a[2], b[2]);
       boxes.push(bx(x0 - 0.45, x1 + 0.45, lo, a[1], z0 - 0.45, z1 + 0.45, 'the lights on the truss'));
     }
   }
@@ -356,12 +367,47 @@ export const CREW: Partial<Record<RoomId, Crew>> = {
     front: { pos: [-4.0, 2.1, 7.8], at: [0, 1.5, -2.5], fov: 40, move: [1.2, 0, 0], pan: [0.6, 0, 0] },
     back: { pos: [1.5, 2.0, -3.3], at: [0, 1.5, 4.5], fov: 50, move: [-2.0, 0, 0], pan: [-1.5, 0, 0] },
     pit: { z: 0.4, y: 1.4, x: 1.6 },
-    crane: { pivot: [6.6, 1.5, 7.8], a: [2.5, 2.9, 5.6], b: [0.8, 1.9, 0.6], rise: 0.2, lookA: [0, 1.2, 4.5], lookB: [0, 1.4, -2.4], period: 30 },   // (on the right: the mirror ball's on the left)
+    // (between the heads on the dance floor and the lights under the low rail: a narrow band)
+    crane: { pivot: [6.6, 1.5, 7.8], a: [2.5, 2.65, 5.6], b: [0.8, 2.5, 1.2], rise: 0.05, lookA: [0, 1.2, 4.5], lookB: [0, 1.4, -2.4], period: 30 },   // (on the right: the mirror ball's on the left)
     walk: {
       y: 1.6, way: [[-5.0, 0.6], [-2.5, 0.45], [0, 0.5], [2.5, 0.45], [5.0, 0.6]],
       look: [[-5.0, 1.4, -2.4], [-2.5, 1.4, -2.4], [0, 1.4, -2.4], [2.5, 1.4, -2.4], [5.0, 1.4, -2.4]],
     },
-    drone: { zc: 2.5, rx: 5.0, rz: 4.6, y: 2.75, bob: 0.05, arc: 0.8, gate: 2.6, near: [1.2, 2.4, 1.5], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 1.4, -2.2], lookNear: [0, 1.4, -2.4] },
+    drone: { zc: 2.5, rx: 5.0, rz: 4.6, y: 2.68, bob: 0.04, arc: 0.8, gate: 2.6, near: [1.2, 2.4, 1.5], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 1.4, -2.2], lookNear: [0, 1.4, -2.4] },
+  },
+  // the theatre: from the stalls (under the balcony's front), its front corner, the front of the
+  // stalls; the audience from the stage
+  theatre: {
+    wide: { pos: [0, 3.4, 11.6], at: [0, 3.6, -1], fov: 32, pan: [1.4, 0, 0], zoom: 0.8 },
+    high: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1], fov: 36, move: [2, 0, 0] },
+    ...side({ pos: [-6.6, 3.2, 3.8], at: [-1.0, 3.0, -1], fov: 32, move: [0.8, 0, -0.2], pan: [0.8, 0, 0], shake: 0.025 }),
+    crowd: { pos: [-2.0, 3.1, 9.6], at: [0, 3.2, -1], fov: 34, move: [1.0, 0, 0.6], pan: [0.8, 0, 0], shake: 0.02 },
+    front: { pos: [-8.6, 3.6, 7.5], at: [0, 3.6, -0.5], fov: 40, move: [1.5, 0, 0], pan: [0.8, 0, 0] },
+    back: { pos: [2.0, 3.6, -3.5], at: [0, 2.2, 7], fov: 50, move: [-2.4, 0, 0], pan: [-2, 0, 0] },
+    pit: { z: 3.9, y: 2.3, x: 3 },
+    crane: { pivot: [-8.0, 1.8, 3.9], a: [-3.0, 3.6, 7.0], b: [-1.0, 3.0, 3.8], rise: 0.3, lookA: [0, 2.0, 5.5], lookB: [0, 3.4, -1.0], period: 32 },
+    walk: {
+      y: 1.65, way: [[-5.6, 3.8], [-2.8, 3.72], [0, 3.76], [2.8, 3.72], [5.6, 3.8]],
+      look: [[-5.0, 3.2, -1], [-2.5, 3.3, -1], [0, 3.4, -1], [2.5, 3.3, -1], [5.0, 3.2, -1]],
+    },
+    drone: { zc: 6, rx: 7, rz: 5.5, y: 3.5, bob: 0.12, arc: 0.8, gate: 3.4, near: [1.5, 3.0, 3.9], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 3.2, -1], lookNear: [0, 3.4, -1] },
+  },
+  // the church: from the back of the nave, high over the pews, the side aisle, the central aisle;
+  // the congregation from behind the altar
+  church: {
+    wide: { pos: [0, 2.6, 20.6], at: [0, 3, -4], fov: 30, pan: [1.2, 0, 0], zoom: 0.8 },
+    high: { pos: [-6.4, 7.5, 12], at: [0, 2.6, -4], fov: 36, move: [2, 0, 0] },
+    ...side({ pos: [-7.8, 2.2, 0.0], at: [-1.0, 2.4, -4], fov: 32, move: [0.6, 0, -0.2], pan: [0.6, 0, 0], shake: 0.02 }),
+    crowd: { pos: [0, 2.3, 4.5], at: [0, 2.6, -4], fov: 36, move: [0, 0, 0.6], pan: [0.6, 0, 0], shake: 0.015 },
+    front: { pos: [-6.0, 3.2, 2.0], at: [0, 2.6, -4], fov: 40, move: [1.2, 0, 0], pan: [0.6, 0, 0] },
+    back: { pos: [2.4, 2.9, -6.7], at: [0, 1.6, 6], fov: 50, move: [-2.0, 0, 0], pan: [-1.5, 0, 0] },
+    pit: { z: -0.4, y: 2.0, x: 2.5 },
+    crane: { pivot: [-7.6, 1.5, 0.2], a: [-3.0, 3.6, 4.0], b: [-1.2, 2.8, -0.6], rise: 0.3, lookA: [0, 1.4, 4], lookB: [0, 2.6, -4.5], period: 44 },
+    walk: {
+      y: 1.6, way: [[-5.4, 0.15], [-2.7, 0.1], [0, 0.12], [2.7, 0.1], [5.4, 0.15]],
+      look: [[-4.0, 2.4, -4], [-2.0, 2.5, -4], [0, 2.6, -4.5], [2.0, 2.5, -4], [4.0, 2.4, -4]],
+    },
+    drone: { zc: 6, rx: 6.2, rz: 8, y: 5.2, bob: 0.2, arc: 0.8, gate: 4.4, near: [1.4, 2.8, -0.3], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 2.6, -4], lookNear: [0, 2.8, -4.5] },
   },
   truss: {
     wide: { pos: [0, 2.5, 12.5], at: [0, 2.9, 1.5], fov: 34, pan: [1, 0, 0], zoom: 0.82 },

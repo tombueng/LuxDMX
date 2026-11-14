@@ -187,7 +187,7 @@ describe('Band cam: close shots cut on the beat', () => {
   it('cuts on beats, holds 2 to 8 beats, goes round the people on stage (or the DJ and the crowd, or the lights)', () => {
     const lights: Light3[] = ['spot', 'spot', 'wash', 'wash', 'par', 'par'].map((kind, i) => ({ kind, p: { x: -5.5 + i, y: 3.65, z: 1.5 } }));
     for (const id of IDS) {
-      const lit = id === 'truss' || id === 'cinema' || id === 'bar';              // (rooms without a band or a DJ: their lights)
+      const lit = id === 'truss' || id === 'cinema' || id === 'bar' || id === 'theatre' || id === 'church';              // (rooms without a band or a DJ: their lights)
       const { out } = run('bandcam', id, { cast: castOf(id, lit ? lights : []) });
       const cuts = out.filter((f) => f.s.cut), step = BPM / 60 / FPS;
       for (const c of cuts.slice(1)) expect(c.beat % 1).toBeLessThan(step + 1e-9);

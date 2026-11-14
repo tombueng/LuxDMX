@@ -37,11 +37,13 @@ describe('a stage without the band', () => {
 });
 
 describe('the templates nobody plays in', () => {
-  it('theatre, church and cinema ask for a stage without the band; the cinema and the bar are in their own rooms', () => {
+  it('theatre, church and cinema ask for a stage without the band; they and the bar are in their own rooms', () => {
     const of = (name: string) => TEMPLATES.find((t) => t.name === name)!.build().settings.stage3d;
     for (const n of ['Theatre', 'Church', 'Cinema']) expect(of(n)?.act, n).toBe('none');
     expect(of('Bar')?.room).toBe('bar');
     expect(of('Cinema')?.room).toBe('cinema');
+    expect(of('Theatre')?.room).toBe('theatre');
+    expect(of('Church')?.room).toBe('church');
     expect(of('Band')?.act).toBeUndefined();
   });
   it('the file: an act it doesn\'t know is left out', () => {

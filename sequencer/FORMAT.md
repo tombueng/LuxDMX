@@ -419,8 +419,9 @@ low ceiling with two little trusses), or one of the demos' rooms: `"club"` (a DJ
 with truss on four towers and one over the dance floor), `"party"` (no stage: a 12 x 12 m square
 of truss over the crowd on four legs, the DJ's table on the floor) or `"truss"` (an empty room with
 one straight truss on two towers), the templates' rooms `"cinema"` (a big cinema: the screen, a
-stage in front of it, raked rows with an audience) and `"bar"` (a long counter with a back bar,
-stools, tables, a little dance floor), or `"custom"`: your own stage at the size in `size`, `{ w, d,
+stage in front of it, raked rows with an audience), `"bar"` (a long counter with a back bar,
+stools, tables, a little dance floor), `"theatre"` (a proscenium stage with a cyclorama, stalls and
+a balcony) and `"church"` (the chancel with the altar, pews down the nave, stained glass), or `"custom"`: your own stage at the size in `size`, `{ w, d,
 riser?, trussY?, trusses? }` in metres: the deck `w` wide and `d` deep, on a 1.2 m riser
 (`riser: true`, the default) or on the floor, `trusses` spans across it (0 to 4, default 2) on
 towers at its sides, their underside `trussY` above the floor (default 5). Out of range numbers are

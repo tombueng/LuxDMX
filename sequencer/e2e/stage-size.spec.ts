@@ -51,21 +51,36 @@ test('your own stage at its size: the room is built for it, heads hang on its tr
   expect(await page.locator('.stage-wrap g.dims line').count()).toBe(7 + 5);   // (a tick a metre, both ends)
 });
 
-test('the Cinema and Bar templates play in their own rooms, every light installed there; the Venue panel has them too', async ({ page }) => {
-  test.setTimeout(150_000);
+test('the Cinema, Bar, Theatre and Church templates play in their own rooms, every light installed there; the Venue panel has them too', async ({ page }) => {
+  test.setTimeout(240_000);
   await openConnected(page);
-  for (const [name, room] of [['Cinema', 'cinema'], ['Bar', 'bar']] as const) {
+  const inRoom = async (name: string, room: string) => {
     await startTemplate(page, name);
     expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.every((f: any) => !!f.p3))).toBe(true);
     if (!(await page.locator('.s3 canvas').isVisible())) await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
     await expect.poll(async () => (await venue(page))?.room, { timeout: 45000 }).toBe(room);
-  }
+  };
+  await inRoom('Cinema', 'cinema');
+  await inRoom('Theatre', 'theatre');
+  // the theatre's: the cyc lights on the top bar over the stage, the footlights on the apron's edge,
+  // the front-of-house bar over the stalls
+  expect((await where(page, 'Cyc 1')).y).toBeGreaterThan(7);
+  expect((await where(page, 'Footlight 1')).y).toBeLessThan(1.5);
+  expect((await where(page, 'Front 1')).z).toBeGreaterThan(6);
+  await inRoom('Church', 'church');
+  // the church's: the wall uplights on the floor at the walls, the heads up in the roof
+  const wall = await where(page, 'Wall 1');
+  expect(wall.y).toBeLessThan(0.5); expect(Math.abs(wall.x)).toBeGreaterThan(8);
+  expect((await where(page, 'Head 1')).y).toBeGreaterThan(9);
+  await inRoom('Bar', 'bar');
   // the bar's lights where a bar has them: the shelf uplights low on the back bar, the PARs on the rail
   expect((await where(page, 'Shelf 1')).y).toBeLessThan(1.3);
   expect((await where(page, 'PAR 1')).y).toBeGreaterThan(3);
   const v = page.locator('.s3').getByRole('group', { name: 'The venue' });
   await page.locator('.s3').getByRole('button', { name: 'Venue', exact: true }).click();
   await expect(v.getByRole('button', { name: 'Bar', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await v.getByRole('button', { name: 'Cinema', exact: true }).click();
-  await expect.poll(async () => (await venue(page))?.room, { timeout: 45000 }).toBe('cinema');
+  for (const [label, room] of [['Cinema', 'cinema'], ['Theatre', 'theatre'], ['Church', 'church']] as const) {
+    await v.getByRole('button', { name: label, exact: true }).click();
+    await expect.poll(async () => (await venue(page))?.room, { timeout: 45000 }).toBe(room);
+  }
 });

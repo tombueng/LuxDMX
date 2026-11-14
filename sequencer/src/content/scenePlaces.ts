@@ -3,7 +3,7 @@
 // The plan follows: each light's plan place is where it is in the room.
 import type { Fixture, Show } from '../model/types';
 import { aimRot, roomOf, TRUSS_HANG, worldToPlan, type Rot, type V3 } from '../stage3d/geometry';
-import { BAR, CINEMA, cinemaFloor } from '../stage3d/sceneSizes';
+import { BAR, CHURCH, CINEMA, cinemaFloor, THEATRE } from '../stage3d/sceneSizes';
 import { DECK } from '../stage3d/geometry';
 
 type Place = { p: V3; rot: Rot };
@@ -59,11 +59,55 @@ const BAR_PLACES: Table = {
   Sparks: (i) => stand({ x: i ? 3.9 : -3.9, y: 0, z: 2.7 }),
 };
 
-const TABLES: Record<'cinema' | 'bar', Table> = { cinema: CINEMA_PLACES, bar: BAR_PLACES };
+// ---- the theatre: the front-of-house bar, the electrics over the stage, the cyc bar, booms in the
+// wings, footlights on the apron, a ground row before the cyc
+const Th = THEATRE, hang = (y: number) => y - TRUSS_HANG;
+const THEATRE_PLACES: Table = {
+  Front: (i, n) => { const x = spread(i, n, -5, 5); return aim({ x, y: hang(10.4), z: 8.4 }, { x: x * 0.5, y: DECK + 1.6, z: 0.5 }); },
+  Cyc: (i, n) => { const x = spread(i, n, -5.25, 5.25); return aim({ x, y: hang(9.0), z: -4.8 }, { x, y: DECK + 3.5, z: Th.cycZ }); },
+  House: (i) => { const x = i ? 4 : -4; return aim({ x, y: Th.ceiling - 0.4, z: 9 }, { x, y: 0, z: 9.2 }); },
+  Boom: (i) => { const sx = i < 2 ? -1 : 1, low = i % 2 === 1, z = low ? 1.0 : -1.2, x = sx * 7.2, y = DECK + (low ? 1.4 : 2.6); return aim({ x, y, z }, { x: -sx * 1.5, y: DECK + 1.4, z }); },
+  Special: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: hang(7.8), z: -0.2 }, { x: x * 0.6, y: DECK, z: -1.5 }); },
+  Spot: (i, n) => hung({ x: spread(i, n, -4.5, 4.5), y: hang(7.8), z: -2.6 }),
+  Wash: (i, n) => hung({ x: [-6, -3, 3, 6][i] ?? spread(i, n, -6, 6), y: hang(7.8), z: -0.2 }),
+  Footlight: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: DECK, z: Th.stage.z1 - 0.15 }, { x, y: DECK + 1.8, z: 0 }); },
+  'Ground row': (i, n) => { const x = spread(i, n, -4, 4); return aim({ x, y: DECK, z: Th.cycZ + 0.5 }, { x, y: DECK + 5, z: Th.cycZ }); },
+  Lightning: () => aim({ x: 0, y: hang(9.0), z: -4.8 }, { x: 0, y: DECK + 4, z: Th.cycZ }),
+  Blinder: (i) => { const sx = i ? 1 : -1; return aim({ x: sx * 6.5, y: DECK + 5, z: Th.arch.z + 0.45 }, { x: sx * 3, y: 2, z: 12 }); },
+  Fog: () => stand({ x: -6.5, y: DECK, z: -3.5 }, 90),
+  Hazer: () => stand({ x: 6.5, y: DECK, z: -4.5 }, -90),
+  Confetti: () => stand({ x: 0, y: DECK, z: 3.0 }),
+  CO2: () => stand({ x: 6.8, y: DECK, z: 1.2 }),
+  Sparks: (i) => stand({ x: i ? 5.5 : -5.5, y: DECK, z: 3.1 }),
+  Flame: (i) => stand({ x: i ? 3 : -3, y: DECK, z: -4.2 }),
+  Bubbles: () => stand({ x: -5.5, y: DECK, z: 2.6 }, 30),
+};
+
+// ---- the church: hung from the roof's beams (over the chancel, over the nave), uplights on the walls
+// between the windows, battens behind the altar lighting the cross
+const Chu = CHURCH, beam = Chu.ceiling - 0.8 - TRUSS_HANG;
+const CHURCH_PLACES: Table = {
+  Front: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: beam, z: 2.2 }, { x: x * 0.4, y: DECK + 1.6, z: -3.5 }); },
+  Wash: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: beam, z: -1.8 }, { x: x * 0.6, y: DECK, z: -4 }); },
+  Altar: (i) => aim({ x: i ? 2 : -2, y: beam, z: -1.8 }, { x: 0, y: DECK + 1, z: Chu.altarZ }),
+  Lectern: () => aim({ x: -6, y: beam, z: -1.8 }, { x: Chu.lecternX, y: DECK + 1.3, z: -2.4 }),
+  Choir: (i) => { const x = [-5.5, -3.5, 3.5, 5.5][i] ?? 0; return aim({ x, y: beam, z: -5.8 }, { x: Math.sign(x) * 4.3, y: DECK, z: -4.6 }); },
+  Head: (i, n) => hung({ x: spread(i, n, -4.5, 4.5), y: beam, z: 6.2 }),
+  Wall: (i, n) => { const sx = i < n / 2 ? -1 : 1, k = i % Math.ceil(n / 2), z = [3.75, 8.25, 12.75][k] ?? 3.75, x = sx * (Chu.wallX - 0.3); return aim({ x, y: 0.1, z }, { x: x * 0.98, y: 6, z }); },
+  Blinder: (i) => { const sx = i ? 1 : -1; return aim({ x: sx * 3.2, y: DECK, z: Chu.chancel.z1 - 0.3 }, { x: sx * 2, y: 1.6, z: 10 }); },
+  Batten: (i) => { const x = i ? 1.5 : -1.5; return aim({ x, y: DECK, z: Chu.chancel.z0 + 0.4 }, { x: x * 0.3, y: DECK + 5, z: Chu.chancel.z0 - 0.4 }); },
+  Hazer: () => stand({ x: 5.5, y: DECK, z: -6.8 }, -150),
+  Bubbles: () => stand({ x: 0, y: DECK, z: Chu.chancel.z1 - 0.4 }),
+  Confetti: (i) => stand({ x: i ? 6.5 : -6.5, y: 0, z: 21 }, 180),
+  Sparks: (i) => stand({ x: i ? 5.2 : -5.2, y: DECK, z: Chu.chancel.z1 - 0.3 }),
+};
+
+type SceneRoom = 'cinema' | 'bar' | 'theatre' | 'church';
+const TABLES: Record<SceneRoom, Table> = { cinema: CINEMA_PLACES, bar: BAR_PLACES, theatre: THEATRE_PLACES, church: CHURCH_PLACES };
 
 // every light of the show whose name the room has a place for: placed there (its 3D place and turn,
 // and its plan place); returns how many
-export function placeIn(s: Show, room: 'cinema' | 'bar'): number {
+export function placeIn(s: Show, room: SceneRoom): number {
   const table = TABLES[room], r = roomOf(room);
   const byKind = new Map<string, Fixture[]>();
   for (const f of s.fixtures) {

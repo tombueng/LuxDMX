@@ -13,9 +13,9 @@ import type { Stage } from './rooms';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const built: Record<string, Stage> = {};
-const room = (id: 'club' | 'party' | 'truss' | 'cinema' | 'bar') => (built[id] ??= buildVenue({ room: id, crowd: 40 }));
+const room = (id: 'club' | 'party' | 'truss' | 'cinema' | 'bar' | 'theatre' | 'church') => (built[id] ??= buildVenue({ room: id, crowd: 40 }));
 
-for (const id of ['club', 'party', 'truss', 'cinema', 'bar'] as const) {
+for (const id of ['club', 'party', 'truss', 'cinema', 'bar', 'theatre', 'church'] as const) {
   describe(`the ${id} room`, () => {
     it('builds with nothing NaN in it, its static parts baked into a few dozen meshes', () => {
       const v = room(id);
@@ -107,12 +107,13 @@ describe('the DJ', () => {
   });
 });
 
-// The templates' own rooms: the cinema (screen, stage, raked rows with an audience) and the bar
-// (counter, back bar, people at it); every Cinema and Bar template light placed in them
-describe('the Cinema and Bar templates in their rooms', () => {
+// The templates' own rooms: the cinema (screen, stage, raked rows with an audience), the bar
+// (counter, back bar, people at it), the theatre (proscenium, stalls, balcony), the church (chancel,
+// pews, stained glass); every light of those templates placed in them
+describe('the Cinema, Bar, Theatre and Church templates in their rooms', () => {
   it('every light has its place in the room, inside its walls, under its ceiling; the room is the template\'s', async () => {
     const { TEMPLATES } = await import('../content/templates');
-    for (const [name, id] of [['Cinema', 'cinema'], ['Bar', 'bar']] as const) {
+    for (const [name, id] of [['Cinema', 'cinema'], ['Bar', 'bar'], ['Theatre', 'theatre'], ['Church', 'church']] as const) {
       const s = TEMPLATES.find((t) => t.name === name)!.build(), r = ROOMS[id];
       expect(s.settings.stage3d?.room).toBe(id);
       for (const f of s.fixtures) {
