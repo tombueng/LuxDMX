@@ -253,8 +253,12 @@ export class TimelinePlayer {
     this.stopSound?.(); this.stopSound = undefined;
     this.playing = false;
   }
-  // another song is up: stopped at its very start, nothing waiting
-  reset() { this.pause(); this.position = this.start; this.clock = this.position; this.landed = Number.NaN; this.missing = ''; this.top = true; }
+  // another song is up: stopped at its very start, nothing waiting (and no part of the last one looping)
+  reset() { this.pause(); this.position = this.start; this.clock = this.position; this.landed = Number.NaN; this.missing = ''; this.top = true; this.loop = null; }
+  // A part of the song played over and over while it's worked on (Loop this part): at its end, back
+  // to its start, as a jump (the stage as it is there, no moment fires on the way back). Only when
+  // playing reaches its end: a jump past it plays on from there. Not kept with the show.
+  loop = $state<{ name: string; from: number; to: number } | null>(null);
   // (a show opened, another song file: Play starts from the top)
   stop() { this.pause(); this.top = true; }
   // after a reload: where the song was (and going on if it was playing). Without a click on the
@@ -310,6 +314,13 @@ export class TimelinePlayer {
       for (const i of due(tl.items, this.last, p.at)) this.app.doTimeline(i.do, false);
       this.pending = null;
       this.seek(Math.min(this.end, p.to.at + (t - p.at)));
+      return;
+    }
+    const lp = this.loop;
+    if (lp && this.last < lp.to && t >= lp.to) {
+      // (what's placed before its end plays; what starts the next part doesn't)
+      for (const i of due(tl.items, this.last, lp.to - 1e-3)) this.app.doTimeline(i.do, false);
+      this.seek(lp.from + Math.min(t - lp.to, 0.2));
       return;
     }
     for (const i of due(tl.items, this.last, t)) this.app.doTimeline(i.do, false);

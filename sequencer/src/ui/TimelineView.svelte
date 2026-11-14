@@ -489,15 +489,30 @@
     list.sort((a, b) => a.at - b.at);
     app.markDirty(0);
   }
-  function partMenu(e: MouseEvent, s: { name: string; at: number }) {
+  function partMenu(e: MouseEvent, s: { name: string; at: number; end: number }) {
     e.preventDefault(); e.stopPropagation();
     ui.openMenu(e, [
       { label: `Go to ${s.name}`, icon: 'play', run: () => jump(s.at) },
       { label: 'Rename…', icon: 'edit', run: () => renamePart(s.at) },
       { label: `Move it to the playhead (${clockOf(P.position, false)})`, icon: 'right', disabled: Math.abs(P.position - s.at) < 0.05, run: () => movePart(s.at) },
+      looping(s) ? { label: 'Stop looping it', icon: 'loop', keys: 'L', run: () => (P.loop = null) } : { label: 'Loop this part', icon: 'loop', keys: 'L', run: () => loopPart(s) },
       { sep: true },
       { label: 'Remove this part', icon: 'trash', danger: true, run: () => removePart(s.at) },
     ]);
+  }
+  // Loop a part: it plays from its start, over and over, until stopped (L again, its chip's ×)
+  const looping = (s: { at: number; end: number }) => !!P.loop && Math.abs(P.loop.from - s.at) < 1e-3 && Math.abs(P.loop.to - s.end) < 1e-3;
+  function loopPart(s: { name: string; at: number; end: number }) {
+    P.loop = { name: s.name, from: s.at, to: s.end };
+    jump(s.at);
+    if (!P.playing) void P.play(false);
+  }
+  // L: the part the playhead is in, looped (or not any more)
+  function loopHere() {
+    const t = P.position, s = sections.find((x) => t >= x.at - 1e-3 && t < x.end) ?? sections.find((x) => x.at >= t);
+    if (P.loop) { P.loop = null; return; }
+    if (!s) { ui.toast('No parts on this song to loop: add one with P or + Part', 4000); return; }
+    loopPart(s);
   }
   function rulerMenu(e: MouseEvent) {
     e.preventDefault();
@@ -670,6 +685,7 @@
     else if (e.key === 'ArrowRight' && !e.altKey) { e.preventDefault(); jump(P.position + bar); }
     else if (e.key === 'ArrowLeft' && !e.altKey) { e.preventDefault(); jump(P.position - bar); }
     else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); addPart(); }
+    else if (e.key.toLowerCase() === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); loopHere(); }
   }
   const peaksPath = $derived.by(() => {
     const p = P.peaks, d = P.duration || 1, w = d * scale;
@@ -693,7 +709,7 @@
         <p>A song file of your own: its tempo, first downbeat and parts are found from the sound (check them: BPM, and the parts on the ruler). P or <b>+ Part</b> starts a part at the bar line nearest the playhead; on the ruler a double-click renames a part, a right-click removes it.</p>
         <p>Before and after the song: give the show time before the song starts (an intro, the band walking on) and after it ends (the cheer, the house lights up). Things go there like anywhere else; Play from the start begins at the very start, and the song comes in at its own 0:00.</p>
         <p>The crowd: Chatter, Cheering, Roar and Quiet change how the crowd sounds from there on, over the length of the bar; a Cheer! swells up and dies away. Right-click one for how loud. The crowd's own volume sits next to the song's.</p>
-        <p>Space plays and pauses, Home goes back to the very start, the arrows a bar, P adds a part, Del removes what's selected, Ctrl+wheel zooms. A song stays in this browser; the show file only names it.</p>
+        <p>Space plays and pauses, Home goes back to the very start, the arrows a bar, P adds a part, L loops the part the playhead is in (right-click a part: Loop this part; L again or its chip's × stops it), Del removes what's selected, Ctrl+wheel zooms. A song stays in this browser; the show file only names it.</p>
         <p>A gig: put every song in the set list, in order, each with its own file and cues (the lights, cues and effects are the whole set's). On Live, Next song gets the next one ready without the lights going dark, and Play from the start comes in on the first downbeat.</p>
       </Help>
     </div>
@@ -796,6 +812,7 @@
       <label>Snap <select bind:value={snapTo} aria-label="Snap"><option value="bar">to the bar</option><option value="beat">to the beat</option><option value="off">off</option></select></label>
       <button class="ghost" onclick={() => addPart()} aria-label="Add a part here" title="A new part of the song starts at the bar line nearest the playhead (P)"><Icon name="plus" size={14} />Part</button>
       <span class="grow"></span>
+      {#if P.loop}<span class="chip looping" role="status"><Icon name="loop" size={13} />Looping {P.loop.name}<button class="ghost x" onclick={() => (P.loop = null)} aria-label="Stop looping {P.loop.name}" title="Stop looping (L)">×</button></span>{/if}
       <span class="chip armed" class:on={app.sfxArmed} title="Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed (the button at the top)">{app.sfxArmed ? 'Machines armed' : 'Machines safe'}</span>
       {#if tl?.audio}<span class="faint name" title={tl.audio.name}>♪ {tl.audio.name}</span>{:else if tl?.demo}<span class="faint name">♪ demo beat</span>{/if}
       <button class="ghost" onclick={() => zoom(0.8)} aria-label="Zoom out"><Icon name="search" size={14} />−</button>
@@ -824,6 +841,7 @@
                 onpointerdown={(e) => e.stopPropagation()} onclick={() => jump(s.at)} ondblclick={() => renamePart(s.at)} oncontextmenu={(e) => partMenu(e, s)}
                 title="{s.name}: {clockOf(s.at, false)} to {clockOf(s.end, false)}. Click to go there, double-click to rename, right-click for more." aria-label="Go to {s.name} ({clockOf(s.at, false)})">{s.name}</button>
             {/each}
+            {#if P.loop}<span class="loopband" style="left:{x(P.loop.from)}px;width:{Math.max(6, (P.loop.to - P.loop.from) * scale)}px" aria-hidden="true"></span>{/if}
             <svg class="wave" style="left:{x(0)}px" width={(P.duration || 240) * scale} height="44" aria-hidden="true"><path d={peaksPath} /></svg>
           </div>
           {#each lanes as ln (ln.id)}
@@ -963,6 +981,10 @@
     background: color-mix(in srgb, var(--accent) var(--mix), #0b0f15); color: var(--text); font-size: .66rem; line-height: 16px; text-align: left;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; z-index: 1; }
   .sec:hover { filter: brightness(1.3); }
+  /* the part that loops: a band under its name on the ruler, and its chip in the transport */
+  .loopband { position: absolute; top: 31px; height: 4px; background: var(--cyan); border-radius: 2px; pointer-events: none; }
+  .chip.looping { display: inline-flex; align-items: center; gap: .3rem; color: var(--cyan); border-color: var(--cyan); cursor: default; }
+  .chip.looping .x { padding: 0 .3rem; min-height: 0; line-height: 1; font-size: 1rem; }
   .wave { position: absolute; left: 0; top: 32px; pointer-events: none; }
   /* before and after the song: hatched, named on the ruler, faintly behind the tracks */
   .span { position: absolute; top: 15px; height: 16px; min-height: 0; display: block; padding: 0 4px; border: 0; border-radius: 0; z-index: 1; cursor: pointer;

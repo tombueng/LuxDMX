@@ -314,3 +314,44 @@ test('a song that arrives after another show was opened stays off that show', as
   await expect(page.locator('.toast')).toContainText('came down after another show was opened');
   expect(await page.evaluate(() => (window as any).__luxdmx.show.timeline?.audio)).toBeUndefined();
 });
+
+test('Loop this part: the part plays over and over, its chip stops it; L loops the part the playhead is in', async ({ page }) => {
+  test.setTimeout(90_000);
+  await bar(page);
+  await page.locator('.tlv').getByRole('button', { name: 'Demo songs…' }).click();
+  const dlg = page.getByRole('dialog', { name: 'Demo songs' });
+  await dlg.getByRole('button', { name: 'Use Demo beat' }).click();
+  await expect(dlg).toHaveCount(0);
+  // (short parts, so it comes round quickly)
+  await page.evaluate(() => { (window as any).__luxdmx.show.timeline.sections = [{ name: 'Intro', at: 0 }, { name: 'Drop', at: 2 }, { name: 'Outro', at: 4.5 }]; });
+  // (zoomed in: on the whole ten minutes the part is a sliver)
+  for (let i = 0; i < 12; i++) await page.getByRole('button', { name: 'Zoom in' }).click();
+  const drop = page.locator('.tlv .sec').filter({ hasText: /^Drop$/ });
+  await expect(drop).toHaveCount(1);
+  await drop.click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Loop this part' }).click();
+  const tr = page.getByRole('toolbar', { name: 'Transport' });
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping Drop' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing)).toBe(true);
+  // over 6 s (more than two rounds): always inside the part, and it came round
+  const seen = await page.evaluate(async () => {
+    const P = (window as any).__luxdmx.timeline, out: number[] = [];
+    for (let i = 0; i < 30; i++) { await new Promise((r) => setTimeout(r, 200)); out.push(P.position); }
+    return out;
+  });
+  expect(Math.min(...seen)).toBeGreaterThanOrEqual(2 - 0.05);
+  expect(Math.max(...seen)).toBeLessThan(4.5 + 0.3);
+  expect(seen.some((t, i) => i > 0 && t < seen[i - 1] - 1)).toBe(true);
+  // the chip's ×: it plays on past the end
+  await tr.getByRole('button', { name: 'Stop looping Drop' }).click();
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping' })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.position), { timeout: 8000 }).toBeGreaterThan(4.6);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+  // L: the part the playhead is in (Intro), and L again stops it
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(0.5));
+  await page.keyboard.press('l');
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping Intro' })).toBeVisible();
+  await page.keyboard.press('l');
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping' })).toHaveCount(0);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+});

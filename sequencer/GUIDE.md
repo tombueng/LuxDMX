@@ -672,7 +672,11 @@ Three more demos come with their own room on the 3D stage:
   unsure), the first downbeat of most and about two thirds of the parts to within a bar. **P** (or
   **Part** in the transport, or a right-click on the ruler) starts a part at the bar line nearest
   the playhead, named after the one before it ("Chorus 2"); double-click a part on the ruler to
-  rename it, right-click it to move it to the playhead or remove it. The song's credit (title, artist, licence) shows under the tracks while
+  rename it, right-click it to move it to the playhead or remove it. **Loop this part** (in that
+  menu, or **L** for the part the playhead is in) plays it over and over while you work on its
+  looks: at its end it jumps back to its start (a jump, so no moment fires on the way back). A
+  cyan band on the ruler and a "Looping" chip in the transport show it; the chip's × or L again
+  stops it. The loop isn't kept with the show. The song's credit (title, artist, licence) shows under the tracks while
   it's the song, and stays with the show; another browser offers to download it again. A song
   still coming down when another show is opened stays off that show (it says so). While the song
   plays, the effects and Auto GO run at its tempo and on its beats, counted from its first
