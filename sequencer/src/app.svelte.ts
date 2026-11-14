@@ -2077,8 +2077,15 @@ class App {
   // cells are picked on some selected light (the others are left alone meanwhile)
   get picking(): boolean { return Object.keys(this.cellSel).length > 0; }
   set(partial: Values) {
+    this.putValues(this.selected, partial);
+    if ([partial.fog, partial.haze].some((v) => typeof v === 'number' && v > 0)) this.letHazeGo();   // fog asked for by hand: a Live "Stop" doesn't sit on it
+  }
+  // Values into the programmer (set by hand, a preset): on the picked cells just there (while
+  // picking, a light with none picked gets only what isn't per cell); else the whole light, its
+  // cells' own values for the same things dropped (all blue means every cell blue)
+  private putValues(ids: string[], partial: Values) {
     const picking = this.picking;
-    for (const id of this.selected) {
+    for (const id of ids) {
       // (on a moving bar, where picked heads point is theirs too)
       const { cell, rest } = splitCell(partial, this.caps(id).cellMoves);
       const cs = this.cellsPicked(id);
@@ -2089,15 +2096,12 @@ class App {
         if (cs.length) this.setCells(id, cs, cell);
         continue;
       }
-      if (picking && !cs.length && cell) { if (Object.keys(rest).length) this.programmer[id] = { ...this.programmer[id], ...rest }; continue; }
-      // the whole light: cells it had in the programmer follow it (all blue means every cell blue)
       const was = this.programmer[id];
       const v: Values = { ...was, ...partial };
       if (was?.cells && cell) v.cells = dropCellKeys(was.cells, Object.keys(cell) as (keyof CellValues)[]);
       if (v.cells && !Object.keys(v.cells).length) delete v.cells;
       this.programmer[id] = v;
     }
-    if ([partial.fog, partial.haze].some((v) => typeof v === 'number' && v > 0)) this.letHazeGo();   // fog asked for by hand: a Live "Stop" doesn't sit on it
   }
   // Cells of one light in the programmer: the same values for all, or each its own (by its place
   // in `cells`).
@@ -2149,18 +2153,20 @@ class App {
   }
   clearProgrammer() { this.programmer = {}; }
   // Picking a colour for lights that are off would show nothing: switch them on too (picked cells:
-  // the ones of them that are dark).
+  // the ones of them that are dark, unless the light's own level is set here; every cell picked is
+  // the whole light).
   lightUpIfDark(ids = this.selected) {
     for (const id of ids) {
       const c = this.caps(id);
       if (!(c.intensity || c.color || c.white)) continue;
-      const cs = this.cellsPicked(id), l = this.look[id], n = c.cells;
-      if (cs.length) {
+      const cs = this.cellsPicked(id), l = this.look[id], n = c.cells, every = cs.length > 0 && cs.length >= n;
+      if (cs.length && !every) {
+        if (this.programmer[id]?.intensity !== undefined) continue;
         const dark = cs.filter((k) => this.programmer[id]?.cells?.[k]?.intensity === undefined && (cellLookAt(l, k, n)?.intensity ?? 0) <= 0);
         if (dark.length) this.setCells(id, dark, { intensity: 1 });
         continue;
       }
-      if (this.picking) continue;
+      if (this.picking && !every) continue;
       if (this.programmer[id]?.intensity !== undefined || (l?.intensity ?? 0) > 0) continue;
       this.programmer[id] = { ...this.programmer[id], intensity: 1 };
     }
@@ -2713,20 +2719,12 @@ class App {
 
   // ---- presets (cues keep references, so changing one changes every cue that uses it)
   applyPreset(id: string, to = this.selected) {
-    const picking = this.picking;
     const p = this.show.presets.find((x) => x.id === id);
     if (!p || !to.length) return false;
     const keys = new Set([...Object.keys(p.values), ...Object.values(p.perFixture ?? {}).flatMap((v) => Object.keys(v))]);
     const v: Values = {};
     for (const k of keys) if (k !== 'raw' && k !== 'cells') (v as Record<string, unknown>)[k] = { preset: id };
-    for (const fid of to) {
-      const { cell, rest } = splitCell(v, this.caps(fid).cellMoves);
-      const cs = this.cellsPicked(fid);
-      if ((cs.length || picking) && cell) { if (Object.keys(rest).length) this.programmer[fid] = { ...this.programmer[fid], ...rest }; if (cs.length) this.setCells(fid, cs, cell); continue; }
-      const was = this.programmer[fid];
-      this.programmer[fid] = { ...was, ...v };
-      if (was?.cells && cell) { const left = dropCellKeys(was.cells, Object.keys(cell) as (keyof CellValues)[]); if (Object.keys(left).length) this.programmer[fid].cells = left; else delete this.programmer[fid].cells; }
-    }
+    this.putValues(to, v);
     if (p.kind === 'color') this.lightUpIfDark(to);
     return true;
   }

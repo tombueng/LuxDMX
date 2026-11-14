@@ -270,6 +270,14 @@ describe('cells in the app (review cycle 2)', () => {
     expect(app.programmer.b.color).toEqual(RED);
     expect(app.programmer.b.cells).toBeUndefined();
   });
+  it('a colour preset on all cells picked is the whole light too, one reference, not one per cell', async () => {
+    const r = await barShow(), { app } = r;
+    const p = app.show.presets.find((x: { kind: string }) => x.kind === 'color');
+    app.selected = ['b']; app.set({ intensity: 1 });
+    app.selectCells([0, 1, 2, 3, 4, 5, 6, 7]); app.applyPreset(p.id);
+    expect(app.programmer.b.color).toEqual({ preset: p.id });
+    expect(app.programmer.b.cells).toBeUndefined();
+  });
   it('play along copies cells only to a light of the same cell shape', async () => {
     const r = await barShow(), { app } = r;
     app.show.cueLists.push({ id: 'L', name: 'L', end: 'stop', cues: [{ id: 'c', name: 'c', fade: 0, advance: { mode: 'manual' }, values: { b: { intensity: 1, cells: { 1: { color: RED } } } } }] });
