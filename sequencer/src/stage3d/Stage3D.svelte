@@ -453,6 +453,8 @@
       winch: (id: string) => rig.winchOf(id),
       gobos: () => (goboAtlas ? { count: GOBOS.length, empty: [...goboAtlas.empty], size: goboAtlas.canvas.width } : null),
       rendering: () => (rendering ? { ...rendering } : null),
+      // (the last render's sound: how long, and how loud its first two seconds are, RMS)
+      lastMix: () => lastMix,
       haze: () => haze,
       ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: houseMats.length ? Math.max(...houseMats.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null }),
     };
@@ -1090,6 +1092,14 @@
   let renderPanel = $state(false);
   let rendering = $state<{ k: number; n: number; left?: number; codec: string; label: string; phase: 'sound' | 'frames' | 'saving' } | null>(null);
   let renderStop = false;
+  let lastMix: { secs: number; rms: number } | null = null;
+  // how loud a sound's first `secs` are (RMS over its channels)
+  function rmsOf(b: AudioBuffer, secs: number) {
+    const n = Math.min(b.length, Math.round(secs * b.sampleRate));
+    let sum = 0;
+    for (let c = 0; c < b.numberOfChannels; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) sum += d[i] * d[i]; }
+    return n ? Math.sqrt(sum / (n * b.numberOfChannels)) : 0;
+  }
   const renderable = typeof VideoEncoder !== 'undefined';
   // the song on the timeline (a file or the demo beat): Render can take it from its start
   const songThere = $derived(!!app.show.timeline && (!!app.show.timeline.demo || !!app.show.timeline.audio));
@@ -1146,9 +1156,12 @@
     const onLost = () => { lost = true; renderStop = true; };
     canvas.addEventListener('webglcontextlost', onLost);
     try {
-      // the sound: the song from the render's start to its end, at full
+      // the sound: the song from the render's start to its end, at full, and the crowd as you hear it
+      // (its volume, or none when it's switched off)
       let mix: AudioBuffer | undefined;
-      if (song) { try { await app.timeline.prepare(); mix = await mixSong({ song: app.timeline.song, demo: !!tl.demo, from, to }); } catch { mix = undefined; } }
+      const P = app.timeline, crowd = tl?.crowd?.length && P.crowdOn ? { items: tl.crowd, volume: P.crowdVolume } : undefined;
+      if (song) { try { await P.prepare(); mix = await mixSong({ song: P.song, demo: !!tl.demo, from, to, crowd }); } catch { mix = undefined; } }
+      lastMix = mix ? { secs: mix.duration, rms: rmsOf(mix, 2) } : null;
       if (renderStop) throw new Error('stopped');
       file = handle ? undefined : new ChunkFile();
       const writable = (handle ? await handle.createWritable() : file!.writable()) as WritableStream;

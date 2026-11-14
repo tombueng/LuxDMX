@@ -92,6 +92,19 @@ function buffersFor(ctx: BaseAudioContext, k: Kit): Buffers {
   return b;
 }
 
+// the three loops' levels for what the crowd does: the chatting, the cheering, more of them cheering
+// (at its loudest about 0.15 RMS at full volume: under a loud song, never pushing it into clipping)
+export function loopLevels(s: CrowdState): [number, number, number] {
+  const x = Math.min(1.2, s.cheer + 0.75 * s.swell);
+  return [
+    0.9 * s.chatter * (1 - 0.6 * Math.min(1, x)),                               // chatting (drowned out by cheering)
+    1.15 * Math.pow(x, 1.4),                                                     // cheering
+    0.8 * Math.pow(Math.max(0, x - 0.45), 1.2),                                  // and more of them, loud
+  ];
+}
+// (the loops: the chatting, the cheering, and the cheering again a little slower: more people)
+const LOOPS = (b: Buffers) => [[b.chatter, 1], [b.roar, 1], [b.roar, 0.93]] as const;
+
 const AHEAD = 0.25;                        // seconds the cheers and shouts are set up ahead (a busy page doesn't stutter them)
 const SHOTS = 18;                          // short sounds at once, at most (the cost stays small)
 
@@ -162,7 +175,7 @@ export class CrowdSound {
   private begin(now: number) {
     const ctx = this.ctx!, b = this.b!;
     // (the cheering twice, a little apart and slower: more people at the loud end)
-    for (const [buf, rate] of [[b.chatter, 1], [b.roar, 1], [b.roar, 0.93]] as const) {
+    for (const [buf, rate] of LOOPS(b)) {
       const src = ctx.createBufferSource(), gain = ctx.createGain();
       src.buffer = buf; src.loop = true; src.playbackRate.value = rate;
       gain.gain.value = 0;
@@ -172,13 +185,7 @@ export class CrowdSound {
     }
   }
   private levels(s: CrowdState, now: number) {
-    const x = Math.min(1.2, s.cheer + 0.75 * s.swell);
-    // (at its loudest about 0.15 RMS at full volume: under a loud song, never pushing it into clipping)
-    const v = [
-      0.9 * s.chatter * (1 - 0.6 * Math.min(1, x)),                             // chatting (drowned out by cheering)
-      1.15 * Math.pow(x, 1.4),                                                   // cheering
-      0.8 * Math.pow(Math.max(0, x - 0.45), 1.2),                                // and more of them, loud
-    ];
+    const v = loopLevels(s);
     this.loops.forEach((l, i) => { if (Math.abs(v[i] - l.v) > 0.002) { l.v = v[i]; l.gain.gain.setTargetAtTime(v[i], now, 0.12); } });
   }
   private events(items: readonly CrowdItem[] | undefined, s: CrowdState, t: number, now: number) {
@@ -223,4 +230,64 @@ function poisson(m: number) {
   const u = Math.random();
   while (u > s && n < 20) { n++; p *= m / n; s += p; }
   return n;
+}
+
+// The crowd for a render (render/audio.ts): the same sounds as when the show plays, from `from` to
+// `to` on the song's clock, into `out` on an offline context (its time 0 is `from`). The loops'
+// levels follow the crowd track every 50 ms, the cheers come where the track has them; the shouts
+// and whistles of the sounds made here at random, but the same ones each time (seeded).
+export async function renderCrowd(ctx: BaseAudioContext, out: AudioNode, items: readonly CrowdItem[], from: number, to: number, volume = 0.8, seed = 1) {
+  const k = await loadKit(), b = buffersFor(ctx, k), len = to - from;
+  if (!(len > 0) || !(volume > 0)) return;
+  const node = ctx.createGain();
+  node.gain.value = volume; node.connect(out);
+  let r = seed >>> 0 || 1;
+  const rand = () => { r = (Math.imul(r, 1664525) + 1013904223) >>> 0; return r / 4294967296; };
+  // the loops, their levels as the crowd goes
+  const STEP = 0.05;
+  LOOPS(b).forEach(([buf, rate], i) => {
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf; src.loop = true; src.playbackRate.value = rate;
+    g.gain.setValueAtTime(loopLevels(crowdAt(items, from + 0.05))[i], 0);
+    for (let t = STEP; t <= len + 1e-9; t += STEP) g.gain.linearRampToValueAtTime(loopLevels(crowdAt(items, from + t + 0.05))[i], t);
+    src.connect(g).connect(node);
+    src.start(0, rand() * buf.duration);
+  });
+  const shot = (buf: AudioBuffer, when: number, gain: number, pan: number, rate: number) => {
+    if (when < 0 || when >= len) return;
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf; src.playbackRate.value = rate; g.gain.value = gain;
+    let last: AudioNode = src.connect(g);
+    if (pan && typeof ctx.createStereoPanner === 'function') { const p = ctx.createStereoPanner(); p.pan.value = pan; last = last.connect(p); }
+    last.connect(node);
+    src.start(when);
+  };
+  const pick = <T,>(a: T[]) => a[Math.floor(rand() * a.length)];
+  // the cheers where the track has them (one that started before `from` is heard from its middle
+  // when it's a recording, as playing from there would)
+  let cheerNo = -1;
+  for (const it of items) {
+    if (it.do.do !== 'cheer') continue;
+    const l = it.do.level, at = it.at - from;
+    if (b.cheers.length) {
+      cheerNo = (cheerNo + 1) % b.cheers.length;
+      if (at >= 0 && at < len) shot(b.cheers[cheerNo], at, 0.45 + 0.75 * l, 0, 0.97 + rand() * 0.06);
+      continue;
+    }
+    for (let n = Math.round(2 + 8 * l); n > 0; n--) { if (b.woos.length) shot(pick(b.woos), at + rand() * 1.4, 0.3 + 0.4 * l, rand() * 1.6 - 0.8, 0.9 + rand() * 0.2); }
+    for (let n = Math.round(3 * l); n > 0; n--) { if (b.whistles.length) shot(pick(b.whistles), at + 0.2 + rand() * 1.8, 0.25 + 0.3 * l, rand() * 1.6 - 0.8, 0.95 + rand() * 0.1); }
+  }
+  // someone shouting or whistling now and then while they cheer (the sounds made here only)
+  if (b.woos.length) for (let t = 0; t < len; t += AHEAD) {
+    const s = crowdAt(items, from + t), k2 = Math.min(1, s.cheer + s.swell);
+    const rate = 3 * Math.pow(Math.max(0, s.cheer - 0.15), 1.3) + 3 * s.swell;
+    const m = rate * AHEAD, u = rand();
+    let n = 0, p = Math.exp(-m), acc = p;
+    while (u > acc && n < 20) { n++; p *= m / n; acc += p; }
+    for (; n > 0; n--) {
+      const when = t + rand() * AHEAD;
+      if (rand() < 0.75) shot(pick(b.woos), when, 0.2 + 0.25 * k2, rand() * 1.6 - 0.8, 0.9 + rand() * 0.2);
+      else if (b.whistles.length) shot(pick(b.whistles), when, 0.15 + 0.2 * k2, rand() * 1.6 - 0.8, 0.95 + rand() * 0.1);
+    }
+  }
 }

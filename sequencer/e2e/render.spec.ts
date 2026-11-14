@@ -119,6 +119,40 @@ test('the song from the playhead, with its sound, straight into the file the bro
   expect(await c.evaluate((el) => getComputedStyle(el).objectFit)).not.toBe('contain');      // (back to the window's shape)
 });
 
+test('the crowd is in the render\'s sound: chatting before the song as the show has it; switched off, silence there', async ({ page }) => {
+  test.setTimeout(480_000);
+  await page.addInitScript(() => {
+    (window as any).__saved = null;
+    (window as any).showSaveFilePicker = async (o: { suggestedName: string }) => ({ name: o.suggestedName, createWritable: async () => new WritableStream({ close() { (window as any).__saved = { name: o.suggestedName }; } }) });
+  });
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 1, 0, 'PAR');
+  // the song with ten seconds of show before it, the crowd chatting there (as the festival waits for the band)
+  await page.evaluate(async () => {
+    const a = (window as any).__luxdmx; a.timeline.useDemo(); await a.timeline.prepare();
+    const t = a.timeline.ensure(); t.lead = 10; t.crowd = [{ id: 'c1', at: -10, do: { do: 'crowd', mood: 'chatter', level: 0.8 } }];
+    a.timeline.setCrowd(0.8, true); a.timeline.seek(-8);
+  });
+  await open3d(page);
+  const render = async () => {
+    await page.evaluate(() => { (window as any).__saved = null; });
+    const p = await panel(page);
+    await p.getByRole('button', { name: '1080p', exact: true }).click();
+    await p.getByLabel('Frames a second').selectOption('25');
+    await p.getByRole('radio', { name: /The song, from the playhead/ }).check();
+    await p.getByLabel('Seconds to render').fill('1');
+    await p.getByRole('button', { name: 'Render 1080p' }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__saved?.name ?? ''), { timeout: 200_000 }).toMatch(/\.mp4$/);
+    return page.evaluate(() => (window as any).__stage3d.lastMix());
+  };
+  const withCrowd = await render();
+  expect(withCrowd.secs).toBeCloseTo(1, 1);
+  expect(withCrowd.rms).toBeGreaterThan(0.005);                    // (8 s before the song: only the crowd)
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.timeline.setCrowd(0.8, false); a.timeline.seek(-8); });
+  const without = await render();
+  expect(without.rms).toBeLessThan(0.0005);                        // (switched off: silence before the song)
+});
+
 test('8K on a graphics card too small for it says so, and renders nothing', async ({ page }) => {
   await page.addInitScript(() => {
     const real = WebGL2RenderingContext.prototype.getParameter;

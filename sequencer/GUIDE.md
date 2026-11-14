@@ -932,7 +932,7 @@ Three more demos come with their own room on the 3D stage:
   else HEVC or AV1 (8K usually needs one of those: a graphics card that encodes them, or the
   browser's own slower encoder), VP9 last; the sound AAC, or Opus where AAC isn't there (Chrome on
   Linux). A graphics card that can't draw that big says so before anything starts, one that runs
-  out of memory part way stops the render with a note. The crowd's sound isn't in a render.
+  out of memory part way stops the render with a note. The crowd is in it as you hear it (its track: chatting while they wait before the song, the cheers where they come, at the **Crowd** volume; switched off, it's left out).
 - **Interface size** (the ⋯ menu: − 100 % +, or Ctrl+K "size"): everything bigger or smaller, kept
   in this browser. The same menu has **Hide the hints** (the little blue notes at the top of the
   panels) and brings them back.
