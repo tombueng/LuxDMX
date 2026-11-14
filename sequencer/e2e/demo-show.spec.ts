@@ -101,3 +101,23 @@ test('the band only plays while the music does: still in the show\'s intro befor
   await expect.poll(moved, { timeout: 10000 }).toBeGreaterThan(0.01);
   await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
 });
+
+test('Space pauses a template\'s show and plays it again, wherever the welcome left the focus (not the shows)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  const w = await welcome(page), t = demoTile(w, 'Bar');
+  await t.getByLabel('Music for Bar').selectOption('beat');
+  await t.getByRole('button', { name: 'Play the show: Bar' }).click();
+  await expect(w).toBeHidden({ timeout: 30000 });
+  const playing = () => page.evaluate(() => (window as any).__luxdmx.timeline.playing);
+  await expect.poll(playing, { timeout: 30000 }).toBe(true);
+  // (the focus on the show's name, as a click on it leaves it: Space there is the show's too)
+  await page.locator('.top .show').focus();
+  await page.keyboard.press('Space');
+  await expect.poll(playing).toBe(false);
+  await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
+  await page.keyboard.press('Space');
+  await expect.poll(playing).toBe(true);
+  await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+});

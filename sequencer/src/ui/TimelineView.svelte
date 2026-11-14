@@ -12,7 +12,7 @@
   import Modal from './Modal.svelte';
   import StageView from './StageView.svelte';
   import { app, newId } from '../app.svelte';
-  import { ui, dialogOpen, asPercent } from './ui.svelte';
+  import { ui, dialogOpen, asPercent, spaceIsGo } from './ui.svelte';
   import { cueNumber } from '../model/cuenum';
   import { isFogTimer } from '../model/library';
   import { isMachineList } from '../content/busking';
@@ -678,7 +678,9 @@
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
-    if (e.code === 'Space' && !(e.target as HTMLElement).closest('button')) { e.preventDefault(); P.toggle(); }
+    // (Space on a button the mouse last pressed is the show's too: the welcome hands the focus back
+    // to the show's name, and Space must pause the song, not open the shows. Tabbed to, the button's)
+    if (e.code === 'Space') { if (spaceIsGo(e)) { e.preventDefault(); P.toggle(); } else if (e.repeat) e.preventDefault(); }
     else if (e.key === 'Home') { e.preventDefault(); jump(P.start); }
     else if (e.key === 'End') { e.preventDefault(); jump(P.end); }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); remove(sel); }
