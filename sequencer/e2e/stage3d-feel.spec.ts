@@ -307,3 +307,16 @@ test('a dark theatre is dark: every light out, at the default Ambient the pictur
   expect(h.nan).toBe(0);
   expect(h.mean).toBeLessThan(0.035);
 });
+
+test('the drop reads: blinders turned out to the audience light the crowd (and nothing does when they\'re out)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Band');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('hall');
+  const crowd = () => page.evaluate(() => (window as any).__stage3d.stats().crowdLight as number);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures) a.programmer[f.id] = { intensity: 0 }; });
+  await expect.poll(crowd, { timeout: 8000 }).toBe(0);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures.filter((x: any) => /^Blinder/.test(x.name))) a.programmer[f.id] = { intensity: 1 }; });
+  await expect.poll(crowd, { timeout: 8000 }).toBeGreaterThan(150);
+});

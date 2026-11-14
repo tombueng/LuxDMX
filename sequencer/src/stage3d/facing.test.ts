@@ -39,3 +39,16 @@ describe('bars face the audience', () => {
     expect(wrong(s, CROWD[d.room])).toEqual([]);
   });
 });
+
+// Blinders are for the audience: in every template they're turned out over the crowd (the Band
+// template's hung where a light hangs by default, facing the band: its drop lit the drummer)
+describe('blinders face the audience', () => {
+  for (const t of TEMPLATES) it(`in "${t.name}"`, () => {
+    const s = t.build(), r = s.settings.stage3d?.room, aud = r && CROWD[r] ? CROWD[r] : AUDIENCE;
+    for (const f of s.fixtures.filter((x) => /blinder/i.test(x.typeId))) {
+      const def = defaultPlace(f, 'dimmer', roomOf(r)), p = f.p3 ?? def.p, rot = f.rot ?? def.rot;
+      const d = toWorld({ x: 0, y: 1, z: 0 }, rot), a = { x: aud.x - p.x, y: aud.y - p.y, z: aud.z - p.z }, n = Math.hypot(a.x, a.y, a.z);
+      expect((d.x * a.x + d.y * a.y + d.z * a.z) / n, `${t.name}: ${f.name}`).toBeGreaterThan(0.5);
+    }
+  });
+});

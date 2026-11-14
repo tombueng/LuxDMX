@@ -184,6 +184,9 @@ export const TEMPLATES: Template[] = [
       const washes = b.add('gen-wash', 6, 'Wash', 0.54, { x0: 0.1, x1: 0.9 });
       const bars = b.add('gen-bar16', 4, 'Bar', 0.38, { x0: 0.2, x1: 0.8 });
       const blinders = b.at(b.add('gen-blinder2', 4, 'Blinder', 0.86), 0.86, [0.3, 0.43, 0.57, 0.7]);
+      // (audience blinders: on the front truss, turned out over the crowd. Left to where a light hangs,
+      // they faced the band, and the drop was a white line at the stage's edge)
+      b.place(blinders, (f) => { const d = defaultPlace(f, 'dimmer'); f.p3 = d.p; f.rot = aimRot(d.p, { x: d.p.x * 1.3, y: 1.7, z: D / 2 + 9 }); });
       const strobes = b.add('gen-strobe', 2, 'Strobe', 0.06, { x0: 0.06, x1: 0.94 });
       const hazer = b.add('gen-hazer', 1, 'Hazer', 0.22, { x0: 0.03, x1: 0.03 });
       b.add('gen-confetti', 2, 'Confetti', 0.86, { x0: 0.16, x1: 0.84 });

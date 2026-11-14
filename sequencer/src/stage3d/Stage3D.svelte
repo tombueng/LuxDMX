@@ -123,6 +123,9 @@
   let composer: EffectComposer, bloom: UnrealBloomPass;
   let rig: Rig, particles: Particles, venue: ReturnType<typeof buildVenue>;
   let wash: THREE.SpotLight[] = [];
+  let crowdLamp: THREE.SpotLight | undefined, crowdLevel = 0;
+  const audCol = new THREE.Color();
+  const deckFront = () => room.deck.z1;          // (the stage's front edge, where the crowd light hangs)
   // (the air is never pure black: a hall has some light in it, even between looks)
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
   const overlay = new THREE.Scene();       // drawn after the glow: the gizmo, the Measure line
@@ -414,6 +417,10 @@
     // three washes over the deck, coloured by what the lights do on each side (the band and the
     // backdrop take the show's colours; hundreds of real lights would be far too slow)
     wash = [-1, 0, 1].map((s) => { const l = new THREE.SpotLight(0xffffff, 0, 40, 0.55, 0.6, 1.2); l.position.set(s * 5, 11, 7); l.target.position.set(s * 3.5, DECK, -0.5); scene.add(l, l.target); return l; });
+    // and one over the crowd from the front of the stage: what points at the audience (blinders, a
+    // PAR turned out) lights them, in its colour (the washes only ever lit the deck: a blinder hit
+    // was a white line at the stage's edge and a crowd in the dark)
+    { const l = new THREE.SpotLight(0xffffff, 0, 60, 1.0, 0.75, 1.0); l.name = 'crowd light'; scene.add(l, l.target); }
     venue = buildVenue({ room: room.id, band: bandShown, act, custom: room }); builtRoom = room.key ?? room.id; builtAct = act; showRoom(room);
     scene.add(venue.group);
     rig = new Rig(); scene.add(rig.group);
@@ -451,7 +458,7 @@
     controls.addEventListener('change', grabbed);
     // for the tests (dev only): what can't be read off the pixels (the shown stage's)
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook = {
-      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog, drawn: drawnFrames }),
+      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog, drawn: drawnFrames, crowdLight: crowdLevel }),
       // a band member's right hand (the band stands still without music)
       band: () => (venue as { band?: { handAt: (s: 'L' | 'R') => THREE.Vector3 }[] }).band?.[1]?.handAt('R').toArray() ?? null,
       // the screens: the live camera's picture on them (and how many it has drawn, its last shot)
@@ -1057,6 +1064,17 @@
     const lv = [0, 0, 0];
     for (const l of rig.lit) { const s = l.p.x < -W / 6 ? 0 : l.p.x > W / 6 ? 2 : 1; sideCol[s].r += l.c.r * l.level; sideCol[s].g += l.c.g * l.level; sideCol[s].b += l.c.b * l.level; lv[s] += l.level; energy += l.level; }
     wash.forEach((w, i) => { const n = Math.max(1e-3, lv[i]); w.color.setRGB(sideCol[i].r / n, sideCol[i].g / n, sideCol[i].b / n); w.intensity = Math.min(1, lv[i] / 4) * 140 * spill; });
+    // (the lights turned out to the audience: their level and colour on the crowd light)
+    crowdLamp ??= scene.getObjectByName('crowd light') as THREE.SpotLight | undefined;
+    if (crowdLamp) {
+      let aud = 0; audCol.setRGB(0, 0, 0);
+      for (const l of rig.lit) if (l.d.z > 0.4 && l.d.y > -0.75) { aud += l.level; audCol.r += l.c.r * l.level; audCol.g += l.c.g * l.level; audCol.b += l.c.b * l.level; }
+      const z1 = deckFront();
+      crowdLamp.position.set(0, DECK + 2.5, z1 + 0.5); crowdLamp.target.position.set(0, 1.2, z1 + 10);
+      if (aud > 1e-3) crowdLamp.color.setRGB(audCol.r / aud, audCol.g / aud, audCol.b / aud);
+      crowdLamp.intensity = Math.min(1, aud / 3) * 320 * (0.4 + 0.6 * spill);
+      crowdLevel = crowdLamp.intensity;
+    }
     energy = Math.min(1, energy / Math.max(4, fixtures.length * 0.4));
     const all = sideCol[0].clone().add(sideCol[1]).add(sideCol[2]).multiplyScalar(1 / Math.max(1e-3, lv[0] + lv[1] + lv[2]));
     // (music: the song playing on the timeline, inside the song, or the microphone hearing a beat;
