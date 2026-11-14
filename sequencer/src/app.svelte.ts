@@ -341,18 +341,26 @@ class App {
     }
     return n;
   });
-  // What every cue of every list looks like (for pictures), from the plain copy.
+  // What every cue of every list looks like (for pictures), from the plain copy. A list whose cues,
+  // the presets and the lights' types are as they were keeps its looks (the same objects: its cards'
+  // pictures aren't drawn again; on the festival every edit redrew every card)
+  private looksMemo = new Map<string, { key: string; looks: Record<string, Resolved>[] }>();
   cueLooksOf = $derived.by(() => {
     const p = this.plain, m = new Map<string, Record<string, Resolved>[]>();
     if (!p) return m;
     const presets = new Map(p.presets.map((x) => [x.id, x]));
     const types = typeMap(p), capsById = new Map(p.fixtures.map((f) => [f.id, capsOf(modeOf(types.get(f.typeId), f.mode))]));
+    const common = JSON.stringify(p.presets) + JSON.stringify(p.fixtures.map((f) => [f.id, f.typeId, f.mode])) + p.fixtureTypes.length;
+    const memo = new Map<string, { key: string; looks: Record<string, Resolved>[] }>();
     for (const l of p.cueLists) {
+      const key = common + JSON.stringify(l), was = this.looksMemo.get(l.id);
+      if (was && was.key === key) { m.set(l.id, was.looks); memo.set(l.id, was); continue; }
       const looks = cueLooks(l, presets, isLooks(l));
       // fitted like the stage: a dimmer in a "Purple" cue looks like a dimmer on its card too
       for (const look of looks) for (const [id, v] of Object.entries(look)) { const c = capsById.get(id); if (c) fitLook(v, c, !!v.color); }
-      m.set(l.id, looks);
+      m.set(l.id, looks); memo.set(l.id, { key, looks });
     }
+    untrack(() => { this.looksMemo = memo; });
     return m;
   });
   private dirtyTimer: ReturnType<typeof setTimeout> | undefined;

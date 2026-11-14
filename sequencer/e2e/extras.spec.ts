@@ -1,5 +1,5 @@
 // Small things that make it nicer: the demo, Highlight, group names on fixture rows.
-import { openConnected, resetFake, patch, channels, selectFixtures, tab, test, expect, full, selectAll, selectNone, go, demo, startTemplate, newBlankShow } from './helpers';
+import { openConnected, resetFake, patch, channels, selectFixtures, tab, test, expect, full, selectAll, selectNone, go, demo, startTemplate, newBlankShow, swatch, record, cues } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -267,4 +267,21 @@ test('check the patch: one light at a time at full, then everything as it was', 
   await expect(dlg).toBeHidden();
   await expect.poll(() => channels(0, 3)).toEqual([0, 0, 0]);
   await expect(page.locator('.fl li.oitem.sel .nm')).toHaveText(['D 2']);       // the selection is back
+});
+
+test('a cue card\'s picture follows its cue: updated, it shows the new look; the other card\'s picture stays as it was', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 2, 0, 'PAR');
+  await selectAll(page); await full(page); await swatch(page, 'Red'); await record(page);
+  await swatch(page, 'Blue'); await record(page);
+  const pic = (i: number) => cues(page).nth(i).locator('img.look').getAttribute('src');
+  await expect.poll(() => pic(1)).not.toBe(await pic(0));
+  const [a0, b0] = [await pic(0), await pic(1)];
+  // the second cue updated to green: its picture changes, the first card's doesn't
+  await cues(page).nth(1).dblclick();
+  await swatch(page, 'Green');
+  await page.locator('.deck').getByRole('button', { name: 'Update' }).click();
+  await expect.poll(() => pic(1), { timeout: 5000 }).not.toBe(b0);
+  expect(await pic(0)).toBe(a0);
+  expect(decodeURIComponent((await pic(1))!)).toMatch(/fill="rgb\(0, ?255, ?0\)|#00ff00|hsl\(1[12]\d/i);
 });

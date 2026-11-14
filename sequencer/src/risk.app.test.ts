@@ -23,3 +23,32 @@ describe('the risk marks', () => {
     expect(cueRiskOf(app.show, cue, app.showRev)).toBe('hazard');
   }, 60000);
 });
+
+// The cards' looks and pictures: a list nobody changed keeps its looks (the same objects, its
+// pictures not drawn again); a changed cue gets a new look and a new picture; moving a light on the
+// plan draws the pictures again (where the lights are is in them).
+describe('the cards\' pictures', () => {
+  it('kept while nothing they show changed, new when it did', async () => {
+    const { app } = await freshApp();
+    const { buildDemo } = await import('./content/demo');
+    const { lookSvg, layoutKey } = await import('./ui/thumb');
+    app.replaceShow(buildDemo()); app.checkpoint();
+    const [l0, l1] = app.show.cueLists, before0 = app.cueLooksOf.get(l0.id), before1 = app.cueLooksOf.get(l1.id);
+    const pic = (look: any) => lookSvg(app.plain.fixtures, layoutKey(app.plain.fixtures, app.kinds), look, app.kinds, 160, 90, false);
+    const svg0 = pic(before0[0]);
+    // a light renamed: nothing a card shows
+    app.checkpoint(); app.show.fixtures[1].name += ' x'; app.checkpoint();
+    expect(app.cueLooksOf.get(l0.id)).toBe(before0); expect(app.cueLooksOf.get(l1.id)).toBe(before1);
+    expect(pic(app.cueLooksOf.get(l0.id)[0])).toBe(svg0);
+    // a cue of the first list changed: that list's looks are new, the other's kept
+    const f = Object.keys(l0.cues[0].values)[0];
+    app.checkpoint(); l0.cues[0].values[f] = { intensity: 1, color: { r: 0, g: 1, b: 0 } }; app.checkpoint();
+    expect(app.cueLooksOf.get(l0.id)).not.toBe(before0); expect(app.cueLooksOf.get(l1.id)).toBe(before1);
+    expect(pic(app.cueLooksOf.get(l0.id)[0])).not.toBe(svg0);
+    // a light moved on the plan: the same look, drawn again
+    const look1 = app.cueLooksOf.get(l1.id)[0], s1 = pic(look1);
+    app.checkpoint(); app.show.fixtures[0].x = 0.01; app.show.fixtures[0].y = 0.02; app.checkpoint();
+    expect(app.cueLooksOf.get(l1.id)[0]).toBe(look1);
+    expect(pic(look1)).not.toBe(s1);
+  }, 60000);
+});

@@ -12,7 +12,7 @@
   import CueInspector from './CueInspector.svelte';
   import { app } from '../app.svelte';
   import { dialogOpen, focusSelect, spaceIsGo, ui, listKeys, menuKey, asPercent } from './ui.svelte';
-  import { stageSvg, svgImage } from './thumb';
+  import { layoutKey, lookSvg, svgImage } from './thumb';
   import type { Advance, Cue } from '../model/types';
   import { whileShown } from './shown.svelte';
 
@@ -33,7 +33,8 @@
     const looks = app.cueLooksOf.get(list.id) ?? [];
     const fixtures = app.plain?.fixtures ?? [];
     const own = isLooks(list);                // a look's card: what it names, the rest as outlines
-    return looks.map((l) => stageSvg(fixtures, l, app.kinds, 160, 90, own, (id) => app.placesOf(id), (id) => app.caps(id).cells));
+    const at = layoutKey(fixtures, app.kinds);
+    return looks.map((l) => lookSvg(fixtures, at, l, app.kinds, 160, 90, own, (id) => app.placesOf(id), (id) => app.caps(id).cells));
   });
   let settings = $state(false);
   let renaming = $state<string | null>(null);

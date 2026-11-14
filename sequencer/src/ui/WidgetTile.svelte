@@ -5,7 +5,7 @@
   import TileFace from './TileFace.svelte';
   import CueListPanel from './CueListPanel.svelte';
   import { app } from '../app.svelte';
-  import { stageSvg } from './thumb';
+  import { lookSvg, layoutKey } from './thumb';
   import type { Widget } from '../model/types';
   import { clock } from './clock.svelte';
   import { faderValue, widgetFace, type Face } from './widgetFace';
@@ -32,7 +32,8 @@
     const list = app.show.cueLists.find((l) => l.id === w.list);
     const i = list ? list.cues.findIndex((c) => c.id === w.cue) : -1;
     const look = i >= 0 ? app.cueLooksOf.get(w.list)?.[i] : undefined;
-    return look ? stageSvg(app.plain?.fixtures ?? [], look, app.kinds, 160, 80, false, (id) => app.placesOf(id), (id) => app.caps(id).cells) : '';
+    const fx = app.plain?.fixtures ?? [];
+    return look ? lookSvg(fx, layoutKey(fx, app.kinds), look, app.kinds, 160, 80, false, (id) => app.placesOf(id), (id) => app.caps(id).cells) : '';
   });
 </script>
 
