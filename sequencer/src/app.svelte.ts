@@ -451,11 +451,13 @@ class App {
         // show is left (it stayed on for good)
         if (e.data?.gone && e.data.tab !== this.tabId && this.otherTabs.delete(e.data.tab) && !this.otherTabs.size) { this.otherTab = false; this.otherNewer = false; }
       };
-      addEventListener('pagehide', () => this.channel?.postMessage({ gone: true, tab: this.tabId }));
+      addEventListener('pagehide', () => this.sayGone());
     } catch { /* no BroadcastChannel: fine */ }
   }
   otherTab = $state(false);
   private otherTabs = new Set<string>();   // (the other tabs heard saving this show)
+  // (the channel may be closed by then: going away never throws)
+  private sayGone() { try { this.channel?.postMessage({ gone: true, tab: this.tabId }); } catch { /* closed */ } }
   // ...and the other tab's save is the newer one: what's in this tab is out of date, and its next
   // save would quietly drop what was done over there. The top bar offers to take that version.
   otherNewer = $state(false);
@@ -965,7 +967,7 @@ class App {
     this.showId = id;
     this.schedLast = Date.now();               // another show: its timetable goes on from now (no catching up)
     // (this tab is on another show now: the others on the old one hear it's gone)
-    if (this.otherTabs.size) this.channel?.postMessage({ gone: true, tab: this.tabId });
+    if (this.otherTabs.size) this.sayGone();
     this.otherTab = false; this.otherNewer = false; this.otherTabs.clear();
     try { localStorage.setItem(CUR, id); } catch { /* storage blocked */ }
   }
