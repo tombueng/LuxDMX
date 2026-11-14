@@ -242,6 +242,9 @@ export class Rig {
         void main() {
           vec2 p = (vUv - 0.5) * 2.0;
           float r = length(p), a = vLevel * (1.0 - smoothstep(0.45, 1.0, r)) * 0.7;
+          // (a wash grazing a wall: brightest at the light's end (the picture's top, +y), fading the
+          // further up it runs, and softly to both ends)
+          if (vFx.w > 0.5) { r = length(vec2(p.x, p.y * 0.75)); a = vLevel * (1.0 - smoothstep(0.4, 1.0, r)) * 0.7 * mix(0.35, 1.35, clamp((p.y + 1.0) * 0.5, 0.0, 1.0)); }
           vec3 c = vColor;
           // a gobo: its picture, sharp (as sharp as the focus and the frost let it be), a glass one in colour
           if (uHasGobos > 0.5 && hasGobo(vGobo, vFx)) {
@@ -452,13 +455,27 @@ export class Rig {
         // most three times as long as it's wide, and the more it grazes the more it spreads its light
         // thin: dimmer, as on a real wall)
         const n = NV.set(hit.n.x, hit.n.y, hit.n.z), cos = Math.abs(dir.dot(n)), wall = n.y <= 0.5, r0 = Math.max(0.15, r);
-        const rr = wall ? Math.min(3 * r0, r0 / Math.max(0.16, cos)) : r0 / Math.max(0.35, cos), dim = wall ? Math.max(0.4, Math.min(1, cos / 0.3)) : 1;
         PZ.copy(dir).addScaledVector(n, -dir.dot(n)); if (PZ.lengthSq() < 1e-8) PZ.set(0, n.y ? 0 : 1, n.y ? 1 : 0); PZ.normalize();
         PX.crossVectors(n, PZ).normalize(); BASIS.makeBasis(PX, n, PZ); qb.setFromRotationMatrix(BASIS);
-        mb.compose(pb.set(hit.x + n.x * 0.01, hit.y + n.y * 0.01, hit.z + n.z * 0.01), qb, sb.set(r0, 1, rr));
+        let w = r0, rr = r0 / Math.max(0.35, cos), dim = 1;
+        pb.set(hit.x, hit.y, hit.z);
+        if (wall) {
+          // On a wall the light is the cone cut by the wall: from where its near edge meets it to
+          // where its far edge does (an uplight close to a wall: from just above the floor, a long
+          // way up), as wide as the cone is there, and its light spread over all that (dimmer)
+          const d = Math.max(0.02, (p.x - hit.x) * n.x + (p.y - hit.y) * n.y + (p.z - hit.z) * n.z);
+          const th = Math.asin(Math.min(1, cos)), half = Math.min(1.3, (deg / 2) * RAD), sAxis = d / Math.max(1e-3, Math.tan(th));
+          // (its far end at most a few metres on: further up a real wash is too faint to see)
+          const sNear = d / Math.tan(Math.min(1.55, th + half)), reach = Math.max(2.5, 4 * r0), sFar = Math.min(sNear + reach, th > half + 0.02 ? d / Math.tan(th - half) : sNear + reach);
+          const sMid = (sNear + sFar) / 2;
+          rr = Math.max(0.15, (sFar - sNear) / 2); w = Math.max(0.15, Math.hypot(d, sMid) * Math.tan(half));
+          pb.addScaledVector(PZ, sMid - sAxis);
+          dim = Math.max(0.35, Math.min(1, (1.3 * r0 * r0) / (w * rr)));
+        }
+        mb.compose(pb.addScaledVector(n, 0.01), qb, sb.set(w, 1, rr));
         if (n.y < 0.5) nw++;
         this.pools.setMatrixAt(np, mb); this.pools.setColorAt(np, c); this.poolLevel.setX(np, level * dim * (1 - L / MAX_BEAM) * 1.2);
-        this.poolGobo.setXYZW(np, gobo[0], gobo[1], gobo[2], gobo[3]); this.poolFx.setXYZW(np, gobo[4], gobo[5], soft, 0); np++;
+        this.poolGobo.setXYZW(np, gobo[0], gobo[1], gobo[2], gobo[3]); this.poolFx.setXYZW(np, gobo[4], gobo[5], soft, wall && cos < 0.7 ? 1 : 0); np++;
       }
     };
     const lightOf = (v: Resolved | undefined, strobeT: number) => {
