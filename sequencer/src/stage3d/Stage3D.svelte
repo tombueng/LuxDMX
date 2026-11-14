@@ -57,7 +57,7 @@
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
   import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
-  import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, type CamMode, type Cast, type Part } from './director';
+  import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
   import type { Resolved, Show } from '../model/types';
@@ -167,12 +167,33 @@
     stopCam();
     const pts = fs.map((f) => { const p = pivotOf(f.p, f.rot); return new THREE.Vector3(p.x, p.y, p.z); });
     const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
+    // (a light up under the ceiling: looked at from a little below it, the camera can't go above it
+    // and the controls never put it under what it looks at)
+    if (c.y > room.ceiling - 0.9) c.y = room.ceiling - 0.9;
     const r = Math.max(0.6, box.getSize(new THREE.Vector3()).length() / 2);
     // (from in front and a little to the side: up at hung lights, as the audience sees them; down
     // at ones on the floor)
-    const dir = (c.y > 2.5 ? new THREE.Vector3(0.35, -0.32, 1) : new THREE.Vector3(0.35, 0.45, 1)).normalize();
     const d = Math.max(4.5, (r / Math.sin((camera.fov * Math.PI) / 360)) * 1.15);
-    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: c.clone().addScaledVector(dir, d), t1: c, at: performance.now(), dur: 700 };
+    // (where the camera can be: inside the room, clear of its rows, tables and people. A light on
+    // the cinema's side wall seen from the front put it inside the raked seats: the first of a few
+    // ways round that's clear, else the nearest to it)
+    const W = room.walls, inside = (p: THREE.Vector3) => Math.abs(p.x) < W.x - 0.5 && p.z > W.z0 + 0.5 && p.z < W.z1 - 0.5 && p.y > 0.4 && p.y < room.ceiling - 0.8;
+    const sp = spaceOf(room, castOf(room.id)), into = Math.sign(-c.x) || 1;
+    // (hung lights, shining down: from the front and level with them; the rest from above. Not by
+    // their height: a washer on the cinema's top rows is high up and shines up its wall)
+    const hung = fs.every((f) => toWorld({ x: 0, y: 1, z: 0 }, f.rot).y < -0.3);
+    const dirs = hung ? [[0.35, -0.32, 1], [-0.35, -0.32, 1], [into * 0.8, -0.2, 0.6], [0, -0.8, 0.6], [into * 0.7, -0.7, 0.2], [0, -1, 0.08], [0, 0.4, 1]] : [[0.35, 0.45, 1], [-0.35, 0.45, 1], [into * 0.9, 0.5, 0.4], [into * 0.5, 1.1, 0.6], [0, 0.9, 1], [into * 0.15, 0.25, 1], [into * 0.15, 0.25, -1], [into * 0.3, 1.4, 0.2]];
+    let p1: THREE.Vector3 | undefined;
+    for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
+      if (p1) break;
+      const q = c.clone().addScaledVector(new THREE.Vector3(x, y, z).normalize(), d * k);
+      // (the controls never let the camera under what it looks at: where they'd put it)
+      if (q.y < c.y + 0.05) q.y = c.y + 0.05;
+      if (inside(q) && !blocked(sp, { x: q.x, y: q.y, z: q.z })) p1 = q;
+    }
+    p1 ??= c.clone().addScaledVector(new THREE.Vector3(into * 0.6, 0.8, 0.3).normalize(), Math.min(d, 3));
+    p1.set(Math.max(-W.x + 0.6, Math.min(W.x - 0.6, p1.x)), Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), Math.max(W.z0 + 0.6, Math.min(W.z1 - 0.6, p1.z)));
+    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1, t1: c, at: performance.now(), dur: 700 };
     return true;
   }
   // asked from elsewhere (a light's menu): once the stage and its lights are there

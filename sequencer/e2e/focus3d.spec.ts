@@ -2,7 +2,7 @@
 // menu (it opens the 3D stage too). The light ends up in the middle of the picture, near enough to
 // see, and grabbing the stage stops the flight.
 import type { Page } from '@playwright/test';
-import { openConnected, patch, test, expect } from './helpers';
+import { openConnected, patch, startTemplate, test, expect } from './helpers';
 
 // where a light is in the 3D picture, from the middle of it (0: the middle, 1: the edge)
 const offCentre = (page: Page, name: string) => page.evaluate((name) => {
@@ -83,4 +83,26 @@ test('Measure on the 3D stage: two points and how far apart; one light: how high
   await expect(s3.locator('.meas')).toBeVisible();
   await s3.getByRole('button', { name: 'Select', exact: true }).click();
   await expect(s3.locator('.meas')).toHaveCount(0);
+});
+
+test('"Selected" never puts the camera inside the room\'s things: a cinema wall washer seen from a clear spot, not from inside the raked seats', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Cinema');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 45000 }).toBe('cinema');
+  const cam = page.locator('.s3').getByRole('group', { name: 'Camera' });
+  for (const name of ['Wall 2', 'Wall 6', 'Step 3', 'House 3']) {
+    await page.locator(`.fl li[data-fixture="${name}"]`).click();
+    await cam.getByRole('button', { name: 'Selected', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__stage3d.flying()), { timeout: 20000 }).toBe(false);
+    const where = await page.evaluate(async () => {
+      const { blocked, spaceOf, castOf } = await import('/src/stage3d/director.ts');
+      const { ROOMS } = await import('/src/stage3d/geometry.ts');
+      const c = (window as any).__stage3d.internals.camera.position, r = ROOMS.cinema;
+      return { in: Math.abs(c.x) < r.walls.x && c.z > r.walls.z0 && c.z < r.walls.z1 && c.y > 0 && c.y < r.ceiling, hit: blocked(spaceOf(r, castOf('cinema')), { x: c.x, y: c.y, z: c.z }) };
+    });
+    expect(where, name).toEqual({ in: true, hit: '' });
+    expect(await offCentre(page, name), name).toBeLessThan(0.4);
+  }
 });
