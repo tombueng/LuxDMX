@@ -560,23 +560,28 @@ export const TEMPLATES: Template[] = [
     },
   },
   {
-    name: 'Cinema', icon: 'moon', blurb: 'House lights, coloured wall washers, a marquee chase, a stage for premieres with spots, confetti and CO2.',
+    name: 'Cinema', icon: 'moon', blurb: 'A premiere house: house lights, wall washers all round, the marquee over the screen, a stage with spots and sky beams, a starry ceiling and the screen curtain. Twenty-three looks from the doors opening to the credits.',
     build: () => {
       const b = new Builder('Cinema');
-      const house = b.add('gen-dimmer', 4, 'House', 0.54);
-      const walls = b.add('gen-rgb', 6, 'Wall', 0.06);
+      // a premiere house: house lights over the rows, wall washers all the way down, the marquee's
+      // pixel bars over the screen, the stage in front of it with its wash, spots on the bar over the
+      // front rows, sky beams on the stage's edge for the premieres, step lights, a starry ceiling,
+      // the screen's curtain, haze, low fog and the premiere machines (one confetti shot)
+      const house = b.add('gen-dimmer', 8, 'House', 0.54);
+      const walls = b.add('gen-rgb', 12, 'Wall', 0.06);
       b.place(walls, (f) => { f.beamDeg = [36, 36]; });     // (wall washers: a wide wash up the wall)
-      // a stage in front of the screen for premieres and live events, the screen's marquee lights,
-      // step lights, a starry ceiling, haze for the spots and the premiere machines
-      const marquee = b.add('gen-bar16', 4, 'Marquee', 0.22, { x0: 0.2, x1: 0.8 });
-      const stage = b.at(b.add('gen-drgbw', 4, 'Stage', 0.38), 0.38, [0.06, 0.32, 0.68, 0.94]);
-      const spots = b.at(b.add('gen-spotgobo', 2, 'Spot', 0.38), 0.38, [0.19, 0.81]);
-      const steps = b.add('gen-rgb', 6, 'Step', 0.7);
-      const ceiling = b.add('gen-bar8', 4, 'Ceiling', 0.86, { x0: 0.2, x1: 0.8 });
+      // (the marquee's pixel bars on the box's second universe: the house is bigger than one)
+      const marquee = b.add('gen-bar16', 6, 'Marquee', 0.22, { universe: 1, x0: 0.15, x1: 0.85 });
+      const stage = b.at(b.add('gen-drgbw', 8, 'Stage', 0.38), 0.38, [0.06, 0.18, 0.3, 0.42, 0.58, 0.7, 0.82, 0.94]);
+      const spots = b.add('gen-spotgobo', 4, 'Spot', 0.42, { x0: 0.3, x1: 0.7 });
+      const sky = b.add('gen-roll', 4, 'Sky', 0.3, { x0: 0.2, x1: 0.8 });
+      const steps = b.add('gen-rgb', 8, 'Step', 0.7);
+      const ceiling = b.add('gen-bar8', 6, 'Ceiling', 0.86, { x0: 0.15, x1: 0.85 });
       const hazer = b.add('gen-hazer', 1, 'Hazer', 0.54, { x0: 0.5, x1: 0.5 });
-      b.add('gen-confetti', 2, 'Confetti', 0.86, { x0: 0.06, x1: 0.94 });
+      const lowFog = b.add('gen-fog', 1, 'Fog', 0.3, { x0: 0.06, x1: 0.06 });
+      b.add('gen-confetti', 1, 'Confetti', 0.86, { x0: 0.06, x1: 0.06 });
       b.add('gen-co2', 2, 'CO2', 0.22, { x0: 0.05, x1: 0.95 });
-      b.add('gen-sparks', 2, 'Sparks', 0.38, { x0: 0.44, x1: 0.56 });
+      b.add('gen-sparks', 4, 'Sparks', 0.38, { x0: 0.4, x1: 0.6 });
       b.add('gen-bubbles', 1, 'Bubbles', 0.86, { x0: 0.5, x1: 0.5 });
       // the screen's curtain (its motor moves only armed on the wire; the 3D stage shows it either way)
       const curtain = b.add('gen-curtain', 1, 'Screen curtain', 0.1, { x0: 0.5, x1: 0.5 });
@@ -584,35 +589,68 @@ export const TEMPLATES: Template[] = [
       const open = (v: number): [string[], Values] => [curtain, { hoist: v }];
       b.group('House', house); const gWall = b.group('Walls', walls);
       const gMarq = b.group('Marquee', marquee), gStage = b.group('Stage', stage), gSpot = b.group('Spots', spots), gStep = b.group('Steps', steps), gCeil = b.group('Ceiling', ceiling);
+      const gSky = b.group('Sky beams', sky);
       const chase = b.effect('Marquee chase', 'theater', gMarq, {});
       const scan = b.effect('Marquee scanner', 'scanner', gMarq, {});
+      const marqFire = b.effect('Marquee fireworks', 'fireworks', gMarq, {});
+      const marqMeteor = b.effect('Marquee meteors', 'meteorRain', gMarq, {});
       const stars = b.effect('Starry ceiling', 'twinkle', gCeil, {});
       const glitter = b.effect('Ceiling glitter', 'glitter', gCeil, {});
+      const ceilAurora = b.effect('Ceiling aurora', 'aurora', gCeil, {});
+      const codeRain = b.effect('Ceiling code rain', 'matrix', gCeil, {});
       const searchlight = b.effect('Searchlights', 'pan', gSpot, { size: 0.4, speed: 8, spread: 0.5 });
+      const spotStar = b.effect('Spots star', 'star', gSpot, { size: 0.3, speed: 10 });
+      const spotSpiro = b.effect('Spots spirograph', 'spirograph', gSpot, { size: 0.35, speed: 24 });
+      const spotKnot = b.effect('Spots knot', 'knot', gSpot, { size: 0.3, speed: 12 });
+      const skySearch = b.effect('Sky searchlights', 'searchlight', gSky, { size: 0.5, speed: 12, spread: 0.5 });
+      const skyWeave = b.effect('Sky weave', 'weave', gSky, { size: 0.4, speed: 6 });
+      const skyCircles = b.effect('Sky mirror circles', 'mirrorCircles', gSky, { size: 0.3, speed: 6 });
+      const skyWander = b.effect('Sky wander', 'wander', gSky, { size: 0.4, speed: 8 });
       const wallFade = b.effect('Walls colour fade', 'colorFade', gWall, { speed: 30, tempo: false, spread: 0.6 });
-      const stepChase = b.effect('Step chase', 'chase', gStep, { speed: 2, low: 0.3 });
-      const stageColours = b.effect('Stage colours', 'colorChase', gStage, { speed: 4 });
+      const wallRainbow = b.effect('Walls rainbow', 'rainbow', gWall, { speed: 16 });
+      const wallOcean = b.effect('Walls ocean', 'ocean', gWall, {});
+      const wallFire = b.effect('Walls fire', 'fire', gWall, {});
+      const police = b.effect('Walls police', 'police', gWall, {});
       const flicker = b.effect('Horror flicker', 'candle', gWall, { low: 0.1 });
-      const extra = [marquee, stage, spots, steps, ceiling].flat();
+      const sepia = b.effect('Silent film flicker', 'candle', gStage, { low: 0.55 });
+      const stepChase = b.effect('Step chase', 'chase', gStep, { speed: 2, low: 0.3 });
+      const stepTwinkle = b.effect('Step twinkle', 'sparkle', gStep, { size: 0.3 });
+      const stageColours = b.effect('Stage colours', 'colorChase', gStage, { speed: 4 });
+      const stageRainbow = b.effect('Stage rainbow', 'rainbow', gStage, { speed: 8 });
+      const extra = [marquee, stage, spots, sky, steps, ceiling].flat();
       const out: [string[], Values][] = [[extra, { intensity: 0 }]];
+      const up = (more: Values = {}): Values => ({ pan: 0.5, tilt: 0.5, zoom: 0, ...more });
       const l = b.list('Screening', { play: false });
       b.haze(hazer, 0.2);
-      const m = b.machines();
+      const m = b.machines(), fogShot = b.shot('Fog burst', lowFog, { fog: 1 }, 6, '6 s of low fog', '#8a94a3');
       b.cue(l, 'Walk-in', [...out, open(0), [house, on(1)], [walls, on(0.8, C.amber)], [marquee, on(0.8, C.gold)], [steps, on(0.6, C.amber)], [ceiling, on(0.4)]], { fade: 3, effects: [chase, stars] });
+      b.cue(l, 'Doors open', [...out, open(0), [house, on(1)], [walls, on(1, C.gold)], [marquee, on(1, C.gold)], [stage, on(0.6, C.red)], [steps, on(0.8, C.gold)], [ceiling, on(0.6)]], { fade: 2, effects: [chase, glitter, wallFade] });
       b.cue(l, 'Preshow', [...out, open(0), [house, on(0.4)], [walls, on(0.6, C.purple)], [marquee, on(0.4, C.purple)], [steps, on(0.4, C.purple)], [ceiling, on(0.5)]], { fade: 5, effects: [stars] });
+      b.cue(l, 'Trailers', [...out, open(1), [house, on(0.15)], [walls, on(0.3, C.blue)], [steps, on(0.3, C.blue)], [ceiling, on(0.3)]], { fade: 4, effects: [stars] });
+      b.cue(l, 'Countdown', [...out, open(1), [house, on(0.1)], [walls, on(0.4, C.white)], [marquee, on(1, C.white)], [steps, on(0.5, C.white)]], { fade: 1, effects: [scan, stepChase] });
       b.cue(l, 'Feature', [...out, open(1), [house, on(0)], [walls, on(0)], [steps, on(0.15, C.blue)]], { fade: 8 });
       b.cue(l, 'Credits', [...out, open(1), [house, on(0.3)], [walls, on(0.3, C.deepBlue)], [steps, on(0.3, C.blue)], [ceiling, on(0.4)]], { fade: 5, effects: [stars] });
-      b.cue(l, 'Exit', [...out, open(0), [house, on(1)], [walls, on(0.6, C.warm)], [marquee, on(0.6, C.gold)], [steps, on(0.8, C.warm)]], { fade: 3, effects: [chase, stepChase] });
-      b.cue(l, 'Trailers', [...out, open(1), [house, on(0.15)], [walls, on(0.3, C.blue)], [steps, on(0.3, C.blue)], [ceiling, on(0.3)]], { fade: 4, effects: [stars] });
       b.cue(l, 'Intermission', [...out, open(0), [house, on(0.7)], [walls, on(0.7, C.magenta)], [marquee, on(1, C.magenta)], [steps, on(0.6, C.magenta)], [ceiling, on(0.6)]], { fade: 3, effects: [scan, glitter, wallFade] });
-      b.cue(l, 'Red carpet', [...out, [house, on(0.5)], [walls, on(0.8, C.red)], [marquee, on(1, C.gold)], [stage, on(0.8, C.red)], [steps, on(0.8, C.red)], [ceiling, on(0.8)],
-        [spots, on(1, C.white, { pan: 0.5, tilt: 0.7, zoom: 0.05, gobo: gobo('Star') })]], { fade: 2, effects: [chase, searchlight, glitter] });
-      b.cue(l, 'Premiere applause', [...out, [house, on(0.8)], [walls, on(1, C.gold)], [marquee, on(1, C.gold)], [stage, on(1, C.white)], [steps, on(1, C.gold)], [ceiling, on(1)],
-        [spots, on(1, C.white, { pan: 0.5, tilt: 0.6, zoom: 0.3 })]], { fade: 0.5, effects: [chase, glitter, stageColours], actions: fire(m.confetti, m.co2, m.sparks), note: 'Confetti, CO2 and sparks' });
-      b.cue(l, 'Kids matinee', [...out, [house, on(0.8)], [walls, on(0.8, C.yellow)], [marquee, on(0.8)], [steps, on(0.8, C.green)], [ceiling, on(0.6)]], { fade: 2, effects: [scan, stageColours], actions: fire(m.bubbles) });
-      b.cue(l, 'Horror night', [...out, [house, on(0)], [walls, on(0.5, C.red)], [steps, on(0.2, C.red)], [marquee, on(0.3, C.red)]], { fade: 3, effects: [flicker] });
-      b.cue(l, 'Sci-fi night', [...out, [house, on(0.1)], [walls, on(0.6, C.cyan)], [marquee, on(0.8, C.cyan)], [steps, on(0.4, C.cyan)], [ceiling, on(0.8)],
-        [spots, on(0.8, C.cyan, { pan: 0.5, tilt: 0.65, zoom: 0.1, gobo: gobo('Spiral'), goboRotation: turn('gen-spotgobo', 0.8) })]], { fade: 3, effects: [stars, scan, searchlight] });
+      b.cue(l, 'Exit', [...out, open(0), [house, on(1)], [walls, on(0.6, C.warm)], [marquee, on(0.6, C.gold)], [steps, on(0.8, C.warm)]], { fade: 3, effects: [chase, stepChase] });
+      b.cue(l, 'Red carpet', [...out, open(0), [house, on(0.5)], [walls, on(0.8, C.red)], [marquee, on(1, C.gold)], [stage, on(0.8, C.red)], [steps, on(0.8, C.red)], [ceiling, on(0.8)],
+        [spots, on(1, C.white, { pan: 0.5, tilt: 0.7, zoom: 0.05, gobo: gobo('Star') })], [sky, on(1, C.white, up())]], { fade: 2, effects: [chase, searchlight, glitter, skySearch] });
+      b.cue(l, 'Hollywood searchlights', [...out, open(0), [house, on(0.2)], [walls, on(0.4, C.deepBlue)], [sky, on(1, C.white, up())], [marquee, on(0.8, C.gold)], [ceiling, on(0.6)]], { fade: 2, effects: [skySearch, chase, stars] });
+      b.cue(l, 'Premiere applause', [...out, open(0), [house, on(0.8)], [walls, on(1, C.gold)], [marquee, on(1, C.gold)], [stage, on(1, C.white)], [steps, on(1, C.gold)], [ceiling, on(1)],
+        [spots, on(1, C.white, { pan: 0.5, tilt: 0.6, zoom: 0.3 })], [sky, on(1, C.gold, up())]], { fade: 0.5, effects: [chase, glitter, stageColours, skyWeave], actions: fire(m.co2, m.sparks), note: 'CO2 and sparks' });
+      b.cue(l, 'Awards night', [...out, open(0), [house, on(0.4)], [walls, on(1, C.gold)], [marquee, on(1, C.gold)], [stage, on(1, C.gold)], [spots, on(1, C.gold, { pan: 0.5, tilt: 0.62, zoom: 0.1, gobo: gobo('Star') })],
+        [sky, on(1, C.gold, up())], [ceiling, on(0.8)]], { fade: 1, effects: [spotStar, skyCircles, marqFire, glitter], actions: fire(m.confetti), note: 'Confetti for the winner: the one shot of the night' });
+      b.cue(l, 'Kids matinee', [...out, open(1), [house, on(0.8)], [walls, on(0.8, C.yellow)], [marquee, on(0.8)], [steps, on(0.8, C.green)], [ceiling, on(0.6)]], { fade: 2, effects: [scan, stageColours, wallRainbow], actions: fire(m.bubbles) });
+      b.cue(l, 'Horror night', [...out, open(1), [house, on(0)], [walls, on(0.5, C.red)], [steps, on(0.2, C.red)], [marquee, on(0.3, C.red)]], { fade: 3, effects: [flicker], actions: fire(fogShot), note: 'Low fog creeping in' });
+      b.cue(l, 'Sci-fi night', [...out, open(1), [house, on(0.1)], [walls, on(0.6, C.cyan)], [marquee, on(0.8, C.cyan)], [steps, on(0.4, C.cyan)], [ceiling, on(0.8)],
+        [spots, on(0.8, C.cyan, { pan: 0.5, tilt: 0.65, zoom: 0.1, gobo: gobo('Spiral'), goboRotation: turn('gen-spotgobo', 0.8) })]], { fade: 3, effects: [stars, scan, searchlight, codeRain] });
+      b.cue(l, 'Space opera', [...out, open(1), [house, on(0)], [walls, on(0.5, C.deepBlue)], [ceiling, on(1)], [spots, on(1, C.lavender, { pan: 0.5, tilt: 0.65, gobo: gobo('Star'), zoom: 0.3, prism: 1 })],
+        [sky, on(0.8, C.ice, up())], [steps, on(0.3, C.purple)]], { fade: 4, effects: [ceilAurora, spotSpiro, skyWander, stars] });
+      b.cue(l, 'Action movie', [...out, open(1), [house, on(0)], [walls, on(1)], [marquee, on(1, C.red)], [stage, on(1, C.red)], [steps, on(0.5, C.red)]], { fade: 0.5, effects: [police, marqMeteor] });
+      b.cue(l, 'Western', [...out, open(1), [house, on(0.1)], [walls, on(0.7, C.amber)], [marquee, on(0.6, C.orange)], [steps, on(0.4, C.amber)], [stage, on(0.5, C.orange)]], { fade: 6, effects: [wallFire] });
+      b.cue(l, 'Love story', [...out, open(1), [house, on(0.1)], [walls, on(0.6, C.pink)], [steps, on(0.4, C.pink)], [ceiling, on(0.5)], [spots, on(0.6, C.pink, { pan: 0.5, tilt: 0.65, gobo: gobo('Flower'), zoom: 0.3 })]], { fade: 6, effects: [spotKnot, stars, wallFade] });
+      b.cue(l, 'Musical', [...out, open(1), [house, on(0.2)], [walls, on(1)], [marquee, on(1)], [stage, on(1)], [steps, on(0.6)], [ceiling, on(0.8)]], { fade: 2, effects: [wallRainbow, stageRainbow, chase, stepTwinkle] });
+      b.cue(l, 'Silent film', [...out, open(1), [house, on(0.1)], [stage, on(0.6, C.warm)], [walls, on(0.3, C.amber)], [marquee, on(0.4, C.amber)]], { fade: 4, effects: [sepia] });
+      b.cue(l, 'Deep sea', [...out, open(1), [house, on(0)], [walls, on(0.7, C.teal)], [ceiling, on(0.6)], [steps, on(0.3, C.blue)]], { fade: 6, effects: [wallOcean, ceilAurora] });
       b.s.settings.stage3d = { act: 'none' };   // (a premiere: no band on the 3D stage)
       // (in its own room, a real cinema: every light where a cinema has it, scenePlaces.ts)
       const done = b.done();

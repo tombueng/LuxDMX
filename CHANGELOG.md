@@ -13,6 +13,11 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A much bigger Cinema**: 67 lights (house lights over the rows, twelve wall washers, the marquee round
+  the screen, an eight-light stage wash, spots, sky beams for the premieres, step lights, a starry
+  ceiling) and 23 looks: Hollywood searchlights, a countdown, awards night, space opera, an action
+  movie, a western, a silent film, deep sea. The curtain opens for the films. Confetti only for the
+  winner.
 - **A much bigger Bar**: 45 lights (ten PARs, six shelf bars, an LED strip on the counter, heads, beam
   heads, strobes) and an LED sign beside the neon (BAR in neon, HAPPY HOUR typed out, SHOTS on the beat,
   GOAL for the match). Twenty-two moods: rooftop sunset, quiz night, football, Latin night, disco,

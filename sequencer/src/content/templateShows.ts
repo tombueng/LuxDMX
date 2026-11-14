@@ -64,11 +64,12 @@ export const TEMPLATE_SHOWS: Record<string, TemplateShow> = {
   Cinema: {
     crowd: 'calm', song: 'wont-fall-in-love', list: 'Screening', end: 'Exit',
     sets: {
-      intro: [['Preshow']], verse: [['Red carpet'], ['Trailers']], build: [['Sci-fi night']],
-      chorus: [['Premiere applause', 'Red carpet'], ['Premiere applause']], solo: [['Horror night']], break: [['Intermission']],
-      inst: [['Sci-fi night']], outro: [['Credits']],
+      intro: [['Preshow', 'Doors open']], verse: [['Red carpet', 'Hollywood searchlights'], ['Trailers', 'Love story'], ['Western', 'Silent film']], build: [['Countdown', 'Sci-fi night']],
+      chorus: [['Premiere applause', 'Red carpet'], ['Musical', 'Action movie'], ['Space opera', 'Awards night']], solo: [['Horror night']], break: [['Intermission', 'Deep sea']],
+      inst: [['Sci-fi night', 'Space opera']], outro: [['Credits']],
     },
-    lastChorus: ['Premiere applause', 'Sci-fi night', 'Premiere applause'], hits: ['co2', 'confetti', 'sparks', 'bubbles'],
+    // (the one confetti shot is the awards' own)
+    lastChorus: ['Awards night', 'Musical', 'Premiere applause'], hits: ['co2', 'sparks', 'bubbles'],
   },
   Wedding: {
     crowd: 'party', song: 'hot-core', list: 'Wedding', end: 'Lights up',
