@@ -106,3 +106,28 @@ test('"Selected" never puts the camera inside the room\'s things: a cinema wall 
     expect(await offCentre(page, name), name).toBeLessThan(0.4);
   }
 });
+
+test('"Selected" on every light of the bar (a low room, a rail of lights under its ceiling): the camera always somewhere clear', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Bar');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 45000 }).toBe('bar');
+  const bad = await page.evaluate(async () => {
+    const a = (window as any).__luxdmx, s3 = (window as any).__stage3d;
+    const btn = [...document.querySelectorAll<HTMLButtonElement>('.s3 [role=group][aria-label=Camera] button')].find((b) => b.textContent?.trim() === 'Selected')!;
+    const { blocked, spaceOf, castOf } = await import('/src/stage3d/director.ts');
+    const { ROOMS } = await import('/src/stage3d/geometry.ts');
+    const r = ROOMS.bar, sp = spaceOf(r, castOf('bar')), out: string[] = [];
+    for (const f of a.show.fixtures) {
+      a.selected = [f.id];
+      await new Promise((x) => setTimeout(x, 60));
+      btn.click();
+      for (let k = 0; k < 40 && (k < 2 || s3.flying()); k++) await new Promise((x) => setTimeout(x, 50));
+      const c = s3.internals.camera.position, hit = blocked(sp, { x: c.x, y: c.y, z: c.z });
+      if (hit) out.push(`${f.name}: ${hit}`);
+    }
+    return out;
+  });
+  expect(bad).toEqual([]);
+});

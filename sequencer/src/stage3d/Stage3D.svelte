@@ -191,6 +191,12 @@
       if (q.y < c.y + 0.05) q.y = c.y + 0.05;
       if (inside(q) && !blocked(sp, { x: q.x, y: q.y, z: q.z })) p1 = q;
     }
+    // (none of those: round it, nearer and nearer, level with it and a little above, the side
+    // towards the audience first; a low bar's rail of lights left little room)
+    if (!p1) for (const k of [0.8, 0.55, 0.35]) for (const dy of [0.05, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
+      const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = new THREE.Vector3(c.x + Math.sin(ang) * d * k, c.y + dy, c.z + Math.cos(ang) * d * k);
+      if (inside(q) && !blocked(sp, { x: q.x, y: q.y, z: q.z })) p1 = q;
+    }
     p1 ??= c.clone().addScaledVector(new THREE.Vector3(into * 0.6, 0.8, 0.3).normalize(), Math.min(d, 3));
     p1.set(Math.max(-W.x + 0.6, Math.min(W.x - 0.6, p1.x)), Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), Math.max(W.z0 + 0.6, Math.min(W.z1 - 0.6, p1.z)));
     fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1, t1: c, at: performance.now(), dur: 700 };
