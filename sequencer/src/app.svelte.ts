@@ -10,7 +10,7 @@ import { placeNew } from './model/place';
 import { freezeGroupNumbers, groupByNumber, nextGroupNumber } from './model/groupnum';
 import { cleanHost, hostProblem } from './model/host';
 import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
-import { GENERIC, caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
+import { caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
 import { curveOfPort, curveTable, isPixelType, onPort, onScreen, powerScale, WS2812, type LedCurve, type PortInfo } from './model/ledCurve';
 import { CELL_ATTRS, CELL_MOVES, type CellMove, type CellValues, type Channel, type Color, type NumAttr, type Cue, type CueList, type Effect, type Fixture, type Group, type FixtureMode, type FixtureType, type Page, type Preset, type PresetKind, type Resolved, type Show, type Values, type Widget } from './model/types';
@@ -50,7 +50,7 @@ import { parseCommand } from './model/command';
 import { untrack } from 'svelte';
 import { Engine, LIGHT } from './engine/engine';
 import { load } from './perf/load.svelte';
-import { ATMOS_AND_MACHINES as ATMOS, machinesSafe, zeroedFrames } from './output/safe';
+import { atmosAndMachines, machinesSafe, zeroedFrames } from './output/safe';
 import { OutputThread } from './output/host.svelte';
 import type { PlayerStatus } from './engine/player';
 import { Bridge, listen } from './output/bridge';
@@ -108,11 +108,9 @@ function keptHeld(): Record<string, { v: number; at: number }> {
     return e && typeof e.v === 'number' && e.v >= 0 && e.v <= 255 ? [[k, { v: e.v, at: typeof e.at === 'number' ? e.at : 0 }]] : [];
   }));
 }
-const ATMOS_AND_MACHINES = ATMOS;
-const MACHINES_SAFE = machinesSafe;
 const hasLocks = () => typeof navigator !== 'undefined' && !!(navigator as unknown as { locks?: LockManager }).locks?.request;
 const COLD_WITHIN = 3 * 3600_000;   // ms: a tablet restarted during the evening, not the next morning (the box may have been off)
-export const GO_GUARD_MS = 300;     // a second GO this soon on the same list is a double press (a beat at 200 BPM still gets through)
+const GO_GUARD_MS = 300;     // a second GO this soon on the same list is a double press (a beat at 200 BPM still gets through)
 const GROUP_FLASH_MAX = 30;         // seconds a held flash button stays on at most
 export const MAX_FOG = 60;          // and a fog button, whatever its own maximum says
 // A fog timer's pause is at least this long, and at least as long as its burst (machines reheat).
@@ -124,17 +122,17 @@ const DEFAULT_DEVICE = (import.meta.env.VITE_DEFAULT_DEVICE as string | undefine
 // place (the editor works on a copy and saves a new object). Giving them their own prototype keeps
 // Svelte from wrapping them in proxies, so reading them (every frame, every save) costs nothing.
 const RawType = Object.create(Object.prototype);
-export function rawType<T extends object>(t: T): T { return Object.getPrototypeOf(t) === RawType ? t : Object.setPrototypeOf(t, RawType); }
+function rawType<T extends object>(t: T): T { return Object.getPrototypeOf(t) === RawType ? t : Object.setPrototypeOf(t, RawType); }
 // A cue's cells the same way: a rainbow over a few matrices is thousands of small objects, and
 // wrapping each one made every save (after every click) and every undo take seconds. A map of cells
 // is replaced, never changed in place. (only before it goes into the show: a proxy can't be turned)
-export function rawCells<T extends Values | undefined>(v: T): T {
+function rawCells<T extends Values | undefined>(v: T): T {
   if (v?.cells) try { if (Object.getPrototypeOf(v.cells) !== RawType) Object.setPrototypeOf(v.cells, RawType); } catch { /* already the show's: stays as it is */ }
   return v;
 }
-export const rawCellMap = <T extends object>(m: T): T => { try { Object.setPrototypeOf(m, RawType); } catch { /* a proxy */ } return m; };
-export function rawCue<T extends { values: Record<string, Values> }>(c: T): T { for (const v of Object.values(c.values)) rawCells(v); return c; }
-export function rawTypes(s: Show): Show {
+const rawCellMap = <T extends object>(m: T): T => { try { Object.setPrototypeOf(m, RawType); } catch { /* a proxy */ } return m; };
+function rawCue<T extends { values: Record<string, Values> }>(c: T): T { for (const v of Object.values(c.values)) rawCells(v); return c; }
+function rawTypes(s: Show): Show {
   s.fixtureTypes = s.fixtureTypes.map(rawType);
   for (const l of s.cueLists) for (const c of l.cues) rawCue(c);
   for (const p of s.presets) { rawCells(p.values); for (const v of Object.values(p.perFixture ?? {})) rawCells(v); }
@@ -513,7 +511,7 @@ class App {
       // machines are made safe (going live again starts safe)
       this.armMachines(false);
       // (the winches where the wire held them)
-      const frozen = this.lastSent && this.zeroed(this.lastSent, (a) => ATMOS_AND_MACHINES.includes(a));
+      const frozen = this.lastSent && this.zeroed(this.lastSent, atmosAndMachines);
       if (frozen) this.engine.putHeld(frozen, this.heldWire());
       this.setFrozen(frozen);
     } else { this.setFrozen(null); ui.untoast(BLIND_TOAST); }
@@ -561,7 +559,7 @@ class App {
     // (only to say so after a reload: arming itself is never kept)
     if (on) WAS_ARMED.set(true); else if (!(leaving && was)) WAS_ARMED.remove();
     // (disarmed while blind: the frozen look loses them too)
-    if (!on && this.frozen) this.setFrozen(this.zeroed(this.frozen, MACHINES_SAFE));
+    if (!on && this.frozen) this.setFrozen(this.zeroed(this.frozen, machinesSafe));
   }
   // the show's machines that wait for arming
   // (and the winches: they move only while armed)
@@ -584,13 +582,13 @@ class App {
     // (blind: the frozen look goes out again, its machines off; nothing new)
     if (this.output === 'blind') {
       if (!this.frozen) return;
-      const off = this.zeroed(this.frozen, (a) => ATMOS_AND_MACHINES.includes(a));
+      const off = this.zeroed(this.frozen, atmosAndMachines);
       for (const b of this.bridges) { if (b.sendFinal) b.sendFinal(off, t); else for (const [uni, data] of off) b.send(uni, data, t); }
       return;
     }
     this.engine.live = { ...this.engine.live, ...Object.fromEntries(fog.map((f) => [f.id, { fog: 0, haze: 0, confetti: 0, bubbles: 0, flame: 0, sparks: 0, co2: 0 }])) };
     // (and their channels at 0 whatever set them: a raw number in "All channels" too)
-    const off = this.zeroed(this.engine.tick().frames, (a) => ATMOS_AND_MACHINES.includes(a));
+    const off = this.zeroed(this.engine.tick().frames, atmosAndMachines);
     for (const b of this.bridges) { if (b.sendFinal) b.sendFinal(off, t); else for (const [uni, data] of off) b.send(uni, data, t); }
   }
 
@@ -749,12 +747,10 @@ class App {
   // One tab plays a show to the box at a time: the one sending holds a lock named after the show (a
   // closed or crashed tab lets go of it by itself). False: another tab holds it.
   private outLock?: () => void;
-  private outAsked = '';
-  private outLockFor = '';
+  private outLockFor = '';            // (the show it was asked for)
   private takeOutput(): Promise<boolean> {
     if (this.outLock && this.outLockFor === this.showId) return Promise.resolve(true);   // (already ours)
     this.outLock?.(); this.outLock = undefined;
-    this.outAsked = this.showId;
     this.outLockFor = this.showId;
     if (!hasLocks()) return Promise.resolve(true);
     return new Promise((ok) => {
@@ -1039,7 +1035,7 @@ class App {
       try {
         const last = this.output === 'live' ? this.lastSent : this.frozen;
         if (!last || this.quiet) return;
-        const off = this.zeroed(last, (a) => ATMOS_AND_MACHINES.includes(a)), t = performance.now();
+        const off = this.zeroed(last, atmosAndMachines), t = performance.now();
         for (const b of this.bridges) { if (this.thread.serves(b)) continue; for (const [uni, data] of off) b.send(uni, data, t); }
       } catch { /* nothing more to do: the boxes hold what they had */ }
     }
@@ -1143,7 +1139,7 @@ class App {
     // off and on again mustn't black out the bar it was lighting).
     if (this.quiet && ([...this.engine.players.values()].some((p) => p.running) || Object.keys(this.programmer).length || this.engine.liveEffects().length
       || Object.keys(this.live).length || this.testOverlay || this.highlight || this.blackout || this.grandMaster < 1)) this.quiet = false;
-    if (!this.quiet && this.outAsked !== this.showId) void this.takeOutput();
+    if (!this.quiet && this.outLockFor !== this.showId) void this.takeOutput();
     // live: this frame; blind: the look that was out when it went blind, nothing new
     const out = this.output === 'live' ? frames : this.blindFrames();
     // (not where the output thread sends: a late frame from here would put an older look back)
@@ -1176,7 +1172,7 @@ class App {
     for (const [w, until] of Object.entries(this.fogUntil)) if (nowMs >= until) this.expire(w);
     // ---- what the screen shows: every frame, or every n-th while the output needs the time
     // (perf/load.svelte.ts); a fresh start or a change of look shows at once
-    if (++this.uiN >= load.uiEvery || !this.status || this.shownRev !== this.rev) { this.uiN = 0; this.shownRev = this.rev; this.publish(stage, look, frames); }
+    if (++this.uiN >= load.uiEvery || this.shownRev !== this.rev) { this.uiN = 0; this.shownRev = this.rev; this.publish(stage, look, frames); }
     this.remote.tick(t);
     this.timeline.tick();
     if (t - this.schedAt > 5000) { this.schedAt = t; this.runSchedule(); }
@@ -1586,7 +1582,6 @@ class App {
     this.markDirty();
     return added.length;
   }
-  duplicateFixtures() { this.copyFixtures().then(() => this.pasteFixtures()); }
   // Removes the lights; groups that only had them go too (and their live buttons). Says how many
   // cues lose them, so a template's lights don't vanish from its looks without a word.
   // what points at something deleted goes too (model/prune.ts): said in the delete's toast
@@ -2005,7 +2000,7 @@ class App {
     for (const k of [...this.holds.keys()]) if (k.startsWith('console:')) { this.holdOff(k); this.capHold(k, false, () => {}); }
     for (const k of [...this.capped.keys()]) if (k.startsWith('console:list:')) this.expire(k);
   }
-  flashList(id: string, down: boolean) { if (down) this.wakeMaster(id); this.engine.flash(id, down); this.capHold(`console:list:${id}`, down, () => this.engine.flash(id, false)); }
+  flashList(id: string, down: boolean) { if (down) this.engine.wake(id); this.engine.flash(id, down); this.capHold(`console:list:${id}`, down, () => this.engine.flash(id, false)); }
   // A playback fader: its level; up from 0 starts the list, down to 0 lets it go (fader start),
   // with a little room between the two so a finger resting at the bottom doesn't start it again
   // and again. A list let go this way comes back at full when GO plays it.
@@ -2018,7 +2013,6 @@ class App {
     else if (v <= 0.004 && was.running && !was.releasing) { this.engine.release(id); this.engine.faderReleased(id); }
   }
   // a list that isn't playing and whose level was left at 0 (by its fader) plays at full again
-  private wakeMaster(id: string) { this.engine.wake(id); }
   // A gobo, a built-in effect or a colour program, picked by its name: each selected light that has
   // one by that name gets its own (the same gobo sits at different places on different heads); one
   // without it is left as it is (one light alone takes the one at that place).
@@ -2475,11 +2469,6 @@ class App {
     this.checkpoint();
     renumber(l);
   }
-  removeCue(listId: string, i: number) {
-    this.checkpoint();
-    const l = this.show.cueLists.find((x) => x.id === listId);
-    if (l) l.cues.splice(i, 1);
-  }
 
   // ---- cue selection, order, clipboard (all on the current list)
   selectCue(id: string, how: 'only' | 'toggle' | 'range') {
@@ -2715,7 +2704,6 @@ class App {
     return this.show.effects.filter((e) => (this.fx[e.id] ?? 0) > 0 &&
       (e.group ? this.show.groups.find((g) => g.id === e.group)?.fixtures ?? [] : e.fixtures ?? []).some((f) => ids.includes(f)));
   }
-  effectTargetCount(e: Effect) { return e.group ? this.show.groups.find((g) => g.id === e.group)?.fixtures.length ?? 0 : e.fixtures?.length ?? 0; }
 
   // ---- presets (cues keep references, so changing one changes every cue that uses it)
   applyPreset(id: string, to = this.selected) {
@@ -3174,7 +3162,7 @@ class App {
   // cues (Auto GO and follow cues don't come through here).
   private lastGo = { id: '', at: -1e9 };
   go(id = this.currentList) {
-    this.wakeMaster(id);
+    this.engine.wake(id);
     const now = performance.now();
     if (id === this.lastGo.id && now - this.lastGo.at < GO_GUARD_MS) return;
     this.lastGo = { id, at: now };
@@ -3201,7 +3189,6 @@ class App {
   }
   back(id = this.currentList) { this.played(id); this.followSel = true; this.engine.back(id); }
   jump(id: string, i: number) { this.played(id); this.followSel = true; this.engine.jumpTo(id, i); }
-  toggle(id: string) { this.engine.toggle(id); }
   release(id = this.currentList) {
     this.engine.release(id);
     // effects started on their own (on Live, by the timeline) aren't the list's and go on lighting
@@ -3660,4 +3647,3 @@ function dropCellKeys(cells: Record<string, CellValues>, keys: (keyof CellValues
 }
 
 export const app = new App();
-export { GENERIC };

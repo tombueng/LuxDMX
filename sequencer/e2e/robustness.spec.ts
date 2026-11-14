@@ -458,7 +458,7 @@ test('a long session: undo all the way back is the empty show, redo all the way 
       ['remove group', () => a.removeGroup(a.show.groups[0].id)],
       ['new list', () => a.newList('Second')],
       ['record into second', () => { a.selected = [a.show.fixtures[1].id]; a.set({ intensity: 0.3 }); a.record(); }],
-      ['remove cue 2 of list 1', () => a.removeCue(a.show.cueLists[0].id, 1)],
+      ['remove cue 2 of list 1', () => { a.currentList = a.show.cueLists[0].id; a.deleteCues([a.show.cueLists[0].cues[1].id]); }],
       ['fixture rename', () => { a.checkpoint(); a.show.fixtures[2].name = 'Center'; }],
       ['add 3 more', () => a.addFixtures('gen-rgbw', '', 3, 1, 'W')],
       ['move another', () => a.moveFixture(a.show.fixtures[5].id, 0.7, 0.8)],
