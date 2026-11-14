@@ -65,6 +65,10 @@
     const bad = app.addDevice(host);
     if (bad) { ui.toast(bad, 6000); return; }
     host = ''; open = false;
+    // (and connects at once: the box's window opens from this click, so the browser lets it. Added
+    // and then Connect as well was a step nobody expected)
+    const key = h.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    app.bridges.find((b) => b.host === key)?.open();
     setTimeout(() => document.querySelector<HTMLElement>(`[data-box="${CSS.escape(h)}"] button.primary`)?.focus(), 0);
   }
   // (autofocus doesn't fire for a field that comes in later)

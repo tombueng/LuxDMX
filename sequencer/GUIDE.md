@@ -11,7 +11,7 @@ wheels), you just don't have to learn a pro console to use them.
 ## Getting started
 
 1. **Connect your LuxDMX.** Top right, `+`, type the box's address (what you'd type to open its
-   web page), **Add LuxDMX**, then **Connect** on its pill and **Allow** in the popup. The popup has to stay open: it's the
+   web page), **Add LuxDMX** (it connects at once: **Connect** on its pill does it again later) and **Allow** in the popup. The popup has to stay open: it's the
    box's own page, and it's what carries the DMX (a browser page can't send Art-Net itself).
    The pill next to the box says how it's going; "no answer" means the address is wrong or the
    box's firmware is too old for the sequencer (it needs v1.0.293 or newer: update it from its

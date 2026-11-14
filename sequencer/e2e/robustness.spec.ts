@@ -194,9 +194,8 @@ test('a box that never answers says so instead of "opening" forever', async ({ p
   const port = (server.address() as { port: number }).port;
   try {
     await fresh(page);
-    await addDevice(page, `127.0.0.1:${port}`);
+    const popup = (await addDevice(page, `127.0.0.1:${port}`))!;          // (Add opens the box's window at once)
     await showBoxes(page);
-    const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('.dev').getByRole('button', { name: 'Connect' }).click()]);
     await expect(page.locator('.dev')).toContainText('opening');
     await expect(page.locator('.dev')).toContainText('no answer', { timeout: 12000 });
     await expect(page.locator('.dev.silent')).toHaveAttribute('title', /firmware/);
@@ -556,8 +555,7 @@ test('two boxes, one gone: the bar names its universes and the box by its addres
     for (let i = 0; i < 50; i++) { try { await fetch(`http://${host2}/info.json`); break; } catch { await new Promise((r) => setTimeout(r, 200)); } }
     await page.setViewportSize({ width: 1600, height: 1000 });
     await openConnected(page);
-    await addDevice(page, host2);
-    const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('.dev').getByRole('button', { name: 'Connect' }).click()]);
+    const popup = (await addDevice(page, host2))!;
     await popup.locator('#allow').click();
     await expect(page.locator('.dev.ready')).toHaveCount(2);
     await fetch(`http://${FAKE}/ws/test`, { method: 'POST', body: JSON.stringify({ down: 6000 }) });

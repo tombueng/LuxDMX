@@ -91,19 +91,21 @@ export async function demo(page: Page, song = 'beat', name = 'Festival stage') {
 // Fresh app, connected to a device through its bridge popup.
 export async function openConnected(page: Page, host = FAKE) {
   await fresh(page);
-  await addDevice(page, host);
-  return connect(page);
+  const opened = await addDevice(page, host);
+  return connect(page, opened);
 }
 // On a phone the boxes sit behind one status button in the top bar.
 const boxesButton = (page: Page) => page.locator('.top').getByRole('button', { name: /LuxDMX boxes/ });
-export async function addDevice(page: Page, host = FAKE) {
+// (Add LuxDMX connects at once: the box's window opens from that click; it's handed back)
+export async function addDevice(page: Page, host = FAKE): Promise<Page | null> {
   // one of the two is there once the app has drawn (isVisible doesn't wait: a slow first paint took the wrong one)
   const add = page.getByRole('button', { name: 'Add a LuxDMX' });
   await expect(boxesButton(page).or(add).first()).toBeVisible();
   if (await boxesButton(page).isVisible()) { if (!(await page.getByLabel('LuxDMX address').isVisible())) await boxesButton(page).click(); }
   else await add.click();
   await page.getByLabel('LuxDMX address').fill(host);
-  await page.getByRole('button', { name: 'Add LuxDMX' }).click();
+  const [popup] = await Promise.all([page.waitForEvent('popup', { timeout: 10000 }).catch(() => null), page.getByRole('button', { name: 'Add LuxDMX' }).click()]);
+  return popup;
 }
 // The boxes' pills: on a tablet, or when they'd wrap the top bar, they sit in the boxes button's
 // list: opened when it's that way. A box connected: its pill, or the boxes button, says so.
@@ -112,11 +114,12 @@ export async function showBoxes(page: Page) {
   if (await boxesButton(page).isVisible() && !(await page.locator('.dev').first().isVisible())) await boxesButton(page).click();
 }
 export const boxReady = (page: Page) => page.locator('.dev.ready').or(page.locator('.top .boxes.ready')).first();
-export async function connect(page: Page) {
+export async function connect(page: Page, opened?: Page | null) {
   await expect(boxesButton(page).or(page.locator('.dev')).first()).toBeVisible();
   const compact = await boxesButton(page).isVisible();
   if (compact && !(await page.locator('.dev').first().isVisible())) await boxesButton(page).click();
-  const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('.dev').getByRole('button', { name: 'Connect' }).click()]);
+  // (the window Add opened, or Connect's)
+  const popup = opened ?? (await Promise.all([page.waitForEvent('popup'), page.locator('.dev').getByRole('button', { name: 'Connect' }).click()]))[0];
   await popup.locator('#allow').click();
   await expect(page.locator('.dev.ready')).toBeVisible();
   if (compact) { await page.keyboard.press('Escape'); await expect(page.locator('.top .boxes.ready')).toBeVisible(); }
