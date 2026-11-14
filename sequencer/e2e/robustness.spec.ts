@@ -363,7 +363,17 @@ test('two tabs on one show: the out-of-date one says "changed in another tab" an
   // the other way round: a change in A now makes B the out-of-date one
   await patch(page, 'gen-dimmer', 1, 0, 'From A');
   await expect(b.locator('.top').getByRole('button', { name: 'changed in another tab' })).toBeVisible({ timeout: 5000 });
-  await b.close();
+  // B saw A saving: it says the show is open elsewhere too. A closed: that warning goes
+  const c = await context.newPage();
+  await c.goto('/');
+  await expect(fixturesOnStage(c)).toHaveCount(4);
+  await patch(c, 'gen-dimmer', 1, 0, 'From C');
+  await expect(page.locator('.top').getByText(/open in another tab|changed in another tab/).first()).toBeVisible({ timeout: 5000 });
+  await page.getByRole('button', { name: 'changed in another tab' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Take it' }).click();
+  await expect(page.locator('.top').getByText('open in another tab')).toBeVisible({ timeout: 5000 });
+  await b.close(); await c.close();
+  await expect(page.locator('.top').getByText('open in another tab')).toHaveCount(0, { timeout: 5000 });
 });
 
 // The browser keeps nothing (its storage full, or blocked): said in red, with the way out, not a

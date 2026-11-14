@@ -439,6 +439,7 @@ class App {
         // newer when the other tab undid its change. Both sides fingerprint the text as written:
         // the file fixes a few fields the live show doesn't have yet)
         if (e.data?.saved === this.showId && e.data.tab !== this.tabId) {
+          this.otherTabs.add(e.data.tab);
           this.otherTab = true; this.otherSaves++;
           this.otherNewer = e.data.sum !== textSum(serializeShow(JSON.parse(this.lastSnap), false));
         }
@@ -446,10 +447,15 @@ class App {
         if (e.data?.playing === this.showId && e.data.tab !== this.tabId && !this.quiet)
           this.channel?.postMessage({ isPlaying: this.showId, tab: this.tabId });
         if (e.data?.isPlaying === this.showId && e.data.tab !== this.tabId) this.othersPlay = true;
+        // another tab closed (or went to another show): the warning goes when no other tab on this
+        // show is left (it stayed on for good)
+        if (e.data?.gone && e.data.tab !== this.tabId && this.otherTabs.delete(e.data.tab) && !this.otherTabs.size) { this.otherTab = false; this.otherNewer = false; }
       };
+      addEventListener('pagehide', () => this.channel?.postMessage({ gone: true, tab: this.tabId }));
     } catch { /* no BroadcastChannel: fine */ }
   }
   otherTab = $state(false);
+  private otherTabs = new Set<string>();   // (the other tabs heard saving this show)
   // ...and the other tab's save is the newer one: what's in this tab is out of date, and its next
   // save would quietly drop what was done over there. The top bar offers to take that version.
   otherNewer = $state(false);
@@ -958,7 +964,9 @@ class App {
   private setShowId(id: string) {
     this.showId = id;
     this.schedLast = Date.now();               // another show: its timetable goes on from now (no catching up)
-    this.otherTab = false; this.otherNewer = false;
+    // (this tab is on another show now: the others on the old one hear it's gone)
+    if (this.otherTabs.size) this.channel?.postMessage({ gone: true, tab: this.tabId });
+    this.otherTab = false; this.otherNewer = false; this.otherTabs.clear();
     try { localStorage.setItem(CUR, id); } catch { /* storage blocked */ }
   }
   async duplicateShow(id: string) {
