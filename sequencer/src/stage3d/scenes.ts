@@ -268,17 +268,21 @@ export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
   // the proscenium: a deep frame round the opening, gold mouldings; the house curtain gathered at
   // the sides, its valance across the top; black legs in the wings
   const aw = T.arch.w, ah = T.arch.h, az = T.arch.z, side = X - aw / 2;
+  // (the proscenium's wall goes from the Top view, as the roof steel does in the hall: seen from above
+  // its header lay right over the front of the stage)
+  const above = <M extends THREE.Material>(m: M) => { const c = m.clone() as M; c.userData.hideAbove = H - 0.6; return c; };
+  const creamA = above(cream), goldA = above(gold);
   for (const sx of [-1, 1]) {
-    add(box(side, H, 0.8, cream), sx * (aw / 2 + side / 2), H / 2, az);
+    add(box(side, H, 0.8, creamA), sx * (aw / 2 + side / 2), H / 2, az);
     add(box(0.14, ah, 0.86, gold), sx * (aw / 2 + 0.07), DECK + ah / 2, az);
     add(box(1.1, ah, 0.4, velvet), sx * (aw / 2 - 0.5), DECK + ah / 2, az - 0.5);
     for (const z of [-1.2, -3.6]) add(box(1.4, ah + 1, 0.1, M.black), sx * (aw / 2 - 0.3), DECK + (ah + 1) / 2, z);
     // the booms in the wings: a pipe on a base plate each (their lights clamped on, scenePlaces.ts)
     for (const z of [-1.2, 1.0]) { add(cyl(0.025, 0.025, 3.2, M.black, 8), sx * 7.2, DECK + 1.6, z); add(cyl(0.22, 0.22, 0.03, M.black, 16), sx * 7.2, DECK + 0.015, z); }
   }
-  add(box(aw, H - DECK - ah, 0.8, cream), 0, DECK + ah + (H - DECK - ah) / 2, az);
-  add(box(aw + 0.28, 0.16, 0.86, gold), 0, DECK + ah + 0.08, az);
-  add(box(aw, 1.0, 0.4, velvet), 0, DECK + ah - 0.5, az - 0.5);
+  add(box(aw, H - DECK - ah, 0.8, creamA), 0, DECK + ah + (H - DECK - ah) / 2, az);
+  add(box(aw + 0.28, 0.16, 0.86, goldA), 0, DECK + ah + 0.08, az);
+  add(box(aw, 1.0, 0.4, above(velvet)), 0, DECK + ah - 0.5, az - 0.5);
   // the stalls: gently raked rows, an aisle down the middle
   const S = T.stalls;
   for (let rr = 0; rr < S.rows; rr++) {

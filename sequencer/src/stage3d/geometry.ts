@@ -149,7 +149,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     band: { x: 7, z0: -6, z1: 3.4 }, walls: { x: 11, z0: -6.4, z1: 21 }, screens: [{ z: -5.7, x: 7, y0: DECK, y1: DECK + 8.4 }],
     floor: (_x, z) => theatreFloor(z),
     frame: [span(7.4, 9.0, -4.8), span(7.4, 7.8, -2.6), span(7.4, 7.8, -0.2), span(8.4, 10.4, 8.4)],
-    views: { front: { pos: [0, 8.8, 19.6], at: [0, 4, -1] }, foh: { pos: [2.8, 3.4, 11], at: [0, 3.4, -1] }, side: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -3.5], at: [0, 3.5, 14] } },
+    views: { front: { pos: [0, 8.8, 19.6], at: [0, 4, -1] }, foh: { pos: [2.8, 3.4, 11], at: [0, 3.4, -1] }, side: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1] }, top: { pos: [0, 30, 1.01], at: [0, 0, 1] }, band: { pos: [0, 2.9, -3.5], at: [0, 3.5, 14] } },
     tour: { rx: 7.5, rz: 6, z0: 6, y: 3.6, dy: 0.3, at: [0, 3.6, -1] },
   },
   // a church (scenes.ts buildChurch): the chancel is the deck; the plan is the whole church, wall to

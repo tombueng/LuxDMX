@@ -140,3 +140,25 @@ describe('the Cinema, Bar, Theatre and Church templates in their rooms', () => {
     const r0 = ball!.rotation.y; v.animate(10, 20, 0.5, new THREE.Color(1, 1, 1)); expect(ball!.rotation.y).not.toBe(r0);
   });
 });
+
+// The theatre's Top view: straight down onto the stage, nothing in between. The proscenium's wall
+// (its header over the opening) lay right over the front of the stage; it hides when the camera is
+// above the ceiling, as the roof steel does in the hall.
+describe('the theatre from above', () => {
+  it('the Top view sees the front of the stage, centre and sides: nothing it draws is in the way', () => {
+    const v = room('theatre'), r = ROOMS.theatre, cam = V(...r.views.top.pos);
+    v.group.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster();
+    for (const x of [-4, 0, 4]) for (const z of [-4, 0, 2.2, 2.8]) {
+      const p = V(x, 1.2, z), d = p.clone().sub(cam), far = d.length() - 0.05;
+      ray.set(cam, d.normalize()); ray.far = far;
+      const hits = ray.intersectObject(v.group, true).filter((h) => {
+        const m = (h.object as THREE.Mesh).material as THREE.Material | THREE.Material[];
+        const mat = Array.isArray(m) ? m[(h.face?.materialIndex ?? 0)] : m;
+        if (!mat?.visible || (mat.transparent && mat.opacity < 0.5)) return false;
+        return !(typeof mat.userData.hideAbove === 'number' && cam.y > mat.userData.hideAbove);
+      });
+      expect(hits.map((h) => h.object.name || h.object.type), `${x}, ${z}`).toEqual([]);
+    }
+  });
+});
