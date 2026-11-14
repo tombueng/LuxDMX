@@ -10,6 +10,7 @@
 import { Engine } from '../engine/engine';
 import { modeOf as modeIn, typeMap } from '../model/library';
 import { atmosAndMachines, zeroedFrames } from './safe';
+import { COMMANDS, type Command } from './commands';
 import { dmxMessage, due, linkFrame, linkRoutes as routesOf, type LinkProto, type Sent } from './wire';
 import type { Fixture, FixtureMode, Show, Values } from '../model/types';
 
@@ -17,7 +18,7 @@ export type ToThread =
   | { t: 'init'; origin: number; page?: string }
   | { t: 'show'; json: string }          // (as text: parsed here, not on the page)
   | { t: 'inputs'; v: Partial<Inputs> }
-  | { t: 'call'; m: string; a: unknown[]; at: number }
+  | { t: 'call'; m: Command; a: unknown[]; at: number }
   | { t: 'jumped'; op: 'add' | 'delete' | 'clear'; id?: string }
   | { t: 'policy'; quiet: boolean; blind: [number, Uint8Array][] | null }
   | { t: 'port'; key: string; port: MessagePort; outputs: { en: boolean; uni: number }[] }
@@ -143,8 +144,7 @@ function loop() {
 }
 
 // ---- what the page says
-const COMMANDS = new Set(['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
-  'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'giveBackEffects', 'stopAllEffects', 'act']);
+const COMMAND = new Set<string>(COMMANDS);
 self.onmessage = (e: MessageEvent<ToThread>) => {
   const m = e.data;
   heardAt = performance.now();
@@ -159,7 +159,7 @@ self.onmessage = (e: MessageEvent<ToThread>) => {
     }
     case 'inputs': Object.assign(engine, m.v); break;
     case 'call':
-      if (!COMMANDS.has(m.m)) break;
+      if (!COMMAND.has(m.m)) break;
       // The page's beat count as it was when it was said: on here by how long the message took (a
       // page busy for a moment sent it late, and the effects stepped back a frame), never back by a
       // hair (that's a step back too), and at once when it's really another beat (a jump in a song).

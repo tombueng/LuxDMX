@@ -11,12 +11,11 @@ import type { Bridge } from './bridge';
 import { LINK, LINK_URL, PAGE_ID } from './link';
 import type { FromThread, Inputs, ToThread } from './thread';
 import type { LinkProto } from './wire';
+import { COMMANDS } from './commands';
 import type { Show } from '../model/types';
 
-const COMMANDS = ['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
-  'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects', 'giveBackEffects', 'stopAllEffects', 'act'];
-const ASK_MS = 1500;
-const SHOW_EVERY_MS = 150;    // a show that keeps changing goes over at most this often          // a box's page that doesn't take a channel by then: the page sends to it
+const ASK_MS = 1500;           // a box's page that doesn't take a channel by then: the page sends to it
+const SHOW_EVERY_MS = 150;    // a show that keeps changing goes over at most this often
 const QUIET_MS = 1500;        // the thread not heard from for this long: the page sends again
 
 export class OutputThread {
