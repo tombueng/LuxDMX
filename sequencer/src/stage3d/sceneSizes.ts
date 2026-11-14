@@ -2,10 +2,13 @@
 // them): pure numbers, no three.js, so the templates can use them.
 
 // (its numbers, for the template's places too: where the screen, the rows and the walls are)
+// (a big premiere house: a 22 m screen, 22 rows rising steeply to the projection booth)
 export const CINEMA = {
-  screenZ: -3.0, screenW: 15, screenH: 6.4, screenY: 3.0,
-  rows: 18, rowZ0: 4.2, rowD: 1.05, rowRise: 0.32,
-  aisles: [-4.8, 4.8], wallX: 11, backZ: 26, ceiling: 11.5,
+  screenZ: -4.2, screenW: 22, screenH: 9.2, screenY: 3.6,
+  rows: 22, rowZ0: 5.8, rowD: 1.1, rowRise: 0.34,
+  aisles: [-7.5, 7.5], wallX: 16, backZ: 36, ceiling: 16,
+  // the stage's truss in front of the screen and the bar over the front rows
+  stageTruss: { z: 1.2, y: 12 }, foh: { z: 9, y: 13.5 }, deck: { x: 11, z0: -4.0, z1: 2.2 },
 };
 // the height of the floor at z (the stalls, then the rows rising to the back)
 export function cinemaFloor(z: number) {

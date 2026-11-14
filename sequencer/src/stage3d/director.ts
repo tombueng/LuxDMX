@@ -97,7 +97,7 @@ export const CROWDS: Partial<Record<RoomId, CrowdArea>> = {
   party: { z0: 2.2, z1: 14.8, half: () => 10 - 1.6, top: 2.6, high: [4.2, 11.2, 2.9] },
   // the cinema's front rows (the ones a camera films; the rows behind rise: GEAR has them) and the
   // bar's dance floor
-  cinema: { z0: 4.2, z1: 7.4, half: () => 9.6, top: 2.3 },
+  cinema: { z0: 5.8, z1: 9.1, half: () => 14.6, top: 2.3 },
   bar: { z0: 2.6, z1: 7.2, half: () => 3.6, top: 1.9 },
   theatre: { z0: 5, z1: 9, half: () => 14.5, top: 2.0 },
   church: { z0: 1.0, z1: 8.5, half: () => 7.4, top: 1.6 },
@@ -134,7 +134,7 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
   ],
   truss: [bx(6.2, 7.0, 0, 1.0, 6.2, 7.8, 'the table'), bx(-7.4, -6.6, 0, 1.7, 7.4, 9.9, 'road cases')],
   // the cinema's rows, three at a time, up to the heads of the audience in them (scenes.ts CINEMA)
-  cinema: [0, 1, 2, 3, 4, 5].map((k) => bx(-10.6, 10.6, 0, (3 * k + 3) * 0.32 + 1.3, 4.2 + 3 * k * 1.05, 4.2 + (3 * k + 3) * 1.05, 'the rows')),
+  cinema: [0, 1, 2, 3, 4, 5, 6, 7].map((k) => bx(-15.6, 15.6, 0, (3 * k + 3) * 0.34 + 1.3, 5.8 + 3 * k * 1.1, 5.8 + (3 * k + 3) * 1.1, 'the rows')),
   // the theatre: its stalls four rows at a time, the balcony, the proscenium's walls round the opening
   theatre: [...[0, 1, 2, 3].map((k) => bx(-16, 16, 0, (4 * k + 4) * 0.16 + 1.3, 5 + 4 * k, 9 + 4 * k, 'the stalls')), bx(-16, 16, 5.0, 9.7, 15.5, 26, 'the balcony'),
     bx(-16, -9, 0, 20, 1.8, 2.6, 'the proscenium'), bx(9, 16, 0, 20, 1.8, 2.6, 'the proscenium'), bx(-9, 9, 11.2, 20, 1.8, 2.6, 'the proscenium')],
@@ -353,19 +353,19 @@ export const CREW: Partial<Record<RoomId, Crew>> = {
   // the cinema: from the back rows, high on the side, the front of the stalls, over the front rows;
   // the stage filmed, and the audience from the stage
   cinema: {
-    wide: { pos: [0, 7.7, 22.4], at: [0, 3.6, -1], fov: 30, pan: [1.6, 0, 0], zoom: 0.8 },
-    high: { pos: [-9.4, 9.6, 14], at: [0, 3.2, -0.5], fov: 34, move: [2, 0, 0] },
-    ...side({ pos: [-6.2, 3.4, 3.2], at: [-1.0, 3.0, -0.5], fov: 32, move: [0.8, 0, -0.2], pan: [0.8, 0, 0], shake: 0.025 }),
-    crowd: { pos: [-2.0, 4.9, 12.0], at: [0, 3.2, -0.5], fov: 34, move: [1.0, 0, 0.6], pan: [0.8, 0, 0], shake: 0.02 },
-    front: { pos: [-8.5, 4.6, 9.0], at: [0, 3.6, -0.5], fov: 40, move: [1.5, 0, 0], pan: [0.8, 0, 0] },
-    back: { pos: [2.0, 4.0, -2.3], at: [0, 2.4, 6.5], fov: 50, move: [-2.4, 0, 0], pan: [-2, 0, 0] },
-    pit: { z: 2.7, y: 2.4, x: 3 },
-    crane: { pivot: [-8.6, 1.8, 3.4], a: [-3.0, 6.6, 6.6], b: [-1.0, 3.3, 2.9], rise: 0.4, lookA: [0, 2.6, 3.0], lookB: [0, 3.4, -1.0], period: 32 },
+    wide: { pos: [0, 10.5, 32], at: [0, 5, -2], fov: 32, pan: [2, 0, 0], zoom: 0.8 },
+    high: { pos: [-14, 13, 20], at: [0, 4.5, -1], fov: 36, move: [3, 0, 0] },
+    ...side({ pos: [-9, 3.6, 1.8], at: [-1.5, 3.4, -1], fov: 34, move: [1.0, 0, -0.2], pan: [1.0, 0, 0], shake: 0.025 }),
+    crowd: { pos: [-3.0, 6.6, 16], at: [0, 4.4, -1], fov: 36, move: [1.4, 0, 0.6], pan: [1.0, 0, 0], shake: 0.02 },
+    front: { pos: [-12.5, 5.6, 12], at: [0, 4.6, -1], fov: 42, move: [2, 0, 0], pan: [1, 0, 0] },
+    back: { pos: [3.0, 4.4, -3.2], at: [0, 3.2, 9], fov: 52, move: [-3, 0, 0], pan: [-2.5, 0, 0] },
+    pit: { z: 3.6, y: 2.4, x: 4 },
+    crane: { pivot: [-12, 1.8, 4.0], a: [-4.0, 8.5, 9.0], b: [-1.5, 3.6, 3.6], rise: 0.5, lookA: [0, 3.0, 4.0], lookB: [0, 4.6, -1.5], period: 32 },
     walk: {
-      y: 1.65, way: [[-6.0, 3.25], [-3.0, 3.15], [0, 3.2], [3.0, 3.15], [6.0, 3.25]],
-      look: [[-5.0, 3.2, -1], [-2.5, 3.3, -1], [0, 3.4, -1], [2.5, 3.3, -1], [5.0, 3.2, -1]],
+      y: 1.65, way: [[-8.5, 4.0], [-4.2, 3.9], [0, 3.95], [4.2, 3.9], [8.5, 4.0]],
+      look: [[-7, 4.2, -2], [-3.5, 4.4, -2], [0, 4.6, -2], [3.5, 4.4, -2], [7, 4.2, -2]],
     },
-    drone: { zc: 6, rx: 8, rz: 10, y: 7.6, bob: 0.3, arc: 0.9, gate: 6.6, near: [1.5, 3.6, 3.2], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 3.2, -0.5], lookNear: [0, 3.4, -0.5] },
+    drone: { zc: 9, rx: 11, rz: 13, y: 10.5, bob: 0.3, arc: 0.9, gate: 9, near: [2, 4.2, 3.8], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 4.4, -1], lookNear: [0, 4.6, -1] },
   },
   // the bar: the counter filmed from the dance floor, from its corners, from behind the bar
   bar: {

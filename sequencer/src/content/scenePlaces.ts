@@ -15,28 +15,28 @@ const stand = (p: V3, yaw = 0): Place => ({ p, rot: { yaw, pitch: 0, roll: 0 } }
 const spread = (i: number, n: number, a: number, b: number) => (n === 1 ? (a + b) / 2 : a + ((b - a) * i) / (n - 1));
 
 // ---- the cinema
-const C = CINEMA, stageT = 0.9, stageY = 8.2 - TRUSS_HANG, fohT = 6.4, fohY = 8.8 - TRUSS_HANG;
+const C = CINEMA, stageT = C.stageTruss.z, stageY = C.stageTruss.y - TRUSS_HANG, fohT = C.foh.z, fohY = C.foh.y - TRUSS_HANG;
 const CINEMA_PLACES: Table = {
   // downlights in the ceiling over the rows
-  House: (i) => { const x = i % 2 ? 4.2 : -4.2, z = i < 2 ? 9 : 17; return aim({ x, y: C.ceiling - 0.25, z }, { x, y: 0, z: z + 0.2 }); },
+  House: (i, n) => { const x = i % 2 ? 6.5 : -6.5, z = 12 + Math.floor(i / 2) * (n > 4 ? 6 : 12); return aim({ x, y: C.ceiling - 0.25, z }, { x, y: 0, z: z + 0.2 }); },
   // washers low on the side walls, washing them up to the ceiling
   // (tipped a little towards the wall: the wash runs up it from about a metre up)
-  Wall: (i, n) => { const sx = i < n / 2 ? -1 : 1, k = i % Math.ceil(n / 2), z = 3 + k * 7, x = sx * (C.wallX - 0.3), y = cinemaFloor(z) + 0.35; return aim({ x, y, z }, { x: sx * C.wallX, y: y + 3, z }); },
+  Wall: (i, n) => { const sx = i < n / 2 ? -1 : 1, k = i % Math.ceil(n / 2), m = Math.ceil(n / 2), z = 4 + k * (28 / Math.max(1, m - 1 || 1)), x = sx * (C.wallX - 0.3), y = cinemaFloor(z) + 0.35; return aim({ x, y, z }, { x: sx * C.wallX, y: y + 3, z }); },
   // over the screen, the marquee's bars shining out over the rows
-  Marquee: (i, n) => { const x = spread(i, n, -4.5, 4.5), y = C.screenY + C.screenH + 0.25; return aim({ x, y, z: C.screenZ + 0.45 }, { x: x * 1.2, y: 3, z: 10 }); },
+  Marquee: (i, n) => { const x = spread(i, n, -7, 7), y = C.screenY + C.screenH + 0.25; return aim({ x, y, z: C.screenZ + 0.45 }, { x: x * 1.2, y: 3, z: 14 }); },
   // the stage's wash, from its truss
-  Stage: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: stageY, z: stageT }, { x: x * 0.5, y: DECK, z: -0.6 }); },
-  // the two spots on the bar over the front rows
-  Spot: (i, n) => hung({ x: spread(i, n, -3, 3), y: fohY, z: fohT }),
+  Stage: (i, n) => { const x = spread(i, n, -7, 7); return aim({ x, y: stageY, z: stageT }, { x: x * 0.5, y: DECK, z: -1 }); },
+  // the spots on the bar over the front rows
+  Spot: (i, n) => hung({ x: spread(i, n, -4.5, 4.5), y: fohY, z: fohT }),
   // step lights in the aisles, shining across the steps
   Step: (i, n) => { const ax = C.aisles[i % 2], k = Math.floor(i / 2), z = C.rowZ0 + (3 + k * 6) * C.rowD + 0.2, y = cinemaFloor(z) + 0.12, x = ax - 0.4 * Math.sign(ax || 1); void n; return aim({ x, y, z }, { x: ax + Math.sign(ax || 1) * 0.6, y: y - 0.1, z: z + 0.3 }); },
   // star bars flat on the ceiling, shining down
-  Ceiling: (i) => { const x = i % 2 ? 5 : -5, z = i < 2 ? 8 : 16; return aim({ x, y: C.ceiling - 0.15, z }, { x, y: 0, z }); },
-  Hazer: () => stand({ x: 6.2, y: DECK, z: -2.3 }, -30),
-  Confetti: (i) => stand({ x: i ? 6.3 : -6.3, y: DECK, z: 1.2 }),
-  CO2: (i) => stand({ x: i ? 6.6 : -6.6, y: DECK, z: -1.4 }),
-  Sparks: (i) => stand({ x: i ? 3 : -3, y: DECK, z: 1.4 }),
-  Bubbles: () => stand({ x: 0, y: DECK, z: -2.2 }),
+  Ceiling: (i) => { const x = i % 2 ? 7 : -7, z = i < 2 ? 11 : 23; return aim({ x, y: C.ceiling - 0.15, z }, { x, y: 0, z }); },
+  Hazer: () => stand({ x: 9, y: DECK, z: -3.5 }, -30),
+  Confetti: (i) => stand({ x: i ? 9.5 : -9.5, y: DECK, z: 1.6 }),
+  CO2: (i) => stand({ x: i ? 10 : -10, y: DECK, z: -2.2 }),
+  Sparks: (i) => stand({ x: i ? 4.5 : -4.5, y: DECK, z: 1.8 }),
+  Bubbles: () => stand({ x: 0, y: DECK, z: -3.4 }),
 };
 
 // ---- the bar
