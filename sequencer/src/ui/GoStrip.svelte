@@ -114,7 +114,8 @@
     .go { min-width: 0; flex: 1; }
     .info { order: 5; flex: 1 1 100%; grid-template-columns: auto 1fr; }
     .lst { grid-row: auto; } .lst select { max-width: 7rem; }
-    .nxt { display: none; }
+    /* (Next on a line of its own: what comes on the next GO is what a phone at the show needs most) */
+    .nxt { grid-column: 1 / -1; }
     .grow { display: none; }
     .auto { order: 6; }
   }

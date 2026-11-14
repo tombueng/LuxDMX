@@ -38,6 +38,20 @@ test.describe('phone', () => {
   });
 });
 
+test.describe('a phone on Live', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test('the GO bar says what comes next too; the buttons have no key badges (a finger has no keys)', async ({ page }) => {
+    await openConnected(page);
+    await startTemplate(page, 'Wedding');
+    await page.evaluate(() => { const a = (window as any).__luxdmx; a.view = 'live'; a.jump(a.show.cueLists[0].id, 2); });
+    await expect(page.locator('.strip .nxt')).toBeVisible();
+    await expect(page.locator('.strip .nxt')).toContainText('Speeches');
+    const keys = page.locator('.live .tile .key');
+    expect(await keys.count()).toBeGreaterThan(0);
+    for (const k of await keys.all()) await expect(k).toBeHidden();
+  });
+});
+
 test.describe('tablet', () => {
   test.use({ viewport: { width: 1024, height: 768 }, hasTouch: true });
   test('stage and the programmer side by side, the other lists one tab away', async ({ page }) => {

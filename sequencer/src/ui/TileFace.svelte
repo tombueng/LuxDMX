@@ -201,6 +201,8 @@
   .key { position: absolute; top: .35rem; right: .4rem; font: 600 .76rem ui-monospace, monospace; color: var(--faint); border: 1px solid var(--line2); border-radius: 4px; padding: 0 .25rem; }
   /* tiles with a picture: the key goes down by the name, the picture stays clean */
   .tile.cue .key, .tile.effect .key { top: auto; bottom: .45rem; }
+  /* (a finger has no keys: on a touch screen without a mouse the key badges go) */
+  @media (hover: none) and (pointer: coarse) { .key { display: none; } .tile.cue:has(> .key) .t, .tile.effect:has(> .key) .t { padding-right: 0; } }
   .tile:not(.cue):not(.effect) .risk + .key { top: 1.6rem; }      /* (under the mark) */
   /* nobody has a keyboard on a phone or tablet */
   @media (pointer: coarse) and (hover: none) { .key { display: none; } }
