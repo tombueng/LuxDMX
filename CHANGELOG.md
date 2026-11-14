@@ -70,6 +70,12 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - The gallery is in the ⋯ menu at the top and in the 3D stage's ⋯ now, not only behind Ctrl+K.
 - Live's **Stop effects** stops everything moving, the cue's own effects too (its look stays; the
   next cue brings its effects back). It only stopped the ones started by hand.
+- From a wedding DJ's evening (a tester trimming the Wedding template to a small rig): a light
+  dragged on the plan moves in 3D too; removing a machine takes its shot list and the cue actions
+  that started it; cues tapped onto the timeline in a row go a bar apart; the timeline's Moments
+  offer only the machines the rig has; a machine's Live button pressed while safe says "Safe: not
+  firing"; a locked page's Blackout says "hold"; Add LuxDMX connects at once; a phone's GO bar
+  says what's next; overlapping addresses are said under the light list too.
 - Small ones from a tester's round: pressing Edit on Live moves none of the bar's buttons, "open in
   another tab" goes away when that tab is closed, Play the show on a phone opens on the 3D stage,
   the lock PIN is kept as a hash (not readable in the show file), a tab opened from an on-stage

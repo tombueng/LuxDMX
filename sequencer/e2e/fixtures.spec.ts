@@ -237,9 +237,12 @@ test('re-patch a fixture, and overlapping addresses are flagged', async ({ page 
   await dlg.getByLabel('Fixture address').press('Tab');
   await expect(page.locator('li.clash')).toHaveCount(2);
   await expect(dlg.locator('.err')).toContainText('Shares channels with PAR 1');
+  // said under the list too, where it stays after the dialog closes (Escape kept the overlap)
+  await expect(page.locator('.fl .usage .clashnote')).toContainText('2 overlap');
   await dlg.getByLabel('Fixture address').fill('20');
   await dlg.getByLabel('Fixture address').press('Tab');
   await expect(page.locator('li.clash')).toHaveCount(0);
+  await expect(page.locator('.fl .usage .clashnote')).toHaveCount(0);
   await dlg.getByRole('button', { name: 'Done' }).click();
   await selectAll(page);
   await full(page);

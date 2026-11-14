@@ -219,6 +219,9 @@
           </div>
         </details>
       {/if}
+      <!-- (lights sharing channels: said down here too, with a way to them: in a long list the row's
+           mark was out of sight) -->
+      {#if clash.size}<button class="ghost sm clashnote" onclick={() => { app.selected = app.show.fixtures.filter((f) => clash.has(f.id)).map((f) => f.id); }} title="Select the lights whose addresses overlap"><span aria-hidden="true">⚠ </span>{clash.size} overlap{clash.size === 1 ? 's' : ''}</button>{/if}
       <button class="ghost sm check" onclick={() => (ui.modal = 'patchCheck')} title="Light one fixture at a time to check the addresses in the room"><Icon name="sun" size={13} />Check the patch</button>
     </div>
   {/if}
@@ -239,6 +242,7 @@
   .txt .faint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .addr { font-variant-numeric: tabular-nums; }
   .clash .addr { color: var(--pink); border-color: var(--pink); }
+  .clashnote { color: var(--pink); font-weight: 650; }
   .lvl { width: 5px; height: 26px; background: var(--line); border-radius: 3px; display: flex; align-items: flex-end; overflow: hidden; flex: none; }
   .lvl span { width: 100%; background: var(--orange); }
   .check { margin-left: auto; font-size: .78rem; padding: .1rem .4rem; }
