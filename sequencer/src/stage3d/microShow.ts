@@ -127,6 +127,11 @@ export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'pri
       },
     };
   }
+  // ---- a curtain: opening and closing; a drop: flying in and out
+  if (look === 'curtain' || look === 'flybar') {
+    does.push(look === 'curtain' ? 'opens and closes' : 'flies in and out');
+    return { len: L, does, at: (t) => ({ hoist: 0.5 - 0.5 * Math.cos((t / L) * Math.PI * 2) }) };
+  }
   // ---- a winch: up and down
   if (look === 'winch') {
     does.push('moves up and down');

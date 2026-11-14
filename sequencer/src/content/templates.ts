@@ -10,6 +10,7 @@ import { GENERIC, modeOf } from '../model/library';
 import { slotsOf } from '../engine/render';
 import type { ChannelAttr, Color, Cue, CueList, Effect, Fixture, Group, Show, Values } from '../model/types';
 import { D, DECK, W, aimRot, defaultPlace, planToWorld } from '../stage3d/geometry';
+import { CINEMA, THEATRE } from '../stage3d/sceneSizes';
 import { addStandardPresets } from './presets';
 import { placeIn } from './scenePlaces';
 
@@ -377,6 +378,15 @@ export const TEMPLATES: Template[] = [
       b.add('gen-sparks', 2, 'Sparks', 0.7, { x0: 0.05, x1: 0.95 });
       b.at(b.add('gen-flame', 2, 'Flame', 0.22), 0.22, [0.375, 0.625]);
       b.add('gen-bubbles', 1, 'Bubbles', 0.06, { x0: 0.06, x1: 0.06 });
+      // the stage machinery: the house curtain and four fly bars, each with a painted drop (they move
+      // the real motors only while the machines are armed; the 3D stage shows them either way)
+      const curtain = b.add('gen-curtain', 1, 'House curtain', 0.7, { x0: 0.5, x1: 0.5 });
+      const flys = b.add('gen-flybar', 4, 'Fly', 0.3);
+      b.place(curtain, (f) => { f.cloth = { w: THEATRE.arch.w + 0.6, h: THEATRE.arch.h + 0.25 }; });
+      b.place(flys, (f, i) => { f.cloth = { w: THEATRE.drop.w, h: THEATRE.drop.h, picture: ['forest', 'castle', 'stars', 'city'][i] }; });
+      // (which drop is in: the others flown out; none: all out)
+      const drop = (k: number | null): [string[], Values][] => flys.map((id, i) => [[id], { hoist: i === k ? 1 : 0 }]);
+      const open = (v: number): [string[], Values] => [curtain, { hoist: v }];
       // in 3D: the front light on the front truss, the booms on stands at the sides aimed across
       b.place(front, (f) => { const d = defaultPlace({ x: f.x, y: 0.8 }, 'dimmer'); f.p3 = d.p; f.rot = d.rot; });
       b.place(side, (f) => { const s = f.x < 0.5 ? -1 : 1; f.p3 = { x: s * (W / 2 - 0.4), y: DECK + 1.8, z: (f.y - 0.5) * D }; f.rot = aimRot(f.p3, { x: -s * 2, y: DECK + 1.2, z: f.p3.z }); });
@@ -405,24 +415,24 @@ export const TEMPLATES: Template[] = [
       b.haze(hazer, 0.25);
       const fogShot = b.shot('Fog burst', fog, { fog: 1 }, 5, '5 s of fog', '#8a94a3');
       const m = b.machines();
-      b.cue(show, 'Preset', [...out, [front, on(0.3)], [cyc, on(0.4, C.deepBlue)], [ground, on(0.3, C.deepBlue)]], { fade: 3, note: 'Audience coming in', actions: [{ do: 'goto', list: hl.id, cue: hFull.id }] });
-      b.cue(show, 'Scene 1', [...out, [front, on(0.85)], [cyc, on(0.7, C.warm)], [side, on(0.6, C.warm)], [ground, on(0.5, C.amber)]], { fade: 4, actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights fade out with it' });
-      b.cue(show, 'Night', [...out, [front, on(0.3)], [cyc, on(0.6, C.blue)], [side, on(0.3, C.deepBlue)], [ground, on(0.6)], [washes, on(0.3, C.deepBlue, down({ zoom: 1 }))]], { fade: 6, effects: [stars] });
-      b.cue(show, 'Sunrise', [...out, [front, on(0.8)], [cyc, on(1, C.orange)], [side, on(0.7, C.gold)], [ground, on(1, C.orange)], [washes, on(0.5, C.amber, down({ zoom: 1 }))]], { fade: 10 });
-      b.cue(show, 'Storm', [...out, [front, on(0.25)], [cyc, on(0.35, C.deepBlue)], [side, on(0.4, C.ice)], [ground, on(0.5)], [lightningStrobe, on(0)], [washes, on(0.4, C.deepBlue, down({ zoom: 0.8 }))]],
+      b.cue(show, 'Preset', [...out, open(0), ...drop(null), [front, on(0.3)], [cyc, on(0.4, C.deepBlue)], [ground, on(0.3, C.deepBlue)]], { fade: 3, note: 'Audience coming in', actions: [{ do: 'goto', list: hl.id, cue: hFull.id }] });
+      b.cue(show, 'Scene 1', [...out, open(1), ...drop(0), [front, on(0.85)], [cyc, on(0.7, C.warm)], [side, on(0.6, C.warm)], [ground, on(0.5, C.amber)]], { fade: 4, actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights fade out with it' });
+      b.cue(show, 'Night', [...out, open(1), ...drop(2), [front, on(0.3)], [cyc, on(0.6, C.blue)], [side, on(0.3, C.deepBlue)], [ground, on(0.6)], [washes, on(0.3, C.deepBlue, down({ zoom: 1 }))]], { fade: 6, effects: [stars] });
+      b.cue(show, 'Sunrise', [...out, open(1), ...drop(1), [front, on(0.8)], [cyc, on(1, C.orange)], [side, on(0.7, C.gold)], [ground, on(1, C.orange)], [washes, on(0.5, C.amber, down({ zoom: 1 }))]], { fade: 10 });
+      b.cue(show, 'Storm', [...out, open(1), ...drop(null), [front, on(0.25)], [cyc, on(0.35, C.deepBlue)], [side, on(0.4, C.ice)], [ground, on(0.5)], [lightningStrobe, on(0)], [washes, on(0.4, C.deepBlue, down({ zoom: 0.8 }))]],
         { fade: 2, effects: [storm, flash, rain, sway], actions: [{ do: 'start', list: fogShot.id }], note: 'Thunder on the sound cue, fog with it' });
-      b.cue(show, 'Dream', [...out, [front, on(0.2, undefined)], [cyc, on(0.6, C.lavender)], [ground, on(0.8)], [specials, on(0.5)],
+      b.cue(show, 'Dream', [...out, open(1), ...drop(2), [front, on(0.2, undefined)], [cyc, on(0.6, C.lavender)], [ground, on(0.8)], [specials, on(0.5)],
         [spots, on(0.8, C.lavender, down({ tilt: 0.55, gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.4), zoom: 0.4, focus: 0.5 }))], [washes, on(0.5, C.purple, down({ zoom: 1 }))]],
       { fade: 8, effects: [aurora, drift, waltz], actions: fire(m.bubbles), note: 'Bubbles with the music' });
-      b.cue(show, 'Ballroom', [...out, [front, on(0.7)], [cyc, on(0.8, C.gold)], [side, on(0.8, C.warm)], [ground, on(0.6, C.amber)],
+      b.cue(show, 'Ballroom', [...out, open(1), ...drop(3), [front, on(0.7)], [cyc, on(0.8, C.gold)], [side, on(0.8, C.warm)], [ground, on(0.6, C.amber)],
         [spots, on(1, C.white, down({ tilt: 0.6, gobo: gobo('Dots'), prism: 1, zoom: 0.5 }))], [washes, on(0.6, C.gold, down({ zoom: 0.7 }))]], { fade: 4, effects: [waltz] });
-      b.cue(show, 'Fireside', [...out, [front, on(0.35, undefined)], [cyc, on(0.3, C.red)], [specials, on(0.6)], [ground, on(1)], [side, on(0.4, C.orange)]],
+      b.cue(show, 'Fireside', [...out, open(1), ...drop(0), [front, on(0.35, undefined)], [cyc, on(0.3, C.red)], [specials, on(0.6)], [ground, on(1)], [side, on(0.4, C.orange)]],
         { fade: 5, effects: [hearth], actions: fire(m.flame), note: 'Flames on the bang' });
-      b.cue(show, 'Finale', [...out, [front, on(1)], [cyc, on(1, C.magenta)], [side, on(1, C.white)], [ground, on(1)], [foot, on(1, C.gold)], [blinders, on(1)],
+      b.cue(show, 'Finale', [...out, open(1), ...drop(null), [front, on(1)], [cyc, on(1, C.magenta)], [side, on(1, C.white)], [ground, on(1)], [foot, on(1, C.gold)], [blinders, on(1)],
         [spots, on(1, C.white, down({ tilt: 0.7, zoom: 0.1 }))], [washes, on(1, C.pink, down({ tilt: 0.6, zoom: 0.4 }))]],
       { fade: 1, effects: [marquee, waltz], actions: fire(m.confetti, m.sparks, m.co2), note: 'Confetti, sparks and CO2 on the last note' });
-      b.cue(show, 'Bows', [...out, [front, on(1)], [cyc, on(0.8, C.warm)], [side, on(0.8, C.warm)], [foot, on(1, C.gold)], [ground, on(0.6, C.amber)]], { fade: 2, effects: [marquee] });
-      b.cue(show, 'End', [[[...front, ...cyc, ...extra], on(0)]], { fade: 3, actions: [{ do: 'goto', list: hl.id, cue: hFull.id }], note: 'House lights up with it' });
+      b.cue(show, 'Bows', [...out, open(1), [front, on(1)], [cyc, on(0.8, C.warm)], [side, on(0.8, C.warm)], [foot, on(1, C.gold)], [ground, on(0.6, C.amber)]], { fade: 2, effects: [marquee] });
+      b.cue(show, 'End', [[[...front, ...cyc, ...extra], on(0)], open(0), ...drop(null)], { fade: 3, actions: [{ do: 'goto', list: hl.id, cue: hFull.id }], note: 'House lights up with it' });
       // the show first, house lights second (then the haze, the fog and the machines)
       [b.s.cueLists[0], b.s.cueLists[1]] = [show, hl];
       b.s.settings.stage3d = { act: 'none' };   // (a play: nobody playing on the 3D stage, the banners say its name)
@@ -516,6 +526,10 @@ export const TEMPLATES: Template[] = [
       b.add('gen-co2', 2, 'CO2', 0.22, { x0: 0.05, x1: 0.95 });
       b.add('gen-sparks', 2, 'Sparks', 0.38, { x0: 0.44, x1: 0.56 });
       b.add('gen-bubbles', 1, 'Bubbles', 0.86, { x0: 0.5, x1: 0.5 });
+      // the screen's curtain (its motor moves only armed on the wire; the 3D stage shows it either way)
+      const curtain = b.add('gen-curtain', 1, 'Screen curtain', 0.1, { x0: 0.5, x1: 0.5 });
+      b.place(curtain, (f) => { f.cloth = { w: CINEMA.curtain.w, h: CINEMA.screenY + CINEMA.screenH + 0.45 - DECK }; });
+      const open = (v: number): [string[], Values] => [curtain, { hoist: v }];
       b.group('House', house); const gWall = b.group('Walls', walls);
       const gMarq = b.group('Marquee', marquee), gStage = b.group('Stage', stage), gSpot = b.group('Spots', spots), gStep = b.group('Steps', steps), gCeil = b.group('Ceiling', ceiling);
       const chase = b.effect('Marquee chase', 'theater', gMarq, {});
@@ -532,13 +546,13 @@ export const TEMPLATES: Template[] = [
       const l = b.list('Screening', { play: false });
       b.haze(hazer, 0.2);
       const m = b.machines();
-      b.cue(l, 'Walk-in', [...out, [house, on(1)], [walls, on(0.8, C.amber)], [marquee, on(0.8, C.gold)], [steps, on(0.6, C.amber)], [ceiling, on(0.4)]], { fade: 3, effects: [chase, stars] });
-      b.cue(l, 'Preshow', [...out, [house, on(0.4)], [walls, on(0.6, C.purple)], [marquee, on(0.4, C.purple)], [steps, on(0.4, C.purple)], [ceiling, on(0.5)]], { fade: 5, effects: [stars] });
-      b.cue(l, 'Feature', [...out, [house, on(0)], [walls, on(0)], [steps, on(0.15, C.blue)]], { fade: 8 });
-      b.cue(l, 'Credits', [...out, [house, on(0.3)], [walls, on(0.3, C.deepBlue)], [steps, on(0.3, C.blue)], [ceiling, on(0.4)]], { fade: 5, effects: [stars] });
-      b.cue(l, 'Exit', [...out, [house, on(1)], [walls, on(0.6, C.warm)], [marquee, on(0.6, C.gold)], [steps, on(0.8, C.warm)]], { fade: 3, effects: [chase, stepChase] });
-      b.cue(l, 'Trailers', [...out, [house, on(0.15)], [walls, on(0.3, C.blue)], [steps, on(0.3, C.blue)], [ceiling, on(0.3)]], { fade: 4, effects: [stars] });
-      b.cue(l, 'Intermission', [...out, [house, on(0.7)], [walls, on(0.7, C.magenta)], [marquee, on(1, C.magenta)], [steps, on(0.6, C.magenta)], [ceiling, on(0.6)]], { fade: 3, effects: [scan, glitter, wallFade] });
+      b.cue(l, 'Walk-in', [...out, open(0), [house, on(1)], [walls, on(0.8, C.amber)], [marquee, on(0.8, C.gold)], [steps, on(0.6, C.amber)], [ceiling, on(0.4)]], { fade: 3, effects: [chase, stars] });
+      b.cue(l, 'Preshow', [...out, open(0), [house, on(0.4)], [walls, on(0.6, C.purple)], [marquee, on(0.4, C.purple)], [steps, on(0.4, C.purple)], [ceiling, on(0.5)]], { fade: 5, effects: [stars] });
+      b.cue(l, 'Feature', [...out, open(1), [house, on(0)], [walls, on(0)], [steps, on(0.15, C.blue)]], { fade: 8 });
+      b.cue(l, 'Credits', [...out, open(1), [house, on(0.3)], [walls, on(0.3, C.deepBlue)], [steps, on(0.3, C.blue)], [ceiling, on(0.4)]], { fade: 5, effects: [stars] });
+      b.cue(l, 'Exit', [...out, open(0), [house, on(1)], [walls, on(0.6, C.warm)], [marquee, on(0.6, C.gold)], [steps, on(0.8, C.warm)]], { fade: 3, effects: [chase, stepChase] });
+      b.cue(l, 'Trailers', [...out, open(1), [house, on(0.15)], [walls, on(0.3, C.blue)], [steps, on(0.3, C.blue)], [ceiling, on(0.3)]], { fade: 4, effects: [stars] });
+      b.cue(l, 'Intermission', [...out, open(0), [house, on(0.7)], [walls, on(0.7, C.magenta)], [marquee, on(1, C.magenta)], [steps, on(0.6, C.magenta)], [ceiling, on(0.6)]], { fade: 3, effects: [scan, glitter, wallFade] });
       b.cue(l, 'Red carpet', [...out, [house, on(0.5)], [walls, on(0.8, C.red)], [marquee, on(1, C.gold)], [stage, on(0.8, C.red)], [steps, on(0.8, C.red)], [ceiling, on(0.8)],
         [spots, on(1, C.white, { pan: 0.5, tilt: 0.7, zoom: 0.05, gobo: gobo('Star') })]], { fade: 2, effects: [chase, searchlight, glitter] });
       b.cue(l, 'Premiere applause', [...out, [house, on(0.8)], [walls, on(1, C.gold)], [marquee, on(1, C.gold)], [stage, on(1, C.white)], [steps, on(1, C.gold)], [ceiling, on(1)],

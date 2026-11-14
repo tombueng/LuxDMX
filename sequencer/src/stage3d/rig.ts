@@ -13,6 +13,11 @@ import { headAngles, headLocal, hitRoom, RAD, toWorld, type Optics, type Rot, ty
 import { PAN_SPEED, ROLL_SPEED, TILT_SPEED, slew, type Axis } from './motion';
 import { body, headBarParts, headParts, HEADBAR_LENS, HEADBAR_PITCH, HEADBAR_PIVOT, lensOf, PIVOT, WINCH_BALL, WINCH_BOX, winchParts, type Look } from './models';
 import { ATLAS_CELLS, PLAIN_WHEEL, prismOf, rotationOf } from './gobos';
+import { dropTexture } from './drops';
+import { pleats } from './textures';
+// (a curtain's pleats: many across its width, the same texture for every curtain)
+let pleatTex: THREE.Texture | undefined;
+const pleatsRepeat = () => { if (!pleatTex) { pleatTex = pleats().clone(); pleatTex.wrapS = THREE.RepeatWrapping; pleatTex.repeat.set(10, 1); pleatTex.needsUpdate = true; } return pleatTex; };
 
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
 export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number;
@@ -27,7 +32,9 @@ export interface RigFixture { id: string; name: string; kind: FixtureKind; look:
   headPan?: boolean;      // its heads pan each on their own too
   barPan?: boolean;       // the bar itself pans (a pan channel of the whole light)
   // a winch: its travel (m) and speed (m/s), its soft limits (parts of its travel)
-  winch?: { travel: number; speed: number; limits?: [number, number] } }   // a moving bar's heads (its cells that tilt on their own)
+  winch?: { travel: number; speed: number; limits?: [number, number] };
+  // a curtain or a drop on a fly bar: its cloth (m), what's painted on a drop
+  cloth?: { w: number; h: number; picture?: string } }   // a moving bar's heads (its cells that tilt on their own)
 type Ranges = { from: number; to: number; label?: string }[];
 // A gobo wheel of a light (gobos.ts): the pattern of each of its slots (null: open; none listed: a
 // plain level, a few patterns spread over it), and its rotation channel's ranges
@@ -65,6 +72,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 // scratch objects for the frame (a few hundred lights: no garbage every frame)
 const E = new THREE.Euler(), BASE = new THREE.Matrix4(), YOKE = new THREE.Matrix4(), HEAD = new THREE.Matrix4(), TMP = new THREE.Matrix4(), TMP2 = new THREE.Matrix4();
 const LP = new THREE.Vector3(), DIR = new THREE.Vector3(), CP = new THREE.Vector3(), C2 = new THREE.Color();
+const CQ = new THREE.Quaternion(), UPY = new THREE.Vector3(0, 1, 0);
 const PU = new THREE.Vector3(), PW = new THREE.Vector3(), PD = new THREE.Vector3(), XAX = new THREE.Vector3(1, 0, 0);
 const NV = new THREE.Vector3(), PZ = new THREE.Vector3(), PX = new THREE.Vector3(), BASIS = new THREE.Matrix4();
 
@@ -153,6 +161,10 @@ export class Rig {
   // a winch's load: how far down it is now (m), at the winch's speed
   private winches = new Map<string, Axis>();
   private winchNow = new Map<string, number>();
+  // the curtains' and the drops' cloths (each its own size and picture: not instanced)
+  private cloths = new Map<string, THREE.Mesh[]>();
+  private clothMats: THREE.Material[] = [];
+  readonly scenery = new THREE.Group();
   winchOf(id: string) { return this.winchNow.get(id); }
   private barHeads = new Map<string, { p: Axis; t: Axis[]; hp: Axis[]; pan?: number; tilts: number[]; pans: number[] }>();
   barOf(id: string) { const m = this.barHeads.get(id); return m ? { pan: m.pan ?? 0, tilts: [...m.tilts], pans: [...m.pans] } : undefined; }
@@ -261,6 +273,22 @@ export class Rig {
 
   // lights come or go (or another type): build the instances again
   build(list: RigFixture[]) {
+    // (the cloths of the curtains and the drops: made again for these lights)
+    for (const ms of this.cloths.values()) for (const m of ms) { this.scenery.remove(m); m.geometry.dispose(); }
+    for (const m of this.clothMats) m.dispose();
+    this.cloths.clear(); this.clothMats = [];
+    if (!this.scenery.parent) this.group.add(this.scenery);
+    const velvet = list.some((f) => f.look === 'curtain') ? new THREE.MeshStandardMaterial({ map: pleatsRepeat(), color: 0x8a0f1c, roughness: 0.85, emissive: 0x2a0306, emissiveIntensity: 0.9, side: THREE.DoubleSide }) : undefined;
+    if (velvet) this.clothMats.push(velvet);
+    for (const f of list) {
+      if (!f.cloth) continue;
+      if (f.look === 'curtain' && velvet) this.cloths.set(f.id, [0, 1].map(() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), velvet); this.scenery.add(m); return m; }));
+      else if (f.look === 'flybar') {
+        const tex = dropTexture(f.cloth.picture ?? 'forest'), mat = new THREE.MeshStandardMaterial({ map: tex ?? undefined, color: tex ? 0xffffff : 0x4a6a4a, roughness: 0.95, side: THREE.DoubleSide });
+        this.clothMats.push(mat);
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); this.scenery.add(m); this.cloths.set(f.id, [m]);
+      }
+    }
     // (the old ones let go of their buffers and materials: lights come and go a lot while patching)
     for (const m of this.meshes) {
       this.group.remove(m); m.geometry.dispose(); m.dispose();
@@ -282,7 +310,10 @@ export class Rig {
     const looks = new Set(list.map((f) => f.look));
     for (const look of looks) {
       const count = list.filter((f) => f.look === look).length;
-      if (look === 'winch') {
+      if (look === 'curtain' || look === 'flybar') {
+        // a curtain's track, a fly bar's pipe: a metre long here, scaled to its cloth's width
+        this.parts.set(look, add(look === 'curtain' ? new THREE.BoxGeometry(1, 0.1, 0.14) : new THREE.CylinderGeometry(0.03, 0.03, 1, 8).rotateZ(Math.PI / 2), yokeMat, count));
+      } else if (look === 'winch') {
         const w = winchParts();
         this.parts.set('winch:box', add(w.box, yokeMat, count));
         this.parts.set('winch:cable', add(w.cable, new THREE.MeshStandardMaterial({ color: 0x8a8f99, roughness: 0.3, metalness: 0.8 }), count));
@@ -497,6 +528,7 @@ export class Rig {
       if (f.shape) m4.compose(pos, q, sc.set(f.size! * shapeW(f.shape) + 0.06, 0.2, f.size! * shapeH(f.shape) + 0.06));
       else if (f.look === 'headbar') m4.compose(pos, q, sc.set(HEADBAR_PITCH * (f.heads ?? 1) + 0.15, 0.45, 0.35));
       else if (f.look === 'winch') m4.compose(pos, q, sc.set(0.4, 0.4, 0.4));
+      else if (f.cloth) m4.compose(pos, CQ.setFromAxisAngle(UPY, f.rot.yaw * RAD), sc.set(f.cloth.w, 0.5, 0.5));
       else m4.compose(pos, q, sc.set(f.kind === 'bar' ? Math.max(1, f.cells / 30) : 0.6, 0.7, 0.6));
       this.hit.setMatrixAt(nh++, m4); this.hitIds.push(f.id);
       if (inSel && ns < this.sel.instanceMatrix.count) this.sel.setMatrixAt(ns++, m4);   // (placed while it fades out too)
@@ -581,6 +613,31 @@ export class Rig {
           m.tilts[k] = ta;
         }
         m.pan = pa;
+      } else if ((f.look === 'curtain' || f.look === 'flybar') && f.winch && f.cloth) {
+        // a curtain opening (each half drawn back to its side, gathering there) or a drop flying in
+        // and out, at its motor's real speed, never past its soft limits; turned only about the
+        // vertical (a cloth hangs straight down)
+        const w = f.winch, lim = w.limits ?? [0, 1], cl = f.cloth;
+        let a = this.winches.get(f.id);
+        if (!a) this.winches.set(f.id, (a = { at: NaN, v: 0 }));
+        const wire = this.winchWire?.(f.id);
+        const here = Number.isFinite(a.at) ? a.at / w.travel : lim[0];
+        const want = wire === null ? here : wire !== undefined ? wire : typeof v?.hoist === 'number' ? Math.max(lim[0], Math.min(lim[1], v.hoist)) : here;
+        const moved = slew(a, want * w.travel, dt, w.speed, Math.max(0.2, w.speed * 2));
+        this.winchNow.set(f.id, moved);
+        const yq = CQ.setFromAxisAngle(UPY, f.rot.yaw * RAD), ms = this.cloths.get(f.id) ?? [];
+        const hang = (m: THREE.Mesh | undefined, x: number, y: number, sw: number, sh: number) => {
+          if (!m) return;
+          m.position.set(x, y, 0).applyQuaternion(yq).add(pos); m.quaternion.copy(yq); m.scale.set(Math.max(0.01, sw), Math.max(0.01, sh), 1);
+        };
+        if (f.look === 'curtain') {
+          put('curtain', TMP.compose(pos, yq, sc.set(cl.w, 1, 1)));
+          const half = cl.w / 2, gather = Math.min(half, 0.4 + half * 0.08), pw = Math.max(gather, half - moved);
+          hang(ms[0], -half + pw / 2, -cl.h / 2, pw, cl.h); hang(ms[1], half - pw / 2, -cl.h / 2, pw, cl.h);
+        } else {
+          put('flybar', TMP.compose(CP.set(0, -moved, 0).applyQuaternion(yq).add(pos), yq, sc.set(cl.w, 1, 1)));
+          hang(ms[0], 0, -moved - cl.h / 2 - 0.03, cl.w, cl.h);
+        }
       } else if (f.look === 'winch' && f.winch) {
         // a winch: the cable straight down from its box (whichever way the box is hung), the ball
         // on it going down and up at the winch's real speed, never past its soft limits

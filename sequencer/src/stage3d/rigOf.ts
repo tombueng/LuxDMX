@@ -12,6 +12,7 @@ import { placesOfLight, shapeSize, shapeStanding } from '../model/pixelLayout';
 import { defaultPlace, type Room } from './geometry';
 import type { GoboWheel, RigFixture, Sfx } from './rig';
 import type { Look } from './models';
+import { isDropPicture } from './drops';
 
 const SFX: Sfx[] = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
 type Mode = FixtureMode | undefined;
@@ -41,8 +42,11 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
   const shape = placesOfLight(f, m), size = shape && shapeSize(shape);
   const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
   const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
-  const look: Look = sfx ?? (has('hoist') ? 'winch' : c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
-    : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
+  // (stage machinery on a winch channel: a curtain track, a fly bar with its drop; else a kinetic winch)
+  const machinery: Look | undefined = has('hoist') ? (/curtain/i.test(t?.model ?? '') ? 'curtain' : /fly bar/i.test(t?.model ?? '') ? 'flybar' : 'winch') : undefined;
+  const look: Look = sfx ?? (machinery ?? (c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
+    : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel'));
+  const cloth = clothOf(f, look, t);
   return {
     id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
     p: f.p3 ? { ...f.p3 } : shape ? shapeStanding(def.p, shape).p : def.p, rot: f.rot ? { ...f.rot } : shape ? shapeStanding(def.p, shape).rot : def.rot, shape, size,
@@ -58,10 +62,21 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
     ...(c.heads > 1 && m ? { heads: c.heads, headCells: headCellsOf(m), headPan: c.cellMoves.includes('pan'), barPan: m.channels.some((ch) => ch.attr === 'pan' && ch.cell === undefined) } : {}),
     // a winch: its travel and speed from its type (a guess without), its soft limits
     ...(has('hoist') ? { winch: { travel: t?.physical?.travel ?? 4, speed: t?.physical?.hoistSpeed ?? 0.4, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}),
+    // a curtain: each half travels half its width; a fly bar: its type's travel
+    ...(cloth ? { cloth, ...(look === 'curtain' ? { winch: { travel: cloth.w / 2, speed: t?.physical?.hoistSpeed ?? 0.7, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}) } : {}),
     // more than two axes: endless pan and tilt, a third axis (roll) and its endless turning
     axes: has('panRotation') || has('tiltRotation') || has('roll') || has('rollRotation') ? {
       ...(has('panRotation') ? { panRot: chOf(m, 'panRotation')?.ranges ?? null } : {}), ...(has('tiltRotation') ? { tiltRot: chOf(m, 'tiltRotation')?.ranges ?? null } : {}),
       ...(has('roll') || has('rollRotation') ? { rollDeg: t?.physical?.rollDeg || 360 } : {}), ...(has('rollRotation') ? { rollRot: chOf(m, 'rollRotation')?.ranges ?? null } : {}),
     } : undefined,
   };
+}
+
+// A curtain's or a drop's cloth: its own size, else its type's (a curtain spans its track's travel),
+// and what's painted on a drop (a forest without)
+export function clothOf(f: Pick<Fixture, 'cloth'>, look: Look, t: FixtureType | undefined): RigFixture['cloth'] {
+  if (look !== 'curtain' && look !== 'flybar') return undefined;
+  const own = f.cloth ?? {}, num = (v: unknown, d: number, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
+  if (look === 'curtain') return { w: num(own.w, t?.physical?.travel ?? 18, 1, 60), h: num(own.h, 10.4, 0.5, 30) };
+  return { w: num(own.w, 18, 1, 60), h: num(own.h, 10.2, 0.5, 30), picture: isDropPicture(own.picture) ? own.picture : 'forest' };
 }

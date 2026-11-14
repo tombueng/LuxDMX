@@ -202,6 +202,14 @@ Three more demos come with their own room on the 3D stage:
   sent within them, so set the lowest above the heads of the people under it. Cues that move a
   winch carry the ⚠ mark. A number typed on its height channel in All channels becomes its height;
   raw numbers on that channel (from an old file, say) are never sent, since they'd fade in from 0.
+  **Stage machinery** runs on a winch channel too, with the same safety: a **Curtain track** (a
+  house curtain or a screen curtain: its two halves part from the middle, 0 closed, 1 open) and a
+  **Fly bar** with a painted drop (0 flown out above the opening, 1 in, standing on the deck). The 3D
+  stage draws them as what they are and moves them at their motors' speed; live and safe they hold,
+  like any winch (Blind shows what the show does). The Theatre has a house curtain and four drops
+  (a forest, a castle at sunset, a starry sky, a city by night) that its cues open and fly in and
+  out; the Cinema's screen curtain opens for the feature. A cloth's size and a drop's picture are
+  the light's own (`cloth` in the show file).
   A controller with several winches as cells: each is its own, pick them in the cell picker like a
   bar's heads, each held on its own (two height channels without cells are one height, a truss
   lifted at both ends). A jump or a scrub on the timeline never moves a winch: it waits until the

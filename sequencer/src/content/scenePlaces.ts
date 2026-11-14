@@ -37,6 +37,8 @@ const CINEMA_PLACES: Table = {
   CO2: (i) => stand({ x: i ? 10 : -10, y: DECK, z: -2.2 }),
   Sparks: (i) => stand({ x: i ? 4.5 : -4.5, y: DECK, z: 1.8 }),
   Bubbles: () => stand({ x: 0, y: DECK, z: -3.4 }),
+  // (its track over the screen: the template gives it its cloth, down to the stage)
+  'Screen curtain': () => stand({ x: 0, y: C.screenY + C.screenH + 0.45, z: C.curtain.z }),
 };
 
 // ---- the bar
@@ -88,6 +90,10 @@ const THEATRE_PLACES: Table = {
   Sparks: (i) => stand({ x: i ? 8 : -8, y: DECK, z: 3.2 }),
   Flame: (i) => stand({ x: i ? 5 : -5, y: DECK, z: -9.5 }),
   Bubbles: () => stand({ x: 9.5, y: DECK, z: -4.6 }, -30),
+  // the stage machinery: the house curtain's track at the top of the opening, the fly bars at the
+  // grid (their drops flown out, above the opening)
+  'House curtain': () => stand({ x: 0, y: DECK + Th.arch.h + 0.25, z: Th.curtainZ }),
+  Fly: (i) => stand({ x: 0, y: Th.ceiling - 0.6, z: Th.flys[i] ?? Th.flys[Th.flys.length - 1] }),
 };
 
 // ---- the church: hung from the roof's beams (over the chancel, over the nave), uplights on the walls

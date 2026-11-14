@@ -168,6 +168,11 @@ export const GENERIC: FixtureType[] = [
     ch('Height', 'hoist'), ch('Height fine', 'hoist', { fine: true }), ch('Speed', 'speed'),
     ch('Motion enable', 'enable', { ranges: [{ from: 0, to: 99, label: 'Safe' }, { from: 100, to: 255, label: 'Motion enabled' }] }),
     I, R, G, B]), physical: { travel: 4, hoistSpeed: 0.5 } },
+  // stage machinery, driven by a winch channel each (kinetics: only armed on the wire): a curtain
+  // track, its two halves parting from the middle (0 closed, 1 open; travel: the width it spans),
+  // and a fly bar lowering a painted drop in (0 flown out, 1 in; travel: how far it flies)
+  { ...gen('gen-curtain', 'Curtain track (a house or screen curtain, 2 ch)', [ch('Open', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 18, hoistSpeed: 1.2 } },
+  { ...gen('gen-flybar', 'Fly bar with a painted drop (2 ch)', [ch('Fly in', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 10.2, hoistSpeed: 1.5 } },
   // a big profile spot as touring rigs have them: CMY and a colour wheel, a rotating gobo wheel (each
   // gobo can shake; the wheel can run round), a fixed wheel with glass gobos, an animation wheel,
   // three prisms that turn, iris, zoom, focus and frost; the rotation channels index or spin

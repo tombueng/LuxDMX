@@ -512,6 +512,8 @@
       // (how the toolbar fits: its tier by the width, and how many steps smaller it had to go)
       toolsFit: () => ({ tier, squeeze, over: toolsEl ? toolsEl.scrollWidth - toolsEl.clientWidth : 0, overWas: [...overWas] }),
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
+      // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
+      machinery: () => fixtures.filter((f) => f.cloth).map((f) => ({ name: f.name, look: f.look, at: rig.winchOf(f.id) ?? 0, travel: f.winch?.travel ?? 0, picture: f.cloth?.picture })),
       lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
       ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: lightest(houseMats.filter((m) => m.userData.houseLeast === undefined)), glass: lightest(houseMats.filter((m) => m.userData.houseLeast !== undefined)) }),

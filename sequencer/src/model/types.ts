@@ -157,6 +157,9 @@ export interface Fixture {
   // a winch's soft limits: how high and how low it may go, as parts of its travel (0 the top, 1 the
   // bottom): whatever a cue says, the winch is sent within them
   hoistLimits?: [number, number];
+  // a curtain or a drop on a fly bar (stage machinery): the cloth's width and height (m) and, for a
+  // drop, what's painted on it (DROP_PICTURES); none: its type's size, a forest
+  cloth?: { w?: number; h?: number; picture?: string };
   swapPanTilt?: boolean;
   // its own pan (tilt) turns the other way round from what its type says: the picture, Aim and the
   // 3D stage follow the real one; what goes out on the wire stays the same (invert changes that)

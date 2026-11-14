@@ -133,6 +133,17 @@ function placed(light: PreviewLight): Placed {
     const at = new THREE.Vector3(OFF, rf0.look === 'headbar' ? 1.6 : 1.42, 0.4);
     return { list, m, show, cam: { at, from: at.clone().add(new THREE.Vector3(0.8 * back, (0.5 + (piv.y - HANG) * 0.2) * back, 3.35 * back)) } };
   }
+  // a curtain or a drop: a small one (3 m across) in the middle of the little room, its track or its
+  // pipe up high, the camera in front
+  if (rf0.cloth) {
+    for (const rf of list) {
+      rf.cloth = { ...rf0.cloth, w: 3, h: 2.2 };
+      rf.winch = rf0.look === 'curtain' ? { travel: 1.5, speed: 1 } : { travel: 1.2, speed: 1 };
+      rf.p = { x: OFF, y: rf0.look === 'curtain' ? 2.3 : 3.5, z: 0 }; rf.rot = { yaw: 0, pitch: 0, roll: 0 };
+    }
+    const at = new THREE.Vector3(OFF, 1.3, 0);
+    return { list: list.slice(0, 1), m, show, cam: { at, from: at.clone().add(new THREE.Vector3(0.9, 0.5, 4.6)) } };
+  }
   // standing: a bar, a ring or a matrix, a machine, a winch (it hangs from its box: up high)
   const winch = rf0.look === 'winch';
   const lift = rf0.shape ? size / 2 + 0.3 : winch ? HANG + 0.4 : 0;

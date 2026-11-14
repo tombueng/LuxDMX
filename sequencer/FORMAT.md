@@ -198,6 +198,11 @@ the deck, by its kind, under its 2D place):
   doesn't say or says wrong. Optional.
 - `beamDeg`: this light's own beam angle, `[narrowest, widest]` in degrees (0.5 to 180), over its
   type's `physical.beamDeg`. Optional.
+- `cloth`: stage machinery's cloth, `{ "w", "h", "picture" }`: a curtain track's or a fly bar's
+  width and height in metres, and the picture painted on a drop (`forest`, `city`, `stars`,
+  `castle`, `sea`, `clouds`). Optional, each part too: a curtain spans its type's `physical.travel`,
+  10.4 m high; a drop is 18 x 10.2 m, a forest. On a curtain `hoist` is how far it's open (0 shut,
+  1 open), on a fly bar how far its drop is flown in (0 out, 1 in).
 - `hoistLimits`: a winch's soft limits, `[highest, lowest]` as parts of its travel (0 the top, 1 the
   bottom): whatever a cue says, its `hoist` is sent within them. Optional (none: its whole travel);
   anything that isn't two numbers from 0 to 1 is left out with a note.

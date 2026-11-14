@@ -9,6 +9,8 @@ export const CINEMA = {
   aisles: [-7.5, 7.5], wallX: 16, backZ: 36, ceiling: 16,
   // the stage's truss in front of the screen and the bar over the front rows
   stageTruss: { z: 1.2, y: 12 }, foh: { z: 9, y: 13.5 }, deck: { x: 11, z0: -4.0, z1: 2.2 },
+  // the screen's curtain: its track over the screen, the cloth down to the stage
+  curtain: { z: -3.65, w: 23.6 },
 };
 // the height of the floor at z (the stalls, then the rows rising to the back)
 export function cinemaFloor(z: number) {
@@ -23,15 +25,18 @@ export const BAR = {
 
 // a theatre: a big stage behind the proscenium (z 2.2: an 18 m opening, 16 m deep behind it, wide
 // wings), its apron in front; the stalls rising gently, a balcony over their back half; a fly
-// tower over the stage (the ceiling at 20 m), so drops can fly out of sight
+// tower over the stage (the ceiling at 22 m), so drops fly out of sight behind the proscenium
 export const THEATRE = {
   arch: { z: 2.2, w: 18, h: 10 }, stage: { x: 14, z0: -14, z1: 3.6 }, cycZ: -13.3, cyc: { w: 22, h: 13 },
   stalls: { z0: 5, rows: 16, d: 1.0, rise: 0.16 }, balcony: { z0: 15.5, y: 5.4, rows: 8, d: 1.05, rise: 0.38 },
-  wallX: 16, backZ: 26, ceiling: 20,
+  wallX: 16, backZ: 26, ceiling: 22,
   // the electrics over the stage (front to back) and the front-of-house bar over the stalls
   electrics: [{ z: 0.8, y: 11.2 }, { z: -3.5, y: 11.2 }, { z: -7.5, y: 11.8 }, { z: -11.5, y: 12.6 }], foh: { z: 11, y: 13 },
   // the booms in the wings (either side, two each), the black legs masking them
   booms: { x: 10.8, z: [-2.4, 1.0] }, legs: [-2.4, -6, -10],
+  // the house curtain's track just behind the proscenium; the fly bars (their drops) between the
+  // electrics, hung from the grid under the roof; a drop flown in stands on the deck
+  curtainZ: 1.45, flys: [-1.6, -5.3, -9.2, -12.5], drop: { w: 20, h: 10 },
 };
 // the floor of the stalls at z (gently raked)
 export function theatreFloor(z: number) {

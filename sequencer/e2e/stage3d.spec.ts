@@ -3,7 +3,7 @@
 // heads at the spot clicked (measured on the wire), and the effect machines throw particles.
 // The page offers a small hook in dev (window.__stage3d) for what can't be read off pixels.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, patch, selectAll, full, test, expect, demo, startTemplate } from './helpers';
+import { openConnected, resetFake, channels, patch, selectAll, full, test, expect, demo, startTemplate, cues } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -287,4 +287,29 @@ test('Ctrl+Z in a light\'s Height field undoes the move (the light goes back), C
   await h.press('Control+z');
   await expect(h).toHaveValue('5');
   expect(await y()).toBe(5);
+});
+
+test('the theatre\'s machinery: live and safe it holds; in Blind the house curtain opens and the forest drop flies in on Scene 1, the stars swap in on Night', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('theatre');
+  const mach = () => page.evaluate(() => Object.fromEntries((window as any).__stage3d.machinery().map((m: any) => [m.name, +(m.at / m.travel).toFixed(2)])));
+  await cues(page).filter({ hasText: 'Preset' }).first().dblclick();
+  await expect.poll(async () => (await mach())['House curtain'], { timeout: 20000 }).toBe(0);
+  await cues(page).filter({ hasText: 'Scene 1' }).first().dblclick();
+  // live and the machines safe: the motors hold where they are (on the wire and in 3D, like a winch)
+  await page.waitForTimeout(2500);
+  expect((await mach())['House curtain']).toBe(0);
+  // Blind (working on the show without the room): the 3D stage shows what the show does
+  await page.locator('.top').getByRole('button', { name: 'On stage', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.output)).not.toBe('live');
+  // (the motors take their time: the curtain is part way a moment later, open in the end)
+  await expect.poll(async () => (await mach())['House curtain'], { timeout: 4000 }).toBeGreaterThan(0.05);
+  await expect.poll(async () => { const m = await mach(); return [m['House curtain'], m['Fly 1']]; }, { timeout: 25000 }).toEqual([1, 1]);
+  await cues(page).filter({ hasText: 'Night' }).first().dblclick();
+  await expect.poll(async () => { const m = await mach(); return [m['Fly 1'], m['Fly 3']]; }, { timeout: 25000 }).toEqual([0, 1]);
+  const pics = await page.evaluate(() => (window as any).__stage3d.machinery().filter((m: any) => m.look === 'flybar').map((m: any) => m.picture));
+  expect(pics).toEqual(['forest', 'castle', 'stars', 'city']);
 });

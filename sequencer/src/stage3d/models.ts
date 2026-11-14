@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch';
+export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch' | 'curtain' | 'flybar';
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 
 // moving heads: the head turns about the yoke's arms at PIVOT; its lens is HEAD_LENS above that
