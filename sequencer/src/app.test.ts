@@ -274,8 +274,8 @@ describe('Cut', () => {
     app.groupFromSelection('Only P1');
     app.selected = ['p1'];
     expect(await app.cutFixtures()).toBe(1);
-    expect(app.show.fixtures.some((f) => f.id === 'p1')).toBe(false);
-    expect(app.show.groups.some((g) => g.name === 'Only P1')).toBe(false);
+    expect(app.show.fixtures.some((f: { id: string }) => f.id === 'p1')).toBe(false);
+    expect(app.show.groups.some((g: { name: string }) => g.name === 'Only P1')).toBe(false);
   });
 });
 
