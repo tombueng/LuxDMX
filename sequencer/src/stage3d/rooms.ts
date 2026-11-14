@@ -14,6 +14,7 @@ import { at, bake, box, cyl, gearMats, movingMeshes, roadCase, std, waterCrate, 
 import { concrete, exitSign, hallWall, neonSign, pleats, roofDeck, screen, stageFloor } from './textures';
 import { buildCrowd, type Crowd } from './crowd';
 import { beatClock, djBooth, djPerson } from './dj';
+import { buildBar, buildCinema } from './scenes';
 import type { Person } from './people';
 
 // What the 3D stage needs of any room (the hall's and the pub's venue has more: the band).
@@ -33,8 +34,8 @@ export interface Stage {
   // the DJ (for the tests): the person, how far the left hand is up, the booth (the person's parent)
   dj?: { p: Person; raised: () => number; booth: THREE.Object3D };
 }
-export type DemoRoom = 'club' | 'party' | 'truss' | 'custom';
-export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss' || r === 'custom';
+export type DemoRoom = 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar';
+export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss' || r === 'custom' || r === 'cinema' || r === 'bar';
 
 // Is WebGL drawn in software here (no graphics chip: SwiftShader, llvmpipe)? Hundreds of people cost
 // a second a frame there.
@@ -135,6 +136,7 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
   let crowd: Crowd | undefined, dj: Stage['dj'];
   let booth: ReturnType<typeof djBooth> | undefined, boothName = '', boothShows = '';
   let djPlay: ((b: number, e: number) => void) | undefined;
+  let sceneAnim: ((t: number) => void) | undefined;        // a scene's own moving parts (the bar's mirror ball)
   const DEFAULT = id === 'club' ? 'CLUB NIGHT' : 'HOUSE PARTY';
 
   if (id === 'club') {
@@ -172,6 +174,11 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
     }
     // the DJ's road cases against the back wall, water
     group.add(at(roadCase(M, 1.0, 0.75, 0.65, { wheels: true, stencil: 7 }), -2.4, 0, Z0 + 0.6), at(roadCase(M, 1.0, 0.75, 0.65, { stencil: 0 }), -2.4, 0.86, Z0 + 0.6), at(waterCrate(M), 2.2, 0, Z0 + 0.5, [0, 0.3, 0]));
+  } else if (id === 'cinema') {
+    sceneAnim = buildCinema(group, M, r).animate;
+    frame(group, M, r);
+  } else if (id === 'bar') {
+    sceneAnim = buildBar(group, M, r).animate;
   } else if (id === 'custom') {
     // your own stage: the hall's walls, its deck (or none), its spans on towers, a PA either side
     shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x6a6a70 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ color: 0x1a1b1f })) });
@@ -242,6 +249,7 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
     // no music: the DJ stops where the last beat was, hands still, and waits
     if (!music) { rest ??= Math.floor(beat); djPlay?.(rest, 0); return; }
     rest = null;
+    sceneAnim?.(t);
     djPlay?.(clock(t, beat), crowd ? crowd.excitement() : Math.min(1, energy));
   }
   // what never moves is baked; the DJ and the crowd move

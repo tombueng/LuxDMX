@@ -56,6 +56,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   and the 2400+ library fixtures. Every tile plays its light in 3D: spots sweep and run their gobos
   and prisms, washes breathe, PARs run the colours, bars chase. All in one WebGL context, only the
   tiles on the screen, so it stays smooth. The old library popup is gone.
+- 3D: the Cinema and Bar templates play in real rooms of their own, not on the concert stage: a
+  big cinema (screen, curtains, a premiere stage, raked rows with an audience, step lights, wall
+  washers, a starry ceiling) and a bar (a long counter, a back bar of lit bottles, people on the
+  stools, bartenders, tables, a dance floor with a mirror ball), every light installed there.
 - 3D: **Your stage** in the Venue panel: your real stage at its size (width, depth, a riser or
   not, how many trusses and how high). The room, crowd and camera moves are built for it, the
   lights hang on its trusses, the plan is that stage.

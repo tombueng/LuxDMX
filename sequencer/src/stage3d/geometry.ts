@@ -46,7 +46,9 @@ export const toLocal = (v: V3, r: Rot) => rz(rx(ry(v, -r.yaw), -r.pitch), -r.rol
 //
 // And your own stage ('custom'): its size from the show (StageSize), built from that like the demo
 // rooms are (a deck or none, spans of truss on towers over it, walls round it).
-export type RoomId = 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom';
+// The Cinema and Bar templates bring rooms of their own too (scenes.ts): a cinema with its screen,
+// stage and raked seats; a bar with a long counter, a back bar and a little dance floor.
+export type RoomId = 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar';
 export type ViewKey = 'front' | 'foh' | 'side' | 'top' | 'band';
 type P3 = [number, number, number];
 // a piece of truss: the middle line of the box from one end to the other
@@ -108,6 +110,24 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   },
   // an empty room with one straight truss on two towers: two of every kind of light on it, the
   // machines on the floor in front (for trying things out)
+  // a big cinema (scenes.ts buildCinema): the stage in front of the screen is the deck and the plan;
+  // the rows rise behind it to the projection booth; a truss over the stage, a bar for the spots
+  // over the front rows
+  cinema: {
+    id: 'cinema', W: 14, D: 4.4, zc: -0.6, truss: [{ z: 0.9, y: 8.2 }, { z: 6.4, y: 8.8 }], deck: { x: 7, z0: -2.8, z1: 1.6 }, ceiling: 11.5,
+    band: { x: 7, z0: -2.8, z1: 1.6 }, walls: { x: 11, z0: -3.2, z1: 26 },
+    frame: [span(7.6, 8.2, 0.9), span(8.6, 8.8, 6.4)],
+    views: { front: { pos: [0, 8.2, 23], at: [0, 4.4, -1.5] }, foh: { pos: [3.2, 4.6, 12], at: [0, 4.2, -2] }, side: { pos: [-9.6, 7.2, 9], at: [0, 3.8, 0] }, top: { pos: [0, 46, 10.01], at: [0, 0, 10] }, band: { pos: [0, 2.9, -1.9], at: [0, 4.2, 20] } },
+    tour: { rx: 8.2, rz: 11, z0: 10, y: 7, dy: 1.4, at: [0, 4, -0.5] },
+  },
+  // a bar (scenes.ts buildBar): the long counter along the back wall, the floor in front of it the
+  // plan, a ceiling rail for the lights, no deck
+  bar: {
+    id: 'bar', W: 14, D: 10, zc: 2.4, truss: [{ z: -0.6, y: 3.55 }, { z: 2.4, y: 3.55 }, { z: 5.0, y: 3.55 }, { z: 7.4, y: 3.55 }], deck: { x: -1, z0: -4.4, z1: -4.4 }, ceiling: 3.9,
+    band: { x: 6, z0: -4.4, z1: -1.0 }, walls: { x: 8, z0: -4.6, z1: 9.2 },
+    views: { front: { pos: [0, 1.75, 8.6], at: [0, 1.6, -3] }, foh: { pos: [5.6, 2.2, 6.4], at: [-1, 1.5, -2.6] }, side: { pos: [-7.3, 2.5, 4], at: [2, 1.4, -2] }, top: { pos: [0, 24, 2.31], at: [0, 0, 2.3] }, band: { pos: [0, 1.7, -3.7], at: [0, 1.5, 8] } },
+    tour: { rx: 5.6, rz: 4.6, z0: 2.6, y: 2.2, dy: 0.35, at: [0, 1.5, -1.5] },
+  },
   truss: {
     id: 'truss', W: 11, D: 6, zc: 3, truss: [{ z: 1.5, y: 4.0 }], deck: { x: -1, z0: -1.7, z1: -1.7 }, ceiling: 6,
     band: { x: 6.5, z0: 0.5, z1: 5 }, walls: { x: 8, z0: -2, z1: 14 },

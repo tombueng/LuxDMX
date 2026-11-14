@@ -863,7 +863,13 @@ Three more demos come with their own room on the 3D stage:
   on the room's rig. The camera views go inside the pub. The demos bring rooms of their own: a club
   (a stage framed by truss on four towers, a truss over the dance floor, a bar at the back, a
   mirror ball), a party room (a square of truss over the crowd, no stage) and an empty room with
-  one truss; the camera views go inside them too. **Your stage**: your real stage at its size,
+  one truss; the camera views go inside them too. The Cinema and Bar templates bring theirs: a
+  **Cinema** (a big screen between red curtains, a stage in front of it for premieres, raked rows of
+  red seats with an audience, step lights in the aisles, wall washers, house lights and a starry
+  ceiling, the projection booth at the back) and a **Bar** (a long counter, a back bar of bottles on
+  lit shelves in front of a mirror, pendant lamps, people on the stools and two bartenders, tables
+  along the walls, a little dance floor with a mirror ball); every light of those templates is
+  installed where such a room has it, and the camera moves film them as they are. **Your stage**: your real stage at its size,
   width and depth in metres, on a riser (1.2 m) or on the floor, 0 to 4 trusses across it on
   towers and how high their underside is. The room, its crowd and the camera views and moves are
   built for it; your lights hang on its trusses and the plan is that stage (a quarter across the

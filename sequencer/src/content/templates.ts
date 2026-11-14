@@ -11,6 +11,7 @@ import { slotsOf } from '../engine/render';
 import type { ChannelAttr, Color, Cue, CueList, Effect, Fixture, Group, Show, Values } from '../model/types';
 import { D, DECK, W, aimRot, defaultPlace, planToWorld } from '../stage3d/geometry';
 import { addStandardPresets } from './presets';
+import { placeIn } from './scenePlaces';
 
 export const C = {
   red: { r: 1, g: 0, b: 0 }, orange: { r: 1, g: 0.45, b: 0 }, amber: { r: 1, g: 0.65, b: 0.1 }, yellow: { r: 1, g: 0.9, b: 0 },
@@ -531,7 +532,10 @@ export const TEMPLATES: Template[] = [
       b.cue(l, 'Sci-fi night', [...out, [house, on(0.1)], [walls, on(0.6, C.cyan)], [marquee, on(0.8, C.cyan)], [steps, on(0.4, C.cyan)], [ceiling, on(0.8)],
         [spots, on(0.8, C.cyan, { pan: 0.5, tilt: 0.65, zoom: 0.1, gobo: gobo('Spiral'), goboRotation: turn('gen-spotgobo', 0.8) })]], { fade: 3, effects: [stars, scan, searchlight] });
       b.s.settings.stage3d = { act: 'none' };   // (a premiere: no band on the 3D stage)
-      return b.done();
+      // (in its own room, a real cinema: every light where a cinema has it, scenePlaces.ts)
+      const done = b.done();
+      placeIn(done, 'cinema');
+      return done;
     },
   },
   {
@@ -584,8 +588,10 @@ export const TEMPLATES: Template[] = [
         { fade: 0.5, effects: [danceChase, bally, mirror], actions: fire(m.confetti, m.sparks), note: 'Confetti and sparks with the cake' });
       b.cue(l, 'Last call', [...out, [pars, on(0.6, C.amber)], [warm, on(0.8, undefined, { cct: 0.5 })], [shelves, on(0.5, C.amber)]], { fade: 5 });
       b.cue(l, 'Lights up', [...out, [pars, on(1, C.white)], [warm, on(1, undefined, { cct: 0.8 })], [shelves, on(0.6, C.white)], [dance, on(1, C.white)]], { fade: 3 });
-      b.s.settings.stage3d = { room: 'pub' };   // (a bar's music room)
-      return b.done();
+      // (in its own room, a bar: the counter, the back bar, the dance floor; scenePlaces.ts)
+      const done = b.done();
+      placeIn(done, 'bar');
+      return done;
     },
   },
 ];

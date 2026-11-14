@@ -95,6 +95,10 @@ export const CROWDS: Partial<Record<RoomId, CrowdArea>> = {
   pub: { z0: 9 / 2 + 1.2, z1: 14.6 - 3.0, half: () => 4.6 - 0.7, top: 2.6 },
   club: { z0: 9 / 2 + 1.0, z1: 22 - 3.4, half: () => 10 - 1.4, top: 2.6, high: [9 / 2 + 3, 9 / 2 + 10, 2.9] },
   party: { z0: 2.2, z1: 14.8, half: () => 10 - 1.6, top: 2.6, high: [4.2, 11.2, 2.9] },
+  // the cinema's front rows (the ones a camera films; the rows behind rise: GEAR has them) and the
+  // bar's dance floor
+  cinema: { z0: 4.2, z1: 7.4, half: () => 9.6, top: 2.3 },
+  bar: { z0: 2.6, z1: 7.2, half: () => 3.6, top: 1.9 },
 };
 export interface Space { room: Room; lo: V3; hi: V3; deck: Box | null; boxes: Box[]; caps: Cap[]; crowd?: CrowdArea }
 const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, what: string, c = CLEAR): Box =>
@@ -103,7 +107,7 @@ const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: numb
 const both = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, what: string) => [bx(x0, x1, y0, y1, z0, z1, what), bx(-x1, -x0, y0, y1, z0, z1, what)];
 const cap = (a: P3, b: P3, r: number, what: string): Cap => ({ a: P(a), b: P(b), r: r + CLEAR, what });
 // the big things in each room that a camera could fly into (metres, as venue.ts / rooms.ts build them)
-const GEAR: Record<Exclude<RoomId, 'custom'>, Box[]> = {
+const GEAR: Partial<Record<RoomId, Box[]>> = {
   hall: [
     ...both(4.55, 5.45, DECK, DECK + 1.7, -0.85, -0.15, 'an amp'), ...both(6.5, 7.4, DECK, DECK + 1.6, 0.9, 1.8, 'a side fill'),
     bx(7.5, 9.0, DECK, DECK + 1.9, 0.2, 1.5, 'monitor world'), bx(8.2, 8.9, DECK, DECK + 1.2, -0.7, 0, 'the in-ear rack'),
@@ -126,6 +130,12 @@ const GEAR: Record<Exclude<RoomId, 'custom'>, Box[]> = {
     ...both(8.2, 9.6, 0, 2.8, -2.8, -1.4, 'the PA'), ...both(8.2, 9.6, 0, 2.8, 16.4, 17.8, 'the PA'), bx(-2.9, -1.9, 0, 1.7, -2.75, -2.1, 'road cases'),
   ],
   truss: [bx(6.2, 7.0, 0, 1.0, 6.2, 7.8, 'the table'), bx(-7.4, -6.6, 0, 1.7, 7.4, 9.9, 'road cases')],
+  // the cinema's rows, three at a time, up to the heads of the audience in them (scenes.ts CINEMA)
+  cinema: [0, 1, 2, 3, 4, 5].map((k) => bx(-10.6, 10.6, 0, (3 * k + 3) * 0.32 + 1.3, 4.2 + 3 * k * 1.05, 4.2 + (3 * k + 3) * 1.05, 'the rows')),
+  // the bar: its counter, the stools and the people on them, the back counter, the tables at the
+  // sides, the mirror ball (scenes.ts BAR)
+  bar: [bx(-6.1, 6.1, 0, 1.2, -2.7, -1.9, 'the counter'), bx(-6.0, 6.0, 0, 1.85, -1.9, -1.0, 'the stools'), bx(-6.2, 6.2, 0, 3.4, -4.6, -3.8, 'the back bar'),
+    bx(-7.8, -5.7, 0, 1.5, 0.2, 6.8, 'the tables'), bx(5.7, 7.8, 0, 1.5, 0.2, 6.8, 'the tables'), bx(-3.55, -2.85, 2.9, 3.9, 3.25, 3.95, 'the mirror ball')],
 };
 // the truss pieces of a room (the hall's and the pub's are built in venue.ts from `truss`)
 function trussOf(r: Room): Seg[] {
@@ -145,7 +155,7 @@ export function spaceOf(r: Room, c: Cast): Space {
   if (!m) spaces.set(c, (m = new Map()));
   let s = m.get(r.key ?? r.id);
   if (s) return s;
-  const w = r.walls, caps: Cap[] = [], boxes: Box[] = [...(r.id === 'custom' ? [] : GEAR[r.id])];
+  const w = r.walls, caps: Cap[] = [], boxes: Box[] = [...(GEAR[r.id] ?? [])];
   for (const [a, b] of trussOf(r)) {
     caps.push(cap(a, b, 0.15, 'the truss'));
     // a level piece has lights under it (a head hangs about a metre and a quarter below its middle)
@@ -259,7 +269,7 @@ interface Crew {
 }
 const mirror = (f: Fixed): Fixed => ({ ...f, pos: [-f.pos[0], f.pos[1], f.pos[2]], at: [-f.at[0], f.at[1], f.at[2]], move: f.move && [-f.move[0], f.move[1], f.move[2]], pan: f.pan && [-f.pan[0], f.pan[1], f.pan[2]] });
 const side = (f: Fixed): { left: Fixed; right: Fixed } => ({ left: f, right: mirror(f) });
-export const CREW: Record<Exclude<RoomId, 'custom'>, Crew> = {
+export const CREW: Partial<Record<RoomId, Crew>> = {
   hall: {
     wide: { pos: [0, 4.6, 23.9], at: [0, 3.4, 0.5], fov: 30, pan: [1.6, 0, 0], zoom: 0.8 },
     high: { pos: [-15, 10.5, 16], at: [0, 2.8, 0.5], fov: 36, move: [3, 0, 0] },
@@ -320,6 +330,39 @@ export const CREW: Record<Exclude<RoomId, 'custom'>, Crew> = {
     },
     drone: { zc: 1, rx: 8, rz: 14, y: 6.65, bob: 0.3, arc: 0.9, gate: 6.65, near: [1.2, 3.4, 2.5], phase: [0, 0, 0, 0.75, 0.55, 1], lookFar: [0, 1.8, 4], lookNear: [0, 1.6, 0.3] },
   },
+  // the cinema: from the back rows, high on the side, the front of the stalls, over the front rows;
+  // the stage filmed, and the audience from the stage
+  cinema: {
+    wide: { pos: [0, 7.7, 22.4], at: [0, 3.6, -1], fov: 30, pan: [1.6, 0, 0], zoom: 0.8 },
+    high: { pos: [-9.4, 9.6, 14], at: [0, 3.2, -0.5], fov: 34, move: [2, 0, 0] },
+    ...side({ pos: [-6.2, 3.4, 3.2], at: [-1.0, 3.0, -0.5], fov: 32, move: [0.8, 0, -0.2], pan: [0.8, 0, 0], shake: 0.025 }),
+    crowd: { pos: [-2.0, 4.9, 12.0], at: [0, 3.2, -0.5], fov: 34, move: [1.0, 0, 0.6], pan: [0.8, 0, 0], shake: 0.02 },
+    front: { pos: [-8.5, 4.6, 9.0], at: [0, 3.6, -0.5], fov: 40, move: [1.5, 0, 0], pan: [0.8, 0, 0] },
+    back: { pos: [2.0, 4.0, -2.3], at: [0, 2.4, 6.5], fov: 50, move: [-2.4, 0, 0], pan: [-2, 0, 0] },
+    pit: { z: 2.7, y: 2.4, x: 3 },
+    crane: { pivot: [-8.6, 1.8, 3.4], a: [-3.0, 6.6, 6.6], b: [-1.0, 3.3, 2.9], rise: 0.4, lookA: [0, 2.6, 3.0], lookB: [0, 3.4, -1.0], period: 32 },
+    walk: {
+      y: 1.65, way: [[-6.0, 3.25], [-3.0, 3.15], [0, 3.2], [3.0, 3.15], [6.0, 3.25]],
+      look: [[-5.0, 3.2, -1], [-2.5, 3.3, -1], [0, 3.4, -1], [2.5, 3.3, -1], [5.0, 3.2, -1]],
+    },
+    drone: { zc: 6, rx: 8, rz: 10, y: 7.6, bob: 0.3, arc: 0.9, gate: 6.6, near: [1.5, 3.6, 3.2], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 3.2, -0.5], lookNear: [0, 3.4, -0.5] },
+  },
+  // the bar: the counter filmed from the dance floor, from its corners, from behind the bar
+  bar: {
+    wide: { pos: [0, 1.9, 8.6], at: [0, 1.5, -2.8], fov: 34, pan: [1.2, 0, 0], zoom: 0.85 },
+    high: { pos: [-6.5, 2.9, 8.4], at: [0, 1.4, -2.5], fov: 40, move: [2, 0, 0] },
+    ...side({ pos: [-5.0, 1.8, 1.0], at: [-1.5, 1.4, -2.6], fov: 32, move: [0.6, 0, 0.2], pan: [0.6, 0, 0], shake: 0.02 }),
+    crowd: { pos: [1.2, 1.7, 1.5], at: [0, 1.3, -2.4], fov: 38, move: [0, 0, 0.6], pan: [0.6, 0, 0], shake: 0.015 },
+    front: { pos: [-4.0, 2.1, 7.8], at: [0, 1.5, -2.5], fov: 40, move: [1.2, 0, 0], pan: [0.6, 0, 0] },
+    back: { pos: [1.5, 2.0, -3.3], at: [0, 1.5, 4.5], fov: 50, move: [-2.0, 0, 0], pan: [-1.5, 0, 0] },
+    pit: { z: 0.4, y: 1.4, x: 1.6 },
+    crane: { pivot: [6.6, 1.5, 7.8], a: [2.5, 2.9, 5.6], b: [0.8, 1.9, 0.6], rise: 0.2, lookA: [0, 1.2, 4.5], lookB: [0, 1.4, -2.4], period: 30 },   // (on the right: the mirror ball's on the left)
+    walk: {
+      y: 1.6, way: [[-5.0, 0.6], [-2.5, 0.45], [0, 0.5], [2.5, 0.45], [5.0, 0.6]],
+      look: [[-5.0, 1.4, -2.4], [-2.5, 1.4, -2.4], [0, 1.4, -2.4], [2.5, 1.4, -2.4], [5.0, 1.4, -2.4]],
+    },
+    drone: { zc: 2.5, rx: 5.0, rz: 4.6, y: 2.75, bob: 0.05, arc: 0.8, gate: 2.6, near: [1.2, 2.4, 1.5], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 1.4, -2.2], lookNear: [0, 1.4, -2.4] },
+  },
   truss: {
     wide: { pos: [0, 2.5, 12.5], at: [0, 2.9, 1.5], fov: 34, pan: [1, 0, 0], zoom: 0.82 },
     high: { pos: [-6.0, 4.8, 9.0], at: [0, 2.6, 2.0], fov: 42, move: [2.0, 0, 0] },
@@ -340,22 +383,24 @@ export const CREW: Record<Exclude<RoomId, 'custom'>, Crew> = {
 // is ~11 m wide round its truss at z 1.5, 4 m up)
 const crews = new Map<string, Crew>();
 export function crewOf(r: Room): Crew {
-  if (r.id !== 'custom') return CREW[r.id];
-  const had = crews.get(r.key ?? '');
+  const own = CREW[r.id];
+  if (own) return own;
+  const had = crews.get(r.key ?? r.id);
   if (had) return had;
-  const t = CREW.truss, kx = Math.max(0.8, r.W / 11), kz = Math.max(0.8, r.D / 6), ty = r.truss[0]?.y ?? 5, ky = Math.max(0.8, ty / 4.0);
-  const lift = r.deck.x > 0 ? DECK : 0;
-  const p = ([x, y, z]: P3): P3 => [x * kx, y * ky + lift * 0.5, (z - 1.5) * kz];
+  const t = CREW.truss!, kx = Math.max(0.8, r.W / 11), kz = Math.max(0.8, r.D / 6), ty = r.truss[0]?.y ?? 5, ky = Math.max(0.8, ty / 4.0);
+  const lift = r.deck.x > 0 ? DECK : 0, top = r.ceiling - 0.4;
+  // (moved to its middle, never over its ceiling: the bar's is low)
+  const p = ([x, y, z]: P3): P3 => [x * kx, Math.min(top, y * ky + lift * 0.5), (z - 1.5) * kz + r.zc];
   const v = ([x, y, z]: P3): P3 => [x * kx, y * ky, z * kz];
   const fx = (f: Fixed): Fixed => ({ ...f, pos: p(f.pos), at: p(f.at), ...(f.move ? { move: v(f.move) } : {}), ...(f.pan ? { pan: v(f.pan) } : {}) });
   const c: Crew = {
     wide: fx(t.wide), high: fx(t.high), left: fx(t.left), right: fx(t.right), crowd: fx(t.crowd), back: fx(t.back), front: fx(t.front),
-    pit: { z: (t.pit.z - 1.5) * kz, y: t.pit.y * ky + lift * 0.5, x: t.pit.x * kx },
+    pit: { z: (t.pit.z - 1.5) * kz + r.zc, y: Math.min(top, t.pit.y * ky + lift * 0.5), x: t.pit.x * kx },
     crane: { ...t.crane, pivot: p(t.crane.pivot), a: p(t.crane.a), b: p(t.crane.b), lookA: p(t.crane.lookA), lookB: p(t.crane.lookB) },
-    walk: { y: t.walk.y * ky + lift * 0.5, way: t.walk.way.map(([x, z]) => [x * kx, (z - 1.5) * kz] as [number, number]), look: t.walk.look.map(p) },
-    drone: { ...t.drone, zc: 0, rx: t.drone.rx * kx, rz: t.drone.rz * kz, y: t.drone.y * ky, gate: t.drone.gate * ky, near: p(t.drone.near), lookFar: p(t.drone.lookFar), lookNear: p(t.drone.lookNear) },
+    walk: { y: Math.min(top, t.walk.y * ky + lift * 0.5), way: t.walk.way.map(([x, z]) => [x * kx, (z - 1.5) * kz + r.zc] as [number, number]), look: t.walk.look.map(p) },
+    drone: { ...t.drone, zc: r.zc, rx: t.drone.rx * kx, rz: t.drone.rz * kz, y: Math.min(top, t.drone.y * ky), gate: Math.min(top, t.drone.gate * ky), near: p(t.drone.near), lookFar: p(t.drone.lookFar), lookNear: p(t.drone.lookNear) },
   };
-  crews.set(r.key ?? '', c);
+  crews.set(r.key ?? r.id, c);
   return c;
 }
 
@@ -554,7 +599,11 @@ function subjects(r: Room, c: Cast): ((k: number) => Close)[] {
         return l.y > 1.8 ? { pos: add(l, v3(sx * 0.7, -1.35, 1.9)), at: add(l, v3(0, -0.1, 0)), fov: 28, cam: kind } : { pos: add(l, v3(sx * 0.6, 1.4, 2.0)), at: add(l, v3(0, 0.35, 0)), fov: 30, cam: kind };
       });
     }
-    if (!out.length) out.push(() => ({ pos: v3(1.5, 2.0, 5.5), at: v3(0, 3.6, 1.5), fov: 34, cam: 'the truss' }));
+    // (no lights in it either: the test truss's own view; another room's from its side)
+    if (!out.length) {
+      const f = crewOf(r).left;
+      out.push(r.id === 'truss' ? () => ({ pos: v3(1.5, 2.0, 5.5), at: v3(0, 3.6, 1.5), fov: 34, cam: 'the truss' }) : () => ({ pos: P(f.pos), at: P(f.at), fov: f.fov, cam: 'the room' }));
+    }
   }
   return out;
 }

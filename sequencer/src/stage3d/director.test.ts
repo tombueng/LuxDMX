@@ -9,7 +9,7 @@
 // a frame costs well under a tenth of a millisecond.
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { blocked, castOf, CAM_MODES, CROWDS, CREW, direct, holdFor, LENS, newMemory, partAt, spaceOf, WALK, type CamMode, type Cast, type Light3, type Music, type Part, type Shot } from './director';
+import { blocked, castOf, CAM_MODES, CROWDS, direct, holdFor, LENS, newMemory, partAt, spaceOf, WALK, type CamMode, type Cast, type Light3, type Music, type Part, type Shot, crewOf } from './director';
 import { DECK, ROOMS, defaultPlace, type Room, type RoomId, type V3 } from './geometry';
 import { buildVenue, type Venue } from './venue';
 import type { Stage } from './rooms';
@@ -103,7 +103,7 @@ describe('the modes move like their crews', () => {
   });
   it('Crane: from over the crowd up to the stage and back, rising in between', () => {
     for (const id of IDS) {
-      const c = CREW[id].crane, { out } = run('crane', id, { secs: c.period, t0: 0 });
+      const c = crewOf(ROOMS[id]).crane, { out } = run('crane', id, { secs: c.period, t0: 0 });
       const near = (p: number[]) => Math.min(...out.map((f) => len(sub(f.s.pos, { x: p[0], y: p[1], z: p[2] }))));
       expect(near(c.a), id).toBeLessThan(0.05); expect(near(c.b), id).toBeLessThan(0.05);
       const mid = out[Math.round(out.length / 4)].s.pos;
@@ -113,7 +113,7 @@ describe('the modes move like their crews', () => {
   it('Steadicam: walks its way at a walking pace (up to 1.2 m/s), swaying, and comes back', () => {
     for (const id of IDS) {
       const { out } = run('steadicam', id, { secs: 90 });
-      const way = CREW[id].walk.way, first = { x: way[0][0], z: way[0][1] }, last = { x: way.at(-1)![0], z: way.at(-1)![1] };
+      const way = crewOf(ROOMS[id]).walk.way, first = { x: way[0][0], z: way[0][1] }, last = { x: way.at(-1)![0], z: way.at(-1)![1] };
       const reach = (q: { x: number; z: number }) => Math.min(...out.map((f) => Math.hypot(f.s.pos.x - q.x, f.s.pos.z - q.z)));
       expect(reach(first), id).toBeLessThan(0.1); expect(reach(last), id).toBeLessThan(0.1);
       expect(Math.max(...out.map((f) => Math.abs(f.s.roll)))).toBeGreaterThan(0.3);
@@ -187,13 +187,14 @@ describe('Band cam: close shots cut on the beat', () => {
   it('cuts on beats, holds 2 to 8 beats, goes round the people on stage (or the DJ and the crowd, or the lights)', () => {
     const lights: Light3[] = ['spot', 'spot', 'wash', 'wash', 'par', 'par'].map((kind, i) => ({ kind, p: { x: -5.5 + i, y: 3.65, z: 1.5 } }));
     for (const id of IDS) {
-      const { out } = run('bandcam', id, { cast: castOf(id, id === 'truss' ? lights : []) });
+      const lit = id === 'truss' || id === 'cinema' || id === 'bar';              // (rooms without a band or a DJ: their lights)
+      const { out } = run('bandcam', id, { cast: castOf(id, lit ? lights : []) });
       const cuts = out.filter((f) => f.s.cut), step = BPM / 60 / FPS;
       for (const c of cuts.slice(1)) expect(c.beat % 1).toBeLessThan(step + 1e-9);
       const beats = cuts.map((c) => Math.floor(c.beat)), holds = beats.slice(1).map((b, i) => b - beats[i]);
       for (const h of holds) { expect(h).toBeGreaterThanOrEqual(2); expect(h).toBeLessThanOrEqual(8); }
       const seen = new Set(cuts.map((c) => c.s.cam));
-      const want = id === 'hall' || id === 'pub' ? ['the singer', 'the guitar', 'the drums', 'the bass', 'the keys'] : id === 'truss' ? ['spot', 'wash', 'par'] : ['the DJ\'s hands', 'the DJ', 'the crowd'];
+      const want = id === 'hall' || id === 'pub' ? ['the singer', 'the guitar', 'the drums', 'the bass', 'the keys'] : lit ? ['spot', 'wash', 'par'] : ['the DJ\'s hands', 'the DJ', 'the crowd'];
       for (const w of want) expect(seen.has(w), `${id}: ${w}`).toBe(true);
       // close up: a few metres at most from what it shows (the crowd shot: across the floor)
       for (const f of out) if (f.s.cam !== 'the crowd' && !f.s.cam.startsWith('over')) expect(len(sub(f.s.at, f.s.pos)), f.s.cam).toBeLessThan(3.2);

@@ -13,9 +13,9 @@ import type { Stage } from './rooms';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const built: Record<string, Stage> = {};
-const room = (id: 'club' | 'party' | 'truss') => (built[id] ??= buildVenue({ room: id, crowd: 40 }));
+const room = (id: 'club' | 'party' | 'truss' | 'cinema' | 'bar') => (built[id] ??= buildVenue({ room: id, crowd: 40 }));
 
-for (const id of ['club', 'party', 'truss'] as const) {
+for (const id of ['club', 'party', 'truss', 'cinema', 'bar'] as const) {
   describe(`the ${id} room`, () => {
     it('builds with nothing NaN in it, its static parts baked into a few dozen meshes', () => {
       const v = room(id);
@@ -104,5 +104,32 @@ describe('the DJ', () => {
     const after = v.bandInfo();
     expect(after.name).toBe('Night Owl'); expect(after.surfaces[0].shows).toBe('NIGHT OWL');
     expect(after.surfaces[0].uuid).toBe(before.uuid); expect(after.surfaces[0].version).toBeGreaterThan(before.version);
+  });
+});
+
+// The templates' own rooms: the cinema (screen, stage, raked rows with an audience) and the bar
+// (counter, back bar, people at it); every Cinema and Bar template light placed in them
+describe('the Cinema and Bar templates in their rooms', () => {
+  it('every light has its place in the room, inside its walls, under its ceiling; the room is the template\'s', async () => {
+    const { TEMPLATES } = await import('../content/templates');
+    for (const [name, id] of [['Cinema', 'cinema'], ['Bar', 'bar']] as const) {
+      const s = TEMPLATES.find((t) => t.name === name)!.build(), r = ROOMS[id];
+      expect(s.settings.stage3d?.room).toBe(id);
+      for (const f of s.fixtures) {
+        expect(f.p3, `${name}: ${f.name}`).toBeTruthy();
+        expect(Math.abs(f.p3!.x), `${name}: ${f.name}`).toBeLessThan(r.walls.x);
+        expect(f.p3!.z, `${name}: ${f.name}`).toBeGreaterThan(r.walls.z0);
+        expect(f.p3!.z, `${name}: ${f.name}`).toBeLessThan(r.walls.z1);
+        expect(f.p3!.y, `${name}: ${f.name}`).toBeLessThan(r.ceiling);
+        expect(f.p3!.y, `${name}: ${f.name}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+  it('the bar: people at the counter, the mirror ball turning', () => {
+    const v = room('bar');
+    expect(v.room).toBe('bar');
+    const ball = v.group.getObjectsByProperty('type', 'Mesh').find((m) => (m as THREE.Mesh).geometry.type === 'SphereGeometry' && Math.abs(m.position.y - 3.2) < 0.01);
+    expect(ball).toBeTruthy();
+    const r0 = ball!.rotation.y; v.animate(10, 20, 0.5, new THREE.Color(1, 1, 1)); expect(ball!.rotation.y).not.toBe(r0);
   });
 });
