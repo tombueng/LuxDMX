@@ -113,7 +113,7 @@ test('the console faders learn MIDI controls, and they work in every view', asyn
   expect(await page.evaluate(() => (window as any).__luxdmx.show.settings.consoleMidi.map((b: any) => [b.to.split(':')[0], b.midi.num]))).toEqual([['light', 8], ['grand', 7]]);
   // the controller unplugged and back (or its bank changed): a fader far from the grand master
   // doesn't jump it; once it passes where the master is, it moves it again
-  await page.evaluate(() => { const a = (window as any).__luxdmx; a.releaseMidi(); a.grandMaster = 0.5; });
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.midiIn.releaseAll(); a.grandMaster = 0.5; });
   await send(page, [0xb0, 7, 127]);
   await send(page, [0xb0, 7, 90]);
   expect(await page.evaluate(() => (window as any).__luxdmx.grandMaster)).toBe(0.5);

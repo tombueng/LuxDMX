@@ -168,15 +168,15 @@ describe('console faders on MIDI', () => {
   it('take over only once they reach the fader; a pad flashes and goes back; locked: nothing', async () => {
     const r = await show(), { app } = r;
     app.show.settings.consoleMidi = [{ to: 'grand', midi: { kind: 'cc', ch: 1, num: 7 } }, { to: 'grand', midi: { kind: 'note', ch: 1, num: 36 } }];
-    const cc = (v: number) => app.midi({ kind: 'cc', ch: 1, num: 7, value: v });
+    const cc = (v: number) => app.midiIn.take({ kind: 'cc', ch: 1, num: 7, value: v });
     app.grandMaster = 0.5;
     cc(0.1); expect(app.grandMaster).toBe(0.5);                   // (far from it: not yet)
     cc(0.3); expect(app.grandMaster).toBe(0.5);
     cc(0.6); expect(app.grandMaster).toBe(0.6);                   // (crossed it: taken over)
     cc(0.2); expect(app.grandMaster).toBe(0.2);
-    app.midi({ kind: 'note', ch: 1, num: 36, value: 1 }); expect(app.grandMaster).toBe(1);
-    app.midi({ kind: 'note', ch: 1, num: 36, value: 0 }); expect(app.grandMaster).toBe(0.2);
-    app.midi({ kind: 'note', ch: 1, num: 36, value: 1 }); app.releaseMidi(); expect(app.grandMaster).toBe(0.2);
+    app.midiIn.take({ kind: 'note', ch: 1, num: 36, value: 1 }); expect(app.grandMaster).toBe(1);
+    app.midiIn.take({ kind: 'note', ch: 1, num: 36, value: 0 }); expect(app.grandMaster).toBe(0.2);
+    app.midiIn.take({ kind: 'note', ch: 1, num: 36, value: 1 }); app.midiIn.releaseAll(); expect(app.grandMaster).toBe(0.2);
     cc(0.2); cc(0.3); expect(app.grandMaster).toBe(0.3);         // (taken over again, at the fader)
     app.show.pages = [{ id: 'p', name: 'Service', widgets: [], locked: true }]; app.view = 'live';   // (locked for the service)
     expect(app.locked).toBe(true);

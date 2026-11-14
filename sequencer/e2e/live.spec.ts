@@ -243,7 +243,7 @@ for (const change of ['left as it was', 'removed', 'pointed at another list'] as
       const p = a.ownPages()[0];
       p.widgets.push({ id: 'lf', type: 'list', list: l1.id, action: 'flash', label: 'LF', midi: { kind: 'note', ch: 0, num: 60 } });
       a.markDirty(0);
-      a.midi({ kind: 'note', ch: 0, num: 60, value: 1 });           // the pad goes down and sticks
+      a.midiIn.take({ kind: 'note', ch: 0, num: 60, value: 1 });           // the pad goes down and sticks
       const flashing = a.engine.status(l1.id).flashing;
       const w = p.widgets.find((x: any) => x.id === 'lf');
       if (change === 'removed') p.widgets = p.widgets.filter((x: any) => x.id !== 'lf');

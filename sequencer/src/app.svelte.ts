@@ -27,7 +27,8 @@ import { patchSheetHtml } from './export/patchsheet';
 import { pictureColors } from './content/pictureColors';
 import { starterLooks } from './content/looks';
 import { findQlc } from './library/catalog';
-import { onMidi, onMidiInputs, sameBinding, type MidiBinding, type MidiMsg } from './input/midi';
+import { onMidi, onMidiInputs } from './input/midi';
+import { MidiIn } from './app/midi.svelte';
 import { describeChange } from './model/diff';
 import { cueNum, cueNumber, freezeNumbers, numbersFor, renumber } from './model/cuenum';
 import { rawCellMap, rawCells, rawType, rawTypes } from './model/raw';
@@ -219,6 +220,8 @@ class App {
   live = $state<Record<string, Values>>({});          // fog buttons: on top, never recorded
   fogUntil = $state.raw<Record<string, number>>({});  // fog widget id -> when it switches off (ms)
   page = $state('');                                  // live page on screen
+  // a MIDI controller's notes and controls (app/midi.svelte.ts)
+  readonly midiIn: MidiIn = new MidiIn(this);
   goList = $state('');                                // the list GO (and Space) plays in Live
   highlight = $state(false);                          // selected lights at full white, to find them in the room
   recordedAside = false;                             // the last Record went into a play away from where it is (the programmer kept it)
@@ -362,10 +365,10 @@ class App {
     // its key's own "maybe changed" and costs nothing)
     this.thread.beforeCommand = () => { if (this.savePending && !this.holdUndo) this.checkpoint(true); };
     this.startClock();
-    onMidi((m) => this.midi(m));
+    onMidi((m) => this.midiIn.take(m));
     // A controller unplugged while a pad was down: what it held is let go.
     let inputs = 0;
-    onMidiInputs((names) => { if (names.length < inputs) this.releaseMidi(); inputs = names.length; });
+    onMidiInputs((names) => { if (names.length < inputs) this.midiIn.releaseAll(); inputs = names.length; });
     this.refreshMyTypes();
     // (the winches' heights as the wire holds them: kept, at once when they're made safe)
     this.thread.onHeld = () => {
@@ -2703,46 +2706,6 @@ class App {
         return;
     }
   }
-  // A MIDI note or control: the controls on the live page on screen (or the first page) that
-  // learned it. Faders follow a knob or fader; buttons press on note on (or CC above half).
-  // What each MIDI control is holding down right now (by the control, not by the button: a button
-  // removed or re-learned while held is still released when the pad comes up).
-  private midiDown = new Map<string, Widget[]>();
-  private midiHintAt = -1e9;
-  midi(m: MidiMsg) {
-    const key = `${m.kind}:${m.ch}:${m.num}`;
-    // the console's faders on MIDI controls: they move wherever you are (a desk's faders do), not
-    // while the show is locked for the service
-    const cm = (this.show.settings.consoleMidi ?? []).filter((b) => sameBinding(b.midi, m));
-    if (cm.length && !this.locked) for (const b of cm) this.midiConsole(b.to, m);
-    if (cm.length) return;
-    const down = m.value > 0.5 || (m.kind === 'note' && m.value > 0);
-    if (!down) {
-      for (const w of this.midiDown.get(key) ?? []) this.fireWidget(w, false);
-      this.midiDown.delete(key);
-    }
-    const page = this.pages.find((p) => p.id === this.page) ?? this.pages[0];
-    // a pad nothing listens to: say so once in a while, with how to give it a job
-    if (down && !(page?.widgets ?? []).some((w) => sameBinding(w.midi, m)) && performance.now() - this.midiHintAt > 8000) {
-      this.midiHintAt = performance.now();
-      ui.toast(`${m.kind === 'note' ? 'Pad' : 'Control'} ${m.num} isn't on a button of this page yet: Live, Edit, pick a button, Learn, then touch it.`, 5000);
-    }
-    for (const w of page?.widgets ?? []) {
-      if (!sameBinding(w.midi, m)) continue;
-      if (w.type === 'fader') { this.setFader(w, m.value); continue; }
-      if (down && !this.midiDown.get(key)?.some((x) => x.id === w.id)) {
-        // a copy: a button edited while the pad is down still lets go of what it pressed
-        this.midiDown.set(key, [...(this.midiDown.get(key) ?? []), $state.snapshot(w) as Widget]);
-        this.fireWidget(w, true);
-      }
-    }
-  }
-  // A console fader on a MIDI control. A fader or knob takes over only once it reaches where the
-  // fader is (soft takeover: a controller sending its positions when plugged in, or after a bank
-  // change, doesn't jump the level or start a list). A pad is a flash: full while held, back to
-  // where it was when let go, never longer than a held flash may stay.
-  private midiAt = new Map<string, number>();          // (a control's last value, by fader, until it's taken over)
-  private midiHeld = new Map<string, number>();        // (a pad held: the fader's value before)
   consoleLevel(to: string): number {
     const [k, id] = to.split(/:(.*)/s);
     if (k === 'grand') return this.grandMaster;
@@ -2750,21 +2713,6 @@ class App {
     if (k === 'group') return this.groupMasters[id] ?? 1;
     return this.look[id]?.intensity ?? 0;
   }
-  private midiConsole(to: string, m: MidiMsg) {
-    if (m.kind === 'note') {
-      const key = `midi:${to}`;
-      if (m.value > 0) { if (!this.midiHeld.has(to)) { this.midiHeld.set(to, this.consoleLevel(to)); this.consoleFader(to, 1); this.capHold(key, true, () => this.midiLetGo(to)); } }
-      else if (this.midiHeld.has(to)) { this.midiLetGo(to); this.capHold(key, false, () => {}); }
-      return;
-    }
-    const now = this.consoleLevel(to), was = this.midiAt.get(to);
-    // (taken over: it moves the fader; not yet: only once it's within a step of it, or crosses it)
-    if (was !== undefined && Number.isNaN(was)) { this.consoleFader(to, m.value); return; }
-    const near = Math.abs(m.value - now) <= 0.04, crossed = was !== undefined && (was - now) * (m.value - now) <= 0;
-    if (near || crossed) { this.midiAt.set(to, NaN); this.consoleFader(to, m.value); }
-    else this.midiAt.set(to, m.value);
-  }
-  private midiLetGo(to: string) { const v = this.midiHeld.get(to); this.midiHeld.delete(to); if (v !== undefined) this.consoleFader(to, v); }
   // A console fader by what it moves ('grand', 'list:<id>', 'group:<id>', 'light:<id>')
   consoleFader(to: string, v: number) {
     v = Math.max(0, Math.min(1, v));
@@ -2778,28 +2726,6 @@ class App {
     }
     else if (k === 'group' && this.show.groups.some((g) => g.id === id)) this.groupMasters = { ...this.groupMasters, [id]: v };
     else if (k === 'light' && this.show.fixtures.some((f) => f.id === id)) this.setLevelOf([id], v);
-  }
-  // a console fader learns a control (one control, one fader: either one's old pairing goes)
-  bindConsoleMidi(to: string, midi: MidiBinding) {
-    this.checkpoint();
-    this.midiAt.set(to, NaN);                  // (learned by moving it: it's where you put it)
-    const keep = (this.show.settings.consoleMidi ?? []).filter((b) => b.to !== to && !sameBinding(b.midi, { ...midi, value: 0 }));
-    this.show.settings.consoleMidi = [...keep, { to, midi: { kind: midi.kind, ch: midi.ch, num: midi.num } }];
-  }
-  unbindConsoleMidi(to: string) {
-    const was = this.show.settings.consoleMidi ?? [];
-    if (!was.some((b) => b.to === to)) return;
-    this.checkpoint();
-    const keep = was.filter((b) => b.to !== to);
-    if (keep.length) this.show.settings.consoleMidi = keep; else delete this.show.settings.consoleMidi;
-  }
-  // A controller went away: let go of everything it held.
-  releaseMidi() {
-    for (const ws of this.midiDown.values()) for (const w of ws) this.fireWidget(w, false);
-    this.midiDown.clear();
-    // (pads held on console faders let go too; faders take over again by reaching where they are)
-    for (const to of [...this.midiHeld.keys()]) { this.midiLetGo(to); this.capHold(`midi:${to}`, false, () => {}); }
-    this.midiAt.clear();
   }
   setFader(w: Widget, v: number) {
     if (w.type !== 'fader' || this.lockedOut(w)) return;
@@ -2832,7 +2758,7 @@ class App {
   // MIDI pad, a phone): fogUntil carries the deadline, expire() lets go of what the widget pressed.
   // What to let go of is taken when it's pressed: the button edited or removed meanwhile still lets go.
   private capped = new Map<string, () => void>();
-  private capHold(id: string, down: boolean, letGo: () => void) {
+  capHold(id: string, down: boolean, letGo: () => void) {
     if (down) { this.capped.set(id, letGo); this.fogUntil = { ...this.fogUntil, [id]: performance.now() + GROUP_FLASH_MAX * 1000 }; }
     else { this.capped.delete(id); this.fogOff(id); }
   }
@@ -2931,7 +2857,7 @@ class App {
     const hazeStop = this.holds.get('haze-stop');
     this.holds.clear(); this.live = {};
     if (hazeStop) this.holdOn('haze-stop', hazeStop);
-    this.releaseMidi();
+    this.midiIn.releaseAll();
     this.engine.releaseFlashes();
   }
   setMaster(id: string, v: number) { this.engine.setMaster(id, v); }

@@ -88,10 +88,10 @@
   }
   function learnFor(to: string) {
     if (learning === to) { learning = null; learnMidi(null); return; }
-    if (boundTo(to) && learning === null) { app.unbindConsoleMidi(to); return; }
+    if (boundTo(to) && learning === null) { app.midiIn.unbind(to); return; }
     learning = to;
     learnMidi((m) => {
-      learning = null; app.bindConsoleMidi(to, m);
+      learning = null; app.midiIn.bind(to, m);
       // (the console has it first: a live page's button or fader on the same control stops answering it)
       const on = app.show.pages.flatMap((p) => p.widgets.filter((w) => sameBinding(w.midi, m)).map((w) => w.label || p.name));
       ui.toast(`${m.kind === 'note' ? 'Note' : 'Control'} ${m.num} moves it now${on.length ? `. It was on ${on.slice(0, 2).join(', ')} on a live page: that one doesn't answer it any more` : ''}`, on.length ? 7000 : 2200);
