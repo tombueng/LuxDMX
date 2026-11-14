@@ -11,11 +11,12 @@ import { wholeLook } from '../engine/cuelook';
 import type { FixtureKind } from '../model/library';
 import { headAngles, headLocal, hitRoom, RAD, toWorld, type Optics, type Rot, type V3 } from './geometry';
 import { PAN_SPEED, ROLL_SPEED, TILT_SPEED, slew, type Axis } from './motion';
-import { body, headBarParts, headParts, HEADBAR_LENS, HEADBAR_PITCH, HEADBAR_PIVOT, lensOf, PIVOT, WINCH_BALL, WINCH_BOX, winchParts, type Look } from './models';
+import { body, headBarParts, headParts, HEADBAR_LENS, HEADBAR_PITCH, HEADBAR_PIVOT, lensOf, matrixHeadParts, PIVOT, WINCH_BALL, WINCH_BOX, winchParts, type Look } from './models';
 import { ATLAS_CELLS, PLAIN_WHEEL, prismOf, rotationOf } from './gobos';
 import { dropTexture } from './drops';
 import { pleats } from './textures';
 import { ballMotion, mirrorBall, type Ball } from './mirrorBall';
+import { cellAt, whiteOf, type Profile } from './profiles';
 // (a curtain's pleats: many across its width, the same texture for every curtain)
 let pleatTex: THREE.Texture | undefined;
 // A curtain's cloth: a metre square with real folds (a fold every 1/n of its width, `depth` deep), so
@@ -31,7 +32,7 @@ const pleatsRepeat = () => { if (!pleatTex) { pleatTex = pleats().clone(); pleat
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
 // (barLen: a bar's or a strip's length in metres when it says; scale: a light drawn bigger or smaller,
 // its own size against its kind's)
-export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number; barLen?: number; scale?: number;
+export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number; barLen?: number; scale?: number; profile?: Profile;
   gobos?: GoboWheel[]; prism?: { ranges?: Ranges; rot?: Ranges }; anim?: { rot?: Ranges };
   // more than two axes: endless pan / tilt (their turning channels' ranges; null: a channel without
   // ranges), a third axis (roll: how far it turns), and its endless turning
@@ -333,7 +334,9 @@ export class Rig {
     this.list = list;
     const n = Math.max(1, list.length);
     const lamps = list.reduce((s, f) => s + (f.look === 'blinder' ? 2 : f.look === 'headbar' ? (f.heads ?? 1) : 1), 0) + 1;
-    const cells = Math.max(1, list.reduce((s, f) => s + (f.kind === 'bar' ? f.cells : 0), 0));
+    // (a real fixture's cells: round ones with the rest, square ones a part of their own; each has a beam)
+    const profCells = (sq: boolean) => list.reduce((s, f) => s + (f.profile && !!f.profile.cells.square === sq ? f.profile.cells.cols * f.profile.cells.rows : 0), 0);
+    const cells = Math.max(1, list.reduce((s, f) => s + (f.kind === 'bar' && !f.profile ? f.cells : 0), 0) + profCells(false));
     const add = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number) => {
       const m = new THREE.InstancedMesh(geo, mat, count);
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.count = 0;
@@ -345,6 +348,14 @@ export class Rig {
     const looks = new Set(list.map((f) => f.look));
     for (const look of looks) {
       const count = list.filter((f) => f.look === look).length;
+      if (look === 'matrixhead') {
+        // (one set of parts for each real head there is: their shapes differ)
+        for (const name of new Set(list.filter((f) => f.look === look && f.profile).map((f) => f.profile!.name))) {
+          const prof = list.find((f) => f.profile?.name === name)!.profile!, n = list.filter((f) => f.profile?.name === name).length, mp = matrixHeadParts(prof);
+          this.parts.set(`mh:${name}:base`, add(mp.base, paint, n)); this.parts.set(`mh:${name}:yoke`, add(mp.yoke, yokeMat, n)); this.parts.set(`mh:${name}:head`, add(mp.head, paint, n));
+        }
+        continue;
+      }
       if (look === 'curtain' || look === 'flybar') {
         // a curtain's track, a fly bar's pipe: a metre long here, scaled to its cloth's width
         this.parts.set(look, add(look === 'curtain' ? new THREE.BoxGeometry(1, 0.1, 0.14) : new THREE.CylinderGeometry(0.03, 0.03, 1, 8).rotateZ(Math.PI / 2), yokeMat, count));
@@ -373,7 +384,8 @@ export class Rig {
     this.lens = add(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), lamps);
     const cone = new THREE.CylinderGeometry(1, 0, 1, 28, 1, true).translate(0, 0.5, 0);
     // (a head with a prism has up to 8 beams and pictures)
-    const facets = list.reduce((s, f) => s + (f.prism ? 7 : 0), 0);
+    const facets = list.reduce((s, f) => s + (f.prism ? 7 : 0), 0) + profCells(true) + profCells(false);
+    if (profCells(true)) { const sq = add(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), profCells(true)); sq.setColorAt(0, new THREE.Color(0)); this.parts.set('sqcell', sq); }
     this.beams = add(cone, this.beamMat, lamps + facets + cells);
     this.beamLevel = new THREE.InstancedBufferAttribute(new Float32Array(lamps + facets + cells), 1); this.beamLevel.setUsage(THREE.DynamicDrawUsage);
     this.beams.geometry.setAttribute('aLevel', this.beamLevel);
@@ -565,6 +577,7 @@ export class Rig {
       else if (f.look === 'headbar') m4.compose(pos, q, sc.set(HEADBAR_PITCH * (f.heads ?? 1) + 0.15, 0.45, 0.35));
       else if (f.look === 'winch') m4.compose(pos, q, sc.set(0.4, 0.4, 0.4));
       else if (f.cloth) m4.compose(pos, CQ.setFromAxisAngle(UPY, f.rot.yaw * RAD), sc.set(f.cloth.w, 0.5, 0.5));
+      else if (f.profile?.panel) m4.compose(pos, q, sc.set(f.profile.panel.w, 0.2, f.profile.panel.h));
       else m4.compose(pos, q, sc.set(f.kind === 'bar' ? (f.barLen ?? Math.max(1, f.cells / 30)) : 0.6 * s1, 0.7 * s1, 0.6 * s1));
       this.hit.setMatrixAt(nh++, m4); this.hitIds.push(f.id);
       if (inSel && ns < this.sel.instanceMatrix.count) this.sel.setMatrixAt(ns++, m4);   // (placed while it fades out too)
@@ -708,6 +721,36 @@ export class Rig {
         if (ball) { const i = counts.get('winch:ball') ?? 0; put('winch:ball', TMP.makeTranslation(bp.x, bp.y, bp.z)); ball.setColorAt(i, level > 0.01 ? C2.copy(col).multiplyScalar(0.35 + level * 1.2) : isSel ? sel : C2.set(0x24262c)); }
         if (level > 0.01) pushLit(fi, bp, DIR.set(0, -1, 0), col, level * 0.35, 150);
         this.winchNow.set(f.id, drop);
+      } else if (f.profile && (f.profile.panel || f.profile.head)) {
+        // a real fixture (profiles.ts): a panel where it hangs, or a moving head turned as its motors
+        // have got; its cells on its face as the manual numbers them, each with its own beam
+        const pr = f.profile, n = pr.cells.cols * pr.cells.rows, white = pr.white ? whiteOf(pr.white) : null;
+        let face: THREE.Matrix4 = base, lift = 0.004;
+        if (pr.head) {
+          const key = `mh:${pr.name}`, want = headAngles(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.optics);
+          let m = this.heads.get(f.id);
+          if (!m) this.heads.set(f.id, (m = { p: { at: NaN, v: 0 }, t: { at: NaN, v: 0 }, r: { at: NaN, v: 0 } }));
+          const pa = axisTo(m.p, want.p, dt, PAN_SPEED, f.axes?.panRot, v?.panRotation), ta = axisTo(m.t, want.t, dt, TILT_SPEED, f.axes?.tiltRot, v?.tiltRotation);
+          put(`${key}:base`, base);
+          const yoke = YOKE.copy(base).multiply(TMP.makeRotationY(pa * RAD)); put(`${key}:yoke`, yoke);
+          face = HEAD.copy(yoke).multiply(TMP.makeTranslation(0, pr.head.pivot, 0)).multiply(TMP2.makeRotationX(ta * RAD)); put(`${key}:head`, face);
+          lift = pr.head.depth / 2 + 0.004;
+        } else put('panel', TMP.copy(base).multiply(TMP2.makeScale(pr.panel!.w, pr.panel!.d / 0.02, pr.panel!.h)));
+        const fq = CQ.setFromRotationMatrix(face), dir = DIR.set(0, 1, 0).transformDirection(face), sq = this.parts.get('sqcell');
+        this.beamNow.set(f.id, pr.beamDeg);
+        for (let i = 0; i < n; i++) {
+          const cl = lightOf(cellLookAt(v, i, f.cells) ?? v, t);
+          // (a white fixture's channels are dimmers: its LEDs' own warm white)
+          if (white && !(cellLookAt(v, i, f.cells) ?? v)?.color) col.setRGB(white[0], white[1], white[2]);
+          const [cx, cz] = cellAt(pr, i), cp = CP.set(cx, lift, cz).applyMatrix4(face);
+          const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off, sz = pr.cells.size;
+          m4.compose(cp, fq, sc.set(sz, pr.cells.square ? 0.008 : 0.012, sz));
+          if (pr.cells.square && sq) { const k = counts.get('sqcell') ?? 0; put('sqcell', m4); sq.setColorAt(k, cc); }
+          else { this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++; }
+          // (25 beams side by side: each a share of the light, together as bright as one big one)
+          if (cl > 0.01) beamAt(CP.addScaledVector(dir, 0.01), dir, pr.beamDeg, cl * 0.22, col, MAX_BEAM, i % 4 === 0);
+        }
+        pushLit(fi, CP.set(0, lift, 0).applyMatrix4(face), dir, lightOf(v, t) > 0 ? col : C2.set(0, 0, 0), level, pr.beamDeg);
       } else if (f.shape) {
         // a ring or a matrix: its board in the light's x-z plane, its pixels on it, facing its up
         const at = f.shape, S = f.size! / 2, dot = Math.max(0.006, 2 * at.dot * S);

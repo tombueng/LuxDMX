@@ -12,6 +12,7 @@ import { placesOfLight, shapeSize, shapeStanding, shapeW } from '../model/pixelL
 import { DECK, defaultPlace, type Room } from './geometry';
 import type { GoboWheel, RigFixture, Sfx } from './rig';
 import { lookWidth, type Look } from './models';
+import { profileOf } from './profiles';
 import { isDropPicture } from './drops';
 
 const SFX: Sfx[] = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
@@ -45,14 +46,16 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
   // (stage machinery on a winch channel: a curtain track, a fly bar with its drop; else a kinetic winch)
   const machinery: Look | undefined = has('hoist') ? (/curtain/i.test(t?.model ?? '') ? 'curtain' : /fly bar/i.test(t?.model ?? '') ? 'flybar' : 'winch')
     : /mirror ?ball|disco ?ball|spiegelkugel/i.test(t?.model ?? '') ? 'mirrorball' : undefined;
-  const look: Look = sfx ?? (machinery ?? (c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
+  // a real fixture drawn as what it is (profiles.ts), when its type is one
+  const profile = profileOf(t?.manufacturer, t?.model);
+  const look: Look = profile?.head ? 'matrixhead' : profile?.panel ? 'panel' : sfx ?? (machinery ?? (c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
     : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel'));
   const cloth = clothOf(f, look, t);
   // (its size: its own, else its type's; a strip or a bar its length, a ring or a matrix its width,
   // anything else drawn that much bigger or smaller)
   const dims = f.dims ?? t?.physical?.dims, w = dims?.w;
   return {
-    id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
+    id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), ...(profile ? { profile } : {}), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
     p: f.p3 ? { ...f.p3 } : shape ? shapeStanding(def.p, shape).p : def.p, rot: f.rot ? { ...f.rot } : shape ? shapeStanding(def.p, shape).rot : def.rot, shape,
     size: shape && w ? w / Math.max(1e-6, shapeW(shape)) : size, ...(w && !shape && k === 'bar' ? { barLen: w } : w && !shape && k !== 'bar' && !cloth ? { scale: w / lookWidth(look) } : {}),
     // (the light's own pan / tilt range first, then its type's; swapped when it says so)

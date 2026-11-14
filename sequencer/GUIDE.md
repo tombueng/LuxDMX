@@ -36,7 +36,11 @@ wheels), you just don't have to learn a pro console to use them.
    its gobos turning and puts its prism in, a wash breathes its zoom through the colours, a PAR runs
    the colours, a bar chases along its pixels (**What the 3D stage draws** shows them all, big,
    machines included: the ⋯ menu at the top, the 3D stage's ⋯, or Ctrl+K "gallery"). A library tile plays a built-in one of its kind
-   ("like this") until it's picked; then it has come down and plays the real thing. The one picked
+   ("like this") until it's picked; then it has come down and plays the real thing, in the mode that
+   can do the most. A few lights are drawn as what they really are, from their manuals: the
+   Stairville LED Matrix Blinder 5x5 (a 45 cm plate, 25 warm white lenses, 55° each) and the Showtec
+   Phantom Matrix FX (a moving head with a 5 x 5 RGBW face, each cell its own 45° beam); more to
+   come, the rest keep their kind's look. The one picked
    is big on the right with its modes and channels (to hold next to the manual's DMX table), how
    many, where, and Add. Most cheap PARs are one of the generic types: the channel table in the
    manual ("CH1 dimmer, CH2 red...") says which. Anything

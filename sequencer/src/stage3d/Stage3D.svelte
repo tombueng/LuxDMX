@@ -527,6 +527,7 @@
       // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
       mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ballsNow().map((b) => +b.obj.rotation.y.toFixed(3)), tilt: ballsNow().map((b) => +b.obj.rotation.x.toFixed(4)) }),
       machinery: () => fixtures.filter((f) => f.cloth).map((f) => ({ name: f.name, look: f.look, at: rig.winchOf(f.id) ?? 0, travel: f.winch?.travel ?? 0, picture: f.cloth?.picture })),
+      looks: () => fixtures.map((f) => ({ name: f.name, look: f.look, profile: f.profile?.name ?? null })),
       lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
       ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: lightest(houseMats.filter((m) => m.userData.houseLeast === undefined)), glass: lightest(houseMats.filter((m) => m.userData.houseLeast !== undefined)) }),

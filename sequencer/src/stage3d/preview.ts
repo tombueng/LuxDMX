@@ -106,7 +106,10 @@ function teardown() {
 // fixed lights tipped to the floor in front), or standing on the floor facing the camera; a row of
 // them side by side, the camera back to see them all
 function placed(light: PreviewLight): Placed {
-  const t = light.type, m = t.modes.find((x) => x.name === light.mode) ?? t.modes[0], k = kindOf(m);
+  // (no mode asked for, a library tile: the one that can do the most, its pixels and colours too, so
+  // the tile shows what the light can do)
+  const richest = () => t.modes.reduce((a, b) => (b.channels.length > a.channels.length ? b : a), t.modes[0]);
+  const t = light.type, m = t.modes.find((x) => x.name === light.mode) ?? (light.mode === undefined ? richest() : t.modes[0]), k = kindOf(m);
   const n = Math.max(1, Math.min(8, light.copies ?? 1));
   const one = (i: number) => rigFixtureFull({ id: `preview${i}`, name: t.model, typeId: t.id, mode: m?.name ?? '', universe: 0, address: 1, x: 0.5, y: 0.5 } as Fixture, m, k, t, HALL);
   const list = Array.from({ length: n }, (_, i) => one(i)), rf0 = list[0];

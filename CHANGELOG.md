@@ -24,6 +24,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   deep, the cyc 32 x 19 m, two front-of-house bars, the fly tower up to 32 m. The house curtain is
   folded velvet with a valance and gold fringes; the front light is softer and the deck dark, so
   the scenes don't glare white, and the castle lost its zebra stripes.
+- **Real fixtures, the first two**: the Stairville LED Matrix Blinder 5x5 and the Showtec Phantom
+  Matrix FX are drawn as what they are on the 3D stage and in the library: the size, the 25 cells
+  in the manual's order, each cell's own beam, the blinder's warm white, the Phantom's head moving
+  on its yoke. A library tile plays the mode that can do the most, so a pixel light shows its pixels.
 - **Curves on the timeline**: the Effects track opens into a row per knob (speed, size, spread...);
   drag the line to change the effect's own value, double-click for a curve that changes the knob
   along the bar while the song plays (the output thread plays it too; nothing in the show is

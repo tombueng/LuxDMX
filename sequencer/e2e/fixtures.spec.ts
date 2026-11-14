@@ -344,3 +344,20 @@ test('one dialog: the search is live as you type over the built-in types and the
   await expect(dlg).toBeHidden();
   expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.map((f: any) => f.typeId))).toEqual([expect.stringMatching(/robe/i)]);
 });
+
+test('real fixtures drawn as what they are: the Stairville Matrix Blinder 5x5 (QLC+) a panel of 25 warm lenses, the Showtec Phantom Matrix FX (OFL) a moving 5 x 5 head', async ({ page }) => {
+  await openConnected(page);
+  await fromLibrary(page, 'matrix blinder 5x5', 'QLC+', /LED Matrix Blinder 5x5/);
+  await patchSelected(page, 1, 0, '26-Channel (26 ch)');
+  await fromLibrary(page, 'phantom matrix', 'OFL', /Phantom Matrix FX/);
+  await patchSelected(page, 1, 1, '118-Channel (118 ch)');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 45000 });
+  const looks = () => page.evaluate(() => (window as any).__stage3d?.looks?.() ?? []);
+  await expect.poll(async () => (await looks()).map((l: any) => `${l.look}:${l.profile}`).sort(), { timeout: 20000 })
+    .toEqual(['matrixhead:Showtec Phantom Matrix FX', 'panel:Stairville LED Matrix Blinder 5x5']);
+  // the blinder's LEDs on the wire: its master and each cell a dimmer, as the manual has them
+  await selectAll(page);
+  await full(page);
+  await expect.poll(async () => (await channels(0, 26)).slice(0, 26).every((v) => v === 255)).toBe(true);
+});

@@ -2,9 +2,10 @@
 // Each is built around where its light comes out: the lens at the origin, the beam along +y, the
 // body behind it (-y). A moving head comes in three parts (base, yoke, head) that turn separately.
 import * as THREE from 'three';
+import type { Profile } from './profiles';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch' | 'curtain' | 'flybar' | 'mirrorball';
+export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch' | 'curtain' | 'flybar' | 'mirrorball' | 'matrixhead';
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 
 // moving heads: the head turns about the yoke's arms at PIVOT; its lens is HEAD_LENS above that
@@ -30,6 +31,20 @@ const LENS: Partial<Record<Look, { at: number; r: number; lamps?: [number, numbe
   blinder: { at: 0, r: 0.12, lamps: [[-0.15, 0], [0.15, 0]] }, strobe: { at: 0, r: 0.2 },
 };
 export function lensOf(look: Look) { const l = LENS[look] ?? { at: 0, r: 0.1 }; return { at: l.at, r: l.r, lamps: l.lamps ?? [[0, 0]] as [number, number][] }; }
+
+// A moving head as its profile has it (profiles.ts): its base, the yoke's crossbar and two arms up to
+// where the head tilts, the head a flat box with its face (the cells) towards its up
+export function matrixHeadParts(p: Profile) {
+  const h = p.head!, [bw, bh, bd] = h.base, arm = h.arms.top - bh, aw = 0.04, ad = Math.min(0.1, bd * 0.6);
+  const base = new THREE.BoxGeometry(bw, bh, bd).translate(0, bh / 2, 0);
+  const yoke = merge([
+    new THREE.BoxGeometry(h.arms.span, 0.06, ad).translate(0, bh + 0.03, 0),
+    new THREE.BoxGeometry(aw, arm, ad).translate(-h.arms.span / 2 + aw / 2, bh + arm / 2, 0),
+    new THREE.BoxGeometry(aw, arm, ad).translate(h.arms.span / 2 - aw / 2, bh + arm / 2, 0),
+  ]);
+  const head = new THREE.BoxGeometry(h.face[0], h.depth, h.face[1]);
+  return { base, yoke, head };
+}
 
 // A moving bar: a mount on the truss (or the floor), the bar turning on it (its pan), and its heads
 // in a row along the bar, each tilting about the bar's length. The bar is a metre long here (scaled
