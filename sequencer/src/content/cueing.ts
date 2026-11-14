@@ -45,13 +45,16 @@ export function crowdTrack(kind: CrowdKind, parts: Part[], duration: number): Cr
   const mood = (at: number, m: 'chatter' | 'cheer', level: number, len = 0) => cr(at, { do: 'crowd', mood: m, level }, len);
   const cheer = (at: number, level: number, len = 4) => cr(at, { do: 'cheer', level }, len);
   const lead = -SHOW_LEAD, choruses = parts.filter((p) => p.kind === 'chorus');
+  // (a cheer swells up on its own; the crowd's mood follows a moment later, so the two never start
+  // together: on the timeline's crowd lane they were clips on top of each other)
+  const LAG = 1.6;
   // waiting: chatting (a bar's a little louder, a church's hushed)
   mood(lead, 'chatter', kind === 'bar' ? 0.55 : kind === 'calm' ? 0.4 : 0.5);
   if (kind === 'concert' || kind === 'party') {
     // the music starts: a cheer, cheering that dies away into the first part
-    cheer(-0.3, kind === 'concert' ? 1 : 0.7, 6); mood(-0.3, 'cheer', kind === 'concert' ? 0.8 : 0.55, 0.5); mood(4, 'cheer', 0, 8);
+    cheer(-0.3, kind === 'concert' ? 1 : 0.7, 6); mood(-0.3 + LAG, 'cheer', kind === 'concert' ? 0.8 : 0.55, 0.5); mood(5, 'cheer', 0, 8);
     // every chorus (a drop at the party) gets its cheer, the last one the biggest
-    for (const p of choruses) { const big = p.lastChorus; cheer(p.at, big ? 0.9 : kind === 'party' ? 0.65 : 0.5, big ? 6 : 4); if (kind === 'party' || big) { mood(p.at, 'cheer', big ? 0.6 : 0.4, 0.5); mood(p.at + 6, 'cheer', 0, 6); } }
+    for (const p of choruses) { const big = p.lastChorus; cheer(p.at, big ? 0.9 : kind === 'party' ? 0.65 : 0.5, big ? 6 : 4); if (kind === 'party' || big) { mood(p.at + LAG, 'cheer', big ? 0.6 : 0.4, 0.5); mood(p.at + 6, 'cheer', 0, 6); } }
   } else if (kind === 'calm') {
     mood(-2, 'chatter', 0, 3);                      // (hushed as it starts)
   } else {
@@ -62,7 +65,7 @@ export function crowdTrack(kind: CrowdKind, parts: Part[], duration: number): Cr
   // the end: cheering, then chatting as they get up
   const last = [...parts].reverse().find((p) => p.kind === 'outro');
   const end = Math.max(0, (last ? last.end : duration) - 0.5);
-  cheer(end, kind === 'bar' ? 0.6 : 1, 6); mood(end, 'cheer', kind === 'bar' ? 0.5 : 0.8, 1); mood(end + 3, 'chatter', 0.4, 4);
+  cheer(end, kind === 'bar' ? 0.6 : 1, 6); mood(end + LAG, 'cheer', kind === 'bar' ? 0.5 : 0.8, 1); mood(end + 4.5, 'chatter', 0.4, 4);
   return out.sort((a, b) => a.at - b.at);
 }
 

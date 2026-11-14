@@ -37,6 +37,9 @@ describe('the templates play as shows', () => {
       // the audience: chatting while it waits, cheering at the end
       expect(crowdAt(tl.crowd, -4).chatter, t.name).toBeGreaterThan(0.2);
       expect(loudness(crowdAt(tl.crowd, tl.duration + 1)), t.name).toBeGreaterThan(0.4);
+      // (no two of its moments start together: on the crowd lane they'd be clips on top of each other)
+      const at = tl.crowd!.map((c) => c.at).sort((a, b) => a - b);
+      for (let i = 1; i < at.length; i++) expect(at[i] - at[i - 1], t.name).toBeGreaterThan(1);
       // the machines: only the ones the show takes
       const fired = new Set(tl.items.filter((i) => i.do.do === 'burst').map((i) => (i.do as { attr: string }).attr));
       for (const a of fired) if (a !== 'blinder') expect(TEMPLATE_SHOWS[t.name].hits, `${t.name}: ${a}`).toContain(a);
