@@ -801,7 +801,8 @@
       <button class="ghost" onclick={() => jump(P.start)} aria-label="Back to the start" title="Back to the start (Home)"><Icon name="back" /></button>
       <button class="primary play" onclick={() => P.toggle()} aria-label={P.playing ? 'Pause' : 'Play'} title="Play / pause (Space)"><Icon name={P.playing ? 'stop' : 'play'} />{P.playing ? 'Pause' : 'Play'}</button>
       <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(P.duration || tl?.duration || span.to, false)}</span></span>
-      <label class="bpm">BPM <input type="number" min="40" max="240" value={tl?.bpm ?? app.show.settings.bpm} aria-label="Timeline BPM"
+      <!-- (a found tempo has its tenth: shown whole, as the top bar shows it while the song plays) -->
+      <label class="bpm">BPM <input type="number" min="40" max="240" step="0.1" value={Math.round((tl?.bpm ?? app.show.settings.bpm) * 10) / 10} aria-label="Timeline BPM"
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (v >= 40 && v <= 240) { app.timeline.ensure().bpm = v; app.markDirty(0); } }} /></label>
       <span class="vol"><button class="ghost snd" class:off={!P.soundHere} aria-pressed={P.soundHere} onclick={() => P.setSoundHere(!P.soundHere)} aria-label="Sound here"
         title={P.soundHere ? "The song plays out of this device. Click for no sound here (a band playing live): the song's clock runs on" : 'No sound here: the song runs silently (a video of the 3D stage still gets it). Click for sound here'}><Icon name="music" size={14} /></button><input
@@ -961,7 +962,7 @@
   @container app (min-width: 95.72rem) and (max-width: 107.14rem) { .vol input { width: 4.5rem; } }
   .play { min-width: 6.5rem; }
   .clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
-  .bpm input { width: 4.2em; }
+  .bpm input { width: 5.4em; }
   .vol { display: inline-flex; align-items: center; gap: .3rem; } .vol input { width: 6rem; }
   .name { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .grow { flex: 1; }

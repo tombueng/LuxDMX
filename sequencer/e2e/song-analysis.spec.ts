@@ -73,7 +73,8 @@ test('an own song file: tempo, first downbeat and parts found on load, the last 
   expect(JSON.stringify(t.sections)).not.toContain('Old');
   await expect(page.locator('.tlv .sec')).toHaveCount(t.sections.length);
   await expect(page.locator('.tlv .sec').first()).toHaveText('Intro');
-  await expect(page.locator('.tlv .transport').getByLabel('Timeline BPM')).toHaveValue(String(t.bpm));
+  // (shown to its tenth, as the top bar shows it)
+  await expect(page.locator('.tlv .transport').getByLabel('Timeline BPM')).toHaveValue(String(Math.round(t.bpm * 10) / 10));
   // undo: what was found goes (the song stays, without the old song's tempo or parts); redo brings it back
   await page.locator('body').press('Control+z');
   await expect.poll(async () => { const u = await tl(page); return [u.audio?.name, u.bpm ?? null, u.offset ?? null, u.sections ?? null]; }).toEqual(['my-band.wav', null, null, null]);
@@ -154,4 +155,19 @@ test('noise: no steady beat found, says so, sets no tempo and no parts', async (
   const t = await tl(page);
   expect([t.audio.name, t.bpm ?? null, t.sections ?? null]).toEqual(['wind.wav', null, null]);
   await expect(page.locator('.tlv .sec')).toHaveCount(0);
+});
+
+test('a found tempo with its tenth (155.8): the timeline\'s BPM field shows it whole, the same as the top bar while the song plays', async ({ page }) => {
+  await bar(page);
+  await load(page, 'my-band.wav', band());
+  await expect(page.locator('.toast')).toContainText(/BPM, first beat/, { timeout: 20000 });
+  await page.evaluate(() => { (window as any).__luxdmx.timeline.ensure().bpm = 155.8; });
+  const field = page.locator('.tlv .transport').getByLabel('Timeline BPM');
+  await expect(field).toHaveValue('155.8');
+  // (its text fits the field: it read "155", the tenth cut off)
+  expect(await field.evaluate((el: HTMLInputElement) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.play());
+  const top = page.locator('.top').getByLabel('BPM', { exact: true });
+  await expect.poll(() => top.inputValue()).toBe('155.8');
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
 });

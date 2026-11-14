@@ -160,7 +160,7 @@
   {#if !app.locked}
   <span class="bpm" title="Tempo: beat-based cues and effects follow it. Tap along to the music.">
     <!-- following the music: the tempo shown is the one everything runs at -->
-    {#if app.bpm !== app.show.settings.bpm}<input type="number" value={app.bpm} readonly class="frommusic" aria-label="BPM" title="From the music (♪) or the song playing on the timeline. Your own tempo comes back when they stop." />
+    {#if app.bpm !== app.show.settings.bpm}<input type="number" value={Math.round(app.bpm * 10) / 10} readonly class="frommusic" aria-label="BPM" title="From the music (♪) or the song playing on the timeline. Your own tempo comes back when they stop." />
     <!-- (only a tempo that can be one goes in: typing 90 went through 9 BPM, a 1 froze the chases,
          an emptied field stopped the beat clock dead; between 20 and 300, back as it was when left empty) -->
     {:else}<NumField value={app.show.settings.bpm} min={20} max={300} required label="BPM" width="4.2em" onset={(v) => { if (v !== undefined) { app.show.settings.bpm = Math.round(v); app.markDirty(); } }} />{/if}<span class="lab">BPM</span>
