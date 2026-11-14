@@ -1,7 +1,7 @@
 // Safety on the wire: blind keeps the stage as it was (nothing new goes out until you go live);
 // confetti, flames, sparks and CO2 send 0 until someone holds Arm; a timeline jumped about over a
 // flame moment never fires it, playing through it does (armed).
-import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, welcome, demoTile, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, welcome, demoTile, startTemplate, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -188,5 +188,22 @@ test('a template\'s show: its confetti moment sends 0 while the machines are saf
   // armed: the same moment fires it
   await page.evaluate(() => (window as any).__luxdmx.armMachines(true));
   expect(Math.max(0, ...(await through()))).toBeGreaterThan(0);
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(false));
+});
+
+test('a machine\'s button pressed while safe says so ("Safe: not firing"), instead of lighting up as if it fired; armed it lights up', async ({ page }) => {
+  await openConnected(page);
+  await startTemplate(page, 'Wedding');
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const sparks = page.locator('.live .tile.list').filter({ hasText: 'Sparks' }).first();
+  await sparks.click();
+  await expect(sparks).toHaveClass(/\bsafe\b/);
+  await expect(sparks).toContainText('Safe: not firing');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.engine.status((window as any).__luxdmx.show.cueLists.find((l: any) => l.name === 'Sparks').id).running), { timeout: 5000 }).toBe(false);
+  // armed: pressed, it lights up as it fires
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(true));
+  await sparks.click();
+  await expect(sparks).toHaveClass(/\bon\b/);
+  await expect(sparks).not.toHaveClass(/\bsafe\b/);
   await page.evaluate(() => (window as any).__luxdmx.armMachines(false));
 });

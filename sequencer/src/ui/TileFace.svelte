@@ -136,7 +136,7 @@
     {#if face.inert}<span class="sub">not while locked</span>{:else if touchy && !editing}<span class="sub">{grabbed ? 'drag' : 'hold, then drag'}</span>{/if}
   </div>
 {:else}
-  <button class="tile {face.type}" class:on={face.on} class:pressed class:editing class:selected class:missing={face.missing || face.inert} class:inert={face.inert} class:wide={face.wide}
+  <button class="tile {face.type}" class:on={face.on} class:safe={face.safe} class:pressed class:editing class:selected class:missing={face.missing || face.inert} class:inert={face.inert} class:wide={face.wide}
           style="--c:{face.color}" aria-pressed={face.on} aria-disabled={face.inert || undefined} data-widget={face.id}
           onpointerdown={down} onpointermove={settleMove} onpointerup={(e) => { settleUp(); tapUp(e); up(); }} onpointercancel={() => { tap = null; if (settle) { clearTimeout(settle.t); settle = null; } up(); }} onlostpointercapture={up}
           onkeydown={(e) => key(e, true)} onkeyup={(e) => key(e, false)} data-no-longpress={!editing || undefined}
@@ -151,7 +151,7 @@
       <span class="pic fxp"><EffectPreview kind={face.fx.kind} params={face.fx.params} w={130} h={34} bpm={face.fx.bpm} paused={!face.on} /></span>
     {/if}
     <span class="t">{face.label}</span>
-    {#if face.sub}<span class="sub">{face.sub}</span>{/if}
+    {#if face.safe}<span class="sub safe-note">Safe: not firing</span>{:else if face.sub}<span class="sub">{face.sub}</span>{/if}
     {#if face.bar !== undefined}<span class="bar"><span style="width:{Math.max(0, Math.min(1, face.bar)) * 100}%"></span></span>{/if}
     {#if face.risk === 'hazard'}<span class="risk hazard" title="Fires a machine (flames, sparks or CO2): only while armed"><Icon name="warn" size={12} /><span class="sr">fires a machine</span></span>
     {:else if face.risk === 'once'}<span class="risk once" title="Fires confetti (once): only while armed">1×<span class="sr">fires once</span></span>{/if}
@@ -193,6 +193,9 @@
   .tile.on .glyph { color: var(--text); }
   .burst { position: absolute; right: .4rem; bottom: .4rem; font-size: .76rem; padding: .1rem .45rem; border-radius: 999px; border: 1px solid var(--line2); color: var(--muted); background: var(--panel); }
   .burst:hover { color: var(--text); border-color: var(--c); }
+  /* (on while the machines are safe: it runs, but nothing fires: not lit up as if it did) */
+  .tile.on.safe { background: var(--panel2); border-style: dashed; box-shadow: none; }
+  .sub.safe-note { color: var(--orange); font-weight: 700; }
   .risk { position: absolute; top: .3rem; right: .35rem; display: inline-flex; align-items: center; font: 700 .72rem ui-monospace, monospace; color: var(--orange); background: #000a; border-radius: 4px; padding: .05rem .2rem; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .key { position: absolute; top: .35rem; right: .4rem; font: 600 .76rem ui-monospace, monospace; color: var(--faint); border: 1px solid var(--line2); border-radius: 4px; padding: 0 .25rem; }

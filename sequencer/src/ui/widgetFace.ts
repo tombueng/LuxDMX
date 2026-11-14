@@ -27,6 +27,7 @@ export interface Face {
   burst?: number;                 // fog: seconds of the burst button next to it
   fx?: { kind: string; params: Record<string, unknown>; bpm: number };   // an effect's preview
   risk?: 'once' | 'hazard';       // it fires confetti (once) or flames, sparks or CO2 (model/safety.ts)
+  safe?: boolean;                 // on, but the machines aren't armed: nothing fires (it lit up as if it did)
 }
 
 const GLYPH_LIST: Record<string, string> = { go: 'play', back: 'back', release: 'stop', flash: 'bolt', toggle: 'loop', solo: 'eye', select: 'note' };
@@ -146,6 +147,6 @@ export function widgetFace(app: App, w: Widget, manyLists = false, now = perform
   if (w.type === 'effect' && fx) face.fx = { kind: fx.kind, params: fx.params, bpm: app.bpm };
   // what it sets off, marked on the tile: a cue's own values and the lists it plays, a list's cues
   const risk = cue ? cueRiskOf(app.show, cue, app.showRev) : list && (w.type === 'cuelist' || (w.type === 'list' && w.action !== 'select' && w.action !== 'release')) ? listRiskOf(app.show, list, app.showRev) : 'light';
-  if (risk === 'once' || risk === 'hazard') face.risk = risk;
+  if (risk === 'once' || risk === 'hazard') { face.risk = risk; if (face.on && !app.sfxArmed) face.safe = true; }
   return face;
 }
