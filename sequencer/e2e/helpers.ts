@@ -170,3 +170,11 @@ export async function lockPage(page: Page) {
   await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
   await page.getByRole('menuitem', { name: /^Lock without a PIN/ }).click();
 }
+
+// A setting as the app keeps it (src/store/kept.ts: {"v": n, "data": …}); a value from before
+// versions as it was
+export const keptValue = (page: Page, key: string, session = false) => page.evaluate(([k, s]) => {
+  const r = (s ? sessionStorage : localStorage).getItem(k as string);
+  if (r === null) return null;
+  try { const j = JSON.parse(r); return j && typeof j === 'object' && 'v' in j && 'data' in j ? j.data : j; } catch { return r; }
+}, [key, session] as const);

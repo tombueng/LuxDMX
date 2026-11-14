@@ -4,7 +4,7 @@
 // browser without MediaRecorder says so.
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { openConnected, resetFake, test, expect, startTemplate } from './helpers';
+import { openConnected, resetFake, test, expect, startTemplate, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 // (the 3D stage draws in software in the test browser: slow when the machine is busy)
@@ -98,7 +98,7 @@ test('As shown: the take is the size on the screen (even numbers), and closing t
   expect((await readFile((await dl.path())!)).length).toBeGreaterThan(2000);
   await expect(page.locator('.s3')).toHaveCount(0);
   // the size choice stays with the browser
-  expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.video3d'))).toBe('shown');
+  expect(await keptValue(page, 'luxdmx.seq.video3d')).toBe('shown');
 });
 
 test('a browser that can\'t record says so instead of failing', async ({ page }) => {

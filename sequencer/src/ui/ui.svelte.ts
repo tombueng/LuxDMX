@@ -13,8 +13,7 @@ export interface MenuItem {
 }
 
 export type ModalName = 'welcome' | 'shows' | 'addFixtures' | 'gallery' | 'effects' | 'shortcuts' | 'palette' | 'guide' | 'monitor' | 'fogTimer' | 'patchCheck' | 'remote' | 'schedule' | 'rig';
-const ZOOM_KEY = 'luxdmx.seq.zoom';
-const HINTS_KEY = 'luxdmx.seq.hints';
+import { HINTS, STAGE_3D, ZOOM } from '../store/kept';
 
 class Ui {
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -52,9 +51,9 @@ class Ui {
   }
   zoom = $state(1);                          // UI size, saved per browser
   // the stage in 3D instead of the plan (saved per browser)
-  private s3 = $state((() => { try { return localStorage.getItem('luxdmx.seq.stage3d') === '1'; } catch { return false; } })());
+  private s3 = $state(STAGE_3D.get());
   get stage3d() { return this.s3; }
-  set stage3d(v: boolean) { this.s3 = v; this.s3now = v; try { localStorage.setItem('luxdmx.seq.stage3d', v ? '1' : '0'); } catch { /* not remembered */ } }
+  set stage3d(v: boolean) { this.s3 = v; this.s3now = v; STAGE_3D.set(v); }
   // the same, plain: what it is now even in a teardown (Svelte gives a teardown the value from before
   // the change that's tearing it down: the 3D stage closing because 2D was picked would read "3D")
   private s3now = this.s3;
@@ -73,7 +72,7 @@ class Ui {
   // The one-line hints at the top of the panels: on until someone hides them (remembered).
   private hintsOn = $state(true);
   get help() { return this.hintsOn; }
-  set help(v: boolean) { this.hintsOn = v; try { localStorage.setItem(HINTS_KEY, v ? '1' : '0'); } catch { /* not remembered */ } }
+  set help(v: boolean) { this.hintsOn = v; HINTS.set(v); }
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   // A context menu at the pointer, or under the button that opened it (so it never covers it).
@@ -99,13 +98,13 @@ class Ui {
   }
 
   constructor() {
-    try { this.zoom = Math.max(0.7, Math.min(1.6, +(localStorage.getItem(ZOOM_KEY) ?? 1) || 1)); } catch { /* storage blocked */ }
-    try { this.hintsOn = localStorage.getItem(HINTS_KEY) !== '0'; } catch { /* shown */ }
+    this.zoom = ZOOM.get();
+    this.hintsOn = HINTS.get();
     this.applyZoom();
   }
   setZoom(z: number) {
     this.zoom = Math.round(Math.max(0.7, Math.min(1.6, z)) * 100) / 100;
-    try { localStorage.setItem(ZOOM_KEY, String(this.zoom)); } catch { /* not saved, still applied */ }
+    ZOOM.set(this.zoom);
     this.applyZoom();
   }
   private applyZoom() { if (typeof document !== 'undefined') document.documentElement.style.fontSize = `${87.5 * this.zoom}%`; }

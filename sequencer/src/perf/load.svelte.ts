@@ -6,9 +6,9 @@
 // has been on time for a while, it comes back up to the quality chosen. The display shows the
 // page's load (its own work on the main thread), the graphics card's time per 3D frame where the
 // browser can measure it, and the output: frames a second and the longest gap.
+import { QUALITY } from '../store/kept';
 export type Level = 0 | 1 | 2;                    // low, medium, high
 export const LEVEL_NAME = ['Low', 'Medium', 'High'] as const;
-const KEY = 'luxdmx.seq.quality';
 const PERIOD = 25;                                // ms between output frames (40 a second)
 const LATE = 10;                                  // a frame this much later than due is late
 const WINDOW = 5000;                              // the display and the governor look back this far
@@ -16,7 +16,7 @@ const WINDOW = 5000;                              // the display and the governo
 export class Load {
   // the quality chosen (the most the drawing may do)
   // (nothing stored: High. Number(null) is 0, which made everyone's default Low: no glow, 20 frames)
-  quality = $state<Level>((() => { try { const s = localStorage.getItem(KEY), v = s === null ? 2 : Number(s); return v === 0 || v === 1 ? v : 2; } catch { return 2; } })());
+  quality = $state<Level>(QUALITY.get());
   // what's drawn now: the chosen quality, or lower while the output needs the time
   level = $state<Level>(2);
   // the stage pictures get new values every n-th output frame (1: every frame)
@@ -48,7 +48,7 @@ export class Load {
     this.quality = q;
     if (this.level > q) this.level = q;
     if (this.level2d > q) this.level2d = q;
-    try { localStorage.setItem(KEY, String(q)); } catch { /* this visit only */ }
+    QUALITY.set(q);
   }
   // an output frame ran at t0 (ms, performance.now()) and took `ms`
   tick(t0: number, ms: number) {

@@ -6,7 +6,7 @@
 // starts (and the sound coming out of it with it), it loads chatter and cheering only (no applause,
 // no claps), its switch in the transport silences it, and its chips have no Clapping.
 import type { Page } from '@playwright/test';
-import { channels, demo, openConnected, resetFake, test, expect, startTemplate } from './helpers';
+import { channels, demo, openConnected, resetFake, test, expect, startTemplate, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -152,7 +152,7 @@ test("the crowd: its sound node is there, louder when the music starts, and its 
   await sw.click();
   await expect(sw).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.crowd.node.gain.value), { timeout: 3000 }).toBeLessThan(0.01);
-  expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.crowd'))).toBe('off');
+  expect(await keptValue(page, 'luxdmx.seq.crowd')).toBe(false);
   await sw.click();
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.crowd.node.gain.value), { timeout: 3000 }).toBeGreaterThan(0.3);
   await page.evaluate(() => (window as any).__luxdmx.timeline.pause());

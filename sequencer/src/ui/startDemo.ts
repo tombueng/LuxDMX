@@ -6,8 +6,20 @@ import { ui } from './ui.svelte';
 import { CATALOG, GENRES } from '../timeline/catalog';
 import { creditOf, downloadSong, SongError } from '../timeline/download';
 import { DEMO_SONG } from '../timeline/beat';
+import { keepDemoSongs } from '../store/songCache';
 
 export { DEMO_SONG };
+// the songs of the demos and the templates' shows
+export async function demoSongIds(): Promise<string[]> {
+  const [{ DEMOS }, { TEMPLATE_SHOWS }] = await Promise.all([import('../content/demos'), import('../content/templateShows')]);
+  return [...new Set([...DEMOS.map((d) => d.song), ...Object.values(TEMPLATE_SHOWS).map((t) => t.song)].filter((x): x is string => !!x && !!demoSong(x)))];
+}
+async function keepTheDemoSongs() {
+  const ids = await demoSongIds();
+  // (after the show has had its start: the songs share the network with nothing it needs)
+  await new Promise((r) => setTimeout(r, 8000));
+  await keepDemoSongs(ids, (id) => downloadSong(demoSong(id)!, () => {}));
+}
 export const demoSong = (id: string | null) => (id ? CATALOG.find((s) => s.id === id) : undefined);
 
 // `song`: a catalog id, or null for the demo beat. `ready`: the song is here (or isn't coming), the
@@ -45,8 +57,11 @@ export async function startDemo(song: string | null = DEMO_SONG, progress: (got:
     } catch { why = `"${s.title}" came down, but it doesn't play in this browser: the show runs without sound`; }
   }
   await app.timeline.play();
+  // a demo's song used: the other demos' and templates' songs come down too, in the background, so
+  // they all play offline later (store/songCache.ts)
+  if (file && s) void keepTheDemoSongs();
   const len = Math.round(app.timeline.duration / 60), what = `${d.name}: ${app.show.fixtures.length} lights`;
-  if (why) ui.toast(`${why}. The demo plays on the demo beat instead (made here, nothing to download).`, 7000);
+  if (why) ui.toast(`${why.replace(/\.$/, '')}. The demo plays on the demo beat instead (made here, nothing to download).`, 7000);
   else ui.toast(file && s ? `${what}, to "${s.title}" by ${s.artist} (${GENRES[s.genre]}), cued to its parts. Space pauses; Live (top) for the buttons; full screen on the 3D stage.`
     : `${what}, ${len} minute${len === 1 ? '' : 's'} on the demo beat. Space pauses; Live (top) for the buttons; full screen on the 3D stage.`, 6000);
 }

@@ -5,6 +5,7 @@ dist/
 test-results/
 playwright-report/
 dist-offline-test/
+dist-profile/
 # LuxDMX Link builds (node scripts/build-link.mjs)
 public/link/
 # ...and quick local ones (go build in link/)

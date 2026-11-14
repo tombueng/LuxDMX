@@ -4,7 +4,7 @@
 // comes back in through Import and runs the same; a file that isn't one is refused and said.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { openConnected, patch, channels, pixelPorts, resetFake, selectAll, tab, test, expect, FAKE } from './helpers';
+import { openConnected, patch, channels, pixelPorts, resetFake, selectAll, tab, test, expect, FAKE, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 const lib = (page: Page) => page.getByRole('dialog', { name: 'Add an effect' });
@@ -95,7 +95,7 @@ test('shared as a file, imported again, it runs the same; a file that isn\'t one
   expect(effects.length).toBe(2);
   expect(effects[1].params.vals).toEqual({ glow: '#ff00ff' });
   // kept after a reload of the library
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('luxdmx.seq.addons.imported') ?? '[]').length)).toBe(1);
+  expect(((await keptValue(page, 'luxdmx.seq.addons.imported')) as unknown[] | null)?.length).toBe(1);
   // a file that isn't one
   const junk = info.outputPath('junk.luxfx');
   fs.writeFileSync(junk, JSON.stringify({ format: 'luxdmx-effect', formatVersion: 1, id: 'x.y', name: 'Bad', author: { name: 'X' }, code: { lang: 'luxfx-1', pixel: 'document.cookie' } }));
@@ -148,11 +148,11 @@ test('another source, in the submenu: a warning, a tick that you trust it, its e
   const greens = async () => { const c = await channels(10, 510); let n = 0; for (let i = 0; i + 2 < c.length; i += 3) if (c[i + 1] > 40 && c[i] === 0) n++; return n; };
   await expect.poll(greens, { timeout: 8000 }).toBeGreaterThan(20);
   // kept in this browser; removed, gone
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('luxdmx.seq.addons.sources') ?? '[]'))).toEqual([`http://${FAKE}/repo/`]);
+  expect(await keptValue(page, 'luxdmx.seq.addons.sources')).toEqual([`http://${FAKE}/repo/`]);
   await openLibrary(page);
   await expect(lib(page).getByRole('heading', { name: /From A tester's effects/ })).toBeVisible();
   await lib(page).getByRole('button', { name: 'More sources…' }).click();
   await lib(page).getByRole('button', { name: "Remove A tester's effects" }).click();
   await expect(lib(page).getByRole('heading', { name: /From A tester's effects/ })).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.addons.sources'))).toBe('[]');
+  expect(await keptValue(page, 'luxdmx.seq.addons.sources')).toEqual([]);
 });

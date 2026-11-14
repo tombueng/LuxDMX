@@ -482,9 +482,19 @@ Three more demos come with their own room on the 3D stage:
     jumps a level or starts a list); a pad is a flash: full while held, back when let go. A control
     a live page's button had goes to the console (learning it says so).
 - **Background tabs** don't slow the output down (the clock runs in a Worker).
-- **No internet at the venue?** Open the app once at home: it keeps itself and works offline after
-  that (shows live in the browser anyway). Chrome and Edge can also install it as an app (the
-  install icon in the address bar), so it opens in its own window without browser bars.
+- **No internet at the venue?** Open the app once at home: it keeps all of itself and works
+  offline after that (shows live in the browser anyway). A Wi-Fi without internet doesn't hold it
+  up: after 4 seconds without an answer it starts from its own copy. Chrome and Edge can also
+  install it as an app (the install icon in the address bar), so it opens in its own window
+  without browser bars.
+- **Songs offline**: a song of the catalog played once while online stays in this browser and plays
+  offline later. Play one of the demos' or templates' songs and all of them come down in the
+  background (ten songs, about 80 MB), so every demo plays at the venue.
+- **Updates come by themselves.** The app looks for a new version when it starts, every half hour
+  and when you come back to it. A new one comes down in the background and goes in at a quiet
+  moment (nothing playing, nothing held in the programmer, the show saved, nobody at the keys for a
+  minute and a half): the page reloads once and says it was updated. Never in the middle of a show:
+  then it waits, and the next start is on the new version anyway.
 - **Colours from a picture**: the picture button in Presets, Colours (or drop an image on the
   panel) turns the main colours of a poster, an album cover or a photo of the room into colour
   presets, and with lights selected offers a slow colour fade through them. Ctrl+K finds it too ("poster", "photo").

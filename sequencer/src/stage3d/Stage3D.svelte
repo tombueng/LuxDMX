@@ -26,6 +26,7 @@
 </script>
 
 <script lang="ts">
+  import { AMBIENT_3D, CAM_3D, GLOW_3D, HAZE_3D, RENDER_OPTS, SCREENS_LIVE, SEL_PANEL_OPEN, SPILL_3D, VIDEO_SIZE } from '../store/kept';
   // The stage in 3D: the venue, the lights as they are right now (beams in the haze, pools on the
   // deck, moving heads turning), the effect machines' confetti, bubbles, flames and sparks. Drag to
   // look around; click a light to select it (the same selection as the 2D stage). Move and Turn
@@ -73,19 +74,18 @@
   type Mode = 'select' | 'move' | 'turn' | 'aim' | 'calib' | 'measure';
   let mode = $state<Mode>('select');
   // the glow round bright lights and the haze in the air: two sliders, kept per browser
-  const stored = (k: string, d: number) => { try { const v = localStorage.getItem(k); return v === null ? d : Math.max(0, Math.min(1.5, Number(v) || 0)); } catch { return d; } };
-  let glow = $state(Math.min(0.8, stored('luxdmx.seq.glow3', 0.3)));
-  let hazeAmt = $state(stored('luxdmx.seq.haze', 0.45));
+  let glow = $state(GLOW_3D.get());
+  let hazeAmt = $state(HAZE_3D.get());
   // the LED screens beside the stage show the Broadcast camera live (off: the band's name, painted)
-  let liveScreens = $state((() => { try { return localStorage.getItem('luxdmx.seq.screensLive') !== '0'; } catch { return true; } })());
-  function setLiveScreens(on: boolean) { liveScreens = on; try { localStorage.setItem('luxdmx.seq.screensLive', on ? '1' : '0'); } catch { /* storage blocked */ } }
+  let liveScreens = $state(SCREENS_LIVE.get());
+  function setLiveScreens(on: boolean) { liveScreens = on; SCREENS_LIVE.set(on); }
   // the room's own light (the night sky, the house, reflections): how much of the venue you see
   // besides your lights. On a curve like the eye's (most of the slider is the dark end); 1 is a
   // little more than it always had, it starts at about a third of that
-  let ambient = $state(Math.min(1, stored('luxdmx.seq.ambient2', 0.6)));
+  let ambient = $state(AMBIENT_3D.get());
   // how much your lights light up the room round them (the band, the deck, the walls, the haze's
   // glow): 1 as it always was, 0 only their beams and the light where they land
-  let spill = $state(Math.min(1, stored('luxdmx.seq.spill', 0.45)));
+  let spill = $state(SPILL_3D.get());
   const ambLight = (s: number) => 1.25 * Math.pow(s, 2.2);
   let hemi: THREE.HemisphereLight | undefined, keyLight: THREE.DirectionalLight | undefined;
   let houseOf: THREE.Object3D | undefined, houseMats: THREE.MeshBasicMaterial[] = [];
@@ -141,13 +141,12 @@
 
   // the camera views (where each one is depends on the room: geometry.ts ROOMS)
   const VIEWS: Record<ViewKey, string> = { front: 'Front', foh: 'FOH', side: 'Side', top: 'Top', band: 'From the stage' };
-  const CAM_KEY = 'luxdmx.seq.cam3d';
   let camSaved = 0;
   function keepCam() {
     const now = performance.now();
     if (now - camSaved < 250) return;
     camSaved = now;
-    try { sessionStorage.setItem(CAM_KEY, JSON.stringify({ p: camera.position.toArray().map((v) => +v.toFixed(3)), t: controls.target.toArray().map((v) => +v.toFixed(3)), cam: camMode, pick: camPick })); } catch { /* not kept */ }
+    CAM_3D.set({ p: camera.position.toArray().map((v) => +v.toFixed(3)), t: controls.target.toArray().map((v) => +v.toFixed(3)), cam: camMode, pick: camPick });
   }
   function view(k: ViewKey) {
     const v = room.views[k]; camMode = null; lensBack();
@@ -363,8 +362,8 @@
     if (custom) scene.add(custom);
     lensBase = 0; lensSet = 0;
     restoreCam();
-    glow = Math.min(0.8, stored('luxdmx.seq.glow3', 0.3)); hazeAmt = stored('luxdmx.seq.haze', 0.45); ambient = Math.min(1, stored('luxdmx.seq.ambient2', 0.6)); spill = Math.min(1, stored('luxdmx.seq.spill', 0.45));
-    try { liveScreens = localStorage.getItem('luxdmx.seq.screensLive') !== '0'; } catch { /* as it was */ }
+    glow = GLOW_3D.get(); hazeAmt = HAZE_3D.get(); ambient = AMBIENT_3D.get(); spill = SPILL_3D.get();
+    liveScreens = SCREENS_LIVE.get();
     composer.setPixelRatio(renderer.getPixelRatio());
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook;
   }
@@ -529,8 +528,7 @@
   // the camera where it was in this tab (a reload, back from 2D, or as the last view left it): not
   // back at the front
   function restoreCam() {
-    let cam: { p: number[]; t: number[]; tour?: boolean; cam?: unknown; pick?: unknown } | null = null;
-    try { cam = JSON.parse(sessionStorage.getItem(CAM_KEY) ?? 'null'); } catch { /* none */ }
+    const cam = CAM_3D.get() as { p?: number[]; t?: number[]; tour?: boolean; cam?: unknown; pick?: unknown } | null;
     if (cam && cam.p?.length === 3 && cam.t?.length === 3 && [...cam.p, ...cam.t].every(Number.isFinite)) {
       camera.position.set(cam.p[0], cam.p[1], cam.p[2]); controls.target.set(cam.t[0], cam.t[1], cam.t[2]); controls.update();
       // (and the camera move that was running, and the one picked)
@@ -1140,16 +1138,15 @@
   async function fullscreen() {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await host!.requestFullscreen(); } catch { ui.toast('This browser won\'t go full screen here'); }
   }
-  $effect(() => { try { localStorage.setItem('luxdmx.seq.glow3', String(glow)); localStorage.setItem('luxdmx.seq.haze', String(hazeAmt)); localStorage.setItem('luxdmx.seq.ambient2', String(ambient)); localStorage.setItem('luxdmx.seq.spill', String(spill)); } catch { /* not remembered */ } });
+  $effect(() => { GLOW_3D.set(glow); HAZE_3D.set(hazeAmt); AMBIENT_3D.set(ambient); SPILL_3D.set(spill); });
   const pickedName = $derived(app.selected.length === 1 ? app.show.fixtures.find((f) => f.id === app.selected[0])?.name : app.selected.length ? `${app.selected.length} lights` : '');
 
   // ---- a video of the stage with its sound (the timeline's song or the demo beat): Record starts a
   // take, the REC chip counts, Stop saves the file. A 1080p take draws at 1920 x 1080 while it
   // runs (letterboxed here) and goes back to the window's size after; a 9:16 one (phones: Reels,
   // Stories) at 1080 x 1920, with a lens wide enough across for the band and the lights.
-  const VIDEO_KEY = 'luxdmx.seq.video3d';
-  let videoSize = $state<VideoSize>((() => { try { const v = localStorage.getItem(VIDEO_KEY); return VIDEO_SIZES.find((s) => s === v) ?? '1080p'; } catch { return '1080p'; } })());
-  $effect(() => { try { localStorage.setItem(VIDEO_KEY, videoSize); } catch { /* not remembered */ } });
+  let videoSize = $state<VideoSize>(VIDEO_SIZES.find((s) => s === VIDEO_SIZE.get()) ?? '1080p');
+  $effect(() => { VIDEO_SIZE.set(videoSize); });
   const recordable = canRecord();
   // (a browser that only makes WebM, like Firefox: Instagram and many phones want MP4)
   const webmOnly = recordable && (() => { try { return pickFormat((t) => MediaRecorder.isTypeSupported(t))?.ext === 'webm'; } catch { return false; } })();
@@ -1187,20 +1184,17 @@
   // from the song's file. The live show isn't touched: the render runs its own copy of the show,
   // nothing goes out from it, the box keeps getting what it got. While it runs this stage shows the
   // frames being drawn.
-  const RENDER_KEY = 'luxdmx.seq.render3d';
   type ROpts = { size: RenderSize; fps: RenderFps; what: 'song' | 'here' | 'look'; seconds: number; programmer: boolean };
   const R_DEFAULT: ROpts = { size: '4k', fps: 30, what: 'song', seconds: 30, programmer: false };
   let rOpts = $state<ROpts>((() => {
-    try {
-      const v = { ...R_DEFAULT, ...JSON.parse(localStorage.getItem(RENDER_KEY) ?? '{}') } as ROpts;
-      if (!RENDER_ORDER.includes(v.size)) v.size = R_DEFAULT.size;
-      if (!RENDER_FPS.includes(v.fps)) v.fps = R_DEFAULT.fps;
-      if (!['song', 'here', 'look'].includes(v.what)) v.what = 'song';
-      v.seconds = Math.max(1, Math.min(3600, Math.round(+v.seconds || 30)));
-      return v;
-    } catch { return { ...R_DEFAULT }; }
+    const v = { ...R_DEFAULT, ...RENDER_OPTS.get() } as ROpts;
+    if (!RENDER_ORDER.includes(v.size)) v.size = R_DEFAULT.size;
+    if (!RENDER_FPS.includes(v.fps)) v.fps = R_DEFAULT.fps;
+    if (!['song', 'here', 'look'].includes(v.what)) v.what = 'song';
+    v.seconds = Math.max(1, Math.min(3600, Math.round(+v.seconds || 30)));
+    return v;
   })());
-  $effect(() => { try { localStorage.setItem(RENDER_KEY, JSON.stringify(rOpts)); } catch { /* not remembered */ } });
+  $effect(() => { RENDER_OPTS.set({ ...rOpts }); });
   let renderPanel = $state(false);
   let rendering = $state<{ k: number; n: number; left?: number; codec: string; label: string; phase: 'sound' | 'frames' | 'saving' } | null>(null);
   let renderStop = false;
@@ -1423,9 +1417,8 @@
     else if (e.key === 'Escape' && mode === 'measure' && meas && shownNow && !dialogOpen()) { e.preventDefault(); meas = null; }
   }
   // the selection's panel folds to its name (kept per browser)
-  const FOLD_KEY = 'luxdmx.seq.sel3d';
-  let selOpen = $state((() => { try { return localStorage.getItem(FOLD_KEY) !== 'folded'; } catch { return true; } })());
-  function foldSel() { selOpen = !selOpen; try { localStorage.setItem(FOLD_KEY, selOpen ? 'open' : 'folded'); } catch { /* not remembered */ } }
+  let selOpen = $state(SEL_PANEL_OPEN.get());
+  function foldSel() { selOpen = !selOpen; SEL_PANEL_OPEN.set(selOpen); }
 </script>
 
 <svelte:document onfullscreenchange={() => { full = !!document.fullscreenElement; queueMicrotask(resize); }} onvisibilitychange={hiddenTake} />
@@ -1458,7 +1451,8 @@
 {#snippet sizePick()}
   <label class="slide" title="How big the video is: 1080p is 1920 x 1080 whatever the window, 9:16 is 1080 x 1920 for phones (Reels, Stories), As shown is the 3D stage as it is on the screen">{#if tier !== 'wide'}Video{/if}
     <select bind:value={videoSize} disabled={!!take} aria-label="Video size"><option value="1080p">1080p</option><option value="vertical">9:16</option><option value="shown">As shown</option></select></label>
-  {#if webmOnly}<span class="webm" role="note" aria-label="WebM only" title={WEBM_NOTE}>WebM</span>{/if}
+  <!-- (on the wide toolbar the sliders have its room: Record's own title says it) -->
+  {#if webmOnly && tier !== 'wide'}<span class="webm" role="note" aria-label="WebM only" title={WEBM_NOTE}>WebM</span>{/if}
 {/snippet}
 {#snippet fullBtn(text: boolean)}
   <button class="ghost" onclick={fullscreen} aria-label={full ? 'Leave full screen' : 'Full screen'} title="Full screen (for a presentation)"><Icon name={full ? 'close' : 'eye'} />{#if text}{full ? 'Leave full screen' : 'Full screen'}{/if}</button>
@@ -1671,7 +1665,11 @@
      video size fit the one row too) */
   .slides { display: inline-flex; align-items: center; gap: .3rem; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .45rem; }
   .slides .slide { background: none; border: 0; padding: 0; gap: .25rem; }
-  .slides .slide input { width: 2.2rem; }   /* (narrow: with Selected and Measure the wide toolbar has to fit them all in one row) */
+  /* (twice as wide where the row has room; where it hasn't they give way down to half that before
+     the toolbar has to put anything into More) */
+  .tools > .slides { flex: 0 1 auto; min-width: 0; }
+  .slides .slide { min-width: 0; }
+  .slides .slide input { width: 4.4rem; min-width: 2.2rem; flex: 0 1 4.4rem; }
   .slide select { font-size: .78rem; padding: .05rem .2rem; background: transparent; border-color: transparent; }
   /* Record: a red dot; while it records, the red REC chip with the time and Stop */
   .recbtn :global(svg) { color: #ff4d55; fill: #ff4d55; }

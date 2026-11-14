@@ -68,7 +68,7 @@ describe('a winch', () => {
     app.programmer = { w: { hoist: 0.5 } };
     out();
     app.armMachines(false);
-    const kept = JSON.parse(localStorage.getItem('luxdmx.seq.held') ?? '{}');
+    const kept = JSON.parse(localStorage.getItem('luxdmx.seq.held') ?? '{}').data ?? {};
     expect(kept['w:hoist'].v).toBe(128);
     const e = new Engine(() => app.show);
     e.heldSeed = { 'w:hoist': 128 };
@@ -86,7 +86,7 @@ describe('a winch', () => {
     app.programmer = { w: { hoist: 0.5 } };
     out();
     app.armMachines(false);
-    expect(JSON.parse(localStorage.getItem('luxdmx.seq.held')!)['w:hoist'].v).toBe(200);
+    expect(JSON.parse(localStorage.getItem('luxdmx.seq.held')!).data['w:hoist'].v).toBe(200);
   });
   it('armed with nothing saying where: it stays where it was; where it is unknown, its enable stays shut', async () => {
     const { app, out } = await winch();

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CONSOLE_STAGE } from '../store/kept';
   // The console: the app laid out like a lighting desk (a compact one, the size of a ChamSys
   // QuickQ), for a mouse, a keyboard or a touch screen. A command line ("1 thru 4 @ 50", "group 2
   // @ full", "1.3 thru 1.16", "go 2"), a fader with a select and a flash button for every light or
@@ -24,9 +25,8 @@
   let cmd = $state(''), said = $state(''), bad = $state(false), line = $state<HTMLInputElement>();
   // The stage beside the desk (the plan, or 3D with its button): a click on a light selects it, as
   // a desk's visualiser does. Hidden with its button; remembered in the browser.
-  const STAGE_KEY = 'luxdmx.seq.console.stage';
-  let showStage = $state((() => { try { const v = localStorage.getItem(STAGE_KEY); return v === null ? typeof window === 'undefined' || window.innerWidth > 1100 : v === '1'; } catch { return true; } })());
-  $effect(() => { try { localStorage.setItem(STAGE_KEY, showStage ? '1' : '0'); } catch { /* not kept */ } });
+  let showStage = $state(CONSOLE_STAGE.get() ?? (typeof window === 'undefined' || window.innerWidth > 1100));
+  $effect(() => { CONSOLE_STAGE.set(showStage); });
   const history: string[] = [];
   let back = -1;
   function run() {

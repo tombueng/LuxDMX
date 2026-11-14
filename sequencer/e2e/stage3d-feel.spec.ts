@@ -4,7 +4,7 @@
 // drawing quality starts at High, a pixel bar lit by an effect reads its real level, and a Release
 // says which effects go on running.
 import type { Page } from '@playwright/test';
-import { channels, full, openConnected, resetFake, patch, fresh, selectAll, test, expect, startTemplate } from './helpers';
+import { channels, full, openConnected, resetFake, patch, fresh, selectAll, test, expect, startTemplate, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -239,7 +239,7 @@ test('the Spill slider: how much the lights light up the room round them, lower 
   await slider('1');
   await expect.poll(lit).toBeGreaterThan(at45 * 1.8);
   await page.reload();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('luxdmx.seq.spill'))).toBe('1');
+  await expect.poll(() => keptValue(page, 'luxdmx.seq.spill')).toBe(1);
 });
 
 test('a beam as wide as the light\'s data says: a wash from the library 7° to 50° over its zoom; its own angle set in Mounting counts, cleared it\'s its type\'s again', async ({ page }) => {

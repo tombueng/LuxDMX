@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, history, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, test, expect, keptValue } from './helpers';
 
 const send = (page: Page, bytes: number[]) => page.evaluate((b) => (window as any).__midiIn.onmidimessage({ data: new Uint8Array(b) }), bytes);
 // (fn runs in the page with the app; it can't use anything from here)
@@ -140,7 +140,7 @@ test('Sound here off, from Live: no sound from this browser, the song plays on i
   await sound.click();
   await expect(sound).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.toast')).toContainText('No sound here');
-  expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.sound'))).toBe('off');
+  expect(await keptValue(page, 'luxdmx.seq.sound')).toBe(false);
   // (a count-in: its clicks go to the speakers, so they're there to be silent)
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
   await page.evaluate(() => { (window as any).__luxdmx.show.setlist.countIn = 1; });

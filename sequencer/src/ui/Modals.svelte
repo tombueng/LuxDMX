@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { WELCOMED } from '../store/kept';
   // The big dialogs, one at a time, opened from anywhere (buttons, the command palette, keys).
   // Also the keys that open them: ? for the shortcuts, Ctrl+K for the command palette.
   import ShowManager from './ShowManager.svelte';
@@ -27,13 +28,10 @@
   const close = () => (ui.modal = null);
   // The welcome comes up by itself when the app opens on a show with nothing in it, once per show
   // (a reload doesn't bring it back; "Get started" on the empty stage does). Never over a locked page.
-  const WELCOMED = 'luxdmx.seq.welcomed';
   onMount(() => {
-    let seen: string | null = null;
-    try { seen = localStorage.getItem(WELCOMED); } catch { /* storage blocked */ }
-    if (ui.modal || app.show.fixtures.length || app.locked || seen === app.showId) return;
+    if (ui.modal || app.show.fixtures.length || app.locked || WELCOMED.get() === app.showId) return;
     ui.modal = 'welcome';
-    try { localStorage.setItem(WELCOMED, app.showId); } catch { /* storage blocked */ }
+    WELCOMED.set(app.showId);
   });
   function key(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement).tagName;

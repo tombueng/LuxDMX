@@ -10,6 +10,7 @@ import { CrowdSound } from '../audio/crowd';
 import { DEMO_BPM, DEMO_SECONDS, demoPeaks, playDemo } from './beat';
 import { beatAfter, partAfter, partsOf, startOf, type Part } from './gig';
 import { getSong, putSong } from '../store/audio';
+import { CROWD_ON, CROWD_VOLUME, SOUND_HERE, VOLUME } from '../store/kept';
 
 export interface TimelineHost {
   readonly show: Show;
@@ -31,15 +32,15 @@ export class TimelinePlayer {
   peaks = $state.raw<number[]>([]);
   missing = $state('');               // a song this browser doesn't have (opened on another computer)
   // how loud (0..1), kept per browser
-  volume = $state((() => { try { const v = Number(localStorage.getItem('luxdmx.seq.volume')); return Number.isFinite(v) && localStorage.getItem('luxdmx.seq.volume') !== null ? v : 0.8; } catch { return 0.8; } })());
+  volume = $state(VOLUME.get());
   // "The band plays live": no sound out of this browser's speakers (kept per browser). The song's
   // clock runs on, and a recording of the stage still gets the song (it hangs off the bus).
-  soundHere = $state((() => { try { return localStorage.getItem('luxdmx.seq.sound') !== 'off'; } catch { return true; } })());
+  soundHere = $state(SOUND_HERE.get());
   // The crowd (audio/crowd.ts): how loud against the song, and whether it's heard at all (kept per
   // browser). It goes into the same bus as the song: the speakers and a recording both get it.
   readonly crowd = new CrowdSound();
-  crowdVolume = $state((() => { try { const v = Number(localStorage.getItem('luxdmx.seq.crowdVol')); return Number.isFinite(v) && localStorage.getItem('luxdmx.seq.crowdVol') !== null ? v : 0.8; } catch { return 0.8; } })());
-  crowdOn = $state((() => { try { return localStorage.getItem('luxdmx.seq.crowd') !== 'off'; } catch { return true; } })());
+  crowdVolume = $state(CROWD_VOLUME.get());
+  crowdOn = $state(CROWD_ON.get());
   count = $state(0);                  // counting in: the click it's on (1, 2, 3, 4), else 0
   // Next part, waiting for its beat: when (on the song's clock) and where to
   pending = $state<{ at: number; to: Part } | null>(null);
@@ -174,16 +175,16 @@ export class TimelinePlayer {
     void ctx.resume().catch(() => undefined);
     return this.tap.stream;
   }
-  setVolume(v: number) { this.volume = Math.max(0, Math.min(1, v)); if (this.gain) this.gain.gain.value = this.soundHere ? this.volume : 0; try { localStorage.setItem('luxdmx.seq.volume', String(this.volume)); } catch { /* not kept */ } }
+  setVolume(v: number) { this.volume = Math.max(0, Math.min(1, v)); if (this.gain) this.gain.gain.value = this.soundHere ? this.volume : 0; VOLUME.set(this.volume); }
   setCrowd(volume: number, on = this.crowdOn) {
     this.crowdVolume = Math.max(0, Math.min(1, volume)); this.crowdOn = on;
     this.crowd.setVolume(this.crowdVolume, on);
-    try { localStorage.setItem('luxdmx.seq.crowdVol', String(this.crowdVolume)); if (on) localStorage.removeItem('luxdmx.seq.crowd'); else localStorage.setItem('luxdmx.seq.crowd', 'off'); } catch { /* this time only */ }
+    CROWD_VOLUME.set(this.crowdVolume); CROWD_ON.set(on);
   }
   setSoundHere(on: boolean) {
     this.soundHere = on;
     if (this.gain) this.gain.gain.value = on ? this.volume : 0;
-    try { if (on) localStorage.removeItem('luxdmx.seq.sound'); else localStorage.setItem('luxdmx.seq.sound', 'off'); } catch { /* this time only */ }
+    SOUND_HERE.set(on);
   }
 
   // ---- transport

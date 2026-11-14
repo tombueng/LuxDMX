@@ -24,11 +24,10 @@
   import { DEMO_SONG, demoSong, startDemo } from './startDemo';
   import { TEMPLATE_SHOWS } from '../content/templateShows';
   import { onDestroy } from 'svelte';
+  import { WELCOME_DEMOS_HIDDEN, WELCOME_SONGS } from '../store/kept';
 
   let { onclose }: { onclose: () => void } = $props();
 
-  const get = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
-  const put = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } };
 
   // the demos (content/demos.ts, loaded with the welcome: the shows' code stays out of the page
   // until wanted); their names and words are here at once, the rest when it has come
@@ -43,23 +42,21 @@
   const asShow = (t: Template): Demo | undefined => TEMPLATE_SHOWS[t.name] ? { id: `t:${t.name}`, name: t.name, blurb: t.blurb, icon: t.icon, song: TEMPLATE_SHOWS[t.name].song } : undefined;
 
   // folded away or not (this browser)
-  const FOLD_KEY = 'luxdmx.seq.welcomeDemos';
   // (asked for the demos, from Shows or the command palette: shown, the choice kept as it was)
-  let demosHidden = $state(get(FOLD_KEY) === 'hidden' && !ui.welcomeDemos);
+  let demosHidden = $state(WELCOME_DEMOS_HIDDEN.get() && !ui.welcomeDemos);
   ui.welcomeDemos = false;
   // (asked for a new show, from Shows: Empty stage is a new empty show; over an empty show, the
   // first start or Get started, it only closes: the box connected stays)
   const forNew = ui.welcomeNew;
   ui.welcomeNew = false;
   async function empty() { if (forNew) await app.newShow(); onclose(); }
-  function fold() { demosHidden = !demosHidden; put(FOLD_KEY, demosHidden ? 'hidden' : 'shown'); }
+  function fold() { demosHidden = !demosHidden; WELCOME_DEMOS_HIDDEN.set(demosHidden); }
 
   // each demo's music: a song of the catalog, or 'beat' (the demo beat, made here); its own song
   // unless another was picked on its tile (remembered)
-  const SONGS_KEY = 'luxdmx.seq.demoSongs';
-  let songs = $state<Record<string, string>>((() => { try { return JSON.parse(get(SONGS_KEY) ?? '{}') ?? {}; } catch { return {}; } })());
+  let songs = $state<Record<string, string>>(WELCOME_SONGS.get());
   const songOf = (d: Demo) => { const v = songs[d.id]; return v === 'beat' || demoSong(v) ? v! : d.song ?? DEMO_SONG; };
-  function pickSong(d: Demo, v: string) { songs[d.id] = v; put(SONGS_KEY, JSON.stringify(songs)); }
+  function pickSong(d: Demo, v: string) { songs[d.id] = v; WELCOME_SONGS.set({ ...songs }); }
   const byGenre = (() => {
     const m = new Map<string, CatalogSong[]>();
     for (const s of CATALOG) { const g = GENRES[s.genre] ?? s.genre; m.set(g, [...(m.get(g) ?? []), s]); }

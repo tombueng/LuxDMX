@@ -220,13 +220,13 @@ describe('a reload with a second tab that has its own remote on', () => {
       L.as('A');
       const a2 = new RemoteHost({} as never); await settle(20);
       expect([a2.code, a2.on]).toEqual([codeA, true]);
-      expect(JSON.parse(localStorage.getItem(KEEP_KEY)!).code).toBe(b.code);
+      expect(JSON.parse(localStorage.getItem(KEEP_KEY)!).data.code).toBe(b.code);
       // a tab whose session says on with B's code (an old copy): off, and B's "keep it on" stays
       sessionStorage.clear(); sessionStorage.setItem(SESSION_KEY, JSON.stringify({ on: true, code: b.code }));
       L.as('C');
       const c = new RemoteHost({} as never); await settle(20);
       expect(c.on).toBe(false);
-      expect(JSON.parse(localStorage.getItem(KEEP_KEY)!).code).toBe(b.code);
+      expect(JSON.parse(localStorage.getItem(KEEP_KEY)!).data.code).toBe(b.code);
     } finally { L.uninstall(); }
   });
 });

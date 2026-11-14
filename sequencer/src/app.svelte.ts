@@ -9,7 +9,7 @@ import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
 import { freezeGroupNumbers, groupByNumber, nextGroupNumber } from './model/groupnum';
 import { hostProblem } from './model/host';
-import { emptyShow, parseShow, serializeShow, FormatError } from './model/format';
+import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
 import { GENERIC, caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
 import { curveOfPort, curveTable, isPixelType, onPort, onScreen, powerScale, WS2812, type LedCurve, type PortInfo } from './model/ledCurve';
@@ -39,6 +39,7 @@ import { listShows, readShow, writeShow, deleteShow as dbDelete, listMyTypes, sa
 import { ui } from './ui/ui.svelte';
 import { copyClip, readClip } from './store/clipboard';
 import { bundle, isZip, storedOf, unbundle } from './store/bundle';
+import { CURRENT_SHOW, HELD, LAST_PLAYED, OUTPUT_LOCKED_LIVE, OUTPUT_TAB, PLAYING_TAB, SCHEDULE_LOOKED, UNDO_TAB, WAS_ARMED } from './store/kept';
 import { getModel, getSong, putModel, putSong } from './store/audio';
 import { prune, prunedText } from './model/prune';
 import { stageSvg } from './ui/thumb';
@@ -80,19 +81,15 @@ const cueAt = (l: CueList, n: number) => l.cues.findIndex((_, i) => Math.abs(cue
 
 
 const KEY = 'luxdmx.seq.show';
-const CUR = 'luxdmx.seq.current';   // id of the show that's open
 const FPS = 40;
 const UNDO_DEPTH = 100;
 const UNDO_BYTES = 30_000_000;      // and never more than this much text in the undo history
-const UNDO_KEY = 'luxdmx.seq.undo';
-const PLAYBACK_KEY = 'luxdmx.seq.playing';
 const RESUME_WITHIN = 60_000;       // ms: a reload, not a tab restored hours later
 // Is this page a reload of its tab? (Not a new tab opened from another, nor a duplicated one: those
 // get a copy of the tab's session storage, and must start afresh. Unknown: as a reload.)
 function reloaded() {
   try { const nav = (performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined)?.type; return !nav || nav === 'reload'; } catch { return true; }
 }
-const OUTPUT_KEY = 'luxdmx.seq.output';  // 'live' or 'blind': this tab (session), or a locked show's browser
 // runs after the current task and the screen updates it caused (a message to ourselves)
 const pingAfter = (() => {
   if (typeof MessageChannel === 'undefined') return (f: () => void) => setTimeout(f, 0);
@@ -102,22 +99,16 @@ const pingAfter = (() => {
 })();
 // (said when a box connects while blind; gone the moment you go on stage)
 const BLIND_TOAST = 'Connected. You are blind';
-const HELD_KEY = 'luxdmx.seq.held';           // where the winches were last sent armed (held there over a reload)
-// (what's kept: { "fixture:hoist": { v: byte, at: ms } }; anything else isn't)
+// where the winches were last sent armed (held there over a reload): { "fixture:hoist": { v: byte,
+// at: ms } }, anything else isn't kept
 function keptHeld(): Record<string, { v: number; at: number }> {
-  try {
-    const h = JSON.parse(localStorage.getItem(HELD_KEY) ?? '{}');
-    if (!h || typeof h !== 'object') return {};
-    return Object.fromEntries(Object.entries(h).flatMap(([k, x]) => {
-      const e = x as { v?: unknown; at?: unknown };
-      return e && typeof e.v === 'number' && e.v >= 0 && e.v <= 255 ? [[k, { v: e.v, at: typeof e.at === 'number' ? e.at : 0 }]] : [];
-    }));
-  } catch { return {}; }
+  return Object.fromEntries(Object.entries(HELD.get()).flatMap(([k, x]) => {
+    const e = x as { v?: unknown; at?: unknown };
+    return e && typeof e.v === 'number' && e.v >= 0 && e.v <= 255 ? [[k, { v: e.v, at: typeof e.at === 'number' ? e.at : 0 }]] : [];
+  }));
 }
-const WAS_ARMED_KEY = 'luxdmx.seq.wasArmed';   // this tab had the machines armed (a reload says they're safe now)
 const ATMOS_AND_MACHINES = ATMOS;
 const MACHINES_SAFE = machinesSafe;
-const LASTPLAY_KEY = 'luxdmx.seq.lastplay.';   // + show id: what was playing, for a cold start
 const hasLocks = () => typeof navigator !== 'undefined' && !!(navigator as unknown as { locks?: LockManager }).locks?.request;
 const COLD_WITHIN = 3 * 3600_000;   // ms: a tablet restarted during the evening, not the next morning (the box may have been off)
 export const GO_GUARD_MS = 300;     // a second GO this soon on the same list is a double press (a beat at 200 BPM still gets through)
@@ -163,20 +154,21 @@ let fromLocal = false;
 function loadShow(): Show {
   let text: string | null = null;
   try {
-    const cur = localStorage.getItem(CUR), owner = localStorage.getItem(KEY_ID);
-    if (!owner || owner === cur) text = localStorage.getItem(KEY) ?? localStorage.getItem('luxdmx.seq.show.v1');
+    const cur = CURRENT_SHOW.get(), owner = localStorage.getItem(KEY_ID);
+    if (!owner || owner === cur) text = localStorage.getItem(KEY);
   } catch { /* storage blocked */ }
   if (text) {
     try { const s = parseShow(text); fromLocal = true; return s; } catch (e) {
       loadError = `The show that was open can't be opened by this version (${(e as Error).message}). It's still saved; this is a new show.`;
-      try { localStorage.setItem(`${KEY}.unreadable`, text); localStorage.removeItem(CUR); } catch { /* keep going */ }
+      try { localStorage.setItem(`${KEY}.unreadable`, text); } catch { /* keep going */ }
+      CURRENT_SHOW.remove();
     }
   }
   const s = emptyShow();
   addStandardPresets(s);
   return s;
 }
-const storedId = () => { try { return loadError ? null : localStorage.getItem(CUR); } catch { return null; } };
+const storedId = () => (loadError ? null : CURRENT_SHOW.get() || null);
 
 class App {
   show = $state<Show>(rawTypes(loadShow()));
@@ -318,7 +310,7 @@ class App {
     if (!changed) return;
     const kept = keptHeld();
     for (const [k, x] of Object.entries(this.heldMine)) if (!kept[k] || kept[k].at <= x.at) kept[k] = x;
-    try { localStorage.setItem(HELD_KEY, JSON.stringify(kept)); } catch { /* not kept */ }
+    HELD.set(kept);
   }
   // The DMX output on a thread of its own (output/thread.ts): its frames go out on time whatever
   // this page draws. This page's engine is its mirror, for the screen.
@@ -385,7 +377,7 @@ class App {
     this.bridges = this.show.outputs.devices.map((d) => this.makeBridge(d.host));
     this.currentList = this.show.cueLists[0]?.id ?? '';
     this.lastSnap = JSON.stringify(this.show);
-    try { localStorage.setItem(CUR, this.showId); } catch { /* storage blocked */ }
+    CURRENT_SHOW.set(this.showId);
     this.thread.start(this.engine, () => this.show);
     // (a command right after an edit in a form, a GO clicked after changing a cue's action: the
     // save that's due runs first, so the thread has the edit; a GO from the keyboard comes before
@@ -494,7 +486,7 @@ class App {
   // (A tab opened from this one, or duplicated, gets a copy of this tab's session storage: it starts
   // blind all the same, as any new tab. Only a reload of the tab itself keeps live.)
   output = $state<'live' | 'blind'>((() => {
-    try { return (sessionStorage.getItem(OUTPUT_KEY) === 'live' && reloaded()) || localStorage.getItem(OUTPUT_KEY) === 'live' ? 'live' : 'blind'; } catch { return 'blind'; }
+    return (OUTPUT_TAB.get() === 'live' && reloaded()) || OUTPUT_LOCKED_LIVE.get() ? 'live' : 'blind';
   })());
   private frozen: Map<number, Uint8Array> | null = null;
   private frozenDark: Map<number, Uint8Array> | null = null;   // the same with every light off (Blackout)
@@ -530,11 +522,9 @@ class App {
   }
   private setFrozen(f: Map<number, Uint8Array> | null) { this.frozen = f; this.frozenDark = null; }
   private keepOutput() {
-    try { sessionStorage.setItem(OUTPUT_KEY, this.output); } catch { /* this tab only */ }
-    try {
-      if (this.output === 'live' && this.show.pages.some((p) => p.locked)) localStorage.setItem(OUTPUT_KEY, 'live');
-      else localStorage.removeItem(OUTPUT_KEY);
-    } catch { /* this tab only */ }
+    OUTPUT_TAB.set(this.output);
+    if (this.output === 'live' && this.show.pages.some((p) => p.locked)) OUTPUT_LOCKED_LIVE.set(true);
+    else OUTPUT_LOCKED_LIVE.remove();
   }
   // What a blind tab sends: the frozen look; with Blackout on, that look with every light off
   // (Blackout always reaches the stage).
@@ -555,7 +545,7 @@ class App {
     this.thread.inputsNow(this.engine);              // (the output thread: at once)
     if (!on) this.keepHeld(true);
     // (only to say so after a reload: arming itself is never kept)
-    try { if (on) sessionStorage.setItem(WAS_ARMED_KEY, '1'); else if (!(leaving && was)) sessionStorage.removeItem(WAS_ARMED_KEY); } catch { /* not said */ }
+    if (on) WAS_ARMED.set(true); else if (!(leaving && was)) WAS_ARMED.remove();
     // (disarmed while blind: the frozen look loses them too)
     if (!on && this.frozen) this.setFrozen(this.zeroed(this.frozen, MACHINES_SAFE));
   }
@@ -699,22 +689,22 @@ class App {
     // (a reload also picks the song up where it was: only this tab's copy says where)
     // (and which song of the set: the show itself may not be saved yet after a Next song)
     const tl = this.timeline.playing || this.timeline.position > 0 ? { pos: Math.round(this.timeline.position * 100) / 100, playing: this.timeline.playing, song: songIndex(this.show) } : undefined;
-    try { sessionStorage.setItem(PLAYBACK_KEY, tl ? JSON.stringify({ ...JSON.parse(saved), tl }) : saved); } catch { /* fine: no resume */ }
+    PLAYING_TAB.set(tl ? { ...JSON.parse(saved), tl } : JSON.parse(saved));
     // and for a cold start (the tablet switched off and on again): this show's, in localStorage
-    if (!this.quiet) { try { localStorage.setItem(LASTPLAY_KEY + this.showId, saved); } catch { /* fine: a cold start is quiet */ } }
+    if (!this.quiet) LAST_PLAYED.of(this.showId).set(JSON.parse(saved));
   }
   private pbStamped = 0;
   private started = false;          // the saved state was read (ticks before that mustn't overwrite it)
   quiet = true;                     // fresh start, nothing played yet: nothing goes out (see tick)
   coldStart = $state(false);        // picked up what was playing after a cold start: the lights are expected to be on
   // (read before anything disarms: the start opens the show, and that makes them safe)
-  private wasArmed = (() => { try { return sessionStorage.getItem(WAS_ARMED_KEY) === '1' && reloaded(); } catch { return false; } })();
+  private wasArmed = WAS_ARMED.get() && reloaded();
   private resumePlayback() {
     if (this.wasArmed && this.gatedMachines.length) ui.toast('The reload made the machines safe: confetti, flames, sparks and CO2 send nothing, winches stay where they were, until you hold Arm again.', 8000);
     this.wasArmed = false;
     type Saved = { id: string; lists: [string, number, number, number?, (string | number)[]?, number?][]; fx: string[]; gm: number; gms?: unknown; bo: boolean; at?: number; view?: 'program' | 'live'; autoGo?: number; music?: boolean; goList?: string; quiet?: boolean; hz?: string[]; live?: number };
-    let p: Saved | null = null;
-    try { p = JSON.parse(sessionStorage.getItem(PLAYBACK_KEY) ?? 'null'); sessionStorage.removeItem(PLAYBACK_KEY); } catch { /* nothing */ }
+    let p = PLAYING_TAB.get() as Saved | null;
+    PLAYING_TAB.remove();
     this.started = true;
     // A reload of this tab (or a crashed tab coming back). A duplicated tab gets a copy of the
     // session storage too, and must not start a second copy of the show.
@@ -732,8 +722,7 @@ class App {
       if (tl && Number.isFinite(tl.pos)) this.timeline.resumeAt(tl.pos + (tl.playing ? (Date.now() - (p.at ?? Date.now())) / 1000 : 0), tl.playing);
       return;
     }
-    let q: Saved | null = null;
-    try { q = JSON.parse(localStorage.getItem(LASTPLAY_KEY + this.showId) ?? 'null'); } catch { /* nothing to pick up */ }
+    const q = LAST_PLAYED.of(this.showId).get() as Saved | null;
     if (!q || q.id !== this.showId || !(Date.now() - (q.at ?? 0) < COLD_WITHIN) || q.quiet || !(q.lists.length || q.fx.length)) return;
     // another tab may be playing this show right now (a second tab): then this one stays quiet. The
     // tab that sends holds the show's output lock; without Web Locks the other tabs are asked.
@@ -825,7 +814,6 @@ class App {
   // without its fade or actions: the box has been holding a look all along.
   private schedAt = -1e9;
   private schedLast = 0;            // when it last looked (ms since 1970); 0: not since the app started
-  private schedKey() { return `luxdmx.seq.sched.${this.showId}`; }
   runSchedule(now = new Date()) {
     if (!this.started || this.coldPending) return;
     // One tab runs the timetable: the one holding the show's output. A second tab on the same show
@@ -844,9 +832,9 @@ class App {
     }
     const t = now.getTime();
     let from = this.schedLast;
-    if (!from) { try { from = Number(localStorage.getItem(this.schedKey())) || 0; } catch { /* never looked */ } }
+    if (!from) from = SCHEDULE_LOOKED.of(this.showId).get();
     this.schedLast = t;
-    try { localStorage.setItem(this.schedKey(), String(t)); } catch { /* it looks again after a restart */ }
+    SCHEDULE_LOOKED.of(this.showId).set(t);
     // switched off, or paused (a party tonight): what comes meanwhile is skipped, not caught up later
     const st = this.show.settings;
     if (st.scheduleOff || (st.schedulePause ?? 0) > t) return;
@@ -881,6 +869,13 @@ class App {
   // ---- shows in this browser
   // `thread`: the show did change (the output thread gets it with the next frame, and before any
   // command); false: it may have (a click, a key), the save finds out
+  // Nothing a reload would cut short (for an update put in by itself, src/pwa.ts): no song playing,
+  // no list running, nothing held in the programmer or on the live buttons, the show saved
+  quietForUpdate(): boolean {
+    if (this.timeline.playing || [...this.engine.players.values()].some((p) => p.running)) return false;
+    if (Object.keys(this.programmer).length || this.engine.liveEffects().length || Object.keys(this.live).length) return false;
+    return this.saved && !this.savePending && !this.sfxArmed;
+  }
   markDirty(delay = 350, thread = true) {
     if (thread) this.thread.showChanged();
     if (!thread) this.savePending = true;
@@ -980,7 +975,7 @@ class App {
     // (this tab is on another show now: the others on the old one hear it's gone)
     if (this.otherTabs.size) this.sayGone();
     this.otherTab = false; this.otherNewer = false; this.otherTabs.clear();
-    try { localStorage.setItem(CUR, id); } catch { /* storage blocked */ }
+    CURRENT_SHOW.set(id);
   }
   async duplicateShow(id: string) {
     const text = id === this.showId ? serializeShow(JSON.parse(JSON.stringify(this.show))) : await readShow(id);
@@ -1200,18 +1195,16 @@ class App {
   private saveUndo(now = false) {
     clearTimeout(this.undoTimer);
     if (!now) { this.undoTimer = setTimeout(() => this.saveUndo(true), 1500); return; }
-    try {
-      const keep: string[] = [];
-      let bytes = 0;
-      for (let i = this.undoStack.length - 1; i >= 0 && keep.length < 12; i--) { bytes += this.undoStack[i].length; if (bytes > 1_500_000) break; keep.unshift(this.undoStack[i]); }
-      sessionStorage.setItem(UNDO_KEY, JSON.stringify({ id: this.showId, top: this.lastSnap.length, steps: keep }));
-    } catch { /* too big or blocked: undo just doesn't survive a reload */ }
+    // (too big or blocked: undo just doesn't survive a reload)
+    const keep: string[] = [];
+    let bytes = 0;
+    for (let i = this.undoStack.length - 1; i >= 0 && keep.length < 12; i--) { bytes += this.undoStack[i].length; if (bytes > 1_500_000) break; keep.unshift(this.undoStack[i]); }
+    UNDO_TAB.set({ id: this.showId, top: this.lastSnap.length, steps: keep, fv: FORMAT_VERSION });
   }
   private loadUndo() {
-    try {
-      const u = JSON.parse(sessionStorage.getItem(UNDO_KEY) ?? 'null');
-      if (u?.id === this.showId && u.top === this.lastSnap.length && Array.isArray(u.steps)) { this.undoStack = u.steps; this.canUndo = u.steps.length > 0; }
-    } catch { /* nothing to restore */ }
+    const u = UNDO_TAB.get();
+    // (steps from another version of the show format, before an update: not brought back)
+    if (u?.id === this.showId && u.top === this.lastSnap.length && u.fv === FORMAT_VERSION && Array.isArray(u.steps)) { this.undoStack = u.steps; this.canUndo = u.steps.length > 0; }
   }
   undo() { this.checkpoint(); this.step(this.undoStack, this.redoStack, 'Undone'); }
   // "Done. [Undo]": the Undo undoes this, and only while nothing else has changed since.

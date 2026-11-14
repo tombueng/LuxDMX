@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { AUTHOR } from '../store/kept';
   import NumField from './NumField.svelte';
   // The knobs of one effect. Plain words first; the finer ones under "More".
   import Icon from './Icon.svelte';
@@ -54,7 +55,7 @@
 
   // ---- share it as a file (a package: ADDONS.md), with a little animation for the picker
   let sharing = $state(false), author = $state(''), about = $state(''), license = $state('CC-BY-4.0'), shareErr = $state('');
-  $effect(() => { if (sharing && !author) { try { author = localStorage.getItem('luxdmx.seq.author') ?? ''; } catch { /* fine */ } } });
+  $effect(() => { if (sharing && !author) { author = AUTHOR.get(); } });
   function share() {
     shareErr = '';
     if (!author.trim()) { shareErr = 'Say who made it'; return; }
@@ -66,7 +67,7 @@
       a.download = `${pkg.id}.luxfx`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      try { localStorage.setItem('luxdmx.seq.author', author.trim()); } catch { /* fine */ }
+      AUTHOR.set(author.trim());
       sharing = false;
     } catch (e) { shareErr = e instanceof PackageError ? e.message : `It couldn't be packed: ${e instanceof Error ? e.message : String(e)}`; }
   }

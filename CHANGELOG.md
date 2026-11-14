@@ -13,6 +13,18 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **Offline, properly.** The app keeps all of itself when it's first opened (before, only what had
+  been loaded), and a Wi-Fi without internet no longer holds the start up. Catalog songs played once
+  stay for offline; the demos' songs all come down as soon as one is used.
+- **Updates by themselves**: looked for at the start, every half hour and on coming back, put in
+  at a quiet moment without asking, never mid-show. A short note says when it happened.
+- **Settings keep their version.** Everything the app keeps in the browser has a version now, and
+  one place brings old settings along (STORAGE.md). Nothing is thrown away: what can't be read is
+  put aside.
+- **Space pauses a template's show** after Play the show (it opened the shows instead).
+- **A scene change on a winch says winch**, not "fires a machine": the Theatre's drops and the
+  curtains no longer look like pyro on every card.
+- The 3D stage's sliders are twice as wide where the toolbar has the room.
 - **A much bigger Theatre** for its big stage: 89 lights (ten front-of-house, gobo profiles on the box
   booms with leaves, water and snowflakes, eight each of cyc floods, booms, specials, spots and washes,
   footlights, ground rows) and a play in nineteen scenes, each with its drop flown in: curtain up, a

@@ -91,7 +91,7 @@ describe('the time before and after the song', () => {
       const { app, run } = await around();
       const P = app.timeline;
       P.setCrowd(0.5, true);
-      expect(localStorage.getItem('luxdmx.seq.crowdVol')).toBe('0.5');
+      expect(JSON.parse(localStorage.getItem('luxdmx.seq.crowdVol')!).data).toBe(0.5);
       const rec = P.audioStream();
       expect(rec).toEqual({ id: 'recording' });
       await P.play();
@@ -102,7 +102,7 @@ describe('the time before and after the song', () => {
       expect(P.bus.to).toContain(P.tap);
       P.setCrowd(0.5, false);
       expect(node.gain.target).toBe(0);
-      expect(localStorage.getItem('luxdmx.seq.crowd')).toBe('off');
+      expect(JSON.parse(localStorage.getItem('luxdmx.seq.crowd')!).data).toBe(false);
       P.setCrowd(0.7, true);
       expect(node.gain.target).toBe(0.7);
       P.pause();

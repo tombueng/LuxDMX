@@ -1,7 +1,7 @@
 // Things that must not go wrong in front of an audience (from the independent code review):
 // a show from a newer version is never overwritten, deleting the open show deletes it, a blackout
 // cue holds, a held flash can't stay on, undo brings a box back with its connection.
-import { FAKE, jumpTo, openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, fresh, go, test, expect, addDevice, fixturesOnStage, welcomeDialog, showBoxes, boxReady, startTemplate } from './helpers';
+import { FAKE, jumpTo, openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, fresh, go, test, expect, addDevice, fixturesOnStage, welcomeDialog, showBoxes, boxReady, startTemplate, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -19,7 +19,7 @@ test('a show this version cannot read is kept, and a new show opens next to it',
   await expect(page.locator('.toast')).toContainText("can't be opened by this version");
   await page.waitForTimeout(800);
   expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.show.unreadable'))).toContain('From the future');
-  expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.current'))).not.toBe('sFUTURE');
+  expect(await keptValue(page, 'luxdmx.seq.current')).not.toBe('sFUTURE');
 });
 
 test('deleting the show that is open deletes it', async ({ page }) => {

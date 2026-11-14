@@ -1,6 +1,7 @@
 // Fetching a song of the catalog when someone picks it: from the artist's own file first, then
 // from our copy, with progress as it comes in. What goes wrong is said in plain words.
 import type { CatalogSong } from './catalog';
+import { keepSong, keptSong } from '../store/songCache';
 
 export class SongError extends Error {}
 
@@ -43,6 +44,14 @@ export const PUBLIC_SONGS = 'https://tombueng.github.io/LuxDMX/sequencer/';
 export const NO_BROWSERS = ['ccmixter.org', 'www.joshwoodward.com', 'joshwoodward.com'];
 const turnsAway = (u: string) => { try { return NO_BROWSERS.includes(new URL(u).hostname); } catch { return false; } };
 export async function downloadSong(s: CatalogSong, progress: (got: number, total: number) => void, signal?: AbortSignal, stallMs = STALL_MS): Promise<File> {
+  // (kept from an earlier time: no network needed, store/songCache.ts)
+  const kept = await keptSong(s.id);
+  if (kept) { progress(kept.size, kept.size); return kept; }
+  const file = await fetchSong(s, progress, signal, stallMs);
+  void keepSong(s.id, file);
+  return file;
+}
+async function fetchSong(s: CatalogSong, progress: (got: number, total: number) => void, signal?: AbortSignal, stallMs = STALL_MS): Promise<File> {
   const here = typeof location !== 'undefined' && s.mirror ? new URL(s.mirror, location.href).href : '';
   const pub = s.mirror ? new URL(s.mirror, PUBLIC_SONGS).href : '';
   const artist = s.url && s.mirror && turnsAway(s.url) ? '' : s.url;
@@ -83,7 +92,7 @@ export async function downloadSong(s: CatalogSong, progress: (got: number, total
   }
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   throw new SongError(offline
-    ? `"${s.title}" can't be downloaded: this computer is offline. Once it's online again, it can.`
+    ? `"${s.title}" isn't here yet and this computer is offline. Played once while online, a song stays here for offline use.`
     : `"${s.title}" can't be downloaded right now (its site may be down, or blocked on this network). Try again later, or load a song of your own.`);
 }
 // the first n bytes of what came in so far

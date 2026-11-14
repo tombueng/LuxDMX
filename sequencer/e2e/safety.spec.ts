@@ -1,7 +1,7 @@
 // Safety on the wire: blind keeps the stage as it was (nothing new goes out until you go live);
 // confetti, flames, sparks and CO2 send 0 until someone holds Arm; a timeline jumped about over a
 // flame moment never fires it, playing through it does (armed).
-import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, welcome, demoTile, startTemplate, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, welcome, demoTile, startTemplate, test, expect, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -155,7 +155,7 @@ test('a tab opened from this one starts blind (it gets a copy of this tab\'s sto
   // (a new tab from this one, as a link or the browser's Duplicate does: session storage copied)
   const [tab] = await Promise.all([page.context().waitForEvent('page'), page.evaluate(() => { window.open(location.href, '_blank'); })]);
   await tab.waitForFunction(() => !!(window as any).__luxdmx, null, { timeout: 30000 });
-  expect(await tab.evaluate(() => sessionStorage.getItem('luxdmx.seq.output'))).toBe('live');   // (the copy is there)
+  expect(await keptValue(tab, 'luxdmx.seq.output', true)).toBe('live');   // (the copy is there)
   expect(await out(tab)).toBe('blind');
   await tab.close();
   // this tab reloaded: still on stage

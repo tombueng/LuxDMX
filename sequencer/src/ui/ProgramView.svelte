@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PANEL_SIZES } from '../store/kept';
   // Program: build the show. Three layouts:
   //   desktop  lists | stage + DMX | programmer, the cues along the bottom
   //   tablet   stage | one panel with tabs (Set, Fixtures, Groups, Presets, Effects), cues below
@@ -40,13 +41,12 @@
   let panel = $state<'set' | Side>('set');
   let pane = $state<'stage' | 'set' | 'lists' | 'cues'>('stage');
   // Panel sizes on a desktop: the gaps between them can be dragged; remembered in this browser.
-  const SIZES_KEY = 'luxdmx.seq.panels', NORMAL = { side: 300, right: 300, foot: 0 };
+  const NORMAL = { side: 300, right: 300, foot: 0 };
   // the cues keep a whole row of cards, the stage keeps room to see the lights
   const FOOT_MIN = 210, CENTER_MIN = 350;
-  let sizes = $state({ ...NORMAL });
-  try { sizes = { ...NORMAL, ...JSON.parse(localStorage.getItem(SIZES_KEY) ?? '{}') }; } catch { /* normal sizes */ }
+  let sizes = $state({ ...NORMAL, ...PANEL_SIZES.get() });
   let grid = $state<HTMLElement>();
-  const save = () => { try { localStorage.setItem(SIZES_KEY, JSON.stringify(sizes)); } catch { /* not remembered */ } };
+  const save = () => PANEL_SIZES.set({ ...sizes });
   function drag(e: PointerEvent, which: 'side' | 'right' | 'foot') {
     if (!grid || e.button !== 0) return;
     e.preventDefault();

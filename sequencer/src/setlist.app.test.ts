@@ -218,7 +218,7 @@ describe('the set list on a live page', () => {
     app.nextSong();
     app.timeline.seek(3);
     await run(500);
-    const saved = JSON.parse(sessionStorage.getItem('luxdmx.seq.playing') ?? '{}');
+    const saved = JSON.parse(sessionStorage.getItem('luxdmx.seq.playing') ?? '{}').data ?? {};
     expect(saved.tl).toMatchObject({ song: 1, pos: 3, playing: false });
   });
 });
@@ -242,7 +242,7 @@ describe('Sound here', () => {
       const P = app.timeline;
       expect(P.soundHere).toBe(true);
       P.setSoundHere(false);
-      expect(localStorage.getItem('luxdmx.seq.sound')).toBe('off');
+      expect(JSON.parse(localStorage.getItem('luxdmx.seq.sound')!).data).toBe(false);
       const rec = P.audioStream();                                   // the 3D stage's recorder asks for the sound
       expect(rec).toEqual({ id: 'recording' });
       setOptions(app.show, { countIn: 1 });                           // (clicks: the speakers get them, not a recording)
@@ -258,7 +258,7 @@ describe('Sound here', () => {
       expect(P.position).toBeGreaterThan(0.2);
       P.setSoundHere(true);
       expect(gain.gain.value).toBe(P.volume);
-      expect(localStorage.getItem('luxdmx.seq.sound')).toBe(null);
+      expect(JSON.parse(localStorage.getItem('luxdmx.seq.sound')!).data).toBe(true);
       P.pause();
     } finally { delete (globalThis as any).AudioContext; }
   });

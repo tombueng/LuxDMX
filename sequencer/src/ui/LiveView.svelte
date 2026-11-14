@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LIVE_VIEW } from '../store/kept';
   import { pinMatches } from '../model/pin';
   import { looksPage } from '../content/busking';
   import { whatsNew } from '../content/whatsNew';
@@ -49,12 +50,10 @@
   let dropAt = $state<string | null>(null);
   // the stage next to the buttons on a big screen; on a tablet the buttons get the room (the eye shows it)
   // the button size and the stage: remembered on this device (a reload by the cleaner keeps them)
-  const VIEW_KEY = 'luxdmx.seq.liveview';
-  let saved: { stage?: boolean; tile?: number } = {};
-  try { saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}'); } catch { /* defaults */ }
+  const saved = LIVE_VIEW.get();
   let showStage = $state(saved.stage ?? (typeof window === 'undefined' || window.innerWidth > 1100));
   let tile = $state(saved.tile ?? 130);
-  $effect(() => { const v = JSON.stringify({ stage: showStage, tile }); try { localStorage.setItem(VIEW_KEY, v); } catch { /* not kept */ } });
+  $effect(() => { LIVE_VIEW.set({ stage: showStage, tile }); });
   const selected = $derived(page?.widgets.find((w) => w.id === selW));
   const progHeld = $derived(Object.keys(app.programmer).length);
   // Look buttons name their list only when this page has looks from more than one list.

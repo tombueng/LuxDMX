@@ -5,10 +5,9 @@
 
 import type { RdmReply, RdmRequest } from '../rdm/types';
 import type { PortInfo } from '../model/ledCurve';
+import { BOX_INFO, BOX_NAME } from '../store/kept';
 
 const HEARTBEAT_MS = 250;
-const INFO_KEY = 'luxdmx.seq.box.';
-const NAME_KEY = 'luxdmx.seq.boxname.';
 
 function sameBytes(a: Uint8Array, b: Uint8Array) {
   if (a.length !== b.length) return false;
@@ -57,7 +56,7 @@ export class Bridge {
   constructor(readonly host: string, private changed: () => void) {
     this.origin = 'http://' + host;
     // its name from the last time (a tablet switched on again says "the bar's box", not an address)
-    try { this.name = localStorage.getItem(NAME_KEY + host) ?? ''; } catch { /* the address then */ }
+    this.name = BOX_NAME.of(host).get();
   }
 
   // Must run from a click: browsers only allow popups from user gestures.
@@ -104,8 +103,8 @@ export class Bridge {
       case 'ready':
         this.outputs = m.outputs ?? []; this.pixels = Array.isArray(m.pixels) ? m.pixels.filter(Number.isInteger) : []; this.ports = portsOf(m.pixelPorts); this.name = m.name ?? ''; this.ip = typeof m.ip === 'string' ? m.ip : ''; this.sent.clear(); this.adopting = false;
         // kept for this tab: a popup taken back after a reload doesn't say it again
-        try { sessionStorage.setItem(INFO_KEY + this.host, JSON.stringify({ outputs: this.outputs, pixels: this.pixels, ports: this.ports, name: this.name, ip: this.ip })); } catch { /* fine */ }
-        try { if (this.name) localStorage.setItem(NAME_KEY + this.host, this.name); } catch { /* fine */ }
+        BOX_INFO.of(this.host).set({ outputs: this.outputs, pixels: this.pixels, ports: this.ports, name: this.name, ip: this.ip });
+        if (this.name) BOX_NAME.of(this.host).set(this.name);
         this.set('ready'); break;
       case 'denied': this.adopting = false; this.set('denied'); break;
       case 'status':
@@ -132,7 +131,7 @@ export class Bridge {
     this.adopting = true;
     this.sent.clear();
     try {
-      const info = JSON.parse(sessionStorage.getItem(INFO_KEY + this.host) ?? 'null');
+      const info = BOX_INFO.of(this.host).get() as { outputs?: BoxOutput[]; pixels?: unknown; ports?: unknown; name?: string; ip?: string } | null;
       if (info) { this.outputs = info.outputs ?? []; this.pixels = Array.isArray(info.pixels) ? info.pixels : []; this.ports = portsOf(info.ports); this.name = info.name ?? ''; this.ip = info.ip ?? ''; }
     } catch { /* it sends everything until it says otherwise */ }
     this.set('opening');
