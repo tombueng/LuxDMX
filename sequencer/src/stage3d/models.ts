@@ -53,6 +53,16 @@ export function winchParts() {
 }
 
 // fixed lights and machines, standing on their up (the beam / what they throw goes up)
+// how wide a light of this look is drawn as it comes (metres), for one drawn its own size
+const widths = new Map<Look, number>();
+export function lookWidth(look: Look): number {
+  let w = widths.get(look);
+  if (w === undefined) {
+    const g = look === 'spot' || look === 'wash' ? headParts(look).base : look === 'headbar' ? headBarParts().bar : body(look).geo;
+    g.computeBoundingBox(); w = Math.max(0.05, g.boundingBox!.max.x - g.boundingBox!.min.x); widths.set(look, w);
+  }
+  return w;
+}
 export function body(look: Look): { geo: THREE.BufferGeometry; lensR: number; lenses?: [number, number][] } {
   switch (look) {
     case 'par': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.3, 12).translate(0, -0.15, 0), new THREE.TorusGeometry(0.17, 0.012, 4, 12, Math.PI).rotateY(Math.PI / 2).translate(0, -0.15, 0)]), lensR: 0.11 };

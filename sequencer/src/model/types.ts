@@ -63,6 +63,9 @@ export type PixelLayout =
   | { kind: 'rings'; rings: number[]; ccw?: boolean; turn?: number }
   | { kind: 'matrix'; cols: number; rows: number; zigzag?: boolean; vertical?: boolean; from?: 'tl' | 'tr' | 'bl' | 'br' };
 
+// A light's size in metres: w across (a bar's or a strip's length), h, d. Each one left out: as it is.
+export interface Dims { w?: number; h?: number; d?: number }
+
 export interface FixtureMode {
   name: string;
   channels: Channel[];
@@ -79,7 +82,8 @@ export interface FixtureType {
   // rollDeg: how far its third axis turns (360 when not said); beamDeg: its beam's opening angle in
   // degrees, narrowest and widest (zoom in and out; the same twice: no zoom), from its data sheet
   // travel, hoistSpeed: a winch's travel in metres (from the top of it down) and how fast it goes (m/s)
-  physical?: { panDeg?: number; tiltDeg?: number; rollDeg?: number; beamDeg?: [number, number]; travel?: number; hoistSpeed?: number };
+  // dims: how big it is in metres, as the 3D stage draws it (w: across, a bar's or a strip's length)
+  physical?: { panDeg?: number; tiltDeg?: number; rollDeg?: number; beamDeg?: [number, number]; travel?: number; hoistSpeed?: number; dims?: Dims };
   // the light's RDM maker (ESTA) and model ids, and which of its modes each RDM personality is (by
   // number): a light found on the line is patched with this type and the right mode
   rdm?: { maker: number; model: number; modes?: Record<string, string> };
@@ -154,6 +158,7 @@ export interface Fixture {
   panDeg?: number;
   tiltDeg?: number;
   beamDeg?: [number, number];   // this light's own beam angle, narrowest and widest (over its type's)
+  dims?: Dims;                  // this light's own size in metres (over its type's): a strip's length, a bigger PAR
   // a winch's soft limits: how high and how low it may go, as parts of its travel (0 the top, 1 the
   // bottom): whatever a cue says, the winch is sent within them
   hoistLimits?: [number, number];

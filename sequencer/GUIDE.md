@@ -486,6 +486,9 @@ Three more demos come with their own room on the 3D stage:
     jumps a level or starts a list); a pad is a flash: full while held, back when let go. A control
     a live page's button had goes to the console (learning it says so).
 - **Background tabs** don't slow the output down (the clock runs in a Worker).
+- **A light's size** (its setup, Mounting: Width m): how wide the 3D stage draws it. A strip's or a
+  bar's length (144 LEDs over the whole back bar), a matrix's or a ring's width, any other light that
+  much bigger or smaller. Empty: as its type has it. Kept with the show (`dims`).
 - **No internet at the venue?** Open the app once at home: it keeps all of itself and works
   offline after that (shows live in the browser anyway). A Wi-Fi without internet doesn't hold it
   up: after 4 seconds without an answer it starts from its own copy. Chrome and Edge can also
@@ -566,11 +569,12 @@ Three more demos come with their own room on the 3D stage:
   does: how many balls, how high the flames...). On a wall of strips the ones that rise or fall
   run up every strip on its own; "Back" in Direction turns them round when your strips hang the
   other way up.
-- **LED rings and matrices**: a WS2812 ring, a disc of rings (the usual 241 LEDs on 9 rings, 144, 93,
-  61, 37) or a matrix (8 x 8, 16 x 16, 32 x 8) is one light with a shape. Pick it in Add fixtures, or
-  "Ring or matrix..." for your own: how many LEDs on each ring, or columns and rows, where the data
-  starts and which way it runs. A picture walks the LEDs in data order, to compare with the real
-  one. Once it's patched, its **LEDs** tab (double-click it in the list) has a test picture for the
+- **LED rings, matrices and strips**: a WS2812 ring, a disc of rings (the usual 241 LEDs on 9 rings,
+  144, 93, 61, 37), a matrix (8 x 8, 16 x 16, 32 x 8) or a strip is one light with a shape. Pick it
+  in Add fixtures, or "Ring, matrix or strip..." for your own: how many LEDs on each ring, columns
+  and rows, or a strip's LEDs and its length in metres; where the data starts and which way it runs,
+  and the **colour order** each LED wants (WS2812 strips: GRB; RGBW chips: RGBW). A picture walks the
+  LEDs in data order, to compare with the real one. Once it's patched, its **LEDs** tab (double-click it in the list) has a test picture for the
   real one, turns and mirrors it, and finds the wiring from three LEDs you click. Over 170 RGB pixels (128 RGBW) a light runs on over the next universes, whole pixels on
   each, the way a LuxDMX box's pixel port reads it: patch it on the universe the port starts at.
   A box tells the app what its ports listen on and only gets those universes. If a line under the

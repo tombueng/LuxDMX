@@ -24,6 +24,11 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   deep, the cyc 32 x 19 m, two front-of-house bars, the fly tower up to 32 m. The house curtain is
   folded velvet with a valance and gold fringes; the front light is softer and the deck dark, so
   the scenes don't glare white, and the castle lost its zebra stripes.
+- **LED strips of your own**: the LED maker makes strips too (how many LEDs, how long, the colour
+  order each LED wants: GRB for WS2812, RGBW...), and any light can have its own size on the 3D stage
+  (setup, Mounting: Width), a strip's length or a bigger PAR. The Bar has 144-LED strips the whole
+  width of the back bar behind the bottles on every shelf and one under the counter, and its
+  bottles are see-through glass now (and drawn in a dozen batches instead of 416 meshes).
 - **A mirror ball on a DMX motor**: a new generic type with one motor channel (stop, either way,
   slow to fast). The ball never hangs dead still, it sways and twists a little on its chain. The
   Bar has one: slow all evening, faster for the disco.

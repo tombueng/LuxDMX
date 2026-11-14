@@ -10,7 +10,7 @@ import { GENERIC, modeOf } from '../model/library';
 import { slotsOf } from '../engine/render';
 import type { ChannelAttr, Color, Cue, CueList, Effect, Fixture, Group, Show, Values } from '../model/types';
 import { D, DECK, aimRot, defaultPlace, planToWorld } from '../stage3d/geometry';
-import { CINEMA, THEATRE } from '../stage3d/sceneSizes';
+import { BAR, CINEMA, THEATRE } from '../stage3d/sceneSizes';
 import { addStandardPresets } from './presets';
 import { placeIn } from './scenePlaces';
 
@@ -695,8 +695,12 @@ export const TEMPLATES: Template[] = [
       // mirror ball, strobes, fog and a few machines for the big nights (one confetti shot)
       const pars = b.add('gen-drgbw', 10, 'PAR', 0.3);
       const warm = b.add('gen-wwcw', 4, 'Counter', 0.7, { x0: 0.25, x1: 0.75 });
-      const shelves = b.add('gen-bar12', 6, 'Shelf', 0.12, { x0: 0.15, x1: 0.85 });
-      const strip = b.add('gen-bar16', 2, 'Counter strip', 0.2, { x0: 0.3, x1: 0.7 });
+      // long LED strips, 144 pixels each, the whole width of the back bar: one behind the bottles on
+      // every shelf, one under the counter (on the box's pixel ports, a universe each, after the sign's two)
+      const shelves = [12, 13, 14, 15].flatMap((u, i) => b.add('gen-strip144', 1, `Shelf strip ${i + 1}`, 0.12, { universe: u, x0: 0.5, x1: 0.5 }));
+      const strip = b.add('gen-strip144', 1, 'Counter strip', 0.2, { universe: 16, x0: 0.5, x1: 0.5 });
+      b.place(shelves, (f) => { f.dims = { w: 2 * BAR.counterX - 0.7 }; });
+      b.place(strip, (f) => { f.dims = { w: 2 * BAR.counterX - 0.2 }; });
       const dance = b.add('gen-drgbwauvs', 6, 'Dance', 0.5, { x0: 0.2, x1: 0.8 });
       const heads = b.add('gen-mover8', 4, 'Head', 0.5, { x0: 0.04, x1: 0.96 });
       const beams = b.add('gen-roll', 2, 'Beam', 0.56, { x0: 0.4, x1: 0.6 });

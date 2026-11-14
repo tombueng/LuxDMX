@@ -110,14 +110,55 @@ test('Letter zoom says your words a letter at a time on a matrix; the word shows
   expect(Math.max(...seen)).toBeLessThan(150);
 });
 
+test('a strip of your own: 144 LEDs over 2.4 m, its colours in WS2812 order (GRB) on the wire; its width set in its setup', async ({ page }) => {
+  await pixelPorts([[5, 1]]);
+  await openConnected(page);
+  await tab(page, 'Fixtures');
+  await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
+  const add = page.getByRole('dialog', { name: 'Add fixtures' });
+  await add.getByRole('button', { name: 'Ring, matrix or strip…' }).click();
+  const maker = page.getByRole('dialog', { name: 'A LED ring, matrix or strip' });
+  await maker.getByRole('radio', { name: 'Strip' }).click();
+  await maker.getByLabel('LEDs on the strip').fill('144');
+  await maker.getByLabel('Length in metres').fill('2.4');
+  await expect(maker.getByLabel('Colour order')).toHaveValue('GRB');               // (a strip starts in WS2812's order)
+  await expect(maker.getByText('144 pixels, 432 channels.')).toBeVisible();
+  await maker.getByRole('button', { name: 'Save' }).click();
+  await expect(maker).toBeHidden();
+  await add.getByLabel('How many').fill('1');
+  await add.getByLabel('Universe').fill('5');
+  await add.getByRole('button', { name: /^Add \d+ × / }).click();
+  await expect(add).toBeHidden();
+  const t = await page.evaluate(() => (window as any).__luxdmx.show.fixtureTypes[0]);
+  expect(t.physical.dims.w).toBe(2.4);
+  expect(t.modes[0].layout).toEqual({ kind: 'matrix', cols: 144, rows: 1 });
+  expect(t.modes[0].channels.slice(0, 3).map((c: any) => c.attr)).toEqual(['green', 'red', 'blue']);
+  // red goes out as WS2812 wants it: green first, then red
+  await selectAll(page);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.programmer[a.show.fixtures[0].id] = { intensity: 1, color: { r: 1, g: 0, b: 0 } }; });
+  await expect.poll(async () => (await channels(5, 6)).slice(0, 6), { timeout: 8000 }).toEqual([0, 255, 0, 0, 255, 0]);
+  // its own width, in its setup (the Mounting tab): kept with the light, its type's as the hint
+  const name = await page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].name);
+  await page.locator(`.fl li[data-fixture="${name}"]`).dblclick();
+  const dlg = page.getByRole('dialog', { name: `Patch: ${name}` });
+  await dlg.getByRole('tab', { name: 'Mounting' }).click();
+  await expect(dlg.getByLabel('Width in metres')).toHaveAttribute('placeholder', '2.4 (its type)');
+  await dlg.getByLabel('Width in metres').fill('3.5');
+  await dlg.getByLabel('Width in metres').press('Tab');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].dims)).toEqual({ w: 3.5 });
+  await dlg.getByLabel('Width in metres').fill('');
+  await dlg.getByLabel('Width in metres').press('Tab');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].dims)).toBeUndefined();
+});
+
 test('a ring of your own, worked out from its total, on the wire', async ({ page }) => {
   await pixelPorts([[5, 1]]);
   await openConnected(page);
   await tab(page, 'Fixtures');
   await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).first().click();
   const add = page.getByRole('dialog', { name: 'Add fixtures' });
-  await add.getByRole('button', { name: 'Ring or matrix…' }).click();
-  const maker = page.getByRole('dialog', { name: 'A LED ring or matrix' });
+  await add.getByRole('button', { name: 'Ring, matrix or strip…' }).click();
+  const maker = page.getByRole('dialog', { name: 'A LED ring, matrix or strip' });
   await maker.getByLabel('LEDs in all').fill('144');
   await maker.getByLabel('How many rings').fill('9');
   await maker.getByRole('button', { name: 'Work it out' }).click();

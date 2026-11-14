@@ -354,6 +354,7 @@ function mendType(t: Obj, note: Note) {
       for (const k of ['panDeg', 'tiltDeg', 'rollDeg']) fixNum(t.physical, k, 1, 1080, where, note);
       fixNum(t.physical, 'travel', 0.1, 100, where, note); fixNum(t.physical, 'hoistSpeed', 0.01, 10, where, note);
       if (t.physical.beamDeg !== undefined) { const b = beamDegOf(t.physical.beamDeg); if (b) t.physical.beamDeg = b; else { note(`${where}: beam angle ${shown(t.physical.beamDeg)} can't be right, left out`); delete t.physical.beamDeg; } }
+      if (t.physical.dims !== undefined) { const d = dimsOf(t.physical.dims); if (d) t.physical.dims = d; else { note(`${where}: size ${shown(t.physical.dims)} can't be right, left out`); delete t.physical.dims; } }
     }
   }
 }
@@ -375,6 +376,7 @@ function mendFixture(f: Obj, note: Note): boolean {
   // its own pan / tilt range (degrees): a number a head can have, or gone (the type's, or 540 / 270)
   for (const k of ['panDeg', 'tiltDeg']) if (f[k] !== undefined && !(typeof f[k] === 'number' && f[k] >= 1 && f[k] <= 1080)) { note(`${where}: ${k} ${shown(f[k])} can't be right, left out`); delete f[k]; }
   if (f.beamDeg !== undefined) { const b = beamDegOf(f.beamDeg); if (b) f.beamDeg = b; else { note(`${where}: beam angle ${shown(f.beamDeg)} can't be right, left out`); delete f.beamDeg; } }
+  if (f.dims !== undefined) { const d = dimsOf(f.dims); if (d) f.dims = d; else { note(`${where}: size ${shown(f.dims)} can't be right, left out`); delete f.dims; } }
   // (a winch's soft limits: two parts of its travel, the top one first; anything else isn't kept, and
   // the winch has its whole travel)
   if (f.hoistLimits !== undefined) {
@@ -397,6 +399,13 @@ function mendFixture(f: Obj, note: Note): boolean {
   return true;
 }
 
+// a light's size: w, h, d in metres, each from 2 cm to 100 m (one that isn't: left out); none: no size
+function dimsOf(x: unknown): { w?: number; h?: number; d?: number } | undefined {
+  if (!isObj(x)) return undefined;
+  const out: { w?: number; h?: number; d?: number } = {};
+  for (const k of ['w', 'h', 'd'] as const) { const v = (x as Record<string, unknown>)[k]; if (typeof v === 'number' && v >= 0.02 && v <= 100) out[k] = v; }
+  return Object.keys(out).length ? out : undefined;
+}
 // a beam's opening angle, narrowest and widest: two numbers from half a degree to 180, the narrow one first
 function beamDegOf(x: unknown): [number, number] | undefined {
   if (!Array.isArray(x) || x.length !== 2 || !x.every((v) => typeof v === 'number' && v >= 0.5 && v <= 180)) return undefined;

@@ -61,7 +61,10 @@ const BAR_PLACES: Table = {
   // the back bar's uplights under the bottles
   Shelf: (i, n) => { const x = spread(i, n, -4.6, 4.6); return aim({ x, y: 1.08, z: B.backZ + 0.2 }, { x, y: 3.2, z: B.backZ - 0.1 }); },
   // the LED strips along the counter's front, at the foot rail, shining out at the stools
-  'Counter strip': (i) => { const x = i ? 2.6 : -2.6; return aim({ x, y: 0.2, z: B.counterZ + 0.32 }, { x, y: 0.4, z: B.counterZ + 3 }); },
+  'Counter strip': () => ({ p: { x: 0, y: 0.14, z: B.counterZ + 0.33 }, rot: { yaw: 0, pitch: 90, roll: 0 } }),
+  // (the long strips: behind the bottles on each shelf, shining out through them; under the counter's
+  // front, the whole length of it)
+  'Shelf strip': (i) => ({ p: { x: 0, y: B.shelves[i % B.shelves.length] + 0.05, z: B.backZ - 0.1 }, rot: { yaw: 0, pitch: 90, roll: 0 } }),
   // the dance floor's wash
   Dance: (i, n) => { const x = spread(i, n, -3.2, 3.2); return aim({ x, y: rail, z: 5.0 }, { x: x * 0.6, y: 0, z: 4.6 }); },
   Head: (i, n) => hung({ x: spread(i, n, -3.6, 3.6), y: rail, z: 7.4 }),

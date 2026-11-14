@@ -29,7 +29,9 @@ function pleated(n: number, depth: number) {
 const pleatsRepeat = () => { if (!pleatTex) { pleatTex = pleats().clone(); pleatTex.wrapS = THREE.RepeatWrapping; pleatTex.repeat.set(10, 1); pleatTex.needsUpdate = true; } return pleatTex; };
 
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
-export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number;
+// (barLen: a bar's or a strip's length in metres when it says; scale: a light drawn bigger or smaller,
+// its own size against its kind's)
+export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number; barLen?: number; scale?: number;
   gobos?: GoboWheel[]; prism?: { ranges?: Ranges; rot?: Ranges }; anim?: { rot?: Ranges };
   // more than two axes: endless pan / tilt (their turning channels' ranges; null: a channel without
   // ranges), a third axis (roll: how far it turns), and its endless turning
@@ -556,13 +558,13 @@ export class Rig {
       const f = this.list[fi], v = stage[f.id];
       pos.set(f.p.x, f.p.y, f.p.z);
       q.setFromEuler(E.set(f.rot.pitch * RAD, f.rot.yaw * RAD, f.rot.roll * RAD, 'YXZ'));
-      const base = BASE.compose(pos, q, sc.set(1, 1, 1));
+      const s1 = f.scale ?? 1, base = BASE.compose(pos, q, sc.set(s1, s1, s1));
       const level = lightOf(wholeLook(v), t), inSel = selected.has(f.id), isSel = inSel && marked;   // (a head lit only by its cells has a beam too)
       if (f.shape) m4.compose(pos, q, sc.set(f.size! * shapeW(f.shape) + 0.06, 0.2, f.size! * shapeH(f.shape) + 0.06));
       else if (f.look === 'headbar') m4.compose(pos, q, sc.set(HEADBAR_PITCH * (f.heads ?? 1) + 0.15, 0.45, 0.35));
       else if (f.look === 'winch') m4.compose(pos, q, sc.set(0.4, 0.4, 0.4));
       else if (f.cloth) m4.compose(pos, CQ.setFromAxisAngle(UPY, f.rot.yaw * RAD), sc.set(f.cloth.w, 0.5, 0.5));
-      else m4.compose(pos, q, sc.set(f.kind === 'bar' ? Math.max(1, f.cells / 30) : 0.6, 0.7, 0.6));
+      else m4.compose(pos, q, sc.set(f.kind === 'bar' ? (f.barLen ?? Math.max(1, f.cells / 30)) : 0.6 * s1, 0.7 * s1, 0.6 * s1));
       this.hit.setMatrixAt(nh++, m4); this.hitIds.push(f.id);
       if (inSel && ns < this.sel.instanceMatrix.count) this.sel.setMatrixAt(ns++, m4);   // (placed while it fades out too)
       if (f.look === 'spot' || f.look === 'wash') {
@@ -720,7 +722,7 @@ export class Rig {
         pushLit(fi, pos, dir, col, level * 0.4, 60);
       } else if (f.kind === 'bar') {
         // the bar lies along its x; its cells shine along its up
-        const L = f.cells > 24 ? f.cells / 30 : 1;
+        const L = f.barLen ?? (f.cells > 24 ? f.cells / 30 : 1);
         put('bar', TMP.copy(base).multiply(TMP2.makeScale(L + 0.04, 1, 1)));
         const dir = DIR.copy(UP).applyQuaternion(q);
         for (let i = 0; i < f.cells; i++) {

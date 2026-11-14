@@ -28,14 +28,15 @@ function pixelStrip(pixels: number, white = false): FixtureType {
   return gen(`gen-strip${pixels}${white ? 'w' : ''}`, `Pixel strip, ${pixels} ${white ? 'RGBW pixels (SK6812)' : 'RGB pixels (WS2811/WS2812)'}`, channels);
 }
 
-// A ring, a disc of rings or a matrix: a strip with a shape, so effects can draw on it.
-// (app-made ones come from here too: the ring and matrix maker)
-export function pixelShape(id: string, model: string, layout: PixelLayout, white = false, source: FixtureType['source'] = 'generic'): FixtureType {
-  const n = layoutCells(layout), channels: Channel[] = [];
-  for (let c = 0; c < n; c++) {
-    channels.push(ch(`Red ${c + 1}`, 'red', { cell: c }), ch(`Green ${c + 1}`, 'green', { cell: c }), ch(`Blue ${c + 1}`, 'blue', { cell: c }));
-    if (white) channels.push(ch(`White ${c + 1}`, 'white', { cell: c }));
-  }
+// The order a pixel's colours come in on the wire, as strips and chips have them (WS2812 is GRB)
+export const PIXEL_ORDERS = ['RGB', 'GRB', 'BRG', 'RBG', 'BGR', 'GBR', 'RGBW', 'GRBW'] as const;
+const COLOR_OF = { R: ['Red', 'red'], G: ['Green', 'green'], B: ['Blue', 'blue'], W: ['White', 'white'] } as const;
+// A ring, a disc of rings, a matrix or a strip (a matrix one LED high): pixels with a shape, so
+// effects can draw on them. `order`: each pixel's colours in the order they come (RGB unless it
+// says; with a W, white too). (app-made ones come from here too: the LED maker)
+export function pixelShape(id: string, model: string, layout: PixelLayout, white = false, source: FixtureType['source'] = 'generic', order?: (typeof PIXEL_ORDERS)[number]): FixtureType {
+  const n = layoutCells(layout), channels: Channel[] = [], seq = (order ?? (white ? 'RGBW' : 'RGB')).split('') as (keyof typeof COLOR_OF)[];
+  for (let c = 0; c < n; c++) for (const k of seq) channels.push(ch(`${COLOR_OF[k][0]} ${c + 1}`, COLOR_OF[k][1], { cell: c }));
   const t = gen(id, model, channels);
   t.source = source;
   if (source !== 'generic') t.manufacturer = '';

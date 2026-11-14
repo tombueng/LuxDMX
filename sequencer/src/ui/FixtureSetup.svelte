@@ -110,6 +110,20 @@
     }
     app.markDirty(0);
   }
+  // its size on the 3D stage: this light's own width (a strip's or a bar's length), over its type's;
+  // empty: as its type has it again
+  function setWidth(v: number) {
+    app.checkpoint();
+    const ok = Number.isFinite(v) && v >= 0.02 && v <= 100;
+    for (const x of peers) {
+      const g = fx(x);
+      if (!g) continue;
+      const rest = { ...(g.dims ?? {}) };
+      if (ok) rest.w = Math.round(v * 1000) / 1000; else delete rest.w;
+      if (Object.keys(rest).length) g.dims = rest; else delete g.dims;
+    }
+    app.markDirty(0);
+  }
   // the beam angle (narrowest or widest): this light's own, over its type's; both empty: its type's again
   function setBeam(i: 0 | 1, v: number) {
     app.checkpoint();
@@ -320,6 +334,15 @@
         <p class="faint small">{tb ? "From its type's fixture file; set your own if the real one differs." : "Its type doesn't say: the 3D stage guesses from what kind of light it is. The data sheet has it (beam angle, often with a zoom range)."}</p>
       </section>
     {/if}
+    <!-- its size on the 3D stage: a strip's or a bar's length, a matrix's width, a bigger or smaller light -->
+    <section aria-labelledby="size-h">
+      <h3 id="size-h">Its size</h3>
+      <div class="angles">
+        <label title="How wide it is in metres: a strip's or a bar's length, a matrix's or a ring's width; any other light is drawn that much bigger or smaller">Width m<input type="number" min="0.02" max="100" step="0.05" aria-label="Width in metres" value={f.dims?.w ?? ''}
+          placeholder={t?.physical?.dims?.w ? `${t.physical.dims.w} (its type)` : 'as drawn'} onfocus={pickAll} onchange={(e) => { setWidth(num(e)); shown(e, f.dims?.w); }} /></label>
+      </div>
+      <p class="faint small">For the 3D stage: a strip of 144 LEDs over 2.4 m, a matrix the size of the real one. Empty: as its type has it.</p>
+    </section>
     {#if testable.length}
       <section aria-labelledby="try-h">
         <h3 id="try-h">Try it</h3>

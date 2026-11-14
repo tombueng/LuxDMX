@@ -148,16 +148,24 @@ export function buildBar(group: THREE.Group, M: Mats, r: Room) {
   const mirror = std({ color: 0x9aa4b0, metalness: 1, roughness: 0.05 });
   add(new THREE.Mesh(new THREE.PlaneGeometry(2 * B.counterX - 0.6, 2.0), mirror), 0, 2.05, B.backZ - 0.12);
   add(box(2 * B.counterX + 0.2, 1.05, 0.55, wood), 0, 0.52, B.backZ + 0.15);                        // (the low back counter, the fridges)
-  const glass = [0x2f6b2a, 0x8a4a12, 0xd8e2e0, 0x24406e, 0x6a1420, 0xc8a046].map((color) => std({ color, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.85 }));
+  // the bottles: glass you see the light behind them through (a strip behind them shines out through
+  // the glass), each colour one batch of bottles and one of necks (416 meshes were 416 draws)
+  const glass = [0x2f6b2a, 0x8a4a12, 0xd8e2e0, 0x24406e, 0x6a1420, 0xc8a046].map((color) => std({ color, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.42, depthWrite: false, emissive: color, emissiveIntensity: 0.08 }));
   const strip = new THREE.MeshBasicMaterial({ color: 0xffb060, toneMapped: false });
+  const bottles: { x: number; y: number; tall: number; m: number }[] = [];
   B.shelves.forEach((y, k) => {
     add(box(2 * B.counterX - 0.6, 0.035, 0.28, wood), 0, y, B.backZ);
     add(box(2 * B.counterX - 0.6, 0.012, 0.02, strip), 0, y - 0.025, B.backZ + 0.13);
-    for (let i = 0; i < 52; i++) {
-      const x = -B.counterX + 0.55 + i * 0.21 + (k % 2) * 0.08, m = glass[(i * 5 + k * 3) % glass.length], tall = (i + k) % 3 ? 0 : 0.06;
-      add(cyl(0.034, 0.034, 0.2 + tall, m, 10), x, y + 0.12 + tall / 2, B.backZ + 0.01);
-      add(cyl(0.011, 0.034, 0.05, m, 10), x, y + 0.245 + tall, B.backZ + 0.01);
-    }
+    for (let i = 0; i < 52; i++) bottles.push({ x: -B.counterX + 0.55 + i * 0.21 + (k % 2) * 0.08, y, tall: (i + k) % 3 ? 0 : 0.06, m: (i * 5 + k * 3) % glass.length });
+  });
+  const body = new THREE.CylinderGeometry(0.034, 0.034, 1, 12), neck = new THREE.CylinderGeometry(0.011, 0.034, 0.05, 10), M4 = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3();
+  glass.forEach((m, gi) => {
+    const mine = bottles.filter((b) => b.m === gi), bodies = new THREE.InstancedMesh(body, m, mine.length), necks = new THREE.InstancedMesh(neck, m, mine.length);
+    mine.forEach((b, i) => {
+      bodies.setMatrixAt(i, M4.compose(P.set(b.x, b.y + 0.12 + b.tall / 2, B.backZ + 0.01), Q0, S.set(1, 0.2 + b.tall, 1)));
+      necks.setMatrixAt(i, M4.compose(P.set(b.x, b.y + 0.245 + b.tall, B.backZ + 0.01), Q0, S.set(1, 1, 1)));
+    });
+    group.add(bodies, necks);
   });
   add(new THREE.Mesh(new THREE.PlaneGeometry(3.0, 0.75), new THREE.MeshBasicMaterial({ map: neonSign('Cocktails', '#36d6e7'), toneMapped: false })), 0, 3.35, B.backZ - 0.1);
   // the counter: wood, a brass foot rail, a lit line under its top, taps, glasses

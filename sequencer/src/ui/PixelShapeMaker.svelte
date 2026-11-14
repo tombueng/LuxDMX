@@ -1,22 +1,26 @@
 <script lang="ts">
-  // A LED ring, disc or matrix of your own: how many LEDs where, and which way the data runs through
-  // them, with a picture to compare against the real thing (a dot walks the LEDs in data order).
+  // A LED ring, disc, matrix or strip of your own: how many LEDs where, which way the data runs
+  // through them and the order each one's colours come in, with a picture to compare against the
+  // real thing (a dot walks the LEDs in data order). A strip has its length too (the 3D stage).
   import Modal from './Modal.svelte';
   import { clock } from './clock.svelte';
   import { app, newId } from '../app.svelte';
-  import { pixelShape } from '../model/library';
+  import { pixelShape, PIXEL_ORDERS } from '../model/library';
   import { layoutCells, MAX_PIXELS, placesFor, ringsFor } from '../model/pixelLayout';
   import type { PixelLayout } from '../model/types';
 
   let { onclose, onsaved }: { onclose: () => void; onsaved: (id: string) => void } = $props();
 
-  let kind = $state<'rings' | 'matrix'>('rings');
+  let kind = $state<'rings' | 'matrix' | 'strip'>('rings');
+  let leds = $state(144), metres = $state(1);
   let ringText = $state('60, 48, 40, 32, 24, 16, 12, 8, 1');
   let ccw = $state(false), turn = $state(0);
   let total = $state(144), ringCount = $state(9);
   let cols = $state(16), rows = $state(16), zigzag = $state(true), vertical = $state(false);
   let from = $state<'tl' | 'tr' | 'bl' | 'br'>('tl');
-  let white = $state(false);
+  // each LED's colours in the order they come (WS2812 strips: GRB; with a W: RGBW chips)
+  let order = $state<(typeof PIXEL_ORDERS)[number]>('RGB');
+  const white = $derived(order.includes('W'));
   let named = $state('');
 
   const rings = $derived(ringText.split(/[^0-9]+/).filter(Boolean).map(Number));
@@ -25,21 +29,25 @@
       if (!rings.length || rings.some((r) => r < 1)) return null;
       return { kind: 'rings', rings: [...rings], ...(ccw ? { ccw } : {}), ...(turn ? { turn } : {}) };
     }
+    if (kind === 'strip') return Number.isInteger(leds) && leds >= 1 ? { kind: 'matrix', cols: leds, rows: 1 } : null;
     if (!(cols >= 1 && rows >= 1) || !Number.isInteger(cols) || !Number.isInteger(rows)) return null;
     return { kind: 'matrix', cols, rows, ...(zigzag ? { zigzag } : {}), ...(vertical ? { vertical } : {}), ...(from !== 'tl' ? { from } : {}) };
   });
   const count = $derived(layout ? layoutCells(layout) : 0);
-  const err = $derived(!layout ? (kind === 'rings' ? 'Say how many LEDs each ring has, like 24, 16, 12, 8, 1.' : 'Give it columns and rows.')
-    : count > MAX_PIXELS ? `That's ${count} LEDs: ${MAX_PIXELS} is the most one light can have.` : '');
-  const auto = $derived(kind === 'rings' ? (rings.length > 1 ? `LED disc, ${count} pixels on ${rings.length} rings` : `LED ring, ${count} pixels`) : `LED matrix, ${cols} x ${rows}`);
+  const err = $derived(!layout ? (kind === 'rings' ? 'Say how many LEDs each ring has, like 24, 16, 12, 8, 1.' : kind === 'strip' ? 'Say how many LEDs it has.' : 'Give it columns and rows.')
+    : count > MAX_PIXELS ? `That's ${count} LEDs: ${MAX_PIXELS} is the most one light can have.`
+    : kind === 'strip' && !(metres >= 0.02 && metres <= 100) ? 'Its length in metres, like 1 or 2.4.' : '');
+  const auto = $derived(kind === 'rings' ? (rings.length > 1 ? `LED disc, ${count} pixels on ${rings.length} rings` : `LED ring, ${count} pixels`)
+    : kind === 'strip' ? `LED strip, ${count} pixels, ${metres} m (${order})` : `LED matrix, ${cols} x ${rows}`);
   const width = $derived(count * (white ? 4 : 3));
   const universes = $derived(width > 512 ? Math.ceil(count / (white ? 128 : 170)) : 1);
 
   function work() { ringText = ringsFor(Math.max(1, total | 0), Math.max(1, ringCount | 0)).join(', '); }
   function save() {
     if (!layout || err) return;
-    const t = pixelShape(newId('user:'), named.trim() || auto, $state.snapshot(layout) as PixelLayout, white, 'user');
+    const t = pixelShape(newId('user:'), named.trim() || auto, $state.snapshot(layout) as PixelLayout, white, 'user', order);
     t.manufacturer = 'My fixtures';
+    if (kind === 'strip') t.physical = { ...t.physical, dims: { w: metres } };
     app.saveType(t);
     onsaved(t.id);
     onclose();
@@ -64,12 +72,13 @@
   });
 </script>
 
-<Modal title="A LED ring or matrix" {onclose} wide>
+<Modal title="A LED ring, matrix or strip" {onclose} wide>
   <div class="grid">
     <div class="form">
       <div class="seg" role="radiogroup" aria-label="Shape">
         <button role="radio" aria-checked={kind === 'rings'} class:on={kind === 'rings'} onclick={() => (kind = 'rings')}>Ring or disc</button>
         <button role="radio" aria-checked={kind === 'matrix'} class:on={kind === 'matrix'} onclick={() => (kind = 'matrix')}>Matrix</button>
+        <button role="radio" aria-checked={kind === 'strip'} class:on={kind === 'strip'} onclick={() => { kind = 'strip'; if (order === 'RGB') order = 'GRB'; }}>Strip</button>
       </div>
       {#if kind === 'rings'}
         <label>LEDs per ring, in the order the data runs through them
@@ -82,6 +91,12 @@
         <p class="faint">Starts at the middle? Write the rings the other way round: 1, 8, 12...</p>
         <label class="check"><input type="checkbox" bind:checked={ccw} /> runs counter-clockwise</label>
         <label>Turned by (degrees) <input type="number" step="15" bind:value={turn} aria-label="Turned by" /></label>
+      {:else if kind === 'strip'}
+        <div class="row">
+          <label>LEDs <input type="number" min="1" max={MAX_PIXELS} bind:value={leds} aria-label="LEDs on the strip" /></label>
+          <label>Length m <input type="number" min="0.02" max="100" step="0.1" bind:value={metres} aria-label="Length in metres" /></label>
+        </div>
+        <p class="faint">The data runs from its first LED to its last; on the 3D stage it's as long as it really is.</p>
       {:else}
         <div class="row">
           <label>Columns <input type="number" min="1" max="512" bind:value={cols} aria-label="Columns" /></label>
@@ -97,7 +112,7 @@
           </select></label>
         <label class="check"><input type="checkbox" bind:checked={zigzag} /> zigzag: every second line runs back (most flexible panels)</label>
       {/if}
-      <label class="check"><input type="checkbox" bind:checked={white} /> has a white LED too (RGBW, SK6812)</label>
+      <label>Colour order <select bind:value={order} aria-label="Colour order">{#each PIXEL_ORDERS as o (o)}<option value={o}>{o}{o === 'GRB' ? ' (WS2812)' : o === 'RGBW' ? ' (SK6812)' : ''}</option>{/each}</select></label>
       <label>Name <input bind:value={named} placeholder={auto} aria-label="Name" /></label>
       {#if err}<p class="err" role="status">{err}</p>{/if}
       <p class="faint">{count} pixels, {width} channels{universes > 1 ? `, ${universes} universes` : ''}.</p>

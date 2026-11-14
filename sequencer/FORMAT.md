@@ -110,7 +110,9 @@ allows unknown fields everywhere, like readers must).
   angle in degrees, `[narrowest, widest]` (zoomed in and out; the same twice for a light without a
   zoom), from the fixture file (OFL `physical.lens.degreesMinMax` or a zoom's angles, GDTF a zoom
   in degrees or the beam's `BeamAngle`, QLC+ `Lens DegreesMin/DegreesMax`). The 3D stage draws the
-  beam at that angle; without it, a guess for its kind. `travel` and `hoistSpeed`, for a winch:
+  beam at that angle; without it, a guess for its kind. `dims`: how big it is in metres, `{ w, h, d }`
+  (each 0.02 to 100, each optional; `w` across: a strip's or a bar's length, a matrix's width), as the
+  3D stage draws it. `travel` and `hoistSpeed`, for a winch:
   how far its load goes from the top down (metres, 0.1 to 100) and its top speed (metres a second,
   0.01 to 10); the 3D stage moves it so (4 m and 0.4 m/s when not said).
 - `rdm` (optional): what the real fixture says it is over RDM, so a light found on the line is
@@ -198,6 +200,9 @@ the deck, by its kind, under its 2D place):
   doesn't say or says wrong. Optional.
 - `beamDeg`: this light's own beam angle, `[narrowest, widest]` in degrees (0.5 to 180), over its
   type's `physical.beamDeg`. Optional.
+- `dims`: this light's own size, `{ w, h, d }` in metres as in a type's `physical.dims`, over its
+  type's (a strip cut to the length of the bar, a bigger PAR). Optional; a value that can't be right
+  is left out with a note.
 - `cloth`: stage machinery's cloth, `{ "w", "h", "picture" }`: a curtain track's or a fly bar's
   width and height in metres, and the picture painted on a drop (`forest`, `city`, `stars`,
   `castle`, `sea`, `clouds`). Optional, each part too: a curtain spans its type's `physical.travel`,
