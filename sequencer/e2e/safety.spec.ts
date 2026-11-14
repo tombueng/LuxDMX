@@ -1,7 +1,7 @@
 // Safety on the wire: blind keeps the stage as it was (nothing new goes out until you go live);
 // confetti, flames, sparks and CO2 send 0 until someone holds Arm; a timeline jumped about over a
 // flame moment never fires it, playing through it does (armed).
-import { openConnected, resetFake, channels, history, patch, selectAll, full, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -145,4 +145,21 @@ test('a machine moment coming while safe is said on the Live page; a reload says
   await page.reload();
   await expect(page.locator('.toast')).toContainText('The reload made the machines safe');
   await expect(page.locator('.top .arm')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('a tab opened from this one starts blind (it gets a copy of this tab\'s storage); a reload of this tab stays on stage', async ({ page }) => {
+  await openConnected(page);
+  await goLive(page);
+  const out = (p: typeof page) => p.evaluate(() => (window as any).__luxdmx.output);
+  expect(await out(page)).toBe('live');
+  // (a new tab from this one, as a link or the browser's Duplicate does: session storage copied)
+  const [tab] = await Promise.all([page.context().waitForEvent('page'), page.evaluate(() => { window.open(location.href, '_blank'); })]);
+  await tab.waitForFunction(() => !!(window as any).__luxdmx, null, { timeout: 30000 });
+  expect(await tab.evaluate(() => sessionStorage.getItem('luxdmx.seq.output'))).toBe('live');   // (the copy is there)
+  expect(await out(tab)).toBe('blind');
+  await tab.close();
+  // this tab reloaded: still on stage
+  await page.reload();
+  await page.waitForFunction(() => !!(window as any).__luxdmx, null, { timeout: 30000 });
+  expect(await out(page)).toBe('live');
 });

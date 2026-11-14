@@ -82,6 +82,11 @@ const UNDO_BYTES = 30_000_000;      // and never more than this much text in the
 const UNDO_KEY = 'luxdmx.seq.undo';
 const PLAYBACK_KEY = 'luxdmx.seq.playing';
 const RESUME_WITHIN = 60_000;       // ms: a reload, not a tab restored hours later
+// Is this page a reload of its tab? (Not a new tab opened from another, nor a duplicated one: those
+// get a copy of the tab's session storage, and must start afresh. Unknown: as a reload.)
+function reloaded() {
+  try { const nav = (performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined)?.type; return !nav || nav === 'reload'; } catch { return true; }
+}
 const OUTPUT_KEY = 'luxdmx.seq.output';  // 'live' or 'blind': this tab (session), or a locked show's browser
 // runs after the current task and the screen updates it caused (a message to ourselves)
 const pingAfter = (() => {
@@ -464,8 +469,10 @@ class App {
   // out. Live is kept over a reload of this tab; a new tab or browser starts blind, going live is a
   // deliberate step (the top bar says which). A show locked for the service keeps it in the
   // browser too: after a power cut its page carries on without anyone at the controls.
+  // (A tab opened from this one, or duplicated, gets a copy of this tab's session storage: it starts
+  // blind all the same, as any new tab. Only a reload of the tab itself keeps live.)
   output = $state<'live' | 'blind'>((() => {
-    try { return sessionStorage.getItem(OUTPUT_KEY) === 'live' || localStorage.getItem(OUTPUT_KEY) === 'live' ? 'live' : 'blind'; } catch { return 'blind'; }
+    try { return (sessionStorage.getItem(OUTPUT_KEY) === 'live' && reloaded()) || localStorage.getItem(OUTPUT_KEY) === 'live' ? 'live' : 'blind'; } catch { return 'blind'; }
   })());
   private frozen: Map<number, Uint8Array> | null = null;
   private frozenDark: Map<number, Uint8Array> | null = null;   // the same with every light off (Blackout)
@@ -679,7 +686,7 @@ class App {
   quiet = true;                     // fresh start, nothing played yet: nothing goes out (see tick)
   coldStart = $state(false);        // picked up what was playing after a cold start: the lights are expected to be on
   // (read before anything disarms: the start opens the show, and that makes them safe)
-  private wasArmed = (() => { try { return sessionStorage.getItem(WAS_ARMED_KEY) === '1'; } catch { return false; } })();
+  private wasArmed = (() => { try { return sessionStorage.getItem(WAS_ARMED_KEY) === '1' && reloaded(); } catch { return false; } })();
   private resumePlayback() {
     if (this.wasArmed && this.gatedMachines.length) ui.toast('The reload made the machines safe: confetti, flames, sparks and CO2 send nothing, winches stay where they were, until you hold Arm again.', 8000);
     this.wasArmed = false;
@@ -689,8 +696,7 @@ class App {
     this.started = true;
     // A reload of this tab (or a crashed tab coming back). A duplicated tab gets a copy of the
     // session storage too, and must not start a second copy of the show.
-    const nav = (performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined)?.type;
-    if ((nav && nav !== 'reload') || !p || p.id !== this.showId || !(Date.now() - (p.at ?? 0) < RESUME_WITHIN)) p = null;
+    if (!reloaded() || !p || p.id !== this.showId || !(Date.now() - (p.at ?? 0) < RESUME_WITHIN)) p = null;
     // A cold start (the tablet switched off and on, the browser restarted): what was playing when
     // this show was last open comes back silently if that was this evening and no other tab is
     // playing it right now (they're asked). The box has been holding that look,

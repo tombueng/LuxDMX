@@ -161,7 +161,7 @@ Three more demos come with their own room on the 3D stage:
 - **Safe by default.** What you do only goes out to the lights when the top bar says **On stage**
   (red); in **Blind** you see it on the stage here (and on the Live page and a phone remote it says
   so), and the lights keep the look they had, without fog, haze and the machines. **Blackout**
-  always reaches the stage. A new tab starts blind; a reload keeps what it was, and so does a
+  always reaches the stage. A new tab starts blind (one opened from this one or duplicated too); a reload keeps what it was, and so does a
   tablet switched off and on in the middle of a show (it carries on where it was), or a show locked
   for the service. Going on stage asks once, going blind is one click.
 - **The machines wait for a person.** Confetti, flames, sparks and CO2 send nothing until someone
