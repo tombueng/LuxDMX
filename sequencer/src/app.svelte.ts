@@ -38,6 +38,8 @@ import { MusicListener, type MusicState } from './input/audio';
 import { listShows, readShow, writeShow, deleteShow as dbDelete, listMyTypes, saveMyType, deleteMyType, setOnBlocked, type ShowMeta } from './store/shows';
 import { ui } from './ui/ui.svelte';
 import { copyClip, readClip } from './store/clipboard';
+import { bundle, isZip, storedOf, unbundle } from './store/bundle';
+import { getModel, getSong, putModel, putSong } from './store/audio';
 import { prune, prunedText } from './model/prune';
 import { stageSvg } from './ui/thumb';
 import { cueLooks } from './engine/cuelook';
@@ -433,7 +435,7 @@ class App {
       const handled = e.defaultPrevented;
       e.preventDefault();
       const f = e.dataTransfer.files[0];
-      if (handled || !f || !/\.(json|luxdmx|qxw)$/i.test(f.name) || this.locked) return;
+      if (handled || !f || !/\.(json|luxdmx|qxw|zip)$/i.test(f.name) || this.locked) return;
       const playing = !this.quiet;
       void (async () => {
         if (playing && !(await ui.confirm(`Open "${f.name}"?`, 'The show playing now stops (it stays in Shows).', 'Open it', false))) return;
@@ -3283,8 +3285,18 @@ class App {
 
   // ---- files
   exportShow() {
-    ui.toast(`Saved ${fileName(this.show)}.luxdmx.json in your downloads. On a tablet or another computer: open the app, "Open a show file" (or drop the file on it).`, 6000);
+    // (its songs stay in this browser: said, with the way to take them along)
+    const n = storedOf(this.show).songs.length;
+    ui.toast(`Saved ${fileName(this.show)}.luxdmx.json in your downloads. On a tablet or another computer: open the app, "Open a show file" (or drop the file on it).${n ? ` Its song${n === 1 ? '' : 's'} (the audio) stay${n === 1 ? 's' : ''} in this browser: "Save with its songs" takes ${n === 1 ? 'it' : 'them'} along.` : ''}`, n ? 10000 : 6000);
     download(new Blob([serializeShow(JSON.parse(JSON.stringify(this.show)))], { type: 'application/json' }), `${fileName(this.show)}.luxdmx.json`);
+  }
+  // The show and its songs (and its own 3D venue) in one .zip, for another computer (store/bundle.ts)
+  async exportShowWithSongs() {
+    const json = serializeShow(JSON.parse(JSON.stringify(this.show)));
+    const b = await bundle(json, this.show, { song: getSong, model: getModel });
+    download(b.blob, `${fileName(this.show)}.luxdmx.zip`);
+    const mb = (b.blob.size / 1e6).toFixed(1);
+    ui.toast(`Saved ${fileName(this.show)}.luxdmx.zip (${mb} MB) with ${b.songs} song${b.songs === 1 ? '' : 's'} in it. On another computer: "Open a show file" and pick it.${b.missing.length ? ` Not in this browser, so not in it: ${b.missing.join(', ')}.` : ''}`, 9000);
   }
   // To the tablet (or anyone): the device's share sheet with the show file (Nearby Share, AirDrop,
   // mail, a messenger); where there's none (most desktop browsers), the download.
@@ -3325,6 +3337,13 @@ class App {
   }
   // A show file, or a QLC+ workspace (converted; the report says what came over).
   async importShow(file: File): Promise<QxwReport | undefined> {
+    // (a show with its songs: they go into this browser's store, the show opens as from its file)
+    if (isZip(new Uint8Array(await file.slice(0, 4).arrayBuffer()))) {
+      const b = unbundle(new Uint8Array(await file.arrayBuffer()));
+      for (const s of b.songs) await putSong(s.key, s.blob).catch(() => {});
+      if (b.model) await putModel(b.model.key, b.model.blob).catch(() => {});
+      file = new File([b.json], file.name.replace(/\.zip$/i, '.json'), { type: 'application/json' });
+    }
     const text = await file.text();
     if (/\.qxw$/i.test(file.name) || /<Workspace[\s>]/.test(text.slice(0, 500))) {
       const { show, report } = await fromQxw(text, findQlc, file.name.replace(/\.qxw$/i, ''));

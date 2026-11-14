@@ -447,7 +447,8 @@ are cut to 60 on load, an empty one is dropped.
 ```
 
 - `audio` (optional): `{ "name", "duration", "store" }`, a song kept in the browser that made the
-  show (`store` is its key there); another browser asks for the file. `demo: true`: the app's own
+  show (`store` is its key there); another browser asks for the file, unless the show came in a
+  `.luxdmx.zip` with its songs (below). `demo: true`: the app's own
   demo beat instead. Neither: silent, its own clock.
 - A song picked from the app's demo songs also has `audio.catalog` (its id in the app's list, so
   another browser can download it again) and `audio.credit` (`"Title" by Artist, CC BY`: the
@@ -788,3 +789,18 @@ presses a button, a control moves a fader). By `type`:
 
 A show without pages gets a page generated from its contents; it's only written to the file once
 someone edits it.
+
+## A show with its songs (.luxdmx.zip)
+
+"Save with its songs" writes a plain zip:
+
+- `show.luxdmx.json`: the show file, exactly as "Save as file" writes it.
+- `songs/<n> <name>`: each song's audio as the browser keeps it (the timeline's and the set
+  list's, each once), stored uncompressed.
+- `venue/<name>`: the show's own 3D venue (`settings.stage3d.model`), if it has one.
+- `manifest.json`: `{ "format": "luxdmx-bundle", "version": 1, "show": "show.luxdmx.json",
+  "songs": [{ "key", "file" }], "model": { "key", "file" } }`. `key` is the `store` key the show
+  names the file by.
+
+Opening one puts every file into the browser's store under its `key`, then opens the show file.
+A zip without a manifest that holds a `.json` show file is opened as that show alone.

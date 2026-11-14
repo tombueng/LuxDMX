@@ -1128,6 +1128,12 @@ there is one, and downloads it where there isn't. On the other side, "Open a sho
 drop the file on the app's window. Copy and paste works between shows too (cues find their
 lights by name).
 
+A show file only names its songs: their audio stays in the browser that loaded them (Save as file
+says so). **Save with its songs** (in Shows, when the show has songs of its own) writes one
+`.luxdmx.zip` with the show and every song's audio, and your own 3D venue if there is one. Open
+that on the other computer the same way ("Open a show file", or drop it on the window) and the
+songs play there straight away, nothing to find again.
+
 **The same show in two tabs** (a bookmark opened twice): the last tab to save wins. The top bar
 says **open in another tab**, and in the tab whose copy is out of date, **changed in another tab**:
 a tap there takes the other tab's version (what you changed in this one since is dropped). A change

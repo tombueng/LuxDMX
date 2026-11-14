@@ -235,7 +235,7 @@
           <div class="th"><span class="ic"><Icon name="folder" size={22} /></span><b>A show file</b></div>
           <p class="blurb">A show saved on another computer (Shows, Save as file), or a QLC+ workspace.</p>
           <div class="acts"><button onclick={() => showFile?.click()}>Open a show file</button></div>
-          <input type="file" accept=".json,.luxdmx,.qxw,application/json" hidden bind:this={showFile}
+          <input type="file" accept=".json,.luxdmx,.qxw,.zip,application/json,application/zip" hidden bind:this={showFile}
                  onchange={(e) => { const inp = e.target as HTMLInputElement; const f = inp.files?.[0]; inp.value = ''; if (f) void open(f); }} />
         </div>
       </div>

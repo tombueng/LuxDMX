@@ -13,6 +13,9 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **Save with its songs** (Shows): one .luxdmx.zip with the show and its songs' audio (and your own
+  3D venue), for another computer. A plain show file only names its songs, which you had to find
+  and load again over there, one by one. Opening the zip puts them in place.
 - Recording a rainbow (or any colour or move effect that switches its lights on) gave a cue that
   played the lights dark. It plays them lit, as they were.
 - Undo of a Record puts the stage back as it was, not just the list; the lock for the service isn't
