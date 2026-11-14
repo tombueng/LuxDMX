@@ -246,7 +246,7 @@ fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in
   `stage3d/rigOf.ts` is the one mapping from a fixture to what the rig draws, for the stage and
   the previews alike.
 - Where light lands: `hitRoom` (geometry.ts) finds the first thing a beam meets in the room shown:
-  the deck, the floor, the walls, the ceiling, or a `Room.screens` plane (the theatre's cyc, the
+  the deck, the floor (a raked one, `Room.floor`, marched along the ray), the walls, the ceiling, or a `Room.screens` plane (the theatre's cyc, the
   cinema's screen). `rig.ts` lays the pool flat on it; on a wall it's the cone cut by the wall
   (from just above an uplight, a few metres up, fading), dimmer the thinner it's spread. With the
   built-in room hidden (`showWalls(false)`, your own venue model) only the floor counts.

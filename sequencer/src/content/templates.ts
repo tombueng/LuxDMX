@@ -353,6 +353,8 @@ export const TEMPLATES: Template[] = [
       const b = new Builder('Opening night');   // (not "Play": the show's name read like a button)
       const front = b.add('gen-dimmer', 6, 'Front', 0.7, { x0: 0.15, x1: 0.85 });
       const cyc = b.at(b.add('gen-rgbw', 4, 'Cyc', 0.06), 0.06, [0.18, 0.36, 0.64, 0.82]);
+      // (cyc floods: a wide wash each, side by side they light the cyc from top to bottom)
+      b.place(cyc, (f) => { f.beamDeg = [80, 80]; });
       // over the audience, between the footlights (so the names don't meet)
       const house = b.add('gen-dimmer', 2, 'House', 0.86, { x0: 0.3, x1: 0.7 });
       // the rest of a well-stocked stage: booms at the sides, specials, moving spots and washes over

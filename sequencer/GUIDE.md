@@ -811,7 +811,7 @@ Three more demos come with their own room on the 3D stage:
   angles when they differ (empty: its type's again). **Spill** (next to Ambient) is how much your lights light up the room round
   them: the band, the deck, the walls and the haze's glow (0 only their beams and where they land;
   it starts lower than it used to be). A spot's gobo shows in 3D as the real pattern: fingers of light in the haze
-  and its picture where the beam lands: the deck, the floor, and the room's walls, its ceiling, the
+  and its picture where the beam lands: the deck, the floor (on raked seats, the seats), and the room's walls, its ceiling, the
   theatre's cyc and the cinema's screen (a wall washer runs its colour up the wall; with the built-in
   room hidden for your own venue model, only the floor). Which pattern comes from the slot's name in the fixture
   file, in English or German (Stars, Sterne, Flower, Dots, Breakup, Leaves, Water, Spiral, Tunnel,

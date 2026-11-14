@@ -11,6 +11,7 @@
 // then pitch about x, then roll about z (hanging = roll 180: up is down, front still the audience).
 import type { Fixture } from '../model/types';
 import type { FixtureKind } from '../model/library';
+import { cinemaFloor, theatreFloor } from './sceneSizes';
 
 export const W = 14, D = 9, DECK = 1.2;
 export const TRUSS = [{ z: -3.3, y: 8.2 }, { z: 0, y: 7.6 }, { z: 3.4, y: 7.0 }];   // back, mid, front (bottom chord heights)
@@ -73,6 +74,9 @@ export interface Room {
   screens?: { z: number; x: number; y0: number; y1: number }[];
   // where light meets the side walls, when something stands off them (the cinema's panels)
   inset?: number;
+  // the floor's height at (x, z) where it isn't flat (raked seats: the theatre's stalls, the cinema's
+  // rows): light lands on the seats there, not on the floor under them
+  floor?: (x: number, z: number) => number;
 }
 // a 0.3 m box truss whose bottom chord is at y: its middle line is 0.15 m higher
 const mid = (y: number) => y + 0.15;
@@ -123,6 +127,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     // all over it, on the walls, in the ceiling, on the steps)
     id: 'cinema', W: 22, D: 24.2, zc: 8.9, truss: [{ z: 0.9, y: 8.2 }, { z: 6.4, y: 8.8 }], deck: { x: 7, z0: -2.8, z1: 1.6 }, ceiling: 11.5,
     band: { x: 7, z0: -2.8, z1: 1.6 }, walls: { x: 11, z0: -3.2, z1: 26 }, screens: [{ z: -3.0, x: 7.5, y0: 3.0, y1: 9.4 }], inset: 0.14,
+    floor: (_x, z) => cinemaFloor(z),
     frame: [span(7.6, 8.2, 0.9), span(8.6, 8.8, 6.4)],
     views: { front: { pos: [0, 8.2, 23], at: [0, 4.4, -1.5] }, foh: { pos: [3.2, 4.6, 12], at: [0, 4.2, -2] }, side: { pos: [-9.6, 7.2, 9], at: [0, 3.8, 0] }, top: { pos: [0, 46, 10.01], at: [0, 0, 10] }, band: { pos: [0, 2.9, -1.9], at: [0, 4.2, 20] } },
     tour: { rx: 8.2, rz: 11, z0: 10, y: 7, dy: 1.4, at: [0, 4, -0.5] },
@@ -140,6 +145,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   theatre: {
     id: 'theatre', W: 14, D: 9.4, zc: -1.3, truss: [{ z: -4.8, y: 9.0 }, { z: -2.6, y: 7.8 }, { z: -0.2, y: 7.8 }, { z: 8.4, y: 10.4 }], deck: { x: 8, z0: -6, z1: 3.4 }, ceiling: 12,
     band: { x: 7, z0: -6, z1: 3.4 }, walls: { x: 11, z0: -6.4, z1: 21 }, screens: [{ z: -5.7, x: 7, y0: DECK, y1: DECK + 8.4 }],
+    floor: (_x, z) => theatreFloor(z),
     frame: [span(7.4, 9.0, -4.8), span(7.4, 7.8, -2.6), span(7.4, 7.8, -0.2), span(8.4, 10.4, 8.4)],
     views: { front: { pos: [0, 8.8, 19.6], at: [0, 4, -1] }, foh: { pos: [2.8, 3.4, 11], at: [0, 3.4, -1] }, side: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -3.5], at: [0, 3.5, 14] } },
     tour: { rx: 7.5, rz: 6, z0: 6, y: 3.6, dy: 0.3, at: [0, 3.6, -1] },
@@ -325,7 +331,22 @@ export function hitFloor(p: V3, d: V3, r: Room = shown): V3 | undefined {
   for (const [y, inside] of [[DECK, (x: number, z: number) => onDeck(x, z, r)], [0, () => true]] as const) {
     if (d.y >= -1e-4 || p.y <= y) continue;
     const k = (y - p.y) / d.y, x = p.x + d.x * k, z = p.z + d.z * k;
-    if (inside(x, z)) return { x, y, z };
+    if (!inside(x, z)) continue;
+    // (a raked floor: along the ray to where it first goes under it, then closer in; the floor is
+    // never above the light, so the flat hit is the furthest it can be)
+    if (r.floor && y === 0) return rakedHit(p, d, k, r.floor) ?? { x, y, z };
+    return { x, y, z };
+  }
+  return undefined;
+}
+function rakedHit(p: V3, d: V3, kMax: number, floor: (x: number, z: number) => number): V3 | undefined {
+  const at = (k: number) => ({ x: p.x + d.x * k, y: p.y + d.y * k, z: p.z + d.z * k }), under = (k: number) => { const q = at(k); return q.y <= floor(q.x, q.z); };
+  const step = 0.2;
+  let lo = 0;
+  for (let k = step; k < kMax + step; k += step) {
+    const kk = Math.min(k, kMax);
+    if (under(kk)) { let hi = kk; for (let i = 0; i < 8; i++) { const m = (lo + hi) / 2; if (under(m)) hi = m; else lo = m; } const q = at(hi); return { x: q.x, y: floor(q.x, q.z), z: q.z }; }
+    lo = kk;
   }
   return undefined;
 }

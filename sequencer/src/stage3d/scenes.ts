@@ -262,7 +262,9 @@ export function buildTheatre(group: THREE.Group, M: Mats, r: Room) {
   const { x: dx, z0, z1 } = r.deck, top = std({ map: stageFloor(), roughness: 0.72 });
   add(new THREE.Mesh(new THREE.BoxGeometry(2 * dx, DECK, z1 - z0), [M.black, M.black, top, M.black, M.black, M.black]), 0, DECK / 2, (z0 + z1) / 2);
   add(box(2 * dx, 0.05, 0.04, gold), 0, DECK - 0.03, z1 + 0.01);
-  add(new THREE.Mesh(new THREE.PlaneGeometry(14, 8.4), std({ color: 0xd8dce4, roughness: 0.95 })), 0, DECK + 4.2, T.cycZ);
+  // (a cyc in a dark theatre is dark until it's lit: grey, so the light's colour is what you see, a
+  // deep blue deep, not a pale lavender over a white cloth)
+  add(new THREE.Mesh(new THREE.PlaneGeometry(14, 8.4), std({ color: 0x5c6068, roughness: 0.95 })), 0, DECK + 4.2, T.cycZ);
   // the proscenium: a deep frame round the opening, gold mouldings; the house curtain gathered at
   // the sides, its valance across the top; black legs in the wings
   const aw = T.arch.w, ah = T.arch.h, az = T.arch.z, side = X - aw / 2;

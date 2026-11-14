@@ -39,3 +39,16 @@ describe('where light lands', () => {
     expect(hitRoom({ x: 0, y: 7, z: 0 }, { x: 0, y: -1, z: 0 }, ROOMS.hall)!.n).toEqual({ x: 0, y: 1, z: 0 });
   });
 });
+
+describe('raked seats', () => {
+  it('a light over the theatre\'s stalls or the cinema\'s rows lands on the seats, not on the floor under them', async () => {
+    const { theatreFloor, cinemaFloor } = await import('./sceneSizes');
+    const t = hitRoom({ x: 4, y: 11.6, z: 9 }, { x: 0, y: -1, z: 0.02 }, ROOMS.theatre)!;
+    expect(t.y).toBeCloseTo(theatreFloor(t.z), 2); expect(t.y).toBeGreaterThan(0.5);
+    const c = hitRoom({ x: 4, y: 11, z: 14 }, { x: 0, y: -1, z: 0 }, ROOMS.cinema)!;
+    expect(c.y).toBeCloseTo(cinemaFloor(14), 2); expect(c.y).toBeGreaterThan(2);
+    // (a slanting beam stops at the first row it meets, before the floor would have been)
+    const s = hitRoom({ x: 0, y: 8, z: 2 }, { x: 0, y: -0.5, z: 0.866 }, ROOMS.theatre)!;
+    expect(s.y).toBeGreaterThan(0); expect(s.y).toBeCloseTo(theatreFloor(s.z), 2);
+  });
+});
