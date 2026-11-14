@@ -141,6 +141,28 @@ test('the welcome offers four demo shows, a tile each: each opens in its own roo
   }
 });
 
+test('the templates play as shows too: their looks cued to a song, DJ / Party in the club with the DJ, the theatre\'s house lights out', async ({ page }) => {
+  test.setTimeout(180_000);
+  for (const [name, room] of [['DJ / Party', 'club'], ['Theatre', 'theatre']] as const) {
+    await fresh(page, true);
+    const w = welcomeDialog(page), t = demoTile(w, name);
+    // its own song picked (the catalog in the test has another: the demo beat then, nothing to download)
+    await expect(t.getByLabel(`Music for ${name}`)).toBeVisible();
+    await t.getByLabel(`Music for ${name}`).selectOption('beat');
+    await expect(t.getByRole('button', { name: `Start ${name}`, exact: true })).toBeVisible();
+    await t.getByRole('button', { name: `Play the show: ${name}` }).click();
+    await expect(w).toBeHidden({ timeout: 30000 });
+    await expect(page.locator('.toast').filter({ hasText: `${name}:` })).toBeVisible({ timeout: 30000 });
+    await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue().room), { timeout: 60000 }).toBe(room);
+    const tl = await page.evaluate(() => { const a = (window as any).__luxdmx, s = a.show; return { items: s.timeline?.items.length ?? 0, view: a.view, lists: s.cueLists.map((l: any) => [l.id, l.name]), gotos: s.timeline.items.filter((i: any) => i.do.do === 'goto').map((i: any) => [i.at, i.do.list, s.cueLists.find((l: any) => l.id === i.do.list)?.cues.find((c: any) => c.id === i.do.cue)?.name]) }; });
+    expect(tl.view).toBe('timeline');
+    expect(tl.items).toBeGreaterThan(10);
+    expect(tl.gotos.every((g: any) => !!g[2])).toBe(true);                  // (every look one of its own)
+    if (name === 'Theatre') { const house = tl.lists.find((l: any) => l[1] === 'House lights')[0]; expect(tl.gotos.find((g: any) => g[1] === house)).toEqual([0, house, 'House out']); }
+    await expect(page.locator('.transport').getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 20000 });   // (playing)
+  }
+});
+
 test('on a phone the welcome fits the screen: every button and the music menu inside it', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await fresh(page, true);
@@ -166,6 +188,10 @@ test('the demos fold away and stay folded; every start stays there; Lights only 
   w = await welcome(page);
   await expect(demoTile(w)).toHaveCount(0);
   await expect(w.getByRole('button', { name: 'Start with an empty stage' })).toBeFocused();
+  // (folded, the demos are still there: a button each that plays it, with its song)
+  const strip = w.getByRole('group', { name: 'The demo shows' });
+  await expect(strip.getByRole('button', { name: /^Play the show: / })).toHaveCount(4);
+  await expect(strip.getByRole('button', { name: 'Play the show: Festival stage' })).toContainText('Festival stage');
   await w.getByRole('button', { name: 'Show the 4 demos' }).click();
   await expect(demoTile(w)).toBeVisible();
   // a template's lights only

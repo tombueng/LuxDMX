@@ -1,5 +1,6 @@
-// Where the Cinema and Bar templates' lights are installed in their rooms (stage3d/scenes.ts): every
-// light where it belongs, turned the way it works, by its name ("Wall 3" is the third wall washer).
+// Where the Cinema, Bar, Theatre and Church templates' lights are installed in their rooms
+// (stage3d/scenes.ts), and the DJ / Party template's in the club (the DJ demo's room): every light
+// where it belongs, turned the way it works, by its name ("Wall 3" is the third wall washer).
 // The plan follows: each light's plan place is where it is in the room.
 import type { Fixture, Show } from '../model/types';
 import { aimRot, roomOf, TRUSS_HANG, worldToPlan, type Rot, type V3 } from '../stage3d/geometry';
@@ -33,7 +34,7 @@ const CINEMA_PLACES: Table = {
   Hazer: () => stand({ x: 6.2, y: DECK, z: -2.3 }, -30),
   Confetti: (i) => stand({ x: i ? 6.3 : -6.3, y: DECK, z: 1.2 }),
   CO2: (i) => stand({ x: i ? 6.6 : -6.6, y: DECK, z: -1.4 }),
-  Sparks: (i) => stand({ x: i ? 2.2 : -2.2, y: DECK, z: 1.3 }),
+  Sparks: (i) => stand({ x: i ? 3 : -3, y: DECK, z: 1.4 }),
   Bubbles: () => stand({ x: 0, y: DECK, z: -2.2 }),
 };
 
@@ -63,7 +64,9 @@ const BAR_PLACES: Table = {
 // wings, footlights on the apron, a ground row before the cyc
 const Th = THEATRE, hang = (y: number) => y - TRUSS_HANG;
 const THEATRE_PLACES: Table = {
-  Front: (i, n) => { const x = spread(i, n, -5, 5); return aim({ x, y: hang(10.4), z: 8.4 }, { x: x * 0.5, y: DECK + 1.6, z: 0.5 }); },
+  // (the front-of-house bar is out over the stalls: on the plan it's at the front edge, a gap in its
+  // middle where the plan says "audience")
+  Front: (i, n) => { const x = n === 6 ? [-5.2, -3.6, -2.0, 2.0, 3.6, 5.2][i] : spread(i, n, -5, 5); return aim({ x, y: hang(10.4), z: 8.4 }, { x: x * 0.5, y: DECK + 1.6, z: 0.5 }); },
   Cyc: (i, n) => { const x = spread(i, n, -5.25, 5.25); return aim({ x, y: hang(9.0), z: -4.8 }, { x, y: DECK + 3.5, z: Th.cycZ }); },
   House: (i) => { const x = i ? 4 : -4; return aim({ x, y: Th.ceiling - 0.4, z: 9 }, { x, y: 0, z: 9.2 }); },
   Boom: (i) => { const sx = i < 2 ? -1 : 1, low = i % 2 === 1, z = low ? 1.0 : -1.2, x = sx * 7.2, y = DECK + (low ? 1.4 : 2.6); return aim({ x, y, z }, { x: -sx * 1.5, y: DECK + 1.4, z }); },
@@ -102,8 +105,32 @@ const CHURCH_PLACES: Table = {
   Sparks: (i) => stand({ x: i ? 5.2 : -5.2, y: DECK, z: Chu.chancel.z1 - 0.3 }),
 };
 
-type SceneRoom = 'cinema' | 'bar' | 'theatre' | 'church';
-const TABLES: Record<SceneRoom, Table> = { cinema: CINEMA_PLACES, bar: BAR_PLACES, theatre: THEATRE_PLACES, church: CHURCH_PLACES };
+// ---- the club (geometry.ts ROOMS.club, the DJ demo's room): beams and movers under the back truss,
+// washes and blinders on the front one, PARs on the floor's truss lighting the stage, uplights along
+// the drape behind the DJ, LED bars against the booth, battens either side of it leaning out to the
+// crowd, the machines on the deck (spread out, so the plan stays readable)
+const Cl = roomOf('club'), BACK = Cl.truss[0], FRONT = Cl.truss[1], FLOOR = Cl.truss[2];
+const CLUB_PLACES: Table = {
+  Beam: (i, n) => hung({ x: spread(i, n, -3.6, 3.6), y: hang(BACK.y), z: BACK.z }),
+  Mover: (i) => hung({ x: i ? 5.2 : -5.2, y: hang(BACK.y), z: BACK.z }),
+  Strobe: (i) => { const p = i === 0 ? { x: 0, y: hang(BACK.y), z: BACK.z } : { x: i === 1 ? -2.8 : 2.8, y: hang(FRONT.y), z: FRONT.z }; return aim(p, { x: p.x * 0.6, y: 1.6, z: 12 }); },
+  Wash: (i, n) => hung({ x: spread(i, n, -4.2, 4.2), y: hang(FRONT.y), z: FRONT.z }),
+  Blinder: (i) => { const x = i ? 5.4 : -5.4; return aim({ x, y: hang(FRONT.y), z: FRONT.z }, { x: x * 0.8, y: 1.6, z: 13 }); },
+  PAR: (i, n) => { const x = spread(i, n, -5.6, 5.6); return aim({ x, y: hang(FLOOR.y), z: FLOOR.z }, { x: x * 0.5, y: DECK + 1.2, z: 1.0 }); },
+  Bar: (i) => ({ p: { x: i ? 0.55 : -0.55, y: DECK + 0.05, z: 2.12 }, rot: { yaw: 0, pitch: 75, roll: 0 } }),
+  Batten: (i) => ({ p: { x: [-5, -3, 3, 5][i] ?? 0, y: DECK + 0.05, z: 0.6 }, rot: { yaw: 0, pitch: 50, roll: 0 } }),
+  Uplight: (i, n) => { const x = spread(i, n, -4.8, 4.8); return aim({ x, y: DECK, z: Cl.deck.z0 + 0.35 }, { x, y: DECK + 5, z: Cl.deck.z0 + 0.05 }); },
+  Fog: () => stand({ x: -0.6, y: DECK, z: 0.15 }),
+  Hazer: () => stand({ x: 2.6, y: DECK, z: -0.3 }),
+  CO2: (i) => stand({ x: i ? 5.6 : -5.6, y: DECK, z: 2.1 }),
+  Confetti: (i) => ({ p: { x: i ? 5.6 : -5.6, y: DECK, z: 3.0 }, rot: { yaw: 0, pitch: 20, roll: 0 } }),
+  Sparks: (i) => stand({ x: i ? 0.5 : -0.5, y: DECK, z: 3.0 }),
+  Flame: (i) => stand({ x: i ? 3 : -3, y: DECK, z: 3.5 }),
+  Bubbles: () => stand({ x: -3.2, y: DECK, z: 2.5 }),
+};
+
+type SceneRoom = 'cinema' | 'bar' | 'theatre' | 'church' | 'club';
+const TABLES: Record<SceneRoom, Table> = { cinema: CINEMA_PLACES, bar: BAR_PLACES, theatre: THEATRE_PLACES, church: CHURCH_PLACES, club: CLUB_PLACES };
 
 // every light of the show whose name the room has a place for: placed there (its 3D place and turn,
 // and its plan place); returns how many

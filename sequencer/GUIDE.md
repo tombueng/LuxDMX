@@ -95,11 +95,16 @@ the show has nothing in it. It's two rows of tiles, each saying what it is and w
 many lights and cues):
 - **Demo shows**: the festival, a DJ in a club, a house party and a test truss, finished shows on
   the 3D stage. Each tile has its music (its own song, or any song from the list, or the demo beat)
-  and **Play the show**. **Hide the demos** folds them away for good in this browser (handy when
-  you start shows every day); **Show the 4 demos** brings them back, and Ctrl+K "demo" or **Demo
-  shows…** in the Shows dialog shows them anyway.
+  and **Play the show**. **Hide the demos** folds the big tiles away for good in this browser
+  (handy when you start shows every day): the demos stay as a row of buttons, one click plays one
+  with the song picked for it; **Show the 4 demos** brings the tiles back, and Ctrl+K "demo" or
+  **Demo shows…** in the Shows dialog shows them anyway.
 - **Start a show**: an **empty stage**, one of the templates (band, DJ, theatre, church, cinema,
-  bar, rings and matrices), or **a show file** from another computer.
+  bar, rings and matrices), or **a show file** from another computer. The templates play as shows
+  too: each has its own song (any other, or the demo beat, picked on its tile) and **Play the
+  show** runs its looks cued to that song's parts on the 3D stage, the machines on the drops (as
+  many as the room takes: no CO2 in the church). **Start** gives the template to work on, its
+  lights and looks, no music. The DJ / Party template is in the club, with the DJ at the decks.
 
 Every demo and template also has **Lights only**: its lights in their places (in its room, for a
 demo), with the groups and palettes, and nothing programmed: no cues, effects, live pages or song.

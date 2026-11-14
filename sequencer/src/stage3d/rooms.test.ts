@@ -113,7 +113,7 @@ describe('the DJ', () => {
 describe('the Cinema, Bar, Theatre and Church templates in their rooms', () => {
   it('every light has its place in the room, inside its walls, under its ceiling; the room is the template\'s', async () => {
     const { TEMPLATES } = await import('../content/templates');
-    for (const [name, id] of [['Cinema', 'cinema'], ['Bar', 'bar'], ['Theatre', 'theatre'], ['Church', 'church']] as const) {
+    for (const [name, id] of [['Cinema', 'cinema'], ['Bar', 'bar'], ['Theatre', 'theatre'], ['Church', 'church'], ['DJ / Party', 'club']] as const) {
       const s = TEMPLATES.find((t) => t.name === name)!.build(), r = ROOMS[id];
       expect(s.settings.stage3d?.room).toBe(id);
       for (const f of s.fixtures) {

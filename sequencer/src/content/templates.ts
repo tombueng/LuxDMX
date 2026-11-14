@@ -341,7 +341,10 @@ export const TEMPLATES: Template[] = [
         [[...strobe, ...sideStrobes], { strobe: 0.85 }], [battens, on(1)]], { fade: 0, effects: [beamBally, bally, glitter, popcorn], actions: fire(m.co2, m.confetti), note: 'CO2 and confetti' });
       b.cue(ml, 'Wind down', [...dark, [pars, on(0.4, C.amber)], [bars, on(0.4, C.orange)], [movers, on(0.2, C.amber, head(0.5, 0.5))],
         [washes, on(0.3, C.orange, head(0.5, 0.5, { zoom: 1 }))], [ups, on(0.4, C.amber)], [battens, on(0.6)]], { fade: 6, effects: [sinelon, fade], actions: fire(m.bubbles) });
-      return b.done();
+      // (in the club, the DJ demo's room: a DJ at the decks, every light where a club has it)
+      const done = b.done();
+      placeIn(done, 'club');
+      return done;
     },
   },
   {

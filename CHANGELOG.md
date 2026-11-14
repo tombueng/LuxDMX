@@ -64,6 +64,12 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   lighting bars, booms in the wings, footlights, stalls and a full balcony) and a church (the
   chancel with altar, cross and choir, pews with the congregation, stained glass windows).
 - The gallery is in the ⋯ menu at the top and in the 3D stage's ⋯ now, not only behind Ctrl+K.
+- The templates play as shows: each has a song of its own (Band to hard rock, DJ / Party to house,
+  the theatre to a pop number, and so on; any other can be picked) and **Play the show** runs its
+  looks on that song's parts with the machines on the drops. DJ / Party moved into the club, DJ
+  included. Folded demos stay as a row of play buttons now, so the festival show can't get lost.
+- The plans of the church and the cinema cover the whole room now, not just the stage: their lights
+  hang all over it.
 - 3D: **Your stage** in the Venue panel: your real stage at its size (width, depth, a riser or
   not, how many trusses and how high). The room, crowd and camera moves are built for it, the
   lights hang on its trusses, the plan is that stage.

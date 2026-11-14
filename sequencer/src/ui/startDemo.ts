@@ -11,7 +11,8 @@ export { DEMO_SONG };
 export const demoSong = (id: string | null) => (id ? CATALOG.find((s) => s.id === id) : undefined);
 
 // `song`: a catalog id, or null for the demo beat. `ready`: the song is here (or isn't coming), the
-// show is about to open. `stage`: which demo (content/demos.ts: festival, club, party, truss).
+// show is about to open. `stage`: which demo (content/demos.ts: festival, club, party, truss), or
+// `t:` and a template's name: the template with its show (content/templateShows.ts).
 // Thrown only when `signal` aborts it.
 export async function startDemo(song: string | null = DEMO_SONG, progress: (got: number, total: number) => void = () => {}, signal?: AbortSignal, ready?: () => void, stage = 'festival') {
   const s = demoSong(song);
@@ -25,7 +26,8 @@ export async function startDemo(song: string | null = DEMO_SONG, progress: (got:
   }
   if (signal?.aborted) throw new DOMException('cancelled', 'AbortError');
   const { demoById } = await import('../content/demos');
-  const d = demoById(stage) ?? demoById('festival')!;
+  const tpl = stage.startsWith('t:') ? (await import('../content/templateShows')).templatePlayable(stage.slice(2)) : undefined;
+  const d = tpl ?? demoById(stage) ?? demoById('festival')!;
   if (signal?.aborted) throw new DOMException('cancelled', 'AbortError');
   ready?.();
   await app.startShow(d.build(file ? s : undefined));

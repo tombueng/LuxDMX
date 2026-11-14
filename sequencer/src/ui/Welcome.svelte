@@ -2,9 +2,12 @@
   // The welcome: how to start. Two kinds of start, each a tile that says what it is:
   // - Demo shows: finished shows on the 3D stage, cued to a song (picked on the tile). They can be
   //   folded away (remembered in this browser): someone who starts shows every day doesn't need
-  //   them each time, and one click brings them back.
+  //   the big tiles each time. Folded, they stay as a row of buttons, one click plays one (with the
+  //   song picked for it), and one more brings the tiles back.
   // - Start a show: an empty stage, a template, or a show file.
-  // Every demo and template also comes as "Lights only": its rig placed, nothing programmed.
+  // Every demo and template also comes as "Lights only": its rig placed, nothing programmed. The
+  // templates play as shows too (Play the show: their looks cued to a song, content/templateShows.ts),
+  // or Start: the rig and its looks to work on, no music.
   // A dialog over everything (the plan and the 3D stage alike). It comes up by itself when the app
   // opens on a show with nothing in it (Modals.svelte), once per show; "Get started" on an empty
   // stage brings it back.
@@ -19,6 +22,7 @@
   import type { Show } from '../model/types';
   import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
   import { DEMO_SONG, demoSong, startDemo } from './startDemo';
+  import { TEMPLATE_SHOWS } from '../content/templateShows';
   import { onDestroy } from 'svelte';
 
   let { onclose }: { onclose: () => void } = $props();
@@ -35,6 +39,8 @@
   import('../content/demos').then((m) => { demos = m.DEMOS.map((d) => ({ ...d })); count(); }).catch(() => {});
   const HUE: Record<string, string> = { festival: 'var(--orange)', club: 'var(--violet)', party: 'var(--pink)', truss: 'var(--cyan)' };
   const TPL_HUES = ['var(--blue)', 'var(--green)', 'var(--violet)', 'var(--orange)', 'var(--cyan)', 'var(--pink)'];
+  // a template as a show to play (its own song; `t:` and its name, as startDemo takes it)
+  const asShow = (t: Template): Demo | undefined => TEMPLATE_SHOWS[t.name] ? { id: `t:${t.name}`, name: t.name, blurb: t.blurb, icon: t.icon, song: TEMPLATE_SHOWS[t.name].song } : undefined;
 
   // folded away or not (this browser)
   const FOLD_KEY = 'luxdmx.seq.welcomeDemos';
@@ -123,6 +129,23 @@
   const tablet = !narrow && typeof window !== 'undefined' && window.innerWidth <= 1100;
 </script>
 
+{#snippet music(d: Demo, song: string, s: CatalogSong | undefined)}
+  <label class="music"><Icon name="music" size={15} />
+    <select value={song} onchange={(e) => pickSong(d, (e.target as HTMLSelectElement).value)} disabled={!!dl} aria-label="Music for {d.name}">
+      {#each byGenre as [g, list] (g)}
+        <optgroup label={g}>
+          {#each list as c (c.id)}<option value={c.id}>{c.title} · {c.artist}{c.id === d.song ? ' (its own)' : ''}</option>{/each}
+        </optgroup>
+      {/each}
+      <optgroup label="Made here"><option value="beat">The demo beat (nothing to download)</option></optgroup>
+    </select></label>
+  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clock(s.duration)} · {s.license}{:else}Builds, drops and breaks, made in the browser{/if}</p>
+{/snippet}
+{#snippet getting(s: CatalogSong | undefined)}
+  <button class="primary" disabled aria-busy="true"><Icon name="play" />{s && dl ? `Getting the song… ${pct(dl)}` : 'Starting…'}</button>
+  <button onclick={() => { dl?.ctl.abort(); dl = null; }}>Cancel</button>
+{/snippet}
+
 <Modal title="Let's get some light on stage" onclose={close} wide>
   <div class="welcome">
     <!-- the demo shows -->
@@ -143,29 +166,33 @@
               <p class="blurb">{d.blurb}</p>
               <p class="meta">{said(`d:${d.id}`)}</p>
               {#if d.song}
-                <label class="music"><Icon name="music" size={15} />
-                  <select value={song} onchange={(e) => pickSong(d, (e.target as HTMLSelectElement).value)} disabled={!!dl} aria-label="Music for {d.name}">
-                    {#each byGenre as [g, list] (g)}
-                      <optgroup label={g}>
-                        {#each list as c (c.id)}<option value={c.id}>{c.title} · {c.artist}{c.id === d.song ? ' (its own)' : ''}</option>{/each}
-                      </optgroup>
-                    {/each}
-                    <optgroup label="Made here"><option value="beat">The demo beat (nothing to download)</option></optgroup>
-                  </select></label>
-                <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clock(s.duration)} · {s.license}{:else}Builds, drops and breaks, made in the browser{/if}</p>
+                {@render music(d, song, s)}
               {:else}
                 <p class="credit">Its own checks on the timeline, no music.</p>
               {/if}
               <div class="acts">
                 {#if dl?.id === d.id}
-                  <button class="primary" disabled aria-busy="true"><Icon name="play" />{s ? `Getting the song… ${pct(dl)}` : 'Starting…'}</button>
-                  <button onclick={() => { dl?.ctl.abort(); dl = null; }}>Cancel</button>
+                  {@render getting(s)}
                 {:else}
                   <button class="primary" onclick={() => play(d)} disabled={!!dl} aria-label="Play the show: {d.name}" data-autofocus={d === demos[0] ? '' : undefined}><Icon name="play" />Play the show</button>
                   <button onclick={() => rigDemo(d)} disabled={!!dl} aria-label="{d.name}, lights only" title="Its lights in their places in its room, nothing programmed">Lights only</button>
                 {/if}
               </div>
             </div>
+          {/each}
+        </div>
+      {:else}
+        <!-- (folded: still there, a button each that plays it) -->
+        <div class="strip" role="group" aria-label="The demo shows">
+          {#each demos as d (d.id)}
+            {@const song = d.song ? songOf(d) : ''}
+            {@const s = song && song !== 'beat' ? demoSong(song) : undefined}
+            <button class="chip" style:--hue={HUE[d.id] ?? 'var(--orange)'} onclick={() => play(d)} disabled={!!dl} aria-label="Play the show: {d.name}"
+                    title="{d.blurb}{s ? ` To "${s.title}".` : ''}">
+              <span class="ic sm"><Icon name={d.icon} size={16} /></span>
+              <span class="cn"><b>{d.name}</b><small>{dl?.id === d.id ? (s ? `Getting the song… ${pct(dl)}` : 'Starting…') : s ? s.title : d.song ? 'the demo beat' : 'no music'}</small></span>
+              <Icon name="play" size={16} />
+            </button>
           {/each}
         </div>
       {/if}
@@ -184,13 +211,22 @@
           <div class="acts"><button class="primary" onclick={empty} data-autofocus={demosHidden ? '' : undefined}>Start with an empty stage</button></div>
         </div>
         {#each TEMPLATES as t, i (t.name)}
+          {@const d = asShow(t)}
+          {@const song = d ? songOf(d) : ''}
+          {@const s = song && song !== 'beat' ? demoSong(song) : undefined}
           <div class="tile" role="group" aria-label={t.name} style:--hue={TPL_HUES[i % TPL_HUES.length]}>
             <div class="th"><span class="ic"><Icon name={t.icon} size={22} /></span><b>{t.name}</b></div>
             <p class="blurb">{t.blurb}</p>
             <p class="meta">{said(`t:${t.name}`)}</p>
+            {#if d}{@render music(d, song, s)}{/if}
             <div class="acts">
-              <button class="primary" onclick={() => template(t)} aria-label="Start {t.name}">Start</button>
-              <button onclick={() => rig(t.name, t.build, false)} aria-label="{t.name}, lights only" title="Its lights in their places, nothing programmed">Lights only</button>
+              {#if d && dl?.id === d.id}
+                {@render getting(s)}
+              {:else}
+                {#if d}<button class="primary" onclick={() => play(d)} disabled={!!dl} aria-label="Play the show: {t.name}" title="Its looks cued to the song, playing on the 3D stage"><Icon name="play" />Play the show</button>{/if}
+                <button class:primary={!d} onclick={() => template(t)} disabled={!!dl} aria-label="Start {t.name}" title="Its lights and looks to work on, no music">Start</button>
+                <button onclick={() => rig(t.name, t.build, false)} disabled={!!dl} aria-label="{t.name}, lights only" title="Its lights in their places, nothing programmed">Lights only</button>
+              {/if}
             </div>
           </div>
         {/each}
@@ -232,6 +268,16 @@
   .sub { color: var(--muted); font-size: .84rem; flex: 1 1 18rem; }
   .sub b { color: var(--text); }
   .fold { margin-left: auto; display: inline-flex; align-items: center; gap: .3rem; font-size: .84rem; }
+  .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr)); gap: .5rem; }
+  .chip { --hue: var(--orange); display: flex; align-items: center; gap: .55rem; text-align: left; min-height: 3.1rem; padding: .45rem .7rem;
+          border: 1px solid color-mix(in srgb, var(--hue) 45%, var(--line2)); border-radius: var(--radius);
+          background: linear-gradient(160deg, color-mix(in srgb, var(--hue) 16%, var(--panel2)) 0%, var(--panel2) 70%); }
+  .chip:hover:not(:disabled) { border-color: var(--hue); }
+  .chip > :global(svg:last-child) { color: var(--hue); flex: none; }
+  .cn { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .cn b { color: var(--text); font-size: .92rem; }
+  .cn small { color: var(--muted); font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic.sm { width: 1.9rem; height: 1.9rem; }
 
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14.5rem), 1fr)); gap: .6rem; }
   .tiles.demos { grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); }

@@ -114,7 +114,9 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   // the rows rise behind it to the projection booth; a truss over the stage, a bar for the spots
   // over the front rows
   cinema: {
-    id: 'cinema', W: 14, D: 4.4, zc: -0.6, truss: [{ z: 0.9, y: 8.2 }, { z: 6.4, y: 8.8 }], deck: { x: 7, z0: -2.8, z1: 1.6 }, ceiling: 11.5,
+    // (the plan: the whole cinema, wall to wall and from the screen to the back rows: its lights are
+    // all over it, on the walls, in the ceiling, on the steps)
+    id: 'cinema', W: 22, D: 24.2, zc: 8.9, truss: [{ z: 0.9, y: 8.2 }, { z: 6.4, y: 8.8 }], deck: { x: 7, z0: -2.8, z1: 1.6 }, ceiling: 11.5,
     band: { x: 7, z0: -2.8, z1: 1.6 }, walls: { x: 11, z0: -3.2, z1: 26 },
     frame: [span(7.6, 8.2, 0.9), span(8.6, 8.8, 6.4)],
     views: { front: { pos: [0, 8.2, 23], at: [0, 4.4, -1.5] }, foh: { pos: [3.2, 4.6, 12], at: [0, 4.2, -2] }, side: { pos: [-9.6, 7.2, 9], at: [0, 3.8, 0] }, top: { pos: [0, 46, 10.01], at: [0, 0, 10] }, band: { pos: [0, 2.9, -1.9], at: [0, 4.2, 20] } },
@@ -137,10 +139,11 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     views: { front: { pos: [0, 8.8, 19.6], at: [0, 4, -1] }, foh: { pos: [2.8, 3.4, 11], at: [0, 3.4, -1] }, side: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -3.5], at: [0, 3.5, 14] } },
     tour: { rx: 7.5, rz: 6, z0: 6, y: 3.6, dy: 0.3, at: [0, 3.6, -1] },
   },
-  // a church (scenes.ts buildChurch): the chancel is the deck and the plan; the lights hang from the
-  // roof's beams
+  // a church (scenes.ts buildChurch): the chancel is the deck; the plan is the whole church, wall to
+  // wall, the chancel at its top (its lights are all over it: over the nave, on the walls); the lights
+  // hang from the roof's beams
   church: {
-    id: 'church', W: 12, D: 6.2, zc: -4.3, truss: [{ z: -5.8, y: 12.2 }, { z: -1.8, y: 12.2 }, { z: 2.2, y: 12.2 }, { z: 6.2, y: 12.2 }], deck: { x: 6, z0: -7.4, z1: -1.2 }, ceiling: 13,
+    id: 'church', W: 17, D: 20, zc: 2.4, truss: [{ z: -5.8, y: 12.2 }, { z: -1.8, y: 12.2 }, { z: 2.2, y: 12.2 }, { z: 6.2, y: 12.2 }], deck: { x: 6, z0: -7.4, z1: -1.2 }, ceiling: 13,
     band: { x: 6, z0: -7.4, z1: -1.2 }, walls: { x: 9, z0: -7.8, z1: 22 },
     views: { front: { pos: [0, 2.6, 20.6], at: [0, 3, -4] }, foh: { pos: [3.2, 2.3, 10], at: [0, 2.6, -4] }, side: { pos: [-7.6, 7.5, 12], at: [0, 2.6, -4] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -6.6], at: [0, 2, 12] } },
     tour: { rx: 6.2, rz: 8, z0: 6, y: 4.5, dy: 0.8, at: [0, 2.6, -4] },
