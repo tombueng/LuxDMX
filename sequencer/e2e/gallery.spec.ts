@@ -38,3 +38,10 @@ test('the gallery: a live tile for each thing the 3D stage draws, machines too; 
   await expect(add.locator('[data-type="gen-winch"]').first()).toHaveClass(/\bcur\b/);
   await expect(add.getByRole('button', { name: /^Add \d+ × / })).toBeVisible();
 });
+
+test('the gallery is in the top bar\'s menu and the 3D stage\'s menu too', async ({ page }) => {
+  await fresh(page);
+  await page.locator('.top').getByRole('button', { name: 'More', exact: true }).click();
+  await page.locator('.ctx').getByRole('menuitem', { name: 'What the 3D stage draws (gallery)' }).click();
+  await expect(page.getByRole('dialog', { name: 'What the 3D stage draws' })).toBeVisible();
+});

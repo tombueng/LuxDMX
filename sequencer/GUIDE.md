@@ -35,7 +35,7 @@ wheels), you just don't have to learn a pro console to use them.
    Library and QLC+. Every tile plays its light on the 3D stage's own models: a spot sweeps, runs
    its gobos turning and puts its prism in, a wash breathes its zoom through the colours, a PAR runs
    the colours, a bar chases along its pixels (**What the 3D stage draws** shows them all, big,
-   machines included: Ctrl+K "gallery"). A library tile plays a built-in one of its kind
+   machines included: the ⋯ menu at the top, the 3D stage's ⋯, or Ctrl+K "gallery"). A library tile plays a built-in one of its kind
    ("like this") until it's picked; then it has come down and plays the real thing. The one picked
    is big on the right with its modes and channels (to hold next to the manual's DMX table), how
    many, where, and Add. Most cheap PARs are one of the generic types: the channel table in the

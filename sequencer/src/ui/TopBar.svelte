@@ -85,6 +85,7 @@
       { label: 'Print a cue sheet', icon: 'printer', run: () => { if (!app.printCueSheet()) ui.toast('The browser blocked the new tab: allow popups for this page'); } },
       { label: 'Cue sheet as CSV (spreadsheet)', icon: 'download', run: () => app.exportCsv() },
       { heading: 'Help and view' },
+      { label: 'What the 3D stage draws (gallery)', icon: 'image', run: () => (ui.modal = 'gallery') },
       { label: 'How it works', icon: 'help', run: () => (ui.modal = 'guide') },
       { label: 'Keyboard shortcuts', icon: 'keyboard', keys: '?', run: () => (ui.modal = 'shortcuts') },
       { label: ui.help ? 'Hide the hints' : 'Show the hints again', icon: 'note', run: () => (ui.help = !ui.help) },
