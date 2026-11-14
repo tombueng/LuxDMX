@@ -136,6 +136,8 @@ export class Bridge {
   // bridge) gets everything; one that says only its outputs (too old to name its pixel ports) gets
   // those: sending every pixel universe to every box slows down what it really plays.
   wants(uni: number) { return this.outputs.length === 0 || this.outputs.some((o) => o.en && o.uni === uni) || this.pixels.includes(uni); }
+  // whether a universe reaches something real through it (a winch there is held until armed): what it plays
+  reaches(uni: number) { return this.wants(uni); }
 
   // 'stalled': under one frame in two seconds over 3 s (a still look alone sends about 4 a second for
   // each universe; a box that never answers gets one every 2 to 4 s); 'slow': it had more to send

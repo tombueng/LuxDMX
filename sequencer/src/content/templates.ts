@@ -437,9 +437,10 @@ export const TEMPLATES: Template[] = [
       b.add('gen-sparks', 2, 'Sparks', 0.7, { x0: 0.05, x1: 0.95 });
       b.at(b.add('gen-flame', 2, 'Flame', 0.22), 0.22, [0.375, 0.625]);
       b.add('gen-bubbles', 1, 'Bubbles', 0.06, { x0: 0.06, x1: 0.06 });
-      // the stage machinery: the house curtain and four fly bars, each with a painted drop
-      // (on MACHINERY_UNIVERSE: moving on the 3D stage, nothing to a real motor until a box plays it)
-      const curtain = b.add('gen-curtain', 1, 'House curtain', 0.7, { x0: 0.5, x1: 0.5, universe: MACHINERY_UNIVERSE });
+      // the stage machinery: the house curtain (flown out on its winch) and four fly bars upstage, each
+      // with a painted drop (on MACHINERY_UNIVERSE: moving on the 3D stage, nothing to a real motor
+      // until a box plays it)
+      const curtain = b.add('gen-flycurtain', 1, 'House curtain', 0.7, { x0: 0.5, x1: 0.5, universe: MACHINERY_UNIVERSE });
       const flys = b.add('gen-flybar', 4, 'Fly', 0.3, { universe: MACHINERY_UNIVERSE });
       b.place(curtain, (f) => { f.cloth = { w: THEATRE.arch.w + 0.6, h: THEATRE.arch.h + 0.25 }; });
       b.place(flys, (f, i) => { f.cloth = { w: THEATRE.drop.w, h: THEATRE.drop.h, picture: ['forest', 'castle', 'stars', 'city'][i] }; });
@@ -483,7 +484,8 @@ export const TEMPLATES: Template[] = [
       b.haze(hazer, 0.25);
       const fogShot = b.shot('Fog burst', fog, { fog: 1 }, 5, '5 s of fog', '#8a94a3');
       const m = b.machines();
-      b.cue(show, 'Preset', [...out, open(0), ...drop(null), [front, on(0.18)], [cyc, on(0.4, C.deepBlue)], [ground, on(0.3, C.deepBlue)]], { fade: 3, note: 'Audience coming in', actions: [{ do: 'goto', list: hl.id, cue: hFull.id }] });
+      // (the first scene's drop already in behind the closed curtain, as a crew sets it before the doors open)
+      b.cue(show, 'Preset', [...out, open(0), ...drop(0), [front, on(0.18)], [cyc, on(0.4, C.deepBlue)], [ground, on(0.3, C.deepBlue)]], { fade: 3, note: 'Audience coming in', actions: [{ do: 'goto', list: hl.id, cue: hFull.id }] });
       b.cue(show, 'Curtain up', [...out, open(1), ...drop(0), [front, on(0.3)], [cyc, on(0.6, C.warm)], [side, on(0.4, C.warm)], [foot, on(0.5, C.warm)]], { fade: 8, effects: [footPulse], actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights out, the curtain goes' });
       b.cue(show, 'Scene 1', [...out, open(1), ...drop(0), [front, on(0.51)], [cyc, on(0.7, C.warm)], [side, on(0.6, C.warm)], [ground, on(0.5, C.amber)]], { fade: 4, actions: [{ do: 'goto', list: hl.id, cue: hOut.id }], note: 'House lights fade out with it' });
       b.cue(show, 'Forest', [...out, open(1), ...drop(0), [front, on(0.3)], [cyc, on(0.7, C.green)], [side, on(0.5, C.green)], [ground, on(0.6, C.teal)],

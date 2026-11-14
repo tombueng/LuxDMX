@@ -207,14 +207,19 @@ Three more demos come with their own room on the 3D stage:
   winch carry the ⚠ mark. A number typed on its height channel in All channels becomes its height;
   raw numbers on that channel (from an old file, say) are never sent, since they'd fade in from 0.
   **Stage machinery** runs on a winch channel too, with the same safety: a **Curtain track** (a
-  house curtain or a screen curtain: its two halves part from the middle, 0 closed, 1 open) and a
-  **Fly bar** with a painted drop (0 flown out above the opening, 1 in, standing on the deck). The 3D
-  stage draws them as what they are (the house curtain in folded velvet with a valance and gold
-  fringes) and moves them at their motors' speed; live and safe they hold, like any winch (Blind
-  shows what the show does). A winch on a universe no connected box plays sends nothing to a motor,
-  so the 3D stage moves it with the show, live too. The Theatre has a house curtain and four drops
-  (a forest, a castle at sunset, a starry sky, a city by night) that its cues open and fly in and
-  out; the Cinema's screen curtain opens for the feature. The templates put their machinery on
+  house curtain or a screen curtain: its two halves part from the middle, 0 closed, 1 open), a **Fly
+  curtain** (a house curtain its winch flies out, up into the tower behind the proscenium: 0 down, 1
+  out; its type's travel is how high it rises, a type of your own is one when its model says "fly
+  curtain") and a **Fly bar** with a painted drop (0 flown out above the opening, 1 in, standing on
+  the deck). The 3D stage draws them as what they are (a house curtain in folded velvet with a
+  valance and gold fringes) and moves them at their motors' speed; live and safe they hold, like any
+  winch (Blind shows what the show does). A winch on a universe no connected box plays sends nothing
+  to a motor, so the 3D stage moves it with the show, live too. LuxDMX Link counts as playing a
+  universe when one of its nodes does (Art-Net), or always when it sends sACN, since a receiver it
+  can't see may be listening. The Theatre's house curtain flies out on "Curtain up", and its four drops
+  (a forest, a castle at sunset, a starry sky, a city by night) hang upstage behind the acting area,
+  the first one set behind the closed curtain before the doors open, the others flown in and out
+  for the scenes; the Cinema's screen curtain opens for the feature. The templates put their machinery on
   universe 15, which no box plays until you give it one. A cloth's size and a drop's picture are
   the light's own (`cloth` in the show file); a fly bar travels as far as takes its drop from where
   it hangs down to the deck.

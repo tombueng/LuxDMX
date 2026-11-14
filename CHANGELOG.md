@@ -18,6 +18,11 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and
   "Throw the changes away" is the way to drop it. A channel called just "Red" that you make green is
   called "Green" too.
+- **The Theatre's curtain flies out, its scenery hangs at the back.** The house curtain is a fly
+  curtain now (a new type: its winch lifts the whole cloth up into the tower, the valance stays), in
+  front of the stage; the four painted drops hang upstage behind where the actors play, the first
+  one already set behind the closed curtain. With LuxDMX Link connected the machinery held still
+  even when no node played its universe: over Art-Net Link only counts the universes its nodes play.
 - **A pinspot on the mirror ball stops on the ball** on the 3D stage, instead of shining on
   through it and laying a grey disc on the bar's wall. The Bar's first pinspot hangs between the
   PARs now, not inside a beam light.

@@ -46,7 +46,7 @@ export interface RigFixture { id: string; name: string; kind: FixtureKind; look:
   // a winch: its travel (m) and speed (m/s), its soft limits (parts of its travel)
   winch?: { travel: number; speed: number; limits?: [number, number] };
   // a curtain or a drop on a fly bar: its cloth (m), what's painted on a drop
-  cloth?: { w: number; h: number; picture?: string } }   // a moving bar's heads (its cells that tilt on their own)
+  cloth?: { w: number; h: number; picture?: string; rises?: boolean } }   // a moving bar's heads (its cells that tilt on their own)
 type Ranges = { from: number; to: number; label?: string }[];
 // A gobo wheel of a light (gobos.ts): the pattern of each of its slots (null: open; none listed: a
 // plain level, a few patterns spread over it), and its rotation channel's ranges
@@ -323,10 +323,12 @@ export class Rig {
     for (const f of list) {
       if (!f.cloth) continue;
       if (f.look === 'curtain' && velvet && gold) {
-        // its two halves (folded velvet), the valance across the top, a gold fringe along each one's hem
+        // its two halves (folded velvet), the valance across the top, a gold fringe along each one's hem;
+        // one that flies out: one cloth the whole width, its fringe, the valance and its fringe
         const mk = (g: THREE.BufferGeometry, m: THREE.Material) => { const x = new THREE.Mesh(g, m); this.scenery.add(x); return x; };
-        this.cloths.set(f.id, [mk(pleated(40, 0.12), velvet), mk(pleated(40, 0.12), velvet), mk(pleated(70, 0.1), velvet),
-          mk(new THREE.BoxGeometry(1, 0.22, 0.05), gold), mk(new THREE.BoxGeometry(1, 0.22, 0.05), gold), mk(new THREE.BoxGeometry(1, 0.26, 0.05), gold)]);
+        const fringe = (h: number) => mk(new THREE.BoxGeometry(1, h, 0.05), gold);
+        this.cloths.set(f.id, f.cloth.rises ? [mk(pleated(80, 0.12), velvet), fringe(0.22), mk(pleated(70, 0.1), velvet), fringe(0.26)]
+          : [mk(pleated(40, 0.12), velvet), mk(pleated(40, 0.12), velvet), mk(pleated(70, 0.1), velvet), fringe(0.22), fringe(0.22), fringe(0.26)]);
       }
       else if (f.look === 'flybar') {
         const tex = dropTexture(f.cloth.picture ?? 'forest'), mat = new THREE.MeshStandardMaterial({ map: tex ?? undefined, color: tex ? 0xffffff : 0x4a6a4a, roughness: 0.95, side: THREE.DoubleSide });
@@ -694,15 +696,23 @@ export class Rig {
           if (!m) return;
           m.position.set(x, y, 0).applyQuaternion(yq).add(pos); m.quaternion.copy(yq); m.scale.set(Math.max(0.01, sw), Math.max(0.01, sh), 1);
         };
-        if (f.look === 'curtain') {
+        // (the valance stays: a band across the top, in front of the cloth, its fringe under it)
+        const vh = Math.min(1.8, cl.h * 0.12);
+        const valance = (band: THREE.Mesh | undefined, edge: THREE.Mesh | undefined) => {
+          hang(band, 0, -vh / 2, cl.w + 0.3, vh); band?.position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
+          hang(edge, 0, -vh + 0.13, cl.w + 0.3, 1); edge?.position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
+        };
+        if (f.look === 'curtain' && cl.rises) {
+          // flown out: the whole cloth up into the tower behind the proscenium, its fringed hem last
+          put('curtain', TMP.compose(pos, yq, sc.set(cl.w, 1, 1)));
+          hang(ms[0], 0, -cl.h / 2 + moved, cl.w, cl.h); hang(ms[1], 0, -cl.h + 0.11 + moved, cl.w, 1);
+          valance(ms[2], ms[3]);
+        } else if (f.look === 'curtain') {
           put('curtain', TMP.compose(pos, yq, sc.set(cl.w, 1, 1)));
           const half = cl.w / 2, gather = Math.min(half, 0.4 + half * 0.08), pw = Math.max(gather, half - moved);
           hang(ms[0], -half + pw / 2, -cl.h / 2, pw, cl.h); hang(ms[1], half - pw / 2, -cl.h / 2, pw, cl.h);
-          // (the valance stays: a band across the top, in front of the halves; the fringes on the hems)
-          const vh = Math.min(1.8, cl.h * 0.12);
-          hang(ms[2], 0, -vh / 2, cl.w + 0.3, vh); if (ms[2]) ms[2].position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
-          hang(ms[3], -half + pw / 2, -cl.h + 0.11, pw, 1); hang(ms[4], half - pw / 2, -cl.h + 0.11, pw, 1); hang(ms[5], 0, -vh + 0.13, cl.w + 0.3, 1);
-          if (ms[5]) ms[5].position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
+          hang(ms[3], -half + pw / 2, -cl.h + 0.11, pw, 1); hang(ms[4], half - pw / 2, -cl.h + 0.11, pw, 1);
+          valance(ms[2], ms[5]);
         } else {
           put('flybar', TMP.compose(CP.set(0, -moved, 0).applyQuaternion(yq).add(pos), yq, sc.set(cl.w, 1, 1)));
           hang(ms[0], 0, -moved - cl.h / 2 - 0.03, cl.w, cl.h);

@@ -177,6 +177,8 @@ export const GENERIC: FixtureType[] = [
   // track, its two halves parting from the middle (0 closed, 1 open; travel: the width it spans),
   // and a fly bar lowering a painted drop in (0 flown out, 1 in; travel: how far it flies)
   { ...gen('gen-curtain', 'Curtain track (a house or screen curtain, 2 ch)', [ch('Open', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 18, hoistSpeed: 1.2 } },
+  // (a house curtain on a winch that flies it out, up into the tower: travel is how far it rises)
+  { ...gen('gen-flycurtain', 'Fly curtain (a house curtain that flies out, 2 ch)', [ch('Open', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 10.4, hoistSpeed: 2 } },
   { ...gen('gen-flybar', 'Fly bar with a painted drop (2 ch)', [ch('Fly in', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 10.2, hoistSpeed: 1.5 } },
   // a big profile spot as touring rigs have them: CMY and a colour wheel, a rotating gobo wheel (each
   // gobo can shake; the wheel can run round), a fixed wheel with glass gobos, an animation wheel,

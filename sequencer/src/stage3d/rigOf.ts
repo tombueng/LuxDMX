@@ -70,9 +70,9 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
     ...(c.heads > 1 && m ? { heads: c.heads, headCells: headCellsOf(m), headPan: c.cellMoves.includes('pan'), barPan: m.channels.some((ch) => ch.attr === 'pan' && ch.cell === undefined) } : {}),
     // a winch: its travel and speed from its type (a guess without), its soft limits
     ...(has('hoist') ? { winch: { travel: t?.physical?.travel ?? 4, speed: t?.physical?.hoistSpeed ?? 0.4, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}),
-    // a curtain: each half travels half its width; a fly bar hung somewhere: as far as takes its drop
-    // from there down to the deck (else its type's travel)
-    ...(cloth ? { cloth, ...(look === 'curtain' ? { winch: { travel: cloth.w / 2, speed: t?.physical?.hoistSpeed ?? 0.7, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } }
+    // a curtain: each half travels half its width (one that flies out: its height); a fly bar hung
+    // somewhere: as far as takes its drop from there down to the deck (else its type's travel)
+    ...(cloth ? { cloth, ...(look === 'curtain' ? { winch: { travel: cloth.rises ? cloth.h : cloth.w / 2, speed: t?.physical?.hoistSpeed ?? 0.7, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } }
       : f.p3 ? { winch: { travel: Math.max(1, f.p3.y - 0.03 - cloth.h - DECK), speed: t?.physical?.hoistSpeed ?? 0.7, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}) } : {}),
     // more than two axes: endless pan and tilt, a third axis (roll) and its endless turning
     axes: has('panRotation') || has('tiltRotation') || has('roll') || has('rollRotation') ? {
@@ -82,11 +82,15 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
   };
 }
 
-// A curtain's or a drop's cloth: its own size, else its type's (a curtain spans its track's travel),
-// and what's painted on a drop (a forest without)
+// A curtain's or a drop's cloth: its own size, else its type's (a curtain spans its track's travel;
+// a fly curtain, named so, rises: as high as its winch lifts it), and what's painted on a drop (a
+// forest without)
 export function clothOf(f: Pick<Fixture, 'cloth'>, look: Look, t: FixtureType | undefined): RigFixture['cloth'] {
   if (look !== 'curtain' && look !== 'flybar') return undefined;
   const own = f.cloth ?? {}, num = (v: unknown, d: number, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
-  if (look === 'curtain') return { w: num(own.w, t?.physical?.travel ?? 18, 1, 60), h: num(own.h, 10.4, 0.5, 30) };
+  if (look === 'curtain') {
+    const rises = /fly curtain|flies out/i.test(t?.model ?? '');
+    return rises ? { w: num(own.w, 18, 1, 60), h: num(own.h, t?.physical?.travel ?? 10.4, 0.5, 30), rises } : { w: num(own.w, t?.physical?.travel ?? 18, 1, 60), h: num(own.h, 10.4, 0.5, 30) };
+  }
   return { w: num(own.w, 18, 1, 60), h: num(own.h, 10.2, 0.5, 30), picture: isDropPicture(own.picture) ? own.picture : 'forest' };
 }

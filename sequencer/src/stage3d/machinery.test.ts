@@ -62,6 +62,26 @@ describe('on the 3D stage', () => {
     const part = run({ curtain: 1, fly: 0 }, 3.5).cloths;
     expect(part[0].scale.x).toBeGreaterThan(3); expect(part[0].scale.x).toBeLessThan(7.5);
   });
+  it('a fly curtain flies out: the whole cloth rises into the tower at its motor\'s speed, the valance stays', () => {
+    const fly = (open: number, secs: number) => {
+      const rig = new Rig(), c = rf('gen-flycurtain', { p3: { x: 0, y: 11.5, z: 1.4 }, cloth: { w: 18, h: 10.4 } });
+      c.p = { x: 0, y: 11.5, z: 1.4 };
+      rig.build([c]); rig.place([c]);
+      for (let t = 0; t <= 0.5; t += 1 / 30) rig.update({ 'gen-flycurtain': { hoist: 0 } }, t, 0.3, new Set());
+      for (let t = 0.5; t <= 0.5 + secs; t += 1 / 30) rig.update({ 'gen-flycurtain': { hoist: open } }, t, 0.3, new Set());
+      return rig.scenery.children as THREE.Mesh[];
+    };
+    expect(rf('gen-flycurtain').look).toBe('curtain');
+    expect(rf('gen-flycurtain', { cloth: { w: 18, h: 10.4 } }).winch?.travel).toBe(10.4);   // (as high as the cloth)
+    const shut = fly(0, 1), bottom = (m: THREE.Mesh) => m.position.y - m.scale.y / 2;
+    expect(shut.length).toBe(4);                                                           // (the cloth, its fringe, the valance, its fringe)
+    expect(shut[0].scale.x).toBeCloseTo(18, 1);                                            // (one cloth, the whole width)
+    expect(bottom(shut[0])).toBeCloseTo(11.5 - 10.4, 1);                                   // (down: its hem at the deck)
+    const open = fly(1, 10);
+    expect(bottom(open[0])).toBeGreaterThan(11.4);                                         // (out: above the opening)
+    expect(open[2].position.y).toBeCloseTo(shut[2].position.y, 3);                         // (the valance where it was)
+    expect(bottom(fly(1, 2.5)[0])).toBeLessThan(8);                                        // (it takes its time)
+  });
   it('the curtain\'s velvet hangs in real folds, deeper than a flat cloth; its valance stays across the top as it opens', () => {
     const open = run({ curtain: 1, fly: 0 }, 12).cloths, half = open[0].geometry as THREE.BufferGeometry, z = half.attributes.position;
     let lo = 0, hi = 0;
@@ -80,14 +100,17 @@ describe('on the 3D stage', () => {
 });
 
 describe('the templates', () => {
-  it('the Theatre: a house curtain and four drops (forest, castle, stars, city) in its room; its cues open the curtain and fly them in and out', async () => {
+  it('the Theatre: a house curtain that flies out and four drops upstage (forest, castle, stars, city); its cues fly them in and out', async () => {
     const { TEMPLATES } = await import('../content/templates');
     const s = TEMPLATES.find((t) => t.name === 'Theatre')!.build();
     const curtain = s.fixtures.find((f) => f.name === 'House curtain')!, flys = s.fixtures.filter((f) => /^Fly \d$/.test(f.name));
-    expect(curtain.typeId).toBe('gen-curtain'); expect(flys.map((f) => f.cloth?.picture)).toEqual(['forest', 'castle', 'stars', 'city']);
+    expect(curtain.typeId).toBe('gen-flycurtain'); expect(flys.map((f) => f.cloth?.picture)).toEqual(['forest', 'castle', 'stars', 'city']);
     expect(curtain.p3!.z).toBeCloseTo(THEATRE.curtainZ); expect(flys.every((f) => f.p3!.y > ROOMS.theatre.ceiling - 1)).toBe(true);
+    // (the drops at the back, behind where the actors play, in front of the cyc)
+    expect(flys.every((f) => f.p3!.z < -10 && f.p3!.z > THEATRE.cycZ)).toBe(true);
     const show = s.cueLists.find((l) => l.name === 'Show')!, at = (name: string, id: string) => (show.cues.find((c) => c.name === name)!.values[id] as { hoist?: number } | undefined)?.hoist;
     expect(at('Preset', curtain.id)).toBe(0); expect(at('Scene 1', curtain.id)).toBe(1);
+    expect(at('Preset', flys[0].id)).toBe(1);                // (the first scene's drop set behind the closed curtain)
     expect(at('Scene 1', flys[0].id)).toBe(1); expect(at('Night', flys[2].id)).toBe(1); expect(at('Night', flys[0].id)).toBe(0);
     expect(at('End', curtain.id)).toBe(0);
   });

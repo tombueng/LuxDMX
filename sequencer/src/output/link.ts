@@ -77,6 +77,9 @@ export class LinkOutput extends Bridge {
   adopt() { /* nothing to adopt: it isn't a window */ }
   // every universe goes to Link; it knows which nodes play which
   wants() { return true; }
+  // Art-Net only goes to the nodes that play a universe: one none of them plays reaches nothing.
+  // sACN is sent to everyone listening, nodes Link can't see too: it may reach a motor.
+  reaches(uni: number) { return this.proto !== 'artnet' || this.nodes.some((n) => n.universes.includes(uni)); }
   // what it sends as: always what the show says now
   get proto(): LinkProto { return this.wantedProto() ?? 'artnet'; }
   private routes() {

@@ -35,9 +35,10 @@ export const THEATRE = {
   electrics: [{ z: 0.8, y: 16.6 }, { z: -5, y: 16.6 }, { z: -10.5, y: 17.2 }, { z: -16, y: 17.8 }], foh: { z: 12, y: 16 }, foh2: { z: 8, y: 15 },
   // the booms in the wings (either side), the black legs masking them
   booms: { x: 15.5, z: [-15, -9.5, -4, 1.0] }, legs: [-4, -9.5, -15],
-  // the house curtain's track just behind the proscenium; the fly bars (their drops) between the
-  // electrics, hung from the grid under the roof; a drop flown in stands on the deck
-  curtainZ: 1.45, flys: [-2.2, -7.5, -12.8, -17.8], drop: { w: 30, h: 15.5 },
+  // the house curtain just behind the proscenium, flown out up into the tower; the fly bars with the
+  // painted drops upstage, behind where the actors play and in front of the cyc's bar, hung from the
+  // grid under the roof; a drop flown in stands on the deck
+  curtainZ: 1.45, flys: [-11.8, -12.9, -14.0, -15.1], drop: { w: 30, h: 15.5 },
 };
 // the floor of the stalls at z (gently raked)
 export function theatreFloor(z: number) {

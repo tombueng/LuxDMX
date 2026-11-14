@@ -301,7 +301,7 @@ class App {
     if (this.output !== 'live' || this.sfxArmed) return null;
     const h = { ...this.engine.heldSeed, ...this.heldWire() }, out = new Map<string, number | null>();
     for (const f of this.show.fixtures) {
-      if (!isKinetic(this.modeOf(f.id)) || !this.bridges.some((b) => b.state === 'ready' && b.wants(f.universe))) continue;
+      if (!isKinetic(this.modeOf(f.id)) || !this.bridges.some((b) => b.state === 'ready' && b.reaches(f.universe))) continue;
       const k = h[`${f.id}:hoist`] !== undefined ? `${f.id}:hoist` : `${f.id}:hoist@0`, fine = h[`${k}:fine`];
       out.set(f.id, h[k] === undefined ? null : fine !== undefined ? ((h[k] << 8) | fine) / 65535 : h[k] / 255);
     }
