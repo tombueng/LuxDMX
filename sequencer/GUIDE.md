@@ -1047,8 +1047,11 @@ Three more demos come with their own room on the 3D stage:
     marked; its **×** gives it back to the show.
   - **Change what the channels do**: name, what it does, fine, default and the named ranges, right in
     the table. **Save for all N lights of this type** (a type of your own changes in place; one from
-    the library becomes a copy the lights use) or **Only for** this light (a copy for it alone). To
-    add or remove channels, use "Change the channel layout" in the fixture list's menu.
+    the library becomes a copy the lights use) or **Only for** this light (a copy for it alone).
+    **Done** (or closing the window, or another tab) saves what you changed the first way; **Throw
+    the changes away** drops it. A name that only said what the channel does follows it ("Red" made
+    green is "Green"). To add or remove channels, use "Change the channel layout" in the fixture
+    list's menu.
   - **A ring or a matrix** shows one pixel's channels, standing for every pixel: their sliders set
     all pixels at once, and changing what one does (a GRB panel: the first is green, the second red)
     changes it on every pixel.

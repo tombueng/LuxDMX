@@ -13,6 +13,11 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **Changing what a light's channels do is kept when you press Done.** Before, only the Save button
+  under the table kept it, and Done threw it away without a word (swap red and green, Done, and
+  they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and
+  "Throw the changes away" is the way to drop it. A channel called just "Red" that you make green is
+  called "Green" too.
 - **A lighter 3D stage**: the camera-like exposure no longer makes the page wait for the graphics
   card to answer a question every few frames (about a sixth of the page's time with the 3D stage
   open), and the stage stopped making the browser lay the page out again every frame. Switching

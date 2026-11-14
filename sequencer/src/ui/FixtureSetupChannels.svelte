@@ -5,6 +5,7 @@
   // channel does can be changed right here, for all lights of the type or only for this one (a copy
   // of the type). A ring or a matrix shows one pixel's channels, standing for all of them. Its other
   // modes say plainly what picking one does: the channel count, and which lights after it move.
+  import { onDestroy } from 'svelte';
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import { ATTR_GROUPS, ATTR_LABEL } from './attrs';
@@ -47,14 +48,18 @@
   // (on a pixel, the name without its number: "Red 1" stands for every pixel's red)
   const plain = (c: Channel) => (pixels && c.cell !== undefined ? c.name.replace(/\s*\d+$/, '') : c.name);
 
+  const labelOf = (attr: ChannelAttr) => (ATTR_LABEL[attr] ?? attr).split(' (')[0];
   function setAttr(all: number[], attr: ChannelAttr) {
     if (!draft) return;
-    const label = (ATTR_LABEL[attr] ?? attr).split(' (')[0];
+    const label = labelOf(attr);
     for (const i of all) {
       const c = draft[i];
       if (!c) continue;
+      // (a name that only said what it did says the new thing: "Red" made green is "Green")
+      const said = c.name === labelOf(c.attr);
       c.attr = attr;
       if (pixels && c.cell !== undefined) c.name = `${label} ${c.cell + 1}`;
+      else if (said) c.name = label;
     }
   }
   function setName(all: number[], name: string) {
@@ -85,6 +90,9 @@
     app.toastUndo(app.changeChannels(id, channels, only));
     draft = null; openRanges = null;
   }
+  // Changes not saved when it goes (Done, the dialog closed, another tab): saved, for all the lights
+  // of the type as Save does (Undo takes them back). "Throw the changes away" is how to drop them.
+  onDestroy(() => { if (dirty) save(false); });
 
   // ---- trying it: a value per channel on the real light, held until let go
   const live = (i: number) => { if (!f) return 0; const w = channelAt(f, m, i); return app.frames.get(w.universe)?.[w.at] ?? 0; };

@@ -7,7 +7,7 @@
 // from there. axe on each tab.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, channels, pixelPorts, test, expect, FAKE, selectFixtures, full } from './helpers';
+import { openConnected, resetFake, patch, channels, pixelPorts, test, expect, FAKE, selectFixtures, full, selectAll, swatch } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -366,4 +366,27 @@ test('the channel table lines up: every row\'s Try slider in one column, a byte 
   expect(await whole('input[aria-label="From"], input[aria-label="To"]')).toBe(0);
   await expect(dlg.getByRole('button', { name: 'Done', exact: true })).toHaveCount(1);
   await expect(dlg.getByRole('button', { name: 'Stop editing' })).toBeVisible();
+});
+
+test('what the channels do, changed and the dialog closed with Done: kept (red and green swapped stay swapped, their names with them)', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 1, 0, 'Par');
+  const dlg = await openSetup(page, 'Par', 'Channels');
+  await dlg.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await dlg.getByLabel('Channel 2 does').selectOption('green');
+  await dlg.getByLabel('Channel 3 does').selectOption('red');
+  await dlg.getByRole('button', { name: 'Done' }).click();
+  await expect(dlg).toBeHidden();
+  const chans = () => page.evaluate(() => { const a = (window as any).__luxdmx; return a.modeOf(a.show.fixtures[0].id).channels.map((c: any) => [c.name, c.attr]); });
+  await expect.poll(chans).toEqual([['Dimmer', 'intensity'], ['Green', 'green'], ['Red', 'red'], ['Blue', 'blue']]);
+  // and on the wire: red goes to the third channel now
+  await selectAll(page); await full(page); await swatch(page, 'Red');
+  await expect.poll(async () => (await channels(0, 4)).slice(0, 4)).toEqual([255, 0, 255, 0]);
+  // thrown away, they're not kept
+  const d2 = await openSetup(page, 'Par', 'Channels');
+  await d2.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await d2.getByLabel('Channel 4 does').selectOption('white');
+  await d2.getByRole('button', { name: /Throw the changes away/ }).click();
+  await d2.getByRole('button', { name: 'Done' }).click();
+  await expect.poll(chans).toEqual([['Dimmer', 'intensity'], ['Green', 'green'], ['Red', 'red'], ['Blue', 'blue']]);
 });
