@@ -87,7 +87,7 @@
       if (app.blackout) app.blackout = false;
       else boArm = setTimeout(() => { boArm = 0; app.blackout = true; }, BO_HOLD) as unknown as number;
     }}
-    onkeyup={boStop}>Blackout</button>
+    onkeyup={boStop}>Blackout{#if app.locked && !app.blackout}<small class="holdnote">hold</small>{/if}</button>
 {/snippet}
 
 <style>
@@ -122,6 +122,8 @@
   .auto-next { font-size: .75rem; color: var(--cyan); border: 1px solid currentColor; border-radius: 999px; padding: 0 .4rem; margin-left: .2rem; }
   .empty { align-self: center; font-size: .85rem; padding-left: .3rem; }
   .bo { position: relative; overflow: hidden; }
+  /* (on a locked page it takes a hold: said on the button, a tap did nothing visible) */
+  .holdnote { display: block; font-size: .62rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; opacity: .75; line-height: 1; margin-top: .1rem; }
   .bo.arming::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--pink); transform-origin: left; animation: arm var(--hold) linear forwards; }
   @keyframes arm { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   /* a staff page of looks: what's on, big, and Blackout taking the room the GO had on a phone */

@@ -36,6 +36,7 @@ test('locked with a PIN: no master, no Release, Blackout by holding, the phone d
   await page.keyboard.press('Escape');
   // a tap on Blackout only says how; holding it blacks out; a tap brings it back
   const bo = page.locator('.strip').getByRole('button', { name: 'Blackout' });
+  await expect(bo).toContainText('hold');                                 // (said on the button: a tap alone does nothing there)
   await bo.click();
   await expect(page.locator('.toast')).toContainText('Hold Blackout');
   expect(await page.evaluate(() => (window as any).__luxdmx.blackout)).toBe(false);
