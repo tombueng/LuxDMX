@@ -54,6 +54,10 @@ test('locked with a PIN: no master, no Release, Blackout by holding, the phone d
   await expect(ph).toContainText('unlock to change this');
   await expect(ph.getByRole('button', { name: /Switch/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
+  // the show keeps the PIN's hash, not the digits (a shared show file doesn't tell it)
+  const kept = await page.evaluate(() => (window as any).__luxdmx.show.settings.lockPin as string);
+  expect(kept).toMatch(/^h1:[0-9a-f]{14}$/);
+  expect(await page.evaluate(() => JSON.stringify((window as any).__luxdmx.show))).not.toContain('4711');
   // holding the padlock asks for the PIN: a wrong one keeps it locked, the right one unlocks
   const lock = page.locator('.live').getByRole('button', { name: /Unlock page/ });
   const hold = async () => { await lock.hover(); await page.mouse.down(); await page.waitForTimeout(1200); await page.mouse.up(); };

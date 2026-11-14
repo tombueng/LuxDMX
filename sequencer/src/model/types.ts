@@ -302,7 +302,8 @@ export interface Show {
   pages: Page[];
   outputs: { devices: Device[] };
   // stage.image: a data: URL drawn under the stage; schedule: the timetable (model/schedule.ts)
-  // lockPin: the PIN that unlocks a show locked for the service (staff-proofing, not security);
+  // lockPin: the PIN that unlocks a show locked for the service, as its hash (model/pin.ts;
+  // staff-proofing, not security);
   // lockPage: the live page it was locked on (the only one shown while locked)
   // place: where the show is, for the timetable's sunrise and sunset (unset: guessed from the time zone)
   // scheduleOff: the timetable switched off; schedulePause: not playing until then (ms since 1970)

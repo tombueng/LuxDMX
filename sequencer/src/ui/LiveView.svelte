@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pinMatches } from '../model/pin';
   import { looksPage } from '../content/busking';
   import { whatsNew } from '../content/whatsNew';
   import { clockOf } from '../model/timeline';
@@ -114,7 +115,7 @@
     ui.openMenu(e, [
       { heading: 'Lock for the show: only playing' },
       { label: app.show.settings.lockPin ? 'Lock with the PIN…' : 'Lock with a PIN…', icon: 'lock', run: pinLock },
-      { label: 'Lock without a PIN (hold the padlock to unlock)', icon: 'lock', run: () => setLocked(true, keys) },
+      { label: 'Lock without a PIN (hold the padlock to unlock)', icon: 'lock', run: () => { delete app.show.settings.lockPin; void setLocked(true, keys); } },
       // (a locked page still has the machines and Blackout on it: for staff, a page of just the looks)
       { sep: true },
       { label: 'First, a page with just the looks (for staff)', icon: 'plus', run: looksOnly },
@@ -126,7 +127,7 @@
       for (let tries = 0; ; tries++) {
         const pin = await ui.ask('Unlock', '', { label: 'PIN', ok: 'Unlock', pin: true, body: tries ? "That wasn't it. Try again." : undefined });
         if (pin === null) return;
-        if (pin.trim() === app.show.settings.lockPin) break;
+        if (pinMatches(app.show.settings.lockPin, pin)) break;
         if (tries >= 4) { ui.toast('Wrong PIN', 2500); return; }
       }
     }

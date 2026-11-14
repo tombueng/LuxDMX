@@ -3,6 +3,7 @@
 //   - A file listing a `requiredFeatures` entry the reader doesn't know is refused, everything
 //     else unknown is kept and written back as it was (we never rebuild objects field by field).
 //   - Older files are brought up to date by one migration step per version, in order.
+import { isPinHash, pinHash } from './pin';
 import { MAX_NUM } from './numbers';
 import { validEntry } from './schedule';
 import { cleanLayout, MAX_PIXELS } from './pixelLayout';
@@ -250,6 +251,8 @@ function mendSettings(st: Obj, note: Note) {
   // the band's name: words, at most 60 characters, or none (their picture)
   if (st.bandName !== undefined) { if (typeof st.bandName === 'string' && st.bandName.trim()) st.bandName = st.bandName.trim().slice(0, 60); else delete st.bandName; }
   for (const k of ['lockPin', 'lockPage']) if (st[k] !== undefined && typeof st[k] !== 'string') delete st[k];
+  // the PIN kept as its hash (model/pin.ts): a show from before that kept the digits gets it now
+  if (typeof st.lockPin === 'string') { if (!st.lockPin.trim()) delete st.lockPin; else if (!isPinHash(st.lockPin)) st.lockPin = pinHash(st.lockPin); }
 }
 
 // the timeline: well-formed or gone; items that aren't, dropped. Its tempo and length bounded (the

@@ -380,7 +380,9 @@ Three more demos come with their own room on the 3D stage:
   Live it's the button on the GO bar (and B on the keyboard).
 - **Lock it for the service** (the padlock on a live page: a tap asks with a PIN or without): only playing is left, no Program, no
   editing, no tempo, no page menu, no rig (RDM). Unlocking takes holding the padlock for a second, so a stray tap
-  can't do it. Locking and unlocking aren't undo steps: Ctrl+Z after unlocking takes back what was
+  can't do it. The show keeps only a hash of the PIN, so the show file doesn't give it away (it
+  can't be shown again either: **Lock with the PIN…** with nothing typed keeps the one it has,
+  **Lock without a PIN** drops it). Locking and unlocking aren't undo steps: Ctrl+Z after unlocking takes back what was
   done, it doesn't lock again. Changes made in Program that weren't recorded show as a banner on Live, with Clear.
 - **The live page** works with a touch screen, the keyboard (letters on the buttons, Space for GO, B for blackout)
   and MIDI pads and faders. The GO bar shows what's on, what's next, and the next cue's note (a

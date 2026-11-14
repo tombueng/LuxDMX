@@ -519,8 +519,11 @@ others around it. The set in order is `before`, then `timeline`, then `after`:
 
 ## Locking for the service
 
-`settings.lockPin` (optional): digits that unlock a show locked for the service (staff-proofing,
-not security: anyone with the file can read it). `settings.lockPage`: the live page it was locked
+`settings.lockPin` (optional): what unlocks a show locked for the service, kept as a hash of the
+PIN, `"h1:"` and 14 hex digits (src/model/pin.ts: cyrb53 of `"luxdmx-pin:"` and the digits), so the
+file doesn't say the PIN in plain text. Staff-proofing, not security: three to eight digits are
+found by trying them all. A file with the digits themselves (as before) still unlocks with them and
+gets the hash when it's opened. `settings.lockPage`: the live page it was locked
 on, the only one shown while locked. A page's `locked` is the lock itself; a reader that imports a
 file should open it unlocked. A page with `"go": false` (a staff page of looks) shows no GO or Back:
 its looks are tapped, not stepped through.

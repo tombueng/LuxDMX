@@ -3,6 +3,7 @@
 // Record stores the fixtures you touched (the programmer), each with its full current look.
 // Fixtures you didn't touch stay out of the cue, so playing it leaves them alone: that's what
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
+import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
 import { freezeGroupNumbers, groupByNumber, nextGroupNumber } from './model/groupnum';
 import { hostProblem } from './model/host';
@@ -2809,16 +2810,18 @@ class App {
   }
   // Lock with a PIN: asks for it (empty: none), keeps it with the show, locks. False: cancelled.
   async pinLock(): Promise<boolean> {
-    const pin = await ui.ask('Lock with a PIN', this.show.settings.lockPin ?? '', { label: 'PIN', ok: 'Lock', digits: true, empty: true,
-      hint: '3 to 8 digits. Empty: no PIN, holding the padlock unlocks.',
+    // (the show keeps only the PIN's hash: it can't be shown again; empty keeps the one it has)
+    const has = !!this.show.settings.lockPin;
+    const pin = await ui.ask('Lock with a PIN', '', { label: 'PIN', ok: 'Lock', digits: true, empty: true,
+      hint: has ? '3 to 8 digits. Empty: the PIN it has now.' : '3 to 8 digits. Empty: no PIN, holding the padlock unlocks.',
       check: (v) => (!v ? '' : /\D/.test(v) ? 'Digits only' : v.length < 3 || v.length > 8 ? 'A PIN is 3 to 8 digits' : ''),
       body: 'This page only, for playing: no other pages, no editing, no masters. Holding the padlock asks for the PIN.' });
     if (pin === null) return false;
     const p = pin.trim();
     if (p && !/^\d{3,8}$/.test(p)) { ui.toast('A PIN is 3 to 8 digits'); return false; }
-    if (p) this.show.settings.lockPin = p; else delete this.show.settings.lockPin;
+    if (p) this.show.settings.lockPin = pinHash(p);
     this.lockShow(true);
-    ui.toast(p ? 'Locked for the show. Hold the padlock and type the PIN to unlock.' : 'Locked for the show: only playing. Hold the padlock to unlock.', 4000);
+    ui.toast(p || has ? 'Locked for the show. Hold the padlock and type the PIN to unlock.' : 'Locked for the show: only playing. Hold the padlock to unlock.', 4000);
     return true;
   }
   // A box the red bar speaks for: it was live and dropped, or it isn't connected while the lights
