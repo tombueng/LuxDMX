@@ -32,7 +32,10 @@ export async function startDemo(song: string | null = DEMO_SONG, progress: (got:
   ready?.();
   await app.startShow(d.build(file ? s : undefined));
   ui.stage3d = true;
-  app.view = 'timeline';
+  // (on the timeline with its stage beside it; on a phone, where the timeline has no room for the
+  // stage, on the stage itself: the show is what's to see)
+  const phone = typeof window !== 'undefined' && window.innerWidth <= 760;
+  app.view = phone ? 'program' : 'timeline';
   if (file && s) {
     try {
       await app.timeline.loadFile(file, app.showId);

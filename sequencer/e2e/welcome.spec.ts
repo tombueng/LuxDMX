@@ -165,6 +165,19 @@ test('the templates play as shows too: their looks cued to a song, DJ / Party in
   }
 });
 
+test('on a phone a show played from the welcome opens on its 3D stage (the timeline has no room for the stage there)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fresh(page, true);
+  const w = welcomeDialog(page), t = demoTile(w, 'Wedding');
+  await t.getByLabel('Music for Wedding').selectOption('beat');
+  await t.getByRole('button', { name: 'Play the show: Wedding' }).click();
+  await expect(w).toBeHidden({ timeout: 30000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.view), { timeout: 20000 }).toBe('program');
+  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 45000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 20000 }).toBe(true);
+});
+
 test('on a phone the welcome fits the screen: every button and the music menu inside it', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await fresh(page, true);
