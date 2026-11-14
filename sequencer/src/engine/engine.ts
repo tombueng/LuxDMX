@@ -1,5 +1,5 @@
-// The engine: runs the cue lists, mixes them, renders DMX. Pure TypeScript, no DOM, so it can be
-// unit-tested and moved into a Worker later.
+// The engine: runs the cue lists, mixes them, renders DMX. Pure TypeScript, no DOM: the output
+// thread runs one for the wire (output/thread.ts), the page one for the screen, and the tests theirs.
 //
 // Mixing, per fixture:
 //   - intensity: highest wins across lists (HTP), each scaled by its list master and weight
@@ -13,13 +13,14 @@ import { isHeld, enableValue, isGated, isMachine, MACHINE_PROGRAMS, MAX_ON, KINE
 import type { CueAction, CueList, Effect, FixtureMode, Preset, Resolved, Show, Values, Fixture } from '../model/types';
 import { headCellsOf, capsOf, modeOf, typeMap } from '../model/library';
 import { isWide, placesOfLight, spansOf } from '../model/pixelLayout';
-// fog, haze and the effect machines: highest wins across lists, like a level (a haze list runs all
-// night whatever the moods say; two lists firing confetti fire it)
-const SMOKE = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 import { ListPlayer, type PlayerStatus } from './player';
 import { lerpResolved, resolveValues, spreadCells, stripCells } from './resolve';
 import { DARK, fitLook, renderFixture, level } from './render';
 import { EFFECT_MAP, applyFx, hash, paramsOf, runEffect, type EffectDef, type EffectParams, type Target } from './effects';
+
+// fog, haze and the effect machines: highest wins across lists, like a level (a haze list runs all
+// night whatever the moods say; two lists firing confetti fire it)
+const SMOKE = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 
 const PRIO = { low: 0, normal: 1, high: 2 } as const;
 const FX_FADE = 0.4;            // seconds an effect started or stopped by hand takes to fade
@@ -116,6 +117,18 @@ export class Engine {
   // keep each list's tracked look from one GO to the next: only where the show is a new copy after
   // every edit (the output thread), so an edit can never leave an old look in it
   cacheTracks = false;
+  // what Record would store (tick()'s `look`): made unless this engine never records (the thread's)
+  wantLook = true;
+  private modesShow: Show | null = null;
+  private modesMap: Map<string, FixtureMode | undefined> | null = null;
+  // each light's mode: kept while it's the same show copy (the thread's, a fresh copy after each
+  // edit); the page's show changes in place, worked out each frame
+  private modesOf(show: Show) {
+    if (this.cacheTracks && this.modesShow === show && this.modesMap) return this.modesMap;
+    const types = typeMap(show), m = new Map(show.fixtures.map((f) => [f.id, modeOf(types.get(f.typeId), f.mode)]));
+    if (this.cacheTracks) { this.modesShow = show; this.modesMap = m; }
+    return m;
+  }
   // a group's master (the console's group faders): its lights' levels times this, like the grand
   // master for just them (a light in two groups: both)
   groupMasters: Record<string, number> = {};
@@ -393,8 +406,7 @@ export class Engine {
     const cellLevels = new Map<string, { lvl: Float64Array; rec: Float64Array }>();
     const plain: Record<string, number> = {}, plainRec: Record<string, number> = {};
     for (const f of show.fixtures) { stage[f.id] = { ...DARK, color: { ...DARK.color! } }; htp[f.id] = 0; }
-    const types = typeMap(show);
-    const modes = new Map(show.fixtures.map((f) => [f.id, modeOf(types.get(f.typeId), f.mode)]));
+    const modes = this.modesOf(show);
 
     for (const { p } of order) {
       const w = p.weightAt(now);
@@ -460,7 +472,9 @@ export class Engine {
       // (a cell the programmer sets is held, not the rest of its light)
       if (pr?.cellVals) for (const [k, c] of Object.entries(pr.cellVals)) { if (c.intensity !== undefined) held.set(`${f.id}#${k}`, 1); if (c.color) colored.add(f.id); }
       if (pr?.color) colored.add(f.id);
-      // what Record stores: what the cues set, not where the masters and fades have it
+      // what Record stores: what the cues set, not where the masters and fades have it (the output
+      // thread has no use for it: it isn't made there)
+      if (!this.wantLook) continue;
       const lk: Resolved = { ...s, color: s.color && { ...s.color } };
       // (the cells as they are: nothing changes them in place after this)
       if (s.cellVals) lk.cellVals = s.cellVals;
@@ -657,12 +671,12 @@ export class Engine {
     for (const k of kin.keys()) this.orphans.delete(k);
     this.kinWas = kin;
     if (!this.orphans.size) return;
-    // (what the patch uses now: an orphan under a light patched there gives way)
-    const used = new Set<string>();
-    for (const f of show.fixtures) for (const s of spansOf(f, modes.get(f.id))) for (let i = 0; i < s.count; i++) used.add(`${s.universe}:${s.at + i}`);
+    // (an orphan under a light patched there now gives way; orphans are a handful, so each is
+    // checked against the patch's spans, no set of every channel made every frame)
+    const spans = show.fixtures.flatMap((f) => spansOf(f, modes.get(f.id)));
     for (const [k, v] of this.orphans) {
-      if (used.has(k)) { this.orphans.delete(k); continue; }
       const [u, at] = k.split(':').map(Number);
+      if (spans.some((sp) => sp.universe === u && at >= sp.at && at < sp.at + sp.count)) { this.orphans.delete(k); continue; }
       let b = frames.get(u);
       if (!b) { b = new Uint8Array(512); frames.set(u, b); }
       b[at] = v;
@@ -733,6 +747,7 @@ export class Engine {
     }
     run.sort((a, b) => FX_ORDER[a.def.category] - FX_ORDER[b.def.category]);
     const base = run.some((r) => r.p.lightUp) ? new Map(Object.entries(stage).map(([id, s]) => [id, s.intensity ?? 0])) : undefined;
+    const lightOf = new Map(show.fixtures.map((x) => [x.id, x]));      // (each element's light, for the pixel shows)
     for (const { e, def, p, f } of run) {
       let since = this.fxSince.get(e.id);
       // Tempo effects count from the last whole beat, so their steps land on the beat (and on the
@@ -741,7 +756,7 @@ export class Engine {
       const total = (p.tempo ? this.beats - since.beats : this.seconds - since.seconds) / p.speed;
       const targets = effectTargets(show, e, def, p, modes);
       // each element's light and its place on it (pixel shows and pictures use them)
-      const rowOf = new Map<string, number>(), lightOf = new Map(show.fixtures.map((f) => [f.id, f]));
+      const rowOf = new Map<string, number>();
       for (const t of targets) if (!rowOf.has(t.fixture)) rowOf.set(t.fixture, rowOf.size);
       const where = targets.map((t) => {
         const m = modes.get(t.fixture)!, n = t.cell === undefined ? 1 : capsOf(m).cells;

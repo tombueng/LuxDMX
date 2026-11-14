@@ -1,6 +1,6 @@
 // The output thread: works out every DMX frame and sends it, 40 a second on its own clock, whatever
 // the page is doing (drawing the stage, a dialog, a slow moment). The page keeps an engine of its own
-// for the screen and tells this one everything that changes it (output/host.ts): the show, what's
+// for the screen and tells this one everything that changes it (output/host.svelte.ts): the show, what's
 // set by hand, every command (GO, a jump, an effect, Arm) with the moment it was given. Both engines
 // work out the same frames; this one's go out.
 //
@@ -22,11 +22,10 @@ export type ToThread =
   | { t: 'port'; key: string; port: MessagePort; outputs: { en: boolean; uni: number }[] }
   | { t: 'outputs'; key: string; outputs: { en: boolean; uni: number }[] }
   | { t: 'drop'; key: string }
-  | { t: 'link'; on: boolean; url: string; proto: 'artnet' | 'sacn' | 'both' }
-  | { t: 'final' };
+  | { t: 'link'; on: boolean; url: string; proto: 'artnet' | 'sacn' | 'both' };
 export type FromThread =
   | { t: 'held'; held: Record<string, number> }
-  | { t: 'stats'; rate: number; worst: number; late: number; ms: number; sent: number; to: number; quiet: boolean; unis: number; link: boolean }
+  | { t: 'stats'; rate: number; worst: number; late: number; quiet: boolean; link: boolean }
   | { t: 'broken'; why: string };
 export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; fxOver: Engine['fxOver']; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
 
@@ -43,11 +42,12 @@ let mainOrigin = performance.timeOrigin;
 let at: number | null = null;                         // a command's own moment, while it's applied
 // the page's clock (seconds), so a fade started there starts at the same moment here
 const now = () => at ?? (performance.now() + performance.timeOrigin - mainOrigin) / 1000;
+const EMPTY = { fixtures: [], cueLists: [], effects: [], groups: [], presets: [], fixtureTypes: [], pages: [] } as unknown as Show;
 const engine = new Engine(() => show ?? EMPTY, now);
 engine.cacheTracks = true;        // (the show here is a fresh copy after every edit)
-const EMPTY = { fixtures: [], cueLists: [], effects: [], groups: [], presets: [], fixtureTypes: [], pages: [] } as unknown as Show;
+engine.wantLook = false;          // (nothing records here)
 let modes = new Map<string, FixtureMode | undefined>();
-let quiet = true, blind: Map<number, Uint8Array> | null = null, stopped = false, failing = false;
+let quiet = true, blind: Map<number, Uint8Array> | null = null, failing = false;
 let last: Map<number, Uint8Array> | null = null;
 const recent = new Map<number, number>();
 
@@ -89,13 +89,13 @@ function linkSend(uni: number, data: Uint8Array, t: number) {
   const f = new Uint8Array(6 + data.length);
   f.set([68, 1, uni & 0xff, (uni >> 8) & 0x7f, 100, 0]);
   f.set(data, 6);
-  link.ws.send(f); sentN++;
+  link.ws.send(f);
 }
 
 function send(frames: Map<number, Uint8Array>, t: number) {
   for (const p of ports.values()) for (const [uni, data] of frames) {
     if (p.outputs.length && !p.outputs.some((o) => o.en && o.uni === uni)) continue;
-    if (due(p.sent, uni, data, t)) { p.port.postMessage({ luxdmx: 1, type: 'dmx', uni, prio: 100, data }); sentN++; }
+    if (due(p.sent, uni, data, t)) p.port.postMessage({ luxdmx: 1, type: 'dmx', uni, prio: 100, data });
   }
   if (link.on) for (const [uni, data] of frames) linkSend(uni, data, t);
 }
@@ -104,9 +104,9 @@ function send(frames: Map<number, Uint8Array>, t: number) {
 // went on the wire. Said on the frame they change (they only change while armed).
 let heldSaid = '', wasArmed = false;
 function tellHeld() {
-  const now = engine.armed;
-  if (!now && !wasArmed && heldSaid) return;
-  wasArmed = now;
+  const armed = engine.armed;
+  if (!armed && !wasArmed && heldSaid) return;
+  wasArmed = armed;
   const h = engine.heldOwn(), s = JSON.stringify(h);
   if (s === heldSaid) return;
   heldSaid = s;
@@ -115,9 +115,9 @@ function tellHeld() {
 
 // ---- the clock
 const ticks: number[] = [];
-let work = 0, statAt = 0, sentN = 0;
+let statAt = 0;
 function frame() {
-  if (stopped || !show) return;
+  if (!show) return;
   const t0 = performance.now();
   let frames: Map<number, Uint8Array> | null;
   try { frames = engine.tick().frames; failing = false; tellHeld(); } catch (e) {
@@ -135,15 +135,12 @@ function frame() {
     if (!quiet) send(out, t0);
   }
   ticks.push(t0); while (ticks.length && t0 - ticks[0] > 5000) ticks.shift();
-  work += performance.now() - t0;
   if (t0 - statAt > 500) {
     let worst = 0, late = 0;
     for (let i = 1; i < ticks.length; i++) { const g = ticks[i] - ticks[i - 1]; worst = Math.max(worst, g); if (g > PERIOD + LATE) late++; }
     const span = ticks.length > 1 ? ticks[ticks.length - 1] - ticks[0] : 0;
-    const dt = Math.max(1, t0 - statAt);
-    post({ t: 'stats', rate: span > 500 ? Math.round(((ticks.length - 1) / span) * 1000) : 0, worst: Math.round(worst), late, ms: Math.round((work / dt) * 1000) / 10, sent: Math.round((sentN / dt) * 1000),
-      to: ports.size + (link.ready ? 1 : 0), quiet, unis: last?.size ?? 0, link: link.ready });
-    work = 0; statAt = t0; sentN = 0;
+    post({ t: 'stats', rate: span > 500 ? Math.round(((ticks.length - 1) / span) * 1000) : 0, worst: Math.round(worst), late, quiet, link: link.ready });
+    statAt = t0;
   }
 }
 // due every 25 ms from the start, not 25 ms after the last one (a late frame doesn't push the rest)
@@ -194,10 +191,6 @@ self.onmessage = (e: MessageEvent<ToThread>) => {
     case 'link':
       link.on = m.on; link.url = m.url; link.proto = m.proto;
       if (m.on) linkOpen(); else { clearTimeout(link.retry); link.ws?.close(); link.ws = null; link.ready = false; }
-      break;
-    case 'final':
-      // the page is going: nothing more from here (the page sends the safe look itself)
-      stopped = true;
       break;
   }
 };

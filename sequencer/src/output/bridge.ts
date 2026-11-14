@@ -158,12 +158,12 @@ export class Bridge {
   }
   get sentRate() { const r = this.recent.slice(-3); return r.length ? r.reduce((n, x) => n + x.fps, 0) / r.length : 0; }
 
-  // Only what changed, plus a heartbeat so the box keeps the source (it drops one after 4 s of
-  // silence). A static look costs 4 frames a second instead of 40, and a box that stalls for a
-  // moment on WiFi doesn't build up seconds of stale frames in the TCP buffer.
   // Its window closed (the popup shut by hand): said at once, whoever sends to it (this page or the
   // output thread), so the red bar comes up. Called every frame.
   watch() { if (this.usesWindow && (this.state === 'ready' || this.state === 'reconnecting') && (!this.win || this.win.closed)) this.set('closed'); }
+  // Only what changed, plus a heartbeat so the box keeps the source (it drops one after 4 s of
+  // silence). A static look costs 4 frames a second instead of 40, and a box that stalls for a
+  // moment on WiFi doesn't build up seconds of stale frames in the TCP buffer.
   send(uni: number, data: Uint8Array, now = performance.now()) {
     if (this.state !== 'ready' || !this.win || this.win.closed) { this.watch(); return; }
     if (!this.wants(uni)) return;

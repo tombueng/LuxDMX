@@ -235,9 +235,12 @@ class App {
   // smoothly as it draws, whatever the panels' update rate: perf/load.svelte.ts)
   stageNow: Record<string, Resolved> = {};
   // what the stage pictures draw: the stage, with pixel lights shown as their LEDs really light
-  // (the box's curve: what it turns off is dark, see ledShown); every frame for the 3D stage, and
-  // as the screen's copy for the 2D one
-  drawnNow: Record<string, Resolved> = {};
+  // (the box's curve: what it turns off is dark, see ledShown); for the 3D stage as it draws, and as
+  // the screen's copy for the 2D one. Worked out when it's first asked for after a frame: a frame
+  // nobody draws (the 3D hidden, the panels updated every few frames) doesn't make it.
+  private ledFrom: { stage: Record<string, Resolved>; frames: Map<number, Uint8Array> } | null = null;
+  private ledMemo: Record<string, Resolved> | null = null;
+  get drawnNow(): Record<string, Resolved> { return (this.ledMemo ??= this.ledFrom ? this.ledShown(this.ledFrom.stage, this.ledFrom.frames) : {}); }
   drawn = $state.raw<Record<string, Resolved>>({});
   look = $state.raw<Record<string, Resolved>>({});     // before grand master / blackout
   frames = $state.raw<Map<number, Uint8Array>>(new Map());
@@ -290,18 +293,22 @@ class App {
   // sent, merged with what's kept (the newest wins: another tab closing late can't put an old
   // height back). Written when it changes, at most ten times a second.
   private heldMine: Record<string, { v: number; at: number }> = {};
-  // A winch's height as the wire holds it while it's live and not armed (part of its travel; null:
-  // nobody knows where it is); undefined when it isn't held (blind, or armed: the show's height; or
-  // no box connected plays its universe: nothing goes out to a motor, the 3D stage shows the show)
-  winchHeldAt(id: string): number | null | undefined {
-    if (this.output !== 'live' || this.sfxArmed) return undefined;
-    const f = this.show.fixtures.find((x) => x.id === id);
-    if (f && !this.bridges.some((b) => b.state === 'ready' && b.wants(f.universe))) return undefined;
-    const h = { ...this.engine.heldSeed, ...this.heldWire() }, k = h[`${id}:hoist`] !== undefined ? `${id}:hoist` : `${id}:hoist@0`;
-    if (h[k] === undefined) return null;
-    const fine = h[`${k}:fine`];
-    return fine !== undefined ? ((h[k] << 8) | fine) / 65535 : h[k] / 255;
+  // Every winch's height as the wire holds it while it's live and not armed (part of its travel;
+  // null: nobody knows where it is). Null when nothing's held (blind, or armed: the show's heights);
+  // a winch no connected box plays isn't in it (nothing goes out to its motor: the 3D shows the
+  // show). Worked out once for a whole frame of the 3D stage.
+  winchesHeld(): Map<string, number | null> | null {
+    if (this.output !== 'live' || this.sfxArmed) return null;
+    const h = { ...this.engine.heldSeed, ...this.heldWire() }, out = new Map<string, number | null>();
+    for (const f of this.show.fixtures) {
+      if (!isKinetic(this.modeOf(f.id)) || !this.bridges.some((b) => b.state === 'ready' && b.wants(f.universe))) continue;
+      const k = h[`${f.id}:hoist`] !== undefined ? `${f.id}:hoist` : `${f.id}:hoist@0`, fine = h[`${k}:fine`];
+      out.set(f.id, h[k] === undefined ? null : fine !== undefined ? ((h[k] << 8) | fine) / 65535 : h[k] / 255);
+    }
+    return out;
   }
+  // one winch's (undefined: it isn't held)
+  winchHeldAt(id: string): number | null | undefined { return this.winchesHeld()?.get(id); }
   // (what the wire holds: the output thread's, while it's the one sending; else this page's engine)
   private heldWire(): Record<string, number> { return this.thread.running && this.thread.held ? this.thread.held : this.engine.heldOwn(); }
   private heldAt = 0;
@@ -383,6 +390,8 @@ class App {
     this.lastSnap = JSON.stringify(this.show);
     CURRENT_SHOW.set(this.showId);
     this.thread.start(this.engine, () => this.show);
+    // (the thread's frame failing while this page's doesn't: said, its look went on with the machines off)
+    this.thread.onBroken = (why) => ui.toast(`The DMX output hit a problem (${why}): the look stays, fog and the machines are off. A reload starts it afresh.`, 10000);
     // (a command right after an edit in a form, a GO clicked after changing a cue's action: the
     // save that's due runs first, so the thread has the edit; a GO from the keyboard comes before
     // its key's own "maybe changed" and costs nothing)
@@ -1114,7 +1123,7 @@ class App {
     // out; and how late the thread itself is)
     load.outputSafe = this.quiet || (this.output !== 'live' && !blindOut) || this.bridges.every((b) => b.state !== 'ready' || this.thread.serves(b));
     load.threadLate = this.thread.running && !this.thread.stats.quiet ? this.thread.stats.late : 0;
-    // ---- the output first: nothing the screen does comes before it
+    // ---- what goes out from this page (a box the thread doesn't serve, older firmware), before the screen
     // A universe nothing drives any more (last fixture removed, wizard closed) gets zeros for a
     // couple of seconds, so the box doesn't keep showing the last value until its source timeout.
     const t = performance.now();
@@ -1136,7 +1145,7 @@ class App {
     for (const b of this.bridges) b.watch?.();      // (a box's window shut: said at once, whoever sends to it)
     if (this.output === 'live' && !this.quiet) this.lastSent = frames;
     // (what the pictures draw, after the frame has gone out: nothing the screen does comes before it)
-    this.drawnNow = this.ledShown(stage, frames);
+    this.ledFrom = { stage, frames }; this.ledMemo = null;
     // ---- then the rest
     // an effect that can't run is left out (engine.ts): said once, by name
     for (const [id, why] of this.engine.broken) if (!this.saidBroken.has(id)) {

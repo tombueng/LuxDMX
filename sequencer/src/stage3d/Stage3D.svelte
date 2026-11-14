@@ -1039,7 +1039,7 @@
     if ((document.hidden && !taking) || !host?.isConnected) return;
     // (folded away to nothing, e.g. the timeline's picture on a phone: nothing to draw)
     if (!canvas || (!taking && !visible)) { last = now; return; }
-    // (fewer frames a second at a lower quality: the time goes to the DMX output)
+    // (fewer frames a second at a lower quality, when the governor says the output needs the time)
     if (!taking && now - drawnAt < EVERY[load.level]) return;
     drawnAt = now; drawnFrames++;
     const work0 = performance.now();
@@ -1071,7 +1071,8 @@
     haze = Math.min(1.5, hazeAmt * (0.9 + 0.5 * room) + 0.08 * Math.max(room, 0.5 * smokeIn));
     (scene.fog as THREE.FogExp2).density = 0.005 + 0.016 * haze;
     // (a winch live and not armed: where the wire holds it, not where the show would send it)
-    rig.winchWire = src ? undefined : (id) => app.winchHeldAt(id);
+    const held = src ? null : app.winchesHeld();
+    rig.winchWire = held ? (id) => held.get(id) : undefined;
     rig.update(src?.drawn ?? app.drawnNow, t, haze, sel);
     particles.light(rig.lit);
     // (the machines' output follows the clock, not the frame rate: a slow computer gets the same fog

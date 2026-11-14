@@ -1,7 +1,8 @@
 // How hard the page works, and whether the DMX output keeps its time.
 //
-// The output comes first. Every output frame (app.tick, due every 25 ms) is timed; when frames come
-// late, the drawing gives way at once: the stage pictures (2D and 3D) get new values less often,
+// The output comes first. The DMX goes out from its own thread (output/thread.ts); this page's frame
+// (app.tick, every 25 ms: the screen's engine, and the frames for a box the thread doesn't serve) is
+// timed, and the thread reports its own. When frames come late, the drawing gives way at once: the stage pictures (2D and 3D) get new values less often,
 // then the 3D stage draws simpler (fewer pixels, no glow, fewer frames a second). When the output
 // has been on time for a while, it comes back up to the quality chosen. The display shows the
 // page's load (its own work on the main thread), the graphics card's time per 3D frame where the

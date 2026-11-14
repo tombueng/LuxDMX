@@ -27,11 +27,11 @@ export class OutputThread {
   private showSentAt = -1e9;
   private showJson = '';
   private showDirty = true;
-  private policyKey = '';
+  private quietSent: boolean | null = null;
   private boxes = new Map<Bridge, { mode: 'asking' | 'port' | 'page'; since: number; outputs: string; port?: MessagePort }>();
   private linkKey = '';
   // the thread's own timing (shown by the load display)
-  stats = $state({ rate: 0, worst: 0, late: 0, ms: 0, sent: 0, to: 0, quiet: true, unis: 0, link: false });
+  stats = $state({ rate: 0, worst: 0, late: 0, quiet: true, link: false });
   onBroken?: (why: string) => void;
   // the winches' heights as the output thread holds them (what's on the wire)
   held: Record<string, number> | null = null;
@@ -51,11 +51,11 @@ export class OutputThread {
     this.wrap(engine);
     return true;
   }
-  postError = '';
-  private post(m: ToThread, transfer: Transferable[] = []) { try { this.w?.postMessage(m, transfer); } catch (e) { this.postError = `${m.t}: ${(e as Error).message}`; } }
+  // (a message that can't go, something in it that can't be copied: said in the console, not lost silently)
+  private post(m: ToThread, transfer: Transferable[] = []) { try { this.w?.postMessage(m, transfer); } catch (e) { console.warn(`output thread: ${m.t} not sent`, e); } }
   private heard(m: FromThread) {
     this.heardAt = performance.now();
-    if (m.t === 'stats') this.stats = { rate: m.rate, worst: m.worst, late: m.late, ms: m.ms, sent: m.sent, to: m.to, quiet: m.quiet, unis: m.unis, link: m.link };
+    if (m.t === 'stats') this.stats = { rate: m.rate, worst: m.worst, late: m.late, quiet: m.quiet, link: m.link };
     else if (m.t === 'broken') this.onBroken?.(m.why);
     else if (m.t === 'held') { this.held = m.held; this.onHeld?.(); }
   }
@@ -137,8 +137,7 @@ export class OutputThread {
     // (a show changing at a fader's or a held key's pace goes over a few times a second: as text it's
     // the whole show, made on the page and read on the thread. A command sends it first anyway.)
     if (this.showDirty && t - this.showSentAt >= SHOW_EVERY_MS) { this.flushShow(show); this.showSentAt = t; }
-    const pk = `${quiet}`;
-    if (pk !== this.policyKey || blind !== this.blindSent) { this.policyKey = pk; this.blindSent = blind; this.post({ t: 'policy', quiet, blind: blind ? [...blind].map(([u, d]) => [u, d.slice()]) : null }); }
+    if (quiet !== this.quietSent || blind !== this.blindSent) { this.quietSent = quiet; this.blindSent = blind; this.post({ t: 'policy', quiet, blind: blind ? [...blind].map(([u, d]) => [u, d.slice()]) : null }); }
     this.boxesNow(bridges, t);
     const lk = bridges.some((b) => b.host === LINK) ? `on:${linkProto}` : 'off';
     if (lk !== this.linkKey) { this.linkKey = lk; this.post({ t: 'link', on: lk !== 'off', url: LINK_URL, proto: linkProto }); }
@@ -171,6 +170,6 @@ export class OutputThread {
   // (Link: only once the thread's own socket to it is up; till then the page sends, as it did)
   serves(b: Bridge) { return this.running && (b.host === LINK ? this.stats.link : this.boxes.get(b)?.mode === 'port'); }
 
-  // The page is going: the thread stops sending at once (the page sends the safe look itself).
-  final() { this.post({ t: 'final' }); this.w?.terminate(); this.w = null; }
+  // The page is going: the thread stops at once (the page sends the safe look itself).
+  final() { this.w?.terminate(); this.w = null; }
 }
