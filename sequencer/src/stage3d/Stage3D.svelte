@@ -56,6 +56,7 @@
   import { Rig, type RigFixture } from './rig';
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
+  import { MirrorDots, type Ball } from './mirrorBall';
   import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type RoomId, type Rot, type V3, type ViewKey } from './geometry';
   import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
@@ -126,6 +127,8 @@
   let crowdLamp: THREE.SpotLight | undefined, crowdLevel = 0;
   const audCol = new THREE.Color();
   const deckFront = () => room.deck.z1;          // (the stage's front edge, where the crowd light hangs)
+  const roomNow = () => room;
+  let mirrorDots: MirrorDots | undefined;
   // (the air is never pure black: a hall has some light in it, even between looks)
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
   const overlay = new THREE.Scene();       // drawn after the glow: the gizmo, the Measure line
@@ -421,6 +424,8 @@
     // PAR turned out) lights them, in its colour (the washes only ever lit the deck: a blinder hit
     // was a white line at the stage's edge and a crowd in the dark)
     { const l = new THREE.SpotLight(0xffffff, 0, 60, 1.0, 0.75, 1.0); l.name = 'crowd light'; scene.add(l, l.target); }
+    // what a mirror ball throws round the room (mirrorBall.ts)
+    scene.add(new MirrorDots().group);
     venue = buildVenue({ room: room.id, band: bandShown, act, custom: room }); builtRoom = room.key ?? room.id; builtAct = act; showRoom(room);
     scene.add(venue.group);
     rig = new Rig(); scene.add(rig.group);
@@ -513,6 +518,7 @@
       toolsFit: () => ({ tier, squeeze, over: toolsEl ? toolsEl.scrollWidth - toolsEl.clientWidth : 0, overWas: [...overWas] }),
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
       // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
+      mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ((venue as { mirrorBalls?: Ball[] }).mirrorBalls ?? []).map((b) => +b.obj.rotation.y.toFixed(3)) }),
       machinery: () => fixtures.filter((f) => f.cloth).map((f) => ({ name: f.name, look: f.look, at: rig.winchOf(f.id) ?? 0, travel: f.winch?.travel ?? 0, picture: f.cloth?.picture })),
       lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
@@ -1066,6 +1072,9 @@
     const lv = [0, 0, 0];
     for (const l of rig.lit) { const s = l.p.x < -W / 6 ? 0 : l.p.x > W / 6 ? 2 : 1; sideCol[s].r += l.c.r * l.level; sideCol[s].g += l.c.g * l.level; sideCol[s].b += l.c.b * l.level; lv[s] += l.level; energy += l.level; }
     wash.forEach((w, i) => { const n = Math.max(1e-3, lv[i]); w.color.setRGB(sideCol[i].r / n, sideCol[i].g / n, sideCol[i].b / n); w.intensity = Math.min(1, lv[i] / 4) * 140 * spill; });
+    // the mirror balls' dots round the room, from the lights on them (none with the room hidden)
+    mirrorDots ??= scene.getObjectByName('mirror dots')?.userData.dots as MirrorDots | undefined;
+    mirrorDots?.update(app.show.settings.stage3d?.hideVenue ? [] : (venue as { mirrorBalls?: Ball[] }).mirrorBalls ?? [], rig.lit, roomNow(), haze);
     // (the lights turned out to the audience: their level and colour on the crowd light)
     crowdLamp ??= scene.getObjectByName('crowd light') as THREE.SpotLight | undefined;
     if (crowdLamp) {

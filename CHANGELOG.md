@@ -13,6 +13,8 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A real mirror ball** in the bar and the club: it turns on its own motor (it stood still without
+  music) and throws its dots round the room when the pinspots hit it, with thin rays in the haze.
 - **Stage machinery**: a curtain track and a fly bar with a painted drop (a forest, a castle, a
   starry sky, a city...), on a winch channel with a winch's safety. The theatre (three times the
   size now, with a fly tower) opens its house curtain and flies its drops in and out with its cues;

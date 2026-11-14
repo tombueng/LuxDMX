@@ -320,3 +320,20 @@ test('the drop reads: blinders turned out to the audience light the crowd (and n
   await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures.filter((x: any) => /^Blinder/.test(x.name))) a.programmer[f.id] = { intensity: 1 }; });
   await expect.poll(crowd, { timeout: 8000 }).toBeGreaterThan(150);
 });
+
+test('the bar\'s mirror ball turns (no music needed) and throws its dots round the room when the pinspots hit it', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Bar');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('bar');
+  const mirror = () => page.evaluate(() => (window as any).__stage3d.mirror());
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures) a.programmer[f.id] = { intensity: 0 }; });
+  await expect.poll(async () => (await mirror()).dots, { timeout: 8000 }).toBe(0);
+  const s0 = (await mirror()).spin[0];
+  await page.waitForTimeout(1200);
+  expect((await mirror()).spin[0]).not.toBe(s0);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures.filter((x: any) => /^Pinspot/.test(x.name))) a.programmer[f.id] = { intensity: 1, color: { r: 1, g: 1, b: 1 } }; });
+  await expect.poll(async () => (await mirror()).dots, { timeout: 8000 }).toBeGreaterThan(100);
+  expect((await mirror()).hit[0]).toBeGreaterThan(0.9);
+});

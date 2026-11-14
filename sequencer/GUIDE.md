@@ -905,9 +905,10 @@ Three more demos come with their own room on the 3D stage:
   red seats with an audience, step lights in the aisles, wall washers, house lights and a starry
   ceiling, the projection booth at the back) and a **Bar** (a long counter, a back bar of bottles on
   lit shelves in front of a mirror, pendant lamps, people on the stools and two bartenders, tables
-  along the walls, a little dance floor with a mirror ball), a **Theatre** (a proscenium stage with
+  along the walls, a little dance floor with a mirror ball), a **Theatre** (a big proscenium stage with
   its gold frame and red house curtain, a cyclorama at the back, lighting bars over the stage,
-  booms in the wings, footlights, raked stalls and a balcony full of people, a chandelier) and a
+  booms in the wings, footlights, a fly tower for its drops, raked stalls and a balcony full of
+  people, a chandelier) and a
   **Church** (the chancel up its steps with the altar, candles, the cross and the choir benches,
   the lectern, pews down the nave with the congregation, stained glass down both walls and a round
   window over the altar, the roof's beams) and a **Ballroom** for the Wedding template (draped walls
@@ -924,6 +925,9 @@ Three more demos come with their own room on the 3D stage:
   backdrop, the banners, the screens and the kick drum (painted in the style of the band picture
   that's there by default; leave it empty for the picture; in the club and at the party it's on
   the front of the DJ booth). Both are kept with the show (the screens' live camera in this browser).
+  A mirror ball (the bar's, the club's) turns on its own motor, music or not; light it with the
+  pinspots aimed at it and it throws its dots round the room, walls, ceiling and floor, sweeping
+  round as it turns, with thin rays through the haze.
   The theatre, church and cinema templates put nobody on stage: no band, a calm audience (on
   your own stage too). Lights keep their places when you change the room; the ones that end up
   outside it (a church's lights 11.85 m up, on a stage with a 9.6 m ceiling) are said: select

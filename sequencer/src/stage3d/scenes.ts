@@ -18,6 +18,16 @@ import { darkWood, hallWall, neonSign, pleats, rug, stageFloor, brick, boards, c
 import { DECK, type Room } from './geometry';
 import { BALLROOM, BAR, CHURCH, CINEMA, cinemaFloor, THEATRE } from './sceneSizes';
 import type { Person } from './people';
+import { mirrorTiles } from './mirrorBall';
+// a mirror ball: a sphere of small mirror tiles, sparkling a little in any light (rig light makes it
+// sparkle more: Stage3D), turning at BALL_SPIN radians a second (about five turns a minute)
+export const BALL_SPIN = 0.5;
+export function mirrorBall(r: number) {
+  const tex = mirrorTiles();
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), std({ color: 0xe8ecf2, map: tex ?? undefined, metalness: 0.9, roughness: 0.18, flatShading: true, emissive: 0xffffff, emissiveMap: tex ?? undefined, emissiveIntensity: 0.12 }));
+  m.name = 'mirror ball'; m.userData.live = true;
+  return m;
+}
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 type Look = Parameters<typeof crewMember>[0];
@@ -210,11 +220,11 @@ export function buildBar(group: THREE.Group, M: Mats, r: Room) {
   const pipe = std({ color: 0x1a1b1e, metalness: 0.6, roughness: 0.45 });
   for (const z of [-0.6, 2.4, 5.0, 7.4]) group.add(rod(V(-X + 0.6, B.rail, z), V(X - 0.6, B.rail, z), 0.025, pipe, 8));
   for (const x of [-X + 0.6, X - 0.6]) group.add(rod(V(x, B.rail, -0.6), V(x, B.rail, 7.4), 0.025, pipe, 8));
-  // the mirror ball over the dance floor
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 14), std({ color: 0xe8ecf2, metalness: 1, roughness: 0.08, flatShading: true }));
+  // the mirror ball over the dance floor: small mirror tiles, turning on its motor (music or not);
+  // what it throws round the room is mirrorBall.ts's
+  const ball = mirrorBall(0.28);
   add(ball, B.ball.x, B.ball.y, B.ball.z); add(cyl(0.006, 0.006, H - B.ball.y - 0.28, M.chrome, 5), B.ball.x, (H + B.ball.y + 0.28) / 2, B.ball.z);
-  ball.userData.live = true;
-  return { people, animate: (t: number) => { ball.rotation.y = t * 0.6; } };
+  return { people, balls: [{ obj: ball, r: 0.28 }], animate: (t: number) => { ball.rotation.y = t * BALL_SPIN; } };
 }
 
 // ---- seats and the people in them (the cinema's way, for the theatre's stalls and balcony too) ----

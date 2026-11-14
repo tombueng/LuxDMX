@@ -14,7 +14,8 @@ import { at, bake, box, cyl, gearMats, movingMeshes, roadCase, std, waterCrate, 
 import { concrete, exitSign, hallWall, neonSign, pleats, roofDeck, screen, stageFloor } from './textures';
 import { buildCrowd, type Crowd } from './crowd';
 import { beatClock, djBooth, djPerson } from './dj';
-import { buildBallroom, buildBar, buildChurch, buildCinema, buildTheatre } from './scenes';
+import { BALL_SPIN, buildBallroom, buildBar, buildChurch, buildCinema, buildTheatre, mirrorBall } from './scenes';
+import type { Ball } from './mirrorBall';
 import type { Person } from './people';
 
 // What the 3D stage needs of any room (the hall's and the pub's venue has more: the band).
@@ -33,6 +34,8 @@ export interface Stage {
   screens?: { mat: THREE.MeshBasicMaterial; painted: THREE.Texture };
   // the DJ (for the tests): the person, how far the left hand is up, the booth (the person's parent)
   dj?: { p: Person; raised: () => number; booth: THREE.Object3D };
+  // its mirror balls (turning: the scene spins them), for what they throw round the room
+  mirrorBalls?: Ball[];
 }
 export type DemoRoom = 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom';
 export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss' || r === 'custom' || r === 'cinema' || r === 'bar' || r === 'theatre' || r === 'church' || r === 'ballroom';
@@ -137,6 +140,7 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
   let booth: ReturnType<typeof djBooth> | undefined, boothName = '', boothShows = '';
   let djPlay: ((b: number, e: number) => void) | undefined;
   let sceneAnim: ((t: number) => void) | undefined;        // a scene's own moving parts (the bar's mirror ball)
+  const balls: Ball[] = [];
   const DEFAULT = id === 'club' ? 'CLUB NIGHT' : 'HOUSE PARTY';
 
   if (id === 'club') {
@@ -161,9 +165,10 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
     group.add(at(box(9, 0.04, 0.3, wood), -2.5, 1.6, r.walls.z1 - 0.2), at(box(9, 0.012, 0.02, strip), -2.5, 1.575, r.walls.z1 - 0.06));
     group.add(at(new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: neonSign('Bar', '#36d6e7'), toneMapped: false })), -2.5, 2.9, r.walls.z1 - 0.03, [0, Math.PI, 0]));
     for (let i = 0; i < 7; i++) { const x = -6.8 + i * 1.4; group.add(at(cyl(0.18, 0.16, 0.05, M.black, 14), x, 0.78, bz - 0.7), at(cyl(0.025, 0.025, 0.76, M.steel, 8), x, 0.38, bz - 0.7), at(cyl(0.2, 0.22, 0.02, M.steel, 14), x, 0.01, bz - 0.7)); }
-    // a mirror ball over the dance floor
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 12), std({ color: 0xe8ecf2, metalness: 1, roughness: 0.08, flatShading: true }));
+    // a mirror ball over the dance floor, turning
+    const ball = mirrorBall(0.32);
     group.add(at(ball, 0, r.ceiling - 1.1, 12), at(cyl(0.008, 0.008, 0.78, M.chrome, 5), 0, r.ceiling - 0.39, 12));
+    balls.push({ obj: ball, r: 0.32 }); sceneAnim = (t) => { ball.rotation.y = t * BALL_SPIN; };
   } else if (id === 'party') {
     shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x9a9aa0 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ map: roofDeck(), color: 0x8a8a90 })) });
     frame(group, M, r);
@@ -178,7 +183,7 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
     sceneAnim = buildCinema(group, M, r).animate;
     frame(group, M, r);
   } else if (id === 'bar') {
-    sceneAnim = buildBar(group, M, r).animate;
+    const bar = buildBar(group, M, r); sceneAnim = bar.animate; balls.push(...bar.balls);
   } else if (id === 'theatre') {
     sceneAnim = buildTheatre(group, M, r).animate;
     frame(group, M, r);
@@ -256,10 +261,11 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
       if (!crowd.group.visible && ++shown > 1) crowd.group.visible = true;
       crowd.update(t, beat, energy, col);
     }
+    // (a mirror ball turns on its own motor, music or not)
+    sceneAnim?.(t);
     // no music: the DJ stops where the last beat was, hands still, and waits
     if (!music) { rest ??= Math.floor(beat); djPlay?.(rest, 0); return; }
     rest = null;
-    sceneAnim?.(t);
     djPlay?.(clock(t, beat), crowd ? crowd.excitement() : Math.min(1, energy));
   }
   // what never moves is baked; the DJ and the crowd move
@@ -280,7 +286,7 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
   }
   setBand(o.band);
   return {
-    group, room: id, crowdCount: crowd?.count ?? 0, animate, setBand, baked, crowd, dj,
+    group, room: id, crowdCount: crowd?.count ?? 0, animate, setBand, baked, crowd, dj, mirrorBalls: balls,
     bandInfo: () => ({ name: boothName, surfaces: booth ? [{ what: 'booth', shows: boothShows, uuid: booth.t.uuid, version: booth.t.version }] : [] }),
   };
 }
