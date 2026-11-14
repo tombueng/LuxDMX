@@ -125,6 +125,16 @@ class Ui {
 export const ui = new Ui();
 
 const mod = (e: KeyboardEvent) => e.ctrlKey || e.metaKey;
+// Is the focus on something typed into (a text or number field, a list to pick from by letter)? A
+// fader, a checkbox or a colour well takes no letters: the page's keys (R records, F full, Space GO)
+// work there too. R after touching the programmer's fader did nothing at all.
+const NO_TEXT = new Set(['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file', 'image']);
+export const typesText = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null;
+  if (!el?.tagName) return false;
+  if (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+  return el.tagName === 'INPUT' && !NO_TEXT.has((el as HTMLInputElement).type);
+};
 // A dialog is open: page-wide keys (GO, intensity, live buttons) leave it alone, its keys are its own.
 export const dialogOpen = () => typeof document !== 'undefined' && !!document.querySelector('[aria-modal="true"]');
 // Space is GO everywhere, except on the few controls that need it themselves (a menu item, the
@@ -159,7 +169,7 @@ if (typeof window !== 'undefined') {
 // were swallowed ("@50" typed on the console lost its @).
 export const isShortcut = (e: KeyboardEvent) => e.metaKey || ((e.ctrlKey || e.altKey)
   && !(e.key.length === 1 && (e.getModifierState?.('AltGraph') || (e.ctrlKey && e.altKey) || (e.altKey && !e.ctrlKey && !/^[a-z0-9]$/i.test(e.key)))));
-const PRESSABLE = 'button, summary, a[href], [role="tab"], [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"]';
+const PRESSABLE = 'button, summary, a[href], [role="tab"], [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"], input[type="checkbox"], input[type="radio"]';
 export const spaceIsGo = (e: KeyboardEvent) => e.code === 'Space' && !e.repeat
   && !(e.target as HTMLElement).closest?.('.ctx, .lockbtn, .dip, .gp .main, [data-own-space]')
   && !(tabbing && (e.target as HTMLElement).matches?.(PRESSABLE));

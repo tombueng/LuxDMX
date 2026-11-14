@@ -70,6 +70,23 @@ test('number keys set the selection, R records', async ({ page }) => {
   await expect.poll(() => channels(0, 2)).toEqual([0, 0]);
 });
 
+test('R and the number keys work with the programmer\'s fader in focus (it takes no letters); a number field keeps its digits', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await page.locator('.stage-wrap').getByRole('button', { name: 'Select all' }).click();
+  const fader = page.locator('.prog').getByLabel('Intensity', { exact: true });
+  await fader.focus();
+  await page.keyboard.press('7');
+  await expect.poll(() => channels(0, 2)).toEqual([179, 179]);
+  await expect(fader).toBeFocused();
+  await page.keyboard.press('r');
+  await expect(page.locator('.deck .card')).toHaveCount(1);
+  // (a number field: its digits are typed, not the page's)
+  const bpm = page.locator('.top').getByLabel('BPM', { exact: true });
+  await bpm.focus(); await page.keyboard.press('3');
+  await expect.poll(() => channels(0, 2)).toEqual([179, 179]);
+});
+
 test('"How it works" opens from the welcome card and the menu', async ({ page }) => {
   await openConnected(page);
   await welcome(page);

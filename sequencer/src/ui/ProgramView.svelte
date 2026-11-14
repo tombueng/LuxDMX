@@ -13,7 +13,7 @@
   import Programmer from './Programmer.svelte';
   import CueDeck from './CueDeck.svelte';
   import { app } from '../app.svelte';
-  import { dialogOpen, tablist, ui } from './ui.svelte';
+  import { dialogOpen, tablist, typesText, ui } from './ui.svelte';
   import { setContext } from 'svelte';
 
   // App.svelte keeps this view while another is shown. Hidden, it rests: the plan and the DMX line
@@ -78,7 +78,7 @@
   // Keys in Program (not while typing): 1-9 = 10-90 %, 0 = off, F = full for the selection; R records.
   function keys(e: KeyboardEvent) {
     const el = e.target as HTMLElement;
-    if (app.view !== 'program' || dialogOpen() || e.ctrlKey || e.metaKey || e.altKey || el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
+    if (app.view !== 'program' || dialogOpen() || e.ctrlKey || e.metaKey || e.altKey || typesText(el)) return;
     if (/^[0-9]$/.test(e.key) && app.selected.length) { e.preventDefault(); if (e.key === '0') app.off(); else app.set({ intensity: +e.key / 10 }); }
     else if (e.key.toLowerCase() === 'f' && app.selected.length) { e.preventDefault(); app.set({ intensity: 1 }); }
     else if (e.key.toLowerCase() === 'r' && !e.shiftKey) { e.preventDefault(); record(); }
