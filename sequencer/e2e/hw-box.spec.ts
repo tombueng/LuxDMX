@@ -115,15 +115,16 @@ test('a real box: a template\'s show plays out of it (the looks change with the 
   await t.getByRole('button', { name: 'Play the show: Wedding' }).click();
   await expect(w).toBeHidden({ timeout: 30000 });
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 30000 }).toBe(true);
-  // where its machines are, and the first chorus (confetti fires as it lands: only when armed)
+  // where its machines are, and the first chorus (the machines' moments come with the choruses:
+  // only when armed)
   const info = await page.evaluate(() => {
     const a = (window as any).__luxdmx, s = a.show;
     const ch = (re: RegExp) => s.fixtures.filter((f: any) => re.test(f.name)).map((f: any) => f.address - 1);
     const chorus = s.timeline.sections ? s.timeline.sections.find((x: any) => /^chorus/i.test(x.name))?.at : undefined;
-    const burst = s.timeline.items.find((i: any) => i.do.do === 'burst' && i.do.attr === 'confetti');
+    const burst = s.timeline.items.find((i: any) => i.do.do === 'burst' && i.do.attr === 'sparks');
     return { machines: [...ch(/^Confetti/), ...ch(/^Sparks/)], at: chorus ?? burst?.at, last: Math.max(...s.fixtures.map((f: any) => f.address + 20)) };
   });
-  expect(info.machines.length).toBe(3);
+  expect(info.machines.length).toBe(5);                     // (the confetti cannon and four cold-spark machines)
   expect(info.at).toBeGreaterThan(0);
   const frames: number[][] = [];
   const sample = async (secs: number) => { const t0 = Date.now(); while (Date.now() - t0 < secs * 1000) { frames.push((await boxOut(info.last)).ch); await page.waitForTimeout(150); } };
