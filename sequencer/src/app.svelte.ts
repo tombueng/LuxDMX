@@ -12,8 +12,8 @@ import { cleanHost, hostProblem } from './model/host';
 import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
 import { capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
-import { curveOfPort, curveTable, isPixelType, onPort, onScreen, powerScale, WS2812, type LedCurve, type PortInfo } from './model/ledCurve';
-import { CELL_ATTRS, CELL_MOVES, type CellMove, type CellValues, type Channel, type Color, type NumAttr, type Cue, type CueList, type Effect, type Fixture, type Group, type FixtureMode, type FixtureType, type Page, type Preset, type PresetKind, type Resolved, type Show, type Values, type Widget } from './model/types';
+import { ledOfLight, ledShown, unservedPixels } from './app/leds';
+import { CELL_ATTRS, CELL_MOVES, type CellMove, type CellValues, type Channel, type Color, type NumAttr, type Cue, type CueList, type Effect, type Fixture, type Group, type FixtureType, type Page, type Preset, type PresetKind, type Resolved, type Show, type Values, type Widget } from './model/types';
 import { EFFECT_MAP, hsv, paramsOf } from './engine/effects';
 import { pictureOf } from './engine/custom';
 import { cueRisk, isGated, isHeld, isKinetic, isMachine, listRisk } from './model/safety';
@@ -35,7 +35,7 @@ import { BEAM_ATTRS, cueAt, dropCellKeys, groupFlash, refsIn, splitCell, stripRe
 import { current, passed, validEntry, whenSaid, type ScheduleEntry } from './model/schedule';
 import { guessPlace, type Place } from './model/sun';
 import { actionText } from './model/actions';
-import { cctColor, fitLook, rawLook, slotsOf, whiteTemperature } from './engine/render';
+import { cctColor, fitLook, slotsOf, whiteTemperature } from './engine/render';
 import { MusicListener, type MusicState } from './input/audio';
 import { listShows, readShow, writeShow, deleteShow as dbDelete, listMyTypes, saveMyType, deleteMyType, setOnBlocked, type ShowMeta } from './store/shows';
 import { ui } from './ui/ui.svelte';
@@ -1343,101 +1343,10 @@ class App {
   }
   // Universes pixel lights are patched on that no connected box says it plays: a pixel port set to
   // another universe, or a box too old to name its pixel ports.
-  // ---- how a pixel light's LEDs really light (model/ledCurve.ts): what it was set to by hand, else
-  // what the box playing it says about its pixel port (the same universe and start channel), else a
-  // port as it comes. Not a pixel light (a DMX bar, a PAR): undefined, drawn as its values say.
-  boxPortOf(f: Fixture): PortInfo | undefined {
-    for (const b of this.bridges) {
-      if (b.state !== 'ready' && b.state !== 'reconnecting') continue;
-      // (through LuxDMX Link: every box it found says its own; through a box's bridge: that box)
-      const lists: [PortInfo[], string][] = b instanceof LinkOutput ? b.nodes.map((n) => [n.pixelPorts ?? [], n.short || n.ip]) : [[b.ports ?? [], b.name || b.host]];
-      for (const [ports, box] of lists) {
-        const p = ports.find((q) => onPort(q, f));
-        if (p) return { ...p, box };
-      }
-    }
-    return undefined;
-  }
-  ledOf(id: string): { curve: LedCurve; from: 'own' | 'box' | 'usual'; port?: PortInfo } | undefined {
-    const f = this.show.fixtures.find((x) => x.id === id);
-    return f ? this.ledOfLight(f) : undefined;
-  }
-  // (once per mode: whether it's a pixel light doesn't change while the mode is the same object)
-  private pixelModes = new WeakMap<object, boolean>();
-  private ledOfLight(f: Fixture): { curve: LedCurve; from: 'own' | 'box' | 'usual'; port?: PortInfo } | undefined {
-    const m = this.modeOf(f.id);
-    if (!m) return undefined;
-    let px = this.pixelModes.get(m);
-    if (px === undefined) { px = isPixelType(this.types.get(f.typeId), m); this.pixelModes.set(m, px); }
-    if (!px) return undefined;
-    const port = this.boxPortOf(f), base = port ? curveOfPort(port) : WS2812;
-    if (f.led && Object.keys(f.led).length) return { curve: { ...base, ...f.led }, from: 'own', port };
-    return { curve: base, from: port ? 'box' : 'usual', port };
-  }
-  // The stage with every pixel light's cells as the LEDs show them: its channels as they go out,
-  // through its port's table, the power cap over everything on that port (as the box adds it up),
-  // back on the screen's own curve.
-  ledShown(stage: Record<string, Resolved>, frames: Map<number, Uint8Array>): Record<string, Resolved> {
-    type One = { f: Fixture; m: FixtureMode; cells: number; out: Uint8Array; curve: LedCurve };
-    const ports = new Map<string, { curve: LedCurve; pixels: number; sum: number; lights: One[] }>();
-    for (const f of this.show.fixtures) {
-      if (!stage[f.id]) continue;
-      const led = this.ledOfLight(f), m = this.modeOf(f.id);
-      if (!led || !m) continue;
-      const n = m.channels.length, out = new Uint8Array(n), cells = capsOf(m).cells, tab = curveTable(led.curve);
-      for (const s of spansOf(f, m)) { const buf = frames.get(s.universe); if (buf) out.set(buf.subarray(s.at, Math.min(512, s.at + s.count)), s.from); }
-      let sum = 0;
-      for (let i = 0; i < n; i++) { out[i] = tab[out[i]]; sum += out[i]; }
-      // (one port, one budget: its lights add up, and all its pixels draw their idle current)
-      const key = led.port ? `${led.port.box}|${led.port.uni}|${led.port.start}` : `light ${f.id}`;
-      let g = ports.get(key);
-      if (!g) { g = { curve: led.curve, pixels: led.port?.count ?? cells, sum: 0, lights: [] }; ports.set(key, g); }
-      g.sum += sum;
-      g.lights.push({ f, m, cells, out, curve: led.curve });
-    }
-    let shownAll = stage;
-    for (const g of ports.values()) {
-      const scale = powerScale(g.curve, g.sum, g.pixels);
-      for (const { f, m, cells, out } of g.lights) {
-        if (scale < 256) for (let i = 0; i < out.length; i++) out[i] = (out[i] * scale) >> 8;
-        const rgbw = new Float32Array(cells * 4);
-        m.channels.forEach((c, i) => {
-          const k = c.attr === 'red' ? 0 : c.attr === 'green' ? 1 : c.attr === 'blue' ? 2 : c.attr === 'white' ? 3 : -1;
-          if (k >= 0 && c.cell !== undefined && c.cell < cells) rgbw[c.cell * 4 + k] = onScreen(out[i]);
-        });
-        const shown: Resolved[] = [];
-        let top = 0;
-        for (let c = 0; c < cells; c++) {
-          const r = rgbw[c * 4], gg = rgbw[c * 4 + 1], b = rgbw[c * 4 + 2], w = rgbw[c * 4 + 3], d = Math.max(r, gg, b, w);
-          top = Math.max(top, d);
-          shown.push(d > 0 ? { intensity: d, color: { r: r / d, g: gg / d, b: b / d }, ...(w ? { white: w / d } : {}) } : { intensity: 0, color: { r: 0, g: 0, b: 0 } });
-        }
-        if (shownAll === stage) shownAll = { ...stage };
-        shownAll[f.id] = { ...stage[f.id], intensity: top, cells: shown };
-      }
-    }
-    // channels set by hand ("All channels"): the pictures show what their bytes do (render.ts rawLook)
-    for (const f of this.show.fixtures) {
-      const v = shownAll[f.id];
-      if (!v?.raw) continue;
-      const m = this.modeOf(f.id);
-      if (!m) continue;
-      const bytes = new Uint8Array(m.channels.length);
-      for (const s of spansOf(f, m)) { const buf = frames.get(s.universe); if (buf) bytes.set(buf.subarray(s.at, Math.min(512, s.at + s.count)), s.from); }
-      const look = rawLook(f, m, v, bytes);
-      if (look === v) continue;
-      if (shownAll === stage) shownAll = { ...stage };
-      shownAll[f.id] = look;
-    }
-    return shownAll;
-  }
-  unservedPixels(): number[] {
-    const up = this.bridges.filter((b) => b.state === 'ready');
-    if (!up.length) return [];
-    const unis = new Set<number>();
-    for (const f of this.show.fixtures) { const m = this.modeOf(f.id); if (capsOf(m).cells > 1) for (const s of spansOf(f, m)) unis.add(s.universe); }
-    return [...unis].filter((u) => !up.some((b) => b.wants(u))).sort((a, b) => a - b);
-  }
+  // ---- how a pixel light's LEDs really light (app/leds.ts)
+  ledOf(id: string) { const f = this.show.fixtures.find((x) => x.id === id); return f ? ledOfLight(this, f) : undefined; }
+  ledShown(stage: Record<string, Resolved>, frames: Map<number, Uint8Array>) { return ledShown(this, stage, frames); }
+  unservedPixels() { return unservedPixels(this); }
   // nothing patched on these universes
   universesFree(universe: number, n: number): boolean {
     return !this.show.fixtures.some((f) => spansOf(f, this.modeOf(f.id)).some((s) => s.universe >= universe && s.universe < universe + n));
