@@ -183,20 +183,34 @@
     // their height: a washer on the cinema's top rows is high up and shines up its wall)
     const hung = fs.every((f) => toWorld({ x: 0, y: 1, z: 0 }, f.rot).y < -0.3);
     const dirs = hung ? [[0.35, -0.32, 1], [-0.35, -0.32, 1], [into * 0.8, -0.2, 0.6], [0, -0.8, 0.6], [into * 0.7, -0.7, 0.2], [0, -1, 0.08], [0, 0.4, 1]] : [[0.35, 0.45, 1], [-0.35, 0.45, 1], [into * 0.9, 0.5, 0.4], [into * 0.5, 1.1, 0.6], [0, 0.9, 1], [into * 0.15, 0.25, 1], [into * 0.15, 0.25, -1], [into * 0.3, 1.4, 0.2]];
-    let p1: THREE.Vector3 | undefined;
+    // (and with nothing between it and the light: a boom in the wings seen through the proscenium's
+    // wall was a box drawn over a blank wall)
+    const seen = (q: THREE.Vector3) => {
+      const n = Math.ceil(q.distanceTo(c) / 0.3);
+      for (let i = 1; i < n - 1; i++) {
+        const m = q.clone().lerp(c, i / n), b = blocked(sp, { x: m.x, y: m.y, z: m.z });
+        // (only what's solid and big hides it: the proscenium, the balcony, the deck. Rows of seats,
+        // tables, the lights on a bar in between: one sees over and between them)
+        if (b === 'the proscenium' || b === 'the balcony' || b === 'the deck') return false;
+      }
+      return true;
+    };
+    let p1: THREE.Vector3 | undefined, clear: THREE.Vector3 | undefined;   // (clear but not seeing it: the next best)
+    const ok = (q: THREE.Vector3) => { if (!inside(q) || blocked(sp, { x: q.x, y: q.y, z: q.z })) return false; if (seen(q)) return true; clear ??= q; return false; };
     for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
       if (p1) break;
       const q = c.clone().addScaledVector(new THREE.Vector3(x, y, z).normalize(), d * k);
       // (the controls never let the camera under what it looks at: where they'd put it)
       if (q.y < c.y + 0.05) q.y = c.y + 0.05;
-      if (inside(q) && !blocked(sp, { x: q.x, y: q.y, z: q.z })) p1 = q;
+      if (ok(q)) p1 = q;
     }
     // (none of those: round it, nearer and nearer, level with it and a little above, the side
     // towards the audience first; a low bar's rail of lights left little room)
     if (!p1) for (const k of [0.8, 0.55, 0.35]) for (const dy of [0.05, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
       const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = new THREE.Vector3(c.x + Math.sin(ang) * d * k, c.y + dy, c.z + Math.cos(ang) * d * k);
-      if (inside(q) && !blocked(sp, { x: q.x, y: q.y, z: q.z })) p1 = q;
+      if (ok(q)) p1 = q;
     }
+    p1 ??= clear;
     p1 ??= c.clone().addScaledVector(new THREE.Vector3(into * 0.6, 0.8, 0.3).normalize(), Math.min(d, 3));
     p1.set(Math.max(-W.x + 0.6, Math.min(W.x - 0.6, p1.x)), Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), Math.max(W.z0 + 0.6, Math.min(W.z1 - 0.6, p1.z)));
     fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1, t1: c, at: performance.now(), dur: 700 };
@@ -1533,7 +1547,7 @@
     <!-- (up here, under the toolbar: never over the selection's numbers at the bottom) -->
     {#if mode === 'aim' && !readonly}<p class="aimhint">Click on the stage: the selected moving heads point there.</p>{/if}
     {#if mode === 'calib' && !readonly}<p class="aimhint">Point the real head at a spot on the stage (pan/tilt pad), then click that spot here.</p>{/if}
-    {#if mode === 'measure' && !meas}<p class="aimhint">Click two points: the deck, the floor or a light. One light alone: its height and its beam.</p>{/if}
+    {#if mode === 'measure' && !meas}<p class="aimhint">Click two points: the deck, the floor, a wall or a light. One light alone: its height and its beam.</p>{/if}
   </div>
   {#if !readonly && app.selected.length}
     <div class="sel" class:folded={!selOpen} role="group" aria-label="The selected lights">
@@ -1582,7 +1596,9 @@
   /* one row; what doesn't fit scrolls sideways (the gaps let clicks through to the stage) */
   .tools { align-self: stretch; display: flex; gap: .4rem; align-items: center; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; pointer-events: none; }
   .tools::-webkit-scrollbar { display: none; }
-  .tools > *, .more, .venue, .aimhint, .sel { pointer-events: auto; }
+  /* (the hints are words only: a click on them goes through to the stage under them, a light behind
+     the Measure hint was out of reach) */
+  .tools > *, .more, .venue, .sel { pointer-events: auto; }
   /* (an open panel above the selected lights' box: on a short 3D view the box lay over Render's
      button, and a click on it hit the box) */
   .venue { position: relative; z-index: 3; }

@@ -134,3 +134,25 @@ test('"Selected" on every light of the bar (a low room, a rail of lights under i
   });
   expect(bad).toEqual([]);
 });
+
+test('"Selected" on a boom in the theatre\'s wings: the camera sees the light, not the proscenium\'s wall in front of it', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 45000 }).toBe('theatre');
+  for (const name of ['Boom 2', 'Boom 4', 'Spot 1']) {
+    await page.evaluate((n) => { const a = (window as any).__luxdmx; a.selected = [a.show.fixtures.find((f: any) => f.name === n).id]; }, name);
+    await page.locator('.s3').getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'Selected', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__stage3d.flying()), { timeout: 20000 }).toBe(false);
+    const between = await page.evaluate(async (n) => {
+      const { blocked, spaceOf, castOf } = await import('/src/stage3d/director.ts');
+      const { ROOMS, pivotOf } = await import('/src/stage3d/geometry.ts');
+      const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => x.name === n), c = pivotOf(f.p3, f.rot), cam = (window as any).__stage3d.internals.camera.position;
+      const sp = spaceOf(ROOMS.theatre, castOf('theatre')), steps = 30;
+      for (let i = 2; i < steps - 2; i++) { const t = i / steps, p = { x: cam.x + (c.x - cam.x) * t, y: cam.y + (c.y - cam.y) * t, z: cam.z + (c.z - cam.z) * t }; const b = blocked(sp, p); if (b === 'the proscenium' || b === 'the balcony' || b === 'the deck') return b; }
+      return '';
+    }, name);
+    expect(between, name).toBe('');
+  }
+});
