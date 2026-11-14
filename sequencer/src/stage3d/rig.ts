@@ -384,7 +384,8 @@ export class Rig {
     this.pools.geometry.setAttribute('aLevel', this.poolLevel);
     this.poolGobo = goboAttr(lamps + facets); this.pools.geometry.setAttribute('aGobo', this.poolGobo);
     this.poolFx = fxAttr(lamps + facets); this.pools.geometry.setAttribute('aFx', this.poolFx);
-    this.cells = add(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), cells);
+    // (an LED is round: a flat disc facing the light's up, as cheap drawn a thousand times as a box)
+    this.cells = add(new THREE.CylinderGeometry(0.5, 0.5, 1, 14), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), cells);
     // what a click finds (invisible boxes round each light)
     this.hit = add(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ visible: false }), n);
     // the selected lights: an orange frame round each, drawn over everything
@@ -730,7 +731,8 @@ export class Rig {
           const cl = lightOf(cv, t);
           const cp = CP.set(-L / 2 + (L * (i + 0.5)) / f.cells, 0.012, 0).applyMatrix4(base);
           const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off;
-          m4.compose(cp, q, sc.set((L / f.cells) * 0.86, 0.016, 0.07)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
+          const d = Math.min((L / f.cells) * 0.86, 0.07);
+          m4.compose(cp, q, sc.set(d, 0.016, d)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
           if (f.cells <= 24) beamAt(cp, dir, 30, cl * 0.6, col, 5, false);
         }
         pushLit(fi, pos, dir, col, level * 0.6, 40);

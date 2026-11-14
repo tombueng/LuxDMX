@@ -24,6 +24,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   deep, the cyc 32 x 19 m, two front-of-house bars, the fly tower up to 32 m. The house curtain is
   folded velvet with a valance and gold fringes; the front light is softer and the deck dark, so
   the scenes don't glare white, and the castle lost its zebra stripes.
+- **Round LEDs** on the 3D stage: a matrix's, a ring's and a strip's pixels are little discs now, not
+  boxes (as cheap: they're still drawn all at once).
 - **LED strips of your own**: the LED maker makes strips too (how many LEDs, how long, the colour
   order each LED wants: GRB for WS2812, RGBW...), and any light can have its own size on the 3D stage
   (setup, Mounting: Width), a strip's length or a bigger PAR. The Bar has 144-LED strips the whole
