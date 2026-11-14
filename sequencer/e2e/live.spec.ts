@@ -610,13 +610,15 @@ test('the GO bar holds still: Release and Auto GO stay where they are whatever t
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   const strip = page.getByRole('group', { name: 'Playback' }), release = strip.getByRole('button', { name: 'Release' }), auto = strip.getByLabel('Auto GO');
   const xs: number[] = [], ax: number[] = [];
+  const titles: string[] = [];
   for (let i = 0; i < 4; i++) {
     await strip.getByRole('button', { name: /^GO/ }).click();
     await expect(release).toBeEnabled();
     xs.push(Math.round((await release.boundingBox())!.x)); ax.push(Math.round((await auto.boundingBox())!.x));
+    titles.push(...(await strip.locator('.now, .nxt').evaluateAll((els) => els.map((el) => el.getAttribute('title') ?? ''))));
   }
   expect(new Set(xs).size, xs.join(',')).toBe(1);
   expect(new Set(ax).size, ax.join(',')).toBe(1);
-  // (the long name cut short, all of it in the tooltip)
-  await expect(strip.locator('.now, .nxt').filter({ hasText: 'A very long' }).first()).toHaveAttribute('title', /thunder and the rain$/);
+  // (the long name cut short, all of it in the tooltip, while it was up or next)
+  expect(titles.some((t) => /thunder and the rain$/.test(t))).toBe(true);
 });

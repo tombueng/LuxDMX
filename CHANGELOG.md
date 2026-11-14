@@ -13,6 +13,9 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A much bigger Band**: 78 lights (beam heads, uplights on the deck, more spots, washes, movers,
+  pixel bars, blinders and strobes) and 25 looks full of the new moves and pixel shows. Confetti only
+  once, at the very end. The plan's group buttons scroll in one row when a rig has many groups.
 - **A real mirror ball** in the bar and the club: it turns on its own motor (it stood still without
   music) and throws its dots round the room when the pinspots hit it, with thin rays in the haze.
 - **Stage machinery**: a curtain track and a fly bar with a painted drop (a forest, a castle, a

@@ -27,11 +27,12 @@ export const TEMPLATE_SHOWS: Record<string, TemplateShow> = {
   Band: {
     crowd: 'concert', song: 'revolution-now', list: 'Songs', end: 'Blackout',
     sets: {
-      intro: [['Intro: thunder']], verse: [['Verse'], ['Verse', 'Love song']], build: [['Drum solo']],
-      chorus: [['Chorus', 'Rock out'], ['Rock out', 'Chorus']], solo: [['Guitar solo']], break: [['Ballad'], ['Love song']],
-      inst: [['Rock out', 'Guitar solo']], outro: [['Encore']],
+      intro: [['Intro: thunder']], verse: [['Verse', 'Searchlights'], ['Verse', 'Love song'], ['Acoustic', 'Verse']], build: [['Drum solo', 'Strobe storm'], ['Beam show']],
+      chorus: [['Chorus', 'Rock out'], ['Rock out', 'Head bang'], ['Rainbow', 'Chorus']], solo: [['Guitar solo', 'Spirograph']], break: [['Ballad', 'Star field'], ['Love song']],
+      inst: [['Fire and ice', 'Beam show'], ['Rock out', 'Guitar solo']], outro: [['Encore', 'Anthem']],
     },
-    lastChorus: ['Big finish', 'Rock out', 'Big finish'], hits: ['fog', 'co2', 'confetti', 'sparks', 'flame', 'strobe', 'blinder'],
+    // (the one confetti shot is Big finish's own, once, as the last chorus lands)
+    lastChorus: ['Big finish', 'Head bang', 'Crowd blinders', 'Anthem'], hits: ['fog', 'co2', 'sparks', 'flame', 'strobe', 'blinder'],
   },
   'DJ / Party': {
     crowd: 'party', song: 'foolish-game', list: 'Moods', end: 'Wind down',

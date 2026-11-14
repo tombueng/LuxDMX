@@ -389,9 +389,13 @@
     <span class="grow"></span>
     {#if !compact}
     <div class="toolbar">
+      <!-- (a big rig's groups in a strip of their own that scrolls sideways: ten of them took the
+           toolbar to three rows on a laptop) -->
+      <span class="grps">
       {#each app.show.groups as g (g.id)}
         <button class="grp" onclick={(e) => app.selectGroup(g.id, ui.adding(e))} title="Select the group (Shift adds)">{g.name}</button>
       {/each}
+      </span>
       <span class="sep"></span>
       <button class="ghost" onclick={() => app.selectAll()} aria-label="Select all">All</button>
       <button class="ghost" onclick={() => app.selectNone()} aria-label="Select none">None</button>
@@ -586,7 +590,9 @@
   .loading { margin: auto; }
   .head { margin-bottom: .35rem; flex-wrap: wrap; }
   .tset { display: inline-flex; align-items: center; gap: .25rem; flex: none; }
-  .grp { padding: .12rem .5rem; font-size: .8rem; border-radius: 999px; }
+  .grp { padding: .12rem .5rem; font-size: .8rem; border-radius: 999px; flex: none; }
+  /* (a small basis: it takes the row's free room and scrolls in it, instead of wrapping the tools) */
+  .grps { display: flex; gap: .25rem; align-items: center; overflow-x: auto; min-width: 8rem; flex: 1 1 12rem; scrollbar-width: thin; padding-bottom: 1px; }
   .area { position: relative; flex: 1; min-height: 0; }
   /* (a phone pinches: the button took a toolbar row of its own) */
   @media (max-width: 760px) { .zoomin { display: none; } }

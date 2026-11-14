@@ -172,40 +172,66 @@ export interface Template { name: string; icon: string; blurb: string; build: ()
 
 export const TEMPLATES: Template[] = [
   {
-    name: 'Band', icon: 'mover', blurb: 'PARs, spots, washes, pixel bars, blinders, strobes, haze and every effect machine. Looks for a whole gig.',
+    name: 'Band', icon: 'mover', blurb: 'A festival rig: beam heads, spots, washes, movers, pixel bars, blinders, strobes, uplights and haze, with twenty-five looks full of sweeps, beam fans and pixel shows.',
     build: () => {
       const b = new Builder('Band night');
-      const front = b.add('gen-drgb', 4, 'Front', 0.7);
-      const back = b.add('gen-drgbwauvs', 4, 'Back', 0.22);
-      const movers = b.add('gen-mover16', 2, 'Mover', 0.06, { x0: 0.2, x1: 0.8 });
+      // the rig of a touring band on a festival stage: front light, LED PARs on the back truss, beam
+      // heads, spots and washes on the trusses, pixel bars on the risers, blinders turned out to the
+      // crowd, strobes, uplights on the deck, haze and the machines (one confetti cannon, kept for
+      // the very end)
+      const front = b.add('gen-drgb', 6, 'Front', 0.7);
+      const back = b.add('gen-drgbwauvs', 8, 'Back', 0.22);
+      const movers = b.add('gen-mover16', 4, 'Mover', 0.14, { x0: 0.12, x1: 0.88 });
       const fog = b.add('gen-fog', 1, 'Fog', 0.54, { x0: 0.5, x1: 0.5 });
-      // the bigger rig: spots between the movers and strobes on the back truss, pixel bars on the
-      // risers, washes on the mid truss, blinders on the front truss, the machines on the deck
-      const spots = b.add('gen-spotgobo', 4, 'Spot', 0.06, { x0: 0.32, x1: 0.68 });
-      const washes = b.add('gen-wash', 6, 'Wash', 0.54, { x0: 0.1, x1: 0.9 });
-      const bars = b.add('gen-bar16', 4, 'Bar', 0.38, { x0: 0.2, x1: 0.8 });
-      const blinders = b.at(b.add('gen-blinder2', 4, 'Blinder', 0.86), 0.86, [0.3, 0.43, 0.57, 0.7]);
+      const spots = b.add('gen-spotgobo', 6, 'Spot', 0.06, { x0: 0.2, x1: 0.8 });
+      const beams = b.add('gen-roll', 8, 'Beam', 0.3, { x0: 0.08, x1: 0.92 });
+      // (the washes and the pixel bars on the box's second universe: the rig is bigger than one)
+      const washes = b.add('gen-wash', 8, 'Wash', 0.54, { universe: 1, x0: 0.08, x1: 0.92 });
+      const bars = b.add('gen-bar16', 8, 'Bar', 0.42, { universe: 1, x0: 0.1, x1: 0.9 });
+      const blinders = b.at(b.add('gen-blinder2', 6, 'Blinder', 0.86), 0.86, [0.2, 0.3, 0.4, 0.6, 0.7, 0.8]);
       // (audience blinders: on the front truss, turned out over the crowd. Left to where a light hangs,
       // they faced the band, and the drop was a white line at the stage's edge)
       b.place(blinders, (f) => { const d = defaultPlace(f, 'dimmer'); f.p3 = d.p; f.rot = aimRot(d.p, { x: d.p.x * 1.3, y: 1.7, z: D / 2 + 9 }); });
-      const strobes = b.add('gen-strobe', 2, 'Strobe', 0.06, { x0: 0.06, x1: 0.94 });
+      const strobes = b.add('gen-strobe', 4, 'Strobe', 0.06, { x0: 0.04, x1: 0.96 });
+      // uplights on the deck's front edge, washing the band from below
+      const floor = b.add('gen-drgbw', 6, 'Floor', 0.78, { x0: 0.14, x1: 0.86 });
+      b.place(floor, (f) => { const w = planToWorld(f.x, 0.78); f.p3 = { x: w.x, y: DECK, z: D / 2 - 0.4 }; f.rot = aimRot(f.p3, { x: w.x * 0.8, y: DECK + 3.2, z: -1 }); });
       const hazer = b.add('gen-hazer', 1, 'Hazer', 0.22, { x0: 0.03, x1: 0.03 });
-      b.add('gen-confetti', 2, 'Confetti', 0.86, { x0: 0.16, x1: 0.84 });
-      b.add('gen-flame', 2, 'Flame', 0.86, { x0: 0.05, x1: 0.95 });
-      b.add('gen-sparks', 2, 'Sparks', 0.38, { x0: 0.05, x1: 0.95 });
-      b.add('gen-co2', 2, 'CO2', 0.7, { x0: 0.25, x1: 0.75 });
-      b.add('gen-bubbles', 1, 'Bubbles', 0.22, { x0: 0.5, x1: 0.5 });
+      b.add('gen-confetti', 1, 'Confetti', 0.62, { x0: 0.5, x1: 0.5 });
+      b.add('gen-flame', 4, 'Flame', 0.9, { x0: 0.05, x1: 0.95 });
+      b.add('gen-sparks', 4, 'Sparks', 0.36, { x0: 0.03, x1: 0.97 });
+      b.add('gen-co2', 2, 'CO2', 0.7, { x0: 0.04, x1: 0.96 });
+      b.add('gen-bubbles', 1, 'Bubbles', 0.22, { x0: 0.97, x1: 0.97 });
       b.group('Front', front);
-      const gBack = b.group('Back', back), gMov = b.group('Movers', movers);
+      const gBack = b.group('Back', back), gMov = b.group('Movers', movers), gBeam = b.group('Beams', beams);
       const gSpot = b.group('Spots', spots), gWash = b.group('Washes', washes), gBar = b.group('Pixel bars', bars);
-      b.group('Blinders', blinders); b.group('Strobes', strobes);
+      const gBlind = b.group('Blinders', blinders), gStrobe = b.group('Strobes', strobes), gFloor = b.group('Floor', floor);
+      // the effects: moves (the new shapes and sweeps), colours, chases, pixel shows
       const sweep = b.effect('Movers sweep', 'pan', gMov, { size: 0.3, speed: 8 });
       const circle = b.effect('Movers circle', 'circle', gMov, { size: 0.3, speed: 4 });
+      const wipers = b.effect('Movers wipers', 'wipers', gMov, { size: 0.35, speed: 2 });
+      const bang = b.effect('Movers head bang', 'headBang', gMov, { size: 0.3, speed: 1 });
       const wave = b.effect('Back wave', 'wave', gBack, { low: 0.35, speed: 4 });
+      const backChase = b.effect('Back chase', 'chase', gBack, { speed: 1, low: 0.15 });
+      const backRainbow = b.effect('Back rainbow', 'rainbow', gBack, { speed: 8 });
+      const backFire = b.effect('Back fire', 'fire', gBack, {});
       const bally = b.effect('Spots ballyhoo', 'ballyhoo', gSpot, { speed: 8 });
       const fan = b.effect('Spots fan', 'fan', gSpot, { size: 0.5, speed: 8 });
+      const star = b.effect('Spots star', 'star', gSpot, { size: 0.35, speed: 10 });
+      const spiro = b.effect('Spots spirograph', 'spirograph', gSpot, { size: 0.4, speed: 24 });
+      const search = b.effect('Spots searchlight', 'searchlight', gSpot, { size: 0.5, speed: 12, spread: 0.5 });
+      const knot = b.effect('Spots knot', 'knot', gSpot, { size: 0.3, speed: 12 });
+      const beamFan = b.effect('Beam fan', 'fan', gBeam, { size: 0.6, speed: 8 });
+      const weave = b.effect('Beam weave', 'weave', gBeam, { size: 0.4, speed: 4 });
+      const mirror = b.effect('Beam mirror circles', 'mirrorCircles', gBeam, { size: 0.35, speed: 4 });
+      const stepper = b.effect('Beam step', 'step', gBeam, { size: 0.5, speed: 4 });
+      const focus = b.effect('Beam focus point', 'focus', gBeam, { size: 0.5, speed: 8 });
+      const beamBang = b.effect('Beam head bang', 'headBang', gBeam, { size: 0.35, speed: 1, spread: 0.25 });
       const swing = b.effect('Washes swing', 'swing', gWash, { size: 0.25, speed: 8 });
+      const zigzag = b.effect('Washes zigzag', 'zigzag', gWash, { size: 0.3, speed: 8 });
+      const bounce = b.effect('Washes bounce', 'bounce', gWash, { size: 0.3, speed: 8, spread: 0.5 });
       const chase = b.effect('Wash colours', 'colorChase', gWash, { speed: 4 });
+      const washRainbow = b.effect('Wash rainbow', 'rainbow', gWash, { speed: 8 });
       const lightning = b.effect('Lightning', 'lightning', gBack, { size: 0.6 });
       const scanner = b.effect('Bar scanner', 'scanner', gBar, {});
       const meteors = b.effect('Bar meteor rain', 'meteorRain', gBar, {});
@@ -213,36 +239,62 @@ export const TEMPLATES: Template[] = [
       const fire2012 = b.effect('Bar fire', 'fire2012', gBar, {});
       const twinkle = b.effect('Bar twinkles', 'twinkle', gBar, {});
       const pride = b.effect('Bar colour waves', 'pride', gBar, {});
-      const lights = [front, back, movers, spots, washes, bars, blinders, strobes].flat();
+      const juggle = b.effect('Bar juggle', 'juggle', gBar, {});
+      const fireworks = b.effect('Bar fireworks', 'fireworks', gBar, {});
+      const popcorn = b.effect('Bar popcorn', 'popcorn', gBar, {});
+      const blindChase = b.effect('Blinder chase', 'chase', gBlind, { speed: 1 });
+      const strobeBurst = b.effect('Strobe burst', 'strobe', gStrobe, { speed: 1 });
+      const floorChase = b.effect('Floor colour chase', 'colorChase', gFloor, { speed: 2 });
+      const floorPulse = b.effect('Floor pulse', 'pulse', gFloor, { speed: 1, low: 0.2 });
+      const lights = [front, back, movers, spots, beams, washes, bars, blinders, strobes, floor].flat();
       const dark: [string[], Values][] = [[lights, { intensity: 0 }]];
+      // (a head's look: where it points, its zoom; a beam head narrow, a fan of beams through its prism)
+      const aim = (tilt: number, more: Values = {}): Values => ({ pan: 0.5, tilt, ...more });
+      const beam = (more: Values = {}): Values => aim(0.62, { zoom: 0, ...more });
       // the lists: the songs and the fog timer as they were, then haze and the machines' shots
       const songs = b.list('Songs', { play: false });                  // looks to pick (a note is a reminder, not a play)
       const fl = b.list('Fog timer', { end: 'loop', color: '#8a94a3' });
       b.haze(hazer);
       const m = b.machines();
-      // the four the band started with (every light named, so a look never inherits the last one)
-      b.cue(songs, 'Walk-in', [...dark, [front, on(0.4, C.warm)], [back, on(0.3, C.deepBlue)], [movers, on(0, C.white, { pan: 0.5, tilt: 0.3 })],
-        [washes, on(0.3, C.deepBlue, { pan: 0.5, tilt: 0.55, zoom: 0.8 })], [bars, on(0.35, C.warm)], [spots, on(0, C.white, { pan: 0.5, tilt: 0.5 })]], { fade: 3, effects: [twinkle] });
-      b.cue(songs, 'Verse', [...dark, [front, on(0.7, C.warm)], [back, on(0.8, C.red)], [movers, on(0.6, C.amber, { pan: 0.5, tilt: 0.55 })],
-        [washes, on(0.6, C.orange, { pan: 0.5, tilt: 0.55, zoom: 0.6 })], [spots, on(0.5, C.amber, { pan: 0.5, tilt: 0.52, gobo: gobo('Dots'), zoom: 0.2 })], [bars, on(0.6, C.red)]], { effects: [sweep, wave, meteors] });
-      b.cue(songs, 'Chorus', [...dark, [front, on(1, C.white)], [back, on(1, C.magenta)], [movers, on(1, C.cyan, { pan: 0.5, tilt: 0.75 })],
-        [washes, on(1, C.purple, { pan: 0.5, tilt: 0.6, zoom: 0.4 })], [spots, on(1, C.white, { pan: 0.5, tilt: 0.7, zoom: 0.05 })], [bars, on(1)]], { fade: 0.5, effects: [circle, bally, pride] });
-      b.cue(songs, 'Ballad', [...dark, [front, on(0.5, C.warm)], [back, on(0.6, C.blue)], [movers, on(0.3, C.purple, { pan: 0.5, tilt: 0.4 })],
-        [washes, on(0.4, C.deepBlue, { pan: 0.5, tilt: 0.5, zoom: 1 })], [spots, on(0.5, C.lavender, { pan: 0.5, tilt: 0.52, gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.4), zoom: 0.3 })], [bars, on(0.3, C.blue)]], { fade: 4, effects: [twinkle] });
-      b.cue(songs, 'Intro: thunder', [...dark, [back, on(0.25, C.deepBlue)], [washes, on(0.35, C.deepBlue, { pan: 0.5, tilt: 0.5, zoom: 0.9 })],
-        [spots, on(1, C.white, { pan: 0.5, tilt: 0.5, zoom: 0, gobo: gobo('Open') })], [strobes, on(0)]], { fade: 3, effects: [lightning, fan] });
-      b.cue(songs, 'Rock out', [...dark, ...split(back, C.red, C.white), [front, on(0.9, C.white)], [movers, on(1, C.red, { pan: 0.5, tilt: 0.7 })],
-        [washes, on(1, C.red, { pan: 0.5, tilt: 0.6, zoom: 0.3 })], [spots, on(1, C.white, { pan: 0.5, tilt: 0.7, zoom: 0.05, prism: 1 })], [bars, on(1, C.red)]], { fade: 0.2, effects: [bally, swing, scanner] });
+      b.cue(songs, 'Walk-in', [...dark, [front, on(0.4, C.warm)], [back, on(0.3, C.deepBlue)], [movers, on(0, C.white, aim(0.3))],
+        [washes, on(0.3, C.deepBlue, aim(0.55, { zoom: 0.8 }))], [bars, on(0.35, C.warm)], [spots, on(0, C.white, aim(0.5))], [floor, on(0.25, C.deepBlue)]], { fade: 3, effects: [twinkle] });
+      b.cue(songs, 'Verse', [...dark, [front, on(0.7, C.warm)], [back, on(0.8, C.red)], [movers, on(0.6, C.amber, aim(0.55))],
+        [washes, on(0.6, C.orange, aim(0.55, { zoom: 0.6 }))], [spots, on(0.5, C.amber, aim(0.52, { gobo: gobo('Dots'), zoom: 0.2 }))], [bars, on(0.6, C.red)], [floor, on(0.4, C.amber)]], { effects: [sweep, wave, meteors] });
+      b.cue(songs, 'Chorus', [...dark, [front, on(1, C.white)], [back, on(1, C.magenta)], [movers, on(1, C.cyan, aim(0.75))], [beams, on(1, C.cyan, beam())],
+        [washes, on(1, C.purple, aim(0.6, { zoom: 0.4 }))], [spots, on(1, C.white, aim(0.7, { zoom: 0.05 }))], [bars, on(1)], [floor, on(0.8, C.magenta)]], { fade: 0.5, effects: [circle, bally, pride, beamFan] });
+      b.cue(songs, 'Ballad', [...dark, [front, on(0.5, C.warm)], [back, on(0.6, C.blue)], [movers, on(0.3, C.purple, aim(0.4))],
+        [washes, on(0.4, C.deepBlue, aim(0.5, { zoom: 1 }))], [spots, on(0.5, C.lavender, aim(0.52, { gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.4), zoom: 0.3 }))], [bars, on(0.3, C.blue)]], { fade: 4, effects: [twinkle, knot] });
+      b.cue(songs, 'Intro: thunder', [...dark, [back, on(0.25, C.deepBlue)], [washes, on(0.35, C.deepBlue, aim(0.5, { zoom: 0.9 }))],
+        [spots, on(1, C.white, aim(0.5, { zoom: 0, gobo: gobo('Open') }))], [strobes, on(0)]], { fade: 3, effects: [lightning, fan] });
+      b.cue(songs, 'Rock out', [...dark, ...split(back, C.red, C.white), [front, on(0.9, C.white)], [movers, on(1, C.red, aim(0.7))], [beams, on(1, C.red, beam({ prism: 1 }))],
+        [washes, on(1, C.red, aim(0.6, { zoom: 0.3 }))], [spots, on(1, C.white, aim(0.7, { zoom: 0.05, prism: 1 }))], [bars, on(1, C.red)], [floor, on(1, C.red)]], { fade: 0.2, effects: [bally, swing, scanner, weave] });
       b.cue(songs, 'Guitar solo', [...dark, [front, on(0.2, C.red)], [back, on(0.4, C.red)], [movers, on(1, C.white, { pan: 0.42, tilt: 0.56 })],
-        [spots, on(1, C.white, { pan: 0.42, tilt: 0.58, zoom: 0 })], [washes, on(0.5, C.red, { pan: 0.5, tilt: 0.5, zoom: 0.2 })], [bars, on(0.8, C.orange)]], { fade: 1, effects: [meteors] });
-      b.cue(songs, 'Drum solo', [...dark, [back, on(1, C.amber)], [washes, on(0.8, C.amber, { pan: 0.5, tilt: 0.52, zoom: 0.1 })], [bars, on(1, C.red)],
-        [spots, on(1, C.amber, { pan: 0.5, tilt: 0.5, zoom: 0, gobo: gobo('Ring') })], [strobes, on(1, undefined, { strobe: 0.4 })]], { fade: 0.2, effects: [heart, chase] });
-      b.cue(songs, 'Love song', [...dark, [front, on(0.6, C.pink)], [back, on(0.5, C.magenta)], [washes, on(0.5, C.pink, { pan: 0.5, tilt: 0.55, zoom: 1 })],
-        [spots, on(0.4, C.pink, { pan: 0.5, tilt: 0.55, gobo: gobo('Flower'), goboRotation: turn('gen-spotgobo', 0.3) })], [bars, on(0.4)]], { fade: 5, effects: [pride, sweep] });
-      b.cue(songs, 'Big finish', [...dark, [lights, on(1, C.white)], [movers, { pan: 0.5, tilt: 0.75 }], [washes, { pan: 0.5, tilt: 0.7, zoom: 0.5 }],
-        [spots, { pan: 0.5, tilt: 0.75, zoom: 0.05 }], [strobes, { strobe: 0.7 }]], { fade: 0, effects: [bally, swing], actions: fire(m.confetti, m.co2, m.sparks), note: 'Confetti, CO2 and sparks' });
-      b.cue(songs, 'Encore', [...dark, [front, on(0.8, C.amber)], [back, on(1, C.orange)], [movers, on(1, C.orange, { pan: 0.5, tilt: 0.7 })],
-        [washes, on(0.9, C.red, { pan: 0.5, tilt: 0.6, zoom: 0.5 })], [spots, on(1, C.amber, { pan: 0.5, tilt: 0.7, zoom: 0.1 })], [bars, on(1)]], { fade: 0.5, effects: [fire2012, circle, bally], actions: fire(m.flame) });
+        [spots, on(1, C.white, { pan: 0.42, tilt: 0.58, zoom: 0 })], [washes, on(0.5, C.red, aim(0.5, { zoom: 0.2 }))], [bars, on(0.8, C.orange)], [beams, on(0.6, C.red, beam())]], { fade: 1, effects: [meteors, focus] });
+      b.cue(songs, 'Drum solo', [...dark, [back, on(1, C.amber)], [washes, on(0.8, C.amber, aim(0.52, { zoom: 0.1 }))], [bars, on(1, C.red)],
+        [spots, on(1, C.amber, aim(0.5, { zoom: 0, gobo: gobo('Ring') }))], [strobes, on(1, undefined, { strobe: 0.4 })], [floor, on(1, C.amber)]], { fade: 0.2, effects: [heart, chase, floorPulse] });
+      b.cue(songs, 'Love song', [...dark, [front, on(0.6, C.pink)], [back, on(0.5, C.magenta)], [washes, on(0.5, C.pink, aim(0.55, { zoom: 1 }))],
+        [spots, on(0.4, C.pink, aim(0.55, { gobo: gobo('Flower'), goboRotation: turn('gen-spotgobo', 0.3) }))], [bars, on(0.4)], [floor, on(0.4, C.pink)]], { fade: 5, effects: [pride, sweep], actions: fire(m.bubbles), note: 'Bubbles with it' });
+      b.cue(songs, 'Big finish', [...dark, [lights, on(1, C.white)], [movers, aim(0.75)], [washes, aim(0.7, { zoom: 0.5 })], [beams, beam({ prism: 1 })],
+        [spots, aim(0.75, { zoom: 0.05 })], [strobes, { strobe: 0.7 }]], { fade: 0, effects: [bally, swing, beamFan, fireworks], actions: fire(m.confetti, m.co2, m.sparks), note: 'Confetti, CO2 and sparks: the one confetti shot of the night' });
+      b.cue(songs, 'Encore', [...dark, [front, on(0.8, C.amber)], [back, on(1, C.orange)], [movers, on(1, C.orange, aim(0.7))], [beams, on(1, C.orange, beam())],
+        [washes, on(0.9, C.red, aim(0.6, { zoom: 0.5 }))], [spots, on(1, C.amber, aim(0.7, { zoom: 0.1 }))], [bars, on(1)], [floor, on(1, C.orange)]], { fade: 0.5, effects: [fire2012, circle, bally, mirror], actions: fire(m.flame) });
+      // the bigger set: beams, sweeps and pixel shows for every kind of song
+      b.cue(songs, 'Beam show', [...dark, [back, on(0.3, C.deepBlue)], [beams, on(1, C.white, beam({ prism: 1 }))], [movers, on(1, C.cyan, aim(0.7))], [bars, on(0.5, C.blue)]], { fade: 0.5, effects: [stepper, juggle] });
+      b.cue(songs, 'Head bang', [...dark, [front, on(0.8, C.white)], ...split(back, C.red, C.amber), [movers, on(1, C.red, aim(0.62))], [beams, on(1, C.amber, beam())],
+        [washes, on(1, C.red, aim(0.6, { zoom: 0.3 }))], [bars, on(1, C.red)], [floor, on(1, C.red)]], { fade: 0, effects: [bang, beamBang, backChase, scanner] });
+      b.cue(songs, 'Searchlights', [...dark, [back, on(0.4, C.deepBlue)], [spots, on(1, C.white, aim(0.62, { zoom: 0 }))], [beams, on(0.8, C.ice, beam())], [bars, on(0.2, C.blue)]], { fade: 2, effects: [search, weave] });
+      b.cue(songs, 'Star field', [...dark, [back, on(0.4, C.purple)], [spots, on(1, C.lavender, aim(0.55, { gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.5), zoom: 0.3, prism: 1 }))],
+        [washes, on(0.4, C.deepBlue, aim(0.5, { zoom: 1 }))], [bars, on(0.6, C.lavender)], [floor, on(0.3, C.purple)]], { fade: 3, effects: [star, twinkle] });
+      b.cue(songs, 'Spirograph', [...dark, [back, on(0.5, C.teal)], [spots, on(1, C.cyan, aim(0.6, { gobo: gobo('Spiral'), zoom: 0.15 }))], [movers, on(1, C.teal, aim(0.65))], [bars, on(0.6, C.teal)]], { fade: 2, effects: [spiro, circle, pride] });
+      b.cue(songs, 'Fire and ice', [...dark, ...split(back, C.orange, C.ice), ...split(washes, C.red, C.cyan, 1, aim(0.6, { zoom: 0.4 })), ...split(beams, C.orange, C.ice, 1, beam()),
+        [bars, on(1)], [floor, on(0.8, C.orange)]], { fade: 1, effects: [fire2012, zigzag, weave] });
+      b.cue(songs, 'Strobe storm', [...dark, [strobes, on(1, undefined, { strobe: 0.9 })], [back, on(0.6, C.white)], [bars, on(1, C.white)], [blinders, on(0.6)]], { fade: 0, effects: [strobeBurst, popcorn, blindChase] });
+      b.cue(songs, 'Rainbow', [...dark, [front, on(0.7, C.white)], [back, on(1)], [washes, on(1, C.white, aim(0.6, { zoom: 0.5 }))], [beams, on(1, C.white, beam())], [bars, on(1)], [floor, on(1)]],
+        { fade: 1, effects: [backRainbow, washRainbow, pride, bounce, floorChase] });
+      b.cue(songs, 'Crowd blinders', [...dark, [blinders, on(1)], [front, on(0.6, C.warm)], [back, on(0.8, C.amber)], [bars, on(0.8, C.amber)]], { fade: 0, effects: [blindChase, backFire] });
+      b.cue(songs, 'Acoustic', [...dark, [front, on(0.6, C.warm)], [floor, on(0.5, C.amber)], [washes, on(0.3, C.amber, aim(0.55, { zoom: 1 }))], [bars, on(0.2, C.warm)]], { fade: 6, effects: [twinkle] });
+      b.cue(songs, 'Anthem', [...dark, [front, on(1, C.white)], [back, on(1, C.gold)], [movers, on(1, C.gold, aim(0.78))], [beams, on(1, C.gold, beam({ prism: 1 }))], [spots, on(1, C.white, aim(0.78, { zoom: 0.05 }))],
+        [washes, on(1, C.amber, aim(0.62, { zoom: 0.4 }))], [bars, on(1, C.gold)], [floor, on(1, C.gold)], [blinders, on(0.5)]], { fade: 1, effects: [focus, wipers, swing, fireworks], actions: fire(m.co2) });
       b.cue(songs, 'Blackout', [[lights, on(0)]], { fade: 0 });
       b.cue(fl, 'Fog on', [[fog, { fog: 1 }]], { fade: 0, advance: { mode: 'wait', time: 3 } });
       b.cue(fl, 'Fog off', [[fog, { fog: 0 }]], { fade: 0, advance: { mode: 'wait', time: 117 } });
