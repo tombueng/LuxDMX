@@ -53,3 +53,14 @@ describe('the templates nobody plays in', () => {
     expect(t.settings.stage3d?.act).toBe('none');
   });
 });
+
+describe('your own stage for a show nobody plays in', () => {
+  it('a service on your stage gets a calm audience (no phones, no fists, nobody on shoulders); a gig a lively one', async () => {
+    const { customRoom } = await import('./geometry');
+    const custom = customRoom({ w: 12, d: 8, trussY: 7, trusses: 3, riser: true });
+    const lifted = (v: ReturnType<typeof buildVenue>) => v.crowd!.fans.filter((f) => [f.arms.L, f.arms.R].some((a) => ['up', 'wave', 'fist', 'phone'].includes(a))).length;
+    const calm = buildVenue({ room: 'custom', custom, crowd: 120, act: 'none' }), wild = buildVenue({ room: 'custom', custom, crowd: 120 });
+    expect(lifted(calm)).toBe(0);
+    expect(lifted(wild)).toBeGreaterThan(20);
+  }, 60_000);
+});

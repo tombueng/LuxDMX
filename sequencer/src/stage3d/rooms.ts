@@ -130,7 +130,7 @@ function frame(group: THREE.Group, M: Mats, r: Room) {
 }
 
 // (your own stage: its room comes with it, built from its size, geometry.ts customRoom)
-export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; custom?: Room } = {}): Stage {
+export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; custom?: Room; act?: 'band' | 'none' } = {}): Stage {
   const r = id === 'custom' ? o.custom! : ROOMS[id], M = gearMats(), group = new THREE.Group();
   const soft = softwareGL();
   let crowd: Crowd | undefined, dj: Stage['dj'];
@@ -235,6 +235,9 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
     const W = r.walls;
     crowd = buildCrowd(o.crowd ?? Math.round((soft ? 0.4 : 1) * Math.min(260, (W.z1 - r.D / 2 - 4) * (2 * W.x - 3) * 0.9)), {
       z0: r.D / 2 + 1.4, z1: W.z1 - 3, spread: () => W.x - 1.4, flags: 0, keepOut: () => false,
+      // (a show nobody plays in, a service or a play, on your stage: an audience standing calmly, as
+      // in the hall, not one with phones and fists in the air)
+      calm: o.act === 'none', riders: o.act === 'none' ? 0 : undefined,
     });
   } else if (id === 'party') {
     const W = r.walls, legs: [number, number][] = [[-6, 1.5], [6, 1.5], [-6, 13.5], [6, 13.5]];

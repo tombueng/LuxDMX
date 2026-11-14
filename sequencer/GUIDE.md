@@ -901,10 +901,14 @@ Three more demos come with their own room on the 3D stage:
   backdrop, the banners, the screens and the kick drum (painted in the style of the band picture
   that's there by default; leave it empty for the picture; in the club and at the party it's on
   the front of the DJ booth). Both are kept with the show (the screens' live camera in this browser).
-  The theatre, church and cinema templates put nobody on stage: no band, a calm audience.
+  The theatre, church and cinema templates put nobody on stage: no band, a calm audience (on
+  your own stage too). Lights keep their places when you change the room; the ones that end up
+  outside it (a church's lights 11.85 m up, on a stage with a 9.6 m ceiling) are said: select
+  them and press **Reset** in the lights' panel to hang them in this room.
   Load your own venue or stage as a 3D model (.glb, or a .gltf with everything inside),
   fitted onto the floor (a model in millimetres or centimetres is scaled down), then size, place
-  and turn it; the built-in stage can go. The model stays in this browser. Its panel closes with
+  and turn it; the built-in room can go (its box says what that is here: in the church the whole
+  church, on the big stage the band, the truss and the crowd). The model stays in this browser. Its panel closes with
   its X or Esc. The tools stay on one row: on a smaller 3D view Haze, Glow, Ambient, the video size and
   full screen are under **More** (⋯), on a phone the camera views and Venue too.
 - **A video of the 3D stage**: **Record** (the red dot in the 3D toolbar) records what the 3D stage

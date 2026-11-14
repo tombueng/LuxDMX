@@ -103,7 +103,7 @@ test('light lands on the walls: the church\'s uplights wash its walls; with the 
   // the built-in room hidden (your own venue model instead): no light on walls that aren't there
   const s3 = page.locator('.s3');
   await s3.getByRole('button', { name: 'Venue', exact: true }).click();
-  const box = s3.getByRole('group', { name: 'The venue' }).getByRole('checkbox', { name: /The built-in stage/ });
+  const box = s3.getByRole('group', { name: 'The venue' }).getByRole('checkbox', { name: 'The church itself (walls, pews, people)' });
   await box.uncheck();
   await expect.poll(walls, { timeout: 20000 }).toBe(0);
   await box.check();
@@ -127,4 +127,29 @@ test('a light dragged on the plan moves in 3D too (the template\'s lights have t
   const now = await where(page, 'Sparks 2');
   expect(before.x - now.x).toBeGreaterThan(5);                  // (across the dance floor: metres to the left)
   expect(now.y).toBeCloseTo(before.y, 2);                         // (on the floor still)
+});
+
+test('the church on your own stage: the lights that now hang through its ceiling are said, with how to bring them in; Reset hangs them there; the box says what it hides', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Church');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(async () => (await venue(page))?.room, { timeout: 45000 }).toBe('church');
+  const s3 = page.locator('.s3');
+  await s3.getByRole('button', { name: 'Venue', exact: true }).click();
+  const v = s3.getByRole('group', { name: 'The venue' });
+  await expect(v.getByRole('checkbox', { name: 'The church itself (walls, pews, people)' })).toBeChecked();
+  await v.getByRole('button', { name: 'Your stage' }).click();
+  await expect(page.locator('.toast')).toContainText(/\d+ lights hang outside this room .*select them, then Reset/);
+  await expect(v.getByRole('checkbox', { name: 'The built-in stage (riser, trusses, crowd)' })).toBeChecked();
+  // (Reset on them all: inside the room now, under its ceiling)
+  const outside = () => page.evaluate(async () => {
+    const { roomFor } = await import('/src/stage3d/geometry.ts');
+    const a = (window as any).__luxdmx, r = roomFor(a.show.settings.stage3d);
+    return a.show.fixtures.filter((f: any) => f.p3 && f.p3.y > r.ceiling + 0.05).length;
+  });
+  expect(await outside()).toBeGreaterThan(10);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = a.show.fixtures.map((f: any) => f.id); });
+  await s3.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect.poll(outside).toBe(0);
 });

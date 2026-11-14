@@ -56,7 +56,7 @@
   import { Rig, type RigFixture } from './rig';
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type RoomId, type Rot, type V3, type ViewKey } from './geometry';
   import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
@@ -880,12 +880,28 @@
     app.checkpoint(); m[k] = v; app.markDirty(0);
   }
   function removeModel() { app.checkpoint(); if (app.show.settings.stage3d) delete app.show.settings.stage3d.model; app.markDirty(0); }
+  // what the "built-in" box hides, said for the room shown (in the church that's the whole church,
+  // not a band and a truss)
+  const BUILT: Partial<Record<RoomId, string>> = {
+    hall: 'The built-in stage (band, truss, crowd)', pub: 'The built-in club (stage, band, people)', club: 'The club itself (DJ, booth, crowd)',
+    party: 'The party room itself (DJ, crowd)', truss: 'The test truss\'s room', custom: 'The built-in stage (riser, trusses, crowd)',
+    cinema: 'The cinema itself (screen, seats, people)', bar: 'The bar itself (counter, people)', theatre: 'The theatre itself (stage, seats, people)',
+    church: 'The church itself (walls, pews, people)', ballroom: 'The ballroom itself (tables, dancers)',
+  };
   function setHideVenue(h: boolean) { app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, hideVenue: h || undefined }; app.markDirty(0); }
   // the built-in room: the big stage, or a small club / pub (kept with the show)
   function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom') {
     if (room.id === id) return;
     const s3 = app.show.settings.stage3d;
     app.checkpoint(); app.show.settings.stage3d = { ...s3, room: id === 'hall' ? undefined : id, ...(id === 'custom' && !s3?.size ? { size: { ...STAGE_SIZE } } : {}) }; app.markDirty(0);
+    sayOutside();
+  }
+  // (lights keep their places when the room changes: those that now hang outside it, through its
+  // ceiling or its walls, are said, with how to bring them in)
+  function sayOutside() {
+    const r = roomFor(app.show.settings.stage3d);
+    const out = app.show.fixtures.filter((f) => f.p3 && (f.p3.y > r.ceiling + 0.05 || Math.abs(f.p3.x) > r.walls.x + 0.05 || f.p3.z < r.walls.z0 - 0.05 || f.p3.z > r.walls.z1 + 0.05));
+    if (out.length) ui.toast(`${out.length} light${out.length === 1 ? '' : 's'} hang${out.length === 1 ? 's' : ''} outside this room (where the last one had ${out.length === 1 ? 'it' : 'them'}). To hang ${out.length === 1 ? 'it' : 'them'} here: select ${out.length === 1 ? 'it' : 'them'}, then Reset in the lights' panel.`, 9000);
   }
   // your own stage's size: each field as it's set (the room is built again for it)
   const size = $derived(stageSize(app.show.settings.stage3d?.size));
@@ -893,6 +909,7 @@
     if (typeof v === 'number' && !Number.isFinite(v)) return;
     const s3 = app.show.settings.stage3d;
     app.checkpoint(); app.show.settings.stage3d = { ...s3, room: 'custom', size: stageSize({ ...s3?.size, [k]: v }) }; app.markDirty(0);
+    sayOutside();
   }
   // the band's name on the banners, screens and kick drum (kept with the show; empty: their
   // picture). While typing the banners follow a moment later; Enter or leaving the field keeps it.
@@ -1547,7 +1564,7 @@
           {/each}
           <button class="ghost" onclick={removeModel}>Remove it</button>
         {/if}
-        <label class="ck"><input type="checkbox" checked={!app.show.settings.stage3d?.hideVenue} onchange={(e) => setHideVenue(!(e.target as HTMLInputElement).checked)} /> The built-in stage (band, truss, crowd)</label>
+        <label class="ck"><input type="checkbox" checked={!app.show.settings.stage3d?.hideVenue} onchange={(e) => setHideVenue(!(e.target as HTMLInputElement).checked)} /> {BUILT[room.id] ?? 'The built-in stage'}</label>
         {#if room.id === 'hall' || room.id === 'pub'}<label class="ck" title="Like a real show's screens: what a TV director's cameras film, live (off: the band's name)"><input type="checkbox" checked={liveScreens} onchange={(e) => setLiveScreens((e.target as HTMLInputElement).checked)} /> The live camera on the screens</label>{/if}
       </div>
     {/if}
