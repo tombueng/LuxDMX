@@ -7,7 +7,7 @@ import { planToWorld, roomFor } from './stage3d/geometry';
 import { reconcile } from './model/reconcile';
 import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
-import { freezeGroupNumbers, groupByNumber, nextGroupNumber } from './model/groupnum';
+import { freezeGroupNumbers, nextGroupNumber } from './model/groupnum';
 import { cleanHost, hostProblem } from './model/host';
 import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
 import { capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
@@ -29,9 +29,9 @@ import { starterLooks } from './content/looks';
 import { findQlc } from './library/catalog';
 import { onMidi, onMidiInputs, sameBinding, type MidiBinding, type MidiMsg } from './input/midi';
 import { describeChange } from './model/diff';
-import { cueNum, cueNumber, fmtNum, freezeNumbers, numbersFor, renumber } from './model/cuenum';
+import { cueNum, cueNumber, freezeNumbers, numbersFor, renumber } from './model/cuenum';
 import { rawCellMap, rawCells, rawType, rawTypes } from './model/raw';
-import { BEAM_ATTRS, cueAt, dropCellKeys, groupFlash, refsIn, splitCell, stripResolved, toHsv, trimCells, withProgrammer } from './model/values';
+import { BEAM_ATTRS, dropCellKeys, groupFlash, refsIn, splitCell, stripResolved, toHsv, trimCells, withProgrammer } from './model/values';
 import { current, passed, validEntry, whenSaid, type ScheduleEntry } from './model/schedule';
 import { guessPlace, type Place } from './model/sun';
 import { actionText } from './model/actions';
@@ -47,8 +47,8 @@ import { prune, prunedText } from './model/prune';
 import { stageSvg } from './ui/thumb';
 import { cueLooks } from './engine/cuelook';
 import { cellLookAt, resolveValues } from './engine/resolve';
-import { byNum, numberFixtures } from './model/numbers';
-import { parseCommand } from './model/command';
+import { numberFixtures } from './model/numbers';
+import { runCommand } from './app/command';
 import { untrack } from 'svelte';
 import { Engine, LIGHT } from './engine/engine';
 import { load } from './perf/load.svelte';
@@ -1630,189 +1630,15 @@ class App {
   // the cells picked on this light (none: the whole light)
   cellsPicked(id: string): number[] { return this.cellSel[id] ?? []; }
   // ---- the console (ConsoleView): what a desk's command line, encoders and faders do
-  // A command typed on the command line (model/command.ts). Says what it did, or what's wrong.
-  runCommand(text: string): { ok: boolean; said: string } {
-    const c = parseCommand(text);
-    if (c.error) return { ok: false, said: c.error };
-    if (c.action) {
-      const list = c.list ? this.show.cueLists[c.list - 1] : this.liveList;
-      if (c.list && !list) return { ok: false, said: `there's no list ${c.list} (${this.show.cueLists.length === 0 ? 'no cue lists yet' : this.show.cueLists.length === 1 ? 'there is 1' : `there are ${this.show.cueLists.length}`})` };
-      const needList = () => ({ ok: false, said: 'No cue list to play yet: select lights, set them, record' });
-      switch (c.action) {
-        // (as on MA: Clear with nothing set lets go of the selection; with something set it says
-        // what stays selected, "@ 50" then went to all 47 lights without a word)
-        case 'clear': {
-          if (!Object.keys(this.programmer).length) { const n = this.selected.length; this.selectNone(); return { ok: true, said: n ? 'Nothing set: the selection let go' : 'Nothing to clear' }; }
-          this.clearProgrammer();
-          return { ok: true, said: this.selected.length ? `Cleared (${this.selected.length} still selected: clear again lets go)` : 'Cleared' };
-        }
-        case 'releaseall': this.releaseAll(); return { ok: true, said: 'Released everything' };
-        case 'lowlight': this.lowlight = this.lowlight > 0 ? 0 : 0.15; return { ok: true, said: this.lowlight > 0 ? `Lowlight on${this.highlight ? '' : ' (with Highlight)'}` : 'Lowlight off' };
-        case 'record': {
-          // (where it goes: the list asked for, the one Live plays, else the one open; the same
-          // for the cue's number being taken: a second "record cue 12" said nothing to record)
-          const into = c.list ? list : this.liveList ?? this.list;
-          if (c.cue !== undefined && into) { const k = cueAt(into, c.cue); if (k >= 0) return { ok: false, said: `${into.name} has cue ${fmtNum(c.cue)} (${into.cues[k].name}): update cue ${fmtNum(c.cue)}, or another number` }; }
-          if (!this.record(into?.id, { num: c.cue, fade: c.time, name: c.label })) return { ok: false, said: 'Nothing to record yet' };
-          const l = into ?? this.list;
-          return { ok: true, said: `Recorded${c.cue !== undefined ? ` cue ${fmtNum(c.cue)}` : ''} into ${l?.name ?? 'a new list'}${this.recordedAside ? ' (the play stays where it is; Clear lets go of your changes)' : ''}` };
-        }
-        case 'update': {
-          if (c.cue === undefined) return this.updateOnStage(c.list ? list : undefined);
-          if (!list) return needList();
-          const k = cueAt(list, c.cue);
-          if (k < 0) return { ok: false, said: `${list.name} has no cue ${fmtNum(c.cue)}` };
-          return this.updateCue(list.cues[k].id, list.id) ? { ok: true, said: `Updated cue ${fmtNum(c.cue)} in ${list.name}` } : { ok: false, said: 'Nothing changed to update' };
-        }
-        case 'label': {
-          if (!list) return needList();
-          const k = cueAt(list, c.cue!);
-          if (k < 0) return { ok: false, said: `${list.name} has no cue ${fmtNum(c.cue!)}` };
-          this.checkpoint(); list.cues[k].name = c.label!; this.markDirty(0);
-          return { ok: true, said: `Cue ${fmtNum(c.cue!)} is "${c.label}" now` };
-        }
-        case 'goto': case 'delete': case 'time': {
-          if (!list) return needList();
-          const k = cueAt(list, c.cue!);
-          if (k < 0) return { ok: false, said: `${list.name} has no cue ${fmtNum(c.cue!)}` };
-          const q = list.cues[k];
-          if (c.action === 'goto') { this.jump(list.id, k); return { ok: true, said: `Cue ${fmtNum(c.cue!)} ${q.name} in ${list.name}${this.safeNote(list.id)}` }; }
-          this.checkpoint();
-          if (c.action === 'delete') { freezeNumbers(list); list.cues.splice(k, 1); this.cueSel = this.cueSel.filter((id) => id !== q.id); return { ok: true, said: `Deleted cue ${fmtNum(c.cue!)} ${q.name} (Undo brings it back)` }; }
-          q.fade = c.time!;
-          return { ok: true, said: `Cue ${fmtNum(c.cue!)} fades in ${fmtNum(c.time!)} s` };
-        }
-        // (GO on the last cue and Back on the first did nothing and said they had)
-        case 'go': {
-          if (!list) return needList();
-          const st = this.engine.status(list.id);
-          if (st.running && !st.releasing && list.end === 'stop' && list.cues.length && st.index >= list.cues.length - 1) return { ok: false, said: `${list.name} is on its last cue: release lets it go, then GO starts it again` };
-          this.go(list.id); return { ok: true, said: `GO ${list.name}${this.safeNote(list.id)}` };
-        }
-        case 'back': {
-          if (!list) return needList();
-          const st = this.engine.status(list.id);
-          if (!st.running) return { ok: false, said: `${list.name} isn't playing` };
-          if (st.index <= 0) return { ok: false, said: `${list.name} is on its first cue` };
-          this.back(list.id); return { ok: true, said: `Back ${list.name}` };
-        }
-        case 'release': if (!list) return needList(); this.release(list.id); return { ok: true, said: `Released ${list.name}` };
-        case 'blackout': this.blackout = !this.blackout; return { ok: true, said: this.blackout ? 'Blackout' : 'Blackout off' };
-        case 'highlight': this.highlight = !this.highlight; return { ok: true, said: this.highlight ? 'Highlight on' : 'Highlight off' };
-        case 'undo': {
-          if (!this.canUndo) return { ok: false, said: 'Nothing to undo' };
-          this.undo();
-          // (what it undid: the last change to the show, which may not be the last command)
-          return { ok: true, said: this.stepSaid ? `Undone: ${this.stepSaid}` : 'Undone' };
-        }
-        case 'redo': {
-          if (!this.canRedo) return { ok: false, said: 'Nothing to redo' };
-          this.redo();
-          return { ok: true, said: this.stepSaid ? `Redone: ${this.stepSaid}` : 'Redone' };
-        }
-        case 'help': return { ok: true, said: 'Try: 5 @ full · 1 thru 4 @ 50 (one digit is tens: @ 5 is 50 %, @ 05 is 5 %) · 1 - 3 · group 2 @ out · 1.3 thru 1.8 · record cue 5 · goto cue 5 · update · next · clear · release all · undo' };
-        case 'next': case 'prev': {
-          this.stepSel(c.action === 'next' ? 1 : -1);
-          const f = this.show.fixtures.find((x) => x.id === this.selected[0]), all = this.stepAll;
-          return f ? { ok: true, said: `${f.num ?? ''} ${f.name}${all ? ` (${all.indexOf(f.id) + 1} of ${all.length})` : ''}`.trim() } : { ok: false, said: 'No lights yet' };
-        }
-      }
-    }
-    const said: string[] = [], gaps: number[] = [], tail: string[] = [];
-    if (c.steps) {
-      const fx = this.show.fixtures;
-      numberFixtures(fx);
-      const lightNo = (n: number) => byNum(fx, n);
-      const problems: string[] = [];
-      for (const st of c.steps) {
-        // (a number without a light: in a run with others it's a gap, skipped as desks do; all on
-        // its own it's said)
-        const nums = st.pick.fixtures, have = nums.filter((n) => lightNo(n));
-        if (nums.length && !have.length) problems.push(nums.length === 1 ? `no light ${nums[0]}` : `no lights ${nums[0]} to ${nums[nums.length - 1]}`);
-        else gaps.push(...nums.filter((n) => !lightNo(n)));
-        st.pick.fixtures = have;
-        for (const n of st.pick.cells.map((x) => x.fixture)) if (!lightNo(n)) problems.push(`no light ${n}`);
-        for (const g of st.pick.groups) if (!groupByNumber(this.show.groups, g)) problems.push(`no group ${g}`);
-        for (const x of st.pick.cells) {
-          const f = lightNo(x.fixture);
-          if (!f) continue;
-          const n = this.caps(f.id).cells, over = x.cells.filter((k) => k >= n);
-          if (n < 2) problems.push(`light ${x.fixture} has no cells`);
-          else if (over.length) problems.push(`light ${x.fixture} has only ${n} cells (${x.fixture}.1 to ${x.fixture}.${n})`);
-        }
-      }
-      if (problems.length) return { ok: false, said: [...new Set(problems)].join('; ') };
-      // the steps one after the other, from nothing or from what's selected; cells by light
-      let ids = c.base === 'current' ? [...this.selected] : [];
-      const outHit: string[] = [], outMiss: string[] = [];
-      const cells = new Map<string, number[]>(c.base === 'current' ? Object.entries(this.cellSel) : []);
-      for (const st of c.steps) {
-        // whole lights, and cells by light (a group of cells: its cells on each of its lights)
-        const whole: string[] = [], picks: { id: string; cells: number[] }[] = [];
-        // ("all" while stepping through a selection is that selection again, as on MA and MagicQ)
-        if (st.pick.all) whole.push(...(this.stepAll ?? fx.map((f) => f.id)));
-        for (const n of st.pick.fixtures) whole.push(lightNo(n)!.id);
-        for (const g of st.pick.groups) {
-          const grp = groupByNumber(this.show.groups, g);
-          if (!grp) continue;
-          if (!grp.cells?.length) { whole.push(...grp.fixtures); continue; }
-          for (const id of grp.fixtures) { const n = this.caps(id).cells, cs = grp.cells.filter((k) => k < n); if (n > 1 && cs.length) picks.push({ id, cells: cs }); }
-        }
-        for (const x of st.pick.cells) picks.push({ id: lightNo(x.fixture)!.id, cells: x.cells });
-        if (st.sign === '+') {
-          for (const id of whole) { if (!ids.includes(id)) ids.push(id); cells.delete(id); }
-          for (const x of picks) {
-            if (!ids.includes(x.id)) ids.push(x.id);
-            const had = cells.get(x.id) ?? [];
-            cells.set(x.id, [...had, ...x.cells.filter((k) => !had.includes(k))]);
-          }
-        } else {
-          for (const id of whole) (ids.includes(id) ? outHit : outMiss).push(id);
-          ids = ids.filter((id) => !whole.includes(id));
-          for (const id of whole) cells.delete(id);
-          for (const x of picks) {
-            const left = (cells.get(x.id) ?? []).filter((k) => !x.cells.includes(k));
-            if (left.length) cells.set(x.id, left); else { cells.delete(x.id); ids = ids.filter((y) => y !== x.id); }
-          }
-        }
-      }
-      // cells on some lights and whole lights next to them can't go in one selection (what would a
-      // colour do to the whole ones?): said, not guessed
-      if (cells.size && ids.some((id) => !cells.has(id))) return { ok: false, said: 'cells and whole lights in one command: say them one after the other (1.3 thru 1.8, then 5 @ 50)' };
-      this.selected = ids;
-      this.cellSel = Object.fromEntries([...cells].filter(([id]) => ids.includes(id)));
-      const nc = [...cells.values()].reduce((a, x) => a + x.length, 0);
-      said.push(ids.length ? `${ids.length} light${ids.length > 1 ? 's' : ''}${nc ? `, ${nc} cell${nc > 1 ? 's' : ''}` : ''}` : 'nothing selected');
-      // (what "-" took out, said: "1-4" is light 1 without 4 here, as on MA and Eos; one that wasn't
-      // in it said so, with how a run is typed: "1-5" read as light 1 said "5 taken out")
-      const noOf = (id: string) => this.show.fixtures.find((f) => f.id === id)?.num ?? this.show.fixtures.findIndex((f) => f.id === id) + 1;
-      if (outHit.length && outHit.length <= 3) tail.push(`(${outHit.map(noOf).join(', ')} taken out)`);
-      if (outMiss.length && outMiss.length <= 3) {
-        const from = c.steps.find((st) => st.sign === '+')?.pick.fixtures, to = noOf(outMiss[0]);
-        const run = from?.length === 1 && outMiss.length === 1 && from[0] < to ? `; a run is ${from[0]} thru ${to}` : '';
-        tail.push(`(${outMiss.map(noOf).join(', ')} wasn't in it${run})`);
-      }
-    }
-    if (c.level) {
-      if (!this.selected.length) return { ok: false, said: 'Select lights first (1 thru 4, group 2)' };
-      if ('abs' in c.level) { if (c.level.abs === 0) this.off(); else this.set({ intensity: c.level.abs }); }
-      else this.nudge('intensity', c.level.rel);
-      said.push('abs' in c.level ? `at ${Math.round(c.level.abs * 100)}%` : `${c.level.rel > 0 ? '+' : ''}${Math.round(c.level.rel * 100)}%`);
-      if ('abs' in c.level && c.level.asked) tail.push(`(${c.level.asked} is more than full)`);
-      // (a group master pulled down holds some of them lower: said, or "5 @ full" staying dim is a mystery)
-      const down = this.show.groups.filter((g) => (this.groupMasters[g.id] ?? 1) < 0.995 && g.fixtures.some((id) => this.selected.includes(id)));
-      if (down.length) tail.push(`(${down.map((g) => `${g.name}'s master at ${Math.round(this.groupMasters[g.id] * 100)}%`).join(', ')})`);
-    }
-    if (gaps.length && gaps.length <= 3) said.push(`(no ${gaps.join(', ')})`);
-    return { ok: true, said: [...said, ...tail].join(' ') };
-  }
+  // A command typed on the command line (app/command.ts). Says what it did, or what's wrong.
+  runCommand(text: string) { return runCommand(this, text); }
   // Update the cue on stage in the list Live plays (not whatever is picked in Program).
   // a fixture that's a machine (its own programs fire it): for telling machine lists from looks
   readonly isMachineFx = (fid: string) => isMachine(this.modeOf(fid));
   // (a list that fires machines, played while they aren't armed: said, so nothing firing isn't a surprise)
   // (about the cue it went to: every GO in a list with a confetti cue somewhere said "nothing fires",
   // a verse with no machine in it too)
-  private safeNote(listId: string) {
+  safeNote(listId: string) {
     if (this.sfxArmed) return '';
     const l = this.show.cueLists.find((x) => x.id === listId), id = this.engine.status(listId).cue, c = l?.cues.find((x) => x.id === id);
     const r = c ? cueRisk(this.show, c, undefined, machines(this.show)) : listRisk(this.show, listId, machines(this.show));
