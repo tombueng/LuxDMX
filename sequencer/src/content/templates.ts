@@ -621,20 +621,26 @@ export const TEMPLATES: Template[] = [
     },
   },
   {
-    name: 'Bar', icon: 'palette', blurb: 'Colour PARs and warm white, glowing shelves, a little dance floor with heads and a strobe. Moods with long, calm fades, and a party.',
+    name: 'Bar', icon: 'palette', blurb: 'A cocktail bar with a dance floor: colour PARs, glowing shelves, an LED strip on the counter, a neon sign, heads, beams and the mirror ball. Twenty-two moods from daytime to the lock-in.',
     build: () => {
       const b = new Builder('Bar');
-      const pars = b.add('gen-drgbw', 6, 'PAR', 0.3);
-      const warm = b.add('gen-wwcw', 2, 'Counter', 0.7, { x0: 0.35, x1: 0.65 });
-      // the back bar's shelves (pixel bars), a small dance floor with two heads, pinspots on a
-      // mirror ball, a strobe, fog, and a few machines for the big nights
-      const shelves = b.add('gen-bar12', 4, 'Shelf', 0.12, { x0: 0.2, x1: 0.8 });
-      const dance = b.add('gen-drgbwauvs', 4, 'Dance', 0.5, { x0: 0.2, x1: 0.8 });
-      const heads = b.add('gen-mover8', 2, 'Head', 0.5, { x0: 0.04, x1: 0.96 });
+      // a cocktail bar with a dance floor: colour PARs on the ceiling rails, warm white over the
+      // counter, the back bar's shelves lit from below, an LED strip along the counter's front, a
+      // neon sign over the bottles, the dance floor's wash, heads and beams over it, pinspots on the
+      // mirror ball, strobes, fog and a few machines for the big nights (one confetti shot)
+      const pars = b.add('gen-drgbw', 10, 'PAR', 0.3);
+      const warm = b.add('gen-wwcw', 4, 'Counter', 0.7, { x0: 0.25, x1: 0.75 });
+      const shelves = b.add('gen-bar12', 6, 'Shelf', 0.12, { x0: 0.15, x1: 0.85 });
+      const strip = b.add('gen-bar16', 2, 'Counter strip', 0.2, { x0: 0.3, x1: 0.7 });
+      const dance = b.add('gen-drgbwauvs', 6, 'Dance', 0.5, { x0: 0.2, x1: 0.8 });
+      const heads = b.add('gen-mover8', 4, 'Head', 0.5, { x0: 0.04, x1: 0.96 });
+      const beams = b.add('gen-roll', 2, 'Beam', 0.56, { x0: 0.4, x1: 0.6 });
       const pins = b.add('gen-dimmer', 2, 'Pinspot', 0.62, { x0: 0.42, x1: 0.58 });
       // (a pinspot's beam is a pencil, about 6°: a dimmer's 30° lit half the room past the mirror ball)
       b.place(pins, (f) => { f.beamDeg = [6, 6]; });
-      const strobe = b.add('gen-strobe', 1, 'Strobe', 0.5, { x0: 0.5, x1: 0.5 });
+      const strobes = b.add('gen-strobe', 2, 'Strobe', 0.5, { x0: 0.45, x1: 0.55 });
+      // the neon sign over the back bar (an LED matrix on the box's pixel port)
+      const sign = b.add('gen-matrix32x8', 1, 'Neon sign', 0.02, { universe: 10, x0: 0.5, x1: 0.5 });
       b.add('gen-fog', 1, 'Fog', 0.88, { x0: 0.08, x1: 0.08 });
       b.add('gen-bubbles', 1, 'Bubbles', 0.88, { x0: 0.92, x1: 0.92 });
       b.add('gen-confetti', 1, 'Confetti', 0.9, { x0: 0.3, x1: 0.3 });
@@ -642,35 +648,71 @@ export const TEMPLATES: Template[] = [
       b.add('gen-sparks', 2, 'Sparks', 0.8, { x0: 0.15, x1: 0.85 });
       const gPar = b.group('PARs', pars);
       b.group('Counter', warm);
-      const gShelf = b.group('Shelves', shelves), gDance = b.group('Dance floor', dance), gHead = b.group('Heads', heads);
-      b.group('Pinspots', pins); b.group('Strobe', strobe);
+      const gShelf = b.group('Shelves', shelves), gStrip = b.group('Counter strip', strip), gDance = b.group('Dance floor', dance), gHead = b.group('Heads', heads);
+      const gBeam = b.group('Beams', beams), gSign = b.group('Neon sign', sign);
+      b.group('Pinspots', pins); const gStrobe = b.group('Strobes', strobes);
       const drift = b.effect('Slow colour drift', 'colorFade', gPar, { speed: 60, tempo: false, spread: 0.5, colors: [C.purple, C.magenta, C.deepBlue] });
+      const parRainbow = b.effect('PAR rainbow', 'rainbow', gPar, { speed: 16 });
+      const parChase = b.effect('PAR chase', 'colorChase', gPar, { speed: 2 });
+      const parSunset = b.effect('PAR sunset', 'colorFade', gPar, { speed: 30, tempo: false, spread: 0.6, colors: [C.orange, C.pink, C.purple] });
       const aurora = b.effect('Shelf aurora', 'aurora', gShelf, {});
       const twinkle = b.effect('Shelf twinkles', 'twinkle', gShelf, {});
       const heart = b.effect('Shelf heartbeat', 'heartbeat', gShelf, {});
       const gradient = b.effect('Shelf gradient', 'gradientChase', gShelf, {});
       const plasma = b.effect('Shelf plasma', 'plasma', gShelf, {});
+      const shelfFire = b.effect('Shelf fire', 'fire2012', gShelf, {});
+      const meteors = b.effect('Strip meteors', 'meteorRain', gStrip, {});
+      const stripWaves = b.effect('Strip colour waves', 'pride', gStrip, {});
+      const stripScan = b.effect('Strip scanner', 'scanner', gStrip, {});
       const danceChase = b.effect('Dance colour chase', 'colorChase', gDance, { speed: 2 });
+      const danceRainbow = b.effect('Dance rainbow', 'rainbow', gDance, { speed: 4 });
       const bally = b.effect('Heads ballyhoo', 'ballyhoo', gHead, {});
+      const wander = b.effect('Heads wander', 'wander', gHead, { size: 0.3, speed: 8 });
+      const weave = b.effect('Heads weave', 'weave', gHead, { size: 0.35, speed: 4 });
+      const flower = b.effect('Heads flower', 'flower', gHead, { size: 0.3, speed: 8 });
+      const beamFan = b.effect('Beam fan', 'fan', gBeam, { size: 0.6, speed: 8 });
+      const beamCircles = b.effect('Beam mirror circles', 'mirrorCircles', gBeam, { size: 0.35, speed: 4 });
       const mirror = b.effect('Mirror ball sparkle', 'sparkle', gDance, { size: 0.4 });
-      const extra = [shelves, dance, heads, pins, strobe].flat();
+      const strobeHit = b.effect('Strobe hits', 'strobe', gStrobe, { speed: 1 });
+      const neon = b.effect('Neon: BAR', 'neonText', gSign, { text: 'BAR', speed: 8 });
+      const cocktails = b.effect('Neon: cocktails', 'glitchText', gSign, { text: 'COCKTAILS', speed: 3 });
+      const happy = b.effect('Neon: happy hour', 'typewriter', gSign, { text: 'HAPPY HOUR 5 TO 7', speed: 0.18 });
+      const shots = b.effect('Neon: shots!', 'wordFlash', gSign, { text: 'SHOTS SHOTS SHOTS', speed: 1 });
+      const cheers = b.effect('Neon: cheers', 'letterZoom', gSign, { text: 'CHEERS', speed: 2 });
+      const open = b.effect('Neon: open', 'spinText', gSign, { text: 'OPEN', speed: 4 });
+      const party = b.effect('Neon: party', 'wavyText', gSign, { text: 'PARTY TIME', speed: 1 });
+      const signHearts = b.effect('Neon: hearts', 'risingHearts', gSign, {});
+      const goal = b.effect('Neon: goal!', 'fallingLetters', gSign, { text: 'GOAL', speed: 2 });
+      const extra = [shelves, strip, dance, heads, beams, pins, strobes, sign].flat();
       const out: [string[], Values][] = [[extra, { intensity: 0 }]];
+      const signOn = (lvl = 1): [string[], Values] => [sign, on(lvl)];
       const l = b.list('Moods', { play: false });
       const m = b.machines();
-      b.cue(l, 'Daytime', [...out, [pars, on(0.5, C.warm)], [warm, on(0.9, undefined, { cct: 0.6 })], [shelves, on(0.4, C.warm)]], { fade: 10 });
-      b.cue(l, 'After work', [...out, [pars, on(0.6, C.amber)], [warm, on(0.7, undefined, { cct: 0.35 })], [shelves, on(0.6, C.amber)]], { fade: 15, effects: [twinkle] });
-      b.cue(l, 'Evening', [...out, [pars, on(0.5, C.purple)], [warm, on(0.5, undefined, { cct: 0.2 })], [shelves, on(0.6)]], { fade: 20, effects: [drift, aurora] });
-      b.cue(l, 'Late night', [...out, [pars, on(0.35, C.deepBlue)], [warm, on(0.3, undefined, { cct: 0.1 })], [shelves, on(0.4, C.deepBlue)]], { fade: 20, effects: [twinkle] });
-      b.cue(l, 'Happy hour', [...out, [pars, on(0.7, C.orange)], [warm, on(0.8, undefined, { cct: 0.4 })], [shelves, on(0.8)], [dance, on(0.4, C.orange)]], { fade: 5, effects: [gradient] });
-      b.cue(l, 'Cocktail hour', [...out, [pars, on(0.6, C.teal)], [warm, on(0.6, undefined, { cct: 0.3 })], [shelves, on(0.7, C.teal)], [pins, on(0.6)]], { fade: 8, effects: [plasma] });
-      b.cue(l, 'Jazz night', [...out, [pars, on(0.4, C.amber)], [warm, on(0.4, undefined, { cct: 0.15 })], [shelves, on(0.3, C.amber)], [dance, on(0.5, C.blue)], [pins, on(0.4)]], { fade: 10, effects: [heart] });
-      b.cue(l, 'Karaoke', [...out, [pars, on(0.7, C.magenta)], [warm, on(0.5, undefined, { cct: 0.3 })], [shelves, on(0.8)], [dance, on(1, C.white)], [heads, on(1, C.white, { pan: 0.5, tilt: 0.6 })]],
-        { fade: 2, effects: [gradient, mirror] });
-      b.cue(l, 'Party', [...out, [pars, on(0.8, C.purple)], [warm, on(0.3, undefined, { cct: 0.2 })], [shelves, on(1)], [dance, on(1, C.magenta)], [heads, on(1, C.cyan, { pan: 0.5, tilt: 0.65 })], [pins, on(1)]],
-        { fade: 1, effects: [danceChase, bally, plasma, mirror] });
-      b.cue(l, 'Birthday!', [...out, [pars, on(1, C.pink)], [warm, on(0.6, undefined, { cct: 0.4 })], [shelves, on(1)], [dance, on(1, C.gold)], [heads, on(1, C.gold, { pan: 0.5, tilt: 0.6 })], [pins, on(1)]],
-        { fade: 0.5, effects: [danceChase, bally, mirror], actions: fire(m.confetti, m.sparks), note: 'Confetti and sparks with the cake' });
-      b.cue(l, 'Last call', [...out, [pars, on(0.6, C.amber)], [warm, on(0.8, undefined, { cct: 0.5 })], [shelves, on(0.5, C.amber)]], { fade: 5 });
+      b.cue(l, 'Daytime', [...out, [pars, on(0.5, C.warm)], [warm, on(0.9, undefined, { cct: 0.6 })], [shelves, on(0.4, C.warm)], signOn(0.6)], { fade: 10, effects: [open] });
+      b.cue(l, 'After work', [...out, [pars, on(0.6, C.amber)], [warm, on(0.7, undefined, { cct: 0.35 })], [shelves, on(0.6, C.amber)], [strip, on(0.5, C.amber)], signOn(0.8)], { fade: 15, effects: [twinkle, neon] });
+      b.cue(l, 'Evening', [...out, [pars, on(0.5, C.purple)], [warm, on(0.5, undefined, { cct: 0.2 })], [shelves, on(0.6)], [strip, on(0.5)], signOn()], { fade: 20, effects: [drift, aurora, stripWaves, neon] });
+      b.cue(l, 'Late night', [...out, [pars, on(0.35, C.deepBlue)], [warm, on(0.3, undefined, { cct: 0.1 })], [shelves, on(0.4, C.deepBlue)], [strip, on(0.3, C.blue)], signOn(0.7)], { fade: 20, effects: [twinkle, neon] });
+      b.cue(l, 'Happy hour', [...out, [pars, on(0.7, C.orange)], [warm, on(0.8, undefined, { cct: 0.4 })], [shelves, on(0.8)], [dance, on(0.4, C.orange)], [strip, on(0.8)], signOn()], { fade: 5, effects: [gradient, meteors, happy] });
+      b.cue(l, 'Cocktail hour', [...out, [pars, on(0.6, C.teal)], [warm, on(0.6, undefined, { cct: 0.3 })], [shelves, on(0.7, C.teal)], [pins, on(0.6)], [strip, on(0.6, C.teal)], signOn()], { fade: 8, effects: [plasma, cocktails] });
+      b.cue(l, 'Jazz night', [...out, [pars, on(0.4, C.amber)], [warm, on(0.4, undefined, { cct: 0.15 })], [shelves, on(0.3, C.amber)], [dance, on(0.5, C.blue)], [pins, on(0.4)], signOn(0.6)], { fade: 10, effects: [heart, neon] });
+      b.cue(l, 'Blues', [...out, [pars, on(0.4, C.deepBlue)], [warm, on(0.25, undefined, { cct: 0.1 })], [shelves, on(0.4, C.blue)], [dance, on(0.4, C.deepBlue)], [heads, on(0.4, C.blue, { pan: 0.5, tilt: 0.6 })]], { fade: 8, effects: [wander, aurora] });
+      b.cue(l, 'Rooftop sunset', [...out, [pars, on(0.8)], [warm, on(0.5, undefined, { cct: 0.15 })], [shelves, on(0.8, C.orange)], [strip, on(0.7, C.pink)], signOn()], { fade: 12, effects: [parSunset, shelfFire, cheers] });
+      b.cue(l, 'Quiz night', [...out, [pars, on(0.7, C.cool)], [warm, on(0.9, undefined, { cct: 0.7 })], [shelves, on(0.6, C.cyan)], signOn()], { fade: 4, effects: [stripScan, open] });
+      b.cue(l, 'Football', [...out, ...split(pars, C.red, C.white), [warm, on(0.8, undefined, { cct: 0.6 })], [shelves, on(1, C.red)], [strip, on(1)], signOn()], { fade: 1, effects: [parChase, stripScan, goal] });
+      b.cue(l, 'Karaoke', [...out, [pars, on(0.7, C.magenta)], [warm, on(0.5, undefined, { cct: 0.3 })], [shelves, on(0.8)], [dance, on(1, C.white)], [heads, on(1, C.white, { pan: 0.5, tilt: 0.6 })], signOn()],
+        { fade: 2, effects: [gradient, mirror, party] });
+      b.cue(l, 'Latin night', [...out, [pars, on(0.8, C.orange)], [shelves, on(1, C.red)], [dance, on(1, C.yellow)], [heads, on(1, C.orange, { pan: 0.5, tilt: 0.62 })], [strip, on(1)], signOn()], { fade: 1, effects: [parChase, flower, danceChase, shelfFire, party] });
+      b.cue(l, 'Disco', [...out, [pars, on(0.8)], [shelves, on(1)], [dance, on(1)], [heads, on(1, C.white, { pan: 0.5, tilt: 0.65 })], [beams, on(1, C.white, { pan: 0.5, tilt: 0.62, zoom: 0, prism: 1 })], [pins, on(1)], [strip, on(1)]],
+        { fade: 1, effects: [parRainbow, danceRainbow, beamCircles, stripWaves, mirror] });
+      b.cue(l, 'Party', [...out, [pars, on(0.8, C.purple)], [warm, on(0.3, undefined, { cct: 0.2 })], [shelves, on(1)], [dance, on(1, C.magenta)], [heads, on(1, C.cyan, { pan: 0.5, tilt: 0.65 })], [pins, on(1)],
+        [beams, on(1, C.magenta, { pan: 0.5, tilt: 0.62, zoom: 0 })], [strip, on(1)], signOn()], { fade: 1, effects: [danceChase, bally, plasma, mirror, beamFan, party] });
+      b.cue(l, 'Shots!', [...out, [pars, on(1, C.red)], [shelves, on(1, C.red)], [dance, on(1, C.white)], [strobes, on(1, undefined, { strobe: 0.6 })], [heads, on(1, C.red, { pan: 0.5, tilt: 0.62 })], [strip, on(1, C.red)], signOn()],
+        { fade: 0, effects: [strobeHit, weave, shots, meteors] });
+      b.cue(l, 'Ladies\' night', [...out, [pars, on(0.8, C.pink)], [shelves, on(0.9, C.magenta)], [dance, on(1, C.pink)], [heads, on(1, C.pink, { pan: 0.5, tilt: 0.62 })], [strip, on(0.9, C.pink)], signOn()], { fade: 2, effects: [weave, danceChase, signHearts, stripWaves] });
+      b.cue(l, 'Birthday!', [...out, [pars, on(1, C.pink)], [warm, on(0.6, undefined, { cct: 0.4 })], [shelves, on(1)], [dance, on(1, C.gold)], [heads, on(1, C.gold, { pan: 0.5, tilt: 0.6 })], [pins, on(1)], signOn()],
+        { fade: 0.5, effects: [danceChase, bally, mirror, cheers], actions: fire(m.confetti, m.sparks), note: 'Confetti and sparks with the cake: the one confetti shot' });
+      b.cue(l, 'Lock-in', [...out, [pars, on(0.2, C.red)], [warm, on(0.2, undefined, { cct: 0.05 })], [shelves, on(0.5, C.red)], [strip, on(0.3, C.red)]], { fade: 10, effects: [shelfFire] });
+      b.cue(l, 'Last call', [...out, [pars, on(0.6, C.amber)], [warm, on(0.8, undefined, { cct: 0.5 })], [shelves, on(0.5, C.amber)], signOn()], { fade: 5, effects: [cheers] });
       b.cue(l, 'Lights up', [...out, [pars, on(1, C.white)], [warm, on(1, undefined, { cct: 0.8 })], [shelves, on(0.6, C.white)], [dance, on(1, C.white)]], { fade: 3 });
       // (in its own room, a bar: the counter, the back bar, the dance floor; scenePlaces.ts)
       const done = b.done();

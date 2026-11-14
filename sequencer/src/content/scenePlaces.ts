@@ -44,18 +44,23 @@ const CINEMA_PLACES: Table = {
 // ---- the bar
 const B = BAR, rail = B.rail - 0.18;
 const BAR_PLACES: Table = {
-  // colour PARs on the rails: three over the counter, three over the room
-  PAR: (i, n) => { const front = i < n / 2, k = front ? i : i - Math.ceil(n / 2), x = spread(k, Math.ceil(n / 2), -4.5, 4.5), z = front ? -0.6 : 2.4; return aim({ x, y: rail, z }, front ? { x, y: B.counterH, z: B.counterZ } : { x, y: 0, z: z + 0.6 }); },
+  // colour PARs on the rails: half over the counter, half over the room
+  PAR: (i, n) => { const front = i < n / 2, k = front ? i : i - Math.ceil(n / 2), x = spread(k, Math.ceil(n / 2), -5.2, 5.2), z = front ? -0.6 : 2.4; return aim({ x, y: rail, z }, front ? { x, y: B.counterH, z: B.counterZ } : { x, y: 0, z: z + 0.6 }); },
   // warm white over the counter, between the pendants
-  Counter: (i, n) => { const x = spread(i, n, -2, 2); return aim({ x, y: 2.55, z: B.counterZ }, { x, y: 0, z: B.counterZ }); },
+  Counter: (i, n) => { const x = spread(i, n, -3, 3); return aim({ x, y: 2.55, z: B.counterZ }, { x, y: 0, z: B.counterZ }); },
   // the back bar's uplights under the bottles
-  Shelf: (i, n) => { const x = spread(i, n, -4.2, 4.2); return aim({ x, y: 1.08, z: B.backZ + 0.2 }, { x, y: 3.2, z: B.backZ - 0.1 }); },
+  Shelf: (i, n) => { const x = spread(i, n, -4.6, 4.6); return aim({ x, y: 1.08, z: B.backZ + 0.2 }, { x, y: 3.2, z: B.backZ - 0.1 }); },
+  // the LED strips along the counter's front, at the foot rail, shining out at the stools
+  'Counter strip': (i) => { const x = i ? 2.6 : -2.6; return aim({ x, y: 0.2, z: B.counterZ + 0.32 }, { x, y: 0.4, z: B.counterZ + 3 }); },
   // the dance floor's wash
-  Dance: (i, n) => { const x = spread(i, n, -2.7, 2.7); return aim({ x, y: rail, z: 5.0 }, { x: x * 0.6, y: 0, z: 4.6 }); },
-  Head: (i, n) => hung({ x: spread(i, n, -2.5, 2.5), y: rail, z: 7.4 }),
+  Dance: (i, n) => { const x = spread(i, n, -3.2, 3.2); return aim({ x, y: rail, z: 5.0 }, { x: x * 0.6, y: 0, z: 4.6 }); },
+  Head: (i, n) => hung({ x: spread(i, n, -3.6, 3.6), y: rail, z: 7.4 }),
+  Beam: (i) => hung({ x: i ? 1.2 : -1.2, y: rail, z: 2.4 }),
   // pinspots on the mirror ball
   Pinspot: (i) => { const p = i ? { x: -5.4, y: rail, z: 5.0 } : { x: -1.2, y: rail, z: 2.4 }; return aim(p, { x: B.ball.x, y: B.ball.y, z: B.ball.z }); },
-  Strobe: () => aim({ x: 0, y: rail, z: 5.0 }, { x: 0, y: 0, z: 5.0 }),
+  Strobe: (i) => aim({ x: i ? 0.6 : -0.6, y: rail, z: 5.0 }, { x: i ? 0.6 : -0.6, y: 0, z: 5.0 }),
+  // the LED sign over the bottles, on the back wall beside the bar's own neon, facing the room
+  'Neon sign': () => ({ p: { x: 3.4, y: 3.32, z: B.backZ + 0.12 }, rot: { yaw: 0, pitch: 90, roll: 0 } }),
   Fog: () => stand({ x: -7.2, y: 0, z: 8.4 }, 140),
   Bubbles: () => stand({ x: 7.2, y: 0, z: 8.4 }, -140),
   Confetti: () => stand({ x: -4.2, y: 0, z: 7.6 }),

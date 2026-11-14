@@ -13,6 +13,10 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A much bigger Bar**: 45 lights (ten PARs, six shelf bars, an LED strip on the counter, heads, beam
+  heads, strobes) and an LED sign beside the neon (BAR in neon, HAPPY HOUR typed out, SHOTS on the beat,
+  GOAL for the match). Twenty-two moods: rooftop sunset, quiz night, football, Latin night, disco,
+  shots, ladies' night, the lock-in. Confetti only for the birthday.
 - **A much bigger Wedding**: 67 lights (16 uplights, a pinspot on all 13 tables, eight heads, four
   spots, beam heads, the dance floor's own), an LED sign over the head table (Just married, LOVE in
   neon, Mr & Mrs) and a heart panel on the DJ's table, and 24 looks from the guests arriving to the

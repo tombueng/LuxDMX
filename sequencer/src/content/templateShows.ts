@@ -83,11 +83,12 @@ export const TEMPLATE_SHOWS: Record<string, TemplateShow> = {
   Bar: {
     crowd: 'bar', song: 'light-me-on-fire', list: 'Moods', end: 'Last call',
     sets: {
-      intro: [['Evening']], verse: [['Cocktail hour'], ['Jazz night'], ['Late night']], build: [['Happy hour']],
-      chorus: [['Party'], ['Party', 'Birthday!']], solo: [['Karaoke']], break: [['Late night']],
-      inst: [['Happy hour', 'Party']], outro: [['Last call']],
+      intro: [['Evening']], verse: [['Cocktail hour', 'Rooftop sunset'], ['Jazz night', 'Blues'], ['Late night', 'Ladies\' night']], build: [['Happy hour', 'Shots!']],
+      chorus: [['Party', 'Disco'], ['Latin night', 'Party'], ['Disco', 'Shots!']], solo: [['Karaoke']], break: [['Late night', 'Lock-in']],
+      inst: [['Happy hour', 'Party'], ['Disco', 'Latin night']], outro: [['Last call']],
     },
-    lastChorus: ['Birthday!', 'Party', 'Birthday!'], hits: ['confetti', 'sparks', 'bubbles'],
+    // (the one confetti shot is the birthday's own)
+    lastChorus: ['Birthday!', 'Party', 'Disco', 'Shots!'], hits: ['sparks', 'bubbles'],
   },
 };
 
