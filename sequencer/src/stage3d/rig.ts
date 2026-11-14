@@ -448,13 +448,16 @@ export class Rig {
       qb.setFromUnitVectors(UP, dir); mb.compose(p, qb, sb.set(r, L, r)); this.beams.setMatrixAt(nb, mb); this.beams.setColorAt(nb, c); this.beamLevel.setX(nb, level); nb++;
       if (pool && hit && L < maxLen && np < this.pools.instanceMatrix.count) {
         // (flat on what it lands on, the floor or a wall: stretched along the beam's way across it)
-        // (a wash grazing a wall runs a long way up it: stretched further there than on the floor)
-        const n = NV.set(hit.n.x, hit.n.y, hit.n.z), cos = Math.abs(dir.dot(n)), rr = Math.max(0.15, r) / Math.max(n.y > 0.5 ? 0.35 : 0.16, cos);
+        // (a wash grazing a wall runs a long way up it: stretched further there than on the floor, at
+        // most three times as long as it's wide, and the more it grazes the more it spreads its light
+        // thin: dimmer, as on a real wall)
+        const n = NV.set(hit.n.x, hit.n.y, hit.n.z), cos = Math.abs(dir.dot(n)), wall = n.y <= 0.5, r0 = Math.max(0.15, r);
+        const rr = wall ? Math.min(3 * r0, r0 / Math.max(0.16, cos)) : r0 / Math.max(0.35, cos), dim = wall ? Math.max(0.4, Math.min(1, cos / 0.3)) : 1;
         PZ.copy(dir).addScaledVector(n, -dir.dot(n)); if (PZ.lengthSq() < 1e-8) PZ.set(0, n.y ? 0 : 1, n.y ? 1 : 0); PZ.normalize();
         PX.crossVectors(n, PZ).normalize(); BASIS.makeBasis(PX, n, PZ); qb.setFromRotationMatrix(BASIS);
-        mb.compose(pb.set(hit.x + n.x * 0.01, hit.y + n.y * 0.01, hit.z + n.z * 0.01), qb, sb.set(Math.max(0.15, r), 1, rr));
+        mb.compose(pb.set(hit.x + n.x * 0.01, hit.y + n.y * 0.01, hit.z + n.z * 0.01), qb, sb.set(r0, 1, rr));
         if (n.y < 0.5) nw++;
-        this.pools.setMatrixAt(np, mb); this.pools.setColorAt(np, c); this.poolLevel.setX(np, level * (1 - L / MAX_BEAM) * 1.2);
+        this.pools.setMatrixAt(np, mb); this.pools.setColorAt(np, c); this.poolLevel.setX(np, level * dim * (1 - L / MAX_BEAM) * 1.2);
         this.poolGobo.setXYZW(np, gobo[0], gobo[1], gobo[2], gobo[3]); this.poolFx.setXYZW(np, gobo[4], gobo[5], soft, 0); np++;
       }
     };

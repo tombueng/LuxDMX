@@ -126,6 +126,12 @@ describe('the Cinema, Bar, Theatre and Church templates in their rooms', () => {
       }
     }
   });
+  it('the bar\'s pinspots are pencils (6°): a dimmer\'s 30° past the mirror ball lit a whole wall', async () => {
+    const { TEMPLATES } = await import('../content/templates');
+    const pins = TEMPLATES.find((t) => t.name === 'Bar')!.build().fixtures.filter((f) => /^Pinspot/.test(f.name));
+    expect(pins.length).toBe(2);
+    for (const f of pins) expect(f.beamDeg).toEqual([6, 6]);
+  });
   it('the bar: people at the counter, the mirror ball turning', () => {
     const v = room('bar');
     expect(v.room).toBe('bar');

@@ -559,6 +559,8 @@ export const TEMPLATES: Template[] = [
       const dance = b.add('gen-drgbwauvs', 4, 'Dance', 0.5, { x0: 0.2, x1: 0.8 });
       const heads = b.add('gen-mover8', 2, 'Head', 0.5, { x0: 0.04, x1: 0.96 });
       const pins = b.add('gen-dimmer', 2, 'Pinspot', 0.62, { x0: 0.42, x1: 0.58 });
+      // (a pinspot's beam is a pencil, about 6°: a dimmer's 30° lit half the room past the mirror ball)
+      b.place(pins, (f) => { f.beamDeg = [6, 6]; });
       const strobe = b.add('gen-strobe', 1, 'Strobe', 0.5, { x0: 0.5, x1: 0.5 });
       b.add('gen-fog', 1, 'Fog', 0.88, { x0: 0.08, x1: 0.08 });
       b.add('gen-bubbles', 1, 'Bubbles', 0.88, { x0: 0.92, x1: 0.92 });

@@ -457,6 +457,8 @@
       lastMix: () => lastMix,
       // (where the light landed in the last frame: on the floor and the deck, or on walls)
       pools: () => ({ walls: rig?.wallPools ?? 0 }),
+      // (the lit lights of the last frame: where each shines from and to, how wide and bright)
+      lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
       ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: houseMats.length ? Math.max(...houseMats.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null }),
     };
