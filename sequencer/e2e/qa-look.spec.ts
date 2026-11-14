@@ -840,3 +840,18 @@ test('a cue\'s Then says its choices in words (no literal "N": the number is the
   await then.selectOption('beats');
   await expect(page.getByLabel('Advance time')).toBeVisible();
 });
+
+test('an open effect gets the room on a laptop (1440 x 900): the list two rows and a scroll, the hint gone, the knobs mostly in sight', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await startTemplate(page, 'Band');
+  await page.locator('.side').getByRole('tab', { name: 'Effects' }).click();
+  await expect(page.locator('.side .ep').getByText('Running effects have a green edge')).toBeVisible();
+  await page.locator('.side .ep li.oitem').first().click();
+  const ed = page.locator('.side .ep .editor');
+  await expect(ed).toBeVisible();
+  await expect(page.locator('.side .ep').getByText('Running effects have a green edge')).toHaveCount(0);
+  const h = await ed.evaluate((el) => ({ shown: el.clientHeight, all: el.scrollHeight }));
+  expect(h.shown).toBeGreaterThan(280);                      // (it was 205 of 399)
+});
