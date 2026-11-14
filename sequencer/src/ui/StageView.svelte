@@ -332,6 +332,9 @@
     for (const f of app.show.fixtures) { const w = halfW(f.id), x = f.x * W, y = f.y * H; put({ id: f.id, x0: x - w, x1: x + w, y0: y - size * 0.7, y1: y + size * 0.7 }); }
     // the word "audience" at the front edge is in the way too
     put({ id: 'audience', x0: W / 2 - 34 * px, x1: W / 2 + 34 * px, y0: H - 30, y1: H - 12 });
+    // and so are the stage's measurements, "14 m wide" at the top and "9 m deep" at the side
+    put({ id: 'wide', x0: W / 2 - 32 * px, x1: W / 2 + 32 * px, y0: 2 * px, y1: 24 * px });
+    put({ id: 'deep', x0: 8 * px, x1: 22 * px, y0: H / 2 - 28 * px, y1: H / 2 + 28 * px });
     // (a name reads as the light nearest to it: every other light clearly further from the label
     // than its own, else it's left out rather than mistaken for that one's)
     // (above it, the last resort, it has to be clearly its own: that's where a name read as the
@@ -397,6 +400,8 @@
       <!-- (and whenever it's on: Console's switch is the same one, and with a mouse it stayed on here with nothing to switch it off) -->
       {#if (coarse || ui.addSel) && !readonly}<button class="ghost" class:on={ui.addSel} aria-pressed={ui.addSel} onclick={() => (ui.addSel = !ui.addSel)} title="On: a tap adds a light or a group to the selection (or takes it out), as Shift does with a mouse">+ Add</button>{/if}
       {#if !ui.stage3d}
+      <!-- (the plan's own tools stay together: on a tablet the magnifier wrapped to a line alone) -->
+      <span class="tset">
       <span class="sep"></span>
       <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show the names (with each light's number)" aria-label="Names" aria-pressed={labels}>Aa</button>
       <button class="ghost" class:on={addrs} onclick={() => (addrs = !addrs)} title="Show each light's number (what the console goes by) and DMX address" aria-label="Numbers and DMX addresses" aria-pressed={addrs}>#</button>
@@ -404,6 +409,7 @@
       <button class="ghost zoomin" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="search" size={14} />+</button>
       <!-- (only while zoomed in: a greyed-out "100%" took a toolbar row of its own on a laptop) -->
       {#if view.k > 1}<button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>{/if}
+      </span>
       {/if}
     </div>
     {/if}
@@ -579,6 +585,7 @@
   .three { position: absolute; inset: 0; z-index: 3; display: flex; }
   .loading { margin: auto; }
   .head { margin-bottom: .35rem; flex-wrap: wrap; }
+  .tset { display: inline-flex; align-items: center; gap: .25rem; flex: none; }
   .grp { padding: .12rem .5rem; font-size: .8rem; border-radius: 999px; }
   .area { position: relative; flex: 1; min-height: 0; }
   /* (a phone pinches: the button took a toolbar row of its own) */
