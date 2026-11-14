@@ -18,7 +18,7 @@ test('the gallery: a live tile for each thing the 3D stage draws, machines too; 
   await page.keyboard.press('Enter');
   const g = page.getByRole('dialog', { name: 'What the 3D stage draws' });
   await expect(g).toBeVisible();
-  await expect(g.getByRole('group')).toHaveCount(22);
+  await expect(g.getByRole('group')).toHaveCount(23);
   // a gobo spot plays: its gobo on the floor
   const gobos = g.locator('[data-item="gobos"]');
   await expect.poll(() => lit(gobos), { timeout: 40000 }).toBeGreaterThan(15);
@@ -26,6 +26,17 @@ test('the gallery: a live tile for each thing the 3D stage draws, machines too; 
   const sparks = g.locator('[data-item="sparks"]');
   await sparks.scrollIntoViewIfNeeded();
   await expect.poll(() => lit(sparks), { timeout: 40000 }).toBeGreaterThan(5);
+  // uplights at the foot of a wall: their light on the wall, four colours
+  const ups = g.locator('[data-item="uplights"]');
+  await ups.scrollIntoViewIfNeeded();
+  await expect.poll(() => lit(ups), { timeout: 40000 }).toBeGreaterThan(400);
+  const hues = await ups.locator('canvas').first().evaluate((c: HTMLCanvasElement) => {
+    const x = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data, seen = new Set<number>();
+    for (let i = 0; i < x.length; i += 4) { const r = x[i], gg = x[i + 1], b = x[i + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      if (mx > 120 && mx - mn > 60) seen.add(Math.round((Math.atan2(Math.sqrt(3) * (gg - b), 2 * r - gg - b) * 180 / Math.PI + 360) % 360 / 45)); }
+    return seen.size;
+  });
+  expect(hues).toBeGreaterThanOrEqual(3);
   // bigger, and back
   await gobos.scrollIntoViewIfNeeded();
   await gobos.getByRole('button', { name: 'Gobos, turning, bigger' }).click();

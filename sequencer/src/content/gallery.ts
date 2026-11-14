@@ -2,7 +2,7 @@
 // built-in lights. The README's GIFs are made from the same list (tools/gallery/capture.mjs).
 import type { Focus } from '../stage3d/microShow';
 
-export interface GalleryItem { id: string; title: string; says: string; type: string; copies?: number; focus?: Focus; extra?: string }
+export interface GalleryItem { id: string; title: string; says: string; type: string; copies?: number; focus?: Focus; extra?: string; wall?: boolean }
 
 export const GALLERY: GalleryItem[] = [
   { id: 'gobos', title: 'Gobos, turning', type: 'gen-spotgobo', focus: 'gobo',
@@ -29,6 +29,8 @@ export const GALLERY: GalleryItem[] = [
     says: 'One light with a shape: a 241-pixel disc on nine rings, effects drawn on it pixel by pixel.' },
   { id: 'matrix', title: 'Pixel matrix', type: 'gen-matrix16x16',
     says: 'A 16 x 16 WS2812 panel, one light laid out as a grid.' },
+  { id: 'uplights', title: 'Uplights on a wall', type: 'gen-drgbw', copies: 4, focus: 'colour', wall: true,
+    says: 'Uplights at the foot of a wall, each washing it in its own colour: brightest just above the light, fading as it runs up.' },
   { id: 'pars', title: 'PARs', type: 'gen-drgbws', copies: 4,
     says: 'The everyday RGBW PAR, running the colours, with a burst of strobe.' },
   { id: 'strobe', title: 'Strobes', type: 'gen-strobe', copies: 2,

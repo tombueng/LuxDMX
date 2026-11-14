@@ -63,4 +63,13 @@ describe('micro shows', () => {
     expect(hue(0)).toEqual({ r: 1, g: 0, b: 0 });
     expect(hue(1 / 3).g).toBeCloseTo(1);
   });
+  it('a row of colour PARs: each light its own place round the colours', async () => {
+    const { GENERIC, kindOf } = await import('../model/library');
+    const { rigFixtureFull } = await import('./rigOf');
+    const { HALL } = await import('./geometry');
+    const t = GENERIC.find((x) => x.id === 'gen-drgbw')!, m = t.modes[0];
+    const rf = rigFixtureFull({ id: 'f', name: 'x', typeId: t.id, mode: m.name, universe: 0, address: 1, x: 0.5, y: 0.5 } as never, m, kindOf(m), t, HALL);
+    const s = microShow(rf, m, 'colour'), cs = [0, 1, 2, 3].map((i) => JSON.stringify(s.at(1, i, 4).color));
+    expect(new Set(cs).size).toBe(4);
+  });
 });

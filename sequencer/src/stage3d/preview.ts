@@ -26,8 +26,9 @@ import type { Fixture, FixtureMode, FixtureType, Resolved } from '../model/types
 
 // a light, in one of its modes; `copies`: a row of them (the gallery's fans); `focus`: one thing
 // shown off on its own (microShow.ts)
-// `extra`: another light with it, hung over it shining at it (a wash through the fog)
-export interface PreviewLight { type: FixtureType; mode?: string; copies?: number; focus?: Focus; extra?: FixtureType }
+// `extra`: another light with it, hung over it shining at it (a wash through the fog); `wall`:
+// standing at the foot of a wall, washing it (uplights)
+export interface PreviewLight { type: FixtureType; mode?: string; copies?: number; focus?: Focus; extra?: FixtureType; wall?: boolean }
 export interface PreviewHandle { set(light: PreviewLight): void; hover(on: boolean): void; destroy(): void; readonly does: string[] }
 
 const OFF = 400;                 // metres off to the side of every room: no deck, the floor at 0
@@ -35,9 +36,11 @@ const HANG = 2.7;                // a hung light this high (low: the light big, 
 // the room the previews are in, while they're drawn: no deck (the beams land on the floor at 0),
 // walls far round the preview's spot (the fog stays inside a room's walls)
 const ROOM: Room = { ...ROOMS.truss, deck: { x: -1, z0: -1.7, z1: -1.7 }, walls: { x: OFF + 20, z0: -8, z1: 14 }, ceiling: 7 };
-interface Placed { list: RigFixture[]; m: FixtureMode | undefined; show: MicroShow; cam: { at: THREE.Vector3; from: THREE.Vector3 }; extra?: { rf: RigFixture; show: MicroShow } }
+// (and for uplights: a real wall behind them, that the light lands on)
+const WALL_Z = -1.2, WALL_ROOM: Room = { ...ROOM, walls: { ...ROOM.walls, z0: WALL_Z } };
+interface Placed { list: RigFixture[]; m: FixtureMode | undefined; show: MicroShow; cam: { at: THREE.Vector3; from: THREE.Vector3 }; extra?: { rf: RigFixture; show: MicroShow }; wall?: boolean }
 interface Slot extends Placed {
-  canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; rig: Rig; particles?: Particles; stepped: number;
+  canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; rig: Rig; particles?: Particles; wallMesh?: THREE.Mesh; stepped: number;
   visible: boolean; hover: boolean; last: number; phase: number; drawn: number;
 }
 
@@ -108,6 +111,14 @@ function placed(light: PreviewLight): Placed {
   const one = (i: number) => rigFixtureFull({ id: `preview${i}`, name: t.model, typeId: t.id, mode: m?.name ?? '', universe: 0, address: 1, x: 0.5, y: 0.5 } as Fixture, m, k, t, HALL);
   const list = Array.from({ length: n }, (_, i) => one(i)), rf0 = list[0];
   const show = microShow(rf0, m, light.focus);
+  // uplights: standing at the foot of a wall, a little apart, each tipped into it
+  if (light.wall) {
+    const step = 1.5, xs = list.map((_, i) => OFF + (i - (n - 1) / 2) * step);
+    // (an uplight's wide wash, about 36°, whatever the type says)
+    list.forEach((rf, i) => { rf.p = { x: xs[i], y: 0.05, z: WALL_Z + 0.35 }; rf.rot = aimRot(rf.p, { x: xs[i], y: 2.4, z: WALL_Z }); rf.beam = [36, 36]; });
+    const at = new THREE.Vector3(OFF, 1.5, WALL_Z), back = 1 + ((n - 1) * step) / 6;
+    return { list, m, show, wall: true, cam: { at, from: at.clone().add(new THREE.Vector3(0.6 * back, 0.3 * back, 3.6 * back)) } };
+  }
   const hung = ['spot', 'wash', 'par', 'fresnel', 'blinder', 'strobe', 'headbar'].includes(rf0.look);
   const size = rf0.size ?? (rf0.look === 'bar' ? Math.max(1, rf0.cells / 30) : rf0.look === 'winch' ? 0.5 : 0.6);
   const gap = hung ? (rf0.look === 'headbar' ? 1.4 : 0.95) : Math.max(0.9, size * 1.25);
@@ -154,7 +165,7 @@ function drawAt(s: Slot, t: number, w: number, h: number) {
   const size = renderer.getSize(new THREE.Vector2());
   if (size.x !== w || size.y !== h) { renderer.setSize(w, h, false); composer?.setSize(w, h); }
   // (its walls are only where the fog stops, nothing to see: the light lands on the floor alone)
-  const was = shownRoom(), walls = wallsShown(); showRoom(ROOM); showWalls(false);
+  const was = shownRoom(), walls = wallsShown(); showRoom(s.wall ? WALL_ROOM : ROOM); showWalls(!!s.wall);
   try { stage(s, t, w, h); } finally { showRoom(was); showWalls(walls); }
   // (the glow when the page has time for it; plain when it's busy. A disc or a matrix, all lit,
   // glows less: it went white)
@@ -166,7 +177,7 @@ function drawAt(s: Slot, t: number, w: number, h: number) {
 function stage(s: Slot, t: number, w: number, h: number) {
   camera.aspect = w / h; camera.updateProjectionMatrix();
   camera.position.copy(s.cam.from); camera.lookAt(s.cam.at);
-  for (const o of slots.values()) { o.rig.group.visible = o === s; if (o.particles) o.particles.group.visible = o === s; }
+  for (const o of slots.values()) { o.rig.group.visible = o === s; if (o.particles) o.particles.group.visible = o === s; if (o.wallMesh) o.wallMesh.visible = o === s; }
   s.rig.group.visible = true;
   const n = s.list.length - (s.extra ? 1 : 0), values: Record<string, Resolved> = {};
   s.list.forEach((f, i) => { values[f.id] = s.extra?.rf === f ? s.extra.show.at(t) : s.show.at(t, i, n); });
@@ -231,6 +242,9 @@ function slotFor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, light
 }
 // a machine's flames, confetti or fog: their own particles (made when the slot shows a machine)
 function machinesOf(s: Slot) {
+  // (the wall the uplights wash: the slot's own, shown only while it's drawn)
+  if (s.wall && !s.wallMesh) { s.wallMesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), new THREE.MeshStandardMaterial({ color: 0x6a625a, roughness: 0.92 })); s.wallMesh.position.set(OFF, 3, WALL_Z); scene.add(s.wallMesh); }
+  if (!s.wall && s.wallMesh) { scene.remove(s.wallMesh); s.wallMesh.geometry.dispose(); (s.wallMesh.material as THREE.Material).dispose(); s.wallMesh = undefined; }
   const want = s.list.some((f) => f.sfx || f.fog);
   if (want && !s.particles) { s.particles = new Particles(); scene.add(s.particles.group); }
   if (!want && s.particles) { scene.remove(s.particles.group); s.particles = undefined; }
@@ -239,6 +253,7 @@ function machinesOf(s: Slot) {
 function free(s: Slot) {
   scene?.remove(s.rig.group); if (spare.length < 48) spare.push(s.rig);
   if (s.particles) scene?.remove(s.particles.group);
+  if (s.wallMesh) { scene?.remove(s.wallMesh); s.wallMesh.geometry.dispose(); (s.wallMesh.material as THREE.Material).dispose(); }
 }
 
 // A canvas showing a light: its micro show, live while it's on the screen.

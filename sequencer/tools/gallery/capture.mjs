@@ -36,7 +36,7 @@ for (const g of items) {
     const { GENERIC } = await import('/src/model/library.ts');
     const { frames } = await import('/src/stage3d/preview.ts');
     const type = GENERIC.find((t) => t.id === g.type), extra = g.extra ? GENERIC.find((t) => t.id === g.extra) : undefined;
-    return frames({ type, copies: g.copies, focus: g.focus, extra }, { w: W, h: H, n: Math.round(SECS * FPS), fps: FPS });
+    return frames({ type, copies: g.copies, focus: g.focus, extra, wall: g.wall }, { w: W, h: H, n: Math.round(SECS * FPS), fps: FPS });
   }, { g, W, H, SECS, FPS });
   const dir = path.join(FRAMES, g.id);
   fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });

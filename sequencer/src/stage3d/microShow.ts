@@ -160,10 +160,11 @@ export function microShow(rf: Pick<RigFixture, 'look' | 'cells' | 'gobos' | 'pri
   if (has('strobe')) does.push('strobe');
   return {
     len: L, does,
-    at(t) {
+    at(t, i = 0, k = 1) {
       const u = ((t % L) + L) % L;
-      // (the colours, and a burst of strobe at the end when it has one)
-      if (coloured) return { intensity: 1, ...(has('strobe') && u >= L - 1.2 ? { strobe: 0.6 } : {}), color: colourAt(u) };
+      // (the colours, each light of a row its own place round them, and a burst of strobe at the end
+      // when it has one)
+      if (coloured) return { intensity: 1, ...(has('strobe') && u >= L - 1.2 ? { strobe: 0.6 } : {}), color: colourAt(u, 1, i, k) };
       return { intensity: 0.15 + 0.85 * (0.5 + 0.5 * Math.sin((u / L) * Math.PI * 4)) };
     },
   };

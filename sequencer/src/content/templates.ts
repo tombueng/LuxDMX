@@ -440,6 +440,7 @@ export const TEMPLATES: Template[] = [
       const choir = b.add('gen-wwcw', 4, 'Choir', 0.34, { x0: 0.2, x1: 0.8 });
       const heads = b.add('gen-wash', 4, 'Head', 0.09, { x0: 0.2, x1: 0.8 });
       const walls = [...b.add('gen-drgbw', 3, 'Wall', 0.32, { x0: 0.02, x1: 0.02 }), ...b.add('gen-drgbw', 3, 'Wall', 0.32, { x0: 0.98, x1: 0.98, from: 4 })];
+      b.place(walls, (f) => { f.beamDeg = [36, 36]; });     // (wall washers: a wide wash up the wall)
       b.place(walls, (f, i) => { const side = i < 3 ? -1 : 1, k = i % 3; f.y = 0.3 + k * 0.2; f.p3 = { x: side * 6.6, y: DECK, z: -3 + k * 2.6 }; f.rot = { yaw: -side * 90, pitch: 12, roll: 0 }; });
       const blinders = b.add('gen-blinder2', 2, 'Blinder', 0.88, { x0: 0.3, x1: 0.7 });
       const battens = b.add('gen-bar16', 2, 'Batten', 0.47, { x0: 0.25, x1: 0.75 });
@@ -497,6 +498,7 @@ export const TEMPLATES: Template[] = [
       const b = new Builder('Cinema');
       const house = b.add('gen-dimmer', 4, 'House', 0.54);
       const walls = b.add('gen-rgb', 6, 'Wall', 0.06);
+      b.place(walls, (f) => { f.beamDeg = [36, 36]; });     // (wall washers: a wide wash up the wall)
       // a stage in front of the screen for premieres and live events, the screen's marquee lights,
       // step lights, a starry ceiling, haze for the spots and the premiere machines
       const marquee = b.add('gen-bar16', 4, 'Marquee', 0.22, { x0: 0.2, x1: 0.8 });
@@ -610,6 +612,7 @@ export const TEMPLATES: Template[] = [
     build: () => {
       const b = new Builder('Wedding');
       const ups = b.add('gen-drgbw', 14, 'Uplight', 0.1);
+      b.place(ups, (f) => { f.beamDeg = [36, 36]; });       // (uplights: a wide wash up the wall)
       const pins = b.add('gen-dimmer', 10, 'Pinspot', 0.5);
       // (pinspots on the centrepieces: a pencil of light each, as a real pinspot's)
       b.place(pins, (f) => { f.beamDeg = [8, 8]; });

@@ -22,7 +22,7 @@
   {#if bigItem}
     {@const t = typeOf(bigItem.type)}
     <div class="big">
-      <div class="pv"><FixturePreview type={t} copies={bigItem.copies ?? 1} focus={bigItem.focus ?? 'all'} extra={bigItem.extra ? typeOf(bigItem.extra) : undefined} hover /></div>
+      <div class="pv"><FixturePreview type={t} copies={bigItem.copies ?? 1} focus={bigItem.focus ?? 'all'} extra={bigItem.extra ? typeOf(bigItem.extra) : undefined} wall={!!bigItem.wall} hover /></div>
       <div class="bt">
         <h3>{bigItem.title}</h3><p>{bigItem.says}</p>
         <div class="row acts">
@@ -38,7 +38,7 @@
         <div class="tile" role="group" aria-label={g.title} data-item={g.id}
              onpointerenter={() => (hot = g.id)} onpointerleave={() => { if (hot === g.id) hot = ''; }}>
           <button class="pv" onclick={() => (big = g.id)} aria-label="{g.title}, bigger" onfocus={() => (hot = g.id)} onblur={() => { if (hot === g.id) hot = ''; }}>
-            <FixturePreview type={t} copies={g.copies ?? 1} focus={g.focus ?? 'all'} extra={g.extra ? typeOf(g.extra) : undefined} hover={hot === g.id} />
+            <FixturePreview type={t} copies={g.copies ?? 1} focus={g.focus ?? 'all'} extra={g.extra ? typeOf(g.extra) : undefined} wall={!!g.wall} hover={hot === g.id} />
           </button>
           <div class="tt">
             <b>{g.title}</b>
