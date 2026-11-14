@@ -4,6 +4,7 @@
   import { untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
+  import { cleanHost } from '../model/host';
   import { rig } from '../rdm/rig.svelte';
   import { dismiss, ui } from './ui.svelte';
   import { LINK, type LinkOutput, type LinkFile, type LinkManifest, type Computer, linkManifest, thisComputer, downloadsFor, OS_NAME, archName, FIRST_RUN } from '../output/link';
@@ -67,7 +68,7 @@
     host = ''; open = false;
     // (and connects at once: the box's window opens from this click, so the browser lets it. Added
     // and then Connect as well was a step nobody expected)
-    const key = h.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const key = cleanHost(h);
     app.bridges.find((b) => b.host === key)?.open();
     setTimeout(() => document.querySelector<HTMLElement>(`[data-box="${CSS.escape(h)}"] button.primary`)?.focus(), 0);
   }

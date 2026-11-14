@@ -227,6 +227,56 @@ describe('fog stopped from Live', () => {
     expect(r.app.status.L.cue).toBe('c1');
     expect(pct(r.app.stage.fg.fog)).toBe(0);
   });
+  it('stays stopped after a reload while the panels update only every few frames (a busy page)', async () => {
+    const { app, tick } = await freshApp();
+    const { load } = await import('./perf/load.svelte');
+    smallShow(app);
+    app.show.cueLists[0].cues[0].values.fg = { fog: 1 };
+    app.checkpoint();
+    tick(2);
+    const was = load.uiEvery;
+    try {
+      load.uiEvery = 3; app.uiN = 0;
+      // (what a reload hands over: the list on its first cue, that fog machine stopped)
+      app.applyPlayback({ id: app.showId, lists: [['L', 0, 1]], fx: [], gm: 1, bo: false, hz: ['fg'] }, false);
+      tick(11);
+      expect(app.holds.has('haze-stop')).toBe(true);
+      expect(pct(app.stage.fg.fog)).toBe(0);
+    } finally { load.uiEvery = was; }
+  });
+  it('another show: the old one\'s stop is gone with it', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.show.cueLists[0].cues[0].values.fg = { fog: 1 };
+    app.checkpoint();
+    app.jump('L', 0); tick(2);
+    app.stopHaze(); tick(1);
+    await app.newShow(); tick(2);
+    expect((app as any).hazeStopAt).toBeNull();
+    expect(app.holds.has('haze-stop')).toBe(false);
+  });
+});
+
+describe('a box added by its address', () => {
+  it('typed with a capital Http:// (a tablet\'s keyboard): the box\'s address, not "Http:"', async () => {
+    const { app } = await freshApp();
+    expect(app.addDevice('Http://192.168.1.50')).toBeUndefined();
+    expect(app.show.outputs.devices.map((d: { host: string }) => d.host)).toContain('192.168.1.50');
+    expect(app.show.outputs.devices.map((d: { host: string }) => d.host)).not.toContain('Http:');
+  });
+});
+
+describe('Cut', () => {
+  it('takes away what Remove does: a group of only that light goes with it', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.selected = ['p1'];
+    app.groupFromSelection('Only P1');
+    app.selected = ['p1'];
+    expect(await app.cutFixtures()).toBe(1);
+    expect(app.show.fixtures.some((f) => f.id === 'p1')).toBe(false);
+    expect(app.show.groups.some((g) => g.name === 'Only P1')).toBe(false);
+  });
 });
 
 describe('locked for the service', () => {

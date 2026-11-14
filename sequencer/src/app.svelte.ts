@@ -8,7 +8,7 @@ import { reconcile } from './model/reconcile';
 import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
 import { freezeGroupNumbers, groupByNumber, nextGroupNumber } from './model/groupnum';
-import { hostProblem } from './model/host';
+import { cleanHost, hostProblem } from './model/host';
 import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
 import { GENERIC, caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
@@ -1064,10 +1064,12 @@ class App {
     const st: Record<string, PlayerStatus> = {};
     for (const l of this.show.cueLists) st[l.id] = this.engine.status(l.id);
     this.status = st;
+    // (a fog stop lasts until a cue that fogs comes on: looked at against the same copy of where the
+    // lists are that it was taken from, so a reload's or a lowered panel rate's older copy can't end it)
+    if (this.hazeStopAt) this.hazeNext();
     // the open list's cue on stage changed (GO, an auto-advance, a jump): the selection comes along
     const on = st[this.currentList]?.cue ?? '';
     if (on !== this.followed) { this.followed = on; if (on && this.followSel) this.cueSel = [on]; }
-    if (this.engine.blackout !== this.bo) this.bo = this.engine.blackout;   // a cue action changed it
     // (the pictures update right after this task: timed from here to the next one)
     pingAfter(() => load.did(performance.now() - t0));
   }
@@ -1120,6 +1122,7 @@ class App {
     this.thread.sync(this.engine, this.show, this.quiet || (this.output !== 'live' && !blindOut), blindOut, this.bridges,
       this.show.outputs.devices.find((d) => d.host === LINK)?.proto ?? 'artnet');
     const { frames, stage, look } = this.engine.tick();
+    if (this.engine.blackout !== this.bo) this.bo = this.engine.blackout;   // a cue action changed it (at once: the Blackout key toggles from it)
     if (this.engine.armed) this.keepHeld();
     this.stageNow = stage;
     // (nothing from this page reaches a box: the thread serves every one that's there, or nothing goes
@@ -1174,7 +1177,6 @@ class App {
     // ---- what the screen shows: every frame, or every n-th while the output needs the time
     // (perf/load.svelte.ts); a fresh start or a change of look shows at once
     if (++this.uiN >= load.uiEvery || !this.status || this.shownRev !== this.rev) { this.uiN = 0; this.shownRev = this.rev; this.publish(stage, look, frames); }
-    if (this.hazeStopAt) this.hazeNext();
     this.remote.tick(t);
     this.timeline.tick();
     if (t - this.schedAt > 5000) { this.schedAt = t; this.runSchedule(); }
@@ -1541,7 +1543,8 @@ class App {
     await copyClip('fixtures', items, types);
     return items.length;
   }
-  async cutFixtures() { this.checkpoint(); const n = await this.copyFixtures(); for (const id of [...this.selected]) this.removeFixture(id); return n; }
+  // Copy, then Remove: what goes with the lights on Remove (a group of only them, a list only for them) goes on Cut too
+  async cutFixtures() { const ids = [...this.selected], n = await this.copyFixtures(ids); if (n) this.removeFixtures(ids); return n; }
   // The first place a light fits: on this universe, or the next one with room (a ring or a long strip
   // can fill one; another of them would otherwise have nowhere to go).
   private roomFor(universe: number, width: number): { universe: number; address: number } | null {
@@ -2128,7 +2131,7 @@ class App {
     const ids = this.hazing;
     this.holdOn('haze-stop', Object.fromEntries(ids.map((id) => [id, { fog: 0, haze: 0 }])));
     this.hazeStopped = ids;
-    this.hazeStopAt = Object.fromEntries(this.show.cueLists.map((l) => [l.id, this.status[l.id]?.cue ?? '']));
+    this.hazeStopAt = Object.fromEntries(this.show.cueLists.map((l) => [l.id, this.engine.status(l.id).cue]));
   }
   private letHazeGo() { this.holdOff('haze-stop'); this.hazeStopAt = null; }
   // the cue on stage of each list when fog was stopped, and which machines: the stop lasts until a
@@ -3283,9 +3286,9 @@ class App {
   addDevice(host: string): string | undefined {
     const bad = host === LINK ? undefined : hostProblem(host);
     if (bad) return bad;
-    this.checkpoint();
-    host = host.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    host = cleanHost(host);
     if (!host || this.show.outputs.devices.some((d) => d.host === host)) return;
+    this.checkpoint();
     this.show.outputs.devices.push({ host });
     this.bridges = [...this.bridges, this.makeBridge(host)];
   }
@@ -3532,6 +3535,7 @@ class App {
     this.engine.stopAllEffects(); this.engine.takeLiveEffects(); this.liveFx = [];
     for (const w of Object.keys(this.fogUntil)) this.fogOff(w);
     this.holds.clear(); this.live = {}; this.groupMasters = {};   // (another show's groups: their masters at full)
+    this.hazeStopAt = null;                                         // (another show's lists: its fog stop is gone with its holds)
     this.page = ''; this.editPage = false; this.highlight = false;
     // The boxes are your hardware, not part of a look: a show without any keeps the ones you have,
     // and a box that stays connected isn't asked again.
