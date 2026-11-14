@@ -535,17 +535,24 @@ test('building a page: a group fader, keys that replace and clash, Alt+Down a ro
   }
 });
 
-test('in Edit with nothing picked the hint is above the controls, not over them', async ({ page }) => {
+test('in Edit with nothing picked the hint is in the bar: not over the controls, and they stay where they were; on a phone above them', async ({ page }) => {
   await djShow(page);
+  const spots = () => page.locator('.live .grid .cell').evaluateAll((els) => els.slice(0, 12).map((e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y + e.parentElement!.scrollTop)}`; }));
+  const before = await spots();
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
-  const hint = page.locator('.live .hint.pick').filter({ hasText: 'to change it' });
+  const hint = page.locator('.live .bar .ehint').filter({ hasText: 'to change it' });
   await expect(hint).toBeVisible();
+  expect(await spots()).toEqual(before);                               // (pressing Edit moves nothing)
   const h = (await hint.boundingBox())!;
   for (const c of await page.locator('.live .cell').all()) {
     const b = (await c.boundingBox())!;
     const overlap = !(b.x + b.width <= h.x || h.x + h.width <= b.x || b.y + b.height <= h.y || h.y + h.height <= b.y);
     expect(overlap).toBe(false);
   }
+  // a phone: no room in the bar, the hint above the controls
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.live .hint.pick').filter({ hasText: 'to change it' })).toBeVisible();
+  await expect(hint).toHaveCount(0);
 });
 
 // (round 16's small ones)

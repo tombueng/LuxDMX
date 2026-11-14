@@ -453,7 +453,10 @@
     </div>
     {#if !app.locked}<button class="ghost" onclick={newPage} title="New page (right-click: one with just the looks)" aria-label="New page"
       oncontextmenu={(e) => { e.preventDefault(); ui.openMenu(e, [{ label: 'Empty page', icon: 'plus', run: newPage }, { label: 'Just the looks (for staff)', icon: 'plus', run: looksOnly }]); }}><Icon name="plus" /></button>{/if}
-    <span class="grow"></span>
+    <!-- (editing with nothing picked: what to do, here in the bar's free room: above the controls it
+         pushed them all down as Edit was pressed, floating over them it covered some; on a phone,
+         where the bar has no room, above the controls) -->
+    <span class="grow">{#if app.editPage && !selected && !narrow}<span class="ehint">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</span>{#if fresh.length}<button class="chip" onclick={addNew} title="New in the show, not on a page yet: {freshNames}">Add the {fresh.length} new here</button>{/if}{/if}</span>
     {#if app.output === 'blind' && app.bridges.length}
       <!-- blind: said here too (on a phone the top bar only has a dot), one tap asks to go on stage -->
       <button class="chip nextup blind" onclick={() => void app.askOnStage()} title="Blind: you see it here, the lights don't get it. Click to send it to the stage.">
@@ -550,9 +553,8 @@
   <div class="body" class:with-stage={showStage} class:editing={app.editPage}>
     {#if showStage}<div class="stagebox">{#if shown || ui.stage3d}<StageView compact readonly blindChip={false} />{/if}</div>{/if}
     <div class="grid" style="--tile:{tile}px" role="list">
-      <!-- (editing with nothing picked: what to do, in the page's flow above its controls; floating at
-           the top right it lay over the buttons there) -->
-      {#if app.editPage && !selected}
+      <!-- (on a phone: what to do while editing, above the controls; elsewhere it's in the bar) -->
+      {#if app.editPage && !selected && narrow}
         {#if fresh.length}<aside class="hint pick inflow">New in the show, not on a page yet: {freshNames}. <button class="ghost" onclick={addNew}>Add them here</button></aside>{/if}
         <aside class="hint pick inflow">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</aside>
       {/if}
@@ -604,6 +606,9 @@
     box-shadow: 0 10px 40px #000a, 0 0 0 1px var(--line2); background: var(--panel); }
   .float.left { right: auto; left: 0; }
   .pick.inflow { grid-column: 1 / -1; margin: 0; }
+  .grow { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+  .ehint { color: var(--muted); font-size: .82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ehint :global(b) { color: var(--text); }
   .stagebox { min-height: 0; display: flex; align-self: start; height: min(62vh, 460px); }
   /* (the stage's own least height is for a page of its own: in this box it fits the box, it ran
      40 px over the heading under it on a phone) */
