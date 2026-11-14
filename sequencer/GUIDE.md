@@ -562,7 +562,14 @@ Three more demos come with their own room on the 3D stage:
     Radar (short stories that start and end dark; Speed is their length in seconds), Black hole,
     Warp, Galaxy, Hypno, Mandala, Tunnel, Plasma clouds, Lava lamp, Campfire, Code rain, Raindrops,
     Sky rockets, Kick rings, Big heart and Equaliser (on the beat, or the bass with the microphone
-    on), Scrolling text (your words). Spread shifts several lights against each other. Wiring test
+    on), Scrolling text (your words). Ten more with your words (their **Words** field): Letter
+    zoom (a letter at a time grows out of the middle and flies past), Typewriter (with a blinking
+    cursor, a line at a time), Wavy text, Falling letters (they drop in and bounce), Word flip,
+    Glitch text, Word flash (a word on every beat, for a chant), Sparkle text, Spinning sign and
+    Neon sign; a word a little too wide goes without the gaps between its letters ("LUXDMX" whole on
+    a 32 wide banner). And ten more pictures: Snake, Double helix, Confetti fall, Snowfall,
+    Lightning storm, Rising hearts, Vortex, Beat wipes, Block strobe and Rotozoom. Spread shifts
+    several lights against each other. Wiring test
     checks the shape: a colour per ring or row, each one's first LED white, a dot walking in data
     order. If the picture is scrambled, that's the shape (or the LED count), not the effect.
   - **The Ring and matrix template** (Shows, or Ctrl+K) has a disc, a matrix, a ring and a banner
@@ -1115,6 +1122,11 @@ Three more demos come with their own room on the 3D stage:
   once: brightness is highest-wins, everything else is latest-wins. House lights on their own
   list, a fog timer on another, the show on a third.
 - **Effects** are chases, rainbows, circles, fire, lightning... They follow the tempo (Tap).
+  Moving heads have 28 moves: Circle, Figure eight, Pan and Tilt sweep, Fan, Cross, Swing and
+  Ballyhoo, shapes drawn with the beam (Square, Triangle, Star, Heart, Spiral, Flower, Knot,
+  Upright eight, Spirograph), sweeps with a character (Bounce, Zigzag, Searchlight, Wipers, Head
+  bang on the beat, Step between four places on the beat, Wander, Shake) and the group together
+  (Weave: neighbours against each other, Mirror circles, Focus point: the beams meet and open).
 - **Live pages** are grids of buttons and faders: scenes, GO, flash, fog (only while held, with a
   hard maximum), masters. A fader can be the grand master, the tempo, a cue list's level, an
   effect's level or a group's (the dance floor, the shelves). In Edit, a control's key is the key

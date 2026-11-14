@@ -487,12 +487,16 @@ const FONT = [
 ].join('').split(' ');
 // (one glyph per ASCII code from 32, as ten hex digits)
 const GLYPHS: number[][] = FONT.map((g) => [0, 2, 4, 6, 8].map((k) => parseInt(g.slice(k, k + 2), 16)));
+// One character's five columns (what the font has: accents dropped, small letters as capitals; a
+// character it hasn't got is a space). For the word effects (matrix.ts).
+export const plainText = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/ß/g, 'SS').slice(0, TEXT_MAX);
+export const glyph = (ch: string): number[] => GLYPHS[ch.charCodeAt(0) - 32] ?? GLYPHS[0];
 const columnsOf = new Map<string, Uint8Array>();
 export function textColumns(text: string): Uint8Array {
   let cols = columnsOf.get(text);
   if (cols) return cols;
   // (accents dropped, small letters as capitals: what the five-by-seven has)
-  const plain = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/ß/g, 'SS').slice(0, TEXT_MAX);
+  const plain = plainText(text);
   const out: number[] = [];
   for (const ch of plain) {
     const g = GLYPHS[ch.charCodeAt(0) - 32] ?? GLYPHS[0];

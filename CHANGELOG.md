@@ -13,6 +13,12 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **40 more effects.** For a matrix or a disc, ten with your words (Letter zoom, Typewriter, Wavy
+  text, Falling letters, Word flip, Glitch text, Word flash, Sparkle text, Spinning sign, Neon sign)
+  and ten pictures (Snake, Double helix, Confetti fall, Snowfall, Lightning storm, Rising hearts,
+  Vortex, Beat wipes, Block strobe, Rotozoom). For moving heads, twenty more moves: a square, a
+  star, a heart, a spirograph, a searchlight, wipers, a head bang on the beat, heads weaving
+  against each other, the beams meeting in one point...
 - **Loop this part** on the timeline (right-click a part, or L): it plays over and over while you
   work on its looks.
 - **Save with its songs** (Shows): one .luxdmx.zip with the show and its songs' audio (and your own

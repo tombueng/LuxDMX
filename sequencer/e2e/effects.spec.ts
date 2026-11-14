@@ -185,6 +185,25 @@ test('a circle moves a moving head around where it points', async ({ page }) => 
   expect(Math.max(...pan)).toBeLessThan(200); expect(Math.min(...pan)).toBeGreaterThan(55);   // around the centre
 });
 
+test('the twenty more moves are in the library with the first eight; the Heart draws a heart on the head', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await selectAll(page); await full(page);
+  await tab(page, 'Effects');
+  await page.locator('.ep').getByRole('button', { name: 'Add', exact: true }).click();
+  for (const k of ['square', 'star', 'heart', 'spirograph', 'headBang', 'weave', 'focus', 'wipers']) await expect(lib(page).locator(`[data-effect="${k}"]`)).toBeVisible();
+  await lib(page).locator('[data-effect="heart"]').click();
+  await expect(lib(page)).toBeHidden();
+  const t0 = Date.now();
+  await page.waitForTimeout(4500);                                      // (a round is 8 beats: 4 s at 120)
+  const pan = (await history(0, 1)).filter(([t]) => t >= t0).map(([, v]) => v);
+  const tilt = (await history(0, 2)).filter(([t]) => t >= t0).map(([, v]) => v);
+  expect(Math.max(...pan) - Math.min(...pan)).toBeGreaterThan(40);
+  expect(Math.max(...tilt) - Math.min(...tilt)).toBeGreaterThan(40);
+  // (around where it points: the middle)
+  expect(Math.max(...pan)).toBeLessThan(215); expect(Math.min(...pan)).toBeGreaterThan(40);
+});
+
 test('effects in the list: copy, paste, delete; the editor renames', async ({ page }) => {
   await openConnected(page);
   await patch(page, 'gen-rgb', 3, 0, 'P');

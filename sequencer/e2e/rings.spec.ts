@@ -89,6 +89,27 @@ test('Scrolling text says your words on a matrix', async ({ page }) => {
   expect(Math.max(...seen)).toBeLessThan(60);                     // one letter: far from the whole panel (192 channels)
 });
 
+test('Letter zoom says your words a letter at a time on a matrix; the word shows are in the library with their Words', async ({ page }) => {
+  await pixelPorts([[3, 1]]);
+  await openConnected(page);
+  await patch(page, 'gen-matrix8x8', 1, 3, 'Panel');
+  await selectAll(page);
+  await tab(page, 'Effects');
+  await page.locator('.ep').getByRole('button', { name: 'Add', exact: true }).click();
+  for (const k of ['typewriter', 'wavyText', 'neonText', 'snake', 'lightningStorm', 'risingHearts', 'rotoZoom']) await expect(lib(page).locator(`[data-effect="${k}"] canvas`)).toBeVisible();
+  await lib(page).locator('[data-effect="letterZoom"]').click();
+  await expect(lib(page)).toBeHidden();
+  await page.locator('.ep li.oitem').first().click();
+  const words = page.locator('.ed').getByLabel('Words');
+  await expect(words).toHaveValue('LUXDMX');
+  await words.fill('IO');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.effects[0].params.text)).toBe('IO');
+  // a letter at a time: an I lights a few pixels, an O more; both come round (two beats each)
+  const seen = new Set<number>();
+  await expect.poll(async () => { seen.add(lit(await channels(3, 192))); return seen.size; }, { timeout: 10000, intervals: [120] }).toBeGreaterThan(3);
+  expect(Math.max(...seen)).toBeLessThan(150);
+});
+
 test('a ring of your own, worked out from its total, on the wire', async ({ page }) => {
   await pixelPorts([[5, 1]]);
   await openConnected(page);
