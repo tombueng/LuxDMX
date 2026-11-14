@@ -106,10 +106,17 @@ test('the song from the playhead, with its sound, straight into the file the bro
   await p2.getByLabel('Seconds to render').fill('600');
   await p2.getByRole('button', { name: 'Render 1080p' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__stage3d.rendering()?.k ?? 0), { timeout: 60_000 }).toBeGreaterThan(3);
+  // while it renders: the picture at the video's shape, not stretched to the window's (a 4K render
+  // showed twice as wide); the dev server holds its updates (the page says it's busy) and leaving
+  // the page would ask first
+  const c = page.locator('.s3 canvas').first();
+  expect(await c.evaluate((el) => getComputedStyle(el).objectFit)).toBe('contain');
+  expect(await page.evaluate(() => (window as any).__ui.recording)).toBe(true);
   await page.locator('.s3').getByRole('button', { name: 'Stop rendering' }).click();
   await expect(page.locator('.toast')).toContainText('Render stopped. Nothing saved.');
   expect(await page.evaluate(() => (window as any).__saved)).toBeNull();
   expect(await page.evaluate(() => (window as any).__stage3d.rendering())).toBeNull();
+  expect(await c.evaluate((el) => getComputedStyle(el).objectFit)).not.toBe('contain');      // (back to the window's shape)
 });
 
 test('8K on a graphics card too small for it says so, and renders nothing', async ({ page }) => {

@@ -73,6 +73,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - The welcome is two rows of tiles: the demo shows (each with its own music menu, and they fold away
   for good once you don't need them), and the everyday starts (empty, the templates, a show file).
   Every demo and template also comes as **Lights only**: the rig placed, nothing programmed.
+- Render: the 3D view keeps the video's shape while it renders (a 4K render showed twice as wide),
+  and closing or reloading the page during a render asks first. On the dev server, code changes
+  wait until the render is done instead of breaking it off.
 - Render: "the song from the playhead" takes a length, so a short clip has its sound. The only short
   one used to be "the look as it is", which has no sound and didn't say so.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help

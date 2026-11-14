@@ -242,6 +242,10 @@ fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in
   frame, the rest in turn within a few ms a frame (less when `load` says the page is busy).
   `stage3d/rigOf.ts` is the one mapping from a fixture to what the rig draws, for the stage and
   the previews alike.
+- While a page records a take or renders a video, the dev server holds its hot updates
+  (`src/dev/holdWhileBusy.ts`, wired in `vite.config.ts`): a code change swapped the 3D stage out
+  under the render. The page says it's busy (`ui.recording`, over the hot-update socket); what
+  changed meanwhile comes as one reload when it's done or its tab is closed.
 - The README's gallery animations: `node tools/gallery/capture.mjs` (dev server running) draws
   each item of `src/content/gallery.ts` frame by frame with `frames()` and makes animated WebPs in
   `docs/media/gallery/` (`--gif` for GIFs, `--only gobos,prism` for some). The frames stay in its

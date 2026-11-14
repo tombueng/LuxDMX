@@ -526,7 +526,9 @@
   // lights mustn't rebuild every mesh 60 times a second)
   let shape: string | null = null;      // (null: never built, also for no lights at all)
   // (a take of another shape: the canvas letterboxed, see the styles)
-  $effect(() => { canvas?.classList.toggle('take', !!take); });
+  // (a take's or a render's size, not the window's: shown whole, not stretched to the window; a
+  // 4K render was drawn twice as wide as it is)
+  $effect(() => { canvas?.classList.toggle('take', !!take || !!rendering); });
   const sigOf = (list: RigFixture[]) => list.map((f) => `${f.id}:${f.kind}:${f.cells}:${f.sfx ?? ''}:${f.look}`).join();
   $effect(() => {
     // (only the stage holding the world; shown again, it catches up with what changed meanwhile)
@@ -814,7 +816,7 @@
   function removeModel() { app.checkpoint(); if (app.show.settings.stage3d) delete app.show.settings.stage3d.model; app.markDirty(0); }
   function setHideVenue(h: boolean) { app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, hideVenue: h || undefined }; app.markDirty(0); }
   // the built-in room: the big stage, or a small club / pub (kept with the show)
-  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom') {
+  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar') {
     if (room.id === id) return;
     const s3 = app.show.settings.stage3d;
     app.checkpoint(); app.show.settings.stage3d = { ...s3, room: id === 'hall' ? undefined : id, ...(id === 'custom' && !s3?.size ? { size: { ...STAGE_SIZE } } : {}) }; app.markDirty(0);
@@ -1414,6 +1416,8 @@
           <button class="ghost" class:on={room.id === 'club'} aria-pressed={room.id === 'club'} onclick={() => setRoom('club')} title="A club: a DJ booth on a stage, LED strips round it, a dance floor with a bar and a mirror ball">Club</button>
           <button class="ghost" class:on={room.id === 'party'} aria-pressed={room.id === 'party'} onclick={() => setRoom('party')} title="No stage: a square of truss over the crowd on four legs, speakers in the corners, the DJ on the floor">Party</button>
           <button class="ghost" class:on={room.id === 'truss'} aria-pressed={room.id === 'truss'} onclick={() => setRoom('truss')} title="An empty room with one truss on two towers: for trying lights out">Test truss</button>
+          <button class="ghost" class:on={room.id === 'cinema'} aria-pressed={room.id === 'cinema'} onclick={() => setRoom('cinema')} title="A big cinema: the screen between red curtains, a stage in front of it, raked rows of seats with an audience">Cinema</button>
+          <button class="ghost" class:on={room.id === 'bar'} aria-pressed={room.id === 'bar'} onclick={() => setRoom('bar')} title="A bar: a long counter with a back bar of bottles and a mirror, stools with people, tables, a little dance floor with a mirror ball">Bar</button>
           <button class="ghost" class:on={room.id === 'custom'} aria-pressed={room.id === 'custom'} onclick={() => setRoom('custom')} title="Your own stage at its real size: its width and depth, a riser or not, how many trusses and how high">Your stage</button>
         </div>
         {#if room.id === 'custom'}

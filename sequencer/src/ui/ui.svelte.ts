@@ -314,3 +314,13 @@ export function asPercent(el: HTMLInputElement, v: number | undefined) {
   set(v);
   return { update: set };
 }
+
+// While a take or a render runs: the dev server holds its hot updates (vite.config.ts, one reload
+// after), and leaving or reloading the page asks first (the browser's own "Leave site?")
+if (typeof window !== 'undefined') {
+  const tab = Math.random().toString(36).slice(2);
+  $effect.root(() => {
+    $effect(() => { const on = ui.recording; if (import.meta.hot) import.meta.hot.send('luxdmx:busy', { id: tab, on }); });
+  });
+  window.addEventListener('beforeunload', (e) => { if (ui.recording) { e.preventDefault(); e.returnValue = ''; } });
+}

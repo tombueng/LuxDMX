@@ -907,7 +907,8 @@ Three more demos come with their own room on the 3D stage:
   their moments; **With what's in the programmer** takes the programmer along too. The sound is the
   song's file (or the demo beat) mixed at full, not the speakers. The panel says how long the video
   is and about how big the file gets. While it renders the 3D stage shows the frames being drawn and
-  a chip counts the per cent and the time left; **Stop** ends it and saves nothing. It runs its own
+  a chip counts the per cent and the time left (at the video's shape, not stretched to the
+  window's); **Stop** ends it and saves nothing, and closing or reloading the page asks first. It runs its own
   copy of the show: nothing goes out to the lights from it, and the show here (the box, the cues,
   the programmer) goes on as it is. Slower than real time at 4K and 8K (each frame is drawn at full
   size with the glow and the haze), but every frame is there. Where the browser asks where to save

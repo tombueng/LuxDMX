@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { holdWhileBusy } from './src/dev/holdWhileBusy.ts';
 
-// base './' so the build works from any sub-path (GitHub Pages serves it under /LuxDMX/...).
 export default defineConfig({
   base: './',
-  plugins: [svelte()],
+  plugins: [svelte(), holdWhileBusy()],
   // Its own dependency cache per dev server (the e2e runs start their own on other ports): servers
   // sharing one rebuild it under each other's feet and a lazy chunk (the 3D stage) fails to load.
   ...(process.env.VITE_CACHE_DIR ? { cacheDir: process.env.VITE_CACHE_DIR } : {}),
