@@ -71,6 +71,13 @@
     { attr: 'co2', label: 'CO2 jet', s: 2 }, { attr: 'bubbles', label: 'Bubbles', s: 8 }, { attr: 'fog', label: 'Fog', s: 5 },
     { attr: 'strobe', label: 'Strobe hit', s: 2 }, { attr: 'blinder', label: 'Blinder hit', s: 1 }];
   const ARMED_ONLY: string[] = ['confetti', 'flame', 'sparks', 'co2'];
+  // (the machine moments the rig can do: one for a confetti cannon it hasn't got did nothing. A strobe
+  // or blinder hit uses any light)
+  const bursts = $derived.by(() => {
+    const attrs = new Set(app.show.fixtures.flatMap((f) => app.modeOf(f.id)?.channels.map((c) => c.attr) ?? []));
+    const fog = app.show.fixtures.some((f) => app.caps(f.id).fog);
+    return BURSTS.filter((b) => b.attr === 'strobe' || b.attr === 'blinder' || (b.attr === 'fog' ? fog : attrs.has(b.attr)));
+  });
 
   // ---- scale and scrolling
   let tracks = $state<HTMLDivElement>();
@@ -754,7 +761,7 @@
     <!-- (only the machines wait for Arm: a strobe, blinder, fog or bubble hit fires on Safe too; it said all of them did) -->
     <p class="note">Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed.</p>
     <div class="chips">
-      {#each BURSTS as b (b.attr)}
+      {#each bursts as b (b.attr)}
         {@const chip = { kind: 'burst', attr: b.attr, s: b.s } as Chip}
         <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{b.label} for {b.s} s{ARMED_ONLY.includes(b.attr) ? ', only while armed' : ''}. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
       {/each}

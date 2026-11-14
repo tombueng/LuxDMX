@@ -84,6 +84,17 @@ test('cues tapped in a row without moving the playhead go one after the other, a
   expect(at.at[1]).toBeCloseTo(len, 1); expect(at.at[2]).toBeCloseTo(2 * len, 1);
 });
 
+test('the Moments offer the machines the rig has (and strobe and blinder hits, which any light does)', async ({ page }) => {
+  await bar(page);                                                         // (the Bar: confetti, CO2, sparks, bubbles, fog; no flames)
+  const mo = page.locator('.tlv .pal .chip.mo');
+  await expect(mo.filter({ hasText: 'Confetti' })).toHaveCount(1);
+  await expect(mo.filter({ hasText: 'Flames' })).toHaveCount(0);
+  await expect(mo.filter({ hasText: 'Strobe hit' })).toHaveCount(1);
+  // the confetti cannon gone: its moment goes from the list too
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = a.show.fixtures.filter((f: any) => /^Confetti/.test(f.name)).map((f: any) => f.id); a.removeFixtures(); });
+  await expect(mo.filter({ hasText: 'Confetti' })).toHaveCount(0);
+});
+
 test('an effect dragged on runs as a bar; Del removes what is selected and Undo brings it back', async ({ page }) => {
   await bar(page);
   const fx = page.locator('.tlv .pal .chip.fx').first();

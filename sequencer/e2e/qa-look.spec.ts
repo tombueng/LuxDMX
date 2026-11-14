@@ -687,6 +687,7 @@ test('the timeline at 140 % on a laptop: Fit and Zoom in on the screen, the tran
 test('what the help says is what happens: Back, moments on Safe, Ctrl+K staff from Program, the sheet', async ({ page }) => {
   await openConnected(page);
   await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await patch(page, 'gen-confetti', 1, 0, 'Cannon');                     // (the Moments offer only the machines the rig has)
   await page.evaluate(() => { const a = (window as any).__luxdmx; a.selectAll(); a.set({ intensity: 0.5 }); a.record(); a.programmer = {}; });
   // Back: no key it doesn't have (Backspace deletes a selected card, as in any list)
   await expect(page.locator('.deck').getByRole('button', { name: 'Back', exact: true })).toHaveAttribute('title', 'Previous cue');

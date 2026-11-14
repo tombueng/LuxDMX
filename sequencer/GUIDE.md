@@ -677,7 +677,7 @@ Three more demos come with their own room on the 3D stage:
   downbeat (following the microphone still wins). Coming up to a machine moment that won't fire
   because the machines are safe, the Live page says so ("Confetti at 2:41 · safe").
   Drag a cue, an effect or a moment (confetti, flames, sparks, CO2, bubbles,
-  fog, a strobe or blinder hit, blackout) onto the tracks, or tap it to put it at the playhead (tap several in a row: they go a bar apart).
+  fog, a strobe or blinder hit, blackout; the machines only those your rig has) onto the tracks, or tap it to put it at the playhead (tap several in a row: they go a bar apart).
   **Snap** (in the transport) says what a drag lands on: the beat, the bar, or nothing. Besides the
   machines the moments have **Blackout**, **Blackout off** and **Everything off**.
   What's placed drags along the beat grid and onto the song's parts (Alt: free), or moves with the
