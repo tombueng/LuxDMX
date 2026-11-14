@@ -390,8 +390,8 @@ test('the GO strip shows the note of the next cue, the standby for the operator'
   await expect(page.locator('.strip .nxt')).toContainText('1. Preset');
   await expect(page.locator('.strip .standby')).toHaveText('Audience coming in');       // its own line
   await page.keyboard.press('Space');
-  await expect(page.locator('.strip .nxt')).toContainText('2. Scene 1');
-  await expect(page.locator('.strip .standby')).toHaveText('House lights fade out with it');
+  await expect(page.locator('.strip .nxt')).toContainText('2. Curtain up');
+  await expect(page.locator('.strip .standby')).toHaveText('House lights out, the curtain goes');
 });
 
 test('the fog timer dialog takes its own defaults as they are', async ({ page }) => {

@@ -78,12 +78,22 @@ const SCENARIOS = [
   { name: 'live', note: 'Live, the festival show playing', prep: async () => { await openFestival(); await tab('Live'); }, act: async () => { await page.waitForTimeout(SECS * 1000); } },
   { name: 'timeline-play', note: 'the timeline playing the festival demo', prep: async () => { await openFestival(); await tab('Timeline'); }, act: async () => { await page.waitForTimeout(SECS * 1000); } },
   { name: 'stage3d', note: 'the 3D stage open, the show playing', prep: async () => { await openFestival(); await page.locator('.s3 canvas').waitFor({ timeout: 60000 }); await page.waitForTimeout(5000); }, act: async () => { await page.waitForTimeout(SECS * 1000); } },
-  { name: 'views', note: 'switching Program, Live, Timeline, Console (the show paused)', prep: async () => { await openFestival(); await app(() => window.__luxdmx.timeline.pause()); }, act: async () => { for (let i = 0; i < 3; i++) for (const t of ['Live', 'Timeline', 'Console', 'Program']) { await tab(t); await page.waitForTimeout(200); } } },
+  { name: 'views', note: 'switching Program, Live, Timeline, Console (the show paused)', prep: async () => { await openFestival(); await app(() => window.__luxdmx.timeline.pause()); }, act: async () => {
+    const took = {};
+    for (let i = 0; i < 3; i++) for (const t of ['Live', 'Timeline', 'Console', 'Program']) {
+      const t0 = Date.now(); await tab(t); await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      (took[t] ??= []).push(Date.now() - t0); await page.waitForTimeout(200);
+    }
+    console.log('   view switch (ms, to the second frame after the click):', JSON.stringify(took));
+  } },
+  { name: 'to-live', note: 'Program to Live and back, five times (the show paused)', prep: async () => { await openFestival(); await app(() => window.__luxdmx.timeline.pause()); for (const t of ['Live', 'Program']) { await tab(t); await page.waitForTimeout(800); } }, act: async () => {
+    const took = [];
+    for (let i = 0; i < 5; i++) { const t0 = Date.now(); await tab('Live'); await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); took.push(Date.now() - t0); await page.waitForTimeout(300); await tab('Program'); await page.waitForTimeout(300); }
+    console.log('   to Live (ms):', JSON.stringify(took));
+  } },
   { name: 'fader', note: 'the intensity fader of 40 selected lights, typed 60 times (the show paused)', prep: async () => {
     await openFestival(); await app(() => window.__luxdmx.timeline.pause()); await tab('Program');
-    const names = await app(() => window.__luxdmx.show.fixtures.slice(0, 40).map((f) => f.name));
-    await page.locator(`.stage-wrap .fx[data-name="${names[0]}"]`).click();
-    for (const n of names.slice(1)) await page.locator(`.stage-wrap .fx[data-name="${n}"]`).click({ modifiers: ['Shift'] });
+    await app(() => { const a = window.__luxdmx; a.selected = a.show.fixtures.slice(0, 40).map((f) => f.id); });
   }, act: async () => {
     const f = page.locator('.prog').getByLabel('Intensity', { exact: true });
     for (let i = 0; i < 60; i++) await f.fill(String((i * 7) % 100));
@@ -94,9 +104,13 @@ async function openFestival() {
   await page.goto(BASE);
   await page.waitForFunction(() => !!window.__luxdmx);
   const shows = page.getByRole('dialog', { name: 'Shows' }), w = page.getByRole('dialog', { name: "Let's get some light on stage" });
-  const tpl = page.getByRole('button', { name: 'or start from a template' });
-  if (await tpl.isVisible()) await tpl.click();
-  else { await page.locator('.top .show').click(); await shows.getByRole('button', { name: 'New show…' }).click(); }
+  // (the welcome may be up by itself on a fresh page)
+  await page.waitForTimeout(1500);
+  if (!(await w.isVisible())) {
+    const tpl = page.getByRole('button', { name: 'or start from a template' });
+    if (await tpl.isVisible()) await tpl.click();
+    else { await page.locator('.top .show').click(); await shows.getByRole('button', { name: 'New show…' }).click(); }
+  }
   const t = w.getByRole('group', { name: 'Festival stage' });
   await t.getByLabel('Music for Festival stage').selectOption('beat');
   await t.getByRole('button', { name: /^Play the show/ }).click();

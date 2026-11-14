@@ -36,3 +36,21 @@ describe('undo on a big rig', () => {
     expect(app.undoStack.length).toBe(depth + 1); expect(app.canRedo).toBe(false);
   }, 60000);
 });
+
+// A click on a view's tab changes nothing in the show: it doesn't book a save (a compare of the whole
+// show, tens of milliseconds on the big demo); a click anywhere else that could change it does.
+describe('what books a save', () => {
+  it('a view\'s tab: nothing; an edit field: a save', async () => {
+    const { app } = await freshApp();
+    app.checkpoint();
+    const top = document.createElement('div'); top.className = 'top';
+    top.innerHTML = '<div class="modes"><button role="tab">Live</button></div><input id="nm">';
+    document.body.append(top);
+    const pending = () => (app as any).savePending as boolean;
+    top.querySelector('[role="tab"]')!.dispatchEvent(new Event('pointerup', { bubbles: true }));
+    expect(pending()).toBe(false);
+    top.querySelector('#nm')!.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(pending()).toBe(true);
+    top.remove();
+  });
+});

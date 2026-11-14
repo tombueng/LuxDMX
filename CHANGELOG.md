@@ -13,6 +13,10 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A lighter 3D stage**: the camera-like exposure no longer makes the page wait for the graphics
+  card to answer a question every few frames (about a sixth of the page's time with the 3D stage
+  open), and the stage stopped making the browser lay the page out again every frame. Switching
+  views no longer compares the whole show for saving on each tab click.
 - **The Theatre's curtain opens, live too.** The templates' curtains and fly bars sit on universe 15,
   which no box plays: a winch nobody's box plays sends nothing to a motor, so the 3D stage moves it
   with the show. A real one on a box still holds until the machines are armed.

@@ -139,7 +139,8 @@
   // (the air is never pure black: a hall has some light in it, even between looks)
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
   const overlay = new THREE.Scene();       // drawn after the glow: the gizmo, the Measure line
-  const meter = new ExposureMeter();
+  // (about once a second: the eye's adapting is slow anyway, and each read costs the page a moment)
+  const meter = new ExposureMeter(45);
   // the middle brightness the exposure aims for (a dark venue: low key; measured so the Front view
   // of the demo sits at about the exposure it always had)
   const EXPOSURE_KEY = 0.024;
@@ -576,12 +577,16 @@
   }
 
   const sizeNow = new THREE.Vector2();
+  // (whether the stage has room to be seen: from the resize observer, not asked every frame, which
+  // made the browser lay the page out again each time)
+  let visible = true;
   function resize() {
     if (!host || !renderer || !holding) return;
     // (a take keeps its own size whatever the window does meanwhile: see record())
     const w = takeSz?.w ?? host.clientWidth, h = takeSz?.h ?? host.clientHeight;
     // (hidden, or folded away: it measures nothing; the canvas keeps its size for when it's back)
-    if (w < 2 || h < 2) return;
+    visible = w >= 2 && h >= 2;
+    if (!visible) return;
     // (the same size again, e.g. the observer's first call: the canvas isn't made anew)
     const pr = renderer.getPixelRatio();
     renderer.getSize(sizeNow);
@@ -1032,7 +1037,7 @@
     // (a take goes on drawing: in a hidden tab a timer calls this, see hiddenTake())
     if ((document.hidden && !taking) || !host?.isConnected) return;
     // (folded away to nothing, e.g. the timeline's picture on a phone: nothing to draw)
-    if (!canvas || (!taking && (canvas.clientWidth < 2 || canvas.clientHeight < 2))) { last = now; return; }
+    if (!canvas || (!taking && !visible)) { last = now; return; }
     // (fewer frames a second at a lower quality: the time goes to the DMX output)
     if (!taking && now - drawnAt < EVERY[load.level]) return;
     drawnAt = now; drawnFrames++;

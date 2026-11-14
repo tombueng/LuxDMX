@@ -410,7 +410,8 @@ class App {
     const plays = (e: Event) => {
       const t = e.target as Element | null;
       if (!t?.closest) return false;
-      if (t.closest('[data-plays], button.go, button.bo, button.tile:not(.editing)')) return true;
+      // (and a view's tab: switching views changes nothing in the show)
+      if (t.closest('[data-plays], button.go, button.bo, button.tile:not(.editing), .top .modes [role="tab"]')) return true;
       return e.type === 'keyup' && (e as KeyboardEvent).code === 'Space' && !t.closest('input, textarea, select, [contenteditable]');
     };
     for (const ev of ['input', 'change', 'pointerup', 'keyup', 'drop'])
