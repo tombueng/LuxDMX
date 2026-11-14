@@ -97,7 +97,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - A render has the crowd in its sound now, as you hear it when the show plays: the chatting before
   the band comes on, the cheers on the big moments, at the Crowd volume.
 - The plans of the church and the cinema cover the whole room now, not just the stage: their lights
-  hang all over it.
+  hang all over it. The theatre's covers the stage and the stalls, so its front-of-house bar and
+  house lights are out in the house on the plan too, not at the stage's edge.
 - 3D: **Your stage** in the Venue panel: your real stage at its size (width, depth, a riser or
   not, how many trusses and how high). The room, crowd and camera moves are built for it, the
   lights hang on its trusses, the plan is that stage.

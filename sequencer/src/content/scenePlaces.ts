@@ -69,7 +69,8 @@ const THEATRE_PLACES: Table = {
   // middle where the plan says "audience")
   Front: (i, n) => { const x = n === 6 ? [-5.2, -3.6, -2.0, 2.0, 3.6, 5.2][i] : spread(i, n, -5, 5); return aim({ x, y: hang(10.4), z: 8.4 }, { x: x * 0.5, y: DECK + 1.6, z: 0.5 }); },
   Cyc: (i, n) => { const x = spread(i, n, -5.25, 5.25); return aim({ x, y: hang(9.0), z: -4.8 }, { x, y: DECK + 3.5, z: Th.cycZ }); },
-  House: (i) => { const x = i ? 4 : -4; return aim({ x, y: Th.ceiling - 0.4, z: 9 }, { x, y: 0, z: 9.2 }); },
+  // (over the stalls, behind the front-of-house bar)
+  House: (i) => { const x = i ? 4 : -4; return aim({ x, y: Th.ceiling - 0.4, z: 11.5 }, { x, y: 0, z: 11.7 }); },
   Boom: (i) => { const sx = i < 2 ? -1 : 1, low = i % 2 === 1, z = low ? 1.0 : -1.2, x = sx * 7.2, y = DECK + (low ? 1.4 : 2.6); return aim({ x, y, z }, { x: -sx * 1.5, y: DECK + 1.4, z }); },
   Special: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: hang(7.8), z: -0.2 }, { x: x * 0.6, y: DECK, z: -1.5 }); },
   Spot: (i, n) => hung({ x: spread(i, n, -4.5, 4.5), y: hang(7.8), z: -2.6 }),
@@ -81,10 +82,11 @@ const THEATRE_PLACES: Table = {
   Fog: () => stand({ x: -6.5, y: DECK, z: -3.5 }, 90),
   Hazer: () => stand({ x: 6.5, y: DECK, z: -4.5 }, -90),
   Confetti: () => stand({ x: 0, y: DECK, z: 3.0 }),
-  CO2: () => stand({ x: 6.8, y: DECK, z: 1.2 }),
+  // (the machines apart from the booms and each other: on the plan they sat on top of them)
+  CO2: () => stand({ x: -5.8, y: DECK, z: -2.4 }),
   Sparks: (i) => stand({ x: i ? 5.5 : -5.5, y: DECK, z: 3.1 }),
   Flame: (i) => stand({ x: i ? 3 : -3, y: DECK, z: -4.2 }),
-  Bubbles: () => stand({ x: -5.5, y: DECK, z: 2.6 }, 30),
+  Bubbles: () => stand({ x: 5.8, y: DECK, z: -2.4 }, -30),
 };
 
 // ---- the church: hung from the roof's beams (over the chancel, over the nave), uplights on the walls
@@ -93,7 +95,8 @@ const Chu = CHURCH, beam = Chu.ceiling - 0.8 - TRUSS_HANG;
 const CHURCH_PLACES: Table = {
   Front: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: beam, z: 2.2 }, { x: x * 0.4, y: DECK + 1.6, z: -3.5 }); },
   Wash: (i, n) => { const x = spread(i, n, -4.5, 4.5); return aim({ x, y: beam, z: -1.8 }, { x: x * 0.6, y: DECK, z: -4 }); },
-  Altar: (i) => aim({ x: i ? 2 : -2, y: beam, z: -1.8 }, { x: 0, y: DECK + 1, z: Chu.altarZ }),
+  // (from the beam over the chancel, either side of the altar: clear of the washes on the next beam)
+  Altar: (i) => aim({ x: i ? 2.6 : -2.6, y: beam, z: -5.8 }, { x: 0, y: DECK + 1, z: Chu.altarZ }),
   Lectern: () => aim({ x: -6, y: beam, z: -1.8 }, { x: Chu.lecternX, y: DECK + 1.3, z: -2.4 }),
   Choir: (i) => { const x = [-5.5, -3.5, 3.5, 5.5][i] ?? 0; return aim({ x, y: beam, z: -5.8 }, { x: Math.sign(x) * 4.3, y: DECK, z: -4.6 }); },
   Head: (i, n) => hung({ x: spread(i, n, -4.5, 4.5), y: beam, z: 6.2 }),

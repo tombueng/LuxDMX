@@ -143,7 +143,9 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   // a theatre (scenes.ts buildTheatre): the stage behind the proscenium and its apron are the deck
   // and the plan; the lighting bars over the stage, one front-of-house bar over the stalls
   theatre: {
-    id: 'theatre', W: 14, D: 9.4, zc: -1.3, truss: [{ z: -4.8, y: 9.0 }, { z: -2.6, y: 7.8 }, { z: -0.2, y: 7.8 }, { z: 8.4, y: 10.4 }], deck: { x: 8, z0: -6, z1: 3.4 }, ceiling: 12,
+    // (the plan: the stage and the stalls, the front-of-house bar and the house lights out over them;
+    // the balcony at the back is left off, the stage would be a sliver)
+    id: 'theatre', W: 18, D: 19.4, zc: 3.3, truss: [{ z: -4.8, y: 9.0 }, { z: -2.6, y: 7.8 }, { z: -0.2, y: 7.8 }, { z: 8.4, y: 10.4 }], deck: { x: 8, z0: -6, z1: 3.4 }, ceiling: 12,
     band: { x: 7, z0: -6, z1: 3.4 }, walls: { x: 11, z0: -6.4, z1: 21 }, screens: [{ z: -5.7, x: 7, y0: DECK, y1: DECK + 8.4 }],
     floor: (_x, z) => theatreFloor(z),
     frame: [span(7.4, 9.0, -4.8), span(7.4, 7.8, -2.6), span(7.4, 7.8, -0.2), span(8.4, 10.4, 8.4)],
@@ -154,7 +156,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   // wall, the chancel at its top (its lights are all over it: over the nave, on the walls); the lights
   // hang from the roof's beams
   church: {
-    id: 'church', W: 17, D: 20, zc: 2.4, truss: [{ z: -5.8, y: 12.2 }, { z: -1.8, y: 12.2 }, { z: 2.2, y: 12.2 }, { z: 6.2, y: 12.2 }], deck: { x: 6, z0: -7.4, z1: -1.2 }, ceiling: 13,
+    id: 'church', W: 18, D: 29.8, zc: 7.1, truss: [{ z: -5.8, y: 12.2 }, { z: -1.8, y: 12.2 }, { z: 2.2, y: 12.2 }, { z: 6.2, y: 12.2 }], deck: { x: 6, z0: -7.4, z1: -1.2 }, ceiling: 13,
     band: { x: 6, z0: -7.4, z1: -1.2 }, walls: { x: 9, z0: -7.8, z1: 22 },
     views: { front: { pos: [0, 2.6, 20.6], at: [0, 3, -4] }, foh: { pos: [3.2, 2.3, 10], at: [0, 2.6, -4] }, side: { pos: [-7.6, 7.5, 12], at: [0, 2.6, -4] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -6.6], at: [0, 2, 12] } },
     tour: { rx: 6.2, rz: 8, z0: 6, y: 4.5, dy: 0.8, at: [0, 2.6, -4] },
