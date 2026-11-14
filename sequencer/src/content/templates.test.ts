@@ -38,14 +38,19 @@ describe('the templates', () => {
       it('every light fits its universe and shares no channel; one box (two universes) runs it', () => {
         const types = typeMap(s), used = new Map<string, string>();
         for (const f of s.fixtures) {
-          const n = modeOf(types.get(f.typeId), f.mode)!.channels.length;
+          const mode = modeOf(types.get(f.typeId), f.mode)!, n = mode.channels.length;
           expect(f.address, f.name).toBeGreaterThanOrEqual(1);
-          expect(f.address + n - 1, f.name).toBeLessThanOrEqual(512);
-          for (let c = 0; c < n; c++) { const k = `${f.universe}.${f.address + c}`; expect(used.get(k), `${f.name} on ${k}`).toBeUndefined(); used.set(k, f.name); }
+          // (a ring or a matrix on a pixel port runs on over the next universes, whole pixels on each:
+          // 170 to a universe; anything else fits its own)
+          const at = (c: number) => (mode.layout ? { u: f.universe + Math.floor(c / 510), a: f.address + (c % 510) } : { u: f.universe, a: f.address + c });
+          if (!mode.layout) expect(f.address + n - 1, f.name).toBeLessThanOrEqual(512);
+          else expect(f.universe, `${f.name}: on a pixel port`).toBeGreaterThanOrEqual(10);
+          for (let c = 0; c < n; c++) { const { u, a } = at(c), k = `${u}.${a}`; expect(a, f.name).toBeLessThanOrEqual(512); expect(used.get(k), `${f.name} on ${k}`).toBeUndefined(); used.set(k, f.name); }
           expect(f.x).toBeGreaterThanOrEqual(0); expect(f.x).toBeLessThanOrEqual(1); expect(f.y).toBeGreaterThanOrEqual(0); expect(f.y).toBeLessThanOrEqual(1);
           for (const v of [f.p3?.x, f.p3?.y, f.p3?.z, f.rot?.yaw, f.rot?.pitch, f.rot?.roll]) if (v !== undefined) expect(Number.isFinite(v), f.name).toBe(true);
         }
-        expect(new Set(s.fixtures.map((f) => f.universe)).size).toBeLessThanOrEqual(2);
+        // (one box: its two DMX universes, and its pixel ports for rings and matrices)
+        expect(new Set(s.fixtures.filter((f) => f.universe < 10).map((f) => f.universe)).size).toBeLessThanOrEqual(2);
         expect(new Set(s.fixtures.map((f) => f.name)).size, 'names are unique').toBe(s.fixtures.length);
       });
       it('everything named is there: lights in cues and groups, effects in cues, lists in actions; effects are known ones', () => {

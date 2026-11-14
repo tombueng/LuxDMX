@@ -146,24 +146,31 @@ const CLUB_PLACES: Table = {
 // machines round the dance floor
 const Bl = BALLROOM, pipeHang = Bl.pipeY - TRUSS_HANG, ceil = Bl.ceiling - 0.15;
 const BALLROOM_PLACES: Table = {
-  // five up each side wall, four along the back wall beside the head table
+  // five up each side wall, six along the back wall either side of the head table
   Uplight: (i) => {
     if (i < 10) { const sx = i < 5 ? -1 : 1, z = [0, 4, 8, 12, 16][i % 5], x = sx * (Bl.wallX - 0.3); return aim({ x, y: 0.1, z }, { x: sx * Bl.wallX, y: 3, z }); }
-    const x = [-9.6, -5.6, 5.6, 9.6][i - 10] ?? 0, z = Bl.z0 + 0.3; return aim({ x, y: 0.1, z }, { x, y: 3, z: Bl.z0 });
+    const x = [-9.6, -6.4, -3.2, 3.2, 6.4, 9.6][i - 10] ?? 0, z = Bl.z0 + 0.3; return aim({ x, y: 0.1, z }, { x, y: 3, z: Bl.z0 });
   },
   Pinspot: (i) => { const [x, z] = Bl.tables[i % Bl.tables.length]; return aim({ x: x * 0.92, y: ceil, z: z - 0.4 }, { x, y: 0.9, z }); },
-  Spot: (i) => hung({ x: i ? 2 : -2, y: pipeHang, z: Bl.pipes[0] }),
-  Head: (i) => hung({ x: i % 2 ? 4 : -4, y: pipeHang, z: Bl.pipes[i < 2 ? 0 : 1] }),
+  // the pipes over the dance floor: the front one with the beams in the middle, spots, heads; the
+  // back one with the dance floor's own lights, spots, heads
+  Spot: (i) => hung({ x: (i % 2 ? 1 : -1) * (i < 2 ? 2.2 : 3.2), y: pipeHang, z: Bl.pipes[i < 2 ? 0 : 1] }),
+  Head: (i) => hung({ x: [-6.5, -4.4, 4.4, 6.5][i % 4], y: pipeHang, z: Bl.pipes[i < 4 ? 0 : 1] }),
+  Beam: (i) => hung({ x: [-1.3, -0.45, 0.45, 1.3][i % 4], y: pipeHang, z: Bl.pipes[0] }),
   Dance: (i, n) => { const x = spread(i, n, -2.4, 2.4); return aim({ x, y: pipeHang, z: Bl.pipes[1] }, { x: x * 0.8, y: 0, z: 7.2 }); },
-  'Head table': (i) => { const x = i ? 2.5 : -2.5; return aim({ x, y: ceil, z: -1.2 }, { x: x * 0.6, y: 1.0, z: Bl.head.z - 0.4 }); },
+  'Head table': (i) => { const x = i ? 2.5 : -2.5; return aim({ x, y: ceil, z: -2.0 }, { x: x * 0.6, y: 1.0, z: Bl.head.z - 0.4 }); },
   // (from the ceiling over the head table's end, clear of the pinspot over the table beside it)
   Cake: () => aim({ x: Bl.cake.x - 1.6, y: ceil, z: -2.2 }, { x: Bl.cake.x, y: 1.3, z: Bl.cake.z }),
   Chandelier: (i) => { const [x, z] = Bl.chandeliers[i % Bl.chandeliers.length]; return aim({ x, y: Bl.ceiling - 1.62, z }, { x, y: 0, z }); },
+  // the LED sign on the back wall over the head table, the heart panel on the front of the DJ's
+  // table, both standing up facing the room
+  Sign: () => ({ p: { x: 0, y: 3.4, z: Bl.z0 + 0.12 }, rot: { yaw: 0, pitch: 90, roll: 0 } }),
+  'Heart panel': () => ({ p: { x: Bl.dj.x, y: 1.35, z: Bl.dj.z + 0.62 }, rot: { yaw: 0, pitch: 90, roll: 0 } }),
   Hazer: () => stand({ x: 10.2, y: 0, z: 19.2 }, -135),
   // (round the dance floor's corners, clear of the heads over them: on the plan they were on top
   // of each other)
   'Low fog': () => stand({ x: -5.3, y: 0, z: 1.6 }, 45),
-  Sparks: (i) => stand({ x: i ? 5.3 : -5.3, y: 0, z: 11.4 }),
+  Sparks: (i) => stand({ x: i % 2 ? 5.3 : -5.3, y: 0, z: i < 2 ? 11.4 : 6.5 }),
   Bubbles: () => stand({ x: 5.3, y: 0, z: 1.6 }, -45),
   Confetti: () => stand({ x: -1.8, y: 0, z: 11.2 }, 180),
 };

@@ -13,6 +13,10 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A much bigger Wedding**: 67 lights (16 uplights, a pinspot on all 13 tables, eight heads, four
+  spots, beam heads, the dance floor's own), an LED sign over the head table (Just married, LOVE in
+  neon, Mr & Mrs) and a heart panel on the DJ's table, and 24 looks from the guests arriving to the
+  sparkler send-off; the heads draw a heart. Confetti only for the bouquet.
 - **A much bigger Band**: 78 lights (beam heads, uplights on the deck, more spots, washes, movers,
   pixel bars, blinders and strobes) and 25 looks full of the new moves and pixel shows. Confetti only
   once, at the very end. The plan's group buttons scroll in one row when a rig has many groups.

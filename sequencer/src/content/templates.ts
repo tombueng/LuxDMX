@@ -679,55 +679,105 @@ export const TEMPLATES: Template[] = [
     },
   },
   {
-    name: 'Wedding', icon: 'heart', blurb: 'A ballroom: coloured uplights on the walls, pinspots on the tables, gobos on the dance floor for the first dance, heads for the party, low fog and cold sparks.',
+    name: 'Wedding', icon: 'heart', blurb: 'A ballroom: uplights all round, a pinspot on every table, heads, spots and beams over the dance floor, an LED sign and a heart panel, low fog and cold sparks. Twenty-four looks from the guests arriving to the send-off.',
     build: () => {
       const b = new Builder('Wedding');
-      const ups = b.add('gen-drgbw', 14, 'Uplight', 0.1);
+      // a ballroom done properly: uplights all round the walls, a pinspot on every table, heads, spots
+      // and beam heads on the pipes over the dance floor, its own lights, the head table and the
+      // cake, the chandeliers, an LED sign over the head table and a heart panel on the DJ's table,
+      // haze, low fog, cold sparks (one confetti shot, for the bouquet)
+      const ups = b.add('gen-drgbw', 16, 'Uplight', 0.1);
       b.place(ups, (f) => { f.beamDeg = [36, 36]; });       // (uplights: a wide wash up the wall)
-      const pins = b.add('gen-dimmer', 10, 'Pinspot', 0.5);
+      const pins = b.add('gen-dimmer', 13, 'Pinspot', 0.5);
       // (pinspots on the centrepieces: a pencil of light each, as a real pinspot's)
       b.place(pins, (f) => { f.beamDeg = [8, 8]; });
-      const spots = b.add('gen-spotgobo', 2, 'Spot', 0.3, { x0: 0.4, x1: 0.6 });
-      const heads = b.add('gen-wash', 4, 'Head', 0.3, { x0: 0.25, x1: 0.75 });
-      const dance = b.add('gen-drgbwauvs', 4, 'Dance', 0.6, { x0: 0.3, x1: 0.7 });
+      const spots = b.add('gen-spotgobo', 4, 'Spot', 0.3, { x0: 0.35, x1: 0.65 });
+      const heads = b.add('gen-wash', 8, 'Head', 0.3, { x0: 0.15, x1: 0.85 });
+      const beams = b.add('gen-roll', 4, 'Beam', 0.3, { x0: 0.4, x1: 0.6 });
+      const dance = b.add('gen-drgbwauvs', 6, 'Dance', 0.6, { x0: 0.25, x1: 0.75 });
       const top = b.add('gen-wwcw', 2, 'Head table', 0.05, { x0: 0.4, x1: 0.6 });
       const cake = b.add('gen-dimmer', 1, 'Cake', 0.05, { x0: 0.85, x1: 0.85 });
       b.place(cake, (f) => { f.beamDeg = [12, 12]; });
       const chand = b.add('gen-dimmer', 3, 'Chandelier', 0.5, { x0: 0.2, x1: 0.8 });
+      // the LED sign and the heart panel, on the box's pixel ports (universes 10 and up)
+      const sign = b.add('gen-matrix32x8', 1, 'Sign', 0.02, { universe: 10, x0: 0.5, x1: 0.5 });
+      const hearts = b.add('gen-matrix16x16', 1, 'Heart panel', 0.05, { universe: 12, x0: 0.15, x1: 0.15 });
       const hazer = b.add('gen-hazer', 1, 'Hazer', 0.95, { x0: 0.95, x1: 0.95 });
       const lowFog = b.add('gen-fog', 1, 'Low fog', 0.2, { x0: 0.3, x1: 0.3 });
-      b.add('gen-sparks', 2, 'Sparks', 0.2, { x0: 0.3, x1: 0.7 });
+      b.add('gen-sparks', 4, 'Sparks', 0.2, { x0: 0.3, x1: 0.7 });
       b.add('gen-bubbles', 1, 'Bubbles', 0.6, { x0: 0.7, x1: 0.7 });
       b.add('gen-confetti', 1, 'Confetti', 0.6, { x0: 0.5, x1: 0.5 });
       const gUp = b.group('Uplights', ups), gPin = b.group('Pinspots', pins), gHead = b.group('Heads', heads), gDance = b.group('Dance floor', dance);
-      b.group('Spots', spots); b.group('Head table', top); b.group('Cake', cake); b.group('Chandeliers', chand);
-      const blush = { r: 1, g: 0.55, b: 0.6 };
+      const gSpot = b.group('Spots', spots), gBeam = b.group('Beams', beams), gSign = b.group('Sign', sign), gHearts = b.group('Heart panel', hearts);
+      b.group('Head table', top); b.group('Cake', cake); b.group('Chandeliers', chand);
+      const blush = { r: 1, g: 0.55, b: 0.6 }, champagne = { r: 1, g: 0.86, b: 0.6 };
+      // the effects: the walls, the tables, the heads (a heart drawn with the beams), the beams, the
+      // dance floor, and words and hearts on the sign and the panel
       const fade = b.effect('Uplights slow colours', 'colorFade', gUp, { speed: 40, tempo: false, spread: 0.6, colors: [blush, C.lavender, C.amber] });
       const chase = b.effect('Uplight colour chase', 'colorChase', gUp, { speed: 2 });
       const rainbow = b.effect('Uplight rainbow', 'rainbow', gUp, { speed: 8 });
+      const ocean = b.effect('Uplights ocean', 'ocean', gUp, {});
+      const gradient = b.effect('Uplights gradient', 'gradient', gUp, { speed: 16, colors: [C.gold, blush, C.lavender] });
+      const breathe = b.effect('Uplights breathing', 'pulse', gUp, { speed: 8, tempo: false, low: 0.4, spread: 0.5 });
+      const twinkle = b.effect('Pinspots twinkle', 'sparkle', gPin, { size: 0.3 });
+      const candles = b.effect('Candlelight', 'candle', gPin, { low: 0.5 });
       const bally = b.effect('Heads ballyhoo', 'ballyhoo', gHead, {});
       const circle = b.effect('Heads slow circles', 'circle', gHead, { size: 0.25, speed: 16 });
-      const danceChase = b.effect('Dance colour chase', 'colorChase', gDance, { speed: 2 });
-      const twinkle = b.effect('Pinspots twinkle', 'sparkle', gPin, { size: 0.3 });
-      const ocean = b.effect('Uplights ocean', 'ocean', gUp, {});
       const fig8 = b.effect('Heads figure eight', 'figure8', gHead, {});
+      const heart = b.effect('Heads draw a heart', 'heart', gHead, { size: 0.3, speed: 8 });
+      const flower = b.effect('Heads flower', 'flower', gHead, { size: 0.3, speed: 8 });
+      const wander = b.effect('Heads wander', 'wander', gHead, { size: 0.3, speed: 8 });
+      const star = b.effect('Spots star', 'star', gSpot, { size: 0.3, speed: 10 });
+      const spiro = b.effect('Spots spirograph', 'spirograph', gSpot, { size: 0.35, speed: 24 });
+      const beamFan = b.effect('Beam fan', 'fan', gBeam, { size: 0.6, speed: 8 });
+      const mirror = b.effect('Beam mirror circles', 'mirrorCircles', gBeam, { size: 0.35, speed: 4 });
+      const stepper = b.effect('Beam step', 'step', gBeam, { size: 0.5, speed: 4 });
+      const danceChase = b.effect('Dance colour chase', 'colorChase', gDance, { speed: 2 });
+      const danceRainbow = b.effect('Dance rainbow', 'rainbow', gDance, { speed: 4 });
+      const married = b.effect('Just married', 'sparkleText', gSign, { text: 'JUST MARRIED', speed: 4 });
+      const love = b.effect('Love in neon', 'neonText', gSign, { text: 'LOVE', speed: 8 });
+      const mrmrs = b.effect('Mr and Mrs', 'letterZoom', gSign, { text: 'MR & MRS', speed: 2 });
+      const welcome = b.effect('Welcome', 'typewriter', gSign, { text: 'WELCOME TO OUR WEDDING', speed: 0.18 });
+      const danceWord = b.effect('Dance!', 'wordFlash', gSign, { text: 'DANCE DANCE DANCE', speed: 1 });
+      const signConfetti = b.effect('Sign confetti', 'confettiFall', gSign, { speed: 6 });
+      const rising = b.effect('Rising hearts', 'risingHearts', gHearts, { speed: 6 });
+      const bigHeart = b.effect('Beating heart', 'bigHeart', gHearts, { speed: 2 });
+      const vortex = b.effect('Heart vortex', 'vortex', gHearts, { speed: 4 });
       const head = (pan: number, tilt: number, more: Values = {}): Values => ({ pan, tilt, ...more });
-      const room: [string[], Values][] = [[[...spots, ...heads, ...dance], { intensity: 0 }]];
+      const room: [string[], Values][] = [[[...spots, ...heads, ...beams, ...dance, ...sign, ...hearts], { intensity: 0 }]];
       const l = b.list('Wedding', { play: false });
       b.haze(hazer);
       const m = b.machines(), fogShot = b.shot('Fog burst', lowFog, { fog: 1 }, 8, '8 s of low fog', '#8a94a3');
-      b.cue(l, 'Guests arrive', [...room, [ups, on(0.7, C.amber)], [pins, on(0.8)], [chand, on(0.8)], [top, on(0.5, undefined, { cct: 0.2 })], [cake, on(0.6)]], { fade: 10 });
+      const signOn = (lvl = 1): [string[], Values] => [sign, on(lvl)], heartsOn = (lvl = 1): [string[], Values] => [hearts, on(lvl)];
+      b.cue(l, 'Guests arrive', [...room, [ups, on(0.7, C.amber)], [pins, on(0.8)], [chand, on(0.8)], [top, on(0.5, undefined, { cct: 0.2 })], [cake, on(0.6)], signOn(0.8)], { fade: 10, effects: [welcome, breathe] });
+      b.cue(l, 'Welcome drinks', [...room, [ups, on(0.8, champagne)], [pins, on(0.7)], [chand, on(0.7)], [top, on(0.5, undefined, { cct: 0.25 })], signOn(0.8), heartsOn(0.6)], { fade: 8, effects: [gradient, twinkle, love, rising] });
       b.cue(l, 'Grand entrance', [...room, [ups, on(1, blush)], [pins, on(0.5)], [chand, on(0.2)], [spots, on(1, C.white, head(0.5, 0.75, { zoom: 0.1, gobo: gobo('Star') }))],
-        [heads, on(1, C.white, head(0.5, 0.7, { zoom: 0.3 }))], [top, on(0.6, undefined, { cct: 0.27 })]], { fade: 2, effects: [bally], actions: fire(m.bubbles), note: 'Bubbles as they come in' });
-      b.cue(l, 'Dinner', [...room, [ups, on(0.6, C.lavender)], [pins, on(1)], [chand, on(0.5)], [top, on(0.7, undefined, { cct: 0.18 })], [cake, on(0.6)]], { fade: 15, effects: [fade] });
-      b.cue(l, 'Speeches', [...room, [ups, on(0.4, C.amber)], [pins, on(0.6)], [chand, on(0.3)], [top, on(1, undefined, { cct: 0.4 })]], { fade: 5 });
-      b.cue(l, 'Cake cutting', [...room, [ups, on(0.5, blush)], [pins, on(0.3)], [chand, on(0.2)], [cake, on(1)], [top, on(0.4, undefined, { cct: 0.14 })]], { fade: 4 });
+        [heads, on(1, C.white, head(0.5, 0.7, { zoom: 0.3 }))], [top, on(0.6, undefined, { cct: 0.27 })], signOn(), heartsOn()], { fade: 2, effects: [bally, married, bigHeart], actions: fire(m.bubbles), note: 'Bubbles as they come in' });
+      b.cue(l, 'Dinner', [...room, [ups, on(0.6, C.lavender)], [pins, on(1)], [chand, on(0.5)], [top, on(0.7, undefined, { cct: 0.18 })], [cake, on(0.6)], signOn(0.5)], { fade: 15, effects: [fade, love] });
+      b.cue(l, 'Candlelight', [...room, [ups, on(0.35, C.amber)], [pins, on(0.8)], [chand, on(0.15)], [top, on(0.5, undefined, { cct: 0.1 })], [cake, on(0.4)]], { fade: 12, effects: [candles] });
+      b.cue(l, 'Speeches', [...room, [ups, on(0.4, C.amber)], [pins, on(0.6)], [chand, on(0.3)], [top, on(1, undefined, { cct: 0.4 })], signOn(0.6)], { fade: 5, effects: [mrmrs] });
+      b.cue(l, 'Champagne toast', [...room, [ups, on(0.9, champagne)], [pins, on(0.9)], [chand, on(0.6)], [top, on(0.9, undefined, { cct: 0.3 })], [spots, on(0.8, champagne, head(0.5, 0.7, { gobo: gobo('Dots'), zoom: 0.3 }))], signOn()], { fade: 2, effects: [twinkle, star, married] });
+      b.cue(l, 'Cake cutting', [...room, [ups, on(0.5, blush)], [pins, on(0.3)], [chand, on(0.2)], [cake, on(1)], [top, on(0.4, undefined, { cct: 0.14 })], heartsOn()], { fade: 4, effects: [bigHeart] });
       b.cue(l, 'First dance', [...room, [ups, on(0.5, C.lavender)], [pins, on(0.2)], [chand, on(0)], [spots, on(1, C.white, head(0.5, 0.82, { zoom: 0.2, gobo: gobo('Flower'), goboRotation: turn('gen-spotgobo', 0.3) }))],
-        [heads, on(0.7, blush, head(0.5, 0.8, { zoom: 0.6 }))]], { fade: 6, effects: [circle], actions: fire(fogShot, m.sparks), note: 'Low fog, cold sparks as it starts' });
-      b.cue(l, 'Party', [...room, [ups, on(1)], [pins, on(0.2)], [chand, on(0)], [heads, on(1, C.magenta, head(0.5, 0.75, { zoom: 0.4 }))], [dance, on(1, C.cyan)]], { fade: 1, effects: [chase, bally, danceChase] });
-      b.cue(l, 'Slow dance', [...room, [ups, on(0.6, C.purple)], [pins, on(0.3)], [heads, on(0.6, C.pink, head(0.5, 0.8, { zoom: 0.7 }))], [dance, on(0.3, C.deepBlue)]], { fade: 4, effects: [circle, twinkle, ocean] });
-      b.cue(l, 'Bouquet toss', [...room, [ups, on(1, C.white)], [pins, on(1)], [chand, on(0.6)], [heads, on(1, C.white, head(0.5, 0.75, { zoom: 0.2 }))], [dance, on(1, C.white)]], { fade: 0.5, actions: fire(m.confetti), note: 'Confetti on the toss' });
-      b.cue(l, 'Last dance', [...room, [ups, on(1, C.gold)], [heads, on(1, C.gold, head(0.5, 0.75, { zoom: 0.3 }))], [dance, on(1, C.gold)], [pins, on(0.6)]], { fade: 2, effects: [rainbow, fig8], actions: fire(m.sparks), note: 'Cold sparks' });
+        [heads, on(0.7, blush, head(0.5, 0.8, { zoom: 0.6 }))], heartsOn()], { fade: 6, effects: [circle, rising], actions: fire(fogShot, m.sparks), note: 'Low fog, cold sparks as it starts' });
+      b.cue(l, 'Love story', [...room, [ups, on(0.7, C.pink)], [pins, on(0.3)], [heads, on(1, C.pink, head(0.5, 0.78, { zoom: 0.2 }))], [spots, on(0.8, blush, head(0.5, 0.8, { gobo: gobo('Flower'), zoom: 0.3 }))], signOn(), heartsOn()],
+        { fade: 4, effects: [heart, flower, love, rising, gradient] });
+      b.cue(l, 'Parents\' dance', [...room, [ups, on(0.6, C.amber)], [pins, on(0.4)], [chand, on(0.3)], [heads, on(0.7, C.warm, head(0.5, 0.8, { zoom: 0.7 }))], heartsOn(0.7)], { fade: 5, effects: [circle, bigHeart, breathe] });
+      b.cue(l, 'Party', [...room, [ups, on(1)], [pins, on(0.2)], [chand, on(0)], [heads, on(1, C.magenta, head(0.5, 0.75, { zoom: 0.4 }))], [dance, on(1, C.cyan)], [beams, on(1, C.cyan, head(0.5, 0.65, { zoom: 0 }))], signOn(), heartsOn()],
+        { fade: 1, effects: [chase, bally, danceChase, beamFan, danceWord, vortex] });
+      b.cue(l, 'Disco fever', [...room, [ups, on(1, C.purple)], [heads, on(1, C.white, head(0.5, 0.7, { zoom: 0.2 }))], [beams, on(1, C.white, head(0.5, 0.62, { zoom: 0, prism: 1 }))], [dance, on(1)], [spots, on(1, C.white, head(0.5, 0.7, { gobo: gobo('Dots'), zoom: 0.1, prism: 1 }))], heartsOn()],
+        { fade: 0.5, effects: [mirror, spiro, danceRainbow, rainbow, vortex] });
+      b.cue(l, 'Golden hour', [...room, [ups, on(0.9, C.gold)], [pins, on(0.5)], [chand, on(0.4)], [heads, on(0.8, C.amber, head(0.5, 0.75, { zoom: 0.8 }))], [dance, on(0.6, C.amber)], signOn(0.7)], { fade: 6, effects: [gradient, wander, love] });
+      b.cue(l, 'Starry night', [...room, [ups, on(0.4, C.deepBlue)], [pins, on(0.2)], [spots, on(1, C.ice, head(0.5, 0.8, { gobo: gobo('Star'), goboRotation: turn('gen-spotgobo', 0.2), zoom: 0.4, prism: 1 }))],
+        [heads, on(0.5, C.deepBlue, head(0.5, 0.8, { zoom: 1 }))]], { fade: 6, effects: [star, twinkle, ocean] });
+      b.cue(l, 'Slow dance', [...room, [ups, on(0.6, C.purple)], [pins, on(0.3)], [heads, on(0.6, C.pink, head(0.5, 0.8, { zoom: 0.7 }))], [dance, on(0.3, C.deepBlue)], heartsOn(0.7)], { fade: 4, effects: [circle, twinkle, ocean, rising] });
+      b.cue(l, 'Throwback hits', [...room, [ups, on(1)], [dance, on(1)], [heads, on(1, C.white, head(0.5, 0.72, { zoom: 0.3 }))], [beams, on(1, C.magenta, head(0.5, 0.62, { zoom: 0 }))], signOn()], { fade: 1, effects: [rainbow, danceRainbow, fig8, stepper, danceWord] });
+      b.cue(l, 'Conga line', [...room, [ups, on(1, C.orange)], [dance, on(1, C.yellow)], [heads, on(1, C.orange, head(0.5, 0.72, { zoom: 0.4 }))], [pins, on(0.3)]], { fade: 1, effects: [chase, danceChase, bally] });
+      b.cue(l, 'Bouquet toss', [...room, [ups, on(1, C.white)], [pins, on(1)], [chand, on(0.6)], [heads, on(1, C.white, head(0.5, 0.75, { zoom: 0.2 }))], [dance, on(1, C.white)], signOn()], { fade: 0.5, effects: [signConfetti], actions: fire(m.confetti), note: 'Confetti as she throws: the one shot of the night' });
+      b.cue(l, 'Photo time', [...room, [ups, on(0.7, C.warm)], [pins, on(0.8)], [chand, on(1)], [top, on(1, undefined, { cct: 0.4 })], [dance, on(0.8, C.white)], signOn()], { fade: 3, effects: [married] });
+      b.cue(l, 'Last dance', [...room, [ups, on(1, C.gold)], [heads, on(1, C.gold, head(0.5, 0.75, { zoom: 0.3 }))], [dance, on(1, C.gold)], [pins, on(0.6)], [beams, on(0.8, C.gold, head(0.5, 0.65, { zoom: 0 }))], heartsOn()],
+        { fade: 2, effects: [rainbow, fig8, beamFan, bigHeart], actions: fire(m.sparks), note: 'Cold sparks' });
+      b.cue(l, 'Sparkler send-off', [...room, [ups, on(0.8, champagne)], [pins, on(0.5)], [chand, on(0.4)], [heads, on(0.8, C.white, head(0.5, 0.7, { zoom: 0.5 }))], signOn()], { fade: 2, effects: [married, twinkle], actions: fire(m.sparks), note: 'Cold sparks as they leave' });
       b.cue(l, 'Lights up', [...room, [ups, on(0.5, C.warm)], [pins, on(0.6)], [chand, on(1)], [top, on(0.8, undefined, { cct: 0.36 })]], { fade: 6 });
       // (in its own room, a ballroom: every light where a wedding has it, scenePlaces.ts)
       const done = b.done();

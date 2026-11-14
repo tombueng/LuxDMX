@@ -164,7 +164,7 @@ test('a tab opened from this one starts blind (it gets a copy of this tab\'s sto
   expect(await out(page)).toBe('live');
 });
 
-test('a template\'s show: its confetti moment sends 0 while the machines are safe, and fires when they\'re armed', async ({ page }) => {
+test('a template\'s show: its cold-spark moment on the song sends 0 while the machines are safe, and fires when they\'re armed', async ({ page }) => {
   test.setTimeout(120_000);
   await openConnected(page);
   const w = await welcome(page), t = demoTile(w, 'Wedding');
@@ -173,10 +173,13 @@ test('a template\'s show: its confetti moment sends 0 while the machines are saf
   await expect(w).toBeHidden({ timeout: 30000 });
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 30000 }).toBe(true);
   const m = await page.evaluate(() => {
-    const s = (window as any).__luxdmx.show, f = s.fixtures.find((x: any) => /^Confetti/.test(x.name));
-    const b = s.timeline.items.find((i: any) => i.do.do === 'burst' && i.do.attr === 'confetti');
-    return { ch: f.address, at: b.at };
+    // (the show's machine moments: cold sparks on the last chorus; confetti is the bouquet's own,
+    // once, not a moment on the song any more)
+    const s = (window as any).__luxdmx.show, f = s.fixtures.find((x: any) => /^Sparks/.test(x.name));
+    const b = s.timeline.items.find((i: any) => i.do.do === 'burst' && i.do.attr === 'sparks');
+    return { ch: f.address, at: b.at, confetti: s.timeline.items.some((i: any) => i.do.do === 'burst' && i.do.attr === 'confetti') };
   });
+  expect(m.confetti).toBe(false);
   const through = async () => {
     const t0 = Date.now();
     await page.evaluate((at) => (window as any).__luxdmx.timeline.seek(at - 1.5), m.at);
@@ -185,7 +188,9 @@ test('a template\'s show: its confetti moment sends 0 while the machines are saf
   };
   // safe: played through the moment, nothing
   expect(Math.max(0, ...(await through()))).toBe(0);
-  // armed: the same moment fires it
+  // armed: the same moment fires it (once the first is over: a moment already running when the
+  // machines are armed stays quiet, arming never fires one half way through)
+  await expect.poll(() => page.evaluate(() => { const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => /^Sparks 1$/.test(x.name)); return a.stageNow[f.id]?.sparks ?? 0; }), { timeout: 10000 }).toBe(0);
   await page.evaluate(() => (window as any).__luxdmx.armMachines(true));
   expect(Math.max(0, ...(await through()))).toBeGreaterThan(0);
   await page.evaluate(() => (window as any).__luxdmx.armMachines(false));

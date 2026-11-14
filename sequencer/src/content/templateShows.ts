@@ -73,11 +73,12 @@ export const TEMPLATE_SHOWS: Record<string, TemplateShow> = {
   Wedding: {
     crowd: 'party', song: 'hot-core', list: 'Wedding', end: 'Lights up',
     sets: {
-      intro: [['Grand entrance']], verse: [['Party'], ['Slow dance', 'Party']], build: [['First dance']],
-      chorus: [['Party', 'Last dance'], ['Last dance', 'Party']], solo: [['Party']], break: [['Slow dance'], ['First dance']],
-      inst: [['Party', 'Last dance']], outro: [['Slow dance']],
+      intro: [['Grand entrance']], verse: [['Party', 'Golden hour'], ['Slow dance', 'Party'], ['Love story', 'Throwback hits']], build: [['First dance'], ['Champagne toast']],
+      chorus: [['Party', 'Disco fever'], ['Last dance', 'Throwback hits'], ['Disco fever', 'Conga line']], solo: [['Love story']], break: [['Slow dance', 'Starry night'], ['First dance']],
+      inst: [['Party', 'Last dance'], ['Disco fever', 'Party']], outro: [['Sparkler send-off']],
     },
-    lastChorus: ['Bouquet toss', 'Last dance', 'Party'], hits: ['fog', 'confetti', 'sparks', 'bubbles'],
+    // (the one confetti shot is the bouquet's own)
+    lastChorus: ['Bouquet toss', 'Last dance', 'Disco fever', 'Party'], hits: ['fog', 'sparks', 'bubbles'],
   },
   Bar: {
     crowd: 'bar', song: 'light-me-on-fire', list: 'Moods', end: 'Last call',
