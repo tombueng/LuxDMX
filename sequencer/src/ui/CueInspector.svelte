@@ -79,8 +79,9 @@
       <label>Fade <span><NumField value={sel[0].fade} max={600} step={0.5} label="Fade" onset={(v) => setAll('fade', v ?? 0)} /> s</span></label>
       <label>Then <select value={sel[0].advance.mode} onchange={(e) => setAdvance((e.target as HTMLSelectElement).value as Advance['mode'])} aria-label="Next cue">
         <!-- (short: the longest was cut off in the inspector, "next cue N seconds aft…") -->
-        <option value="manual">wait for GO</option><option value="wait">next after N s</option>
-        <option value="follow">next N s after its fade</option><option value="beats">next after N beats</option></select></label>
+        <!-- (the number is the field below: no literal "N" in the words) -->
+        <option value="manual">wait for GO</option><option value="wait">next after a wait</option>
+        <option value="follow">next, a while after its fade</option><option value="beats">next after some beats</option></select></label>
       {#if sel[0].advance.mode !== 'manual'}
         <label title={sel[0].advance.mode === 'wait' ? 'Counted from when the cue starts (the fade included)' : sel[0].advance.mode === 'follow' ? 'Counted from when its fade is done' : 'At the tempo (Tap, or follow the music)'}>{sel[0].advance.mode === 'beats' ? 'Beats' : 'Seconds'} <span><NumField value={advVal(sel[0].advance)} min={sel[0].advance.mode === 'follow' ? 0 : sel[0].advance.mode === 'beats' ? 1 : 0.1} max={3600} step={0.5}
              label="Advance time" onset={(v) => { if (v !== undefined) setAdvVal(v); }} /></span></label>

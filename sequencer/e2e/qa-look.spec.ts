@@ -481,6 +481,9 @@ test('the effect editor: the beats choice shows what it is, seconds and blocks k
   const beats = page.getByLabel('Beats per cycle');
   await expect(beats).toBeVisible();
   expect((await beats.boundingBox())!.width).toBeGreaterThan(60);                                    // (it was 19 px, its arrow only)
+  // (a fraction of a beat is "1/4 beat", not "1/4 beats")
+  const words = await beats.locator('option').allTextContents();
+  expect(words).toContain('1/4 beat'); expect(words.join('|')).not.toMatch(/1\/\d beats/);
   const tempo = page.locator('label.tempo input');
   if (await tempo.isChecked()) await tempo.uncheck();
   const secs = page.getByLabel('Seconds per cycle');
@@ -823,4 +826,17 @@ test('a narrow cue card keeps its chips inside: a machine is its warning sign, a
   }));
   expect(outside).toEqual([]);
   await expect(page.locator('.deck .card', { hasText: 'Big finish' }).locator('.chip.orange')).toHaveAttribute('title', /Fires a machine/);
+});
+
+test('a cue\'s Then says its choices in words (no literal "N": the number is the field under it)', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 2, 0, 'PAR');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = a.show.fixtures.map((f: any) => f.id); a.set({ intensity: 1 }); a.record(); });
+  const then = page.getByLabel('Next cue');
+  await expect(then).toBeVisible();
+  const opts = await then.locator('option').allTextContents();
+  expect(opts).toHaveLength(4);
+  expect(opts.join('|')).not.toMatch(/\bN\b/);
+  await then.selectOption('beats');
+  await expect(page.getByLabel('Advance time')).toBeVisible();
 });

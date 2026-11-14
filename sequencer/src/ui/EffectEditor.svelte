@@ -102,7 +102,7 @@
     <label class="tempo" title="Follow the show tempo (Tap)"><input type="checkbox" checked={p.tempo} onchange={(e) => setTempo((e.target as HTMLInputElement).checked)} /> tempo</label>
     {#if p.tempo}
       <select value={String(p.speed)} onchange={(e) => set('speed', +(e.target as HTMLSelectElement).value)} aria-label="Beats per cycle">
-        {#each BEATS as b (b)}<option value={String(b)}>{b < 1 ? `1/${1 / b}` : b} beat{b === 1 ? '' : 's'}</option>{/each}
+        {#each BEATS as b (b)}<option value={String(b)}>{b < 1 ? `1/${1 / b} beat` : `${b} beat${b === 1 ? '' : 's'}`}</option>{/each}
         {#if !BEATS.includes(p.speed)}<option value={String(p.speed)}>{p.speed} beats</option>{/if}
       </select>
     {:else}
