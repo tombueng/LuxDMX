@@ -99,7 +99,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     band: { x: 4, z0: -1.6, z1: 4.5 }, walls: { x: 10, z0: -2.4, z1: 22 },
     frame: [span(6.6, 5.8, -1.0), span(6.6, 5.8, 3.8), ...towers(6.6, 5.8, -1.0), ...towers(6.6, 5.8, 3.8),
       [[-6.6, mid(5.8), -1.0], [-6.6, mid(5.8), 3.8]], [[6.6, mid(5.8), -1.0], [6.6, mid(5.8), 3.8]], span(7.5, 6.2, 9.5)],
-    views: { front: { pos: [0, 3.4, 18], at: [0, 3.0, 1.5] }, foh: { pos: [3.5, 2.9, 14.5], at: [0, 3.0, 1.5] }, side: { pos: [-8.6, 4.6, 9.5], at: [0, 2.8, 2] }, top: { pos: [0, 28, 8.01], at: [0, 0, 8] }, band: { pos: [0.9, 3.4, 0.2], at: [0, 2.4, 14] } },
+    views: { front: { pos: [0, 3.4, 18], at: [0, 3.0, 1.5] }, foh: { pos: [3.5, 2.9, 14.5], at: [0, 3.0, 1.5] }, side: { pos: [-8.6, 4.6, 9.5], at: [0, 2.8, 2] }, top: { pos: [0, 28, 8.01], at: [0, 0, 8] }, band: { pos: [2.6, 3.8, -0.3], at: [0, 2.2, 14] } },
     tour: { rx: 7, rz: 7.5, z0: 9, y: 3.6, dy: 1, at: [0, 3, 1.5] },
   },
   // a party room (a warehouse, no stage): a 12 x 12 m square of truss over the crowd on four legs,
