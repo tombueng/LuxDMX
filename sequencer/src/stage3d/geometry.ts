@@ -334,6 +334,7 @@ export function hitFloor(p: V3, d: V3, r: Room = shown): V3 | undefined {
 let wallsOn = true;
 // the built-in room shown, or hidden (your own venue model instead: its walls aren't known)
 export function showWalls(on: boolean) { wallsOn = on; }
+export const wallsShown = () => wallsOn;
 export function hitRoom(p: V3, d: V3, r: Room = shown): (V3 & { n: V3 }) | undefined {
   const f = hitFloor(p, d, r);
   let best: (V3 & { n: V3 }) | undefined = f ? { ...f, n: { x: 0, y: 1, z: 0 } } : undefined;

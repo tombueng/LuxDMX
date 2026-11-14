@@ -17,7 +17,7 @@ import { rigFixtureFull } from './rigOf';
 import { microShow, type MicroShow } from './microShow';
 import { drawAtlas } from './gobos';
 import { loadGoboFonts } from './goboFonts';
-import { aimRot, HALL, pivotOf, ROOMS, showRoom, shownRoom, type Room, type V3 } from './geometry';
+import { aimRot, HALL, pivotOf, ROOMS, showRoom, shownRoom, type Room, type V3, showWalls, wallsShown } from './geometry';
 import { Particles } from './particles';
 import type { Focus } from './microShow';
 import { kindOf } from '../model/library';
@@ -153,8 +153,9 @@ function drawAt(s: Slot, t: number, w: number, h: number) {
   if (!renderer) return;
   const size = renderer.getSize(new THREE.Vector2());
   if (size.x !== w || size.y !== h) { renderer.setSize(w, h, false); composer?.setSize(w, h); }
-  const was = shownRoom(); showRoom(ROOM);
-  try { stage(s, t, w, h); } finally { showRoom(was); }
+  // (its walls are only where the fog stops, nothing to see: the light lands on the floor alone)
+  const was = shownRoom(), walls = wallsShown(); showRoom(ROOM); showWalls(false);
+  try { stage(s, t, w, h); } finally { showRoom(was); showWalls(walls); }
   // (the glow when the page has time for it; plain when it's busy. A disc or a matrix, all lit,
   // glows less: it went white)
   if (composer && load.level >= 1) { bloom.strength = s.list[0]?.shape ? 0.25 : 0.9; composer.render(); } else renderer.render(scene, camera);
