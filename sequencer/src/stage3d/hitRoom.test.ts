@@ -29,6 +29,10 @@ describe('where light lands', () => {
     const c = ROOMS.cinema, s = hitRoom({ x: 0, y: 6, z: 8 }, { x: 0, y: 0, z: -1 }, c)!;
     near(s.z, c.screens![0].z);
   });
+  it('the cinema\'s side walls: light lands on the panels standing off them, not behind', () => {
+    const c = ROOMS.cinema, h = hitRoom({ x: -10.7, y: 2.5, z: 10 }, { x: -0.1, y: 1, z: 0 }, c)!;
+    near(h.x, -(c.walls.x - c.inset!)); expect(h.n).toEqual({ x: 1, y: 0, z: 0 });
+  });
   it('the room hidden (your own venue model): the floor or nothing, never its walls', () => {
     showWalls(false);
     expect(hitRoom({ x: 0, y: 3, z: 6 }, { x: 0, y: 1, z: 0 }, ROOMS.club)).toBeUndefined();
