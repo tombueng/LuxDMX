@@ -92,7 +92,7 @@ test('a profile spot as touring rigs have it: glass gobos, prisms that turn, the
   await expect.poll(async () => (await gobo())?.prism).toMatchObject({ facets: 3, linear: false });
   await ranges('Prism').getByRole('button', { name: '5-facet linear prism' }).click();
   await expect.poll(async () => (await gobo())?.prism).toMatchObject({ facets: 5, linear: true });
-  expect(await dmx(16)).toBe(130);
+  await expect.poll(() => dmx(16), { timeout: 3000 }).toBe(130);           // (the wire a frame after the stage: polled)
   await ranges('Prism').getByRole('button', { name: '8-facet prism' }).click();
   await expect.poll(async () => (await gobo())?.prism?.facets).toBe(8);
   // turning: an index is an angle, CW turns it on
