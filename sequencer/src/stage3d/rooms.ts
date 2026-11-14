@@ -14,7 +14,7 @@ import { at, bake, box, cyl, gearMats, movingMeshes, roadCase, std, waterCrate, 
 import { concrete, exitSign, hallWall, neonSign, pleats, roofDeck, screen, stageFloor } from './textures';
 import { buildCrowd, type Crowd } from './crowd';
 import { beatClock, djBooth, djPerson } from './dj';
-import { buildBar, buildChurch, buildCinema, buildTheatre } from './scenes';
+import { buildBallroom, buildBar, buildChurch, buildCinema, buildTheatre } from './scenes';
 import type { Person } from './people';
 
 // What the 3D stage needs of any room (the hall's and the pub's venue has more: the band).
@@ -34,8 +34,8 @@ export interface Stage {
   // the DJ (for the tests): the person, how far the left hand is up, the booth (the person's parent)
   dj?: { p: Person; raised: () => number; booth: THREE.Object3D };
 }
-export type DemoRoom = 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church';
-export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss' || r === 'custom' || r === 'cinema' || r === 'bar' || r === 'theatre' || r === 'church';
+export type DemoRoom = 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom';
+export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss' || r === 'custom' || r === 'cinema' || r === 'bar' || r === 'theatre' || r === 'church' || r === 'ballroom';
 
 // Is WebGL drawn in software here (no graphics chip: SwiftShader, llvmpipe)? Hundreds of people cost
 // a second a frame there.
@@ -184,6 +184,8 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
     frame(group, M, r);
   } else if (id === 'church') {
     sceneAnim = buildChurch(group, M, r).animate;
+  } else if (id === 'ballroom') {
+    sceneAnim = buildBallroom(group, M, r).animate;
   } else if (id === 'custom') {
     // your own stage: the hall's walls, its deck (or none), its spans on towers, a PA either side
     shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x6a6a70 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ color: 0x1a1b1f })) });

@@ -69,6 +69,15 @@ export const TEMPLATE_SHOWS: Record<string, TemplateShow> = {
     },
     lastChorus: ['Premiere applause', 'Sci-fi night', 'Premiere applause'], hits: ['co2', 'confetti', 'sparks', 'bubbles'],
   },
+  Wedding: {
+    crowd: 'party', song: 'hot-core', list: 'Wedding', end: 'Lights up',
+    sets: {
+      intro: [['Grand entrance']], verse: [['Party'], ['Slow dance', 'Party']], build: [['First dance']],
+      chorus: [['Party', 'Last dance'], ['Last dance', 'Party']], solo: [['Party']], break: [['Slow dance'], ['First dance']],
+      inst: [['Party', 'Last dance']], outro: [['Slow dance']],
+    },
+    lastChorus: ['Bouquet toss', 'Last dance', 'Party'], hits: ['fog', 'confetti', 'sparks', 'bubbles'],
+  },
   Bar: {
     crowd: 'bar', song: 'light-me-on-fire', list: 'Moods', end: 'Last call',
     sets: {

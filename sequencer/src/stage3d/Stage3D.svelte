@@ -824,7 +824,7 @@
   function removeModel() { app.checkpoint(); if (app.show.settings.stage3d) delete app.show.settings.stage3d.model; app.markDirty(0); }
   function setHideVenue(h: boolean) { app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, hideVenue: h || undefined }; app.markDirty(0); }
   // the built-in room: the big stage, or a small club / pub (kept with the show)
-  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church') {
+  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom') {
     if (room.id === id) return;
     const s3 = app.show.settings.stage3d;
     app.checkpoint(); app.show.settings.stage3d = { ...s3, room: id === 'hall' ? undefined : id, ...(id === 'custom' && !s3?.size ? { size: { ...STAGE_SIZE } } : {}) }; app.markDirty(0);
@@ -1438,6 +1438,7 @@
           <button class="ghost" class:on={room.id === 'party'} aria-pressed={room.id === 'party'} onclick={() => setRoom('party')} title="No stage: a square of truss over the crowd on four legs, speakers in the corners, the DJ on the floor">Party</button>
           <button class="ghost" class:on={room.id === 'truss'} aria-pressed={room.id === 'truss'} onclick={() => setRoom('truss')} title="An empty room with one truss on two towers: for trying lights out">Test truss</button>
           <button class="ghost" class:on={room.id === 'theatre'} aria-pressed={room.id === 'theatre'} onclick={() => setRoom('theatre')} title="A theatre: a proscenium stage with its house curtain and a cyclorama, lighting bars over it, stalls and a balcony with an audience">Theatre</button>
+          <button class="ghost" class:on={room.id === 'ballroom'} aria-pressed={room.id === 'ballroom'} onclick={() => setRoom('ballroom')} title="A ballroom for a wedding: draped walls for the uplights, round tables with the guests, a parquet dance floor, the head table, the cake, chandeliers">Ballroom</button>
           <button class="ghost" class:on={room.id === 'church'} aria-pressed={room.id === 'church'} onclick={() => setRoom('church')} title="A church: the chancel with the altar, the cross and the choir, pews down the nave with the congregation, stained glass">Church</button>
           <button class="ghost" class:on={room.id === 'cinema'} aria-pressed={room.id === 'cinema'} onclick={() => setRoom('cinema')} title="A big cinema: the screen between red curtains, a stage in front of it, raked rows of seats with an audience">Cinema</button>
           <button class="ghost" class:on={room.id === 'bar'} aria-pressed={room.id === 'bar'} onclick={() => setRoom('bar')} title="A bar: a long counter with a back bar of bottles and a mirror, stools with people, tables, a little dance floor with a mirror ball">Bar</button>

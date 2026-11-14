@@ -4,7 +4,7 @@
 // The plan follows: each light's plan place is where it is in the room.
 import type { Fixture, Show } from '../model/types';
 import { aimRot, roomOf, TRUSS_HANG, worldToPlan, type Rot, type V3 } from '../stage3d/geometry';
-import { BAR, CHURCH, CINEMA, cinemaFloor, THEATRE } from '../stage3d/sceneSizes';
+import { BALLROOM, BAR, CHURCH, CINEMA, cinemaFloor, THEATRE } from '../stage3d/sceneSizes';
 import { DECK } from '../stage3d/geometry';
 
 type Place = { p: V3; rot: Rot };
@@ -130,8 +130,33 @@ const CLUB_PLACES: Table = {
   Bubbles: () => stand({ x: -3.2, y: DECK, z: 2.5 }),
 };
 
-type SceneRoom = 'cinema' | 'bar' | 'theatre' | 'church' | 'club';
-const TABLES: Record<SceneRoom, Table> = { cinema: CINEMA_PLACES, bar: BAR_PLACES, theatre: THEATRE_PLACES, church: CHURCH_PLACES, club: CLUB_PLACES };
+// ---- the ballroom (a wedding): uplights at the foot of the draped walls, washing them; pinspots in
+// the ceiling over the tables' centrepieces; the gobo spots and the heads on the pipes over the
+// dance floor; warm white on the head table, a spot on the cake, the chandeliers' own lamps; the
+// machines round the dance floor
+const Bl = BALLROOM, pipeHang = Bl.pipeY - TRUSS_HANG, ceil = Bl.ceiling - 0.15;
+const BALLROOM_PLACES: Table = {
+  // five up each side wall, four along the back wall beside the head table
+  Uplight: (i) => {
+    if (i < 10) { const sx = i < 5 ? -1 : 1, z = [0, 4, 8, 12, 16][i % 5], x = sx * (Bl.wallX - 0.3); return aim({ x, y: 0.1, z }, { x: sx * Bl.wallX, y: 3, z }); }
+    const x = [-9.6, -5.6, 5.6, 9.6][i - 10] ?? 0, z = Bl.z0 + 0.3; return aim({ x, y: 0.1, z }, { x, y: 3, z: Bl.z0 });
+  },
+  Pinspot: (i) => { const [x, z] = Bl.tables[i % Bl.tables.length]; return aim({ x: x * 0.92, y: ceil, z: z - 0.4 }, { x, y: 0.9, z }); },
+  Spot: (i) => hung({ x: i ? 2 : -2, y: pipeHang, z: Bl.pipes[0] }),
+  Head: (i) => hung({ x: i % 2 ? 4 : -4, y: pipeHang, z: Bl.pipes[i < 2 ? 0 : 1] }),
+  Dance: (i, n) => { const x = spread(i, n, -2.4, 2.4); return aim({ x, y: pipeHang, z: Bl.pipes[1] }, { x: x * 0.8, y: 0, z: 7.2 }); },
+  'Head table': (i) => { const x = i ? 2.5 : -2.5; return aim({ x, y: ceil, z: -1.2 }, { x: x * 0.6, y: 1.0, z: Bl.head.z - 0.4 }); },
+  Cake: () => aim({ x: Bl.cake.x - 0.6, y: ceil, z: -1.0 }, { x: Bl.cake.x, y: 1.3, z: Bl.cake.z }),
+  Chandelier: (i) => { const [x, z] = Bl.chandeliers[i % Bl.chandeliers.length]; return aim({ x, y: Bl.ceiling - 1.62, z }, { x, y: 0, z }); },
+  Hazer: () => stand({ x: 10.2, y: 0, z: 19.2 }, -135),
+  'Low fog': () => stand({ x: -4.4, y: 0, z: 2.4 }, 45),
+  Sparks: (i) => stand({ x: i ? 4.4 : -4.4, y: 0, z: 10.4 }),
+  Bubbles: () => stand({ x: 4.6, y: 0, z: 2.4 }, -45),
+  Confetti: () => stand({ x: 0, y: 0, z: 10.6 }, 180),
+};
+
+type SceneRoom = 'cinema' | 'bar' | 'theatre' | 'church' | 'club' | 'ballroom';
+const TABLES: Record<SceneRoom, Table> = { cinema: CINEMA_PLACES, bar: BAR_PLACES, theatre: THEATRE_PLACES, church: CHURCH_PLACES, club: CLUB_PLACES, ballroom: BALLROOM_PLACES };
 
 // every light of the show whose name the room has a place for: placed there (its 3D place and turn,
 // and its plan place); returns how many

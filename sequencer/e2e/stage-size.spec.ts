@@ -51,7 +51,7 @@ test('your own stage at its size: the room is built for it, heads hang on its tr
   expect(await page.locator('.stage-wrap g.dims line').count()).toBe(7 + 5);   // (a tick a metre, both ends)
 });
 
-test('the Cinema, Bar, Theatre and Church templates play in their own rooms, every light installed there; the Venue panel has them too', async ({ page }) => {
+test('the Cinema, Bar, Theatre, Church and Wedding templates play in their own rooms, every light installed there; the Venue panel has them too', async ({ page }) => {
   test.setTimeout(240_000);
   await openConnected(page);
   const inRoom = async (name: string, room: string) => {
@@ -72,6 +72,11 @@ test('the Cinema, Bar, Theatre and Church templates play in their own rooms, eve
   const wall = await where(page, 'Wall 1');
   expect(wall.y).toBeLessThan(0.5); expect(Math.abs(wall.x)).toBeGreaterThan(8);
   expect((await where(page, 'Head 1')).y).toBeGreaterThan(9);
+  await inRoom('Wedding', 'ballroom');
+  // the ballroom's: the uplights at the foot of the walls, the pinspots in the ceiling over the tables
+  const up = await where(page, 'Uplight 1');
+  expect(up.y).toBeLessThan(0.5); expect(Math.abs(up.x)).toBeGreaterThan(10);
+  expect((await where(page, 'Pinspot 1')).y).toBeGreaterThan(6);
   await inRoom('Bar', 'bar');
   // the bar's lights where a bar has them: the shelf uplights low on the back bar, the PARs on the rail
   expect((await where(page, 'Shelf 1')).y).toBeLessThan(1.3);
@@ -79,7 +84,7 @@ test('the Cinema, Bar, Theatre and Church templates play in their own rooms, eve
   const v = page.locator('.s3').getByRole('group', { name: 'The venue' });
   await page.locator('.s3').getByRole('button', { name: 'Venue', exact: true }).click();
   await expect(v.getByRole('button', { name: 'Bar', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  for (const [label, room] of [['Cinema', 'cinema'], ['Theatre', 'theatre'], ['Church', 'church']] as const) {
+  for (const [label, room] of [['Cinema', 'cinema'], ['Theatre', 'theatre'], ['Church', 'church'], ['Ballroom', 'ballroom']] as const) {
     await v.getByRole('button', { name: label, exact: true }).click();
     await expect.poll(async () => (await venue(page))?.room, { timeout: 45000 }).toBe(room);
   }

@@ -101,6 +101,7 @@ export const CROWDS: Partial<Record<RoomId, CrowdArea>> = {
   bar: { z0: 2.6, z1: 7.2, half: () => 3.6, top: 1.9 },
   theatre: { z0: 4.4, z1: 8.4, half: () => 10, top: 2.0 },
   church: { z0: 1.0, z1: 8.5, half: () => 7.4, top: 1.6 },
+  ballroom: { z0: 3.0, z1: 10.0, half: () => 4, top: 1.9 },
 };
 export interface Space { room: Room; lo: V3; hi: V3; deck: Box | null; boxes: Box[]; caps: Cap[]; crowd?: CrowdArea }
 const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, what: string, c = CLEAR): Box =>
@@ -140,6 +141,14 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
   // the church: its pews six rows at a time, the altar, the choir benches, the lectern
   church: [...[0, 1, 2].map((k) => bx(-7.6, 7.6, 0, 1.75, 1.0 + 6.3 * k, 7.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
     bx(-5.2, -3.6, 0, 2.2, -6.5, -2.7, 'the choir'), bx(3.6, 5.2, 0, 2.2, -6.5, -2.7, 'the choir'), bx(-4.6, -3.8, 0, 2.6, -2.8, -2.0, 'the lectern')],
+  // the ballroom: its round tables (chairs and guests round them), the head table, the cake, the
+  // DJ's table, the chandeliers, the couples dancing
+  ballroom: [
+    ...([[-7.8, 0.5], [-7.8, 4.5], [-7.8, 8.5], [-7.8, 12.5], [7.8, 0.5], [7.8, 4.5], [7.8, 8.5], [7.8, 12.5], [-4, 14], [0, 14], [4, 14], [-2, 17.5], [2, 17.5]] as const).map(([x, z]) => bx(x - 1.7, x + 1.7, 0, 1.5, z - 1.7, z + 1.7, 'a table')),
+    bx(-4.3, 4.3, 0, 1.6, -4.7, -2.9, 'the head table'), bx(6.7, 8.1, 0, 1.9, -4.1, -2.7, 'the cake'), bx(-9.6, -5.3, 0, 1.3, -4.2, -3.0, 'the DJ'),
+    ...([[-5, 6.5], [5, 6.5], [0, 15.5]] as const).map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
+    ...([[-1.6, 5.2], [1.6, 6.2], [-0.2, 8.2]] as const).map(([x, z]) => bx(x - 0.6, x + 0.6, 0, 1.9, z - 0.6, z + 0.6, 'the dancers')),
+  ],
   // the bar: its counter, the stools and the people on them, the back counter, the tables at the
   // sides, the mirror ball (scenes.ts BAR)
   bar: [bx(-6.1, 6.1, 0, 1.2, -2.7, -1.9, 'the counter'), bx(-6.0, 6.0, 0, 1.85, -1.9, -1.0, 'the stools'), bx(-6.2, 6.2, 0, 3.4, -4.6, -3.8, 'the back bar'),
@@ -408,6 +417,24 @@ export const CREW: Partial<Record<RoomId, Crew>> = {
       look: [[-4.0, 2.4, -4], [-2.0, 2.5, -4], [0, 2.6, -4.5], [2.0, 2.5, -4], [4.0, 2.4, -4]],
     },
     drone: { zc: 6, rx: 6.2, rz: 8, y: 5.2, bob: 0.2, arc: 0.8, gate: 4.4, near: [1.4, 2.8, -0.3], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 2.6, -4], lookNear: [0, 2.8, -4.5] },
+  },
+  // the ballroom: from the back of the room, high in a corner, from the side between the tables,
+  // from the edge of the dance floor; the room from behind the head table
+  ballroom: {
+    wide: { pos: [0, 3.0, 19.0], at: [0, 1.4, 5], fov: 34, pan: [1.4, 0, 0], zoom: 0.8 },
+    high: { pos: [-9.4, 5.0, 18.2], at: [0, 1.2, 5], fov: 38, move: [2, 0, 0] },
+    ...side({ pos: [-10.2, 2.4, 6.5], at: [0, 1.3, 6], fov: 32, move: [0, 0, 0.2], pan: [0.8, 0, 0], shake: 0.02 }),
+    crowd: { pos: [0, 2.2, 11.4], at: [0, 1.2, 5], fov: 36, move: [0, 0, -0.5], pan: [0.8, 0, 0], shake: 0.015 },
+    front: { pos: [-5.0, 2.6, 11.0], at: [0, 1.2, 6], fov: 40, move: [1.2, 0, 0], pan: [0.8, 0, 0] },
+    back: { pos: [2.4, 2.6, -5.3], at: [0, 1.2, 8], fov: 50, move: [-2.0, 0, 0], pan: [-1.5, 0, 0] },
+    pit: { z: 1.8, y: 1.8, x: 3 },
+    crane: { pivot: [9.7, 1.5, 6.5], a: [4.6, 3.6, 11.8], b: [2.6, 2.8, 1.4], rise: 0.3, lookA: [0, 1.2, 4], lookB: [0, 1.3, 8.5], period: 46 },
+    walk: {
+      y: 1.6, way: [[-3.6, 2.2], [-1.8, 2.1], [0, 2.2], [1.8, 2.1], [3.6, 2.2]],
+      look: [[-1.8, 1.3, 6], [-0.9, 1.3, 6], [0, 1.3, 6.5], [0.9, 1.3, 6], [1.8, 1.3, 6]],
+    },
+    // (round behind the dance floor, never over it: looking straight down at the dancers its view spun)
+    drone: { zc: 14, rx: 6.4, rz: 4, y: 4.2, bob: 0.12, arc: 0.8, gate: 3.6, near: [1.4, 2.6, 10.6], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 1.2, 6], lookNear: [0, 1.3, 6] },
   },
   truss: {
     wide: { pos: [0, 2.5, 12.5], at: [0, 2.9, 1.5], fov: 34, pan: [1, 0, 0], zoom: 0.82 },

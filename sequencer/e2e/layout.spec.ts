@@ -77,7 +77,7 @@ test.describe('the timeline on a tablet', () => {
 test.describe('the stage', () => {
   test('names never run into each other, in any template', async ({ page }) => {
     await openConnected(page);
-    for (const t of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar']) {
+    for (const t of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar', 'Wedding']) {
       await page.locator('.top .show').click();
       await startTemplate(page, t);
       await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();

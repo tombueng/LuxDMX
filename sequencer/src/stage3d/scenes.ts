@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { at, box, cyl, rod, std, house, crewMember, type Mats } from './gear';
 import { darkWood, hallWall, neonSign, pleats, rug, stageFloor, brick, boards, concrete } from './textures';
 import { DECK, type Room } from './geometry';
-import { BAR, CHURCH, CINEMA, cinemaFloor, THEATRE } from './sceneSizes';
+import { BALLROOM, BAR, CHURCH, CINEMA, cinemaFloor, THEATRE } from './sceneSizes';
 import type { Person } from './people';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -360,4 +360,71 @@ export function buildChurch(group: THREE.Group, M: Mats, r: Room) {
     }
   }
   return { animate: () => {} };
+}
+
+// ---- the ballroom (a wedding) -------------------------------------------------------------------
+export function buildBallroom(group: THREE.Group, M: Mats, r: Room) {
+  const add: Add = (o, x, y, z, rot) => { group.add(at(o, x, y, z, rot)); };
+  const B = BALLROOM, X = r.walls.x, Z0 = r.walls.z0, Z1 = r.walls.z1, H = r.ceiling, L = Z1 - Z0, zc = (Z0 + Z1) / 2;
+  // the walls draped in pale fabric (what the uplights colour), a coffered ceiling, carpet, the
+  // parquet dance floor in the middle
+  const drape = std({ map: pleats(), color: 0xd8cfc0, roughness: 0.95 });
+  for (const sx of [-1, 1]) add(new THREE.Mesh(new THREE.PlaneGeometry(L, H), drape), sx * X, H / 2, zc, [0, -sx * Math.PI / 2, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, H), drape), 0, H / 2, Z0 + 0.01);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, H), drape), 0, H / 2, Z1, [0, Math.PI, 0]);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), house(new THREE.MeshBasicMaterial({ color: 0x1a1612 }))), 0, H, zc, [Math.PI / 2, 0, 0]);
+  const beam = std({ color: 0xe8e0d0, roughness: 0.7 });
+  for (let z = Z0 + 3; z < Z1; z += 4) add(box(2 * X, 0.25, 0.3, beam), 0, H - 0.13, z);
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * X, L), std({ map: rug(), color: 0x3a2a40, roughness: 0.95 })), 0, 0.002, zc, [-Math.PI / 2, 0, 0]);
+  const D = B.dance;
+  add(new THREE.Mesh(new THREE.PlaneGeometry(2 * D.x, D.z1 - D.z0), std({ map: boards(), color: 0xb08050, roughness: 0.35 })), 0, 0.006, (D.z0 + D.z1) / 2, [-Math.PI / 2, 0, 0]);
+  // the round tables: white cloths to the floor, chairs round them, a candle centrepiece; guests
+  const cloth = std({ color: 0xf4f1ea, roughness: 0.85 }), chair = std({ color: 0xc8a046, metalness: 0.5, roughness: 0.4 }), seatPad = std({ color: 0xf4f1ea, roughness: 0.8 });
+  const flame = new THREE.MeshBasicMaterial({ color: 0xffb050, toneMapped: false }), glass = std({ color: 0xffffff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35 });
+  const A = audienceMats();
+  B.tables.forEach(([tx, tz], ti) => {
+    add(cyl(0.9, 0.95, 0.76, cloth, 28), tx, 0.38, tz); add(cyl(0.92, 0.92, 0.02, cloth, 28), tx, 0.77, tz);
+    add(cyl(0.09, 0.12, 0.28, glass, 12), tx, 0.92, tz); add(new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), flame), tx, 0.98, tz);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2, cx = tx + Math.sin(a) * 1.25, cz = tz + Math.cos(a) * 1.25;
+      add(box(0.42, 0.06, 0.42, seatPad), cx, 0.46, cz, [0, a, 0]);
+      add(box(0.42, 0.5, 0.05, chair), cx + Math.sin(a) * 0.2, 0.74, cz + Math.cos(a) * 0.2, [0, a, 0]);
+      // (about two thirds of the seats taken, turned to the table)
+      const who = taken(cx, tz + k * 3.1 + ti, 0.68);
+      if (who) { const g = new THREE.Group(); group.add(at(g, cx, 0, cz, [0, a + Math.PI, 0])); sitter((o, x, y, z, rot) => { g.add(at(o, x, y, z, rot)); }, A, 0, 0, 0, who, 0.46); }
+    }
+  });
+  // the head table along the back wall, the couple and their families behind it, facing the room;
+  // the cake beside it, the DJ's table on the other side
+  const hw = B.head.w;
+  add(box(hw, 0.76, 0.9, cloth), 0, 0.38, B.head.z);
+  for (let x = -hw / 2 + 0.5; x <= hw / 2 - 0.4; x += 0.75) {
+    add(box(0.42, 0.5, 0.05, chair), x, 0.74, B.head.z - 0.85);
+    const k = taken(x, 99, 0.85);
+    if (k || Math.abs(x) < 0.5) { const g = new THREE.Group(); group.add(at(g, x, 0, B.head.z - 0.6, [0, Math.PI, 0])); sitter((o, ox, oy, oz, rot) => { g.add(at(o, ox, oy, oz, rot)); }, A, 0, 0, 0, k || 3, 0.46); }
+  }
+  // (the bride in white in the middle)
+  add(box(0.4, 0.55, 0.26, std({ color: 0xffffff, roughness: 0.7 })), 0.375, 0.46 + 0.36, B.head.z - 0.55);
+  for (let i = 0; i < 3; i++) add(cyl(0.3 - i * 0.08, 0.3 - i * 0.08, 0.26, std({ color: 0xfaf6ee, roughness: 0.6 }), 24), B.cake.x, 0.9 + 0.13 + i * 0.26, B.cake.z);
+  add(cyl(0.6, 0.6, 0.76, cloth, 24), B.cake.x, 0.38, B.cake.z);
+  add(box(2.2, 1.0, 0.7, M.black), B.dj.x, 0.5, B.dj.z); add(box(1.4, 0.06, 0.5, M.black), B.dj.x, 1.05, B.dj.z - 0.05);
+  for (const sx of [-1, 1]) { add(box(0.5, 1.1, 0.45, M.black), B.dj.x + sx * 1.7, 0.55, B.dj.z); }
+  // chandeliers: rings of warm bulbs and hanging crystals
+  const gold = std({ color: 0xc8a046, metalness: 0.8, roughness: 0.3 }), bulb = new THREE.MeshBasicMaterial({ color: 0xffd9a0, toneMapped: false });
+  for (const [cx, cz] of B.chandeliers) {
+    add(cyl(0.01, 0.01, 1.2, gold, 4), cx, H - 0.6, cz); add(cyl(0.7, 0.25, 0.4, gold, 20), cx, H - 1.4, cz);
+    for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), bulb), cx + Math.cos(a) * 0.75, H - 1.2, cz + Math.sin(a) * 0.75); add(cyl(0.012, 0.012, 0.3, glass, 5), cx + Math.cos(a) * 0.6, H - 1.75, cz + Math.sin(a) * 0.6); }
+  }
+  // the ceiling pipes over the dance floor (the moving lights and the gobo spots hang there)
+  const pipe = std({ color: 0x1a1b1e, metalness: 0.6, roughness: 0.45 });
+  for (const z of B.pipes) { group.add(rod(V(-D.x - 0.6, B.pipeY, z), V(D.x + 0.6, B.pipeY, z), 0.03, pipe, 8)); for (const sx of [-1, 1]) add(cyl(0.012, 0.012, H - B.pipeY, M.chrome, 5), sx * (D.x + 0.3), (H + B.pipeY) / 2, z); }
+  // a few couples dancing, swaying with the music
+  const dancers: THREE.Object3D[] = [];
+  // (three couples: every person is a few dozen moving parts)
+  [[-1.6, 5.2], [1.6, 6.2], [-0.2, 8.2]].forEach(([x, z], i) => {
+    const pair = new THREE.Group(); group.add(at(pair, x, 0, z));
+    for (const s of [-1, 1]) { const c = crewMember(LOOKS[(i * 2 + (s > 0 ? 1 : 0)) % LOOKS.length], s * 0.22, 0, 0, s > 0 ? -Math.PI / 2 : Math.PI / 2, { L: V(0, 1.25, 0.05), R: V(0, 1.1, -0.1) }, 0.05); pair.add(c.p.group); }
+    pair.userData.live = true; dancers.push(pair);
+  });
+  return { animate: (t: number) => { dancers.forEach((d, i) => { d.rotation.y = t * 0.35 + i * 1.7; d.position.y = Math.abs(Math.sin(t * 2.1 + i)) * 0.02; }); } };
 }

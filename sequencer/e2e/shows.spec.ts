@@ -15,7 +15,7 @@ test.beforeEach(async () => { await resetFake(); });
 
 test('every template builds a working show', async ({ page }) => {
   await fresh(page);
-  for (const name of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar']) {
+  for (const name of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar', 'Wedding']) {
     await openManager(page);
     await startTemplate(page, name);
     await expect(manager(page)).toBeHidden();
@@ -23,8 +23,8 @@ test('every template builds a working show', async ({ page }) => {
     expect(await cues(page).count()).toBeGreaterThan(3);
   }
   await openManager(page);
-  // the six templates (the first, empty show went when the first template opened)
-  await expect(manager(page).locator('.card')).toHaveCount(6);
+  // the seven templates (the first, empty show went when the first template opened)
+  await expect(manager(page).locator('.card')).toHaveCount(7);
 });
 
 // Every template on the box: a look goes out, the live page has a button for each effect machine
@@ -35,7 +35,7 @@ test('every template builds a working show', async ({ page }) => {
 test('every template plays on the box: its first look on the wire, a button per machine, a confetti shot that ends by itself', async ({ page }) => {
   test.setTimeout(150_000);
   await openConnected(page);
-  for (const name of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar']) {
+  for (const name of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar', 'Wedding']) {
     await resetFake();
     await openManager(page);
     await startTemplate(page, name);

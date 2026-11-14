@@ -38,3 +38,16 @@ export const CHURCH = {
   pews: { z0: 1.0, rows: 18, d: 1.05, blocks: [[-7.4, -1.3], [1.3, 7.4]] as [number, number][] },
   wallX: 9, backZ: 22, ceiling: 13, windows: [1.5, 6, 10.5, 15, 19.5],
 };
+
+// a ballroom for a wedding: draped walls (for the uplights), round tables round a parquet dance
+// floor, the head table along the back wall with the cake beside it and the DJ on the other side,
+// chandeliers; two ceiling pipes over the dance floor for the moving lights
+export const BALLROOM = {
+  wallX: 11, z0: -6, z1: 20, ceiling: 6.5,
+  dance: { x: 4, z0: 3, z1: 10 },
+  head: { z: -3.6, w: 8 },
+  cake: { x: 7.4, z: -3.4 }, dj: { x: -7.4, z: -3.6 },
+  tables: [[-7.8, 0.5], [-7.8, 4.5], [-7.8, 8.5], [-7.8, 12.5], [7.8, 0.5], [7.8, 4.5], [7.8, 8.5], [7.8, 12.5], [-4, 14], [0, 14], [4, 14], [-2, 17.5], [2, 17.5]] as [number, number][],
+  chandeliers: [[-5, 6.5], [5, 6.5], [0, 15.5]] as [number, number][],
+  pipeY: 6.1, pipes: [3.0, 10.0],
+};

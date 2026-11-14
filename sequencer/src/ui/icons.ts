@@ -3,6 +3,7 @@
 export const ICONS: Record<string, string> = {
   // fixture kinds
   par: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/>',
+  heart: '<path d="M12 20s-7.5-4.6-9.2-9.3A4.7 4.7 0 0 1 12 7.6a4.7 4.7 0 0 1 9.2 3.1C19.5 15.4 12 20 12 20z"/>',
   sfx: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/><circle cx="12" cy="12" r="2"/>',
   mover: '<path d="M6 20h12M9 20v-4M15 20v-4"/><path d="M5 9a7 7 0 0 1 14 0v3a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><circle cx="12" cy="10" r="2.5"/>',
   bar: '<rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M7 9v6M12 9v6M17 9v6"/>',

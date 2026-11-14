@@ -60,7 +60,7 @@ wheels), you just don't have to learn a pro console to use them.
    chase runs along it.
    Or skip all that: start from a template (the show's name, top left, **New show…**: the same tiles
    as the welcome; on an empty stage, **or start from a template**). The templates
-   (Band, DJ / Party, Theatre, Church, Cinema, Bar; and Ring and matrix, for pixel rings, discs and
+   (Band, DJ / Party, Theatre, Church, Cinema, Bar, Wedding; and Ring and matrix, for pixel rings, discs and
    matrices) are well stocked on purpose: 27 to 48 lights
    each on one universe (PARs, spot and wash heads, pixel bars, strobes, blinders, haze, fog and
    the effect machines that suit the place), groups, 9 to 28 effects (pixel shows among them) and
@@ -100,7 +100,7 @@ many lights and cues):
   with the song picked for it; **Show the 4 demos** brings the tiles back, and Ctrl+K "demo" or
   **Demo shows…** in the Shows dialog shows them anyway.
 - **Start a show**: an **empty stage**, one of the templates (band, DJ, theatre, church, cinema,
-  bar, rings and matrices), or **a show file** from another computer. The templates play as shows
+  bar, wedding, rings and matrices), or **a show file** from another computer. The templates play as shows
   too: each has its own song (any other, or the demo beat, picked on its tile) and **Play the
   show** runs its looks cued to that song's parts on the 3D stage, the machines on the drops (as
   many as the room takes: no CO2 in the church), and the audience on the crowd track: chatting
@@ -875,7 +875,7 @@ Three more demos come with their own room on the 3D stage:
   on the room's rig. The camera views go inside the pub. The demos bring rooms of their own: a club
   (a stage framed by truss on four towers, a truss over the dance floor, a bar at the back, a
   mirror ball), a party room (a square of truss over the crowd, no stage) and an empty room with
-  one truss; the camera views go inside them too. The Cinema, Bar, Theatre and Church templates bring theirs: a
+  one truss; the camera views go inside them too. The Cinema, Bar, Theatre, Church and Wedding templates bring theirs: a
   **Cinema** (a big screen between red curtains, a stage in front of it for premieres, raked rows of
   red seats with an audience, step lights in the aisles, wall washers, house lights and a starry
   ceiling, the projection booth at the back) and a **Bar** (a long counter, a back bar of bottles on
@@ -885,7 +885,9 @@ Three more demos come with their own room on the 3D stage:
   booms in the wings, footlights, raked stalls and a balcony full of people, a chandelier) and a
   **Church** (the chancel up its steps with the altar, candles, the cross and the choir benches,
   the lectern, pews down the nave with the congregation, stained glass down both walls and a round
-  window over the altar, the roof's beams); every light of those templates is
+  window over the altar, the roof's beams) and a **Ballroom** for the Wedding template (draped walls
+  the uplights colour, round tables with the guests and a candle each, a parquet dance floor with
+  couples dancing, the head table with the couple, the cake, the DJ, chandeliers); every light of those templates is
   installed where such a room has it, and the camera moves film them as they are. **Your stage**: your real stage at its size,
   width and depth in metres, on a riser (1.2 m) or on the floor, 0 to 4 trusses across it on
   towers and how high their underside is. The room, its crowd and the camera views and moves are

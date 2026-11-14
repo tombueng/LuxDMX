@@ -60,6 +60,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   big cinema (screen, curtains, a premiere stage, raked rows with an audience, step lights, wall
   washers, a starry ceiling) and a bar (a long counter, a back bar of lit bottles, people on the
   stools, bartenders, tables, a dance floor with a mirror ball), every light installed there.
+- A new template, **Wedding**, in a ballroom of its own: 14 uplights washing the draped walls,
+  pinspots on ten table centrepieces, gobo spots for the first dance, wash heads and PARs over the
+  dance floor, the head table, the cake, chandeliers, low fog, cold sparks, bubbles and confetti.
+  Cues from the guests arriving to the lights going up, and its show plays to a pop song.
 - 3D: the Theatre and Church templates too: a theatre (proscenium with the house curtain, a cyc,
   lighting bars, booms in the wings, footlights, stalls and a full balcony) and a church (the
   chancel with altar, cross and choir, pews with the congregation, stained glass windows).

@@ -131,7 +131,7 @@ test('the welcome offers four demo shows, a tile each: each opens in its own roo
   for (const [name, room, music] of [['Test truss', 'truss', false], ['DJ in a club', 'club', true], ['House party', 'party', true]] as const) {
     await fresh(page, true);
     const w = welcomeDialog(page), t = demoTile(w, name);
-    await expect(w.getByRole('group')).toHaveCount(4 + 7);                     // (four demos, seven templates)
+    await expect(w.getByRole('group')).toHaveCount(4 + 8);                     // (four demos, eight templates)
     await expect(t.getByLabel(`Music for ${name}`)).toHaveCount(music ? 1 : 0);
     if (music) await t.getByLabel(`Music for ${name}`).selectOption('beat');      // (no download in the test)
     await t.getByRole('button', { name: /^Play the show/ }).click();
