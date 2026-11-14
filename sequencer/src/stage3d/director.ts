@@ -146,7 +146,7 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
   ballroom: [
     ...([[-7.8, 0.5], [-7.8, 4.5], [-7.8, 8.5], [-7.8, 12.5], [7.8, 0.5], [7.8, 4.5], [7.8, 8.5], [7.8, 12.5], [-4, 14], [0, 14], [4, 14], [-2, 17.5], [2, 17.5]] as const).map(([x, z]) => bx(x - 1.7, x + 1.7, 0, 1.5, z - 1.7, z + 1.7, 'a table')),
     bx(-4.3, 4.3, 0, 1.6, -4.7, -2.9, 'the head table'), bx(6.7, 8.1, 0, 1.9, -4.1, -2.7, 'the cake'), bx(-9.6, -5.3, 0, 1.3, -4.2, -3.0, 'the DJ'),
-    ...([[-5, 6.5], [5, 6.5], [0, 15.5]] as const).map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
+    ...([[-5, 6.5], [5, 6.5], [0, 12.6]] as const).map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
     ...([[-1.6, 5.2], [1.6, 6.2], [-0.2, 8.2]] as const).map(([x, z]) => bx(x - 0.6, x + 0.6, 0, 1.9, z - 0.6, z + 0.6, 'the dancers')),
   ],
   // the bar: its counter, the stools and the people on them, the back counter, the tables at the

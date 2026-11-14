@@ -146,13 +146,16 @@ const BALLROOM_PLACES: Table = {
   Head: (i) => hung({ x: i % 2 ? 4 : -4, y: pipeHang, z: Bl.pipes[i < 2 ? 0 : 1] }),
   Dance: (i, n) => { const x = spread(i, n, -2.4, 2.4); return aim({ x, y: pipeHang, z: Bl.pipes[1] }, { x: x * 0.8, y: 0, z: 7.2 }); },
   'Head table': (i) => { const x = i ? 2.5 : -2.5; return aim({ x, y: ceil, z: -1.2 }, { x: x * 0.6, y: 1.0, z: Bl.head.z - 0.4 }); },
-  Cake: () => aim({ x: Bl.cake.x - 0.6, y: ceil, z: -1.0 }, { x: Bl.cake.x, y: 1.3, z: Bl.cake.z }),
+  // (from the ceiling over the head table's end, clear of the pinspot over the table beside it)
+  Cake: () => aim({ x: Bl.cake.x - 1.6, y: ceil, z: -2.2 }, { x: Bl.cake.x, y: 1.3, z: Bl.cake.z }),
   Chandelier: (i) => { const [x, z] = Bl.chandeliers[i % Bl.chandeliers.length]; return aim({ x, y: Bl.ceiling - 1.62, z }, { x, y: 0, z }); },
   Hazer: () => stand({ x: 10.2, y: 0, z: 19.2 }, -135),
-  'Low fog': () => stand({ x: -4.4, y: 0, z: 2.4 }, 45),
-  Sparks: (i) => stand({ x: i ? 4.4 : -4.4, y: 0, z: 10.4 }),
-  Bubbles: () => stand({ x: 4.6, y: 0, z: 2.4 }, -45),
-  Confetti: () => stand({ x: 0, y: 0, z: 10.6 }, 180),
+  // (round the dance floor's corners, clear of the heads over them: on the plan they were on top
+  // of each other)
+  'Low fog': () => stand({ x: -5.3, y: 0, z: 1.6 }, 45),
+  Sparks: (i) => stand({ x: i ? 5.3 : -5.3, y: 0, z: 11.4 }),
+  Bubbles: () => stand({ x: 5.3, y: 0, z: 1.6 }, -45),
+  Confetti: () => stand({ x: -1.8, y: 0, z: 11.2 }, 180),
 };
 
 type SceneRoom = 'cinema' | 'bar' | 'theatre' | 'church' | 'club' | 'ballroom';
