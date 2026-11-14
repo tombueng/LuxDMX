@@ -7,7 +7,7 @@
 //
 // Skipped without LUXDMX_BOX. The box's output A must be on universe 0. Leaves the switch on.
 import type { Page } from '@playwright/test';
-import { openConnected, patch, selectAll, full, swatch, record, go, cues, test, expect } from './helpers';
+import { openConnected, patch, selectAll, full, swatch, record, go, cues, demoTile, welcome, test, expect } from './helpers';
 
 const BOX = process.env.LUXDMX_BOX ?? '';
 const TASMOTA = process.env.LUXDMX_TASMOTA ?? 'tasmota-network-switch';
@@ -106,3 +106,38 @@ test('a real box: a fade runs smoothly out of it (red down, blue up, no jumps), 
   console.log('click to box output:', ms, 'ms');
   expect(ms).toBeLessThan(500);
 });
+
+test('a real box: a template\'s show plays out of it (the looks change with the song), and its machines stay at 0 through a moment while they\'re safe', async ({ page }) => {
+  await openConnected(page, BOX);
+  // the Wedding's show on the demo beat (nothing to download): every light on universe 0, output A
+  const w = await welcome(page), t = demoTile(w, 'Wedding');
+  await t.getByLabel('Music for Wedding').selectOption('beat');
+  await t.getByRole('button', { name: 'Play the show: Wedding' }).click();
+  await expect(w).toBeHidden({ timeout: 30000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 30000 }).toBe(true);
+  // where its machines are, and the first chorus (confetti fires as it lands: only when armed)
+  const info = await page.evaluate(() => {
+    const a = (window as any).__luxdmx, s = a.show;
+    const ch = (re: RegExp) => s.fixtures.filter((f: any) => re.test(f.name)).map((f: any) => f.address - 1);
+    const chorus = s.timeline.sections ? s.timeline.sections.find((x: any) => /^chorus/i.test(x.name))?.at : undefined;
+    const burst = s.timeline.items.find((i: any) => i.do.do === 'burst' && i.do.attr === 'confetti');
+    return { machines: [...ch(/^Confetti/), ...ch(/^Sparks/)], at: chorus ?? burst?.at, last: Math.max(...s.fixtures.map((f: any) => f.address + 20)) };
+  });
+  expect(info.machines.length).toBe(3);
+  expect(info.at).toBeGreaterThan(0);
+  const frames: number[][] = [];
+  const sample = async (secs: number) => { const t0 = Date.now(); while (Date.now() - t0 < secs * 1000) { frames.push((await boxOut(info.last)).ch); await page.waitForTimeout(150); } };
+  // the looks: the box sends something, and it changes as the show goes on (from the song's start:
+  // the eight seconds before it hold one look while the guests wait)
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(0));
+  await sample(6);
+  expect(frames.some((f) => f.some((v) => v > 0))).toBe(true);
+  expect(new Set(frames.map((f) => f.join(','))).size).toBeGreaterThan(2);
+  // through the moment: just before it, then playing through it; the machines get 0 all along
+  frames.length = 0;
+  await page.evaluate((at) => (window as any).__luxdmx.timeline.seek(at - 2), info.at);
+  await sample(6);
+  for (const f of frames) for (const c of info.machines) expect(f[c], `channel ${c + 1}`).toBe(0);
+  console.log('wedding at the box:', frames.length, 'frames,', new Set(frames.map((f) => f.join(','))).size, 'different; machines', info.machines.map((c) => c + 1).join(','));
+});
+

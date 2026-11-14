@@ -1,7 +1,7 @@
 // Safety on the wire: blind keeps the stage as it was (nothing new goes out until you go live);
 // confetti, flames, sparks and CO2 send 0 until someone holds Arm; a timeline jumped about over a
 // flame moment never fires it, playing through it does (armed).
-import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, welcome, demoTile, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -162,4 +162,31 @@ test('a tab opened from this one starts blind (it gets a copy of this tab\'s sto
   await page.reload();
   await page.waitForFunction(() => !!(window as any).__luxdmx, null, { timeout: 30000 });
   expect(await out(page)).toBe('live');
+});
+
+test('a template\'s show: its confetti moment sends 0 while the machines are safe, and fires when they\'re armed', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  const w = await welcome(page), t = demoTile(w, 'Wedding');
+  await t.getByLabel('Music for Wedding').selectOption('beat');
+  await t.getByRole('button', { name: 'Play the show: Wedding' }).click();
+  await expect(w).toBeHidden({ timeout: 30000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 30000 }).toBe(true);
+  const m = await page.evaluate(() => {
+    const s = (window as any).__luxdmx.show, f = s.fixtures.find((x: any) => /^Confetti/.test(x.name));
+    const b = s.timeline.items.find((i: any) => i.do.do === 'burst' && i.do.attr === 'confetti');
+    return { ch: f.address, at: b.at };
+  });
+  const through = async () => {
+    const t0 = Date.now();
+    await page.evaluate((at) => (window as any).__luxdmx.timeline.seek(at - 1.5), m.at);
+    await page.waitForTimeout(3500);
+    return (await history(0, m.ch)).filter(([at]) => at >= t0).map(([, v]) => v);
+  };
+  // safe: played through the moment, nothing
+  expect(Math.max(0, ...(await through()))).toBe(0);
+  // armed: the same moment fires it
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(true));
+  expect(Math.max(0, ...(await through()))).toBeGreaterThan(0);
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(false));
 });
