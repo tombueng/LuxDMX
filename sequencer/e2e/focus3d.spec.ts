@@ -69,7 +69,10 @@ test('Measure on the 3D stage: two points and how far apart; one light: how high
   }
   expect(hit).toBe(true);
   const one = await said();
-  expect(one.said.big).toMatch(/^Head: \d+\.\d\d m above the (deck|floor)$/);
+  // (its height: what the Height field says, where it hangs)
+  const hy = await page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].p3?.y);
+  expect(one.said.big).toMatch(/^Head: (\d+\.\d\d m up, \d+\.\d\d m above the deck|\d+\.\d\d m above the floor|on the deck, \d+\.\d\d m up|on the floor)$/);
+  if (hy !== undefined) expect(one.said.big).toContain(`${hy.toFixed(2)} m`);
   expect(one.said.small).toMatch(/Its beam reaches the (deck|floor) \d+\.\d\d m away, \d+\.\d\d m wide there/);
   await expect(s3.locator('.meas')).toBeVisible();
   // a second point on the stage: the distance between the two, as the numbers say
@@ -155,4 +158,35 @@ test('"Selected" on a boom in the theatre\'s wings: the camera sees the light, n
     }, name);
     expect(between, name).toBe('');
   }
+});
+
+test('Measure one light in the theatre: its height is the Height field\'s (where it hangs), and a boom\'s or ground row\'s beam lands on the wall or the cyc', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 45000 }).toBe('theatre');
+  const s3 = page.locator('.s3');
+  await s3.getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'Side', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.flying()), { timeout: 20000 }).toBe(false);
+  const inRow = s3.locator('.tools').getByRole('button', { name: 'Measure', exact: true });
+  if (await inRow.count()) await inRow.click();
+  else { await s3.getByRole('button', { name: 'More', exact: true }).click(); await s3.getByRole('group', { name: 'More for the 3D stage' }).getByRole('button', { name: 'Measure', exact: true }).click(); }
+  const measureOne = async (name: string) => {
+    const at = await page.evaluate((n) => { const a = (window as any).__luxdmx; return (window as any).__stage3d.screenOf(a.show.fixtures.find((f: any) => f.name === n).id); }, name);
+    for (const dy of [0, 4, -4, 8]) {
+      await page.keyboard.press('Escape');
+      await page.mouse.click(at.x, at.y + dy);
+      const m = await page.evaluate(() => (window as any).__stage3d.measure());
+      if (m?.a?.what === name) return m.said;
+    }
+    throw new Error(`${name}: not hit`);
+  };
+  const spot = await measureOne('Spot 1');
+  const y = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.find((f: any) => f.name === 'Spot 1').p3.y);
+  expect(spot.big).toBe(`Spot 1: ${y.toFixed(2)} m up, ${(y - 1.2).toFixed(2)} m above the deck`);
+  expect((await measureOne('Boom 2')).small).toMatch(/^Its beam reaches the wall /);
+  const row = await measureOne('Ground row 2');
+  expect(row.big).toBe('Ground row 2: on the deck, 1.20 m up');
+  expect(row.small).toMatch(/^Its beam reaches the cyc /);
 });

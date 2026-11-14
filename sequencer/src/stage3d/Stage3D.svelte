@@ -56,7 +56,7 @@
   import { Rig, type RigFixture } from './rig';
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
   import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
@@ -732,13 +732,12 @@
   // (the first thing in the room the click's ray meets: the deck, the floor, a wall, the ceiling, the
   // theatre's cyc or the cinema's screen; a gobo is focused on the cyc as on the deck. `on`: what)
   let spotOn = '';
+  const surfaceOf = (h: V3 & { n: V3 }) => h.n.y > 0.5 ? (h.y > 0.01 ? (onDeck(h.x, h.z, room) ? 'the deck' : 'the seats') : 'the floor') : h.n.y < -0.5 ? 'the ceiling'
+    : (room.screens ?? []).some((s) => Math.abs(h.z - s.z) < 0.02 && h.n.z > 0.5) ? (room.id === 'cinema' ? 'the screen' : 'the cyc') : 'the wall';
   function spot(): V3 | undefined {
     const o = ray.ray.origin, d = ray.ray.direction;
     const h = hitRoom({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, room);
-    if (h) {
-      spotOn = h.n.y > 0.5 ? (h.y > 0.01 ? 'the deck' : 'the floor') : h.n.y < -0.5 ? 'the ceiling' : (room.screens ?? []).some((s) => Math.abs(h.z - s.z) < 0.02 && h.n.z > 0.5) ? (room.id === 'cinema' ? 'the screen' : 'the cyc') : 'the wall';
-      return { x: h.x, y: h.y, z: h.z };
-    }
+    if (h) { spotOn = surfaceOf(h); return { x: h.x, y: h.y, z: h.z }; }
     const hit = (y: number) => { const t = (y - o.y) / d.y; return t > 0 ? o.clone().addScaledVector(d, t) : undefined; };
     let p = hit(DECK);
     if (!p || !onDeck(p.x, p.z, room)) p = hit(0);
@@ -773,18 +772,22 @@
     if (!f || f.sfx || f.fog) return null;
     const v = app.stageNow[f.id], piv = pivotOf(f.p, f.rot);
     const d = f.kind === 'mover' ? beamDir(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.rot, f.optics) : toWorld({ x: 0, y: 1, z: 0 }, f.rot);
-    const hit = hitFloor(piv, d, room);
+    // (wherever it lands: a boom's beam across the stage on the far wall, a ground row's on the cyc)
+    const hit = hitRoom(piv, d, room);
     if (!hit) return null;
     const L = Math.hypot(hit.x - piv.x, hit.y - piv.y, hit.z - piv.z), deg = rig.beamOf(f.id) ?? f.beam?.[0] ?? 25;
-    return { L, w: 2 * L * Math.tan((deg / 2) * (Math.PI / 180)), on: hit.y > 0.01 ? 'the deck' : 'the floor', hit };
+    return { L, w: 2 * L * Math.tan((deg / 2) * (Math.PI / 180)), on: surfaceOf(hit), hit };
   }
   const measSaid = $derived.by(() => {
     if (!meas) return null;
     const { a, b } = meas;
     if (!b) {
       if (!a.id) return { big: a.p.y > 0.01 ? `On the deck, ${m2(a.p.y)} up` : 'On the floor', small: 'Click a second point.' };
-      const g = groundAt(a.p.x, a.p.z, room), th = throwOf(a.id);
-      return { big: `${a.what}: ${m2(a.p.y - g)} above the ${g > 0.01 ? 'deck' : 'floor'}`, small: th ? `Its beam reaches ${th.on} ${m2(th.L)} away, ${m2(th.w)} wide there. Click a second point.` : 'Click a second point.' };
+      // (its height as the Height field has it: where it hangs or stands, from the floor; and above
+      // the deck when it's over it. The beam's numbers from where it turns, the pivot.)
+      const f = fixtures.find((x) => x.id === a.id), hp = f?.p ?? a.p, g = groundAt(hp.x, hp.z, room), th = throwOf(a.id);
+      const where = hp.y - g < 0.05 ? (g > 0.01 ? `on the deck, ${m2(hp.y)} up` : 'on the floor') : g > 0.01 ? `${m2(hp.y)} up, ${m2(hp.y - g)} above the deck` : `${m2(hp.y)} above the floor`;
+      return { big: `${a.what}: ${where}`, small: th ? `Its beam reaches ${th.on} ${m2(th.L)} away, ${m2(th.w)} wide there. Click a second point.` : 'Click a second point.' };
     }
     const dx = b.p.x - a.p.x, dy = b.p.y - a.p.y, dz = b.p.z - a.p.z;
     return { big: m2(Math.hypot(dx, dy, dz)), small: `${a.what} to ${b.what}: ${m2(Math.hypot(dx, dz))} across, ${m2(Math.abs(dy))} ${dy >= 0 ? 'up' : 'down'}` };
