@@ -68,6 +68,9 @@ export interface Room {
   walls: { x: number; z0: number; z1: number };
   // every piece of its truss, towers and legs included (the rooms built from a list)
   frame?: Seg[];
+  // flat things standing across the room that light lands on, facing the audience (+z): the
+  // theatre's cyclorama, the cinema's screen (z; -x..x wide; y0..y1 high)
+  screens?: { z: number; x: number; y0: number; y1: number }[];
 }
 // a 0.3 m box truss whose bottom chord is at y: its middle line is 0.15 m higher
 const mid = (y: number) => y + 0.15;
@@ -117,7 +120,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     // (the plan: the whole cinema, wall to wall and from the screen to the back rows: its lights are
     // all over it, on the walls, in the ceiling, on the steps)
     id: 'cinema', W: 22, D: 24.2, zc: 8.9, truss: [{ z: 0.9, y: 8.2 }, { z: 6.4, y: 8.8 }], deck: { x: 7, z0: -2.8, z1: 1.6 }, ceiling: 11.5,
-    band: { x: 7, z0: -2.8, z1: 1.6 }, walls: { x: 11, z0: -3.2, z1: 26 },
+    band: { x: 7, z0: -2.8, z1: 1.6 }, walls: { x: 11, z0: -3.2, z1: 26 }, screens: [{ z: -3.0, x: 7.5, y0: 3.0, y1: 9.4 }],
     frame: [span(7.6, 8.2, 0.9), span(8.6, 8.8, 6.4)],
     views: { front: { pos: [0, 8.2, 23], at: [0, 4.4, -1.5] }, foh: { pos: [3.2, 4.6, 12], at: [0, 4.2, -2] }, side: { pos: [-9.6, 7.2, 9], at: [0, 3.8, 0] }, top: { pos: [0, 46, 10.01], at: [0, 0, 10] }, band: { pos: [0, 2.9, -1.9], at: [0, 4.2, 20] } },
     tour: { rx: 8.2, rz: 11, z0: 10, y: 7, dy: 1.4, at: [0, 4, -0.5] },
@@ -134,7 +137,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   // and the plan; the lighting bars over the stage, one front-of-house bar over the stalls
   theatre: {
     id: 'theatre', W: 14, D: 9.4, zc: -1.3, truss: [{ z: -4.8, y: 9.0 }, { z: -2.6, y: 7.8 }, { z: -0.2, y: 7.8 }, { z: 8.4, y: 10.4 }], deck: { x: 8, z0: -6, z1: 3.4 }, ceiling: 12,
-    band: { x: 7, z0: -6, z1: 3.4 }, walls: { x: 11, z0: -6.4, z1: 21 },
+    band: { x: 7, z0: -6, z1: 3.4 }, walls: { x: 11, z0: -6.4, z1: 21 }, screens: [{ z: -5.7, x: 7, y0: DECK, y1: DECK + 8.4 }],
     frame: [span(7.4, 9.0, -4.8), span(7.4, 7.8, -2.6), span(7.4, 7.8, -0.2), span(8.4, 10.4, 8.4)],
     views: { front: { pos: [0, 8.8, 19.6], at: [0, 4, -1] }, foh: { pos: [2.8, 3.4, 11], at: [0, 3.4, -1] }, side: { pos: [-9.0, 8.0, 11.5], at: [0, 3.2, -1] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -3.5], at: [0, 3.5, 14] } },
     tour: { rx: 7.5, rz: 6, z0: 6, y: 3.6, dy: 0.3, at: [0, 3.6, -1] },
@@ -314,6 +317,34 @@ export function hitFloor(p: V3, d: V3, r: Room = shown): V3 | undefined {
     if (inside(x, z)) return { x, y, z };
   }
   return undefined;
+}
+
+// Where a beam from p along d lands in the room shown: the deck, the floor, and (while the room is
+// there to see) its walls, its ceiling and what stands across it (the cyc, the screen), with the
+// surface's normal (towards the light); undefined if it lands nowhere
+let wallsOn = true;
+// the built-in room shown, or hidden (your own venue model instead: its walls aren't known)
+export function showWalls(on: boolean) { wallsOn = on; }
+export function hitRoom(p: V3, d: V3, r: Room = shown): (V3 & { n: V3 }) | undefined {
+  const f = hitFloor(p, d, r);
+  let best: (V3 & { n: V3 }) | undefined = f ? { ...f, n: { x: 0, y: 1, z: 0 } } : undefined;
+  let bk = f ? Math.hypot(f.x - p.x, f.y - p.y, f.z - p.z) / Math.hypot(d.x, d.y, d.z) : Infinity;
+  if (!wallsOn) return best;
+  const W = r.walls, top = r.ceiling;
+  const take = (k: number, n: V3, ok: (x: number, y: number, z: number) => boolean) => {
+    if (!(k > 1e-6) || k >= bk) return;
+    const x = p.x + d.x * k, y = p.y + d.y * k, z = p.z + d.z * k;
+    if (!ok(x, y, z)) return;
+    bk = k; best = { x, y, z, n };
+  };
+  const inX = (x: number) => Math.abs(x) <= W.x + 1e-6, inZ = (z: number) => z >= W.z0 - 1e-6 && z <= W.z1 + 1e-6, inY = (y: number) => y >= 0 && y <= top + 1e-6;
+  if (d.x < -1e-6) take((-W.x - p.x) / d.x, { x: 1, y: 0, z: 0 }, (_, y, z) => inY(y) && inZ(z));
+  if (d.x > 1e-6) take((W.x - p.x) / d.x, { x: -1, y: 0, z: 0 }, (_, y, z) => inY(y) && inZ(z));
+  if (d.z < -1e-6) take((W.z0 - p.z) / d.z, { x: 0, y: 0, z: 1 }, (x, y) => inY(y) && inX(x));
+  if (d.z > 1e-6) take((W.z1 - p.z) / d.z, { x: 0, y: 0, z: -1 }, (x, y) => inY(y) && inX(x));
+  if (d.y > 1e-6) take((top - p.y) / d.y, { x: 0, y: -1, z: 0 }, (x, _, z) => inX(x) && inZ(z));
+  for (const s of r.screens ?? []) if (d.z < -1e-6 && p.z > s.z) take((s.z - p.z) / d.z, { x: 0, y: 0, z: 1 }, (x, y) => Math.abs(x) <= s.x && y >= s.y0 && y <= s.y1);
+  return best;
 }
 
 // Calibration: the head really points at `target` with these DMX values; the pan and tilt

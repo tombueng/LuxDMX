@@ -9,7 +9,7 @@ import type { Resolved } from '../model/types';
 import { cellLookAt } from '../engine/resolve';
 import { wholeLook } from '../engine/cuelook';
 import type { FixtureKind } from '../model/library';
-import { headAngles, headLocal, hitFloor, RAD, toWorld, type Optics, type Rot, type V3 } from './geometry';
+import { headAngles, headLocal, hitRoom, RAD, toWorld, type Optics, type Rot, type V3 } from './geometry';
 import { PAN_SPEED, ROLL_SPEED, TILT_SPEED, slew, type Axis } from './motion';
 import { body, headBarParts, headParts, HEADBAR_LENS, HEADBAR_PITCH, HEADBAR_PIVOT, lensOf, PIVOT, WINCH_BALL, WINCH_BOX, winchParts, type Look } from './models';
 import { ATLAS_CELLS, PLAIN_WHEEL, prismOf, rotationOf } from './gobos';
@@ -66,6 +66,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const E = new THREE.Euler(), BASE = new THREE.Matrix4(), YOKE = new THREE.Matrix4(), HEAD = new THREE.Matrix4(), TMP = new THREE.Matrix4(), TMP2 = new THREE.Matrix4();
 const LP = new THREE.Vector3(), DIR = new THREE.Vector3(), CP = new THREE.Vector3(), C2 = new THREE.Color();
 const PU = new THREE.Vector3(), PW = new THREE.Vector3(), PD = new THREE.Vector3(), XAX = new THREE.Vector3(1, 0, 0);
+const NV = new THREE.Vector3(), PZ = new THREE.Vector3(), PX = new THREE.Vector3(), BASIS = new THREE.Matrix4();
 
 export interface Lit { key: number; p: THREE.Vector3; d: THREE.Vector3; c: THREE.Color; level: number; deg: number }
 // The gobo atlas read in the shaders (gobos.ts drawAtlas: CELLS x CELLS patterns, each on a round
@@ -114,6 +115,7 @@ export class Rig {
   private lens!: THREE.InstancedMesh;
   private beams!: THREE.InstancedMesh;
   private pools!: THREE.InstancedMesh;
+  wallPools = 0;                 // of the pools last drawn, how many landed on a wall, the ceiling, a cyc or a screen
   private cells!: THREE.InstancedMesh;
   private hit!: THREE.InstancedMesh;
   private beamLevel!: THREE.InstancedBufferAttribute;
@@ -419,7 +421,7 @@ export class Rig {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
     const counts = new Map<string, number>();
     const put = (key: string, m: THREE.Matrix4) => { const mesh = this.parts.get(key); if (!mesh) return; const i = counts.get(key) ?? 0; if (i >= mesh.instanceMatrix.count) return; mesh.setMatrixAt(i, m); counts.set(key, i + 1); };
-    let nl = 0, nb = 0, np = 0, nc = 0, nh = 0, ns = 0;
+    let nl = 0, nb = 0, np = 0, nc = 0, nh = 0, ns = 0, nw = 0;
     this.hitIds = [];
     this.lit.length = 0;
     // (the same objects every frame: no garbage for hundreds of lights)
@@ -437,7 +439,7 @@ export class Rig {
     let lastSoft = 0;
     const beamAt = (p: THREE.Vector3, dir: THREE.Vector3, deg: number, level: number, c: THREE.Color, maxLen = MAX_BEAM, pool = true, gobo: readonly number[] = NO_GOBO) => {
       if (level < 0.01 || nb >= this.beams.instanceMatrix.count) return;
-      const hit = hitFloor(p, dir), L = Math.max(0.05, hit ? Math.min(maxLen, Math.hypot(hit.x - p.x, hit.y - p.y, hit.z - p.z)) : maxLen), r = Math.max(0.01, L * Math.tan((deg / 2) * RAD));
+      const hit = hitRoom(p, dir), L = Math.max(0.05, hit ? Math.min(maxLen, Math.hypot(hit.x - p.x, hit.y - p.y, hit.z - p.z)) : maxLen), r = Math.max(0.01, L * Math.tan((deg / 2) * RAD));
       // the picture's blur: the frost, and how far the focus is off for this throw
       const soft = Math.min(1, gobo[6] + (gobo[7] >= 0 ? Math.abs(gobo[7] - Math.max(0, Math.min(1, (L - FOCUS_NEAR) / (FOCUS_FAR - FOCUS_NEAR)))) * 1.6 : 0));
       lastSoft = soft;
@@ -445,8 +447,13 @@ export class Rig {
       if (!Number.isFinite(L + r + dir.x + dir.y + dir.z)) return;
       qb.setFromUnitVectors(UP, dir); mb.compose(p, qb, sb.set(r, L, r)); this.beams.setMatrixAt(nb, mb); this.beams.setColorAt(nb, c); this.beamLevel.setX(nb, level); nb++;
       if (pool && hit && L < maxLen && np < this.pools.instanceMatrix.count) {
-        const rr = Math.max(0.15, r) / Math.max(0.35, Math.abs(dir.y));
-        qb.setFromAxisAngle(UP, Math.atan2(dir.x, dir.z)); mb.compose(pb.set(hit.x, hit.y + 0.01, hit.z), qb, sb.set(Math.max(0.15, r), 1, rr));
+        // (flat on what it lands on, the floor or a wall: stretched along the beam's way across it)
+        // (a wash grazing a wall runs a long way up it: stretched further there than on the floor)
+        const n = NV.set(hit.n.x, hit.n.y, hit.n.z), cos = Math.abs(dir.dot(n)), rr = Math.max(0.15, r) / Math.max(n.y > 0.5 ? 0.35 : 0.16, cos);
+        PZ.copy(dir).addScaledVector(n, -dir.dot(n)); if (PZ.lengthSq() < 1e-8) PZ.set(0, n.y ? 0 : 1, n.y ? 1 : 0); PZ.normalize();
+        PX.crossVectors(n, PZ).normalize(); BASIS.makeBasis(PX, n, PZ); qb.setFromRotationMatrix(BASIS);
+        mb.compose(pb.set(hit.x + n.x * 0.01, hit.y + n.y * 0.01, hit.z + n.z * 0.01), qb, sb.set(Math.max(0.15, r), 1, rr));
+        if (n.y < 0.5) nw++;
         this.pools.setMatrixAt(np, mb); this.pools.setColorAt(np, c); this.poolLevel.setX(np, level * (1 - L / MAX_BEAM) * 1.2);
         this.poolGobo.setXYZW(np, gobo[0], gobo[1], gobo[2], gobo[3]); this.poolFx.setXYZW(np, gobo[4], gobo[5], soft, 0); np++;
       }
@@ -618,6 +625,7 @@ export class Rig {
       }
     }
     for (const [k, mesh] of this.parts) { mesh.count = counts.get(k) ?? 0; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
+    this.wallPools = nw;
     this.lens.count = nl; this.beams.count = nb; this.pools.count = np; this.cells.count = nc; this.hit.count = nh; this.sel.count = ns;
     for (const m of [this.lens, this.beams, this.pools, this.cells, this.hit, this.sel]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
     for (const a of [this.beamGobo, this.beamFx, this.poolGobo, this.poolFx]) a.needsUpdate = true;

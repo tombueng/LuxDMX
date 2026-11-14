@@ -20,7 +20,8 @@ const CINEMA_PLACES: Table = {
   // downlights in the ceiling over the rows
   House: (i) => { const x = i % 2 ? 4.2 : -4.2, z = i < 2 ? 9 : 17; return aim({ x, y: C.ceiling - 0.25, z }, { x, y: 0, z: z + 0.2 }); },
   // washers low on the side walls, washing them up to the ceiling
-  Wall: (i, n) => { const sx = i < n / 2 ? -1 : 1, k = i % Math.ceil(n / 2), z = 3 + k * 7, x = sx * (C.wallX - 0.3), y = cinemaFloor(z) + 0.35; return aim({ x, y, z }, { x: x * 0.98, y: y + 6, z }); },
+  // (tipped a little towards the wall: the wash runs up it from about a metre up)
+  Wall: (i, n) => { const sx = i < n / 2 ? -1 : 1, k = i % Math.ceil(n / 2), z = 3 + k * 7, x = sx * (C.wallX - 0.3), y = cinemaFloor(z) + 0.35; return aim({ x, y, z }, { x: sx * C.wallX, y: y + 3, z }); },
   // over the screen, the marquee's bars shining out over the rows
   Marquee: (i, n) => { const x = spread(i, n, -4.5, 4.5), y = C.screenY + C.screenH + 0.25; return aim({ x, y, z: C.screenZ + 0.45 }, { x: x * 1.2, y: 3, z: 10 }); },
   // the stage's wash, from its truss
@@ -96,7 +97,7 @@ const CHURCH_PLACES: Table = {
   Lectern: () => aim({ x: -6, y: beam, z: -1.8 }, { x: Chu.lecternX, y: DECK + 1.3, z: -2.4 }),
   Choir: (i) => { const x = [-5.5, -3.5, 3.5, 5.5][i] ?? 0; return aim({ x, y: beam, z: -5.8 }, { x: Math.sign(x) * 4.3, y: DECK, z: -4.6 }); },
   Head: (i, n) => hung({ x: spread(i, n, -4.5, 4.5), y: beam, z: 6.2 }),
-  Wall: (i, n) => { const sx = i < n / 2 ? -1 : 1, k = i % Math.ceil(n / 2), z = [3.75, 8.25, 12.75][k] ?? 3.75, x = sx * (Chu.wallX - 0.3); return aim({ x, y: 0.1, z }, { x: x * 0.98, y: 6, z }); },
+  Wall: (i, n) => { const sx = i < n / 2 ? -1 : 1, k = i % Math.ceil(n / 2), z = [3.75, 8.25, 12.75][k] ?? 3.75, x = sx * (Chu.wallX - 0.3); return aim({ x, y: 0.1, z }, { x: sx * Chu.wallX, y: 3, z }); },
   Blinder: (i) => { const sx = i ? 1 : -1; return aim({ x: sx * 3.2, y: DECK, z: Chu.chancel.z1 - 0.3 }, { x: sx * 2, y: 1.6, z: 10 }); },
   Batten: (i) => { const x = i ? 1.5 : -1.5; return aim({ x, y: DECK, z: Chu.chancel.z0 + 0.4 }, { x: x * 0.3, y: DECK + 5, z: Chu.chancel.z0 - 0.4 }); },
   Hazer: () => stand({ x: 5.5, y: DECK, z: -6.8 }, -150),

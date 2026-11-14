@@ -2,7 +2,7 @@
 // how high); the 3D stage builds that room, the lights hang on its trusses, and it's kept with the
 // show.
 import type { Page } from '@playwright/test';
-import { openConnected, patch, test, expect, startTemplate } from './helpers';
+import { openConnected, patch, test, expect, startTemplate, cues } from './helpers';
 
 const venue = (page: Page) => page.evaluate(() => (window as any).__stage3d?.venue?.());
 const where = (page: Page, name: string) => page.evaluate((name) => { const a = (window as any).__luxdmx; return (window as any).__stage3d.where(a.show.fixtures.find((f: any) => f.name === name).id); }, name);
@@ -83,4 +83,24 @@ test('the Cinema, Bar, Theatre and Church templates play in their own rooms, eve
     await v.getByRole('button', { name: label, exact: true }).click();
     await expect.poll(async () => (await venue(page))?.room, { timeout: 45000 }).toBe(room);
   }
+});
+
+test('light lands on the walls: the church\'s uplights wash its walls; with the built-in room hidden, nothing lands where its walls were', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Church');
+  // a look with the wall uplights on (full, blue)
+  await cues(page).filter({ hasText: 'Worship concert' }).first().dblclick();
+  if (!(await page.locator('.s3 canvas').isVisible())) await page.locator('.stage-wrap').getByRole('button', { name: '3D' }).click();
+  await expect.poll(async () => (await venue(page))?.room, { timeout: 45000 }).toBe('church');
+  const walls = () => page.evaluate(() => (window as any).__stage3d.pools().walls as number);
+  await expect.poll(walls, { timeout: 20000 }).toBeGreaterThanOrEqual(6);                      // (six uplights, a wash each)
+  // the built-in room hidden (your own venue model instead): no light on walls that aren't there
+  const s3 = page.locator('.s3');
+  await s3.getByRole('button', { name: 'Venue', exact: true }).click();
+  const box = s3.getByRole('group', { name: 'The venue' }).getByRole('checkbox', { name: /The built-in stage/ });
+  await box.uncheck();
+  await expect.poll(walls, { timeout: 20000 }).toBe(0);
+  await box.check();
+  await expect.poll(walls, { timeout: 20000 }).toBeGreaterThanOrEqual(6);
 });

@@ -56,7 +56,7 @@
   import { Rig, type RigFixture } from './rig';
   import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, hitFloor, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
   import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
@@ -455,6 +455,8 @@
       rendering: () => (rendering ? { ...rendering } : null),
       // (the last render's sound: how long, and how loud its first two seconds are, RMS)
       lastMix: () => lastMix,
+      // (where the light landed in the last frame: on the floor and the deck, or on walls)
+      pools: () => ({ walls: rig?.wallPools ?? 0 }),
       haze: () => haze,
       ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: houseMats.length ? Math.max(...houseMats.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null }),
     };
@@ -531,6 +533,8 @@
   // (a take's or a render's size, not the window's: shown whole, not stretched to the window; a
   // 4K render was drawn twice as wide as it is)
   $effect(() => { canvas?.classList.toggle('take', !!take || !!rendering); });
+  // (light lands on the room's walls while the room is there to see: with your own venue model alone, not)
+  $effect(() => showWalls(!app.show.settings.stage3d?.hideVenue));
   const sigOf = (list: RigFixture[]) => list.map((f) => `${f.id}:${f.kind}:${f.cells}:${f.sfx ?? ''}:${f.look}`).join();
   $effect(() => {
     // (only the stage holding the world; shown again, it catches up with what changed meanwhile)
