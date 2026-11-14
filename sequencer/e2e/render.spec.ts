@@ -59,6 +59,11 @@ test('the look as it is, rendered: an MP4 at the size and rate asked for, frame 
   // and the stage is back on the live show, at its own size
   expect(await page.evaluate(() => (window as any).__stage3d.rendering())).toBeNull();
   await expect.poll(() => page.evaluate(() => { const c = document.querySelector('.s3 canvas') as HTMLCanvasElement; return c.width !== 1920 || c.height !== 1080; })).toBe(true);
+  // (and drawing again: the render's clock ran ahead of the real one, the view stayed black until
+  // it caught up. Only where a render is faster than real time, a real graphics card; here it's
+  // slower, so this only checks the view draws again at all)
+  const n0 = await page.evaluate(() => (window as any).__stage3d.stats().drawn);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.stats().drawn), { timeout: 3000 }).toBeGreaterThan(n0 + 1);
 });
 
 test('the song from the playhead, with its sound, straight into the file the browser asked for; Stop stops a render and saves nothing', async ({ page }) => {
@@ -112,6 +117,8 @@ test('the song from the playhead, with its sound, straight into the file the bro
   const c = page.locator('.s3 canvas').first();
   expect(await c.evaluate((el) => getComputedStyle(el).objectFit)).toBe('contain');
   expect(await page.evaluate(() => (window as any).__ui.recording)).toBe(true);
+  // (the Stop button says so, in words: during a render it's the one that matters)
+  await expect(page.locator('.s3').getByRole('button', { name: 'Stop rendering' })).toHaveText('Stop');
   await page.locator('.s3').getByRole('button', { name: 'Stop rendering' }).click();
   await expect(page.locator('.toast')).toContainText('Render stopped. Nothing saved.');
   expect(await page.evaluate(() => (window as any).__saved)).toBeNull();

@@ -450,7 +450,7 @@
     controls.addEventListener('change', grabbed);
     // for the tests (dev only): what can't be read off the pixels (the shown stage's)
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook = {
-      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog }),
+      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog, drawn: drawnFrames }),
       // a band member's right hand (the band stands still without music)
       band: () => (venue as { band?: { handAt: (s: 'L' | 'R') => THREE.Vector3 }[] }).band?.[1]?.handAt('R').toArray() ?? null,
       // the screens: the live camera's picture on them (and how many it has drawn, its last shot)
@@ -955,7 +955,7 @@
   // second; Low: no glow, 20 a second. Never fewer pixels than the screen has: a blurred stage was
   // the first thing anyone noticed, frames and glow are what can go. A take keeps every frame.
   const RATIO = [1, 1.5, 2], EVERY = [1000 / 21, 1000 / 31, 0];
-  let drawnAt = 0;
+  let drawnAt = 0, drawnFrames = 0;
   function quality() {
     if (taking) return;
     const want = Math.min(RATIO[load.level], window.devicePixelRatio || 1);
@@ -996,7 +996,7 @@
     if (!canvas || (!taking && (canvas.clientWidth < 2 || canvas.clientHeight < 2))) { last = now; return; }
     // (fewer frames a second at a lower quality: the time goes to the DMX output)
     if (!taking && now - drawnAt < EVERY[load.level]) return;
-    drawnAt = now;
+    drawnAt = now; drawnFrames++;
     const work0 = performance.now();
     quality();
     const real = Math.min(0.5, (now - last) / 1000), dt = Math.min(0.1, real); last = now;
@@ -1281,6 +1281,9 @@
     } finally {
       canvas?.removeEventListener('webglcontextlost', onLost);
       src = null; taking = false; rendering = null; ui.recording = false;
+      // (the render's frames ran on the video's clock, ahead of the real one: the live view would
+      // wait for the real clock to catch up, seconds of black)
+      drawnAt = 0;
       if (!gone) { sizeBack(); last = performance.now(); }
     }
   }
@@ -1452,7 +1455,8 @@
         <div class="seg recseg" role="group" aria-label="Rendering">
           <span class="rec rend" role="status" aria-label="Rendering {rendering.label}: {rendering.k} of {rendering.n} frames">{rendering.label}
             {rendering.phase === 'sound' ? 'sound…' : rendering.phase === 'saving' ? 'saving…' : `${Math.floor((rendering.k / rendering.n) * 100)} %`}{#if rendering.phase === 'frames' && rendering.left !== undefined}{' '}· {clock(rendering.left)} left{/if}</span>
-          <button class="ghost" onclick={() => (renderStop = true)} aria-label="Stop rendering" title="Stop the render (nothing is saved)"><Icon name="stop" size={14} />{#if tier !== 'narrow' && words}Stop{/if}</button>
+          <!-- (always with its word: during a render it's the one button that matters) -->
+          <button class="ghost stoprend" onclick={() => (renderStop = true)} aria-label="Stop rendering" title="Stop the render (nothing is saved)"><Icon name="stop" size={14} />Stop</button>
         </div>
       {:else if !take}
         <button class="ghost" data-popover-toggle class:on={renderPanel} aria-expanded={renderPanel} class:off={!renderable} onclick={() => (renderPanel = !renderPanel)} aria-label="Render a video"
@@ -1653,6 +1657,7 @@
   .rpanel .note { flex: 1 1 100%; margin: 0; font-size: .76rem; line-height: 1.35; }
   .rpanel .load { flex: 1 1 100%; }
   .rend { background: #2a5bd7; }
+  .stoprend { border-color: #d4202a; color: #ff8a8f; }
   .venue .bandname input { width: 100%; font-size: .85rem; padding: .2rem .4rem; }
   /* a browser that only records WebM: said next to Record (the full sentence is its tooltip) */
   .webm { font-size: .72rem; color: var(--muted); background: #0b0f15cc; border: 1px dashed var(--line); border-radius: 6px; padding: .1rem .4rem; white-space: nowrap; cursor: help; }
