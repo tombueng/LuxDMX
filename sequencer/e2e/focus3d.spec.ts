@@ -56,6 +56,10 @@ test('Measure on the 3D stage: two points and how far apart; one light: how high
   if (await inRow.count()) await inRow.click();
   else { await s3.getByRole('button', { name: 'More', exact: true }).click(); await s3.getByRole('group', { name: 'More for the 3D stage' }).getByRole('button', { name: 'Measure', exact: true }).click(); }
   await expect(s3.locator('.aimhint')).toContainText('Click two points');
+  // (the hint is words only: a click on it reaches the stage under it, a light hung behind it
+  // was out of reach)
+  const hb = (await s3.locator('.aimhint').boundingBox())!;
+  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [hb.x + hb.width / 2, hb.y + hb.height / 2])).toBe('CANVAS');
   const said = () => page.evaluate(() => (window as any).__stage3d.measure());
   const box = (await canvas.boundingBox())!;
   // the light: where it is in the picture (a few tries round it: its body is small)
