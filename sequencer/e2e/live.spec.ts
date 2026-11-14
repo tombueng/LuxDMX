@@ -599,3 +599,24 @@ test('a flash and a fog control say their levels in numbers; deleting a page sho
     expect(r.x + r.width <= t.x || t.x + t.width <= r.x || r.y + r.height <= t.y || t.y + t.height <= r.y).toBe(true);
   }
 });
+
+test('the GO bar holds still: Release and Auto GO stay where they are whatever the cues are called', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await startTemplate(page, 'Band');
+  // (a long name and a short one, side by side)
+  await page.evaluate(() => { const l = (window as any).__luxdmx.show.cueLists[0]; l.cues[0].name = 'X'; l.cues[1].name = 'A very long name for the intro with the thunder and the rain'; });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const strip = page.getByRole('group', { name: 'Playback' }), release = strip.getByRole('button', { name: 'Release' }), auto = strip.getByLabel('Auto GO');
+  const xs: number[] = [], ax: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    await strip.getByRole('button', { name: /^GO/ }).click();
+    await expect(release).toBeEnabled();
+    xs.push(Math.round((await release.boundingBox())!.x)); ax.push(Math.round((await auto.boundingBox())!.x));
+  }
+  expect(new Set(xs).size, xs.join(',')).toBe(1);
+  expect(new Set(ax).size, ax.join(',')).toBe(1);
+  // (the long name cut short, all of it in the tooltip)
+  await expect(strip.locator('.now, .nxt').filter({ hasText: 'A very long' }).first()).toHaveAttribute('title', /thunder and the rain$/);
+});

@@ -43,8 +43,8 @@
         {:else}<span class="muted">{list.name}</span>{/if}
       </div>
       <!-- (said when it changes: a GO from the keyboard says which cue is up) -->
-      <div class="now" role="status"><span class="faint">Now</span> <b>{now ? `${cueNumber(list, st!.index)}. ${now.name}` : '(nothing)'}</b></div>
-      {#if stepping}<div class="nxt"><span class="faint">Next</span> {next ? `${cueNumber(list, list.cues.indexOf(next))}. ${next.name}` : 'end of the list'}{#if next && now && now.advance.mode !== 'manual'}{' '}<span class="auto-next">goes by itself</span>{/if}</div>{/if}
+      <div class="now" role="status" title={now ? `${cueNumber(list, st!.index)}. ${now.name}` : undefined}><span class="faint">Now</span> <b>{now ? `${cueNumber(list, st!.index)}. ${now.name}` : '(nothing)'}</b></div>
+      {#if stepping}<div class="nxt" title={next ? `${cueNumber(list, list.cues.indexOf(next))}. ${next.name}` : undefined}><span class="faint">Next</span> {next ? `${cueNumber(list, list.cues.indexOf(next))}. ${next.name}` : 'end of the list'}{#if next && now && now.advance.mode !== 'manual'}{' '}<span class="auto-next">goes by itself</span>{/if}</div>{/if}
       <!-- the next cue's note is the standby ("when the lamp goes off"): its own line, readable in a dark booth -->
       {#if next?.note}<div class="standby" title={next.note}>{next.note}</div>{/if}
       {#if st?.running}<div class="bar"><span style="width:{(st.progress ?? 0) * 100}%"></span></div>{/if}
@@ -97,7 +97,9 @@
   .gon { font-size: .76rem; font-weight: 600; letter-spacing: 0; opacity: .75; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
   .go:hover:not(:disabled) { background: #5be070; }
   .back { padding: .4rem .8rem; }
-  .info { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto auto; column-gap: .8rem; align-items: center; min-width: 0; position: relative; padding-bottom: .3rem; }
+  /* (one width whatever the cues are called: Release and Auto GO after it stay where the hand is, a
+     long name is cut short with …, the whole name in its tooltip) */
+  .info { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto auto; column-gap: .8rem; align-items: center; min-width: 0; position: relative; padding-bottom: .3rem; flex: 0 1 auto; width: clamp(16rem, 30vw, 26rem); }
   .lst { grid-row: 1 / 3; } .lst select { max-width: 11rem; }
   .now, .nxt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .now b { font-size: 1.02rem; }
@@ -112,7 +114,7 @@
   @media (max-width: 700px) {
     .strip { flex-wrap: wrap; }
     .go { min-width: 0; flex: 1; }
-    .info { order: 5; flex: 1 1 100%; grid-template-columns: auto 1fr; }
+    .info { order: 5; flex: 1 1 100%; width: auto; grid-template-columns: auto 1fr; }
     .lst { grid-row: auto; } .lst select { max-width: 7rem; }
     /* (Next on a line of its own: what comes on the next GO is what a phone at the show needs most) */
     .nxt { grid-column: 1 / -1; }
