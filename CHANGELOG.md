@@ -13,6 +13,11 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **A much bigger Theatre** for its big stage: 89 lights (ten front-of-house, gobo profiles on the box
+  booms with leaves, water and snowflakes, eight each of cyc floods, booms, specials, spots and washes,
+  footlights, ground rows) and a play in nineteen scenes, each with its drop flown in: curtain up, a
+  forest, moonlight, a castle at sunrise, a storm, an escape through the city, snow, underwater, a
+  battle, the finale (the one confetti shot).
 - **A much bigger Cinema**: 67 lights (house lights over the rows, twelve wall washers, the marquee round
   the screen, an eight-light stage wash, spots, sky beams for the premieres, step lights, a starry
   ceiling) and 23 looks: Hollywood searchlights, a countdown, awards night, space opera, an action

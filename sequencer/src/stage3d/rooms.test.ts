@@ -10,6 +10,7 @@ import { buildVenue } from './venue';
 import { DJ_BOOTH, ROOMS, onDeck } from './geometry';
 import { BOOTH, DECKS, djPerson } from './dj';
 import type { Stage } from './rooms';
+import { THEATRE } from './sceneSizes';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const built: Record<string, Stage> = {};
@@ -132,18 +133,18 @@ describe('the Cinema, Bar, Theatre and Church templates in their rooms', () => {
     expect(pins.length).toBe(2);
     for (const f of pins) expect(f.beamDeg).toEqual([6, 6]);
   });
-  it('the theatre\'s cyc lights are floods (80°): side by side they wash the cyc from top to bottom, not four blobs', async () => {
+  it('the theatre\'s cyc lights are floods (80°): side by side they wash the cyc from top to bottom, not blobs', async () => {
     const { TEMPLATES } = await import('../content/templates');
     const { hitRoom, beamAxis } = await import('./geometry').then((g) => ({ hitRoom: g.hitRoom, beamAxis: (f: { rot?: { yaw: number; pitch: number; roll: number } }) => g.toWorld({ x: 0, y: 1, z: 0 }, f.rot!) }));
     const cyc = TEMPLATES.find((t) => t.name === 'Theatre')!.build().fixtures.filter((f) => /^Cyc /.test(f.name));
-    expect(cyc.length).toBe(4);
+    expect(cyc.length).toBeGreaterThanOrEqual(4);
     for (const f of cyc) {
       expect(f.beamDeg![0]).toBeGreaterThanOrEqual(60);
       // (each lands on the cyc, and its pool there is wider than the gap to the next one)
       const h = hitRoom(f.p3!, beamAxis(f), ROOMS.theatre)!;
       expect(h.n.z, f.name).toBeGreaterThan(0.5);
       const L = Math.hypot(h.x - f.p3!.x, h.y - f.p3!.y, h.z - f.p3!.z), w = 2 * L * Math.tan((f.beamDeg![0] / 2) * Math.PI / 180);
-      expect(w, f.name).toBeGreaterThan(14 / 4);
+      expect(w, f.name).toBeGreaterThan(THEATRE.cyc.w / cyc.length);
     }
   });
   it('the bar: people at the counter, the mirror ball turning', () => {

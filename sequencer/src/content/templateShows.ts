@@ -46,11 +46,12 @@ export const TEMPLATE_SHOWS: Record<string, TemplateShow> = {
   Theatre: {
     crowd: 'calm', song: 'everybody-on-your-block', list: 'Show', end: 'End', start: ['House lights', 'House out'], close: ['House lights', 'House half'],
     sets: {
-      intro: [['Night']], verse: [['Scene 1'], ['Fireside'], ['Ballroom']], build: [['Sunrise']],
-      chorus: [['Ballroom', 'Dream'], ['Finale'], ['Storm', 'Finale']], solo: [['Storm']], break: [['Dream'], ['Night']],
-      inst: [['Storm', 'Ballroom']], outro: [['Bows']],
+      intro: [['Curtain up', 'Night']], verse: [['Scene 1', 'Forest'], ['Fireside', 'Moonlight'], ['Ballroom', 'Castle']], build: [['Sunrise'], ['Escape']],
+      chorus: [['Ballroom', 'Dream'], ['Castle', 'Battle'], ['Storm', 'Underwater']], solo: [['Storm', 'Escape']], break: [['Dream', 'Snow'], ['Night', 'Moonlight']],
+      inst: [['Storm', 'Ballroom'], ['Forest', 'Snow']], outro: [['Bows']],
     },
-    lastChorus: ['Finale', 'Storm', 'Finale'], hits: ['fog', 'confetti', 'sparks', 'bubbles'],
+    // (the one confetti shot is the finale's own)
+    lastChorus: ['Finale', 'Battle', 'Finale'], hits: ['fog', 'sparks', 'bubbles'],
   },
   Church: {
     crowd: 'calm', song: 'walls-come-down', list: 'Service', end: 'Goodbye',

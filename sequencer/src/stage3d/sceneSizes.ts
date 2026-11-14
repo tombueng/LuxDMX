@@ -33,7 +33,7 @@ export const THEATRE = {
   // the electrics over the stage (front to back) and the front-of-house bar over the stalls
   electrics: [{ z: 0.8, y: 11.2 }, { z: -3.5, y: 11.2 }, { z: -7.5, y: 11.8 }, { z: -11.5, y: 12.6 }], foh: { z: 11, y: 13 },
   // the booms in the wings (either side, two each), the black legs masking them
-  booms: { x: 10.8, z: [-2.4, 1.0] }, legs: [-2.4, -6, -10],
+  booms: { x: 10.8, z: [-10, -6, -2.4, 1.0] }, legs: [-2.4, -6, -10],
   // the house curtain's track just behind the proscenium; the fly bars (their drops) between the
   // electrics, hung from the grid under the roof; a drop flown in stands on the deck
   curtainZ: 1.45, flys: [-1.6, -5.3, -9.2, -12.5], drop: { w: 20, h: 10 },
