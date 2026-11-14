@@ -78,8 +78,11 @@ test('the Cinema, Bar, Theatre, Church and Wedding templates play in their own r
   expect(up.y).toBeLessThan(0.5); expect(Math.abs(up.x)).toBeGreaterThan(10);
   expect((await where(page, 'Pinspot 1')).y).toBeGreaterThan(6);
   await inRoom('Bar', 'bar');
-  // the bar's lights where a bar has them: the shelf uplights low on the back bar, the PARs on the rail
-  expect((await where(page, 'Shelf 1')).y).toBeLessThan(1.3);
+  // the bar's lights where a bar has them: the LED strips behind the bottles on the back bar and
+  // under the counter, the PARs on the rail
+  const shelf = await where(page, 'Shelf strip 1');
+  expect(shelf.y).toBeLessThan(1.6); expect(shelf.z).toBeLessThan(-4);
+  expect((await where(page, 'Counter strip')).y).toBeLessThan(0.4);
   expect((await where(page, 'PAR 1')).y).toBeGreaterThan(3);
   const v = page.locator('.s3').getByRole('group', { name: 'The venue' });
   await page.locator('.s3').getByRole('button', { name: 'Venue', exact: true }).click();

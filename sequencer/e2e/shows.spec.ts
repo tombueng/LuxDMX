@@ -47,7 +47,8 @@ test('every template plays on the box: its first look on the wire, a button per 
       return { universes: [...new Set(s.fixtures.map((f: any) => f.universe))], n: s.fixtures.length, confetti: ids('confetti'),
         machines: ['confetti', 'co2', 'sparks', 'flame', 'bubbles'].filter((m) => ids(m).length).length };
     });
-    expect(rig.universes, name).toEqual([0]);
+    // (the big ones spread over more universes, the first is 0)
+    expect(rig.universes, name).toContain(0);
     expect(rig.n, name).toBeGreaterThanOrEqual(25);
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     await expect(page.locator('div.live')).toBeVisible();
@@ -77,10 +78,10 @@ test('a template plays on the box, survives a reload, and the manager can rename
   await openManager(page);
   await startTemplate(page, 'Theatre');
   await expect(page.locator('.top .show .name')).toHaveText('Opening night');
-  // Theatre: 6 front dimmers at 1-6, preset cue at 30 %
+  // Theatre: 6 front dimmers at 1-6, the preset cue at 18 % (30 % of a front light kept soft, x0.6)
   await page.locator('.deck .tab', { hasText: 'Show' }).click();
   await jumpTo(page, 0);
-  await expect.poll(() => channels(0, 6), { timeout: 5000 }).toEqual([77, 77, 77, 77, 77, 77]);
+  await expect.poll(() => channels(0, 6), { timeout: 5000 }).toEqual([46, 46, 46, 46, 46, 46]);
 
   const lights = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length as number);
   await page.waitForTimeout(800);                     // autosave
@@ -169,4 +170,17 @@ test('a show file opened twice: the second is "(2)", so the two can be told apar
   const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   await expect(card(page, esc(name))).toHaveCount(1);
   await expect(card(page, esc(`${name} (2)`))).toHaveCount(1);
+});
+
+test('a template started twice makes "Bar" and "Bar 2", not two shows of the same name', async ({ page }) => {
+  await fresh(page);
+  await page.locator('.top .show').click();
+  await startTemplate(page, 'Bar');
+  await expect(page.locator('.top .show .name')).toHaveText('Bar');
+  await startTemplate(page, 'Bar');
+  await expect(page.locator('.top .show .name')).toHaveText('Bar 2');
+  await page.locator('.top .show').click();
+  const dlg = page.getByRole('dialog', { name: 'Shows' });
+  await expect(dlg.getByRole('button', { name: 'Bar', exact: true })).toHaveCount(1);
+  await expect(dlg.getByRole('button', { name: 'Bar 2', exact: true })).toHaveCount(1);
 });

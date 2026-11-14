@@ -978,6 +978,9 @@ class App {
   async startShow(s: Show, saveCurrent = true) {
     const blank = this.isBlank() ? this.showId : '';
     if (saveCurrent && !blank) this.checkpoint(); else clearTimeout(this.dirtyTimer);
+    // (a name no other show here has: a template played twice is "Bar" and "Bar 2", not two "Bar"s)
+    const taken = new Set(this.shows.filter((x) => x.id !== blank).map((x) => x.name)), name = s.meta.name;
+    for (let n = 2; taken.has(s.meta.name); n++) s.meta.name = `${name} ${n}`;
     this.replaceShow(s);
     this.setShowId(newId('s'));
     await this.persist(this.lastSnap);

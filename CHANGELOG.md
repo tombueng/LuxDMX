@@ -21,6 +21,8 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - **A pinspot on the mirror ball stops on the ball** on the 3D stage, instead of shining on
   through it and laying a grey disc on the bar's wall. The Bar's first pinspot hangs between the
   PARs now, not inside a beam light.
+- **A template started twice is "Bar" and "Bar 2"**, not two shows both called "Bar" in the Shows
+  list. Any new show gets a name no other show here has.
 - **A lighter 3D stage**: the camera-like exposure no longer makes the page wait for the graphics
   card to answer a question every few frames (about a sixth of the page's time with the 3D stage
   open), and the stage stopped making the browser lay the page out again every frame. Switching
