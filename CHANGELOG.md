@@ -280,6 +280,16 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   one used to be "the look as it is", which has no sound and didn't say so.
 - Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
   notes off the screen, empty states that now say what to do, one name for saving a show file.
+- The QLC+ fixture list had a stray `&#10;` in one name (Chauvet Shocker 90 IRC QRG) and trailing
+  spaces in three. Its names are read from QLC+'s XML in one pass now.
+
+**Firmware**
+
+- **Channel labels and the box's name show as text.** The status page's change log and the bar at
+  the top of every page put them in as HTML, so a label like `<b>Spot</b>` came out bold, and one
+  with a script in it ran in every browser that opened the box. A quote in the name broke
+  `/info.json` (and with it every page); the backup's file name and the setup page's link keep only
+  the letters, digits and dashes of it now.
 
 ## 2026-11-12
 

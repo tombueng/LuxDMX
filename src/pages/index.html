@@ -693,7 +693,14 @@ function connect() {
 LuxNav.live(connect);
 
 // Senders & log polling
-function fmtAgo(ago) { return ago === 0 ? 'now' : ago + 's ago'; }
+function fmtAgo(ago) { return ago === 0 ? 'now' : (+ago) + 's ago'; }
+// Text from the box (channel labels anyone on the network can set, addresses) goes into these
+// lists as text, never as markup: a label like <b>Spot</b> showed bold, and one with a script in
+// it ran in every browser that opened this page.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 function updateSenders(data) {
   var tbody = document.getElementById('senders-body');
@@ -704,9 +711,9 @@ function updateSenders(data) {
   tbody.innerHTML = data.map(function(s) {
     var proto = s.p === 0 ? 'Art-Net' : s.p === 2 ? 'Web' : 'sACN';
     return '<tr>' +
-      '<td class="ps-3" style="font-family:monospace">' + s.ip + '</td>' +
+      '<td class="ps-3" style="font-family:monospace">' + esc(s.ip) + '</td>' +
       '<td>' + proto + '</td>' +
-      '<td>' + s.fps.toFixed(1) + '</td>' +
+      '<td>' + (+s.fps).toFixed(1) + '</td>' +
       '<td>' + fmtAgo(s.ago) + '</td>' +
       '</tr>';
   }).join('');
@@ -723,14 +730,14 @@ function updateLog(data) {
     var ageSec  = Math.round((newest - entry.ms) / 1000);
     var timeStr = ageSec === 0 ? 'now' : ageSec + 's ago';
     var proto   = entry.p === 0 ? 'Art-Net' : entry.p === 2 ? 'Web' : 'sACN';
-    if (entry.u != null && outputs.length > 1) proto += ' U' + entry.u;
+    if (entry.u != null && outputs.length > 1) proto += ' U' + (+entry.u);
     var chs     = entry.ch.map(function(c) {
-      return (labels[c[0]] ? labels[c[0]] : 'ch' + c[0]) + '=' + c[1];
+      return esc(labels[c[0]] ? labels[c[0]] : 'ch' + (+c[0])) + '=' + (+c[1]);
     }).join('&nbsp; ');
     return '<div class="px-3 py-2" style="border-bottom:1px solid #30363d">' +
       '<div class="d-flex justify-content-between align-items-baseline">' +
-      '<span style="font-size:.72rem;color:#8b949e">' + timeStr + ' &middot; ' + proto + ' &middot; ' + entry.ip + '</span>' +
-      '<span class="fw-semibold" style="font-size:.75rem">' + entry.n + ' ch</span>' +
+      '<span style="font-size:.72rem;color:#8b949e">' + timeStr + ' &middot; ' + proto + ' &middot; ' + esc(entry.ip) + '</span>' +
+      '<span class="fw-semibold" style="font-size:.75rem">' + (+entry.n) + ' ch</span>' +
       '</div>' +
       (chs ? '<div style="font-size:.7rem;color:#8b949e;font-family:monospace;margin-top:1px">' + chs + '</div>' : '') +
       '</div>';
