@@ -30,6 +30,7 @@
   import { sectionStarts } from '../timeline/beat';
   import { CATALOG } from '../timeline/catalog';
   import { progressSaid } from '../timeline/songPicker';
+  import { gridOf, peaksPath as wavePath } from '../timeline/ruler';
   import { creditOf } from '../timeline/download';
   import { SURE, type SongAnalysis } from '../timeline/analyze';
   import { analyzeAudio } from '../timeline/songAnalysis';
@@ -122,22 +123,7 @@
     return near ? near.at : Math.min(song, snap(t, tl?.bpm ?? app.show.settings.bpm, snapTo === 'bar' ? 4 : 1, tl?.offset ?? 0));
   };
   // the grid: bars (and beats when there's room)
-  const grid = $derived.by(() => {
-    // (a tempo that isn't a sane number would loop for ever here: 120)
-    const raw = tl?.bpm ?? app.show.settings.bpm, bpm = Number.isFinite(raw) && raw >= 20 && raw <= 300 ? raw : 120;
-    const beat = 60 / bpm, d = songLen || 240, out: { t: number; bar: boolean; n: number; label: boolean }[] = [];
-    const every = scale * beat < 6 ? (scale * beat * 4 < 14 ? 4 * Math.ceil(14 / (scale * beat * 4)) : 4) : 1;
-    // (the bar numbers as far apart as they need: "121" is wider than "9", so past bar 99 only
-    // every second or fourth bar is numbered where they'd run into each other)
-    const barStep = Math.max(1, every / 4), barPx = scale * beat * 4 * barStep;
-    const need = String(Math.max(1, Math.ceil(d / (beat * 4)))).length * 6.6 + 6;
-    const lab = barStep * ([1, 2, 4, 8, 16, 32].find((k) => barPx * k >= need) ?? 64);
-    for (let i = 0, t = tl?.offset ?? 0; t <= d; i += every, t = (tl?.offset ?? 0) + i * beat) {
-      const n = i / 4 + 1;
-      out.push({ t, bar: i % 4 === 0, n, label: i % 4 === 0 && (n - 1) % lab === 0 });
-    }
-    return out;
-  });
+  const grid = $derived(gridOf(tl?.bpm ?? app.show.settings.bpm, songLen, scale, tl?.offset ?? 0));
   // the song's parts: the demo beat's own, the ones a demo song came with, the ones found in a song
   // file of your own, or set by hand
   const sections = $derived.by((): { name: string; at: number; end: number; energy?: number }[] => {
@@ -566,14 +552,7 @@
     else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); addPart(); }
     else if (e.key.toLowerCase() === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); loopHere(); }
   }
-  const peaksPath = $derived.by(() => {
-    const p = P.peaks, d = P.duration || 1, w = d * scale;
-    if (!p.length) return '';
-    let s = 'M0 22';
-    p.forEach((v, i) => { s += `L${((i + 0.5) / p.length * w).toFixed(1)} ${(22 - v * 20).toFixed(1)}`; });
-    for (let i = p.length - 1; i >= 0; i--) s += `L${((i + 0.5) / p.length * w).toFixed(1)} ${(22 + p[i] * 20).toFixed(1)}`;
-    return s + 'Z';
-  });
+  const peaksPath = $derived(wavePath(P.peaks, (P.duration || 1) * scale));
 </script>
 
 <svelte:window onkeydown={keys} />
