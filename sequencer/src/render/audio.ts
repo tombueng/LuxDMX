@@ -1,14 +1,18 @@
 // A render's sound: the song (or the demo beat) from the render's start to its end, mixed in an
 // OfflineAudioContext at full volume (as a recording of the stage has it: the speakers' volume and
-// a muted laptop don't count). From before the song (the time before it, counting in): silence
-// first, then the song. The crowd and the count-in clicks aren't in it (the clicks are for the band;
-// the crowd follows the live show's lights).
+// a muted laptop don't count), and the crowd as the show has it (its track: chatting while it waits
+// before the song, cheering on the big moments) at the crowd's own volume, as when it plays. From
+// before the song (the time before it, counting in): the crowd, then the song. The count-in clicks
+// aren't in it (they're for the band).
+import type { CrowdItem } from '../model/timeline';
+import { renderCrowd } from '../audio/crowd';
 import { playDemo } from '../timeline/beat';
 
 export const RENDER_RATE = 48000;
 
-export async function mixSong(o: { song?: AudioBuffer; demo?: boolean; from: number; to: number; rate?: number }): Promise<AudioBuffer | undefined> {
-  if (!o.song && !o.demo) return undefined;
+export async function mixSong(o: { song?: AudioBuffer; demo?: boolean; from: number; to: number; rate?: number; crowd?: { items: readonly CrowdItem[]; volume: number } }): Promise<AudioBuffer | undefined> {
+  const crowd = o.crowd?.items.length && o.crowd.volume > 0 ? o.crowd : undefined;
+  if (!o.song && !o.demo && !crowd) return undefined;
   const rate = o.rate ?? RENDER_RATE, len = Math.max(1, Math.ceil((o.to - o.from) * rate));
   if (typeof OfflineAudioContext === 'undefined') return undefined;
   const ctx = new OfflineAudioContext(2, len, rate);
@@ -17,6 +21,8 @@ export async function mixSong(o: { song?: AudioBuffer; demo?: boolean; from: num
     src.buffer = o.song; src.connect(ctx.destination);
     // (before the song: it comes in at 0 on its clock; from the middle: from there)
     if (o.from < 0) src.start(-o.from, 0); else if (o.from < o.song.duration) src.start(0, o.from);
-  } else playDemo(ctx, ctx.destination, o.from, o.to);
+  } else if (o.demo) playDemo(ctx, ctx.destination, o.from, o.to);
+  // (the crowd never stops the render: without its sounds it's the song alone)
+  if (crowd) { try { await renderCrowd(ctx, ctx.destination, crowd.items, o.from, o.to, crowd.volume); } catch { /* the song alone */ } }
   return ctx.startRendering();
 }

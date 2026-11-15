@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { AUTHOR } from '../store/kept';
+  import NumField from './NumField.svelte';
   // The knobs of one effect. Plain words first; the finer ones under "More".
   import Icon from './Icon.svelte';
   import EffectPreview from './EffectPreview.svelte';
@@ -18,6 +20,13 @@
   const p = $derived(paramsOf(fx.kind, fx.params));
   const set = (k: string, v: unknown) => { fx.params = { ...fx.params, [k]: v }; };
   const num = (k: string) => (e: Event) => set(k, +(e.target as HTMLInputElement).value);
+  // On the tempo or off it at the same speed: 4 beats at 120 BPM became 4 seconds (twice as slow),
+  // the number kept and not the time. Seconds to the nearest beat choice, and back.
+  function setTempo(on: boolean) {
+    const bpm = app.bpm || 120, sp = Number(fx.params.speed) || 1;
+    const speed = on ? BEATS.reduce((a, b) => (Math.abs(b - sp * bpm / 60) < Math.abs(a - sp * bpm / 60) ? b : a), BEATS[0]) : Math.round(sp * 60 / bpm * 100) / 100;
+    fx.params = { ...fx.params, tempo: on, speed };
+  }
   const BEATS = [0.25, 0.5, 1, 2, 4, 8, 16, 32];
   const DIRS: [Direction, string, string][] = [
     ['forward', '→ Forward', 'Forward'], ['backward', '← Back', 'Backward'], ['bounce', '↔ Bounce', 'There and back'],
@@ -46,7 +55,7 @@
 
   // ---- share it as a file (a package: ADDONS.md), with a little animation for the picker
   let sharing = $state(false), author = $state(''), about = $state(''), license = $state('CC-BY-4.0'), shareErr = $state('');
-  $effect(() => { if (sharing && !author) { try { author = localStorage.getItem('luxdmx.seq.author') ?? ''; } catch { /* fine */ } } });
+  $effect(() => { if (sharing && !author) { author = AUTHOR.get(); } });
   function share() {
     shareErr = '';
     if (!author.trim()) { shareErr = 'Say who made it'; return; }
@@ -58,7 +67,7 @@
       a.download = `${pkg.id}.luxfx`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      try { localStorage.setItem('luxdmx.seq.author', author.trim()); } catch { /* fine */ }
+      AUTHOR.set(author.trim());
       sharing = false;
     } catch (e) { shareErr = e instanceof PackageError ? e.message : `It couldn't be packed: ${e instanceof Error ? e.message : String(e)}`; }
   }
@@ -75,6 +84,8 @@
       {#each EFFECTS.filter((d) => !d.hidden) as d (d.id)}<option value={d.id}>{d.name}</option>{/each}</select></label>
     <label>Runs on <select value={fx.group ?? ''} aria-label="Runs on" onchange={(e) => {
       const v = (e.target as HTMLSelectElement).value;
+      // (nothing selected: it would run on no light at all, quietly; the option is off then anyway)
+      if (v === '__sel' && !app.selected.length) { (e.target as HTMLSelectElement).value = fx.group ?? ''; return; }
       if (v === '__sel') { delete fx.group; fx.fixtures = app.show.fixtures.map((f) => f.id).filter((id) => app.selected.includes(id)); }
       else if (v) { fx.group = v; delete fx.fixtures; }
     }}>
@@ -87,16 +98,20 @@
   {#if live.has('speed')}
   <div class="knob">
     <span class="lab">Speed</span>
-    <label class="tempo" title="Follow the show tempo (Tap)"><input type="checkbox" checked={p.tempo} onchange={(e) => set('tempo', (e.target as HTMLInputElement).checked)} /> tempo</label>
+    <!-- (one row of its own across the knob's columns: the beats choice was squeezed to its arrow) -->
+    <div class="spd">
+    <label class="tempo" title="Follow the show tempo (Tap)"><input type="checkbox" checked={p.tempo} onchange={(e) => setTempo((e.target as HTMLInputElement).checked)} /> tempo</label>
     {#if p.tempo}
       <select value={String(p.speed)} onchange={(e) => set('speed', +(e.target as HTMLSelectElement).value)} aria-label="Beats per cycle">
-        {#each BEATS as b (b)}<option value={String(b)}>{b < 1 ? `1/${1 / b}` : b} beat{b === 1 ? '' : 's'}</option>{/each}
+        {#each BEATS as b (b)}<option value={String(b)}>{b < 1 ? `1/${1 / b} beat` : `${b} beat${b === 1 ? '' : 's'}`}</option>{/each}
         {#if !BEATS.includes(p.speed)}<option value={String(p.speed)}>{p.speed} beats</option>{/if}
       </select>
     {:else}
-      <span class="row"><input type="number" min="0.05" max="600" step="0.1" value={p.speed} onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v)) set('speed', Math.max(0.05, v)); }} aria-label="Seconds per cycle" style="width:5em" /> s</span>
+      <!-- (what it keeps is what it shows: -3 stayed in the field while 0.05 was kept) -->
+      <span class="row"><NumField value={p.speed} min={0.05} max={600} step={0.1} required label="Seconds per cycle" width="5em" onset={(v) => { if (v !== undefined) set('speed', v); }} /> s</span>
     {/if}
     <span class="faint">per round{#if p.tempo} · {Math.round(p.speed * 60 / app.bpm * 10) / 10} s at {app.bpm} BPM{/if}</span>
+    </div>
   </div>
   {/if}
   <CustomEffectFields {fx} {p} {set} />
@@ -156,7 +171,7 @@
         </select></label>
     {/if}
     {#if live.has('blocks')}
-      <label class="knob" title="Neighbours that move together: 2 = pairs"><span class="lab">Blocks</span><input type="number" min="1" max="32" value={p.blocks} oninput={num('blocks')} aria-label="Blocks" style="width:4.5em" /></label>
+      <label class="knob" title="Neighbours that move together: 2 = pairs"><span class="lab">Blocks</span><NumField value={p.blocks} min={1} max={32} required label="Blocks" onset={(v) => { if (v !== undefined) set('blocks', Math.round(v)); }} /></label>
     {/if}
     {#if usesWidth}
       <label class="knob" title="How long each step is on. 0 = one light's worth"><span class="lab">Width</span><input type="range" min="0" max="1" step="0.01" value={p.width} oninput={num('width')} aria-label="Width" /><b>{p.width ? pct(p.width) : 'auto'}</b></label>
@@ -201,6 +216,8 @@
   .lab { color: var(--muted); }
   .knob b { width: 2.2rem; text-align: right; font-size: .8rem; color: var(--text); font-weight: 600; }
   .knob input[type=range] { width: 100%; }
+  .spd { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; }
+  .spd select { width: auto; min-width: 7em; }
   .knob:has(.tempo) { grid-template-columns: 4.6rem auto 1fr auto; }
   .tempo { display: inline-flex; gap: .2rem; align-items: center; font-size: .8rem; }
   .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; grid-column: 2 / 4; }

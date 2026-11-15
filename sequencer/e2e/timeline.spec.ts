@@ -5,7 +5,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, history, patch, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, patch, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -47,7 +47,7 @@ const cueOn = (page: Page) => page.evaluate(() => { const a = (window as any).__
 async function bar(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   await expect(page.locator('.tlv')).toBeVisible();
 }
@@ -71,6 +71,28 @@ test('cues tapped onto the timeline play on its clock; a jump puts the stage whe
   // a jump back to the start: the first look again, at once
   await page.locator('.transport').getByRole('button', { name: 'Back to the start' }).click();
   await expect.poll(() => cueOn(page)).toBe(names[0]);
+});
+
+test('cues tapped in a row without moving the playhead go one after the other, a bar apart, not on top of each other', async ({ page }) => {
+  await bar(page);
+  const chips = page.locator('.tlv .pal .chip');
+  for (const i of [0, 1, 2]) await chips.nth(i).click();
+  const at = await page.evaluate(() => { const t = (window as any).__luxdmx.show.timeline; return { at: t.items.map((i: any) => i.at), bpm: t.bpm ?? (window as any).__luxdmx.show.settings.bpm }; });
+  const len = (60 / at.bpm) * 4;
+  expect(at.at.length).toBe(3);
+  expect(at.at[0]).toBe(0);
+  expect(at.at[1]).toBeCloseTo(len, 1); expect(at.at[2]).toBeCloseTo(2 * len, 1);
+});
+
+test('the Moments offer the machines the rig has (and strobe and blinder hits, which any light does)', async ({ page }) => {
+  await bar(page);                                                         // (the Bar: confetti, CO2, sparks, bubbles, fog; no flames)
+  const mo = page.locator('.tlv .pal .chip.mo');
+  await expect(mo.filter({ hasText: 'Confetti' })).toHaveCount(1);
+  await expect(mo.filter({ hasText: 'Flames' })).toHaveCount(0);
+  await expect(mo.filter({ hasText: 'Strobe hit' })).toHaveCount(1);
+  // the confetti cannon gone: its moment goes from the list too
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = a.show.fixtures.filter((f: any) => /^Confetti/.test(f.name)).map((f: any) => f.id); a.removeFixtures(); });
+  await expect(mo.filter({ hasText: 'Confetti' })).toHaveCount(0);
 });
 
 test('an effect dragged on runs as a bar; Del removes what is selected and Undo brings it back', async ({ page }) => {
@@ -176,6 +198,8 @@ test('a demo song: picked, it downloads with progress, brings its tempo and part
   await expect(dlg).toHaveCount(0, { timeout: 10_000 });
   const tl = await page.evaluate(() => { const t = (window as any).__luxdmx.show.timeline; return { bpm: t.bpm, offset: t.offset, duration: t.duration, demo: t.demo, audio: t.audio, sections: t.sections.map((s: any) => s.name) }; });
   expect(tl).toMatchObject({ bpm: 120, offset: 0.5, sections: ['Intro', 'Verse', 'Chorus', 'Outro'], audio: { catalog: 'e2e-song', credit: '"Test Song" by The Testers, CC BY' } });
+  // (in the set it's called by its title, not its file's name with the artist first)
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.timeline.name)).toBe('Test Song');
   expect(tl.demo).toBeUndefined();
   expect(tl.duration).toBeGreaterThan(23.5); expect(tl.duration).toBeLessThan(24.5);
   await expect(page.locator('.tlv .sec')).toHaveText(['Intro', 'Verse', 'Chorus', 'Outro']);
@@ -289,4 +313,92 @@ test('a song that arrives after another show was opened stays off that show', as
   release();
   await expect(page.locator('.toast')).toContainText('came down after another show was opened');
   expect(await page.evaluate(() => (window as any).__luxdmx.show.timeline?.audio)).toBeUndefined();
+});
+
+test('Loop this part: the part plays over and over, its chip stops it; L loops the part the playhead is in', async ({ page }) => {
+  test.setTimeout(90_000);
+  await bar(page);
+  await page.locator('.tlv').getByRole('button', { name: 'Demo songs…' }).click();
+  const dlg = page.getByRole('dialog', { name: 'Demo songs' });
+  await dlg.getByRole('button', { name: 'Use Demo beat' }).click();
+  await expect(dlg).toHaveCount(0);
+  // (short parts, so it comes round quickly)
+  await page.evaluate(() => { (window as any).__luxdmx.show.timeline.sections = [{ name: 'Intro', at: 0 }, { name: 'Drop', at: 2 }, { name: 'Outro', at: 4.5 }]; });
+  // (zoomed in: on the whole ten minutes the part is a sliver)
+  for (let i = 0; i < 12; i++) await page.getByRole('button', { name: 'Zoom in' }).click();
+  const drop = page.locator('.tlv .sec').filter({ hasText: /^Drop$/ });
+  await expect(drop).toHaveCount(1);
+  await drop.click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Loop this part' }).click();
+  const tr = page.getByRole('toolbar', { name: 'Transport' });
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping Drop' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing)).toBe(true);
+  // over 6 s (more than two rounds): always inside the part, and it came round
+  const seen = await page.evaluate(async () => {
+    const P = (window as any).__luxdmx.timeline, out: number[] = [];
+    for (let i = 0; i < 30; i++) { await new Promise((r) => setTimeout(r, 200)); out.push(P.position); }
+    return out;
+  });
+  expect(Math.min(...seen)).toBeGreaterThanOrEqual(2 - 0.05);
+  expect(Math.max(...seen)).toBeLessThan(4.5 + 0.3);
+  expect(seen.some((t, i) => i > 0 && t < seen[i - 1] - 1)).toBe(true);
+  // the chip's ×: it plays on past the end
+  await tr.getByRole('button', { name: 'Stop looping Drop' }).click();
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping' })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.position), { timeout: 8000 }).toBeGreaterThan(4.6);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+  // L: the part the playhead is in (Intro), and L again stops it
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(0.5));
+  await page.keyboard.press('l');
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping Intro' })).toBeVisible();
+  await page.keyboard.press('l');
+  await expect(tr.getByRole('status').filter({ hasText: 'Looping' })).toHaveCount(0);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+});
+
+test('the Effects track opened: a row per knob; the line drags the effect\'s own value, a double-click makes a curve that plays along the bar; the wheel zooms', async ({ page }) => {
+  await bar(page);
+  const fx = page.locator('.tlv .pal .chip.fx').first();
+  await fx.dragTo(page.locator('.tlv .tracks .lane').first(), { targetPosition: { x: 60, y: 15 } });
+  const it0 = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0]);
+  const fxId = it0.do.effect;
+  await page.locator('.tlv').getByRole('button', { name: /Open the effects/ }).click();
+  await expect(page.locator('.tlv .nl.sub')).not.toHaveCount(0);
+  const kinds = await page.locator('.tlv .nl.sub').allTextContents();
+  expect(kinds).toContain('speed');
+  const row = (k: string) => page.locator('.tlv .lane.sub').nth(kinds.indexOf(k)).locator('svg.curve').first();
+  // the effect's own size, dragged up: the effect itself changes (every bar of it)
+  if (kinds.includes('size')) {
+    const s = await row('size').boundingBox(), line = await row('size').locator('line.hit').boundingBox();
+    await page.mouse.move(s!.x + s!.width / 2, line!.y + line!.height / 2); await page.mouse.down();
+    await page.mouse.move(s!.x + s!.width / 2, s!.y + s!.height * 0.75, { steps: 4 }); await page.mouse.up();
+    await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.show.effects.find((x: any) => x.id === e).params.size, fxId)).toBeLessThan(0.7);
+  }
+  // a double-click on the speed line: a point there, a curve over this bar (its ends the effect's own)
+  const sp = await row('speed').boundingBox(), sl = await row('speed').locator('line.hit').boundingBox();
+  await page.mouse.dblclick(sp!.x + sp!.width / 2, sl!.y + sl!.height / 2);
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves?.[0]?.pts.length)).toBe(3);
+  // dragged to the top: much slower there (the top of the speed row is 32 beats a round)
+  const pt = row('speed').locator('circle.pt').nth(1), pb = await pt.boundingBox();
+  await page.mouse.move(pb!.x + pb!.width / 2, pb!.y + pb!.height / 2); await page.mouse.down();
+  await page.mouse.move(pb!.x + pb!.width / 2, sp!.y + 1, { steps: 4 }); await page.mouse.up();
+  const curve = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves[0]);
+  expect(curve.knob).toBe('speed'); expect(curve.pts[1][1]).toBeGreaterThan(16);
+  // playing through the bar: the effect runs with the curve's speed where the song is, its own after
+  const it = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0]);
+  await page.evaluate((t) => { const p = (window as any).__luxdmx.timeline; p.seek(t); void p.play(); }, it.at + it.len * curve.pts[1][0]);
+  await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.engine.fxOver[e]?.speed ?? 0, fxId), { timeout: 8000 }).toBeGreaterThan(8);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+  await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.engine.fxOver[e], fxId)).toBeUndefined();
+  // a double-click on a point takes it away; down to one, the curve goes (the playhead off it first)
+  await page.evaluate((t) => (window as any).__luxdmx.timeline.seek(t), it.at + it.len + 2);
+  await row('speed').locator('circle.pt').nth(1).dblclick();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves?.[0]?.pts.length)).toBe(2);
+  await row('speed').locator('circle.pt').nth(0).dblclick();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].curves)).toBeUndefined();
+  // the wheel zooms the tracks round the pointer
+  const w0 = await page.locator('.tlv .it').first().boundingBox();
+  const tr = await page.locator('.tlv .tracks').boundingBox();
+  await page.mouse.move(tr!.x + 200, tr!.y + 60); await page.mouse.wheel(0, -300);
+  await expect.poll(async () => (await page.locator('.tlv .it').first().boundingBox())!.width).toBeGreaterThan(w0!.width * 1.3);
 });

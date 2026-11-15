@@ -6,7 +6,7 @@
 // starts (and the sound coming out of it with it), it loads chatter and cheering only (no applause,
 // no claps), its switch in the transport silences it, and its chips have no Clapping.
 import type { Page } from '@playwright/test';
-import { channels, demo, openConnected, resetFake, test, expect } from './helpers';
+import { channels, demo, openConnected, resetFake, test, expect, startTemplate, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -15,7 +15,7 @@ const pos = (page: Page) => page.evaluate(() => (window as any).__luxdmx.timelin
 async function bar(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
   await expect(page.locator('.tlv')).toBeVisible();
 }
@@ -69,7 +69,9 @@ test('a cue placed before the song comes on before the song starts; the time aro
 });
 
 test("the big demo's intro: house lights, dark, searchlights, the backdrop, the walk-on, the band in its spots, then the song", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
+  // (the big demo is heavy: on a busy machine each look-up takes seconds, 8 s of tries weren't enough)
+  const slow = expect.configure({ timeout: 25_000 });
   await openConnected(page);
   await demo(page);
   await expect(page.locator('.tlv')).toBeVisible();
@@ -84,19 +86,19 @@ test("the big demo's intro: house lights, dark, searchlights, the backdrop, the 
   // the intro, step by step (jumps: the stage as it would be there)
   await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
   const at = async (t: number) => { await page.evaluate((x) => (window as any).__luxdmx.timeline.seek(x), t); return cueOn(page, 'Show'); };
-  await expect.poll(() => at(-lead + 6)).toBe('House lights down');
-  await expect.poll(() => at(-20)).toBe('Searchlights');
-  await expect.poll(() => cueOn(page, 'Moves')).toMatch(/^Sweep (left|right), slowly$/);
+  await slow.poll(() => at(-lead + 6)).toBe('House lights down');
+  await slow.poll(() => at(-20)).toBe('Searchlights');
+  await slow.poll(() => cueOn(page, 'Moves')).toMatch(/^Sweep (left|right), slowly$/);
   // the searchlights on the wire (the back beams on universe 0)
   await expect.poll(async () => (await channels(0, 304)).some((v) => v > 0), { timeout: 8000 }).toBe(true);
-  await expect.poll(() => at(-10)).toBe('Reveal: the backdrop');
-  await expect.poll(() => at(-6)).toBe('Walk-on: strobes');
-  await expect.poll(() => at(-1)).toBe('Stop: on the band');
-  await expect.poll(() => at(1)).toBe('Intro: blue haze');
+  await slow.poll(() => at(-10)).toBe('Reveal: the backdrop');
+  await slow.poll(() => at(-6)).toBe('Walk-on: strobes');
+  await slow.poll(() => at(-1)).toBe('Stop: on the band');
+  await slow.poll(() => at(1)).toBe('Intro: blue haze');
   // after the song: the blinders on the crowd, then the house lights
   const dur = await page.evaluate(() => (window as any).__luxdmx.show.timeline.duration);
-  await expect.poll(() => at(dur + 2)).toBe('Thank you: on the crowd');
-  await expect.poll(() => at(dur + 12)).toBe('House lights');
+  await slow.poll(() => at(dur + 2)).toBe('Thank you: on the crowd');
+  await slow.poll(() => at(dur + 12)).toBe('House lights');
 });
 
 test("the crowd: its sound node is there, louder when the music starts, and its switch in the transport silences it", async ({ page }) => {
@@ -150,7 +152,7 @@ test("the crowd: its sound node is there, louder when the music starts, and its 
   await sw.click();
   await expect(sw).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.crowd.node.gain.value), { timeout: 3000 }).toBeLessThan(0.01);
-  expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.crowd'))).toBe('off');
+  expect(await keptValue(page, 'luxdmx.seq.crowd')).toBe(false);
   await sw.click();
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.crowd.node.gain.value), { timeout: 3000 }).toBeGreaterThan(0.3);
   await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
@@ -163,4 +165,47 @@ test('the Crowd chips: chatter, cheering, a roar, quiet and a cheer; no clapping
   const chips = pal.locator('.chip.cr');
   await expect(chips).toHaveText(['Chatter', 'Cheering', 'Roar', 'Quiet', 'Cheer!']);
   await expect(pal.getByRole('button', { name: /clap/i })).toHaveCount(0);
+});
+
+test('no song yet: the ruler doesn\'t say "After the song" over everything', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await expect(page.locator('.tlv .ruler')).toBeVisible();
+  await expect(page.locator('.tlv .ruler .span.tail')).toHaveCount(0);
+});
+
+test('a shorter song: what lies after its end is said, Move them to the end brings it in; Fit shows everything without a scroll', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.show.timeline = { duration: 300, items: [
+      { id: 't1', at: 10, lane: 'special', do: { do: 'blackout', on: true } },
+      { id: 't2', at: 280, lane: 'special', do: { do: 'blackout', on: true } },
+      { id: 't3', at: 290, lane: 'special', do: { do: 'blackout', on: false } },
+    ] };
+    a.checkpoint();
+  });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  await expect(page.locator('.tlv .it')).toHaveCount(3);
+  await page.evaluate(() => { (window as any).__luxdmx.show.timeline.duration = 120; });     // (another song, 2:00)
+  const toast = page.locator('.toast', { hasText: '2 things are placed after the end of this song' });
+  await expect(toast).toBeVisible();
+  const tracks = page.locator('.tlv .tracks');
+  expect(await tracks.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);    // (Fit: all of it, no scroll)
+  await toast.getByRole('button', { name: 'Move them to the end' }).click();
+  const at = await page.evaluate(() => (window as any).__luxdmx.show.timeline.items.map((i: any) => i.at));
+  expect(at[0]).toBe(10);
+  expect(Math.max(...at)).toBeLessThanOrEqual(120);
+  expect(at[2] - at[1]).toBeCloseTo(10, 5);                                                       // (spaced as they were)
+});
+
+test('the before and after fields show their most (600) whole', async ({ page }) => {
+  await openConnected(page);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  for (const label of ['Seconds before the song', 'Seconds after the song']) {
+    const f = page.getByLabel(label);
+    await f.fill('99999'); await f.press('Tab');
+    await expect(f).toHaveValue('600');
+    expect(await f.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  }
 });

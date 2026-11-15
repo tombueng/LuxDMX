@@ -193,7 +193,7 @@
       <canvas bind:this={canvas} style="width:{cssW}px;height:{cssH}px" data-cells={n}></canvas>
       <span class="sr-only" aria-live="polite">{cursorSaid}</span>
     </div>
-    <p class="faint hint">Drag across cells, or a box from outside them. On the plan, Alt-click a pixel picks it.
+    <p class="faint hint">A click adds a cell (or takes it out again). Drag across cells, or a box from outside them. On the plan, Alt-click a pixel picks it.
       <button class="ghost link" class:on={takeOut} aria-pressed={takeOut} onclick={() => (takeOut = !takeOut)} title="Dragging takes cells out instead of adding them (Alt does the same with a mouse)">{takeOut ? 'Taking out' : 'Take out'}</button>
       {#if tiny || zoom > 1}<button class="ghost link" onclick={() => (zoom = zoom >= 4 ? 1 : zoom * 2)} title="Bigger cells: the picture scrolls, a tap picks one" aria-label="Zoom the cells, now {zoom} times">Zoom {zoom}×</button>{/if}</p>
     <div class="typed">
@@ -249,7 +249,7 @@
   .typed .sm { padding: .1rem .5rem; }
   .quick { display: flex; gap: .25rem; flex-wrap: wrap; }
   .quick button { flex: 1 0 18%; padding: .2rem .2rem; font-size: .78rem; }
-  .quick button.on { border-color: var(--accent); color: var(--accent); }
+  .quick button.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .note { margin: 0; font-size: .78rem; }
   .err { margin: 0; font-size: .78rem; color: var(--pink); }
   .link { padding: 0 .2rem; font-size: .78rem; }

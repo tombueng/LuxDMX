@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { between, cueNumber, freezeNumbers, numbersFor, renumber } from './cuenum';
+import { between, cueNumber, freezeNumbers, numbersFor, renumber, setNumber } from './cuenum';
 import type { Cue, CueList } from './types';
 
 const cue = (name: string): Cue => ({ id: name, name, values: {}, fade: 0, advance: { mode: 'manual' } });
@@ -52,5 +52,25 @@ describe('cue numbers', () => {
     const shown = l.cues.map((_, i) => cueNumber(l, i));
     expect(shown).toEqual(['1', '4', '5', '2', '2.5', '3']);
     expect(new Set(shown).size).toBe(shown.length);
+  });
+});
+
+describe('a number typed for a cue', () => {
+  const mk = (n: number): CueList => ({ id: 'L', name: 'Show', end: 'stop', cues: Array.from({ length: n }, (_, i) => ({ id: `c${i + 1}`, name: `C${i + 1}`, values: {}, fade: 0, advance: { mode: 'manual' } })) } as CueList);
+  it('moves the cue where its number says, the others keep theirs', () => {
+    const l = mk(3);
+    expect(setNumber(l, l.cues[1], 0.5)).toBeUndefined();
+    expect(l.cues.map((c) => c.id)).toEqual(['c2', 'c1', 'c3']);
+    expect(l.cues.map((_, i) => cueNumber(l, i))).toEqual(['0.5', '1', '3']);
+    expect(setNumber(l, l.cues[0], 2.5)).toBeUndefined();
+    expect(l.cues.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']);
+    expect(setNumber(l, l.cues[2], 9)).toBeUndefined();
+    expect(l.cues.map((_, i) => cueNumber(l, i))).toEqual(['1', '2.5', '9']);
+  });
+  it('a number that is taken, or not a number above 0, is said and nothing changes', () => {
+    const l = mk(3);
+    expect(setNumber(l, l.cues[2], 1)).toMatch(/cue 1 in Show already/);
+    expect(setNumber(l, l.cues[2], 0)).toMatch(/above 0/);
+    expect(l.cues.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']);
   });
 });

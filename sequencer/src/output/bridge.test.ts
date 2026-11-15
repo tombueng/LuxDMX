@@ -24,4 +24,24 @@ describe('Bridge', () => {
     expect(b.state === 'closed' || b.state === 'reconnecting').toBe(true);
     expect(b.lostAt).toBeGreaterThan(0);
   });
+
+  it('says slow or stalled from what its page counts, not from its first second, and back when it is fine', () => {
+    const b = new Bridge('h', () => {});
+    b.handle({ type: 'ready', name: 'x' });
+    const stats = (fps: number, drops: number) => b.handle({ type: 'stats', fps, drops });
+    stats(0, 2); stats(0, 2); stats(0, 2);
+    expect(b.slow).toBe('');                       // (three seconds in: still warming up, said "hardly answers" here)
+    stats(0, 2);
+    expect(b.slow).toBe('stalled');
+    for (const f of [0, 0, 0, 0]) stats(f, 0);
+    expect(b.slow).toBe('');                       // an idle show: nothing to send, nothing skipped: fine
+    for (const f of [1, 1, 1]) stats(f, 6);
+    expect(b.slow).toBe('slow');                   // a look a second, frames skipped
+    for (const f of [4, 4, 4]) stats(f, 0);
+    expect(b.slow).toBe('');                       // a still look's heartbeat: fine
+    for (const f of [30, 30, 30]) stats(f, 10);
+    expect(b.slow).toBe('');                       // busy but keeping up
+    b.handle({ type: 'status', ws: 'closed' });
+    expect(b.slow).toBe('');                       // (not connected: that's the red bar's)
+  });
 });

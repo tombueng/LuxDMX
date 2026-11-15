@@ -4,9 +4,16 @@
   import Icon from './Icon.svelte';
   import Devices from './Devices.svelte';
   import { app } from '../app.svelte';
-  import { tablist, ui } from './ui.svelte';
+  import { tablist, ui, asPercent } from './ui.svelte';
+  import NumField from './NumField.svelte';
+  import { fieldUndo } from './fieldUndo';
+  $effect(() => fieldUndo());
 
   // The dot blinks on every beat the microphone hears.
+  async function takeOther() {
+    const playing = !app.quiet;
+    if (await ui.confirm('Take the other tab\'s version?', `It was saved after this one. What you changed here since then is dropped${playing ? ', and what plays here stops' : ''}.`, 'Take it', false)) await app.takeOtherTab();
+  }
   let beatFlash = $state(false);
   let lastBeat = 0;
   $effect(() => {
@@ -59,7 +66,9 @@
   function more(e: MouseEvent) {
     // on a phone the undo buttons don't fit the bar: they're the first thing in here
     // (on a tablet, following the music: the bar has it only while it's on)
-    const phone = window.innerWidth <= 760, tablet = window.innerWidth <= 1100;
+    // (a tablet held upright, up to 900 px, has them in here too)
+    const w = window.innerWidth / ui.zoom;          // (as wide as it looks: the interface size counts)
+    const phone = w <= 900, tablet = w <= 1100;
     ui.openMenu(e, [
       ...(phone ? [{ label: 'Undo', icon: 'undo', disabled: !app.canUndo, run: () => app.undo() }, { label: 'Redo', icon: 'redo', disabled: !app.canRedo, run: () => app.redo() }] : []),
       ...(tablet ? [{ label: app.music.on ? 'Stop following the music' : 'Follow the music', icon: 'music', run: () => void music() }, { sep: true }] : []),
@@ -78,6 +87,7 @@
       { label: 'Print a cue sheet', icon: 'printer', run: () => { if (!app.printCueSheet()) ui.toast('The browser blocked the new tab: allow popups for this page'); } },
       { label: 'Cue sheet as CSV (spreadsheet)', icon: 'download', run: () => app.exportCsv() },
       { heading: 'Help and view' },
+      { label: 'What the 3D stage draws (gallery)', icon: 'image', run: () => (ui.modal = 'gallery') },
       { label: 'How it works', icon: 'help', run: () => (ui.modal = 'guide') },
       { label: 'Keyboard shortcuts', icon: 'keyboard', keys: '?', run: () => (ui.modal = 'shortcuts') },
       { label: ui.help ? 'Hide the hints' : 'Show the hints again', icon: 'note', run: () => (ui.help = !ui.help) },
@@ -101,17 +111,20 @@
 
 <header class="top" class:witharm={app.gatedMachines.length > 0}>
   <h1 class="sr-only">LuxDMX Sequencer (alpha): {app.show.meta.name}</h1>
-  <div class="brand" aria-hidden="true">Lux<span>DMX</span> <small class="alpha" title="Alpha: it works, but it's young. Things change, some are rough, keep a copy of your show (Shows, Export).">alpha</small></div>
+  <div class="brand" aria-hidden="true"><img class="logo" src="./luxdmx-logo.png" alt="" width="22" height="22" />Lux<span>DMX</span> <small class="alpha" title="Alpha: it works, but it's young. Things change, some are rough, keep a copy of your show (Shows, Save as file).">alpha</small></div>
   {#if app.locked}
     <!-- Service mode: the show's name and a lock, nothing that edits or leaves the page. -->
     <span class="show lockedname" title="Locked for the show: hold the padlock on the page to unlock"><Icon name="lock" /><span class="name">{app.show.meta.name || 'Untitled'}</span></span>
   {:else}
   <button class="show" onclick={() => (ui.modal = 'shows')} title="Your shows: open, new, duplicate, templates">
     <Icon name="folder" /><span class="name">{app.show.meta.name || 'Untitled'}</span>
-    <span class="saved" class:dirty={!app.saved} title={app.saved ? 'Saved in this browser' : 'Saving…'}>{app.saved ? 'saved' : '…'}</span>
+    <!-- (not "saved" next to "changed in another tab": that one says which copy is behind) -->
+    {#if !app.otherNewer || app.saveFailed}<span class="saved" class:dirty={!app.saved} class:failed={app.saveFailed} title={app.saveFailed ? "This browser isn't keeping the show (its storage is full or blocked): save it as a file" : app.saved ? 'Saved in this browser' : 'Saving…'}>{app.saveFailed ? 'not saved' : app.saved ? 'saved' : '…'}</span>{/if}
   </button>
 
-  {#if app.otherTab}<span class="chip orange warn" title="Another tab saved this show too. The last one to save wins: close one of them.">open in another tab</span>{/if}
+  <!-- (the other tab's save is newer: a tap takes its version; a change here would save over it) -->
+  {#if app.otherNewer}<button class="chip orange warn other" onclick={takeOther} title="Another tab saved this show after this one. A change here saves over what was done there; a tap here takes that version.">changed in another tab</button>
+  {:else if app.otherTab}<span class="chip orange warn" title="Another tab has this show open too. The last one to save wins: close one of them.">open in another tab</span>{/if}
   <div class="modes" role="tablist" aria-label="Mode" use:tablist>
     <button role="tab" aria-label="Program" aria-selected={app.view === 'program'} class:cur={app.view === 'program'} onclick={() => (app.view = 'program')}><Icon name="program" /><span class="lbl">Program</span></button>
     <button role="tab" aria-label="Live" aria-selected={app.view === 'live'} class:cur={app.view === 'live'} onclick={() => (app.view = 'live')}><Icon name="live" /><span class="lbl">Live</span></button>
@@ -126,7 +139,7 @@
   {#if !app.locked}
   <label class="gm" title="Grand master: scales every light">
     <span class="lab">Master</span>
-    <input type="range" min="0" max="1" step="0.01" bind:value={app.grandMaster} aria-label="Grand master" />
+    <input type="range" min="0" max="1" step="0.01" bind:value={app.grandMaster} use:asPercent={app.grandMaster} aria-label="Grand master" />
     <b>{Math.round(app.grandMaster * 100)}%</b>
   </label>
   <!-- a group's master pulled down (the console's group faders): said here, wherever you are, so
@@ -147,15 +160,19 @@
   {#if !app.locked}
   <span class="bpm" title="Tempo: beat-based cues and effects follow it. Tap along to the music.">
     <!-- following the music: the tempo shown is the one everything runs at -->
-    {#if app.bpm !== app.show.settings.bpm}<input type="number" value={app.bpm} readonly class="frommusic" aria-label="BPM" title="From the music (♪) or the song playing on the timeline. Your own tempo comes back when they stop." />
-    {:else}<input type="number" min="20" max="300" bind:value={app.show.settings.bpm} aria-label="BPM" />{/if}<span class="lab">BPM</span>
-    <button onclick={() => app.tap()} title="Tap along to the music to set the tempo">Tap</button>
+    {#if app.bpm !== app.show.settings.bpm}<input type="number" value={Math.round(app.bpm * 10) / 10} readonly class="frommusic" aria-label="BPM" title="From the music (♪) or the song playing on the timeline. Your own tempo comes back when they stop." />
+    <!-- (only a tempo that can be one goes in: typing 90 went through 9 BPM, a 1 froze the chases,
+         an emptied field stopped the beat clock dead; between 20 and 300, back as it was when left empty) -->
+    {:else}<NumField value={app.show.settings.bpm} min={20} max={300} required label="BPM" width="4.2em" onset={(v) => { if (v !== undefined) { app.show.settings.bpm = Math.round(v); app.markDirty(); } }} />{/if}<span class="lab">BPM</span>
+    <!-- (while the song or the microphone sets the tempo, Tap did nothing you could see and quietly
+         changed the show's own tempo for later) -->
+    <button onclick={() => app.tap()} disabled={app.bpm !== app.show.settings.bpm} title={app.bpm !== app.show.settings.bpm ? 'The song playing (or the music) sets the tempo now' : 'Tap along to the music to set the tempo'}>Tap</button>
   </span>
   <div class="toolbar">
     <button class="ghost" onclick={() => app.undo()} disabled={!app.canUndo} title="Undo (Ctrl+Z)" aria-label="Undo"><Icon name="undo" /></button>
     <button class="ghost" onclick={() => app.redo()} disabled={!app.canRedo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><Icon name="redo" /></button>
     <button class="ghost" onclick={() => (ui.modal = 'palette')} title="Find anything (Ctrl+K)" aria-label="Find anything"><Icon name="search" /></button>
-    <button class="ghost" onclick={more} title="More" aria-label="More"><Icon name="more" /></button>
+    <button class="ghost" onclick={more} title="More" aria-label="More" aria-haspopup="menu" aria-expanded={!!ui.menu}><Icon name="more" /></button>
   </div>
   {/if}
   <!-- what goes to the stage: blind (here only) or on stage; the machines that wait for arming. On a
@@ -164,7 +181,7 @@
   {#if !app.locked || app.output !== 'live'}
   <button class="out" class:onair={app.output === 'live'} aria-pressed={app.output === 'live'} onclick={outputClick} aria-label="On stage"
           title={app.output === 'live' ? 'On stage: what you do goes out to the lights. Click for blind (they keep the look they have).' : 'Blind: you see it here, the lights don\'t get it. Click to send it to the stage.'}>
-    <span class="dot"></span><span class="txt">{app.output === 'live' ? 'On stage' : 'Blind'}</span>
+    <span class="dot"></span><span class="txt">{app.output === 'live' ? 'On stage' : 'Blind'}</span>{#if app.output === 'live'}<span class="short">Live</span>{/if}
   </button>
   {/if}
   {#if app.gatedMachines.length && (!app.locked || app.sfxArmed)}
@@ -180,20 +197,45 @@
 
 
 <style>
-  .top { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; background: var(--bg2); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; white-space: nowrap; } .brand span { color: var(--green); }
+  /* (one row on every screen: what doesn't fit gets shorter, the show's name first; a laptop's
+     1366 px with the arm button and a box connected still fits) */
+  .top { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; background: var(--bg2); border-bottom: 1px solid var(--line); flex-wrap: nowrap; min-width: 0; }
+  .top > :global(*) { flex-shrink: 0; }
+  .brand { font-weight: 800; letter-spacing: .02em; font-size: 1.05rem; white-space: nowrap; display: inline-flex; align-items: center; } .brand span { color: var(--green); }
+  .brand .logo { width: 22px; height: 22px; border-radius: 5px; margin-right: .4rem; flex: none; }
   .alpha { font-size: .62rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1000; background: var(--orange); border-radius: 4px; padding: .05rem .3rem; vertical-align: .2em; }
-  .show { background: none; border-color: transparent; max-width: 280px; }
-  .show .name { overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
+  .show { background: none; border-color: transparent; max-width: 280px; min-width: 4.5rem; flex-shrink: 1 !important; overflow: hidden; }
+  .show .name { overflow: hidden; text-overflow: ellipsis; font-weight: 650; min-width: 2.6em; }   /* (a chip beside it squeezed it to nothing) */
   .lockedname { display: inline-flex; align-items: center; gap: .35rem; padding: .32rem .6rem; color: var(--orange); }
   .lockedname .name { color: var(--text); }
-  .saved { font-size: .76rem; color: var(--green); } .saved.dirty { color: var(--muted); }
+  /* (as wide saving as saved: the bar doesn't jump every time the show is saved) */
+  .saved { font-size: .76rem; color: var(--green); display: inline-block; min-width: 2.7em; text-align: left; } .saved.dirty { color: var(--muted); }
+  .saved.failed { color: var(--pink); font-weight: 600; display: inline-block; }   /* (on a phone too) */
   .modes { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
   .modes button { border: 0; background: none; border-radius: 999px; padding: .3rem .85rem; color: var(--muted); }
   .modes button.cur { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
   .modes button.tconsole { padding-inline: .55rem; }
   /* (its name only on a wide screen or while it's open: the bar stays one row on a laptop) */
-  @media (max-width: 1500px) { .modes button.tconsole:not(.cur) .lbl { display: none; } }
+  /* (the steps below are the app's width in rem, not the window's in px: at a bigger interface size
+     the bar runs out of room sooner, and they come sooner; at 100 % a rem is 14 px, so 107.14rem
+     is the 1500 px it was) */
+  @container app (max-width: 107.14rem) {
+    .modes button.tconsole:not(.cur) .lbl { display: none; }
+    .gm .lab, .bpm .lab { display: none; }
+    .show { max-width: 200px; }
+    .top { gap: .5rem; }
+  }
+  @container app (max-width: 98.57rem) {
+    .modes button { padding-inline: .6rem; }
+    .alpha, .gm b { display: none; }
+    .gm input { width: 76px; }
+  }
+  @container app (max-width: 85.71rem) {
+    .modes button { padding-inline: .45rem; }
+    .gm input { width: 64px; }
+    .top { gap: .4rem; }
+    .brand { display: none; }
+  }
   .gms { border-color: var(--orange); color: var(--orange); max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gm { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); } .gm input { width: 90px; } .gm b { width: 2.6rem; color: var(--text); font-size: .85rem; }
   .lab { color: var(--muted); font-size: .82rem; }
@@ -204,7 +246,8 @@
   .pulse { width: .5rem; height: .5rem; border-radius: 50%; background: var(--line2); transition: background .05s; }
   .pulse.beat { background: var(--green); box-shadow: 0 0 8px var(--green); }
   .bo.on { background: var(--pink); border-color: var(--pink); color: #1a0010; font-weight: 700; }
-  .bpm { display: inline-flex; gap: .25rem; } .bpm input { width: 5em; }
+  .out .short { display: none; }                         /* (the phone's word for On stage) */
+  .bpm { display: inline-flex; gap: .25rem; } .bpm :global(input) { width: 5em !important; }
   .bpm .frommusic { color: var(--green); border-color: #45d85c66; }
   .grow { flex: 1; }
   .out { display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; padding: .25rem .65rem; font-weight: 650; color: var(--muted); }
@@ -220,7 +263,7 @@
   /* touch: what goes to the stage and the machines are show controls (44 px) */
   @media (pointer: coarse) { .out, .arm { min-height: 44px; min-width: 44px; justify-content: center; } }
   /* Tablets: one row. The name, the explanations and search move out (the ⋯ menu has them). */
-  @media (max-width: 1100px) {
+  @container app (max-width: 78.57rem) {
     /* (room for Blind / On stage and the arm button: the tabs by name, no icons; Safe and ARMED
        written out, the machines' state is never just an icon) */
     .modes :global(svg) { display: none; }
@@ -230,15 +273,35 @@
     .gm input { width: 64px; }
     .brand, .gm .lab, .gm b { display: none; }          /* (the slider shows the master; its title says it) */
     .music:not(.on) { display: none; }                   /* (in the ⋯ menu; shown while it listens) */
-    .show { max-width: 110px; }
+    .show { max-width: 10rem; }
+    .saved:not(.failed) { display: none; }               /* (the name gets the room: it was "O" at 140 %; the show's menu says it) */
     .toolbar :global(button[aria-label="Explanations"]), .toolbar :global(button[aria-label="Find anything"]) { display: none; }
     .top { gap: .45rem; }
   }
+  /* A tablet held upright (an iPad's 768 to 834 px) with the arm button and a box: undo and redo
+     go into the ⋯ menu, the tabs are icons but the one you're on */
+  @container app (max-width: 64.29rem) {
+    .toolbar :global(button[aria-label="Undo"]), .toolbar :global(button[aria-label="Redo"]) { display: none; }
+    .modes button { padding: .3rem .42rem; gap: .25rem; }
+    .modes button:not(.cur) .lbl { display: none; }
+    .modes :global(svg) { display: inline-block; }
+    .bpm :global(input) { width: 4.6em !important; }
+    .saved { display: none; }                            /* (the show's menu says it) */
+    .gm input { width: 52px; }
+    .show { min-width: 2.6rem; }                         /* (its folder icon at least: the shows) */
+    .top { gap: .3rem; }
+  }
   /* (after the tablets' rules: a phone is narrower than 1100 px too, and these win) */
   /* Narrow screens: one row. The grand master and tempo live on the Live page there. */
-  @media (max-width: 760px) {
+  @container app (max-width: 54.29rem) {
     .top { flex-wrap: nowrap; gap: .2rem; padding: .3rem .4rem; overflow-x: auto; }
+    .top > :global(*) { flex-shrink: 1; }                 /* (as before: everything may give a little) */
     .brand, .gm, .bpm, .bo, .saved, .music, .out .txt, .arm .txt { display: none; }
+    /* (but the states that matter in words: on a phone ARMED and On stage were a dot and an icon,
+       the same colour to someone red-green blind; Blind and Safe stay just their icons) */
+    .out.onair .short, .arm.armed .txt { display: inline; font-size: .78rem; font-weight: 700; }
+    .top > .out.onair, .top > .arm.armed, .top > :global(.arm.armed) { flex-shrink: 0; }   /* (the show's name gives way, not these words) */
+    .gms { display: inline-block; max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }   /* (cut at its end: squeezed it read "shes 4") */
     .out, .arm { padding: .3rem .45rem; }
     .toolbar { flex-wrap: nowrap; }
     .toolbar :global(button[aria-label="Undo"]), .toolbar :global(button[aria-label="Redo"]), .toolbar :global(button[aria-label="Explanations"]),
@@ -249,6 +312,6 @@
     .modes :global(svg) { display: inline-block; }        /* (the tablets' rule hides them; here they're the tabs) */
     /* (with the arm button there too: every tab as an icon) */
     .top.witharm .modes .lbl { display: none; }
-    .show { max-width: 28vw; padding-inline: .3rem; }
+    .show { max-width: 28vw; padding-inline: .3rem; min-width: 2.2rem; }
   }
 </style>

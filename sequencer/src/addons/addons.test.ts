@@ -4,8 +4,9 @@
 // WRITE_ADDONS=1 npx vitest run src/addons/addons.test.ts writes public/addons/ again.
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EFFECT_MAP, paramsOf, runEffect, type Where } from '../engine/effects';
+import { PROGRAM_LIMITS } from '../engine/formula';
 import { placesFor } from '../model/pixelLayout';
 import { effectOfPackage, readPackage, type Standard } from './package';
 import { loadRepo, readRepo, REPO_FORMAT, sourceUrl, themePackage } from './catalog';
@@ -44,6 +45,14 @@ function usesOf(theme: Theme, s: Source): Standard[] {
 const ALL = THEMES.flatMap((t) => t.effects.map((s) => ({ theme: t, s })));
 const OUT = new URL('../../public/addons/', import.meta.url);
 const json = (v: unknown) => JSON.stringify(v, null, 1) + '\n';
+
+
+// These check what the add-ons give, not how fast: the time a frame may take (custom.ts rests a
+// program that takes too long) is lifted, so a busy machine doesn't fail them. The guard has its own
+// test at the end.
+const MS = PROGRAM_LIMITS.ms;
+beforeAll(() => { PROGRAM_LIMITS.ms = 1e9; });
+afterAll(() => { PROGRAM_LIMITS.ms = MS; });
 
 describe('our add-on effects', () => {
   it('ten themes, five each, every id once', () => {
@@ -174,5 +183,25 @@ describe('a repository someone else made (the second review)', () => {
     const { packages, problems } = await loadRepo('http://x/r/', fetcher);
     expect(problems).toEqual([]);
     expect(packages.map((p) => p.name)).toEqual(['Glühen']);
+  });
+});
+
+describe('an add-on that takes too long to work out', () => {
+  it('its package\'s preview is still made (once, on a slow machine too: no time limit a frame)', async () => {
+    const { previewOf } = await import('./preview');
+    const { theme, s: src } = ALL[1];
+    const pkg = themePackage(theme, src, ['level']);
+    PROGRAM_LIMITS.ms = -1;           // (every frame counts as too long)
+    try { expect(previewOf(pkg)).toMatch(/^pic1:32x32:/); } finally { PROGRAM_LIMITS.ms = 1e9; }
+  });
+  it('is stopped within its frame and rests (the frame goes on without it)', () => {
+    const { theme, s: src } = ALL[0];
+    const { params } = effectOfPackage(readPackage(JSON.stringify(themePackage(theme, src, ['level']))));
+    PROGRAM_LIMITS.ms = -1;           // (every frame counts as too long)
+    try {
+      expect(() => play(params, 'disc', [1])).toThrow(/takes too long to work out/);
+      PROGRAM_LIMITS.ms = 1e9;
+      expect(() => play(params, 'disc', [2])).toThrow(/rests a few seconds/);
+    } finally { PROGRAM_LIMITS.ms = 1e9; }
   });
 });

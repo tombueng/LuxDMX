@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { START_WITH, WELCOMED } from '../store/kept';
   // The big dialogs, one at a time, opened from anywhere (buttons, the command palette, keys).
   // Also the keys that open them: ? for the shortcuts, Ctrl+K for the command palette.
   import ShowManager from './ShowManager.svelte';
@@ -18,6 +19,7 @@
   import RemoteDialog from './RemoteDialog.svelte';
   import ScheduleDialog from './ScheduleDialog.svelte';
   import Welcome from './Welcome.svelte';
+  import Gallery from './Gallery.svelte';
   import RigCheck from './RigCheck.svelte';
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
@@ -25,14 +27,13 @@
 
   const close = () => (ui.modal = null);
   // The welcome comes up by itself when the app opens on a show with nothing in it, once per show
-  // (a reload doesn't bring it back; "Get started" on the empty stage does). Never over a locked page.
-  const WELCOMED = 'luxdmx.seq.welcomed';
+  // (a reload doesn't bring it back; "Get started" on the empty stage does). Never over a locked page,
+  // and not when the app opens on the demo or on an empty show by choice (ui/opening.ts).
   onMount(() => {
-    let seen: string | null = null;
-    try { seen = localStorage.getItem(WELCOMED); } catch { /* storage blocked */ }
-    if (ui.modal || app.show.fixtures.length || app.locked || seen === app.showId) return;
+    if (START_WITH.get() !== 'last') return;
+    if (ui.modal || app.show.fixtures.length || app.locked || WELCOMED.get() === app.showId) return;
     ui.modal = 'welcome';
-    try { localStorage.setItem(WELCOMED, app.showId); } catch { /* storage blocked */ }
+    WELCOMED.set(app.showId);
   });
   function key(e: KeyboardEvent) {
     const tag = (e.target as HTMLElement).tagName;
@@ -47,6 +48,7 @@
 {#if ui.modal === 'welcome'}<Welcome onclose={close} />
 {:else if ui.modal === 'shows'}<ShowManager onclose={close} />
 {:else if ui.modal === 'addFixtures'}<AddFixtures onclose={close} />
+{:else if ui.modal === 'gallery'}<Gallery onclose={close} />
 {:else if ui.modal === 'effects'}<EffectLibrary onclose={close} onadded={(id) => { ui.fxSel = [id]; app.sideTab = 'effects'; }} />
 {:else if ui.modal === 'shortcuts'}<Shortcuts onclose={close} />
 {:else if ui.modal === 'palette'}<Palette onclose={close} />
@@ -56,7 +58,8 @@
 {:else if ui.modal === 'patchCheck'}<PatchCheck onclose={close} />
 {:else if ui.modal === 'remote'}<RemoteDialog onclose={close} />
 {:else if ui.modal === 'schedule'}<ScheduleDialog onclose={close} />
-{:else if ui.modal === 'rig'}<RigCheck onclose={close} />{/if}
+<!-- (not on a page locked for the service: scanning and patching from the rig change the show) -->
+{:else if ui.modal === 'rig' && !app.locked}<RigCheck onclose={close} />{/if}
 {#if ui.patch}<FixturePatch id={ui.patch} onclose={() => { ui.patch = null; ui.patchTab = 'patch'; }} />{/if}
 {#if ui.focusCal}<FocusCalibrate ids={ui.focusCal} onclose={() => (ui.focusCal = null)} />{/if}
 {#if ui.panTiltFind}<PanTiltFinder id={ui.panTiltFind} onclose={() => (ui.panTiltFind = null)} />{/if}

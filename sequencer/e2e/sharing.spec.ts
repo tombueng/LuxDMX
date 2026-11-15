@@ -2,13 +2,13 @@
 // personas): new lights play along like one that's there, a show file dropped on the window opens,
 // and the share sheet sends the show (the download where there is none).
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, tab, test, expect } from './helpers';
+import { openConnected, resetFake, channels, tab, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
 async function template(page: Page, name: string) {
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: new RegExp(`^${name}$`) }) }).click();
+  await startTemplate(page, name);
 }
 
 test('new lights play along in every look like one that is there, and on the wire', async ({ page }) => {
@@ -20,7 +20,8 @@ test('new lights play along in every look like one that is there, and on the wir
   const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
   await dlg.locator(`[data-type="${before.type}"]`).click();
   await dlg.getByLabel('How many').fill('2');
-  await dlg.getByLabel('In the looks').selectOption({ label: `like ${before.name}` });
+  // (by the light: the label says its universe too when the show has more than one, the bar's strips)
+  await dlg.getByLabel('In the looks').selectOption(before.id);
   await dlg.getByRole('button', { name: /^Add 2 × / }).click();
   await expect(page.locator('.toast')).toContainText(`they do what ${before.name} does`);
   const r = await page.evaluate((src) => {

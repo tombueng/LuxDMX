@@ -67,3 +67,17 @@ describe('the right LuxDMX Link for this computer', () => {
     expect(m.files.map(archName)).toEqual(['Intel / AMD', 'ARM', 'Apple chip (M1 and newer)', 'Intel', 'PC, Intel / AMD', 'ARM 64-bit, Raspberry Pi 4 / 5']);
   });
 });
+
+describe('what Link reaches (a winch there is held until the machines are armed)', () => {
+  it('over Art-Net only the universes its nodes play; over sACN anything, since nodes it can\'t see may listen', async () => {
+    const { LinkOutput } = await import('./link');
+    let proto: 'artnet' | 'sacn' | 'both' = 'artnet';
+    const l = new LinkOutput(() => {}, () => proto);
+    l.nodes = [{ ip: '10.0.0.5', short: 'Node', long: 'Node', universes: [0, 1] }];
+    expect(l.reaches(0)).toBe(true);
+    expect(l.reaches(15)).toBe(false);
+    expect(l.wants()).toBe(true);                   // (it's still sent every universe)
+    proto = 'sacn'; expect(l.reaches(15)).toBe(true);
+    proto = 'both'; expect(l.reaches(15)).toBe(true);
+  });
+});

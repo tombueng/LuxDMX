@@ -1,7 +1,7 @@
 // Live: the busking page built from a show, every kind of control, keys, hold-to-fog with its hard
 // maximum, flash, and editing the page (add, change, move, remove, lock).
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, patch, selectFixtures, test, expect } from './helpers';
+import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, test, expect, startTemplate } from './helpers';
 
 const tile = (page: Page, id: string) => page.locator(`.live [data-widget="${id}"]`);
 const tileByText = (page: Page, text: string) => page.locator('.live .tile', { hasText: text }).first();
@@ -9,7 +9,7 @@ const tileByText = (page: Page, text: string) => page.locator('.live .tile', { h
 async function djShow(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.live')).toBeVisible();
 }
@@ -76,6 +76,10 @@ test('fog runs only while held, and never longer than its maximum', async ({ pag
   await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
   await fog.click();
   await page.getByLabel('Maximum seconds').fill('1');
+  // emptied, it comes back with its value (it stayed blank while the button said the old one)
+  await page.getByLabel('Maximum seconds').fill('');
+  await page.getByLabel('Maximum seconds').press('Tab');
+  await expect(page.getByLabel('Maximum seconds')).toHaveValue('1');
   await page.locator('.live').getByRole('button', { name: 'Done', exact: true }).click();
   // hold the key: fog on, then off after 1 s although the key is still down
   await page.keyboard.down('v');
@@ -119,7 +123,7 @@ test('edit a page: add a scene button, give it a key, move it, remove it; lock t
   await expect(page.locator('.live .tile', { hasText: 'Chill' })).toHaveCount(0);
   await page.locator('.live').getByRole('button', { name: 'Done', exact: true }).click();
   // lock: no editing until unlocked
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await expect(page.locator('.live').getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await page.locator('.live').getByRole('button', { name: /Unlock page/ }).click();      // a tap isn't enough
   await expect(page.locator('.toast')).toContainText('Hold the padlock');
@@ -138,7 +142,7 @@ test('locked for the service: only playing, and Program changes left behind are 
   await page.locator('.prog .sw[aria-label="Red"]').click();
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.live .held')).toContainText('1 light you changed in Program overrides the show');
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   // the service mode: no Program, no tempo, no editing, no page menu, no command palette
   await expect(page.locator('.top .modes')).toHaveCount(0);
   await expect(page.locator('.top input[aria-label="BPM"]')).toHaveCount(0);
@@ -239,7 +243,7 @@ for (const change of ['left as it was', 'removed', 'pointed at another list'] as
       const p = a.ownPages()[0];
       p.widgets.push({ id: 'lf', type: 'list', list: l1.id, action: 'flash', label: 'LF', midi: { kind: 'note', ch: 0, num: 60 } });
       a.markDirty(0);
-      a.midi({ kind: 'note', ch: 0, num: 60, value: 1 });           // the pad goes down and sticks
+      a.midiIn.take({ kind: 'note', ch: 0, num: 60, value: 1 });           // the pad goes down and sticks
       const flashing = a.engine.status(l1.id).flashing;
       const w = p.widgets.find((x: any) => x.id === 'lf');
       if (change === 'removed') p.widgets = p.widgets.filter((x: any) => x.id !== 'lf');
@@ -255,7 +259,8 @@ for (const change of ['left as it was', 'removed', 'pointed at another list'] as
 test('Live without a cue list still has its Blackout', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
-  await expect(page.locator('.strip')).toContainText('No cue list yet');
+  await expect(page.locator('.strip')).toContainText('No cues yet');
+  await expect(page.locator('.strip').getByRole('button', { name: 'Go to Program' })).toBeVisible();
   await page.locator('.strip').getByRole('button', { name: 'Blackout' }).click();
   await expect(page.locator('.strip').getByRole('button', { name: 'Blackout' })).toHaveClass(/\bon\b/);
   await page.keyboard.press('b');
@@ -303,7 +308,7 @@ test('a fader tile: drag it like a fader, or use the arrow keys', async ({ page 
 test('a set list: a button makes GO play another cue list', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   // the "song" has its own tempo
   await page.locator('.deck .tab', { hasText: 'House lights' }).click();
   await page.locator('.deck').getByRole('button', { name: 'List settings' }).click();
@@ -380,13 +385,13 @@ test('the screen stays on while Live is open, and lets go after', async ({ page 
 test('the GO strip shows the note of the next cue, the standby for the operator', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.strip .nxt')).toContainText('1. Preset');
   await expect(page.locator('.strip .standby')).toHaveText('Audience coming in');       // its own line
   await page.keyboard.press('Space');
-  await expect(page.locator('.strip .nxt')).toContainText('2. Scene 1');
-  await expect(page.locator('.strip .standby')).toHaveText('House lights fade out with it');
+  await expect(page.locator('.strip .nxt')).toContainText('2. Curtain up');
+  await expect(page.locator('.strip .standby')).toHaveText('House lights out, the curtain goes');
 });
 
 test('the fog timer dialog takes its own defaults as they are', async ({ page }) => {
@@ -402,7 +407,7 @@ test('the fog timer dialog takes its own defaults as they are', async ({ page })
 
 test('the service lock holds: Space on the padlock, other pages, the box, a reload', async ({ page }) => {
   await djShow(page);
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   const now = page.locator('.strip .now');
   await expect(now).toContainText('(nothing)');
   // holding Space on the padlock unlocks it, and plays nothing (no GO, no repeats)
@@ -420,7 +425,7 @@ test('the service lock holds: Space on the padlock, other pages, the box, a relo
   await space('keyDown'); for (let i = 0; i < 5; i++) await space('keyDown', true); await space('keyUp');
   await expect(now).toContainText('1.');
   // locked again: another page is locked too, the box can't be removed, a reload comes back locked in Live
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await expect(page.getByRole('button', { name: /Remove 127/ })).toHaveCount(0);
   await page.waitForTimeout(500);
   await page.reload();
@@ -459,7 +464,7 @@ test('Drop: everything white, the strobe going and a fog burst while held, all g
 test('a page made your own says what is new in the show, and adds it in one tap (Undo takes it back)', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live').getByRole('button', { name: 'Edit' }).click();
   await page.locator('.live .tile.cue').first().focus();
@@ -480,4 +485,140 @@ test('a page made your own says what is new in the show, and adds it in one tap 
   await expect(page.locator('.live .chip.fresh')).toHaveCount(0);
   await page.keyboard.press('Control+z');
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.pages[0].widgets.length)).toBe(n);
+});
+
+// Building your own page (from round 16 of the QA): a group's level as a fader, a key pressed is the
+// key (and a clash said), Alt+Down a row, a deleted cue's buttons go with it and are said, and on a
+// phone Edit and the padlock stay on the screen.
+test('building a page: a group fader, keys that replace and clash, Alt+Down a row, a deleted cue\'s buttons, phone controls', async ({ page }) => {
+  await djShow(page);
+  await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.locator('.live .cell').first().click();
+  await page.locator('.live').getByRole('button', { name: 'Add', exact: true }).click();
+  await page.locator('.ctx').getByRole('menuitem', { name: /Fader/ }).first().click();
+  const ed = page.getByRole('complementary', { name: 'Control settings' });
+  const g = await page.evaluate(() => (window as any).__luxdmx.show.groups[0]);
+  await ed.getByLabel('Fader target').selectOption(`group:${g.id}`);
+  const fader = page.locator('.live .cell').nth(1);
+  await expect(fader).toContainText(g.name);
+  await page.evaluate((gid) => { const a = (window as any).__luxdmx; const w = a.show.pages.flatMap((p: any) => p.widgets).find((x: any) => x.type === 'fader' && x.ref === gid); a.setFader(w, 0.4); }, g.id);
+  expect(await page.evaluate((gid) => (window as any).__luxdmx.groupMasters[gid], g.id)).toBe(0.4);
+  // the key: pressed, it's the key; B is said to be Blackout's
+  const key = ed.getByLabel('Keyboard key');
+  await key.click(); await page.keyboard.press('k');
+  await expect(key).toHaveValue('k');
+  await key.click(); await page.keyboard.press('w');
+  await expect(key).toHaveValue('w');                                          // (it took nothing until Backspace)
+  await key.click(); await page.keyboard.press('b');
+  await expect(ed.locator('.clash')).toContainText('Blackout');
+  await page.keyboard.press('Escape');
+  // Alt+Down: a row, as many places as there are columns
+  const cols = await page.locator('.live .grid').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  const ids = () => page.evaluate(() => { const a = (window as any).__luxdmx; return a.show.pages.find((p: any) => p.id === (a.page || a.pages[0].id))?.widgets.map((w: any) => w.id) ?? a.pages[0].widgets.map((w: any) => w.id); });
+  const before = await ids();
+  await page.locator('.live .cell').first().locator('button, [role="button"], [role="slider"]').first().focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  const after = await ids();
+  expect(after.indexOf(before[0])).toBe(Math.min(cols, before.length - 1));
+  await page.locator('.live').getByRole('button', { name: 'Done', exact: true }).click();
+  // a cue deleted in Program: its buttons go with it, said
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  await page.locator('.deck .card').first().click();
+  await page.locator('.deck .cards').press('Delete');
+  await expect(page.locator('.toast')).toContainText(/what played it: \d+ button/);
+  // a phone: Edit and the padlock on the screen
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const name of ['Edit']) {
+    const b = (await page.locator('.live').getByRole('button', { name, exact: true }).boundingBox())!;
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+  }
+});
+
+test('in Edit with nothing picked the hint is in the bar: not over the controls, and they stay where they were; on a phone above them', async ({ page }) => {
+  await djShow(page);
+  const spots = () => page.locator('.live .grid .cell').evaluateAll((els) => els.slice(0, 12).map((e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y + e.parentElement!.scrollTop)}`; }));
+  const before = await spots();
+  // (and the bar's own buttons on the right: Edit becoming Done, Add coming, moved them all)
+  const barRight = () => page.locator('.live .bar > button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().right)));
+  const barBefore = await barRight();
+  await page.locator('.live').getByRole('button', { name: 'Edit', exact: true }).click();
+  expect(await barRight()).toEqual(barBefore);
+  await expect(page.locator('.live .bar').getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+  const hint = page.locator('.live .bar .ehint').filter({ hasText: 'to change it' });
+  await expect(hint).toBeVisible();
+  expect(await spots()).toEqual(before);                               // (pressing Edit moves nothing)
+  const h = (await hint.boundingBox())!;
+  for (const c of await page.locator('.live .cell').all()) {
+    const b = (await c.boundingBox())!;
+    const overlap = !(b.x + b.width <= h.x || h.x + h.width <= b.x || b.y + b.height <= h.y || h.y + h.height <= b.y);
+    expect(overlap).toBe(false);
+  }
+  // a phone: no room in the bar, the hint above the controls
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.live .hint.pick').filter({ hasText: 'to change it' })).toBeVisible();
+  await expect(hint).toHaveCount(0);
+});
+
+// (round 16's small ones)
+test('a flash and a fog control say their levels in numbers; deleting a page shows the next one, undo brings it back; on Live a message sits in the GO bar, not over the buttons', async ({ page }) => {
+  await djShow(page);
+  const live = page.locator('.live');
+  await live.getByRole('button', { name: 'Edit', exact: true }).click();
+  await live.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Flash a group' }).click();
+  const ed = page.getByRole('complementary', { name: 'Control settings' });
+  await expect(ed.getByLabel('Flash level').locator('xpath=following-sibling::output')).toHaveText('100%');
+  await ed.getByLabel('Flash level').fill('0.5');
+  await expect(ed.getByLabel('Flash level').locator('xpath=following-sibling::output')).toHaveText('50%');
+  await expect(ed.getByLabel('Strobe').locator('xpath=following-sibling::output')).toHaveText('off');
+  await live.getByRole('button', { name: 'Done', exact: true }).click();
+  // two more pages; the middle one deleted: the next one comes up, undo brings it back
+  const tabs = live.locator('.pages [role=tab]');
+  const n0 = await tabs.count();
+  await live.getByRole('button', { name: 'New page' }).click();
+  await live.getByRole('button', { name: 'New page' }).click();
+  await expect(tabs).toHaveCount(n0 + 2);
+  const names = await tabs.allTextContents();
+  await tabs.nth(n0).click();
+  await tabs.nth(n0).click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Delete page' }).click();
+  await expect(tabs).toHaveCount(n0 + 1);
+  await expect(tabs.nth(n0)).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.nth(n0)).toHaveText(names[n0 + 1]);
+  await page.locator('body').press('Control+z');
+  await expect(tabs).toHaveCount(n0 + 2);
+  // a message: in the GO bar's gap, over none of the buttons
+  await page.evaluate(() => (window as any).__ui.toast('A message the length of a real one, roughly this long', 6000));
+  const t = (await page.locator('.toast').boundingBox())!, strip = (await live.locator('.strip').boundingBox())!;
+  expect(t.y).toBeGreaterThanOrEqual(strip.y - 1);
+  expect(t.y + t.height).toBeLessThanOrEqual(strip.y + strip.height + 1);
+  for (const b of await live.locator('.strip button, .tile').all()) {
+    const r = await b.boundingBox();
+    if (!r) continue;
+    expect(r.x + r.width <= t.x || t.x + t.width <= r.x || r.y + r.height <= t.y || t.y + t.height <= r.y).toBe(true);
+  }
+});
+
+test('the GO bar holds still: Release and Auto GO stay where they are whatever the cues are called', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openConnected(page);
+  await page.locator('.top .show').click();
+  await startTemplate(page, 'Band');
+  // (a long name and a short one, side by side)
+  await page.evaluate(() => { const l = (window as any).__luxdmx.show.cueLists[0]; l.cues[0].name = 'X'; l.cues[1].name = 'A very long name for the intro with the thunder and the rain'; });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const strip = page.getByRole('group', { name: 'Playback' }), release = strip.getByRole('button', { name: 'Release' }), auto = strip.getByLabel('Auto GO');
+  const xs: number[] = [], ax: number[] = [];
+  const titles: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    await strip.getByRole('button', { name: /^GO/ }).click();
+    await expect(release).toBeEnabled();
+    xs.push(Math.round((await release.boundingBox())!.x)); ax.push(Math.round((await auto.boundingBox())!.x));
+    titles.push(...(await strip.locator('.now, .nxt').evaluateAll((els) => els.map((el) => el.getAttribute('title') ?? ''))));
+  }
+  expect(new Set(xs).size, xs.join(',')).toBe(1);
+  expect(new Set(ax).size, ax.join(',')).toBe(1);
+  // (the long name cut short, all of it in the tooltip, while it was up or next)
+  expect(titles.some((t) => /thunder and the rain$/.test(t))).toBe(true);
 });

@@ -1,11 +1,14 @@
 // Shared e2e helpers: the fake LuxDMX (test/fake-luxdmx.mjs), the bridge handshake, and short
 // ways to drive the UI the way a person would.
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
 // Every test fails on an uncaught error (or a Svelte warning) in the page, even if the
 // assertions happen to pass.
 export const test = base.extend<{ pageErrors: void }>({
   pageErrors: [async ({ page }, use) => {
+    // (the tests start where they always did, on the last show: a visit otherwise opens the demo,
+    // e2e/intro.spec.ts. A test's own init script can take this away again)
+    await page.addInitScript(() => { try { if (!localStorage.getItem('luxdmx.seq.startwith')) localStorage.setItem('luxdmx.seq.startwith', JSON.stringify({ v: 1, data: 'last' })); } catch { /* storage blocked */ } });
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.stack ?? e.message));
     // (the app never asks before leaving; a stray dialog is dismissed)
@@ -55,37 +58,57 @@ export async function fresh(page: Page, keepWelcome = false) {
   }
 }
 export const welcomeDialog = (page: Page) => page.getByRole('dialog', { name: "Let's get some light on stage" });
-// the welcome again, from the empty stage
+// the welcome again, from the empty stage ("or start from a template" there)
 export async function welcome(page: Page) {
-  await page.getByRole('button', { name: 'Get started' }).click();
+  await page.getByRole('button', { name: 'or start from a template' }).click();
   const w = welcomeDialog(page);
   await expect(w).toBeVisible();
   return w;
 }
-// The big demo from the welcome: on the demo beat unless a song is named (a real one would come
-// down from the internet)
-export async function demo(page: Page, song = 'beat') {
-  const w = await welcome(page);
-  await w.getByLabel("The demo's music").selectOption(song);
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
+// A new show from a template: Shows' New show… (when Shows is open) and the welcome's tile
+export async function startTemplate(page: Page, name: string) {
+  const shows = page.getByRole('dialog', { name: 'Shows' }), w = welcomeDialog(page);
+  if (!(await shows.isVisible()) && !(await w.isVisible())) await page.locator('.top .show').click();
+  if (await shows.isVisible()) await shows.getByRole('button', { name: 'New show…' }).click();
+  await w.getByRole('button', { name: `Start ${name}`, exact: true }).click();
+  await expect(w).toBeHidden();
+}
+// A new empty show (Shows, New show…, Empty stage): Shows opened when it isn't
+export async function newBlankShow(page: Page) {
+  const shows = page.getByRole('dialog', { name: 'Shows' });
+  if (!(await shows.isVisible())) await page.locator('.top .show').click();
+  await shows.getByRole('button', { name: 'New show…' }).click();
+  const w = welcomeDialog(page);
+  await w.getByRole('button', { name: 'Start with an empty stage' }).click();
+  await expect(w).toBeHidden();
+}
+// A demo show from the welcome (its tile): on the demo beat unless a song is named (a real one
+// would come down from the internet)
+export const demoTile = (w: Locator, name = 'Festival stage') => w.getByRole('group', { name });
+export async function demo(page: Page, song = 'beat', name = 'Festival stage') {
+  const t = demoTile(await welcome(page), name);
+  await t.getByLabel(`Music for ${name}`).selectOption(song);
+  await t.getByRole('button', { name: /^Play the show/ }).click();
 }
 
 // Fresh app, connected to a device through its bridge popup.
 export async function openConnected(page: Page, host = FAKE) {
   await fresh(page);
-  await addDevice(page, host);
-  return connect(page);
+  const opened = await addDevice(page, host);
+  return connect(page, opened);
 }
 // On a phone the boxes sit behind one status button in the top bar.
 const boxesButton = (page: Page) => page.locator('.top').getByRole('button', { name: /LuxDMX boxes/ });
-export async function addDevice(page: Page, host = FAKE) {
+// (Add LuxDMX connects at once: the box's window opens from that click; it's handed back)
+export async function addDevice(page: Page, host = FAKE): Promise<Page | null> {
   // one of the two is there once the app has drawn (isVisible doesn't wait: a slow first paint took the wrong one)
   const add = page.getByRole('button', { name: 'Add a LuxDMX' });
   await expect(boxesButton(page).or(add).first()).toBeVisible();
   if (await boxesButton(page).isVisible()) { if (!(await page.getByLabel('LuxDMX address').isVisible())) await boxesButton(page).click(); }
   else await add.click();
   await page.getByLabel('LuxDMX address').fill(host);
-  await page.getByRole('button', { name: 'Add LuxDMX' }).click();
+  const [popup] = await Promise.all([page.waitForEvent('popup', { timeout: 10000 }).catch(() => null), page.getByRole('button', { name: 'Add LuxDMX' }).click()]);
+  return popup;
 }
 // The boxes' pills: on a tablet, or when they'd wrap the top bar, they sit in the boxes button's
 // list: opened when it's that way. A box connected: its pill, or the boxes button, says so.
@@ -94,11 +117,12 @@ export async function showBoxes(page: Page) {
   if (await boxesButton(page).isVisible() && !(await page.locator('.dev').first().isVisible())) await boxesButton(page).click();
 }
 export const boxReady = (page: Page) => page.locator('.dev.ready').or(page.locator('.top .boxes.ready')).first();
-export async function connect(page: Page) {
+export async function connect(page: Page, opened?: Page | null) {
   await expect(boxesButton(page).or(page.locator('.dev')).first()).toBeVisible();
   const compact = await boxesButton(page).isVisible();
   if (compact && !(await page.locator('.dev').first().isVisible())) await boxesButton(page).click();
-  const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('.dev').getByRole('button', { name: 'Connect' }).click()]);
+  // (the window Add opened, or Connect's)
+  const popup = opened ?? (await Promise.all([page.waitForEvent('popup'), page.locator('.dev').getByRole('button', { name: 'Connect' }).click()]))[0];
   await popup.locator('#allow').click();
   await expect(page.locator('.dev.ready')).toBeVisible();
   if (compact) { await page.keyboard.press('Escape'); await expect(page.locator('.top .boxes.ready')).toBeVisible(); }
@@ -143,3 +167,17 @@ export const cues = (page: Page) => page.locator('.deck .card');
 export const jumpTo = (page: Page, i: number) => cues(page).nth(i).dblclick();
 export const release = (page: Page) => page.locator('.deck').getByRole('button', { name: 'Release', exact: true }).click();
 export const newList = (page: Page) => page.locator('.deck').getByRole('button', { name: 'List', exact: true }).click();
+
+// Lock the live page without a PIN: the padlock's tap gives the choice (with a PIN or without).
+export async function lockPage(page: Page) {
+  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await page.getByRole('menuitem', { name: /^Lock without a PIN/ }).click();
+}
+
+// A setting as the app keeps it (src/store/kept.ts: {"v": n, "data": …}); a value from before
+// versions as it was
+export const keptValue = (page: Page, key: string, session = false) => page.evaluate(([k, s]) => {
+  const r = (s ? sessionStorage : localStorage).getItem(k as string);
+  if (r === null) return null;
+  try { const j = JSON.parse(r); return j && typeof j === 'object' && 'v' in j && 'data' in j ? j.data : j; } catch { return r; }
+}, [key, session] as const);

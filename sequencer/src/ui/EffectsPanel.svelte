@@ -97,7 +97,8 @@
     </Help>
     <button class="primary" onclick={() => (ui.modal = 'effects')}><Icon name="plus" />Add</button>
   </div>
-  {#if app.show.effects.length}<Hint>Running effects have a green edge. Click one to change its speed, size and colours.</Hint>{/if}
+  <!-- (not while one is open: it says how to get there, and the knobs need the room) -->
+  {#if app.show.effects.length && !open}<Hint>Running effects have a green edge. Click one to change its speed, size and colours.</Hint>{/if}
   {#if app.show.effects.length && selSet.size}
     <p class="selnote" class:some={runningOnSel > 0} data-testid="fx-on-selection">
       {runningOnSel ? `${runningOnSel} running on` : 'Nothing running on'} the {selSet.size === 1 ? 'selected light' : `${selSet.size} selected lights`}
@@ -156,6 +157,8 @@
   .head { flex-wrap: nowrap; }
   .olist { outline: none; flex: 0 1 auto; min-height: 3.5rem; overflow: auto; }
   .ep:has(.editor) .olist { max-height: 32%; }
+  /* (a laptop's short window: the open effect's knobs get the room, the list two rows and a scroll) */
+  @media (max-height: 950px) { .ep:has(.editor) .olist { max-height: 22%; } }
   .editor { flex: 1 1 auto; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding-top: .4rem; }
   .oitem.running { box-shadow: inset 3px 0 0 var(--green); }
   .oitem.onsel { background: color-mix(in srgb, var(--green) 13%, transparent); box-shadow: inset 4px 0 0 var(--green); }

@@ -10,12 +10,13 @@ import { buildVenue } from './venue';
 import { DJ_BOOTH, ROOMS, onDeck } from './geometry';
 import { BOOTH, DECKS, djPerson } from './dj';
 import type { Stage } from './rooms';
+import { THEATRE } from './sceneSizes';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const built: Record<string, Stage> = {};
-const room = (id: 'club' | 'party' | 'truss') => (built[id] ??= buildVenue({ room: id, crowd: 40 }));
+const room = (id: 'club' | 'party' | 'truss' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom') => (built[id] ??= buildVenue({ room: id, crowd: 40 }));
 
-for (const id of ['club', 'party', 'truss'] as const) {
+for (const id of ['club', 'party', 'truss', 'cinema', 'bar', 'theatre', 'church', 'ballroom'] as const) {
   describe(`the ${id} room`, () => {
     it('builds with nothing NaN in it, its static parts baked into a few dozen meshes', () => {
       const v = room(id);
@@ -104,5 +105,78 @@ describe('the DJ', () => {
     const after = v.bandInfo();
     expect(after.name).toBe('Night Owl'); expect(after.surfaces[0].shows).toBe('NIGHT OWL');
     expect(after.surfaces[0].uuid).toBe(before.uuid); expect(after.surfaces[0].version).toBeGreaterThan(before.version);
+  });
+});
+
+// The templates' own rooms: the cinema (screen, stage, raked rows with an audience), the bar
+// (counter, back bar, people at it), the theatre (proscenium, stalls, balcony), the church (chancel,
+// pews, stained glass); every light of those templates placed in them
+describe('the Cinema, Bar, Theatre and Church templates in their rooms', () => {
+  it('every light has its place in the room, inside its walls, under its ceiling; the room is the template\'s', async () => {
+    const { TEMPLATES } = await import('../content/templates');
+    for (const [name, id] of [['Cinema', 'cinema'], ['Bar', 'bar'], ['Theatre', 'theatre'], ['Church', 'church'], ['DJ / Party', 'club'], ['Wedding', 'ballroom']] as const) {
+      const s = TEMPLATES.find((t) => t.name === name)!.build(), r = ROOMS[id];
+      expect(s.settings.stage3d?.room).toBe(id);
+      for (const f of s.fixtures) {
+        expect(f.p3, `${name}: ${f.name}`).toBeTruthy();
+        expect(Math.abs(f.p3!.x), `${name}: ${f.name}`).toBeLessThan(r.walls.x);
+        expect(f.p3!.z, `${name}: ${f.name}`).toBeGreaterThan(r.walls.z0);
+        expect(f.p3!.z, `${name}: ${f.name}`).toBeLessThan(r.walls.z1);
+        expect(f.p3!.y, `${name}: ${f.name}`).toBeLessThan(r.ceiling);
+        expect(f.p3!.y, `${name}: ${f.name}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+  it('the bar\'s pinspots are pencils (6°): a dimmer\'s 30° past the mirror ball lit a whole wall', async () => {
+    const { TEMPLATES } = await import('../content/templates');
+    const pins = TEMPLATES.find((t) => t.name === 'Bar')!.build().fixtures.filter((f) => /^Pinspot/.test(f.name));
+    expect(pins.length).toBe(2);
+    for (const f of pins) expect(f.beamDeg).toEqual([6, 6]);
+  });
+  it('the theatre\'s cyc lights are floods (80°): side by side they wash the cyc from top to bottom, not blobs', async () => {
+    const { TEMPLATES } = await import('../content/templates');
+    const { hitRoom, beamAxis } = await import('./geometry').then((g) => ({ hitRoom: g.hitRoom, beamAxis: (f: { rot?: { yaw: number; pitch: number; roll: number } }) => g.toWorld({ x: 0, y: 1, z: 0 }, f.rot!) }));
+    const cyc = TEMPLATES.find((t) => t.name === 'Theatre')!.build().fixtures.filter((f) => /^Cyc /.test(f.name));
+    expect(cyc.length).toBeGreaterThanOrEqual(4);
+    for (const f of cyc) {
+      expect(f.beamDeg![0]).toBeGreaterThanOrEqual(60);
+      // (each lands on the cyc, and its pool there is wider than the gap to the next one)
+      const h = hitRoom(f.p3!, beamAxis(f), ROOMS.theatre)!;
+      expect(h.n.z, f.name).toBeGreaterThan(0.5);
+      const L = Math.hypot(h.x - f.p3!.x, h.y - f.p3!.y, h.z - f.p3!.z), w = 2 * L * Math.tan((f.beamDeg![0] / 2) * Math.PI / 180);
+      expect(w, f.name).toBeGreaterThan(THEATRE.cyc.w / cyc.length);
+    }
+  });
+  it('the bar: people at the counter, the mirror ball turning', () => {
+    const v = room('bar');
+    expect(v.room).toBe('bar');
+    const ball = v.group.getObjectsByProperty('type', 'Mesh').find((m) => (m as THREE.Mesh).geometry.type === 'SphereGeometry' && Math.abs(m.position.y - 3.2) < 0.01);
+    expect(ball).toBeTruthy();
+    const r0 = ball!.rotation.y; v.animate(10, 20, 0.5, new THREE.Color(1, 1, 1)); expect(ball!.rotation.y).not.toBe(r0);
+  });
+});
+
+// The theatre's Top view: straight down onto the stage, nothing in between. The proscenium's wall
+// (its header over the opening) lay right over the front of the stage; it hides when the camera is
+// above the ceiling, as the roof steel does in the hall.
+describe('the theatre from above', () => {
+  it('the Top view sees the front of the stage, centre and sides: nothing it draws is in the way', () => {
+    const v = room('theatre'), r = ROOMS.theatre, cam = V(...r.views.top.pos);
+    v.group.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster();
+    // (the deck, and over the front rows of the stalls: past the proscenium's header from up there)
+    for (const [x, y, z] of [[-4, 1.2, -4], [0, 1.2, 0], [4, 1.2, 2.2], [0, 1.2, 3.3], [0, 3.5, 6], [-4, 3.5, 5.5], [4, 3.5, 5.5]]) {
+      const p = V(x, y, z), d = p.clone().sub(cam), far = d.length() - 0.05;
+      ray.set(cam, d.normalize()); ray.far = far;
+      const hits = ray.intersectObject(v.group, true).filter((h) => {
+        const m = (h.object as THREE.Mesh).material as THREE.Material | THREE.Material[];
+        const mat = Array.isArray(m) ? m[(h.face?.materialIndex ?? 0)] : m;
+        if (!mat?.visible || (mat.transparent && mat.opacity < 0.5)) return false;
+        // (the bars over the stage are seen from above, as they should be: not what's checked here)
+        if (r.truss.some((t) => Math.abs(h.point.y - (t.y + 0.2)) < 0.7 && Math.abs(h.point.z - t.z) < 0.6)) return false;
+        return !(typeof mat.userData.hideAbove === 'number' && cam.y > mat.userData.hideAbove);
+      });
+      expect(hits.map((h) => h.object.name || h.object.type), `${x}, ${z}`).toEqual([]);
+    }
   });
 });

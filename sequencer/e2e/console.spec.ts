@@ -2,7 +2,7 @@
 // flash button per light and per group, encoders for what the selection has, playback faders with
 // GO, Flash and Release, the grand master, the keyboard. Measured on the wire (the fake box).
 import type { Page } from '@playwright/test';
-import { channels, cues, openConnected, patch, resetFake, test, expect } from './helpers';
+import { channels, cues, openConnected, patch, resetFake, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -48,7 +48,7 @@ test('the command line: lights by number, runs, taking out, levels, words', asyn
   await command(page, '1 @ full'); await command(page, 'record');
   await expect.poll(cueCount).toBe(1);
   await command(page, 'oops');
-  await expect(said(page)).toHaveText('Undone');
+  await expect(said(page)).toContainText('Undone: ');                   // (and what: the last change to the show)
   await expect.poll(cueCount).toBe(0);
 });
 
@@ -86,6 +86,7 @@ test('lights keep their numbers when another goes; the patch dialog changes one'
   await page.locator('.fl li[data-fixture="PAR 3"]').click({ button: 'right' });
   await page.locator('.ctx').getByRole('menuitem', { name: /Number the 3 from/ }).click();
   const ask = page.getByRole('dialog', { name: 'Number the 3 lights from' });
+  await expect(ask.getByLabel('Number', { exact: true })).toBeVisible();     // (it said "Name")
   await ask.getByRole('textbox').fill('101');
   await ask.getByRole('button', { name: 'Number' }).click();
   await expect(page.locator('.fl li[data-fixture="PAR 4"] .num')).toHaveText('103');
@@ -372,4 +373,104 @@ test('the stage beside the desk: a click on a light selects it, the command line
   await expect(view(page)).toBeVisible();
   await expect(view(page).getByRole('region', { name: 'Stage' })).toHaveCount(0);
   await expect(view(page).getByRole('button', { name: 'Show the stage' })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('a group keeps its number when the groups are reordered: "group 1" is still the same lights', async ({ page }) => {
+  await rig(page);
+  await page.getByRole('tab', { name: 'Program' }).click();
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.selected = a.show.fixtures.slice(0, 2).map((f: any) => f.id); a.groupFromSelection('Front');
+    a.selected = a.show.fixtures.slice(2, 4).map((f: any) => f.id); a.groupFromSelection('Back');
+    a.selectNone();
+  });
+  await page.locator('.side').getByRole('tab', { name: 'Groups' }).click();
+  const rows = page.locator('.side li.oitem');
+  await expect(rows).toHaveCount(2);
+  await rows.filter({ hasText: 'Back' }).dragTo(rows.filter({ hasText: 'Front' }));
+  await expect(rows.first()).toContainText('Back');
+  await expect(rows.first()).toContainText('2 ·');                  // (Back is still group 2)
+  await expect(rows.nth(1)).toContainText('1 ·');
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await command(page, 'group 1 @ 40');
+  await expect(said(page)).toHaveText('2 lights at 40%');
+  await expect.poll(async () => { const c = await channels(0, 16); return [c[0], c[4], c[8], c[12]]; }).toEqual([102, 102, 0, 0]);   // the Front PARs
+});
+
+test.describe('the console on a laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('the cue lists\' strips: short machine marks, the name clear of the fader cap, GO in view', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await startTemplate(page, 'Band');
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.cueLists.length)).toBeGreaterThan(4);
+    await page.getByRole('tab', { name: 'Console' }).click();
+    const strips = view(page).locator('.playbacks .strip');
+    await expect(strips.first()).toBeVisible();
+    // the marks fit their strip; what they mean is in their name
+    const marks = view(page).locator('.playbacks .risk');
+    expect(await marks.count()).toBeGreaterThan(2);
+    for (const t of await marks.allTextContents()) expect(['⚠', '1×', 'fog']).toContain(t.trim());
+    await expect(marks.first()).toHaveAttribute('aria-label', /./);
+    const over = await strips.evaluateAll((els) => els.filter((s) => { const m = s.querySelector('.risk'); return m && m.getBoundingClientRect().right > s.getBoundingClientRect().right + 0.5; }).length);
+    expect(over).toBe(0);
+    // the cap at 0 stays above the list's name
+    const hit = await strips.evaluateAll((els) => els.filter((s) => { const c = s.querySelector('.cap')!.getBoundingClientRect(), n = s.querySelector('.name')!.getBoundingClientRect(); return c.bottom > n.top + 0.5; }).length);
+    expect(hit).toBe(0);
+    await expect(strips.first().getByRole('button', { name: /^GO / })).toBeInViewport({ ratio: 1 });
+  });
+});
+
+test('the console\'s add switch says what it does, and is the stage\'s too; Thru and Full read like the other words', async ({ page }) => {
+  await rig(page);
+  const add = view(page).getByRole('button', { name: '+ Add to selection' });
+  await expect(add).toHaveAttribute('aria-pressed', 'false');
+  await add.click();
+  await expect(add).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(async () => (await import('/src/ui/ui.svelte.ts')).ui.addSel)).toBe(true);
+  // on in Program too, so its switch is there to turn it off (with a mouse the stage has none otherwise)
+  await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();
+  const stageAdd = page.locator('.stage-wrap').getByRole('button', { name: /^\+ ?Add$/ });
+  await expect(stageAdd).toHaveAttribute('aria-pressed', 'true');
+  await stageAdd.click();
+  await expect(stageAdd).toHaveCount(0);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Console' }).click();
+  await expect(view(page).locator('.pad').getByRole('button', { name: /^thru$/i })).toHaveText('Thru');
+  await expect(view(page).locator('.pad').getByRole('button', { name: /^full$/i })).toHaveText('Full');
+  // Full ends the command, as on a desk: 1 Thru 3 Full is done, no Enter
+  const pad = view(page).locator('.pad');
+  for (const k of ['1', 'thru', '3', 'full']) await pad.getByRole('button', { name: new RegExp(`^${k}$`, 'i') }).click();
+  await expect(said(page)).toHaveText('3 lights at 100%');
+  await expect(view(page).getByRole('textbox').first()).toHaveValue('');
+  await expect.poll(async () => { const c = await channels(0, 16); return [c[0], c[4], c[8], c[12]]; }).toEqual([255, 255, 255, 0]);   // (the dimmers of 1-3, not 4)
+});
+
+// A desk operator's habits (round 17 of the QA): Clear twice lets go, "all" while stepping is the
+// stepped selection, GO on the last cue says so, undo says what it undid, go to / release all.
+test('desk habits: clear twice, all while stepping, GO at the end, undo says what, go to, release all', async ({ page }) => {
+  await rig(page);
+  await command(page, '1 thru 3 @ 50');
+  await command(page, 'clear');
+  await expect(said(page)).toContainText('3 still selected');
+  await command(page, 'clear');
+  await expect(said(page)).toContainText('the selection let go');
+  expect(await page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(0);
+  // all while stepping: the 3, not every light
+  await command(page, '1 thru 3');
+  await command(page, 'next');
+  await command(page, 'all');
+  expect(await page.evaluate(() => (window as any).__luxdmx.selected.length)).toBe(3);
+  // two cues, GO to the end: said
+  await command(page, '@ full'); await command(page, 'record');
+  await command(page, '@ 20'); await command(page, 'record');
+  await command(page, 'clear');
+  await command(page, 'go to cue 2');
+  await expect(said(page)).toContainText('Cue 2');
+  await command(page, 'go');
+  await expect(said(page)).toContainText('is on its last cue');
+  // undo: what it undid
+  await command(page, 'undo');
+  await expect(said(page)).toContainText('Undone:');
+  await command(page, 'release all');
+  await expect(said(page)).toHaveText('Released everything');
 });

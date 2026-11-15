@@ -227,6 +227,56 @@ describe('fog stopped from Live', () => {
     expect(r.app.status.L.cue).toBe('c1');
     expect(pct(r.app.stage.fg.fog)).toBe(0);
   });
+  it('stays stopped after a reload while the panels update only every few frames (a busy page)', async () => {
+    const { app, tick } = await freshApp();
+    const { load } = await import('./perf/load.svelte');
+    smallShow(app);
+    app.show.cueLists[0].cues[0].values.fg = { fog: 1 };
+    app.checkpoint();
+    tick(2);
+    const was = load.uiEvery;
+    try {
+      load.uiEvery = 3; app.uiN = 0;
+      // (what a reload hands over: the list on its first cue, that fog machine stopped)
+      app.applyPlayback({ id: app.showId, lists: [['L', 0, 1]], fx: [], gm: 1, bo: false, hz: ['fg'] }, false);
+      tick(11);
+      expect(app.holds.has('haze-stop')).toBe(true);
+      expect(pct(app.stage.fg.fog)).toBe(0);
+    } finally { load.uiEvery = was; }
+  });
+  it('another show: the old one\'s stop is gone with it', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.show.cueLists[0].cues[0].values.fg = { fog: 1 };
+    app.checkpoint();
+    app.jump('L', 0); tick(2);
+    app.stopHaze(); tick(1);
+    await app.newShow(); tick(2);
+    expect((app as any).hazeStopAt).toBeNull();
+    expect(app.holds.has('haze-stop')).toBe(false);
+  });
+});
+
+describe('a box added by its address', () => {
+  it('typed with a capital Http:// (a tablet\'s keyboard): the box\'s address, not "Http:"', async () => {
+    const { app } = await freshApp();
+    expect(app.addDevice('Http://192.168.1.50')).toBeUndefined();
+    expect(app.show.outputs.devices.map((d: { host: string }) => d.host)).toContain('192.168.1.50');
+    expect(app.show.outputs.devices.map((d: { host: string }) => d.host)).not.toContain('Http:');
+  });
+});
+
+describe('Cut', () => {
+  it('takes away what Remove does: a group of only that light goes with it', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.selected = ['p1'];
+    app.groupFromSelection('Only P1');
+    app.selected = ['p1'];
+    expect(await app.cutFixtures()).toBe(1);
+    expect(app.show.fixtures.some((f: { id: string }) => f.id === 'p1')).toBe(false);
+    expect(app.show.groups.some((g: { name: string }) => g.name === 'Only P1')).toBe(false);
+  });
 });
 
 describe('locked for the service', () => {
@@ -434,5 +484,171 @@ describe('a song playing on the timeline', () => {
     expect(app.engine.beatCount).toBeLessThan(10.6);
     app.timeline.pause();
     expect(app.bpm).toBe(app.show.settings.bpm);                    // stopped: the show's own tempo again
+  });
+});
+
+describe('Undo of a Record', () => {
+  it("into a list that wasn't playing: the list stops again, the programmer holds the look, the stage stays; no other cue says LIVE", async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    tick(1);
+    app.selected = ['p1']; app.set({ intensity: 0.6 }); tick(2);
+    expect(pct(app.stage.p1.intensity)).toBe(60);
+    expect(app.record('L')).toBe(true);
+    tick(2);
+    expect(app.status.L.cue).toBe(app.show.cueLists[0].cues[2].id);       // the new cue is live
+    expect(Object.keys(app.programmer)).toEqual([]);
+    app.undo(); tick(2);
+    expect(app.show.cueLists[0].cues).toHaveLength(2);
+    expect(app.status.L.running).toBe(false);                              // not "Late LIVE"
+    expect(pct(app.programmer.p1?.intensity)).toBe(60);
+    expect(pct(app.stage.p1.intensity)).toBe(60);                          // nothing changed on stage
+  });
+  it('into a list on cue 1: back on cue 1, with the programmer on top as before', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.engine.jumpTo('L', 0, 0); tick(2);                                 // Warm
+    app.selected = ['p2']; app.set({ intensity: 0.3 }); tick(2);
+    expect(app.record('L')).toBe(true);
+    tick(2);
+    app.undo(); tick(2);
+    expect(app.status.L.cue).toBe('c1');
+    expect([pct(app.stage.p1.intensity), pct(app.stage.p2.intensity)]).toEqual([100, 30]);
+  });
+  it('a running effect the cue took over runs by hand again', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.show.effects.push({ id: 'e1', name: 'Pulse', kind: 'sine', param: 'intensity', fixtures: ['p1', 'p2'], speed: 1, size: 1, spread: 0 } as any);
+    app.checkpoint();
+    app.toggleEffect('e1'); tick(2);
+    expect(app.liveFx).toEqual(['e1']);
+    expect(app.record('L')).toBe(true);
+    tick(1);
+    expect(app.liveFx).toEqual([]);
+    app.undo(); tick(1);
+    expect(app.liveFx).toEqual(['e1']);
+  });
+});
+
+describe('a cue recorded while effects run', () => {
+  it('is named after the lights set first, then the effects; more than two effects say how many more', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.show.groups.push({ id: 'gF', name: 'Fresnels', fixtures: ['p1', 'p2'] });
+    for (const [id, name] of [['e1', 'Spots: circles'], ['e2', 'Police'], ['e3', 'Wave'], ['e4', 'Chase']]) app.show.effects.push({ id, name, kind: 'sine', param: 'intensity', fixtures: ['p1'] } as any);
+    expect(app.suggestName({ p1: { intensity: 0.6 }, p2: { intensity: 0.6 } }, ['e1'])).toBe('Fresnels 60 % + Spots: circles');
+    expect(app.suggestName({ p1: { intensity: 1 } }, ['e1'])).toBe('P1 + Spots: circles');
+    expect(app.suggestName({ p1: { intensity: 0.5 }, p2: { intensity: 0.2 }, fg: { intensity: 0.3 } }, ['e1', 'e2', 'e3', 'e4'])).toBe('3 lights + Spots: circles + Police + 2 more');
+    expect(app.suggestName({}, ['e1', 'e2'])).toBe('Spots: circles + Police');      // (effects only: as before)
+  });
+});
+
+describe('a preset deleted while lights use it', () => {
+  it('the programmer\'s lights keep its colour (they went white); Undo brings the preset back, the colour stays', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    app.show.presets.push({ id: 'pBlue', name: 'Stage blue', kind: 'color', values: { color: { r: 0, g: 0.2, b: 1 } } } as any);
+    app.checkpoint();
+    app.programmer = { p1: { intensity: 1, color: { preset: 'pBlue' } } } as any;
+    tick(1);
+    app.removePresets(['pBlue']);
+    expect(app.programmer.p1.color).toEqual({ r: 0, g: 0.2, b: 1 });
+    app.undo(); tick(1);
+    expect(app.show.presets.some((p: any) => p.id === 'pBlue')).toBe(true);
+    expect(app.programmer.p1.color).toEqual({ r: 0, g: 0.2, b: 1 });
+  });
+});
+
+describe('the lock for the service and Undo', () => {
+  it('Ctrl+Z never locks or unlocks: after unlocking it takes back what was done, not the unlock', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.view = 'live';
+    app.lockShow(true);
+    expect(app.locked).toBe(true);
+    app.addFixtures('gen-dimmer', '', 1, 0, 'New');                // (something done while locked, as the rig's Patch it did)
+    app.checkpoint();
+    app.lockShow(false);
+    expect(app.show.fixtures.some((f: any) => f.name === 'New')).toBe(true);
+    app.undo();
+    expect(app.show.fixtures.some((f: any) => f.name === 'New')).toBe(false);    // the patch is what goes
+    expect(app.locked).toBe(false);                                              // and it stays unlocked
+  });
+  it('locked: an undo takes back a step from before and the page stays locked', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.view = 'live';
+    app.addFixtures('gen-dimmer', '', 1, 0, 'Before');
+    app.checkpoint();
+    app.lockShow(true);
+    app.undo();
+    expect(app.show.fixtures.some((f: any) => f.name === 'Before')).toBe(false);
+    expect(app.locked).toBe(true);
+  });
+});
+
+describe('a light copied from one linked to a real light over RDM', () => {
+  it('the copy has no link (it would claim the real light); cut and paste keeps it', async () => {
+    const { app } = await freshApp();
+    smallShow(app);
+    app.show.fixtures[0].uid = '4C55:00000001';
+    app.selected = ['p1'];
+    await app.copyFixtures();
+    await app.pasteFixtures();
+    const copy = app.show.fixtures.at(-1);
+    expect(copy.name).not.toBe('P1');
+    expect(copy.uid).toBeUndefined();
+    expect(app.show.fixtures[0].uid).toBe('4C55:00000001');
+    // cut and paste: the light moves, its link with it
+    app.selected = ['p1'];
+    await app.copyFixtures();
+    app.removeFixture('p1');
+    await app.pasteFixtures();
+    expect(app.show.fixtures.filter((f: any) => f.uid === '4C55:00000001')).toHaveLength(1);
+  });
+});
+
+describe('a cue recorded from an effect that switched its lights on', () => {
+  it('plays them lit, as they were (the cue stored their look\'s 0 and held them dark)', async () => {
+    const { app, tick } = await freshApp();
+    app.show.fixtures.push(
+      { id: 'r1', name: 'R1', typeId: 'gen-rgb', mode: '', universe: 0, address: 1, x: 0.3, y: 0.5 } as any,
+      { id: 'r2', name: 'R2', typeId: 'gen-rgb', mode: '', universe: 0, address: 4, x: 0.6, y: 0.5 } as any);
+    app.show.effects.push({ id: 'rb', name: 'Rainbow', kind: 'rainbow', fixtures: ['r1', 'r2'], params: {} } as any);
+    app.checkpoint();
+    app.toggleEffect('rb'); await new Promise((r) => setTimeout(r, 1300)); tick(2);   // (its fade in, in real time)
+    expect(pct(app.stage.r1.intensity)).toBeGreaterThan(50);              // the effect lit them
+    expect(app.record()).toBe(true);
+    await new Promise((r) => setTimeout(r, 1300)); tick(2);
+    expect(pct(app.stage.r1.intensity)).toBeGreaterThan(50);              // still lit, from the cue now
+    expect(pct(app.stage.r2.intensity)).toBeGreaterThan(50);
+  });
+});
+
+describe('starter looks', () => {
+  it('leave the strobe out (it was at 85 % in Warm wash: a real one could flash at the room)', async () => {
+    const { app } = await freshApp();
+    app.addFixtures('gen-drgb', '', 2, 0, 'PAR');
+    app.addFixtures('gen-strobe', '', 1, 0, 'Strobe');
+    const strobe = app.show.fixtures.find((f: any) => f.name === 'Strobe').id;
+    expect(app.makeStarterLooks()).toBeGreaterThan(0);
+    const cues = app.show.cueLists.flatMap((l: any) => l.cues);
+    expect(cues.length).toBeGreaterThan(0);
+    expect(cues.some((c: any) => c.values[strobe])).toBe(false);
+  });
+});
+
+describe('GO at the end of a list that stops there', () => {
+  it('says so (it did nothing, silently) and stays on the last cue', async () => {
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    const ui = (await import('./ui/ui.svelte')).ui;
+    const said: string[] = [];
+    const orig = ui.toast.bind(ui);
+    ui.toast = ((t: string, ...r: unknown[]) => { said.push(t); return (orig as any)(t, ...r); }) as any;
+    app.engine.jumpTo('L', 1, 0); tick(2);                                  // the last cue
+    app.go('L'); tick(2);
+    expect(app.status.L.index).toBe(1);
+    expect(said.some((t) => /last cue of Moods/.test(t))).toBe(true);
   });
 });

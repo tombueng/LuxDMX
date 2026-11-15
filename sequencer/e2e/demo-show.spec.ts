@@ -7,7 +7,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Page } from '@playwright/test';
 import { CATALOG } from '../src/timeline/catalog';
-import { openConnected, resetFake, channels, welcome, test, expect } from './helpers';
+import { openConnected, resetFake, channels, demoTile, welcome, test, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -48,8 +48,8 @@ test('the big demo on its own song: dark on a dead stop but for spots on the ban
   await catalog(page);
   await openConnected(page);
   const w = await welcome(page);
-  await expect(w.getByLabel("The demo's music")).toHaveValue('ready-to-go');      // (the demo's own song, picked already)
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
+  await expect(demoTile(w).getByLabel('Music for Festival stage')).toHaveValue('ready-to-go');      // (the demo's own song, picked already)
+  await demoTile(w).getByRole('button', { name: /^Play the show/ }).click();
   await expect(w).toBeHidden({ timeout: 30000 });
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.audio?.catalog), { timeout: 30000 }).toBe('ready-to-go');
   expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists.find((l: any) => l.name === 'Moves')?.priority)).toBe('high');
@@ -85,7 +85,7 @@ test('the band only plays while the music does: still in the show\'s intro befor
   await catalog(page);
   await openConnected(page);
   const w = await welcome(page);
-  await w.getByRole('button', { name: 'Show me a demo' }).click();
+  await demoTile(w).getByRole('button', { name: /^Play the show/ }).click();
   await expect(w).toBeHidden({ timeout: 30000 });
   await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 45000 });
   const hand = () => page.evaluate(() => (window as any).__stage3d?.band() as number[] | null);
@@ -99,5 +99,25 @@ test('the band only plays while the music does: still in the show\'s intro befor
   // in the song: they play
   await page.evaluate(() => (window as any).__luxdmx.timeline.seek(20));
   await expect.poll(moved, { timeout: 10000 }).toBeGreaterThan(0.01);
+  await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
+});
+
+test('Space pauses a template\'s show and plays it again, wherever the welcome left the focus (not the shows)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  const w = await welcome(page), t = demoTile(w, 'Bar');
+  await t.getByLabel('Music for Bar').selectOption('beat');
+  await t.getByRole('button', { name: 'Play the show: Bar' }).click();
+  await expect(w).toBeHidden({ timeout: 30000 });
+  const playing = () => page.evaluate(() => (window as any).__luxdmx.timeline.playing);
+  await expect.poll(playing, { timeout: 30000 }).toBe(true);
+  // (the focus on the show's name, as a click on it leaves it: Space there is the show's too)
+  await page.locator('.top .show').focus();
+  await page.keyboard.press('Space');
+  await expect.poll(playing).toBe(false);
+  await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
+  await page.keyboard.press('Space');
+  await expect.poll(playing).toBe(true);
+  await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
   await page.evaluate(() => (window as any).__luxdmx.timeline.pause());
 });

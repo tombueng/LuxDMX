@@ -1,7 +1,7 @@
 // Several cue lists at once, masters, auto-advance, cue actions, undo, files.
 import type { Page } from '@playwright/test';
 import fs from 'node:fs';
-import { openConnected, channels, history, resetFake, patch, selectAll, selectFixtures, intensity, swatch, record, full, cues, jumpTo, release, newList, fixturesOnStage , test, expect } from './helpers';
+import { openConnected, channels, history, resetFake, patch, selectAll, selectFixtures, intensity, swatch, record, full, cues, jumpTo, release, newList, fixturesOnStage , test, expect, newBlankShow } from './helpers';
 
 const level = (page: Page, v: number) => page.locator('.deck').getByLabel('List level').fill(String(v));
 const inspector = (page: Page) => page.locator('.insp');
@@ -106,7 +106,7 @@ test('save as file and open it again, with the format header', async ({ page }, 
   const shows = page.locator('.top .show');
   await shows.click();
   const dlg = page.getByRole('dialog', { name: 'Shows' });
-  const [dl] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save current as file' }).click()]);
+  const [dl] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save as file' }).click()]);
   const file = info.outputPath('show.luxdmx.json');
   await dl.saveAs(file);
   const json = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -121,7 +121,7 @@ test('save as file and open it again, with the format header', async ({ page }, 
   json.fromTheFuture = { keep: 'me' };
   fs.writeFileSync(file, JSON.stringify(json));
 
-  await dlg.getByRole('button', { name: 'New blank show' }).click();
+  await newBlankShow(page);
   await expect(fixturesOnStage(page)).toHaveCount(0);
   await shows.click();
   await dlg.locator('input[type=file]').setInputFiles(file);
@@ -129,7 +129,7 @@ test('save as file and open it again, with the format header', async ({ page }, 
   await jumpTo(page, 0);
   await expect.poll(() => channels(0, 4)).toEqual([255, 0, 255, 0]);
   await shows.click();
-  const [dl2] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save current as file' }).click()]);
+  const [dl2] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Save as file' }).click()]);
   const again = JSON.parse(fs.readFileSync(await dl2.path(), 'utf8'));
   expect(again.fromTheFuture).toEqual({ keep: 'me' });
 });

@@ -285,7 +285,7 @@ const script: EffectDef = {
     const k = r.k;
     // a new frame (or another effect with the same program): its knobs, the time, the frame part
     if (r.secs !== e.secs || r.beats !== e.beats || r.p !== p) {
-      if (r.resting && now() < r.resting) throw new Error(`it takes too long to work out (over ${PROGRAM_LIMITS.ms} ms a frame), so it rests a few seconds`);
+      if (!p.untimed && r.resting && now() < r.resting) throw new Error(`it takes too long to work out (over ${PROGRAM_LIMITS.ms} ms a frame), so it rests a few seconds`);
       r.resting = 0; r.t0 = now(); r.n = 0;
       r.secs = e.secs; r.beats = e.beats; r.p = p;
       // (Speed: its time runs faster or slower than at the speed it came with)
@@ -300,7 +300,7 @@ const script: EffectDef = {
     // (the clock looked at on each of a frame's first 32 LEDs, then every 32: cheap, and a slow one
     // is caught within its frame however few LEDs it plays on)
     const n = ++r.n;
-    if ((n <= 32 || (n & 31) === 0) && now() - r.t0 > PROGRAM_LIMITS.ms) {
+    if (!p.untimed && (n <= 32 || (n & 31) === 0) && now() - r.t0 > PROGRAM_LIMITS.ms) {
       r.resting = now() + SCRIPT_REST_MS;
       throw new Error(`it takes too long to work out (over ${PROGRAM_LIMITS.ms} ms a frame), so it rests a few seconds`);
     }

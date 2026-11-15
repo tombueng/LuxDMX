@@ -6,6 +6,8 @@
   import EffectPreview from './EffectPreview.svelte';
   import Icon from './Icon.svelte';
   import type { Face } from './widgetFace';
+  import { spaceIsGo } from './ui.svelte';
+  import { MARK_TITLE } from '../model/safety';
 
   let { face, pic = '', swatch, editing = false, selected = false, onfire, onfader, faderNow, onburst, onselect, onmenu }: {
     face: Face; pic?: string; swatch?: string[]; editing?: boolean; selected?: boolean;
@@ -99,8 +101,11 @@
     onfire(true); onfire(false);
   }
   // Keyboard: Enter presses the focused button (and holds it while held). Space stays GO, always.
+  // Enter presses it, and Space too when it was reached by Tab (Space only did nothing on a tile;
+  // clicked with the mouse, Space stays GO, as everywhere)
   function key(e: KeyboardEvent, isDown: boolean) {
-    if (editing || e.key !== 'Enter') return;
+    if (editing || (e.key !== 'Enter' && e.key !== ' ')) return;
+    if (e.key === ' ' && spaceIsGo(e)) return;
     e.preventDefault(); e.stopPropagation();
     if (isDown && !e.repeat && !pressed) { pressed = true; onfire(true); }
     else if (!isDown && pressed) { pressed = false; onfire(false); }
@@ -113,7 +118,9 @@
 </script>
 
 {#if face.type === 'label'}
-  <div class="head" class:editing class:selected style="--c:{face.color}" role="button" tabindex="-1" onclick={onselect} onkeydown={() => {}}>
+  <!-- (a section's heading: a screen reader called it a button that did nothing; a button only while editing, to select it) -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div class="head" class:editing class:selected style="--c:{face.color}" role={editing ? 'button' : 'heading'} aria-level={editing ? undefined : 2} tabindex="-1" onclick={editing ? onselect : undefined} onkeydown={() => {}}>
     <span>{face.label}</span>
   </div>
 {:else if face.type === 'fader'}
@@ -130,7 +137,7 @@
     {#if face.inert}<span class="sub">not while locked</span>{:else if touchy && !editing}<span class="sub">{grabbed ? 'drag' : 'hold, then drag'}</span>{/if}
   </div>
 {:else}
-  <button class="tile {face.type}" class:on={face.on} class:pressed class:editing class:selected class:missing={face.missing || face.inert} class:inert={face.inert} class:wide={face.wide}
+  <button class="tile {face.type}" class:on={face.on} class:safe={face.safe} class:pressed class:editing class:selected class:missing={face.missing || face.inert} class:inert={face.inert} class:wide={face.wide}
           style="--c:{face.color}" aria-pressed={face.on} aria-disabled={face.inert || undefined} data-widget={face.id}
           onpointerdown={down} onpointermove={settleMove} onpointerup={(e) => { settleUp(); tapUp(e); up(); }} onpointercancel={() => { tap = null; if (settle) { clearTimeout(settle.t); settle = null; } up(); }} onlostpointercapture={up}
           onkeydown={(e) => key(e, true)} onkeyup={(e) => key(e, false)} data-no-longpress={!editing || undefined}
@@ -145,9 +152,10 @@
       <span class="pic fxp"><EffectPreview kind={face.fx.kind} params={face.fx.params} w={130} h={34} bpm={face.fx.bpm} paused={!face.on} /></span>
     {/if}
     <span class="t">{face.label}</span>
-    {#if face.sub}<span class="sub">{face.sub}</span>{/if}
+    {#if face.safe}<span class="sub safe-note">Safe: not firing</span>{:else if face.sub}<span class="sub">{face.sub}</span>{/if}
     {#if face.bar !== undefined}<span class="bar"><span style="width:{Math.max(0, Math.min(1, face.bar)) * 100}%"></span></span>{/if}
-    {#if face.risk === 'hazard'}<span class="risk hazard" title="Fires a machine (flames, sparks or CO2): only while armed"><Icon name="warn" size={12} /><span class="sr">fires a machine</span></span>
+    {#if face.risk === 'hazard'}<span class="risk hazard" title={MARK_TITLE.hazard}><Icon name="warn" size={12} /><span class="sr">fires a machine</span></span>
+    {:else if face.risk === 'winch'}<span class="risk winch" title={MARK_TITLE.winch}>⇅<span class="sr">moves a winch</span></span>
     {:else if face.risk === 'once'}<span class="risk once" title="Fires confetti (once): only while armed">1×<span class="sr">fires once</span></span>{/if}
     {#if face.key}<span class="key">{face.key}</span>{/if}
   </button>
@@ -187,11 +195,16 @@
   .tile.on .glyph { color: var(--text); }
   .burst { position: absolute; right: .4rem; bottom: .4rem; font-size: .76rem; padding: .1rem .45rem; border-radius: 999px; border: 1px solid var(--line2); color: var(--muted); background: var(--panel); }
   .burst:hover { color: var(--text); border-color: var(--c); }
+  /* (on while the machines are safe: it runs, but nothing fires: not lit up as if it did) */
+  .tile.on.safe { background: var(--panel2); border-style: dashed; box-shadow: none; }
+  .sub.safe-note { color: var(--orange); font-weight: 700; }
   .risk { position: absolute; top: .3rem; right: .35rem; display: inline-flex; align-items: center; font: 700 .72rem ui-monospace, monospace; color: var(--orange); background: #000a; border-radius: 4px; padding: .05rem .2rem; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .key { position: absolute; top: .35rem; right: .4rem; font: 600 .76rem ui-monospace, monospace; color: var(--faint); border: 1px solid var(--line2); border-radius: 4px; padding: 0 .25rem; }
   /* tiles with a picture: the key goes down by the name, the picture stays clean */
   .tile.cue .key, .tile.effect .key { top: auto; bottom: .45rem; }
+  /* (a finger has no keys: on a touch screen without a mouse the key badges go) */
+  @media (hover: none) and (pointer: coarse) { .key { display: none; } .tile.cue:has(> .key) .t, .tile.effect:has(> .key) .t { padding-right: 0; } }
   .tile:not(.cue):not(.effect) .risk + .key { top: 1.6rem; }      /* (under the mark) */
   /* nobody has a keyboard on a phone or tablet */
   @media (pointer: coarse) and (hover: none) { .key { display: none; } }

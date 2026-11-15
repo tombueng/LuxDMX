@@ -1,8 +1,10 @@
 <script lang="ts">
   // The LuxDMX boxes this show plays on. Each one is a pill with its state; Connect opens the box's
   // bridge page (a popup, because only a page from the box itself may talk to it). + adds a box.
+  import { untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
+  import { cleanHost } from '../model/host';
   import { rig } from '../rdm/rig.svelte';
   import { dismiss, ui } from './ui.svelte';
   import { LINK, type LinkOutput, type LinkFile, type LinkManifest, type Computer, linkManifest, thisComputer, downloadsFor, OS_NAME, archName, FIRST_RUN } from '../output/link';
@@ -59,7 +61,15 @@
   const focusFirst = (node: HTMLElement, on: boolean) => { if (on && takeFocus) queueMicrotask(() => node.focus()); };
   // added: the focus goes on to its Connect (the next thing to do)
   function add(e: Event) {
-    e.preventDefault(); const h = host.trim(); app.addDevice(host); host = ''; open = false;
+    e.preventDefault(); const h = host.trim();
+    // (an address that can't be one: said, and left in the field to put right)
+    const bad = app.addDevice(host);
+    if (bad) { ui.toast(bad, 6000); return; }
+    host = ''; open = false;
+    // (and connects at once: the box's window opens from this click, so the browser lets it. Added
+    // and then Connect as well was a step nobody expected)
+    const key = cleanHost(h);
+    app.bridges.find((b) => b.host === key)?.open();
     setTimeout(() => document.querySelector<HTMLElement>(`[data-box="${CSS.escape(h)}"] button.primary`)?.focus(), 0);
   }
   // (autofocus doesn't fire for a field that comes in later)
@@ -67,7 +77,7 @@
   // On phones and tablets the boxes fold into one button with a status dot; the pills open under it.
   let w = $state(typeof window === 'undefined' ? 1200 : window.innerWidth);
   // One button with a status dot on a tablet, and on a wider screen too when the boxes' pills don't
-  // fit on the top bar's row (they'd wrap it to two rows, and every panel loses that height): the
+  // fit on the top bar's row (they'd push it over the edge or squeeze the show's name away): the
   // width at which they didn't is kept, so it doesn't flip back and forth (more boxes look again)
   let wrapAt = $state(0), devEl = $state<HTMLDivElement>();
   const compact = $derived(w <= 1100 || w <= wrapAt);
@@ -75,10 +85,18 @@
     void app.bridges.length; void w;
     if (compact || !devEl) return;
     const el = devEl;
-    requestAnimationFrame(() => { const top = el.closest('.top'); if (top && el.isConnected && el.getBoundingClientRect().top - top.getBoundingClientRect().top > 24) wrapAt = w; });
+    // (the bar keeps one row: too little room shows as the bar running over, or the show's name
+    // squeezed down to a stub)
+    requestAnimationFrame(() => {
+      const top = el.closest('.top'), show = top?.querySelector('.show');
+      if (!top || !el.isConnected) return;
+      if (top.scrollWidth - top.clientWidth > 1 || el.getBoundingClientRect().top - top.getBoundingClientRect().top > 24 || (show && show.getBoundingClientRect().width < 110)) wrapAt = w;
+    });
   });
-  let lastCount = 0;
-  $effect(() => { const n = app.bridges.length; if (n !== lastCount) { lastCount = n; wrapAt = 0; } });
+  // (not while the boxes' list is open: it would fold away under the hand that just removed one)
+  let lastCount = 0, looksAgain = false;
+  $effect(() => { const n = app.bridges.length; if (n !== lastCount) { lastCount = n; if (untrack(() => list)) looksAgain = true; else wrapAt = 0; } });
+  $effect(() => { if (!list && looksAgain) { looksAgain = false; wrapAt = 0; } });
   let list = $state(false);
   // the list opens to the left of its button, or to the right where there's no room (a top bar that
   // wrapped puts the button near the left edge)
@@ -96,6 +114,7 @@
     return !st.length ? 'none' : st.every((s) => s === 'ready') ? 'ready' : st.some((s) => s === 'denied' || s === 'blocked' || s === 'silent') ? 'denied'
       : st.some((s) => s === 'asking' || s === 'opening' || s === 'ready' || s === 'reconnecting') ? 'asking' : 'closed';
   });
+  const boxesSaid = $derived(overall === 'none' ? 'none yet' : overall === 'ready' ? 'connected' : overall === 'denied' ? 'a problem' : overall === 'asking' ? 'not all connected' : 'not connected');
   // what a pill shows of a box, read now (`_rev`: called again whenever a box changed)
   function view(b: (typeof app.bridges)[number], _rev: number) {
     const l = isLink(b) ? (b as LinkOutput) : undefined;
@@ -179,15 +198,16 @@
 {#if compact}
   <span class="wrap">
     <button class="ghost boxes {overall}" class:on={list} bind:this={boxesBtn} onclick={toggleList} aria-expanded={list} data-popover-toggle
-            title="Your LuxDMX boxes" aria-label="LuxDMX boxes: {overall === 'none' ? 'none yet' : overall === 'ready' ? 'connected' : overall === 'denied' ? 'a problem' : overall === 'asking' ? 'not all connected' : 'not connected'}">
-      <Icon name="link" size={18} /><span class="dot badge"></span>
+            title="Your LuxDMX boxes: {boxesSaid}" aria-label="LuxDMX boxes: {boxesSaid}">
+      <!-- (a mark in the badge, not only its colour: connected and connecting were the same to someone red-green blind) -->
+      <Icon name="link" size={18} /><span class="dot badge">{overall === 'ready' ? '✓' : overall === 'denied' ? '!' : overall === 'none' ? '' : '…'}</span>
     </button>
     {#if list}
       <div class="pop list" class:right={listRight} use:dismiss={() => (list = false)}>
         {@render pills()}
         {#if getOpen && hasLink}{@render getPanel()}{/if}
         {#if !app.bridges.length}<p class="faint">No LuxDMX in this show yet. The app works without one; add your box to light the room.</p>{/if}
-        {#if app.bridges.length}<button class="ghost rigbtn" onclick={() => { list = false; ui.modal = 'rig'; }}><Icon name="search" />The rig (RDM)…{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
+        {#if app.bridges.length && !app.locked}<button class="ghost rigbtn" onclick={() => { list = false; ui.modal = 'rig'; }}><Icon name="search" />The rig (RDM)…{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
         {#if !app.locked}{@render addForm()}{/if}
       </div>
     {/if}
@@ -196,7 +216,7 @@
 
 <div class="devices" bind:this={devEl}>
   {@render pills()}
-  {#if app.bridges.length}<button class="ghost rigbtn" onclick={() => (ui.modal = 'rig')} title="The rig with RDM: find the real lights, check them against the patch, watch them"><Icon name="search" />Rig{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
+  {#if app.bridges.length && !app.locked}<button class="ghost rigbtn" onclick={() => (ui.modal = 'rig')} title="The rig with RDM: find the real lights, check them against the patch, watch them"><Icon name="search" />Rig{#if rigAlert}<span class="alert">{rigAlert}</span>{/if}</button>{/if}
   {#if getOpen && hasLink}{@render getPanel()}{/if}
   {#if !app.locked}
   <span class="wrap">
@@ -225,7 +245,7 @@
   .pop { position: absolute; right: 0; top: 2.2rem; z-index: 60; width: 300px; display: flex; flex-direction: column; gap: .4rem; padding: .7rem; background: var(--panel2); border: 1px solid var(--line2); border-radius: var(--radius); box-shadow: var(--shadow); }
   .boxes { gap: .25rem; padding: .3rem .45rem; position: relative; }
   @media (pointer: coarse) { .boxes { min-height: 44px; min-width: 44px; justify-content: center; } }
-  .boxes .badge { position: absolute; right: 5px; top: 5px; width: 8px; height: 8px; border: 1.5px solid var(--bg2); }
+  .boxes .badge { position: absolute; right: 2px; top: 2px; min-width: 11px; height: 11px; border: 1.5px solid var(--bg2); font-size: 8px; line-height: 8px; font-weight: 800; color: #0b0f15; display: grid; place-items: center; }
   .boxes .dot { background: var(--muted); }
   .boxes.ready .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .boxes.asking .dot { background: var(--orange); animation: blink 1s infinite; }

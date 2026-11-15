@@ -14,6 +14,9 @@ import { at, bake, box, cyl, gearMats, movingMeshes, roadCase, std, waterCrate, 
 import { concrete, exitSign, hallWall, neonSign, pleats, roofDeck, screen, stageFloor } from './textures';
 import { buildCrowd, type Crowd } from './crowd';
 import { beatClock, djBooth, djPerson } from './dj';
+import { buildBallroom, buildBar, buildChurch, buildCinema, buildTheatre } from './scenes';
+import { ballMotion, BALL_SPIN, mirrorBall } from './mirrorBall';
+import type { Ball } from './mirrorBall';
 import type { Person } from './people';
 
 // What the 3D stage needs of any room (the hall's and the pub's venue has more: the band).
@@ -32,9 +35,11 @@ export interface Stage {
   screens?: { mat: THREE.MeshBasicMaterial; painted: THREE.Texture };
   // the DJ (for the tests): the person, how far the left hand is up, the booth (the person's parent)
   dj?: { p: Person; raised: () => number; booth: THREE.Object3D };
+  // its mirror balls (turning: the scene spins them), for what they throw round the room
+  mirrorBalls?: Ball[];
 }
-export type DemoRoom = 'club' | 'party' | 'truss';
-export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss';
+export type DemoRoom = 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom';
+export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === 'party' || r === 'truss' || r === 'custom' || r === 'cinema' || r === 'bar' || r === 'theatre' || r === 'church' || r === 'ballroom';
 
 // Is WebGL drawn in software here (no graphics chip: SwiftShader, llvmpipe)? Hundreds of people cost
 // a second a frame there.
@@ -128,12 +133,15 @@ function frame(group: THREE.Group, M: Mats, r: Room) {
   }
 }
 
-export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {}): Stage {
-  const r = ROOMS[id], M = gearMats(), group = new THREE.Group();
+// (your own stage: its room comes with it, built from its size, geometry.ts customRoom)
+export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; custom?: Room; act?: 'band' | 'none' } = {}): Stage {
+  const r = id === 'custom' ? o.custom! : ROOMS[id], M = gearMats(), group = new THREE.Group();
   const soft = softwareGL();
   let crowd: Crowd | undefined, dj: Stage['dj'];
   let booth: ReturnType<typeof djBooth> | undefined, boothName = '', boothShows = '';
   let djPlay: ((b: number, e: number) => void) | undefined;
+  let sceneAnim: ((t: number) => void) | undefined;        // a scene's own moving parts (the bar's mirror ball)
+  const balls: Ball[] = [];
   const DEFAULT = id === 'club' ? 'CLUB NIGHT' : 'HOUSE PARTY';
 
   if (id === 'club') {
@@ -158,9 +166,12 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {
     group.add(at(box(9, 0.04, 0.3, wood), -2.5, 1.6, r.walls.z1 - 0.2), at(box(9, 0.012, 0.02, strip), -2.5, 1.575, r.walls.z1 - 0.06));
     group.add(at(new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: neonSign('Bar', '#36d6e7'), toneMapped: false })), -2.5, 2.9, r.walls.z1 - 0.03, [0, Math.PI, 0]));
     for (let i = 0; i < 7; i++) { const x = -6.8 + i * 1.4; group.add(at(cyl(0.18, 0.16, 0.05, M.black, 14), x, 0.78, bz - 0.7), at(cyl(0.025, 0.025, 0.76, M.steel, 8), x, 0.38, bz - 0.7), at(cyl(0.2, 0.22, 0.02, M.steel, 14), x, 0.01, bz - 0.7)); }
-    // a mirror ball over the dance floor
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 12), std({ color: 0xe8ecf2, metalness: 1, roughness: 0.08, flatShading: true }));
-    group.add(at(ball, 0, r.ceiling - 1.1, 12), at(cyl(0.008, 0.008, 0.78, M.chrome, 5), 0, r.ceiling - 0.39, 12));
+    // a mirror ball over the dance floor, turning
+    // (ball and chain together: a mirror ball on a DMX motor in the show takes its place, Stage3D)
+    const ball = mirrorBall(0.32), holder = new THREE.Group();
+    holder.add(at(ball, 0, r.ceiling - 1.1, 12), at(cyl(0.008, 0.008, 0.78, M.chrome, 5), 0, r.ceiling - 0.39, 12));
+    group.add(holder);
+    balls.push({ obj: ball, r: 0.32, holder }); sceneAnim = (t) => ballMotion(ball, t, BALL_SPIN);
   } else if (id === 'party') {
     shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x9a9aa0 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ map: roofDeck(), color: 0x8a8a90 })) });
     frame(group, M, r);
@@ -171,6 +182,28 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {
     }
     // the DJ's road cases against the back wall, water
     group.add(at(roadCase(M, 1.0, 0.75, 0.65, { wheels: true, stencil: 7 }), -2.4, 0, Z0 + 0.6), at(roadCase(M, 1.0, 0.75, 0.65, { stencil: 0 }), -2.4, 0.86, Z0 + 0.6), at(waterCrate(M), 2.2, 0, Z0 + 0.5, [0, 0.3, 0]));
+  } else if (id === 'cinema') {
+    sceneAnim = buildCinema(group, M, r).animate;
+    frame(group, M, r);
+  } else if (id === 'bar') {
+    const bar = buildBar(group, M, r); sceneAnim = bar.animate; balls.push(...bar.balls);
+  } else if (id === 'theatre') {
+    sceneAnim = buildTheatre(group, M, r).animate;
+    frame(group, M, r);
+  } else if (id === 'church') {
+    sceneAnim = buildChurch(group, M, r).animate;
+  } else if (id === 'ballroom') {
+    sceneAnim = buildBallroom(group, M, r).animate;
+  } else if (id === 'custom') {
+    // your own stage: the hall's walls, its deck (or none), its spans on towers, a PA either side
+    shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0x6a6a70 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ color: 0x1a1b1f })) });
+    if (r.deck.x > 0) {
+      const { x: dx, z0, z1 } = r.deck, dd = z1 - z0, top = std({ map: stageFloor(), roughness: 0.72 });
+      group.add(at(new THREE.Mesh(new THREE.BoxGeometry(2 * dx, DECK, dd), [M.black, M.black, top, M.black, M.black, M.black]), 0, DECK / 2, (z0 + z1) / 2)).name = 'deck';
+      for (let i = 0; i < 3; i++) { const h = (DECK / 4) * (3 - i); group.add(at(box(0.9, h, 0.3, [M.black, M.black, top, M.black, M.black, M.black]), -dx + 0.6, h / 2, z1 + 0.15 + 0.3 * i)); }
+    }
+    frame(group, M, r);
+    for (const sx of [-1, 1]) { const pa = paStack(M); pa.rotation.y = -sx * 0.25; group.add(at(pa, sx * (r.deck.x > 0 ? r.deck.x + 1.2 : r.W / 2 + 1.2), 0, r.D / 2 - 0.2)); }
   } else {
     shell(group, M, r, { wall: house(new THREE.MeshBasicMaterial({ map: hallWall(), color: 0xa4a4a8 })), su: 6.4, sv: 3.2, floor: std({ map: concrete(), roughness: 0.85 }), ceiling: house(new THREE.MeshBasicMaterial({ map: roofDeck(), color: 0x9a9aa0 })) });
     frame(group, M, r);
@@ -205,6 +238,15 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {
       z0: D / 2 + 1.0, z1: W.z1 - 3.4, spread: () => W.x - 1.4, flags: 0,
       keepOut: (x, z) => (Math.abs(x) > 7.2 && z < D / 2 + 1.4),
     });
+  } else if (id === 'custom') {
+    // (a crowd in front of your stage, the size of the room)
+    const W = r.walls;
+    crowd = buildCrowd(o.crowd ?? Math.round((soft ? 0.4 : 1) * Math.min(260, (W.z1 - r.D / 2 - 4) * (2 * W.x - 3) * 0.9)), {
+      z0: r.D / 2 + 1.4, z1: W.z1 - 3, spread: () => W.x - 1.4, flags: 0, keepOut: () => false,
+      // (a show nobody plays in, a service or a play, on your stage: an audience standing calmly, as
+      // in the hall, not one with phones and fists in the air)
+      calm: o.act === 'none', riders: o.act === 'none' ? 0 : undefined,
+    });
   } else if (id === 'party') {
     const W = r.walls, legs: [number, number][] = [[-6, 1.5], [6, 1.5], [-6, 13.5], [6, 13.5]];
     crowd = buildCrowd(o.crowd ?? (soft ? 90 : 200), {
@@ -222,6 +264,8 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {
       if (!crowd.group.visible && ++shown > 1) crowd.group.visible = true;
       crowd.update(t, beat, energy, col);
     }
+    // (a mirror ball turns on its own motor, music or not)
+    sceneAnim?.(t);
     // no music: the DJ stops where the last beat was, hands still, and waits
     if (!music) { rest ??= Math.floor(beat); djPlay?.(rest, 0); return; }
     rest = null;
@@ -245,7 +289,7 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string } = {
   }
   setBand(o.band);
   return {
-    group, room: id, crowdCount: crowd?.count ?? 0, animate, setBand, baked, crowd, dj,
+    group, room: id, crowdCount: crowd?.count ?? 0, animate, setBand, baked, crowd, dj, mirrorBalls: balls,
     bandInfo: () => ({ name: boothName, surfaces: booth ? [{ what: 'booth', shows: boothShows, uuid: booth.t.uuid, version: booth.t.version }] : [] }),
   };
 }

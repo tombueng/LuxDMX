@@ -19,6 +19,8 @@ import { shapeH, shapeW, type Places } from '../model/pixelLayout';
 import { CUSTOM_EFFECTS } from './custom';
 import { PIXEL_EFFECTS } from './pixels';
 import { SHAPE_EFFECTS } from './shapes';
+import { MOVE_EFFECTS } from './moves';
+import { MATRIX_EFFECTS } from './matrix';
 import {
   PALETTES, TAU, WHITE, along, clamp01, cleanParams, frac, hash, hsv, lerpColor, mix, noise, range, sine, step, tri,
   type EffectCategory, type EffectDef, type EffectParams, type FxOut, withContrast,
@@ -62,6 +64,8 @@ export const EFFECTS: EffectDef[] = [
       pan: 0.5 * p.size * (0.65 * Math.sin(TAU * e.phase) + 0.35 * Math.sin(TAU * (2 * e.phase + e.seed))),
       tilt: 0.35 * p.size * (0.6 * Math.cos(TAU * (e.phase + 0.25)) + 0.4 * Math.sin(TAU * (3 * e.phase + e.seed))),
     }) },
+  // (and twenty more: shapes, sweeps with a character, the group together; moves.ts)
+  ...MOVE_EFFECTS,
 
   // ---- colour
   { id: 'rainbow', name: 'Rainbow', category: 'color', blurb: 'All the colours, rolling along the lights.',
@@ -153,7 +157,7 @@ export const EFFECTS: EffectDef[] = [
     run: (e, p) => ({ intensity: range(p, noise(e.seed, e.total * 7) * 0.7 + noise(e.seed + 3, e.total * 19) * 0.3) }) },
 ];
 // the pixel shows and your own effects join the built-in ones
-EFFECTS.push(...SHAPE_EFFECTS, ...PIXEL_EFFECTS, ...CUSTOM_EFFECTS);
+EFFECTS.push(...SHAPE_EFFECTS, ...MATRIX_EFFECTS, ...PIXEL_EFFECTS, ...CUSTOM_EFFECTS);
 export const EFFECT_MAP = new Map(EFFECTS.map((d) => [d.id, d]));
 export const CATEGORY_LABEL: Record<EffectCategory, string> = { move: 'Moves', color: 'Colour', pixel: 'Pixels', intensity: 'Intensity' };
 

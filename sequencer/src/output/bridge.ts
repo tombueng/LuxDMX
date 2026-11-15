@@ -5,16 +5,9 @@
 
 import type { RdmReply, RdmRequest } from '../rdm/types';
 import type { PortInfo } from '../model/ledCurve';
+import { BOX_INFO, BOX_NAME } from '../store/kept';
 
-const HEARTBEAT_MS = 250;
-const INFO_KEY = 'luxdmx.seq.box.';
-const NAME_KEY = 'luxdmx.seq.boxname.';
-
-function sameBytes(a: Uint8Array, b: Uint8Array) {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
+import { dmxMessage, due, type Sent } from './wire';
 
 // silent: the popup opened but nothing answered for a while (wrong address, or a box whose
 // firmware has no /bridge yet). It keeps trying.
@@ -37,12 +30,17 @@ export class Bridge {
   fps = 0;
   drops = 0;
   lostAt = 0;          // when it stopped getting through, after having been live (0: it hasn't)
+  backAt = 0;          // when it came back after that (the red bar turns green for a while: see ConnectionBanner)
+  // The last few seconds as its page counted them: frames sent a second, and frames it had to
+  // replace because the box hadn't answered the one before. A link that's connected but slow or
+  // stalled (venue Wi-Fi) looked perfectly healthy while the lights got a look every few seconds.
+  recent: { fps: number; drops: number }[] = [];
   readonly origin: string;
   // messages other pages on this box sent (a phone used as a remote, see remote/host.svelte.ts)
   onRelay: ((d: unknown) => void) | null = null;
   private win: Window | null = null;
   private hello: ReturnType<typeof setInterval> | undefined;
-  protected sent = new Map<number, { data: Uint8Array; at: number }>();
+  protected sent: Sent = new Map();
   protected usesWindow = true;     // a popup that may be closed (LuxDMX Link isn't one)
   // RDM: asked of the box's own RDM controller through its page, answered by id (rdm/types.ts)
   protected rdmWaiting = new Map<number, { done: (r: RdmReply) => void; timer: ReturnType<typeof setTimeout> }>();
@@ -52,7 +50,7 @@ export class Bridge {
   constructor(readonly host: string, private changed: () => void) {
     this.origin = 'http://' + host;
     // its name from the last time (a tablet switched on again says "the bar's box", not an address)
-    try { this.name = localStorage.getItem(NAME_KEY + host) ?? ''; } catch { /* the address then */ }
+    this.name = BOX_NAME.of(host).get();
   }
 
   // Must run from a click: browsers only allow popups from user gestures.
@@ -99,8 +97,8 @@ export class Bridge {
       case 'ready':
         this.outputs = m.outputs ?? []; this.pixels = Array.isArray(m.pixels) ? m.pixels.filter(Number.isInteger) : []; this.ports = portsOf(m.pixelPorts); this.name = m.name ?? ''; this.ip = typeof m.ip === 'string' ? m.ip : ''; this.sent.clear(); this.adopting = false;
         // kept for this tab: a popup taken back after a reload doesn't say it again
-        try { sessionStorage.setItem(INFO_KEY + this.host, JSON.stringify({ outputs: this.outputs, pixels: this.pixels, ports: this.ports, name: this.name, ip: this.ip })); } catch { /* fine */ }
-        try { if (this.name) localStorage.setItem(NAME_KEY + this.host, this.name); } catch { /* fine */ }
+        BOX_INFO.of(this.host).set({ outputs: this.outputs, pixels: this.pixels, ports: this.ports, name: this.name, ip: this.ip });
+        if (this.name) BOX_NAME.of(this.host).set(this.name);
         this.set('ready'); break;
       case 'denied': this.adopting = false; this.set('denied'); break;
       case 'status':
@@ -108,7 +106,7 @@ export class Bridge {
         else if (m.ws === 'open' && this.state === 'reconnecting') this.set('ready');
         else if (m.ws === 'closed') this.set(this.win?.closed ? 'closed' : 'reconnecting');
         break;
-      case 'stats': this.fps = m.fps; this.drops = m.drops; this.changed(); break;
+      case 'stats': this.fps = m.fps; this.drops = m.drops; this.recent = [...this.recent.slice(-4), { fps: m.fps, drops: m.drops }]; this.changed(); break;
       case 'relay': this.onRelay?.(m.data); break;
       case 'port': if (m.ok) { this.portTaken = true; this.changed(); } break;
       case 'rdm': this.rdmAnswer(m); break;
@@ -127,7 +125,7 @@ export class Bridge {
     this.adopting = true;
     this.sent.clear();
     try {
-      const info = JSON.parse(sessionStorage.getItem(INFO_KEY + this.host) ?? 'null');
+      const info = BOX_INFO.of(this.host).get() as { outputs?: BoxOutput[]; pixels?: unknown; ports?: unknown; name?: string; ip?: string } | null;
       if (info) { this.outputs = info.outputs ?? []; this.pixels = Array.isArray(info.pixels) ? info.pixels : []; this.ports = portsOf(info.ports); this.name = info.name ?? ''; this.ip = info.ip ?? ''; }
     } catch { /* it sends everything until it says otherwise */ }
     this.set('opening');
@@ -138,20 +136,31 @@ export class Bridge {
   // bridge) gets everything; one that says only its outputs (too old to name its pixel ports) gets
   // those: sending every pixel universe to every box slows down what it really plays.
   wants(uni: number) { return this.outputs.length === 0 || this.outputs.some((o) => o.en && o.uni === uni) || this.pixels.includes(uni); }
+  // whether a universe reaches something real through it (a winch there is held until armed): what it plays
+  reaches(uni: number) { return this.wants(uni); }
 
-  // Only what changed, plus a heartbeat so the box keeps the source (it drops one after 4 s of
-  // silence). A static look costs 4 frames a second instead of 40, and a box that stalls for a
-  // moment on WiFi doesn't build up seconds of stale frames in the TCP buffer.
+  // 'stalled': under one frame in two seconds over 3 s (a still look alone sends about 4 a second for
+  // each universe; a box that never answers gets one every 2 to 4 s); 'slow': it had more to send
+  // than the box took (frames replaced) and got under 10 through a second, or under 2 at all. Only
+  // while connected, and only from what its page has said lately.
+  get slow(): '' | 'slow' | 'stalled' {
+    // (not from its first second: the page warming up said "hardly answers" right after connecting)
+    if (this.state !== 'ready' || this.recent.length < 4) return '';
+    const r = this.recent.slice(-3), fps = r.reduce((n, x) => n + x.fps, 0) / 3, drops = r.reduce((n, x) => n + x.drops, 0);
+    // (only with frames it had to skip: an idle show sends next to nothing and is fine, it was said
+    // to be "answering slowly")
+    if (drops < 3) return '';
+    return fps < 0.5 ? 'stalled' : fps < 10 ? 'slow' : '';
+  }
+  get sentRate() { const r = this.recent.slice(-3); return r.length ? r.reduce((n, x) => n + x.fps, 0) / r.length : 0; }
+
   // Its window closed (the popup shut by hand): said at once, whoever sends to it (this page or the
   // output thread), so the red bar comes up. Called every frame.
   watch() { if (this.usesWindow && (this.state === 'ready' || this.state === 'reconnecting') && (!this.win || this.win.closed)) this.set('closed'); }
+  // only what changed, plus a heartbeat so the box keeps the source (wire.ts)
   send(uni: number, data: Uint8Array, now = performance.now()) {
     if (this.state !== 'ready' || !this.win || this.win.closed) { this.watch(); return; }
-    if (!this.wants(uni)) return;
-    const last = this.sent.get(uni);
-    if (last && now - last.at < HEARTBEAT_MS && sameBytes(last.data, data)) return;
-    this.sent.set(uni, { data: data.slice(), at: now });
-    this.win.postMessage({ luxdmx: 1, type: 'dmx', uni, prio: 100, data }, this.origin);
+    if (this.wants(uni) && due(this.sent, uni, data, now)) this.win.postMessage(dmxMessage(uni, data), this.origin);
   }
 
   // RDM through the box (rdm/rig.svelte.ts): what the page asks, answered within `wait` ms (a box
@@ -183,11 +192,18 @@ export class Bridge {
   protected set(s: BridgeState) {
     if (s !== 'ready') this.portTaken = false;
     if (this.state === 'ready' && s !== 'ready') this.lostAt = Date.now();
-    else if (s === 'ready') this.lostAt = 0;
+    else if (s === 'ready') { if (this.lostAt) this.backAt = Date.now(); this.lostAt = 0; }
+    if (s !== 'ready') this.recent = [];
     this.state = s; this.changed();
     // reconnecting: its window may say it's closed only after its socket did; look again
     clearInterval(this.recheck);
-    if (s === 'reconnecting' && this.usesWindow) this.recheck = setInterval(() => { if (this.state !== 'reconnecting') clearInterval(this.recheck); else if (!this.win || this.win.closed) this.set('closed'); }, 1000);
+    // (and a hello every second: a popup that was reloaded (F5 in it) waits for one, and stayed
+    // waiting while this said "trying again" for ever; a live one only answers with its status)
+    if (s === 'reconnecting' && this.usesWindow) this.recheck = setInterval(() => {
+      if (this.state !== 'reconnecting') clearInterval(this.recheck);
+      else if (!this.win || this.win.closed) this.set('closed');
+      else this.win.postMessage({ luxdmx: 1, type: 'hello' }, this.origin);
+    }, 1000);
   }
   private recheck: ReturnType<typeof setInterval> | undefined;
 }

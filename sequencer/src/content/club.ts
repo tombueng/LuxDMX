@@ -195,7 +195,7 @@ export function buildClub(song?: DemoSong): Show {
 
   // ---- the show on the song (or on the demo beat)
   s.timeline = cueParts(song, {
-    list: L.id, looks, end: 'end', haze: { list: haze.id, cue: haze.cues[0].id },
+    list: L.id, looks, end: 'end', crowd: 'party', haze: { list: haze.id, cue: haze.cues[0].id },
     sets: {
       intro: [['intro']], verse: [['pulse', 'cyan'], ['red', 'bounce'], ['juggle', 'pulse']], build: [['build']],
       chorus: [['drop', 'dropRW'], ['dropUV', 'fireworks', 'pride'], ['popcorn', 'drop', 'dropRW']], solo: [['strobe', 'fireworks']],

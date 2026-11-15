@@ -209,7 +209,7 @@
   .row .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--green); flex: none; }
   .row.warn .dot { background: var(--orange); } .row.bad .dot { background: var(--pink); } .row.gone .dot { background: var(--muted); }
   .row.gone { opacity: .6; }
-  .who { display: flex; gap: .5rem; align-items: center; text-align: left; padding: .1rem; min-width: 0; }
+  .who { display: flex; gap: .5rem; align-items: center; justify-content: flex-start; text-align: left; padding: .1rem; min-width: 0; }
   .nm, .where, .patch { display: flex; flex-direction: column; min-width: 0; }
   .nm b, .patch b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   small { font-size: .75rem; color: var(--muted); }
@@ -222,7 +222,7 @@
   .status { padding: 0 .35rem; border-radius: 4px; } .status.warning { color: var(--orange); } .status.error { color: var(--pink); } .status.advice { color: var(--accent); }
   .do { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: flex-end; }
   .sm { padding: .1rem .5rem; font-size: .8rem; display: inline-flex; gap: .25rem; align-items: center; }
-  .sm.on { border-color: var(--orange); color: var(--orange); }
+  .sm.on { border-color: var(--orange); color: var(--orange); background: #ffaa1c2a; }
   .log { font-size: .82rem; } .log ol { list-style: none; margin: .4rem 0 0; padding: 0; max-height: 14rem; overflow: auto; display: flex; flex-direction: column; gap: .15rem; }
   .log time { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: .4rem; }
   .log .gone, .log .error { color: var(--pink); } .log .back, .log .found { color: var(--green); } .log .status, .log .hot { color: var(--orange); }

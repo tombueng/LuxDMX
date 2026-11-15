@@ -14,14 +14,14 @@ import { cueNum, cueNumber } from '../model/cuenum';
 import { EFFECT_MAP, paramsOf, runEffect } from '../engine/effects';
 import { SONG_STILL, holdsWhilePressed, widgetFace, type Face } from '../ui/widgetFace';
 import type { app as theApp } from '../app.svelte';
+import { REMOTE_CODE, REMOTE_KEEP, REMOTE_TAB } from '../store/kept';
 
 type App = typeof theApp;
 
-const SESSION_KEY = 'luxdmx.seq.remote';     // on: survives a reload of this tab (not a copy of it)
-const CODE_KEY = 'luxdmx.seq.remote.code';   // the code: survives closing the tab for a while, so phones can come back
+// (store/kept.ts: on in this tab survives its reload, not a copy of it; the code survives closing
+// the tab for a while, so phones can come back; "keep it on": on with the same code after a restart
+// too, the pastor's phone every Sunday)
 const CODE_KEEP_MS = 12 * 3600 * 1000;
-// "keep it on": on with the same code after a restart too (the pastor's phone, every Sunday)
-const KEEP_KEY = 'luxdmx.seq.remote.keep';
 const hasLocks = () => typeof navigator !== 'undefined' && !!(navigator as unknown as { locks?: LockManager }).locks?.request;
 const STATE_MS = 200;              // state updates at most this often
 const PRESS_MS = 80;               // after a press a bit sooner, but never closer than this
@@ -80,9 +80,9 @@ export class RemoteHost {
 
   constructor(private app: App) {
     try {
-      const c = JSON.parse(localStorage.getItem(CODE_KEY) ?? 'null');
+      const c = REMOTE_CODE.get();
       if (c && /^\d{4}$/.test(c.code) && Date.now() - c.at < CODE_KEEP_MS) this.code = c.code;
-      const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? 'null');
+      const s = REMOTE_TAB.get();
       // this tab's own code (another tab may have saved its own since)
       if (s && /^\d{4}$/.test(s.code)) this.code = s.code;
       // on again only after a reload of this tab; a copy of the tab (same session storage) starts off
@@ -91,7 +91,7 @@ export class RemoteHost {
       // (taken: another tab has that code on; its "keep it on" is its own, left alone)
       if (s?.on && this.code && (!nav || nav === 'reload')) { this.on = true; void this.holdCode().then((got) => { if (!got) { this.on = false; this.keep = false; this.saveSession(); } }); }
       // kept on: the same code, on again, unless another tab has it on already (it's asked)
-      const k = JSON.parse(localStorage.getItem(KEEP_KEY) ?? 'null');
+      const k = REMOTE_KEEP.get();
       if (k && /^\d{4}$/.test(k.code) && (!this.on || k.code === this.code)) {
         this.keep = true; this.code = k.code;
         if (!this.on) {
@@ -174,14 +174,12 @@ export class RemoteHost {
     this.count(performance.now());
   }
   private forgetPhones() { this.seen.clear(); this.removed.clear(); this.known.clear(); this.out = []; this.count(performance.now()); }
-  private saveSession() { try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ on: this.on, code: this.code })); } catch { /* fine */ } }
+  private saveSession() { REMOTE_TAB.set({ on: this.on, code: this.code }); }
   private save() {
     this.saveSession();
-    try {
-      localStorage.setItem(CODE_KEY, JSON.stringify({ code: this.code, at: Date.now() }));
-      if (this.keep && this.on) localStorage.setItem(KEEP_KEY, JSON.stringify({ code: this.code }));
-      else if (JSON.parse(localStorage.getItem(KEEP_KEY) ?? 'null')?.code === this.code) localStorage.removeItem(KEEP_KEY);   // (only ours: another tab's stays)
-    } catch { /* fine */ }
+    REMOTE_CODE.set({ code: this.code, at: Date.now() });
+    if (this.keep && this.on) REMOTE_KEEP.set({ code: this.code });
+    else if (REMOTE_KEEP.get()?.code === this.code) REMOTE_KEEP.remove();   // (only ours: another tab's stays)
   }
 
   // A relayed message that came in through box `b`.

@@ -10,7 +10,7 @@ test('groups: made by type, renamed with F2, a click selects them, deleting can 
   await patch(page, 'gen-rgb', 3, 0, 'P');
   await patch(page, 'gen-dimmer', 2, 0, 'D');
   await tab(page, 'Groups');
-  await page.locator('.gp').getByRole('button', { name: 'Group by fixture type' }).click();
+  await page.locator('.gp').getByRole('button', { name: 'Group by type' }).click();
   await expect(groups(page)).toHaveCount(2);
   await expect(groups(page).first()).toContainText('3 lights');
   await groups(page).first().locator('.main').focus();

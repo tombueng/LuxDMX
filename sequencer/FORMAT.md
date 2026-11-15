@@ -110,7 +110,9 @@ allows unknown fields everywhere, like readers must).
   angle in degrees, `[narrowest, widest]` (zoomed in and out; the same twice for a light without a
   zoom), from the fixture file (OFL `physical.lens.degreesMinMax` or a zoom's angles, GDTF a zoom
   in degrees or the beam's `BeamAngle`, QLC+ `Lens DegreesMin/DegreesMax`). The 3D stage draws the
-  beam at that angle; without it, a guess for its kind. `travel` and `hoistSpeed`, for a winch:
+  beam at that angle; without it, a guess for its kind. `dims`: how big it is in metres, `{ w, h, d }`
+  (each 0.02 to 100, each optional; `w` across: a strip's or a bar's length, a matrix's width), as the
+  3D stage draws it. `travel` and `hoistSpeed`, for a winch:
   how far its load goes from the top down (metres, 0.1 to 100) and its top speed (metres a second,
   0.01 to 10); the 3D stage moves it so (4 m and 0.4 m/s when not said).
 - `rdm` (optional): what the real fixture says it is over RDM, so a light found on the line is
@@ -198,6 +200,14 @@ the deck, by its kind, under its 2D place):
   doesn't say or says wrong. Optional.
 - `beamDeg`: this light's own beam angle, `[narrowest, widest]` in degrees (0.5 to 180), over its
   type's `physical.beamDeg`. Optional.
+- `dims`: this light's own size, `{ w, h, d }` in metres as in a type's `physical.dims`, over its
+  type's (a strip cut to the length of the bar, a bigger PAR). Optional; a value that can't be right
+  is left out with a note.
+- `cloth`: stage machinery's cloth, `{ "w", "h", "picture" }`: a curtain track's or a fly bar's
+  width and height in metres, and the picture painted on a drop (`forest`, `city`, `stars`,
+  `castle`, `sea`, `clouds`). Optional, each part too: a curtain spans its type's `physical.travel`,
+  10.4 m high; a drop is 18 x 10.2 m, a forest. On a curtain `hoist` is how far it's open (0 shut,
+  1 open), on a fly bar how far its drop is flown in (0 out, 1 in).
 - `hoistLimits`: a winch's soft limits, `[highest, lowest]` as parts of its travel (0 the top, 1 the
   bottom): whatever a cue says, its `hoist` is sent within them. Optional (none: its whole travel);
   anything that isn't two numbers from 0 to 1 is left out with a note.
@@ -229,7 +239,10 @@ the deck, by its kind, under its 2D place):
 The order of `fixtures` is the order effects run in. `auto: true` marks groups the app made from
 the patch (it may rebuild them). `cells` (optional, numbers from 0) makes it a group of some cells
 of its lights ("Rim": `[0, 1, ... 59]` on discs): selecting it picks those cells, and an effect on
-the group (without `cells` of its own) runs on just them, in this order.
+the group (without `cells` of its own) runs on just them, in this order. `num` (optional, a whole
+number from 1, no two the same) is its number on the console ("group 5"); it stays when the list
+is reordered. A group without one counts by its place, after the numbers that are taken (a show
+from before has none: its groups are 1, 2, 3 in order).
 
 ## Values
 
@@ -407,12 +420,24 @@ a note.
 `settings.stage3d` (optional): `hideVenue: true` leaves out the built-in stage (band, truss, PA,
 crowd); `model`: `{ "name", "store", "scale", "x", "y", "z", "yaw" }`, your own venue as a glTF
 model kept in the browser that loaded it (`store` is its key there), placed in metres and turned
-in degrees about up. Another browser asks for the file again. `room`: the built-in room, `"hall"`
+in degrees about up. Another browser asks for the file again. `act`: `"none"` puts nobody on the
+hall's or the pub's stage (a play, a service, a premiere): no band, drum kit or backline, an
+audience standing calmly (no flags, no phones in the air), the banners and screens with the show's
+name (or `bandName`); `"band"` or left out, the band plays. `room`: the built-in room, `"hall"`
 (the big stage, also when it's left out) or `"pub"` (a small club or pub: a smaller deck under a
 low ceiling with two little trusses), or one of the demos' rooms: `"club"` (a DJ on a 12 m stage
 with truss on four towers and one over the dance floor), `"party"` (no stage: a 12 x 12 m square
 of truss over the crowd on four legs, the DJ's table on the floor) or `"truss"` (an empty room with
-one straight truss on two towers). Lights without a `p3` of their own go where their plan
+one straight truss on two towers), the templates' rooms `"cinema"` (a big cinema: the screen, a
+stage in front of it, raked rows with an audience), `"bar"` (a long counter with a back bar,
+stools, tables, a little dance floor), `"theatre"` (a proscenium stage with a cyclorama, stalls and
+a balcony), `"church"` (the chancel with the altar, pews down the nave, stained glass) and
+`"ballroom"` (a wedding: draped walls, round tables, a dance floor, the head table), or `"custom"`: your own stage at the size in `size`, `{ w, d,
+riser?, trussY?, trusses? }` in metres: the deck `w` wide and `d` deep, on a 1.2 m riser
+(`riser: true`, the default) or on the floor, `trusses` spans across it (0 to 4, default 2) on
+towers at its sides, their underside `trussY` above the floor (default 5). Out of range numbers are
+brought into range on load (width 2-40, depth 1.5-25, truss 2.5-15 m); without `size` it's 8 x 5 m.
+The plan is that stage: a quarter across the plan is a quarter across its width. Lights without a `p3` of their own go where their plan
 position puts them in that room; a `p3` stays where it is in metres in either. Any other value is
 dropped on load (the big stage).
 
@@ -432,7 +457,8 @@ are cut to 60 on load, an empty one is dropped.
 ```
 
 - `audio` (optional): `{ "name", "duration", "store" }`, a song kept in the browser that made the
-  show (`store` is its key there); another browser asks for the file. `demo: true`: the app's own
+  show (`store` is its key there); another browser asks for the file, unless the show came in a
+  `.luxdmx.zip` with its songs (below). `demo: true`: the app's own
   demo beat instead. Neither: silent, its own clock.
 - A song picked from the app's demo songs also has `audio.catalog` (its id in the app's list, so
   another browser can download it again) and `audio.credit` (`"Title" by Artist, CC BY`: the
@@ -443,7 +469,11 @@ are cut to 60 on load, an empty one is dropped.
   one per moment. The demo beat has its own and needs none here.
 - `bpm` and `offset` (seconds before the first beat) draw the grid things snap to.
 - An item's `do` is a cue action (see above), `{ "do": "effect", "effect", "on" }` (with `len`: it
-  runs that long), or `{ "do": "burst", "attr", "seconds" }`: the effect machines with that channel
+  runs that long; with `curves`, `[{ "knob": "speed", "pts": [[0, 4], [0.5, 16], [1, 4]] }]`, its
+  knobs change along the bar while the song plays: each point is where along the bar (0 its start,
+  1 its end) and the knob's value there, straight lines between them, the first and last values
+  before and after; knobs `speed`, `size`, `spread`, `width`, `low`, `high`, `contrast`; a curve
+  with fewer than two good points is left out), or `{ "do": "burst", "attr", "seconds" }`: the effect machines with that channel
   (`confetti`, `flame`, `sparks`, `co2`, `bubbles`), the fog machines (`fog`), or every light
   (`strobe`, `blinder`) for that long (30 s at most). `lane` says which track it's drawn on
   (`list:<id>`, `fx`, `special`).
@@ -505,8 +535,11 @@ others around it. The set in order is `before`, then `timeline`, then `after`:
 
 ## Locking for the service
 
-`settings.lockPin` (optional): digits that unlock a show locked for the service (staff-proofing,
-not security: anyone with the file can read it). `settings.lockPage`: the live page it was locked
+`settings.lockPin` (optional): what unlocks a show locked for the service, kept as a hash of the
+PIN, `"h1:"` and 14 hex digits (src/model/pin.ts: cyrb53 of `"luxdmx-pin:"` and the digits), so the
+file doesn't say the PIN in plain text. Staff-proofing, not security: three to eight digits are
+found by trying them all. A file with the digits themselves (as before) still unlocks with them and
+gets the hash when it's opened. `settings.lockPage`: the live page it was locked
 on, the only one shown while locked. A page's `locked` is the lock itself; a reader that imports a
 file should open it unlocked. A page with `"go": false` (a staff page of looks) shows no GO or Back:
 its looks are tapped, not stepped through.
@@ -760,7 +793,7 @@ presses a button, a control moves a fader). By `type`:
 | `list` | `list`, `action` | `go`, `back`, `toggle`, `flash` (on while held), `release`, `solo` (start it, release the other lists that aren't `high` priority), `select` (GO and Space play this list from now on: a song in a set list) |
 | `cue` | `list`, `cue` | go straight to that cue |
 | `effect` | `effect`, `action` | `toggle` or `flash` an effect by hand |
-| `fader` | `target`, `ref` | `grand` master, `bpm`, `list` level or `effect` level (`ref` is its id) |
+| `fader` | `target`, `ref` | `grand` master, `bpm`, `list` level, `effect` level or `group` level (`ref` is its id) |
 | `fog` | `fixtures`, `level`, `burst`, `max` | fog while held, switched off after `max` seconds even if still held |
 | `group` | `group`, `level`, `strobe`, `white` | flash a group while held (optionally strobing; `white`: full white, a blinder) |
 | `cuelist` | `list` | the whole list as rows (number, name, fade, what follows, note), the cue on stage lit; holding a row jumps to it |
@@ -770,3 +803,18 @@ presses a button, a control moves a fader). By `type`:
 
 A show without pages gets a page generated from its contents; it's only written to the file once
 someone edits it.
+
+## A show with its songs (.luxdmx.zip)
+
+"Save with its songs" writes a plain zip:
+
+- `show.luxdmx.json`: the show file, exactly as "Save as file" writes it.
+- `songs/<n> <name>`: each song's audio as the browser keeps it (the timeline's and the set
+  list's, each once), stored uncompressed.
+- `venue/<name>`: the show's own 3D venue (`settings.stage3d.model`), if it has one.
+- `manifest.json`: `{ "format": "luxdmx-bundle", "version": 1, "show": "show.luxdmx.json",
+  "songs": [{ "key", "file" }], "model": { "key", "file" } }`. `key` is the `store` key the show
+  names the file by.
+
+Opening one puts every file into the browser's store under its `key`, then opens the show file.
+A zip without a manifest that holds a `.json` show file is opened as that show alone.

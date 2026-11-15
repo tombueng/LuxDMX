@@ -49,6 +49,15 @@ export function search(all: Entry[], query: string, limit = 60): Entry[] {
     let score = 0;
     if (name === words.join(' ')) score -= 100;
     if (name.startsWith(words[words.length - 1])) score -= 10;
+    // (a whole word first, the maker most of all: "robe" is Robe before Robert Juliat, and a strobe,
+    // which only has it inside a word, comes last)
+    const tokens = hay.split(' '), maker = norm(e.manufacturer).split(' ');
+    for (const w of words) {
+      if (maker.includes(w)) score -= 30;
+      else if (tokens.includes(w)) score -= 20;
+      else if (tokens.some((t) => t.startsWith(w))) score -= 8;
+      else score += 15;
+    }
     if (e.source === 'ofl') score -= 1;            // richer descriptions: show them first on a tie
     scored.push([score + hay.length / 100, e]);
   }

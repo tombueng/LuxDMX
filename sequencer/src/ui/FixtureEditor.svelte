@@ -97,6 +97,12 @@
     openRuns = new Set(); openRanges = null;
   }
 
+  // (a note from the last Save goes as soon as what it's about is put right: a name typed, a channel added)
+  $effect(() => {
+    if (!err) return;
+    const named = !!t.model.trim(), filled = t.modes.every((m) => m.channels.length > 0), apart = new Set(t.modes.map((m) => m.name)).size === t.modes.length;
+    if ((err === 'Give it a name.' && named) || (err === 'Every mode needs at least one channel.' && filled) || (err === 'Two modes have the same name.' && apart)) err = '';
+  });
   function save() {
     err = '';
     if (!t.model.trim()) { err = 'Give it a name.'; return; }
@@ -154,8 +160,8 @@
             <td><select bind:value={c.attr} aria-label="Channel {i + 1} function" onchange={() => named(c)}>
               {#each ATTR_GROUPS as g (g.label)}<optgroup label={g.label}>{#each g.attrs as [a, l] (a)}<option value={a}>{l}</option>{/each}</optgroup>{/each}
             </select></td>
-            <td><input type="checkbox" checked={!!c.fine} onchange={(e) => (c.fine = (e.target as HTMLInputElement).checked || undefined)} /></td>
-            <td><input type="number" min="0" max="255" value={c.default ?? 0} oninput={(e) => (c.default = +(e.target as HTMLInputElement).value || undefined)} style="width:4.2em" /></td>
+            <td><input type="checkbox" checked={!!c.fine} aria-label="Channel {i + 1} is the fine one" onchange={(e) => (c.fine = (e.target as HTMLInputElement).checked || undefined)} /></td>
+            <td><input type="number" min="0" max="255" value={c.default ?? 0} aria-label="Channel {i + 1} default" oninput={(e) => (c.default = +(e.target as HTMLInputElement).value || undefined)} style="width:4.2em" /></td>
             <td><button class="ghost rg" onclick={() => (openRanges = openRanges === i ? null : i)} aria-expanded={openRanges === i}
                         title="Named value ranges: gobo slots, strobe, shutter open...">{c.ranges?.length ? `${c.ranges.length} named` : 'add'}<Icon name={openRanges === i ? 'down' : 'right'} size={12} /></button></td>
             <td><input type="number" min="1" max="4096" value={c.cell === undefined ? '' : c.cell + 1} placeholder="–" style="width:4.2em" aria-label="Channel {i + 1} cell"

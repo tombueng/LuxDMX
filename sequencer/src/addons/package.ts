@@ -90,8 +90,10 @@ function fitsOf(kind: string): Fit[] {
   return FITS.filter((f) => fits.includes(f));
 }
 // (the params a built-in keeps beyond the standard ones)
-const OWN: Record<string, ParamSpec[]> = {
-  scrollText: [{ id: 'text', name: 'Words', description: 'What runs across', type: 'text', default: 'LUXDMX', maxLength: 200 }],
+// (every effect with words has them as its own param: Scrolling text and the word shows of matrix.ts)
+const OWN = (kind: string): ParamSpec[] => {
+  const d = EFFECT_MAP.get(kind)?.defaults.text;
+  return typeof d === 'string' ? [{ id: 'text', name: 'Words', description: kind === 'scrollText' ? 'What runs across' : 'What it shows', type: 'text', default: d || 'LUXDMX', maxLength: 200 }] : [];
 };
 const STANDARD_KEYS = ['speed', 'tempo', 'size', 'spread', 'direction', 'blocks', 'width', 'colors', 'low', 'high', 'lightUp', 'level', 'contrast', 'pixels', 'order'];
 const pick = (p: Partial<EffectParams>, keys: string[]) => Object.fromEntries(Object.entries(p).filter(([k, v]) => keys.includes(k) && v !== undefined));
@@ -102,7 +104,7 @@ export function builtinPackage(kind: string): EffectPackage {
   return {
     format: PACKAGE_FORMAT, formatVersion: PACKAGE_VERSION, id: `luxdmx.${kind.toLowerCase()}`, version: '1.0.0', name: def.name,
     author: { name: 'LuxDMX', url: 'https://github.com/tombueng/LuxDMX' }, license: 'MIT', description: def.blurb, tags: def.shape ? ['ring', 'matrix'] : [def.category],
-    category: def.category, fits: fitsOf(kind), uses: usesOf(kind), params: OWN[kind] ?? [],
+    category: def.category, fits: fitsOf(kind), uses: usesOf(kind), params: OWN(kind),
     defaults: JSON.parse(JSON.stringify(pick(def.defaults, STANDARD_KEYS))), native: kind,
   };
 }
@@ -116,7 +118,7 @@ export function packageOfEffect(e: Effect, about: { name?: string; author: strin
     format: PACKAGE_FORMAT, formatVersion: PACKAGE_VERSION, id: `${slug(about.author)}.${slug(name)}`, version: '1.0.0', name,
     author: { name: about.author.trim().slice(0, 60), ...(about.url ? { url: about.url } : {}) }, license: about.license ?? 'CC-BY-4.0',
     description: (about.description ?? def?.blurb ?? '').slice(0, 1000), tags: (about.tags ?? []).slice(0, 12),
-    category: def?.category ?? 'pixel', fits: fitsOf(e.kind), uses: usesOf(e.kind), params: OWN[e.kind] ?? [],
+    category: def?.category ?? 'pixel', fits: fitsOf(e.kind), uses: usesOf(e.kind), params: OWN(e.kind),
     defaults: JSON.parse(JSON.stringify(pick(p, STANDARD_KEYS))),
   };
   if (e.kind === 'script') {
@@ -133,7 +135,7 @@ export function packageOfEffect(e: Effect, about: { name?: string; author: strin
     if (!p.picture) throw new PackageError('Give it a picture first');
     return { ...base, media: { clip: p.picture }, defaults: { ...base.defaults, mapping: p.mapping } };
   }
-  return { ...base, native: e.kind, defaults: { ...base.defaults, ...(p.text !== undefined && OWN[e.kind]?.some((x) => x.id === 'text') ? { text: p.text } : {}) } };
+  return { ...base, native: e.kind, defaults: { ...base.defaults, ...(p.text !== undefined && OWN(e.kind).some((x) => x.id === 'text') ? { text: p.text } : {}) } };
 }
 const slug = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'x';
 

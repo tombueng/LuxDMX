@@ -7,7 +7,7 @@
 // from there. axe on each tab.
 import fs from 'node:fs';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, channels, pixelPorts, test, expect, FAKE, selectFixtures, full } from './helpers';
+import { openConnected, resetFake, patch, channels, pixelPorts, test, expect, FAKE, selectFixtures, full, selectAll, swatch } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -340,4 +340,53 @@ test("a light's menu has Mounting…: the setup opens on its Mounting tab; the n
   await expect(dlg).toBeHidden();
   await page.locator('.fl li[data-fixture="Head 1"]').dblclick();
   await expect(dlg.getByRole('tab', { name: 'Patch' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('the channel table lines up: every row\'s Try slider in one column, a byte (255) whole in its boxes, one Done', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, ch = (name: string, attr: string, x: any = {}) => ({ name, attr, ...x });
+    const chans = [ch('Pan', 'pan', { default: 128 }), ch('Dimmer', 'intensity'), ch('Strobe', 'strobe', { ranges: [{ from: 0, to: 9, label: 'Off', kind: 'open' }, { from: 10, to: 255, label: 'Slow to fast', kind: 'strobe' }] }), ch('Red', 'red')];
+    const t = a.addType({ id: 'user-spot3', manufacturer: 'Test', model: 'Spot Three', source: 'user', modes: [{ name: 'Basic', channels: chans }] });
+    a.addFixtures(t, 'Basic', 1, 0, 'Spot', 1);
+  });
+  const dlg = await openSetup(page, 'Spot', 'Channels');
+  const lined = async () => {
+    const xs = await dlg.locator('tbody tr[data-ch] input[type=range]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+    expect(xs.length).toBe(4);
+    expect(new Set(xs).size).toBe(1);
+  };
+  const whole = (sel: string) => dlg.locator(sel).evaluateAll((els) => els.filter((e) => { const i = e as HTMLInputElement; const was = i.value; i.value = '255'; const cut = i.scrollWidth > i.clientWidth + 1; i.value = was; return cut; }).length);
+  await lined();
+  expect(await whole('input.v')).toBe(0);
+  await dlg.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await lined();
+  expect(await whole('input[aria-label$="default"]')).toBe(0);
+  await dlg.locator('tr[data-ch="3"]').getByRole('button', { name: '2 named' }).click();
+  expect(await whole('input[aria-label="From"], input[aria-label="To"]')).toBe(0);
+  await expect(dlg.getByRole('button', { name: 'Done', exact: true })).toHaveCount(1);
+  await expect(dlg.getByRole('button', { name: 'Stop editing' })).toBeVisible();
+});
+
+test('what the channels do, changed and the dialog closed with Done: kept (red and green swapped stay swapped, their names with them)', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 1, 0, 'Par');
+  const dlg = await openSetup(page, 'Par', 'Channels');
+  await dlg.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await dlg.getByLabel('Channel 2 does').selectOption('green');
+  await dlg.getByLabel('Channel 3 does').selectOption('red');
+  await dlg.getByRole('button', { name: 'Done' }).click();
+  await expect(dlg).toBeHidden();
+  const chans = () => page.evaluate(() => { const a = (window as any).__luxdmx; return a.modeOf(a.show.fixtures[0].id).channels.map((c: any) => [c.name, c.attr]); });
+  await expect.poll(chans).toEqual([['Dimmer', 'intensity'], ['Green', 'green'], ['Red', 'red'], ['Blue', 'blue']]);
+  // and on the wire: red goes to the third channel now
+  await selectAll(page); await full(page); await swatch(page, 'Red');
+  await expect.poll(async () => (await channels(0, 4)).slice(0, 4)).toEqual([255, 0, 255, 0]);
+  // thrown away, they're not kept
+  const d2 = await openSetup(page, 'Par', 'Channels');
+  await d2.getByRole('button', { name: 'Change what the channels do…' }).click();
+  await d2.getByLabel('Channel 4 does').selectOption('white');
+  await d2.getByRole('button', { name: /Throw the changes away/ }).click();
+  await d2.getByRole('button', { name: 'Done' }).click();
+  await expect.poll(chans).toEqual([['Dimmer', 'intensity'], ['Green', 'green'], ['Red', 'red'], ['Blue', 'blue']]);
 });

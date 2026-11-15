@@ -84,6 +84,7 @@ export class ListPlayer {
   flashing = false;
   private tracks: Record<string, Track> = {};
   private cueAt = 0;      // when the current cue was triggered
+  dueAt = 0;              // when the auto-advance update() just returned was due (a frame before it ran)
   private fade = 0;
   private fadeOut = 0;
   private times: CueTimes | undefined;
@@ -177,8 +178,10 @@ export class ListPlayer {
   // `fxLights`: an effect's lights (in a list of looks an effect on lights the new look doesn't name
   // keeps running, like those lights do).
   // (`presetsKey`: what the presets came from, for the tracked-look cache; none: no cache)
+  // `asPlay`: the cue's look as the list builds it from the top, also in a list of looks (Back: one
+  // step back is the look the card shows, not that look's lights on top of what's on now)
   jump(list: CueList, i: number, now: number, presets: Map<string, Preset>, stamp: number, fadeOverride?: number, stage?: Record<string, Resolved>, exact = false,
-    fxLights?: (effect: string) => string[], presetsKey?: unknown): Cue | undefined {
+    fxLights?: (effect: string) => string[], presetsKey?: unknown, asPlay = false): Cue | undefined {
     const cue = list.cues[i];
     if (!cue) return undefined;
     // a list fading out (released): what's visible is its look times its fading weight; a look
@@ -192,7 +195,7 @@ export class ListPlayer {
       if (x.cellVals) x.cellVals = Object.fromEntries(Object.entries(x.cellVals).map(([ci, c]) => { const y = { ...c }; for (const a of CELL_ATTRS) if (y[a] !== undefined) y[a] = (y[a] as number) * w; return [ci, y]; }));
       cur[id] = x;
     }
-    const own = !exact && isLooks(list);
+    const own = !exact && !asPlay && isLooks(list);
     const target = exact || own ? ownLook(cue, presets) : this.tracked(list, i, presets, presetsKey);
     const fade = fadeOverride ?? cue.fade, fadeOut = fadeOverride ?? cue.fadeOut ?? cue.fade;
     const times = fadeOverride === undefined && cue.times && Object.keys(cue.times).length ? cue.times : undefined;
@@ -360,7 +363,7 @@ export class ListPlayer {
     due = Math.max(due, this.cueAt + 0.05);
     if (now < due) return -1;
     const next = this.nextIndex(list);
-    if (next >= 0) return next;
+    if (next >= 0) { this.dueAt = due; return next; }
     if (list.end === 'release') this.release(list, now);
     else this.held = true;               // 'stop': hold the last cue, no more advancing
     return -1;

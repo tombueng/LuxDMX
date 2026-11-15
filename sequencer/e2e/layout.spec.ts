@@ -1,7 +1,7 @@
 // Layout guarantees measured in the browser (no screenshots): nothing runs off the screen, and on
 // touch screens everything is big enough for a finger.
 import { readFile } from 'node:fs/promises';
-import { openConnected, test, expect, patch } from './helpers';
+import { openConnected, test, expect, patch, startTemplate } from './helpers';
 
 test.describe('phone', () => {
   test.use({ viewport: { width: 360, height: 760 }, hasTouch: true, isMobile: true });     // a small Android
@@ -30,7 +30,7 @@ test.describe('tablet with touch', () => {
   test('buttons and fields are at least finger sized', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     const measure = () => page.evaluate(() => {
       const out: string[] = [];
       for (const el of document.querySelectorAll<HTMLElement>('button, select, input:not([type=checkbox]):not([type=radio]), [role=tab]')) {
@@ -77,14 +77,14 @@ test.describe('the timeline on a tablet', () => {
 test.describe('the stage', () => {
   test('names never run into each other, in any template', async ({ page }) => {
     await openConnected(page);
-    for (const t of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar']) {
+    for (const t of ['Band', 'DJ / Party', 'Theatre', 'Church', 'Cinema', 'Bar', 'Wedding']) {
       await page.locator('.top .show').click();
-      await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: new RegExp(`^${t.replace('/', '\\/')}$`) }) }).click();
+      await startTemplate(page, t);
       await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
       await expect(page.locator('.stage-wrap .fx').first()).toBeVisible();
       const clash = await page.evaluate(() => {
-        // (the names, and the word "audience" at the front edge)
-        const boxes = [...document.querySelectorAll('.stage-wrap text.lbl, .stage-wrap text.edge')].map((el) => ({ n: el.textContent, r: el.getBoundingClientRect() }));
+        // (the names, the word "audience" at the front edge, and the stage's measurements)
+        const boxes = [...document.querySelectorAll('.stage-wrap text.lbl, .stage-wrap text.edge, .stage-wrap g.dims text')].map((el) => ({ n: el.textContent, r: el.getBoundingClientRect() }));
         for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
           const a = boxes[i].r, b = boxes[j].r;
           if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) return `${boxes[i].n} / ${boxes[j].n}`;
@@ -101,7 +101,7 @@ test.describe('the stage', () => {
   test('new lights land in free space, not on the ones already there', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     await patch(page, 'gen-mover16', 2, 0, 'Spot');
     const near = await page.evaluate(() => {
       const fx = [...document.querySelectorAll<SVGGElement>('.stage-wrap .fx')].map((g) => { const r = g.querySelector('circle, rect')!.getBoundingClientRect(); return { n: g.dataset.name, x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
@@ -113,11 +113,29 @@ test.describe('the stage', () => {
   });
 });
 
+test.describe('a tablet', () => {
+  test.use({ viewport: { width: 1024, height: 768 } });
+  test('the plan\'s tools stay together: the magnifier never on a line of its own; the stage\'s size clear of the names', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await startTemplate(page, 'Band');
+    const sw = page.locator('.stage-wrap');
+    const names = (await sw.getByRole('button', { name: 'Names' }).boundingBox())!, zoom = (await sw.getByRole('button', { name: 'Zoom in' }).boundingBox())!;
+    expect(Math.abs(names.y - zoom.y)).toBeLessThan(4);
+    const clash = await page.evaluate(() => {
+      const dims = [...document.querySelectorAll('.stage-wrap g.dims text')].map((e) => e.getBoundingClientRect());
+      for (const l of document.querySelectorAll('.stage-wrap text.lbl')) { const r = l.getBoundingClientRect(); for (const d of dims) if (r.left < d.right && d.left < r.right && r.top < d.bottom && d.top < r.bottom) return l.textContent; }
+      return '';
+    });
+    expect(clash).toBe('');
+  });
+});
+
 test.describe('live edit', () => {
   test('the buttons stay where they are, and the editor never covers the one being changed', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     // where each button sits in the grid (scrolling the grid to reach one isn't moving it)
     const spots = () => page.locator('.live .grid .cell').evaluateAll((els) => els.slice(0, 12).map((e) => { const r = e.getBoundingClientRect(); const st = e.parentElement!.scrollTop; return `${Math.round(r.x)},${Math.round(r.y + st)},${Math.round(r.width)}`; }));
@@ -145,7 +163,7 @@ test.describe('a small laptop', () => {
   test('clicking an effect shows its editor without scrolling', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     await page.locator('.side .tabs').getByRole('tab', { name: 'Effects' }).click();
     await page.locator('.ep li.oitem').last().click();
     // the editor's top (its name and what it runs on) is right there under the list, not below the fold
@@ -183,7 +201,7 @@ test.describe('a desktop', () => {
   test('the gaps stop where the stage and the cues still work; the programmer\'s chips jump and say where you are', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     const s = (await page.locator('.split.h').boundingBox())!;
     await page.mouse.move(s.x + 300, s.y + s.height / 2);
     await page.mouse.down();

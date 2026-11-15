@@ -2,9 +2,10 @@
 // Each is built around where its light comes out: the lens at the origin, the beam along +y, the
 // body behind it (-y). A moving head comes in three parts (base, yoke, head) that turn separately.
 import * as THREE from 'three';
+import type { Profile } from './profiles';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch';
+export type Look = 'spot' | 'wash' | 'par' | 'blinder' | 'strobe' | 'bar' | 'disc' | 'panel' | 'fog' | 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2' | 'fresnel' | 'headbar' | 'winch' | 'curtain' | 'flybar' | 'mirrorball' | 'matrixhead';
 const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
 
 // moving heads: the head turns about the yoke's arms at PIVOT; its lens is HEAD_LENS above that
@@ -31,6 +32,20 @@ const LENS: Partial<Record<Look, { at: number; r: number; lamps?: [number, numbe
 };
 export function lensOf(look: Look) { const l = LENS[look] ?? { at: 0, r: 0.1 }; return { at: l.at, r: l.r, lamps: l.lamps ?? [[0, 0]] as [number, number][] }; }
 
+// A moving head as its profile has it (profiles.ts): its base, the yoke's crossbar and two arms up to
+// where the head tilts, the head a flat box with its face (the cells) towards its up
+export function matrixHeadParts(p: Profile) {
+  const h = p.head!, [bw, bh, bd] = h.base, arm = h.arms.top - bh, aw = 0.04, ad = Math.min(0.1, bd * 0.6);
+  const base = new THREE.BoxGeometry(bw, bh, bd).translate(0, bh / 2, 0);
+  const yoke = merge([
+    new THREE.BoxGeometry(h.arms.span, 0.06, ad).translate(0, bh + 0.03, 0),
+    new THREE.BoxGeometry(aw, arm, ad).translate(-h.arms.span / 2 + aw / 2, bh + arm / 2, 0),
+    new THREE.BoxGeometry(aw, arm, ad).translate(h.arms.span / 2 - aw / 2, bh + arm / 2, 0),
+  ]);
+  const head = new THREE.BoxGeometry(h.face[0], h.depth, h.face[1]);
+  return { base, yoke, head };
+}
+
 // A moving bar: a mount on the truss (or the floor), the bar turning on it (its pan), and its heads
 // in a row along the bar, each tilting about the bar's length. The bar is a metre long here (scaled
 // to its heads); a head's lens is HEADBAR_LENS above where it turns.
@@ -53,6 +68,16 @@ export function winchParts() {
 }
 
 // fixed lights and machines, standing on their up (the beam / what they throw goes up)
+// how wide a light of this look is drawn as it comes (metres), for one drawn its own size
+const widths = new Map<Look, number>();
+export function lookWidth(look: Look): number {
+  let w = widths.get(look);
+  if (w === undefined) {
+    const g = look === 'spot' || look === 'wash' ? headParts(look).base : look === 'headbar' ? headBarParts().bar : body(look).geo;
+    g.computeBoundingBox(); w = Math.max(0.05, g.boundingBox!.max.x - g.boundingBox!.min.x); widths.set(look, w);
+  }
+  return w;
+}
 export function body(look: Look): { geo: THREE.BufferGeometry; lensR: number; lenses?: [number, number][] } {
   switch (look) {
     case 'par': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.3, 12).translate(0, -0.15, 0), new THREE.TorusGeometry(0.17, 0.012, 4, 12, Math.PI).rotateY(Math.PI / 2).translate(0, -0.15, 0)]), lensR: 0.11 };
@@ -72,6 +97,8 @@ export function body(look: Look): { geo: THREE.BufferGeometry; lensR: number; le
     case 'flame': return { geo: merge([new THREE.BoxGeometry(0.42, 0.34, 0.42).translate(0, 0.17, 0), new THREE.CylinderGeometry(0.04, 0.06, 0.18, 8).translate(0, 0.43, 0)]), lensR: 0 };
     case 'sparks': return { geo: merge([new THREE.BoxGeometry(0.4, 0.22, 0.4).translate(0, 0.11, 0), new THREE.CylinderGeometry(0.1, 0.05, 0.12, 10).translate(0, 0.28, 0)]), lensR: 0 };
     case 'co2': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.2, 10).translate(0, 0.1, 0), new THREE.CylinderGeometry(0.035, 0.05, 0.6, 8).translate(0, 0.5, 0)]), lensR: 0 };
+    // a mirror ball's motor: a small box at the top of its chain (the ball is the rig's own, rig.ts)
+    case 'mirrorball': return { geo: new THREE.BoxGeometry(0.12, 0.1, 0.12).translate(0, -0.05, 0), lensR: 0.01 };
     default: return { geo: new THREE.BoxGeometry(0.3, 0.3, 0.3).translate(0, -0.15, 0), lensR: 0.1 };
   }
 }

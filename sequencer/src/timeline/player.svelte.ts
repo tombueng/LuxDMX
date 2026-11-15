@@ -10,6 +10,7 @@ import { CrowdSound } from '../audio/crowd';
 import { DEMO_BPM, DEMO_SECONDS, demoPeaks, playDemo } from './beat';
 import { beatAfter, partAfter, partsOf, startOf, type Part } from './gig';
 import { getSong, putSong } from '../store/audio';
+import { CROWD_ON, CROWD_VOLUME, SOUND_HERE, VOLUME } from '../store/kept';
 
 export interface TimelineHost {
   readonly show: Show;
@@ -31,15 +32,15 @@ export class TimelinePlayer {
   peaks = $state.raw<number[]>([]);
   missing = $state('');               // a song this browser doesn't have (opened on another computer)
   // how loud (0..1), kept per browser
-  volume = $state((() => { try { const v = Number(localStorage.getItem('luxdmx.seq.volume')); return Number.isFinite(v) && localStorage.getItem('luxdmx.seq.volume') !== null ? v : 0.8; } catch { return 0.8; } })());
+  volume = $state(VOLUME.get());
   // "The band plays live": no sound out of this browser's speakers (kept per browser). The song's
   // clock runs on, and a recording of the stage still gets the song (it hangs off the bus).
-  soundHere = $state((() => { try { return localStorage.getItem('luxdmx.seq.sound') !== 'off'; } catch { return true; } })());
+  soundHere = $state(SOUND_HERE.get());
   // The crowd (audio/crowd.ts): how loud against the song, and whether it's heard at all (kept per
   // browser). It goes into the same bus as the song: the speakers and a recording both get it.
   readonly crowd = new CrowdSound();
-  crowdVolume = $state((() => { try { const v = Number(localStorage.getItem('luxdmx.seq.crowdVol')); return Number.isFinite(v) && localStorage.getItem('luxdmx.seq.crowdVol') !== null ? v : 0.8; } catch { return 0.8; } })());
-  crowdOn = $state((() => { try { return localStorage.getItem('luxdmx.seq.crowd') !== 'off'; } catch { return true; } })());
+  crowdVolume = $state(CROWD_VOLUME.get());
+  crowdOn = $state(CROWD_ON.get());
   count = $state(0);                  // counting in: the click it's on (1, 2, 3, 4), else 0
   // Next part, waiting for its beat: when (on the song's clock) and where to
   pending = $state<{ at: number; to: Part } | null>(null);
@@ -174,16 +175,16 @@ export class TimelinePlayer {
     void ctx.resume().catch(() => undefined);
     return this.tap.stream;
   }
-  setVolume(v: number) { this.volume = Math.max(0, Math.min(1, v)); if (this.gain) this.gain.gain.value = this.soundHere ? this.volume : 0; try { localStorage.setItem('luxdmx.seq.volume', String(this.volume)); } catch { /* not kept */ } }
+  setVolume(v: number) { this.volume = Math.max(0, Math.min(1, v)); if (this.gain) this.gain.gain.value = this.soundHere ? this.volume : 0; VOLUME.set(this.volume); }
   setCrowd(volume: number, on = this.crowdOn) {
     this.crowdVolume = Math.max(0, Math.min(1, volume)); this.crowdOn = on;
     this.crowd.setVolume(this.crowdVolume, on);
-    try { localStorage.setItem('luxdmx.seq.crowdVol', String(this.crowdVolume)); if (on) localStorage.removeItem('luxdmx.seq.crowd'); else localStorage.setItem('luxdmx.seq.crowd', 'off'); } catch { /* this time only */ }
+    CROWD_VOLUME.set(this.crowdVolume); CROWD_ON.set(on);
   }
   setSoundHere(on: boolean) {
     this.soundHere = on;
     if (this.gain) this.gain.gain.value = on ? this.volume : 0;
-    try { if (on) localStorage.removeItem('luxdmx.seq.sound'); else localStorage.setItem('luxdmx.seq.sound', 'off'); } catch { /* this time only */ }
+    SOUND_HERE.set(on);
   }
 
   // ---- transport
@@ -253,8 +254,12 @@ export class TimelinePlayer {
     this.stopSound?.(); this.stopSound = undefined;
     this.playing = false;
   }
-  // another song is up: stopped at its very start, nothing waiting
-  reset() { this.pause(); this.position = this.start; this.clock = this.position; this.landed = Number.NaN; this.missing = ''; this.top = true; }
+  // another song is up: stopped at its very start, nothing waiting (and no part of the last one looping)
+  reset() { this.pause(); this.position = this.start; this.clock = this.position; this.landed = Number.NaN; this.missing = ''; this.top = true; this.loop = null; }
+  // A part of the song played over and over while it's worked on (Loop this part): at its end, back
+  // to its start, as a jump (the stage as it is there, no moment fires on the way back). Only when
+  // playing reaches its end: a jump past it plays on from there. Not kept with the show.
+  loop = $state<{ name: string; from: number; to: number } | null>(null);
   // (a show opened, another song file: Play starts from the top)
   stop() { this.pause(); this.top = true; }
   // after a reload: where the song was (and going on if it was playing). Without a click on the
@@ -310,6 +315,13 @@ export class TimelinePlayer {
       for (const i of due(tl.items, this.last, p.at)) this.app.doTimeline(i.do, false);
       this.pending = null;
       this.seek(Math.min(this.end, p.to.at + (t - p.at)));
+      return;
+    }
+    const lp = this.loop;
+    if (lp && this.last < lp.to && t >= lp.to) {
+      // (what's placed before its end plays; what starts the next part doesn't)
+      for (const i of due(tl.items, this.last, lp.to - 1e-3)) this.app.doTimeline(i.do, false);
+      this.seek(lp.from + Math.min(t - lp.to, 0.2));
       return;
     }
     for (const i of due(tl.items, this.last, t)) this.app.doTimeline(i.do, false);

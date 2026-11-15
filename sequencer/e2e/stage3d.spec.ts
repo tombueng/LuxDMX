@@ -3,7 +3,8 @@
 // heads at the spot clicked (measured on the wire), and the effect machines throw particles.
 // The page offers a small hook in dev (window.__stage3d) for what can't be read off pixels.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, patch, selectAll, full, test, expect, demo } from './helpers';
+import { openConnected, resetFake, channels, patch, selectAll, full, test, expect, demo, startTemplate, cues } from './helpers';
+import { THEATRE } from '../src/stage3d/sceneSizes';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -236,4 +237,90 @@ test('a reload keeps the 3D view where it was, and the song playing on from wher
   // still playing, further on than before the reload (not back at 0:00)
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 8000 }).toBe(true);
   expect(await page.evaluate(() => (window as any).__luxdmx.timeline.position)).toBeGreaterThan(before);
+});
+
+test('Aim at the theatre\'s cyc: the spot points there (not at the floor behind it), from the front and from FOH; Measure says "the cyc"', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue().room), { timeout: 45000 }).toBe('theatre');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = [a.show.fixtures.find((f: any) => f.name === 'Spot 2').id]; });
+  const s3 = page.locator('.s3'), cam = s3.getByRole('group', { name: 'Camera' });
+  for (const view of ['Front', 'FOH']) {
+    await cam.getByRole('button', { name: view, exact: true }).click();
+    await page.waitForTimeout(1500);
+    await s3.getByRole('button', { name: 'Aim', exact: true }).click();
+    const spot = { x: 1.5, y: 6, z: THEATRE.cycZ + 0.01 };                     // (on the cyc, a little off centre)
+    const xy = await page.evaluate((p) => (window as any).__stage3d.screenOfPoint(p), spot);
+    await page.mouse.click(xy.x, xy.y);
+    await expect.poll(() => page.evaluate((p) => (window as any).__stage3d.aimError(p), spot), { timeout: 5000, message: view }).toBeLessThan(0.15);
+    await page.evaluate(() => { const a = (window as any).__luxdmx, id = a.selected[0]; a.programmer[id] = { ...a.programmer[id], pan: 0.5, tilt: 0.5 }; });
+  }
+  // Measure: a point on the cyc is "the cyc"
+  await s3.getByRole('button', { name: 'Select', exact: true }).click();
+  const inRow = s3.locator('.tools').getByRole('button', { name: 'Measure', exact: true });
+  if (await inRow.count()) await inRow.click();
+  else { await s3.getByRole('button', { name: 'More', exact: true }).click(); await s3.getByRole('group', { name: 'More for the 3D stage' }).getByRole('button', { name: 'Measure', exact: true }).click(); }
+  const c = await page.evaluate((z) => (window as any).__stage3d.screenOfPoint({ x: -3, y: 7, z }), THEATRE.cycZ + 0.01);
+  await page.mouse.click(c.x, c.y);
+  expect(await page.evaluate(() => (window as any).__stage3d.measure()?.a?.what)).toBe('the cyc');
+});
+
+test('Ctrl+Z in a light\'s Height field undoes the move (the light goes back), Ctrl+Shift+Z redoes it; while typing it\'s the field\'s own undo', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 1, 0, 'PAR');
+  await open3d(page);
+  await selectAll(page);
+  const h = page.locator('.s3 .sel').getByLabel('Height m', { exact: true });
+  const y = () => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].p3?.y);
+  const before = await y();
+  await h.fill('5'); await h.press('Enter');
+  await expect.poll(y).toBe(5);
+  await h.press('Control+z');
+  await expect.poll(y).toBe(before);
+  await expect(h).not.toHaveValue('5');
+  await h.press('Control+Shift+z');
+  await expect.poll(y).toBe(5);
+  await expect(h).toHaveValue('5');
+  // (typing, not sent yet: the field's own undo, the show untouched)
+  await h.fill('6');
+  await h.press('Control+z');
+  await expect(h).toHaveValue('5');
+  expect(await y()).toBe(5);
+});
+
+test('the theatre\'s machinery: on its own universe it moves with the show, live too; given to a box, live and safe it holds; in Blind it follows the show again', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('theatre');
+  const mach = () => page.evaluate(() => Object.fromEntries((window as any).__stage3d.machinery().map((m: any) => [m.name, +(m.at / m.travel).toFixed(2)])));
+  await cues(page).filter({ hasText: 'Preset' }).first().dblclick();
+  await expect.poll(async () => (await mach())['House curtain'], { timeout: 20000 }).toBe(0);
+  // live: the template's machinery is on a universe of its own no box plays, nothing goes out to a
+  // real motor, so the 3D stage shows the show: the curtain opens, the forest drop flies in
+  expect(await page.evaluate(() => (window as any).__luxdmx.output)).toBe('live');
+  await cues(page).filter({ hasText: 'Scene 1' }).first().dblclick();
+  // (the motors take their time: the curtain is part way a moment later, open in the end)
+  await expect.poll(async () => (await mach())['House curtain'], { timeout: 4000 }).toBeGreaterThan(0.05);
+  await expect.poll(async () => { const m = await mach(); return [m['House curtain'], m['Fly 1']]; }, { timeout: 25000 }).toEqual([1, 1]);
+  // the curtain on a universe the box plays (a real motor on it): live and safe it holds where it is
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => x.name === 'House curtain');
+    const end = Math.max(...a.show.fixtures.filter((x: any) => x.universe === 1).map((x: any) => x.address + a.modeOf(x.id).channels.length));
+    a.checkpoint(); f.universe = 1; f.address = end; a.checkpoint();
+  });
+  await cues(page).filter({ hasText: 'Preset' }).first().dblclick();
+  await page.waitForTimeout(2500);
+  expect((await mach())['House curtain']).toBe(1);
+  // Blind (working on the show without the room): the 3D stage shows what the show does again
+  await page.locator('.top').getByRole('button', { name: 'On stage', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.output)).not.toBe('live');
+  await expect.poll(async () => (await mach())['House curtain'], { timeout: 25000 }).toBe(0);
+  await cues(page).filter({ hasText: 'Night' }).first().dblclick();
+  await expect.poll(async () => { const m = await mach(); return [m['Fly 1'], m['Fly 3']]; }, { timeout: 25000 }).toEqual([0, 1]);
+  const pics = await page.evaluate(() => (window as any).__stage3d.machinery().filter((m: any) => m.look === 'flybar').map((m: any) => m.picture));
+  expect(pics).toEqual(['forest', 'castle', 'stars', 'city']);
 });

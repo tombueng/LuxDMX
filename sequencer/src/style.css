@@ -31,7 +31,9 @@ button { cursor: pointer; display: inline-flex; align-items: center; gap: .35rem
 :root { --focus: #6aa2ff; }
 button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .olist:focus-visible, .cards:focus-visible, [role="listbox"]:focus-visible { outline: none; box-shadow: inset 0 0 0 1px #6aa2ff66; border-radius: var(--radius-s); }
-button:disabled { opacity: .4; cursor: default; }
+button:disabled { opacity: .55; cursor: default; }   /* (.4 made a disabled button's word 2:1 against the panel: unreadable in a dark room) */
+/* placeholders as light as the faint text (the browser's grey was 3.5:1 on the fields) */
+input::placeholder, textarea::placeholder { color: var(--faint); opacity: 1; }
 button.primary { background: var(--green); color: #07150b; border-color: var(--green); font-weight: 650; }
 button.primary:hover:not(:disabled) { background: #5be070; }
 button.accent { background: var(--orange); color: #1a1000; border-color: var(--orange); font-weight: 650; }
@@ -53,6 +55,8 @@ h2 { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color:
 .chip { display: inline-flex; align-items: center; gap: .25rem; font-size: .76rem; padding: .05rem .4rem; border-radius: 999px; background: #ffffff0d; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 .chip.green { color: var(--green); border-color: #45d85c55; background: #45d85c14; }
 .chip.orange { color: var(--orange); border-color: #ffaa1c55; background: #ffaa1c14; }
+/* (a winch: careful, but not a bang: the warning's colour, dashed) */
+.chip.winch { color: var(--orange); border: 1px dashed #ffaa1c66; background: transparent; }
 .chip.blue { color: #8ab8ff; border-color: #3a8ef355; background: #3a8ef314; }
 .chip.violet { color: #c3a8ff; border-color: #9a6bff55; background: #9a6bff14; }
 .toolbar { display: flex; gap: .25rem; align-items: center; flex-wrap: wrap; }
@@ -92,7 +96,7 @@ h2 { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color:
 
 /* toasts */
 /* under the top bar: at the bottom they covered the cue cards, the phone's Record button and tabs */
-.toast { position: fixed; top: 3.9rem; left: 50%; transform: translateX(-50%); animation: toast-in .16s ease-out; background: var(--panel2); border: 1px solid var(--line2); border-radius: 999px; padding: .4rem .5rem .4rem 1rem; box-shadow: var(--shadow); z-index: 90; font-size: .9rem; display: flex; align-items: center; gap: .7rem; max-width: min(720px, 94vw); }
+.toast { position: fixed; top: 3.9rem; left: 50%; transform: translateX(-50%); animation: toast-in .16s ease-out; background: var(--panel2); border: 1px solid var(--line2); border-radius: 1.1rem;   /* (a pill when one line; two lines on a phone were a round blob with the words past its edge) */ padding: .4rem .5rem .4rem 1rem; box-shadow: var(--shadow); z-index: 90; font-size: .9rem; display: flex; align-items: center; gap: .7rem; max-width: min(720px, 94vw); }
 .toast button.sm { padding: .15rem .7rem; border-radius: 999px; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -6px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

@@ -18,7 +18,8 @@
   const then = (a: Advance) => a.mode === 'follow' ? (a.time ? `then ${a.time} s` : 'follows') : a.mode === 'wait' ? `auto ${a.time} s` : a.mode === 'beats' ? `${a.beats} beats` : '';
 
   let rowsEl = $state<HTMLElement>();
-  $effect(() => { if (live >= 0 && rowsEl) revealIn(rowsEl, rowsEl.children[live] as HTMLElement); });   // (this list only, not the page)
+  // (this list only, not the page; again when the cue on stage gets a note: its row grows)
+  $effect(() => { void list?.cues[live]?.note; if (live >= 0 && rowsEl) revealIn(rowsEl, rowsEl.children[live] as HTMLElement); });
   // one tab stop: the row on stage (or the first); the arrows move between rows
   const focusAt = $derived(live >= 0 ? live : 0);
   // Space is GO here too (like everywhere on a live page), never "jump to this row": a row keeps
@@ -79,7 +80,9 @@
   .cl.editing { outline: 1px dashed var(--line2); outline-offset: 2px; cursor: pointer; }
   .cl.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
   header { display: flex; align-items: baseline; gap: .6rem; padding: .5rem .8rem; border-bottom: 1px solid var(--line); }
-  ol { list-style: none; margin: 0; padding: .25rem; max-height: min(52vh, 520px); overflow: auto; }
+  /* (no scroll anchoring: a note added to the first cue made the browser scroll down by its height,
+     hiding that cue's name) */
+  ol { list-style: none; margin: 0; padding: .25rem; max-height: min(52vh, 520px); overflow: auto; overflow-anchor: none; }
   li { position: relative; border-radius: 8px; overflow: hidden; }
   li + li { border-top: 1px solid #ffffff08; }
   .row { width: 100%; display: grid; grid-template-columns: 3.4rem 1fr auto auto; grid-template-areas: 'n nm fd th' 'n note note note'; column-gap: .7rem;

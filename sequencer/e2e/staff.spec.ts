@@ -1,14 +1,14 @@
 // A bar's tablet (the bar persona): a lock staff can't get out of without the PIN, Blackout that
 // takes holding, the lights-not-connected bar, and a fresh start that doesn't black out the room.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, frames, channels, test, expect } from './helpers';
+import { openConnected, resetFake, frames, channels, showBoxes, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
 async function bar(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
 }
 
@@ -18,13 +18,25 @@ test('locked with a PIN: no master, no Release, Blackout by holding, the phone d
   await page.locator('.live').getByRole('button', { name: 'Lock page' }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Lock with a PIN…' }).click();
   const ask = page.getByRole('dialog', { name: 'Lock with a PIN' });
+  // a PIN that can't be one is said there; the dialog waits (it closed, the typing lost)
+  await ask.getByLabel(/PIN/).fill('12');
+  await expect(ask.getByRole('status')).toHaveText('A PIN is 3 to 8 digits');
+  await expect(ask.getByRole('button', { name: 'Lock' })).toBeDisabled();
+  await ask.getByLabel(/PIN/).fill('ab12');
+  await expect(ask.getByRole('status')).toHaveText('Digits only');
   await ask.getByLabel(/PIN/).fill('4711');
+  await expect(ask.getByRole('status')).toHaveCount(0);
   await ask.getByRole('button', { name: 'Lock' }).click();
   await expect(page.locator('.live').getByRole('button', { name: /Unlock page/ })).toBeVisible();
   await expect(page.locator('.top input[aria-label="Grand master"]')).toHaveCount(0);
   await expect(page.locator('.strip').getByRole('button', { name: 'Release' })).toHaveCount(0);
+  // no way into the rig either (its Scan and Patch it changed the show behind the lock)
+  await showBoxes(page);                                              // (folded into the boxes button: open it)
+  await expect(page.locator('.top').getByRole('button', { name: /^(Rig|The rig)/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
   // a tap on Blackout only says how; holding it blacks out; a tap brings it back
   const bo = page.locator('.strip').getByRole('button', { name: 'Blackout' });
+  await expect(bo).toContainText('hold');                                 // (said on the button: a tap alone does nothing there)
   await bo.click();
   await expect(page.locator('.toast')).toContainText('Hold Blackout');
   expect(await page.evaluate(() => (window as any).__luxdmx.blackout)).toBe(false);
@@ -43,6 +55,10 @@ test('locked with a PIN: no master, no Release, Blackout by holding, the phone d
   await expect(ph).toContainText('unlock to change this');
   await expect(ph.getByRole('button', { name: /Switch/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
+  // the show keeps the PIN's hash, not the digits (a shared show file doesn't tell it)
+  const kept = await page.evaluate(() => (window as any).__luxdmx.show.settings.lockPin as string);
+  expect(kept).toMatch(/^h1:[0-9a-f]{14}$/);
+  expect(await page.evaluate(() => JSON.stringify((window as any).__luxdmx.show))).not.toContain('4711');
   // holding the padlock asks for the PIN: a wrong one keeps it locked, the right one unlocks
   const lock = page.locator('.live').getByRole('button', { name: /Unlock page/ });
   const hold = async () => { await lock.hover(); await page.mouse.down(); await page.waitForTimeout(1200); await page.mouse.up(); };
@@ -74,7 +90,7 @@ test('when the lights stop getting anything a red bar says so, and Reconnect bri
 test('a fresh start sends nothing until something plays: the box keeps the look it had', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.waitForTimeout(1500);
   expect(Object.keys(await frames())).toEqual([]);                  // lights patched, nothing played: no frames
   await page.keyboard.press('Space');                                // the first GO: now it sends

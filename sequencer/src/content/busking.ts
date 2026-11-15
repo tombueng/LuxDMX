@@ -12,25 +12,40 @@ const NUM = [...'1234567890'], ROW1 = [...'qwertyuiop'], ROW2 = [...'asdfghjkl']
 
 type ListLike = Pick<CueList, 'cues'>;
 // (a machine's own programs, built-in effects and colour programs, count as firing it)
-const keysOf = (l: ListLike, machine?: (fid: string) => boolean) => l.cues.flatMap((c) => Object.entries(c.values).map(([fid, v]) => Object.keys(v).map((k) => (machine && (k === 'effectMacro' || k === 'colorMacro') && machine(fid) ? 'flame' : k))));
+// Is every key of every light in every cue `ok`, and at least one `want`? Stops at the first that
+// isn't: a list of looks on a big rig isn't walked whole (it was, several times over, on every
+// change: a tenth of a second for 320 lights and 40 cues).
+function onlyKeys(l: ListLike, ok: (k: string) => boolean, want: (k: string) => boolean, machine?: (fid: string) => boolean): boolean {
+  let wanted = false;
+  for (const c of l.cues)
+    for (const [fid, v] of Object.entries(c.values))
+      for (const k0 of Object.keys(v)) {
+        const k = machine && (k0 === 'effectMacro' || k0 === 'colorMacro') && machine(fid) ? 'flame' : k0;
+        if (!ok(k)) return false;
+        if (want(k)) wanted = true;
+      }
+  return wanted;
+}
 const MACHINE = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
 // A list that only fires effect machines (a confetti shot, a few seconds of flames): a button that
 // fires it, not a look or an on/off. Its cue ends by itself (a wait and the list's end), so a tap
 // is a shot, never a machine left running.
 export function isMachineList(l: ListLike, machine?: (fid: string) => boolean): boolean {
-  const keys = keysOf(l, machine);
-  return keys.length > 0 && keys.every((ks) => ks.every((k) => MACHINE.includes(k) || k === 'fan')) && keys.some((ks) => ks.some((k) => MACHINE.includes(k)));
+  return onlyKeys(l, (k) => MACHINE.includes(k) || k === 'fan', (k) => MACHINE.includes(k), machine);
 }
 // A list that only fogs or hazes (a fog timer, haze for the night with its fan): it lives with the fog.
-const fogOnly = (l: ListLike) => isFogTimer(l) || (keysOf(l).length > 0 && keysOf(l).every((ks) => ks.every((k) => k === 'fog' || k === 'haze' || k === 'fan')) && keysOf(l).some((ks) => ks.includes('fog') || ks.includes('haze')));
+const fogOnly = (l: ListLike) => isFogTimer(l) || onlyKeys(l, (k) => k === 'fog' || k === 'haze' || k === 'fan', (k) => k === 'fog' || k === 'haze');
 
-export function buskingPage(show: Show) {
+// `go`: the list GO plays, when it's been picked (Live's GO bar): the page is built for that one,
+// not the first (a play's list on Live said "Show" while GO played "The Play")
+export function buskingPage(show: Show, go = '') {
   const w: Widget[] = [];
   const types = typeMap(show);
   const isM = (fid: string) => { const f = show.fixtures.find((x) => x.id === fid); return !!f && isMachine(modeOf(types.get(f.typeId), f.mode)); };
   // the main looks: the first list that isn't a fog timer or a machine's shot (one made before any
   // look mustn't be it)
-  const main = show.cueLists.find((l) => !isFogTimer(l) && !isMachineList(l, isM));
+  const fits = (l: CueList) => !isFogTimer(l) && !isMachineList(l, isM);
+  const main = show.cueLists.find((l) => l.id === go && fits(l)) ?? show.cueLists.find(fits);
   const machines = show.cueLists.filter((l) => l !== main && isMachineList(l, isM));
   const others = show.cueLists.filter((l) => l !== main && !machines.includes(l));
   // A play (standby notes or follow-ons, or the list says so): the page shows the whole list the

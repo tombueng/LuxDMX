@@ -26,6 +26,7 @@
 </script>
 
 <script lang="ts">
+  import { AMBIENT_3D, CAM_3D, GLOW_3D, HAZE_3D, RENDER_OPTS, SCREENS_LIVE, SEL_PANEL_OPEN, SPILL_3D, VIDEO_SIZE } from '../store/kept';
   // The stage in 3D: the venue, the lights as they are right now (beams in the haze, pools on the
   // deck, moving heads turning), the effect machines' confetti, bubbles, flames and sparks. Drag to
   // look around; click a light to select it (the same selection as the 2D stage). Move and Turn
@@ -49,18 +50,16 @@
   import { ui, dismiss, dialogOpen } from '../ui/ui.svelte';
   import Icon from '../ui/Icon.svelte';
   import { canRecord, clock, extOf, FPS, megabytes, pickFormat, saveVideo, stutterNote, tallFov, Take, takeSize, VIDEO_SIZES, videoBits, videoName, type VideoSize } from './recorder';
-  import { headCellsOf, capsOf } from '../model/library';
-  import { slotsOf } from '../engine/render';
-  import { ATLAS_CELLS, ATLAS_SIZE, drawAtlas, GOBOS, wheelPatterns } from './gobos';
+  import { ATLAS_CELLS, ATLAS_SIZE, drawAtlas, GOBOS } from './gobos';
   import { loadGoboFonts } from './goboFonts';
-  import { boardReach, opticsOf, restAt } from '../model/fixtureSetup';
+  import { boardReach, restAt } from '../model/fixtureSetup';
   import { buildVenue } from './venue';
-  import { Rig, type GoboWheel, type RigFixture, type Sfx } from './rig';
-  import { placesOfLight, shapeSize, shapeStanding } from '../model/pixelLayout';
-  import type { Look } from './models';
+  import { Rig, type RigFixture } from './rig';
+  import { rigFixtureFull } from './rigOf';
   import { Particles } from './particles';
-  import { aimAt, aimRot, beamDir, calibrate, faceBand, pivotOf, defaultPlace, DECK, D, nearestTruss, onDeck, roomOf, showRoom, TRUSS_HANG, W, worldToPlan, type Room, type Rot, type V3, type ViewKey } from './geometry';
-  import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, type CamMode, type Cast, type Part } from './director';
+  import { MirrorDots, type Ball } from './mirrorBall';
+  import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type RoomId, type Rot, type V3, type ViewKey } from './geometry';
+  import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
   import type { Resolved, Show } from '../model/types';
@@ -72,80 +71,33 @@
   let host = $state<HTMLDivElement>();
   let cvHost = $state<HTMLDivElement>();
   let canvas = $state<HTMLCanvasElement>();
-  type Mode = 'select' | 'move' | 'turn' | 'aim' | 'calib';
+  type Mode = 'select' | 'move' | 'turn' | 'aim' | 'calib' | 'measure';
   let mode = $state<Mode>('select');
   // the glow round bright lights and the haze in the air: two sliders, kept per browser
-  const stored = (k: string, d: number) => { try { const v = localStorage.getItem(k); return v === null ? d : Math.max(0, Math.min(1.5, Number(v) || 0)); } catch { return d; } };
-  let glow = $state(Math.min(0.8, stored('luxdmx.seq.glow3', 0.3)));
-  let hazeAmt = $state(stored('luxdmx.seq.haze', 0.45));
+  let glow = $state(GLOW_3D.get());
+  let hazeAmt = $state(HAZE_3D.get());
   // the LED screens beside the stage show the Broadcast camera live (off: the band's name, painted)
-  let liveScreens = $state((() => { try { return localStorage.getItem('luxdmx.seq.screensLive') !== '0'; } catch { return true; } })());
-  function setLiveScreens(on: boolean) { liveScreens = on; try { localStorage.setItem('luxdmx.seq.screensLive', on ? '1' : '0'); } catch { /* storage blocked */ } }
+  let liveScreens = $state(SCREENS_LIVE.get());
+  function setLiveScreens(on: boolean) { liveScreens = on; SCREENS_LIVE.set(on); }
   // the room's own light (the night sky, the house, reflections): how much of the venue you see
   // besides your lights. On a curve like the eye's (most of the slider is the dark end); 1 is a
   // little more than it always had, it starts at about a third of that
-  let ambient = $state(Math.min(1, stored('luxdmx.seq.ambient2', 0.6)));
+  let ambient = $state(AMBIENT_3D.get());
   // how much your lights light up the room round them (the band, the deck, the walls, the haze's
   // glow): 1 as it always was, 0 only their beams and the light where they land
-  let spill = $state(Math.min(1, stored('luxdmx.seq.spill', 0.45)));
+  let spill = $state(SPILL_3D.get());
   const ambLight = (s: number) => 1.25 * Math.pow(s, 2.2);
   let hemi: THREE.HemisphereLight | undefined, keyLight: THREE.DirectionalLight | undefined;
   let houseOf: THREE.Object3D | undefined, houseMats: THREE.MeshBasicMaterial[] = [];
+  const lightest = (ms: THREE.MeshBasicMaterial[]) => (ms.length ? Math.max(...ms.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null);
   let full = $state(false);
 
-  const SFX: Sfx[] = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
   // the built-in room: the big stage in a hall, or a small club / pub (geometry.ts ROOMS)
-  const room = $derived(roomOf(app.show.settings.stage3d?.room));
+  const room = $derived(roomFor(app.show.settings.stage3d));
   // every light as the 3D stage needs it (rebuilt when the lights, their types or places change)
   // (a light without a 3D place of its own goes where its plan position puts it in this room)
-  const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => {
-    const m = app.modeOf(f.id), c = capsOf(m), k = app.kinds[f.id] ?? 'other', t = app.types.get(f.typeId);
-    const def = defaultPlace(f, k, room);
-    // a ring or a matrix stands up on its lower edge, facing the audience, unless it's been placed
-    const shape = placesOfLight(f, m), size = shape && shapeSize(shape);
-    const sfx = m?.channels.find((ch) => (SFX as string[]).includes(ch.attr))?.attr as Sfx | undefined;
-    const has = (a: string) => !!m?.channels.some((ch) => ch.attr === a);
-    // which body it gets: a wash head has a zoom and no gobo; a blinder says so in its name
-    const look: Look = sfx ?? (has('hoist') ? 'winch' : c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
-      : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel');
-    return {
-      id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
-      p: f.p3 ? { ...f.p3 } : shape ? shapeStanding(def.p, shape).p : def.p, rot: f.rot ? { ...f.rot } : shape ? shapeStanding(def.p, shape).rot : def.rot, shape, size,
-      // (the light's own pan / tilt range first, then its type's; swapped when it says so)
-      optics: { ...opticsOf(f, t), swap: !!f.swapPanTilt },
-      // its gobo wheels: each slot's pattern from its name (gobos.ts), and its rotation channel's ranges
-      gobos: look === 'spot' ? goboWheels(m) : undefined,
-      // its prism (facets from the prism channel's ranges) and its animation wheel
-      prism: look === 'spot' ? prismOfMode(m) : undefined,
-      anim: look === 'spot' && has('animation') ? { rot: chOf(m, 'animationRotation')?.ranges } : undefined,
-      // its beam's opening angle: its own, else its type's data (else the 3D stage guesses by its kind)
-      beam: f.beamDeg ?? t?.physical?.beamDeg,
-      ...(c.heads > 1 && m ? { heads: c.heads, headCells: headCellsOf(m), headPan: c.cellMoves.includes('pan'), barPan: m.channels.some((ch) => ch.attr === 'pan' && ch.cell === undefined) } : {}),
-      // a winch: its travel and speed from its type (a guess without), its soft limits
-      ...(has('hoist') ? { winch: { travel: t?.physical?.travel ?? 4, speed: t?.physical?.hoistSpeed ?? 0.4, ...(f.hoistLimits ? { limits: f.hoistLimits } : {}) } } : {}),
-      // more than two axes: endless pan and tilt, a third axis (roll) and its endless turning
-      axes: has('panRotation') || has('tiltRotation') || has('roll') || has('rollRotation') ? {
-        ...(has('panRotation') ? { panRot: chOf(m, 'panRotation')?.ranges ?? null } : {}), ...(has('tiltRotation') ? { tiltRot: chOf(m, 'tiltRotation')?.ranges ?? null } : {}),
-        ...(has('roll') || has('rollRotation') ? { rollDeg: t?.physical?.rollDeg || 360 } : {}), ...(has('rollRotation') ? { rollRot: chOf(m, 'rollRotation')?.ranges ?? null } : {}),
-      } : undefined,
-    };
-  }));
+  const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => rigFixtureFull(f, app.modeOf(f.id), app.kinds[f.id] ?? 'other', app.types.get(f.typeId), room)));
 
-  const chOf = (m: ReturnType<typeof app.modeOf>, attr: string) => m?.channels.find((ch) => ch.attr === attr && !ch.fine && ch.cell === undefined);
-  function prismOfMode(m: ReturnType<typeof app.modeOf>): RigFixture['prism'] {
-    const c = chOf(m, 'prism');
-    return c ? { ranges: c.ranges, rot: chOf(m, 'prismRotation')?.ranges } : undefined;
-  }
-  function goboWheels(m: ReturnType<typeof app.modeOf>): GoboWheel[] | undefined {
-    const out: GoboWheel[] = [];
-    for (const [attr, rotAttr] of [['gobo', 'goboRotation'], ['gobo2', 'gobo2Rotation']] as const) {
-      const c = m?.channels.find((ch) => ch.attr === attr && !ch.fine && ch.cell === undefined);
-      if (!c) continue;
-      const r = m!.channels.find((ch) => ch.attr === rotAttr && !ch.fine && ch.cell === undefined);
-      out.push({ attr, rotAttr, slots: wheelPatterns(slotsOf(c).map((x) => x.label ?? '')), rot: r?.ranges });
-    }
-    return out.length ? out : undefined;
-  }
   // The gobo patterns, drawn once for the page into one texture (gobos.ts), with the symbol fonts
   // that come with the app (until they're in, the beams have no gobos)
   let goboAtlas: { canvas: HTMLCanvasElement; tex: THREE.CanvasTexture; empty: string[] } | null = null;
@@ -155,7 +107,7 @@
     const canvas = document.createElement('canvas');
     drawAtlas(canvas);
     // (a pattern that drew nothing: said by the tests, not hidden)
-    const c = canvas.getContext('2d')!, empty: string[] = [];
+    const c = canvas.getContext('2d', { willReadFrequently: true })!, empty: string[] = [];
     GOBOS.forEach((g, i) => {
       const d = c.getImageData((i % ATLAS_CELLS) * ATLAS_SIZE, Math.floor(i / ATLAS_CELLS) * ATLAS_SIZE, ATLAS_SIZE, ATLAS_SIZE).data;
       let lit = 0;
@@ -172,10 +124,23 @@
   let composer: EffectComposer, bloom: UnrealBloomPass;
   let rig: Rig, particles: Particles, venue: ReturnType<typeof buildVenue>;
   let wash: THREE.SpotLight[] = [];
+  let crowdLamp: THREE.SpotLight | undefined, crowdLevel = 0;
+  const audCol = new THREE.Color();
+  const deckFront = () => room.deck.z1;          // (the stage's front edge, where the crowd light hangs)
+  const roomNow = () => room;
+  // the mirror balls: the show's own on their DMX motors, else the room's (its ball and chain hidden
+  // while one of the show's hangs, so there are never two)
+  function ballsNow(): Ball[] {
+    const own = rig.mirrorBalls, room = (venue as { mirrorBalls?: Ball[] }).mirrorBalls ?? [];
+    for (const b of room) if (b.holder) b.holder.visible = !own.length;
+    return own.length ? own : app.show.settings.stage3d?.hideVenue ? [] : room;
+  }
+  let mirrorDots: MirrorDots | undefined;
   // (the air is never pure black: a hall has some light in it, even between looks)
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
-  const overlay = new THREE.Scene();       // drawn after the glow: the gizmo
-  const meter = new ExposureMeter();
+  const overlay = new THREE.Scene();       // drawn after the glow: the gizmo, the Measure line
+  // (about once a second: the eye's adapting is slow anyway, and each read costs the page a moment)
+  const meter = new ExposureMeter(45);
   // the middle brightness the exposure aims for (a dark venue: low key; measured so the Front view
   // of the demo sits at about the exposure it always had)
   const EXPOSURE_KEY = 0.024;
@@ -184,13 +149,12 @@
 
   // the camera views (where each one is depends on the room: geometry.ts ROOMS)
   const VIEWS: Record<ViewKey, string> = { front: 'Front', foh: 'FOH', side: 'Side', top: 'Top', band: 'From the stage' };
-  const CAM_KEY = 'luxdmx.seq.cam3d';
   let camSaved = 0;
   function keepCam() {
     const now = performance.now();
     if (now - camSaved < 250) return;
     camSaved = now;
-    try { sessionStorage.setItem(CAM_KEY, JSON.stringify({ p: camera.position.toArray().map((v) => +v.toFixed(3)), t: controls.target.toArray().map((v) => +v.toFixed(3)), cam: camMode, pick: camPick })); } catch { /* not kept */ }
+    CAM_3D.set({ p: camera.position.toArray().map((v) => +v.toFixed(3)), t: controls.target.toArray().map((v) => +v.toFixed(3)), cam: camMode, pick: camPick });
   }
   function view(k: ViewKey) {
     const v = room.views[k]; camMode = null; lensBack();
@@ -207,6 +171,78 @@
   let crewMem = newMemory(), grabbing = false, grabFrom: { p: THREE.Vector3; t: THREE.Vector3 } | null = null;
   function startCam(m: CamMode) { camPick = m; camMode = m; crewMem = newMemory(); camMenu = false; camSaved = 0; if (controls) keepCam(); }
   function stopCam() { if (!camMode) return; camMode = null; lensBack(); camSaved = 0; keepCam(); }
+
+  // ---- the camera to the selected lights ("Selected", a light's menu: Show in 3D): it flies there
+  // in a moment, far enough back to see them all; grabbing the stage stops it
+  let fly: { p0: THREE.Vector3; t0: THREE.Vector3; p1: THREE.Vector3; t1: THREE.Vector3; at: number; dur: number } | null = null;
+  function focusSel(ids: string[] = app.selected) {
+    const fs = fixtures.filter((f) => ids.includes(f.id));
+    if (!fs.length || !controls) return false;
+    stopCam();
+    const pts = fs.map((f) => { const p = pivotOf(f.p, f.rot); return new THREE.Vector3(p.x, p.y, p.z); });
+    const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
+    // (a light up under the ceiling: looked at from a little below it, the camera can't go above it
+    // and the controls never put it under what it looks at)
+    if (c.y > room.ceiling - 0.9) c.y = room.ceiling - 0.9;
+    const r = Math.max(0.6, box.getSize(new THREE.Vector3()).length() / 2);
+    // (from in front and a little to the side: up at hung lights, as the audience sees them; down
+    // at ones on the floor)
+    const d = Math.max(4.5, (r / Math.sin((camera.fov * Math.PI) / 360)) * 1.15);
+    // (where the camera can be: inside the room, clear of its rows, tables and people. A light on
+    // the cinema's side wall seen from the front put it inside the raked seats: the first of a few
+    // ways round that's clear, else the nearest to it)
+    const W = room.walls, inside = (p: THREE.Vector3) => Math.abs(p.x) < W.x - 0.5 && p.z > W.z0 + 0.5 && p.z < W.z1 - 0.5 && p.y > 0.4 && p.y < room.ceiling - 0.8;
+    const sp = spaceOf(room, castOf(room.id)), into = Math.sign(-c.x) || 1;
+    // (hung lights, shining down: from the front and level with them; the rest from above. Not by
+    // their height: a washer on the cinema's top rows is high up and shines up its wall)
+    const hung = fs.every((f) => toWorld({ x: 0, y: 1, z: 0 }, f.rot).y < -0.3);
+    const dirs = hung ? [[0.35, -0.32, 1], [-0.35, -0.32, 1], [into * 0.8, -0.2, 0.6], [0, -0.8, 0.6], [into * 0.7, -0.7, 0.2], [0, -1, 0.08], [0, 0.4, 1]] : [[0.35, 0.45, 1], [-0.35, 0.45, 1], [into * 0.9, 0.5, 0.4], [into * 0.5, 1.1, 0.6], [0, 0.9, 1], [into * 0.15, 0.25, 1], [into * 0.15, 0.25, -1], [into * 0.3, 1.4, 0.2]];
+    // (and with nothing between it and the light: a boom in the wings seen through the proscenium's
+    // wall was a box drawn over a blank wall)
+    const seen = (q: THREE.Vector3) => {
+      const n = Math.ceil(q.distanceTo(c) / 0.3);
+      for (let i = 1; i < n - 1; i++) {
+        const m = q.clone().lerp(c, i / n), b = blocked(sp, { x: m.x, y: m.y, z: m.z });
+        // (only what's solid and big hides it: the proscenium, the balcony, the deck. Rows of seats,
+        // tables, the lights on a bar in between: one sees over and between them)
+        if (b === 'the proscenium' || b === 'the balcony' || b === 'the deck') return false;
+      }
+      return true;
+    };
+    let p1: THREE.Vector3 | undefined, clear: THREE.Vector3 | undefined;   // (clear but not seeing it: the next best)
+    // (clear with a little room above too: a spot right on the edge of a rail of lights ended up a
+    // hair inside it once the controls settled)
+    const solid = (q: THREE.Vector3) => !!(blocked(sp, { x: q.x, y: q.y, z: q.z }) || blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z }));
+    const ok = (q: THREE.Vector3) => { if (!inside(q) || solid(q)) return false; if (seen(q)) return true; clear ??= q; return false; };
+    for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
+      if (p1) break;
+      const q = c.clone().addScaledVector(new THREE.Vector3(x, y, z).normalize(), d * k);
+      // (the controls never let the camera under what it looks at: where they'd put it)
+      if (q.y < c.y + 0.05) q.y = c.y + 0.05;
+      if (ok(q)) p1 = q;
+    }
+    // (none of those: round it, nearer and nearer, level with it and a little above, the side
+    // towards the audience first; a low bar's rail of lights left little room)
+    // (and close in under a low ceiling: the bar's top shelf, a rail of lights in front of it)
+    if (!p1) for (const k of [0.8, 0.55, 0.35, 0.22]) for (const dy of [0.05, 0.3, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
+      const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = new THREE.Vector3(c.x + Math.sin(ang) * d * k, c.y + dy, c.z + Math.cos(ang) * d * k);
+      if (ok(q)) p1 = q;
+    }
+    p1 ??= clear;
+    p1 ??= c.clone().addScaledVector(new THREE.Vector3(into * 0.6, 0.8, 0.3).normalize(), Math.min(d, 3));
+    p1.set(Math.max(-W.x + 0.6, Math.min(W.x - 0.6, p1.x)), Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), Math.max(W.z0 + 0.6, Math.min(W.z1 - 0.6, p1.z)));
+    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1, t1: c, at: performance.now(), dur: 700 };
+    return true;
+  }
+  // asked from elsewhere (a light's menu): once the stage and its lights are there
+  let focusSeen = 0;
+  $effect(() => {
+    const at = ui.focus3d;
+    if (!at || at === focusSeen || Date.now() - at > 5000) return;
+    // (after the room is built: building it puts the camera at the front)
+    const go = () => { if (!controls || !fixtures.length || !holding || builtRoom !== (room.key ?? room.id)) return void setTimeout(go, 100); focusSeen = at; requestAnimationFrame(() => focusSel()); };
+    untrack(go);
+  });
   // the list of moves (opened from the keys: onto the one running, or the first)
   function openMoves(e: MouseEvent) {
     camMenu = !camMenu;
@@ -263,7 +299,7 @@
     // (a dozen times a second; less on a computer that draws slowly: never more than every fourth frame)
     if (t - feed.at < Math.max(load.level >= 2 ? 1 / 15 : 1 / 8, 4 * frameDt) && t >= feed.at) return;
     feed.at = t;
-    const r = roomOf(venue.room), s = direct('broadcast', r, { t, beat: app.engine.beatCount, energy, part: partNow(app.show.timeline) }, castNow(r), feed.mem), c = feed.cam;
+    const r = room, s = direct('broadcast', r, { t, beat: app.engine.beatCount, energy, part: partNow(app.show.timeline) }, castNow(r), feed.mem), c = feed.cam;
     c.position.set(s.pos.x, s.pos.y, s.pos.z); c.up.set(0, 1, 0); c.lookAt(s.at.x, s.at.y, s.at.z);
     if (s.roll) c.rotateZ(s.roll * RD);
     if (c.fov !== s.fov) { c.fov = s.fov; c.updateProjectionMatrix(); }
@@ -282,7 +318,7 @@
 
   // this frame's shot: where the crew has the camera, what it looks at, its lens and roll
   function shoot(t: number, energy: number) {
-    const r = roomOf(venue.room);
+    const r = room;
     const s = direct(camMode!, r, { t, beat: app.engine.beatCount, energy, part: partNow(app.show.timeline) }, castNow(r), crewMem);
     camera.position.set(s.pos.x, s.pos.y, s.pos.z); controls.target.set(s.at.x, s.at.y, s.at.z);
     camera.up.set(0, 1, 0); camera.lookAt(controls.target);
@@ -338,8 +374,8 @@
     if (custom) scene.add(custom);
     lensBase = 0; lensSet = 0;
     restoreCam();
-    glow = Math.min(0.8, stored('luxdmx.seq.glow3', 0.3)); hazeAmt = stored('luxdmx.seq.haze', 0.45); ambient = Math.min(1, stored('luxdmx.seq.ambient2', 0.6)); spill = Math.min(1, stored('luxdmx.seq.spill', 0.45));
-    try { liveScreens = localStorage.getItem('luxdmx.seq.screensLive') !== '0'; } catch { /* as it was */ }
+    glow = GLOW_3D.get(); hazeAmt = HAZE_3D.get(); ambient = AMBIENT_3D.get(); spill = SPILL_3D.get();
+    liveScreens = SCREENS_LIVE.get();
     composer.setPixelRatio(renderer.getPixelRatio());
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook;
   }
@@ -395,7 +431,13 @@
     // three washes over the deck, coloured by what the lights do on each side (the band and the
     // backdrop take the show's colours; hundreds of real lights would be far too slow)
     wash = [-1, 0, 1].map((s) => { const l = new THREE.SpotLight(0xffffff, 0, 40, 0.55, 0.6, 1.2); l.position.set(s * 5, 11, 7); l.target.position.set(s * 3.5, DECK, -0.5); scene.add(l, l.target); return l; });
-    venue = buildVenue({ room: room.id, band: app.show.settings.bandName }); builtRoom = room.id; showRoom(room);
+    // and one over the crowd from the front of the stage: what points at the audience (blinders, a
+    // PAR turned out) lights them, in its colour (the washes only ever lit the deck: a blinder hit
+    // was a white line at the stage's edge and a crowd in the dark)
+    { const l = new THREE.SpotLight(0xffffff, 0, 60, 1.0, 0.75, 1.0); l.name = 'crowd light'; scene.add(l, l.target); }
+    // what a mirror ball throws round the room (mirrorBall.ts)
+    scene.add(new MirrorDots().group);
+    venue = buildVenue({ room: room.id, band: bandShown, act, custom: room }); builtRoom = room.key ?? room.id; builtAct = act; showRoom(room);
     scene.add(venue.group);
     rig = new Rig(); scene.add(rig.group);
     { const r = rig; void makeGobos().then((a) => { if (rig === r) r.setGobos(a.tex); }); }
@@ -417,6 +459,7 @@
     });
     gizmo.addEventListener('objectChange', () => moved());
     overlay.add(gizmo.getHelper());
+    overlay.add(measGroup);
     scene.add(proxy);
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
@@ -426,12 +469,12 @@
     composer.addPass(new OutputPass());
     restoreCam();
     controls.addEventListener('change', keepCam);
-    controls.addEventListener('start', () => { grabbing = true; grabFrom = { p: camera.position.clone(), t: controls.target.clone() }; });
+    controls.addEventListener('start', () => { grabbing = true; fly = null; grabFrom = { p: camera.position.clone(), t: controls.target.clone() }; });
     controls.addEventListener('end', () => { grabbing = false; grabFrom = null; });
     controls.addEventListener('change', grabbed);
     // for the tests (dev only): what can't be read off the pixels (the shown stage's)
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook = {
-      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog }),
+      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog, drawn: drawnFrames, crowdLight: crowdLevel }),
       // a band member's right hand (the band stands still without music)
       band: () => (venue as { band?: { handAt: (s: 'L' | 'R') => THREE.Vector3 }[] }).band?.[1]?.handAt('R').toArray() ?? null,
       // the screens: the live camera's picture on them (and how many it has drawn, its last shot)
@@ -440,8 +483,10 @@
       screenOf: (id: string) => { const f = fixtures.find((x) => x.id === id)!; const v = new THREE.Vector3(f.p.x, f.p.y, f.p.z).project(camera), r = canvas!.getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height }; },
       aimError: (p: V3) => Math.max(0, ...fixtures.filter((f) => f.kind === 'mover' && app.selected.includes(f.id)).map((f) => {
         // (from the head's pivot, where the beam really turns from)
-        const v = app.stageNow[f.id], d = beamDir(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.rot, f.optics), o = pivotOf(f.p, f.rot), k = (p.y - o.y) / d.y;
-        return Math.hypot(o.x + d.x * k - p.x, o.z + d.z * k - p.z);
+        // (how far p is from the beam's line: on the deck, on the cyc or on a wall alike)
+        const v = app.stageNow[f.id], d = beamDir(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.rot, f.optics), o = pivotOf(f.p, f.rot);
+        const w = { x: p.x - o.x, y: p.y - o.y, z: p.z - o.z }, t = w.x * d.x + w.y * d.y + w.z * d.z;
+        return Math.hypot(w.x - d.x * t, w.y - d.y * t, w.z - d.z * t);
       })),
       // the scene as the bloom gets it (linear light, before tone mapping), in full floats: NaN and
       // values past what the half-float buffers hold (65504) turn into black blocks after the blur
@@ -454,13 +499,17 @@
         const gl = renderer.getContext() as WebGL2RenderingContext;
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
         const px = new Float32Array(w * h * 4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, px); rt.dispose();
-        let nan = 0, over = 0, max = 0;
-        for (let i = 0; i < px.length; i++) { const v = px[i]; if (v !== v) nan++; else if (v > 65504) over++; else if (v > max) max = v; }
-        return { nan, over, max, pixels: w * h };
+        let nan = 0, over = 0, max = 0, sum = 0;
+        for (let i = 0; i < px.length; i++) { const v = px[i]; if (v !== v) nan++; else if (v > 65504) over++; else { if (v > max) max = v; if ((i & 3) !== 3) sum += v; } }
+        // (mean: the picture's average light, red, green and blue alike: how dark a dark stage is)
+        return { nan, over, max, mean: sum / (w * h * 3), pixels: w * h };
       },
       internals: { THREE, renderer, scene, camera, controls, composer, bloom, view, meter, overlay },
+      flying: () => !!fly,
+      measure: () => (meas ? { a: { ...meas.a }, b: meas.b ? { ...meas.b } : undefined, said: measSaid } : null),
       // the room and its people, what the band's banners show; the take running (its frame count)
-      venue: () => ({ room: venue.room, crowd: venue.crowdCount, group: venue.group.uuid, band: venue.bandInfo() }),
+      venue: () => ({ room: venue.room, key: builtRoom, crowd: venue.crowdCount, group: venue.group.uuid, band: venue.bandInfo(), deck: { ...room.deck }, truss: room.truss.map((t) => ({ ...t })) }),
+      where: (id: string) => { const f = fixtures.find((x) => x.id === id); return f ? { ...f.p } : null; },
       take: () => take,
       // a moving head where its motors are (degrees), and the haze the beams get now
       head: (id: string) => rig.headOf(id),
@@ -472,16 +521,27 @@
       winch: (id: string) => rig.winchOf(id),
       gobos: () => (goboAtlas ? { count: GOBOS.length, empty: [...goboAtlas.empty], size: goboAtlas.canvas.width } : null),
       rendering: () => (rendering ? { ...rendering } : null),
+      // (the last render's sound: how long, and how loud its first two seconds are, RMS)
+      lastMix: () => lastMix,
+      // (where the light landed in the last frame: on the floor and the deck, or on walls)
+      pools: () => ({ walls: rig?.wallPools ?? 0 }),
+      // (how the toolbar fits: its tier by the width, and how many steps smaller it had to go)
+      toolsFit: () => ({ tier, squeeze, over: toolsEl ? toolsEl.scrollWidth - toolsEl.clientWidth : 0, overWas: [...overWas] }),
+      // (the lit lights of the last frame: where each shines from and to, how wide and bright)
+      // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
+      mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ballsNow().map((b) => +b.obj.rotation.y.toFixed(3)), tilt: ballsNow().map((b) => +b.obj.rotation.x.toFixed(4)) }),
+      machinery: () => fixtures.filter((f) => f.cloth).map((f) => ({ name: f.name, look: f.look, at: rig.winchOf(f.id) ?? 0, travel: f.winch?.travel ?? 0, picture: f.cloth?.picture })),
+      looks: () => fixtures.map((f) => ({ name: f.name, look: f.look, profile: f.profile?.name ?? null })),
+      lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
       haze: () => haze,
-      ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: houseMats.length ? Math.max(...houseMats.map((m) => Math.max(m.color.r, m.color.g, m.color.b))) : null }),
+      ambient: () => ({ sky: hemi?.intensity, key: keyLight?.intensity, env: scene.environmentIntensity, walls: lightest(houseMats.filter((m) => m.userData.houseLeast === undefined)), glass: lightest(houseMats.filter((m) => m.userData.houseLeast !== undefined)) }),
     };
   }
   let devHook: unknown;
   // the camera where it was in this tab (a reload, back from 2D, or as the last view left it): not
   // back at the front
   function restoreCam() {
-    let cam: { p: number[]; t: number[]; tour?: boolean; cam?: unknown; pick?: unknown } | null = null;
-    try { cam = JSON.parse(sessionStorage.getItem(CAM_KEY) ?? 'null'); } catch { /* none */ }
+    const cam = CAM_3D.get() as { p?: number[]; t?: number[]; tour?: boolean; cam?: unknown; pick?: unknown } | null;
     if (cam && cam.p?.length === 3 && cam.t?.length === 3 && [...cam.p, ...cam.t].every(Number.isFinite)) {
       camera.position.set(cam.p[0], cam.p[1], cam.p[2]); controls.target.set(cam.t[0], cam.t[1], cam.t[2]); controls.update();
       // (and the camera move that was running, and the one picked)
@@ -522,12 +582,16 @@
   }
 
   const sizeNow = new THREE.Vector2();
+  // (whether the stage has room to be seen: from the resize observer, not asked every frame, which
+  // made the browser lay the page out again each time)
+  let visible = true;
   function resize() {
     if (!host || !renderer || !holding) return;
     // (a take keeps its own size whatever the window does meanwhile: see record())
     const w = takeSz?.w ?? host.clientWidth, h = takeSz?.h ?? host.clientHeight;
     // (hidden, or folded away: it measures nothing; the canvas keeps its size for when it's back)
-    if (w < 2 || h < 2) return;
+    visible = w >= 2 && h >= 2;
+    if (!visible) return;
     // (the same size again, e.g. the observer's first call: the canvas isn't made anew)
     const pr = renderer.getPixelRatio();
     renderer.getSize(sizeNow);
@@ -545,7 +609,11 @@
   // lights mustn't rebuild every mesh 60 times a second)
   let shape: string | null = null;      // (null: never built, also for no lights at all)
   // (a take of another shape: the canvas letterboxed, see the styles)
-  $effect(() => { canvas?.classList.toggle('take', !!take); });
+  // (a take's or a render's size, not the window's: shown whole, not stretched to the window; a
+  // 4K render was drawn twice as wide as it is)
+  $effect(() => { canvas?.classList.toggle('take', !!take || !!rendering); });
+  // (light lands on the room's walls while the room is there to see: with your own venue model alone, not)
+  $effect(() => showWalls(!app.show.settings.stage3d?.hideVenue));
   const sigOf = (list: RigFixture[]) => list.map((f) => `${f.id}:${f.kind}:${f.cells}:${f.sfx ?? ''}:${f.look}`).join();
   $effect(() => {
     // (only the stage holding the world; shown again, it catches up with what changed meanwhile)
@@ -686,18 +754,98 @@
     at(e);
     if (mode === 'aim' && !readonly) { aim(); return; }
     if (mode === 'calib' && !readonly) { calib(); return; }
+    if (mode === 'measure') { measure(); return; }
     if (readonly) return;                  // (a Live page or the timeline's picture: looking, not picking lights)
     const id = rig.pick(ray);
     if (id) app.select(id, e.shiftKey || e.ctrlKey || e.metaKey);
     else if (!e.shiftKey && mode === 'select') app.selectNone();
   }
   // where the click meets the deck (or the floor in front of it)
+  // (the first thing in the room the click's ray meets: the deck, the floor, a wall, the ceiling, the
+  // theatre's cyc or the cinema's screen; a gobo is focused on the cyc as on the deck. `on`: what)
+  let spotOn = '';
+  const surfaceOf = (h: V3 & { n: V3 }) => h.n.y > 0.5 ? (h.y > 0.01 ? (onDeck(h.x, h.z, room) ? 'the deck' : 'the seats') : 'the floor') : h.n.y < -0.5 ? 'the ceiling'
+    : (room.screens ?? []).some((s) => Math.abs(h.z - s.z) < 0.02 && h.n.z > 0.5) ? (room.id === 'cinema' ? 'the screen' : 'the cyc') : 'the wall';
   function spot(): V3 | undefined {
-    const hit = (y: number) => { const t = (y - ray.ray.origin.y) / ray.ray.direction.y; return t > 0 ? ray.ray.origin.clone().addScaledVector(ray.ray.direction, t) : undefined; };
+    const o = ray.ray.origin, d = ray.ray.direction;
+    const h = hitRoom({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, room);
+    if (h) { spotOn = surfaceOf(h); return { x: h.x, y: h.y, z: h.z }; }
+    const hit = (y: number) => { const t = (y - o.y) / d.y; return t > 0 ? o.clone().addScaledVector(d, t) : undefined; };
     let p = hit(DECK);
     if (!p || !onDeck(p.x, p.z, room)) p = hit(0);
+    spotOn = p && p.y > 0.01 ? 'the deck' : 'the floor';
     return p ? { x: p.x, y: p.y, z: p.z } : undefined;
   }
+  // ---- Measure: two clicks (the deck, the floor, a light) and how far apart they are, how far
+  // across and how far up; one light on its own: how high it hangs, where its beam lands, how wide
+  // it is there. A third click starts again; Esc or another tool clears it. The line and its dots
+  // are drawn over everything (the overlay), the numbers in a label that follows the line's middle.
+  type MPoint = { p: V3; what: string; id?: string };
+  let meas = $state<{ a: MPoint; b?: MPoint } | null>(null);
+  let measLabel = $state<HTMLDivElement>();
+  const measGroup = new THREE.Group();
+  const measMat = new THREE.LineBasicMaterial({ color: 0xffaa1c, depthTest: false, toneMapped: false });
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffaa1c, depthTest: false, toneMapped: false });
+  const m2 = (x: number) => `${x.toFixed(2)} m`;
+  function measurePick(): MPoint | undefined {
+    const id = rig.pick(ray), f = id ? fixtures.find((x) => x.id === id) : undefined;
+    if (f) return { p: pivotOf(f.p, f.rot), what: f.name, id: f.id };
+    const p = spot();
+    return p ? { p, what: spotOn } : undefined;
+  }
+  function measure() {
+    const m = measurePick();
+    if (!m) return;
+    meas = !meas || meas.b ? { a: m } : { a: meas.a, b: m };
+  }
+  // a light's throw: where its beam lands now, how far, how wide there
+  function throwOf(id: string) {
+    const f = fixtures.find((x) => x.id === id);
+    if (!f || f.sfx || f.fog) return null;
+    const v = app.stageNow[f.id], piv = pivotOf(f.p, f.rot);
+    const d = f.kind === 'mover' ? beamDir(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.rot, f.optics) : toWorld({ x: 0, y: 1, z: 0 }, f.rot);
+    // (wherever it lands: a boom's beam across the stage on the far wall, a ground row's on the cyc)
+    const hit = hitRoom(piv, d, room);
+    if (!hit) return null;
+    const L = Math.hypot(hit.x - piv.x, hit.y - piv.y, hit.z - piv.z), deg = rig.beamOf(f.id) ?? f.beam?.[0] ?? 25;
+    return { L, w: 2 * L * Math.tan((deg / 2) * (Math.PI / 180)), on: surfaceOf(hit), hit };
+  }
+  const measSaid = $derived.by(() => {
+    if (!meas) return null;
+    const { a, b } = meas;
+    if (!b) {
+      if (!a.id) return { big: a.p.y > 0.01 ? `On the deck, ${m2(a.p.y)} up` : 'On the floor', small: 'Click a second point.' };
+      // (its height as the Height field has it: where it hangs or stands, from the floor; and above
+      // the deck when it's over it. The beam's numbers from where it turns, the pivot.)
+      const f = fixtures.find((x) => x.id === a.id), hp = f?.p ?? a.p, g = groundAt(hp.x, hp.z, room), th = throwOf(a.id);
+      const where = hp.y - g < 0.05 ? (g > 0.01 ? `on the deck, ${m2(hp.y)} up` : 'on the floor') : g > 0.01 ? `${m2(hp.y)} up, ${m2(hp.y - g)} above the deck` : `${m2(hp.y)} above the floor`;
+      return { big: `${a.what}: ${where}`, small: th ? `Its beam reaches ${th.on} ${m2(th.L)} away, ${m2(th.w)} wide there. Click a second point.` : 'Click a second point.' };
+    }
+    const dx = b.p.x - a.p.x, dy = b.p.y - a.p.y, dz = b.p.z - a.p.z;
+    return { big: m2(Math.hypot(dx, dy, dz)), small: `${a.what} to ${b.what}: ${m2(Math.hypot(dx, dz))} across, ${m2(Math.abs(dy))} ${dy >= 0 ? 'up' : 'down'}` };
+  });
+  $effect(() => {
+    const m = meas;
+    untrack(() => {
+      for (const c of [...measGroup.children]) { measGroup.remove(c); (c as THREE.Mesh).geometry?.dispose(); }
+      if (!m) return;
+      const pts = [m.a, ...(m.b ? [m.b] : [])].map((x) => new THREE.Vector3(x.p.x, x.p.y, x.p.z));
+      for (const q of pts) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), dotMat); d.position.copy(q); d.renderOrder = 10; measGroup.add(d); }
+      if (pts.length === 2) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), measMat); l.renderOrder = 10; measGroup.add(l); }
+    });
+  });
+  $effect(() => { if (mode !== 'measure') untrack(() => (meas = null)); });
+  // (the label at the line's middle, or by the first point; every frame, as the camera moves)
+  function placeMeasLabel() {
+    if (!measLabel || !meas || !canvas) return;
+    const a = meas.a.p, b = meas.b?.p ?? a;
+    const v = new THREE.Vector3((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2).project(camera);
+    const r = canvas.getBoundingClientRect(), host0 = measLabel.offsetParent?.getBoundingClientRect() ?? r;
+    const x = r.left - host0.left + ((v.x + 1) / 2) * r.width, y = r.top - host0.top + ((1 - v.y) / 2) * r.height;
+    measLabel.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -130%)`;
+    measLabel.style.visibility = v.z < 1 ? 'visible' : 'hidden';
+  }
+
   // Calibrate: the real head points at a spot (moved there with the pan/tilt pad); a click on that
   // spot here works out its offsets, so the 3D stage and Aim agree with the room from then on
   function calib() {
@@ -764,11 +912,36 @@
     app.checkpoint(); m[k] = v; app.markDirty(0);
   }
   function removeModel() { app.checkpoint(); if (app.show.settings.stage3d) delete app.show.settings.stage3d.model; app.markDirty(0); }
+  // what the "built-in" box hides, said for the room shown (in the church that's the whole church,
+  // not a band and a truss)
+  const BUILT: Partial<Record<RoomId, string>> = {
+    hall: 'The built-in stage (band, truss, crowd)', pub: 'The built-in club (stage, band, people)', club: 'The club itself (DJ, booth, crowd)',
+    party: 'The party room itself (DJ, crowd)', truss: 'The test truss\'s room', custom: 'The built-in stage (riser, trusses, crowd)',
+    cinema: 'The cinema itself (screen, seats, people)', bar: 'The bar itself (counter, people)', theatre: 'The theatre itself (stage, seats, people)',
+    church: 'The church itself (walls, pews, people)', ballroom: 'The ballroom itself (tables, dancers)',
+  };
   function setHideVenue(h: boolean) { app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, hideVenue: h || undefined }; app.markDirty(0); }
   // the built-in room: the big stage, or a small club / pub (kept with the show)
-  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss') {
+  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom') {
     if (room.id === id) return;
-    app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, room: id === 'hall' ? undefined : id }; app.markDirty(0);
+    const s3 = app.show.settings.stage3d;
+    app.checkpoint(); app.show.settings.stage3d = { ...s3, room: id === 'hall' ? undefined : id, ...(id === 'custom' && !s3?.size ? { size: { ...STAGE_SIZE } } : {}) }; app.markDirty(0);
+    sayOutside();
+  }
+  // (lights keep their places when the room changes: those that now hang outside it, through its
+  // ceiling or its walls, are said, with how to bring them in)
+  function sayOutside() {
+    const r = roomFor(app.show.settings.stage3d);
+    const out = app.show.fixtures.filter((f) => f.p3 && (f.p3.y > r.ceiling + 0.05 || Math.abs(f.p3.x) > r.walls.x + 0.05 || f.p3.z < r.walls.z0 - 0.05 || f.p3.z > r.walls.z1 + 0.05));
+    if (out.length) ui.toast(`${out.length} light${out.length === 1 ? '' : 's'} hang${out.length === 1 ? 's' : ''} outside this room (where the last one had ${out.length === 1 ? 'it' : 'them'}). To hang ${out.length === 1 ? 'it' : 'them'} here: select ${out.length === 1 ? 'it' : 'them'}, then Reset in the lights' panel.`, 9000);
+  }
+  // your own stage's size: each field as it's set (the room is built again for it)
+  const size = $derived(stageSize(app.show.settings.stage3d?.size));
+  function setSize(k: keyof typeof STAGE_SIZE, v: number | boolean) {
+    if (typeof v === 'number' && !Number.isFinite(v)) return;
+    const s3 = app.show.settings.stage3d;
+    app.checkpoint(); app.show.settings.stage3d = { ...s3, room: 'custom', size: stageSize({ ...s3?.size, [k]: v }) }; app.markDirty(0);
+    sayOutside();
   }
   // the band's name on the banners, screens and kick drum (kept with the show; empty: their
   // picture). While typing the banners follow a moment later; Enter or leaving the field keeps it.
@@ -785,19 +958,24 @@
   // a show with another room: that room is built (and the camera goes to its front view); another
   // name: only the banners are painted again
   let builtRoom = '';
+  // who is on the stage (settings.stage3d.act): the band, or nobody (a play, a service, a premiere:
+  // the banners and screens show the show's own name then)
+  const act = $derived(app.show.settings.stage3d?.act ?? 'band');
+  const bandShown = $derived(app.show.settings.bandName || (act === 'none' ? app.show.meta.name : ''));
+  let builtAct: 'band' | 'none' = 'band';
   $effect(() => {
-    const r = room;
+    const r = room, a = act;
     if (!holding) return;
     untrack(() => {
-      if (!scene || !venue || r.id === builtRoom) return;
+      if (!scene || !venue || ((r.key ?? r.id) === builtRoom && a === builtAct)) return;
       scene.remove(venue.group); free(venue.group);
-      venue = buildVenue({ room: r.id, band: app.show.settings.bandName });
+      venue = buildVenue({ room: r.id, band: bandShown, act: a, custom: r });
       venue.group.visible = !app.show.settings.stage3d?.hideVenue;
-      scene.add(venue.group); builtRoom = r.id; showRoom(r);
+      scene.add(venue.group); builtRoom = r.key ?? r.id; builtAct = a; showRoom(r);
       view('front');
     });
   });
-  $effect(() => { const n = app.show.settings.bandName ?? ''; if (holding) untrack(() => venue?.setBand(n)); });
+  $effect(() => { const n = bandShown; if (holding) untrack(() => venue?.setBand(n)); });
   // the model in the scene: loaded once per file, placed every time the numbers change
   $effect(() => {
     const m = vm, hide = !!app.show.settings.stage3d?.hideVenue;
@@ -826,7 +1004,7 @@
   // second; Low: no glow, 20 a second. Never fewer pixels than the screen has: a blurred stage was
   // the first thing anyone noticed, frames and glow are what can go. A take keeps every frame.
   const RATIO = [1, 1.5, 2], EVERY = [1000 / 21, 1000 / 31, 0];
-  let drawnAt = 0;
+  let drawnAt = 0, drawnFrames = 0;
   function quality() {
     if (taking) return;
     const want = Math.min(RATIO[load.level], window.devicePixelRatio || 1);
@@ -864,10 +1042,10 @@
     // (a take goes on drawing: in a hidden tab a timer calls this, see hiddenTake())
     if ((document.hidden && !taking) || !host?.isConnected) return;
     // (folded away to nothing, e.g. the timeline's picture on a phone: nothing to draw)
-    if (!canvas || (!taking && (canvas.clientWidth < 2 || canvas.clientHeight < 2))) { last = now; return; }
-    // (fewer frames a second at a lower quality: the time goes to the DMX output)
+    if (!canvas || (!taking && !visible)) { last = now; return; }
+    // (fewer frames a second at a lower quality, when the governor says the output needs the time)
     if (!taking && now - drawnAt < EVERY[load.level]) return;
-    drawnAt = now;
+    drawnAt = now; drawnFrames++;
     const work0 = performance.now();
     quality();
     const real = Math.min(0.5, (now - last) / 1000), dt = Math.min(0.1, real); last = now;
@@ -897,7 +1075,8 @@
     haze = Math.min(1.5, hazeAmt * (0.9 + 0.5 * room) + 0.08 * Math.max(room, 0.5 * smokeIn));
     (scene.fog as THREE.FogExp2).density = 0.005 + 0.016 * haze;
     // (a winch live and not armed: where the wire holds it, not where the show would send it)
-    rig.winchWire = src ? undefined : (id) => app.winchHeldAt(id);
+    const held = src ? null : app.winchesHeld();
+    rig.winchWire = held ? (id) => held.get(id) : undefined;
     rig.update(src?.drawn ?? app.drawnNow, t, haze, sel);
     particles.light(rig.lit);
     // (the machines' output follows the clock, not the frame rate: a slow computer gets the same fog
@@ -909,6 +1088,20 @@
     const lv = [0, 0, 0];
     for (const l of rig.lit) { const s = l.p.x < -W / 6 ? 0 : l.p.x > W / 6 ? 2 : 1; sideCol[s].r += l.c.r * l.level; sideCol[s].g += l.c.g * l.level; sideCol[s].b += l.c.b * l.level; lv[s] += l.level; energy += l.level; }
     wash.forEach((w, i) => { const n = Math.max(1e-3, lv[i]); w.color.setRGB(sideCol[i].r / n, sideCol[i].g / n, sideCol[i].b / n); w.intensity = Math.min(1, lv[i] / 4) * 140 * spill; });
+    // the mirror balls' dots round the room, from the lights on them (none with the room hidden)
+    mirrorDots ??= scene.getObjectByName('mirror dots')?.userData.dots as MirrorDots | undefined;
+    mirrorDots?.update(ballsNow(), rig.lit, roomNow(), haze);
+    // (the lights turned out to the audience: their level and colour on the crowd light)
+    crowdLamp ??= scene.getObjectByName('crowd light') as THREE.SpotLight | undefined;
+    if (crowdLamp) {
+      let aud = 0; audCol.setRGB(0, 0, 0);
+      for (const l of rig.lit) if (l.d.z > 0.4 && l.d.y > -0.75) { aud += l.level; audCol.r += l.c.r * l.level; audCol.g += l.c.g * l.level; audCol.b += l.c.b * l.level; }
+      const z1 = deckFront();
+      crowdLamp.position.set(0, DECK + 2.5, z1 + 0.5); crowdLamp.target.position.set(0, 1.2, z1 + 10);
+      if (aud > 1e-3) crowdLamp.color.setRGB(audCol.r / aud, audCol.g / aud, audCol.b / aud);
+      crowdLamp.intensity = Math.min(1, aud / 3) * 320 * (0.4 + 0.6 * spill);
+      crowdLevel = crowdLamp.intensity;
+    }
     energy = Math.min(1, energy / Math.max(4, fixtures.length * 0.4));
     const all = sideCol[0].clone().add(sideCol[1]).add(sideCol[2]).multiplyScalar(1 / Math.max(1e-3, lv[0] + lv[1] + lv[2]));
     // (music: the song playing on the timeline, inside the song, or the microphone hearing a beat;
@@ -924,6 +1117,11 @@
     // the camera: a crew moving it (held still while you grab the stage), or yours
     // (the controls glide out a drag frame by frame: as many steps as 60 frames a second would take,
     // so on a slow computer the camera stops as soon as on a fast one, not seconds later)
+    if (fly) {
+      const k = Math.min(1, (performance.now() - fly.at) / fly.dur), e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e);
+      if (k >= 1) fly = null;
+    }
     if (!camMode) { const steps = Math.max(1, Math.min(30, Math.round(real * 60))); for (let i = 0; i < steps; i++) controls.update(); }
     else if (!grabbing) shoot(t, energy);
     feedFrame(t, energy, real);
@@ -939,7 +1137,7 @@
     if (houseOf !== venue.group) { houseOf = venue.group; houseMats = []; venue.group.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined; if (m?.userData?.house !== undefined && !houseMats.includes(m)) houseMats.push(m); }); }
     // (at the top of the slider as the room always looked; the default near black)
     const hk = Math.pow(amb / 1.25, 3);
-    for (const m of houseMats) m.color.setHex(m.userData.house).multiplyScalar(hk);
+    for (const m of houseMats) { const f = m.userData.houseLeast ?? 0; m.color.setHex(m.userData.house).multiplyScalar(f + (1 - f) * hk); }
     if (keyLight) keyLight.intensity = 0.35 * amb;
     scene.environmentIntensity = 0.28 * amb;
     // exposure like a camera's: down when looking into the lights, up a little for a dark look (less
@@ -949,7 +1147,7 @@
     if (glow > 0.02 && (load.level > 0 || taking)) composer.render(); else renderer.render(scene, camera);
     // the gizmo on top, after the glow (inside it, a bright look washed it out)
     // (not in a render: the video is the show, not the tools)
-    if (!src) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true; }
+    if (!src) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true; placeMeasLabel(); }
     gpuEnd(q);
     if (taking) take?.frame(now);          // (a take running: this frame into the video, see recorder.ts)
     if (!src) load.did(performance.now() - work0);   // (a render's slow frames aren't the screen's load)
@@ -958,16 +1156,15 @@
   async function fullscreen() {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await host!.requestFullscreen(); } catch { ui.toast('This browser won\'t go full screen here'); }
   }
-  $effect(() => { try { localStorage.setItem('luxdmx.seq.glow3', String(glow)); localStorage.setItem('luxdmx.seq.haze', String(hazeAmt)); localStorage.setItem('luxdmx.seq.ambient2', String(ambient)); localStorage.setItem('luxdmx.seq.spill', String(spill)); } catch { /* not remembered */ } });
+  $effect(() => { GLOW_3D.set(glow); HAZE_3D.set(hazeAmt); AMBIENT_3D.set(ambient); SPILL_3D.set(spill); });
   const pickedName = $derived(app.selected.length === 1 ? app.show.fixtures.find((f) => f.id === app.selected[0])?.name : app.selected.length ? `${app.selected.length} lights` : '');
 
   // ---- a video of the stage with its sound (the timeline's song or the demo beat): Record starts a
   // take, the REC chip counts, Stop saves the file. A 1080p take draws at 1920 x 1080 while it
   // runs (letterboxed here) and goes back to the window's size after; a 9:16 one (phones: Reels,
   // Stories) at 1080 x 1920, with a lens wide enough across for the band and the lights.
-  const VIDEO_KEY = 'luxdmx.seq.video3d';
-  let videoSize = $state<VideoSize>((() => { try { const v = localStorage.getItem(VIDEO_KEY); return VIDEO_SIZES.find((s) => s === v) ?? '1080p'; } catch { return '1080p'; } })());
-  $effect(() => { try { localStorage.setItem(VIDEO_KEY, videoSize); } catch { /* not remembered */ } });
+  let videoSize = $state<VideoSize>(VIDEO_SIZES.find((s) => s === VIDEO_SIZE.get()) ?? '1080p');
+  $effect(() => { VIDEO_SIZE.set(videoSize); });
   const recordable = canRecord();
   // (a browser that only makes WebM, like Firefox: Instagram and many phones want MP4)
   const webmOnly = recordable && (() => { try { return pickFormat((t) => MediaRecorder.isTypeSupported(t))?.ext === 'webm'; } catch { return false; } })();
@@ -1005,23 +1202,28 @@
   // from the song's file. The live show isn't touched: the render runs its own copy of the show,
   // nothing goes out from it, the box keeps getting what it got. While it runs this stage shows the
   // frames being drawn.
-  const RENDER_KEY = 'luxdmx.seq.render3d';
   type ROpts = { size: RenderSize; fps: RenderFps; what: 'song' | 'here' | 'look'; seconds: number; programmer: boolean };
   const R_DEFAULT: ROpts = { size: '4k', fps: 30, what: 'song', seconds: 30, programmer: false };
   let rOpts = $state<ROpts>((() => {
-    try {
-      const v = { ...R_DEFAULT, ...JSON.parse(localStorage.getItem(RENDER_KEY) ?? '{}') } as ROpts;
-      if (!RENDER_ORDER.includes(v.size)) v.size = R_DEFAULT.size;
-      if (!RENDER_FPS.includes(v.fps)) v.fps = R_DEFAULT.fps;
-      if (!['song', 'here', 'look'].includes(v.what)) v.what = 'song';
-      v.seconds = Math.max(1, Math.min(3600, Math.round(+v.seconds || 30)));
-      return v;
-    } catch { return { ...R_DEFAULT }; }
+    const v = { ...R_DEFAULT, ...RENDER_OPTS.get() } as ROpts;
+    if (!RENDER_ORDER.includes(v.size)) v.size = R_DEFAULT.size;
+    if (!RENDER_FPS.includes(v.fps)) v.fps = R_DEFAULT.fps;
+    if (!['song', 'here', 'look'].includes(v.what)) v.what = 'song';
+    v.seconds = Math.max(1, Math.min(3600, Math.round(+v.seconds || 30)));
+    return v;
   })());
-  $effect(() => { try { localStorage.setItem(RENDER_KEY, JSON.stringify(rOpts)); } catch { /* not remembered */ } });
+  $effect(() => { RENDER_OPTS.set({ ...rOpts }); });
   let renderPanel = $state(false);
   let rendering = $state<{ k: number; n: number; left?: number; codec: string; label: string; phase: 'sound' | 'frames' | 'saving' } | null>(null);
   let renderStop = false;
+  let lastMix: { secs: number; rms: number } | null = null;
+  // how loud a sound's first `secs` are (RMS over its channels)
+  function rmsOf(b: AudioBuffer, secs: number) {
+    const n = Math.min(b.length, Math.round(secs * b.sampleRate));
+    let sum = 0;
+    for (let c = 0; c < b.numberOfChannels; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) sum += d[i] * d[i]; }
+    return n ? Math.sqrt(sum / (n * b.numberOfChannels)) : 0;
+  }
   const renderable = typeof VideoEncoder !== 'undefined';
   // the song on the timeline (a file or the demo beat): Render can take it from its start
   const songThere = $derived(!!app.show.timeline && (!!app.show.timeline.demo || !!app.show.timeline.audio));
@@ -1029,7 +1231,8 @@
   const renderSecs = $derived.by(() => {
     if (rOpts.what === 'look' || !songThere) return rOpts.seconds;
     const span = spanOf(app.show.timeline);
-    return Math.max(0, span.to - (rOpts.what === 'here' ? Math.max(span.from, app.timeline.position) : span.from));
+    if (rOpts.what === 'here') { const at = Math.max(span.from, app.timeline.position); return Math.max(0, Math.min(span.to, at + rOpts.seconds) - at); }
+    return Math.max(0, span.to - span.from);
   });
   function cardLimits(): CardLimits {
     const gl = renderer.getContext();
@@ -1051,7 +1254,9 @@
     const song = o.what !== 'look' && songThere && tl;
     const span = spanOf(tl);
     const from = song ? (o.what === 'here' ? Math.max(span.from, Math.min(span.to - 0.5, app.timeline.position)) : span.from) : 0;
-    const to = song ? span.to : o.seconds;
+    // (from the playhead: for the seconds asked, up to the song's end; a short clip with its sound
+    // could only be had as the look as it is, which has none)
+    const to = song ? (o.what === 'here' ? Math.min(span.to, from + o.seconds) : span.to) : o.seconds;
     const n = frameCount(to - from, o.fps), name = renderName(app.show.meta.name, o.size, new Date());
     // where it goes: asked first where the browser can (Chrome, Edge), so an 8K file goes straight
     // to disk; else it's kept as it's made and saved at the end
@@ -1075,9 +1280,12 @@
     const onLost = () => { lost = true; renderStop = true; };
     canvas.addEventListener('webglcontextlost', onLost);
     try {
-      // the sound: the song from the render's start to its end, at full
+      // the sound: the song from the render's start to its end, at full, and the crowd as you hear it
+      // (its volume, or none when it's switched off)
       let mix: AudioBuffer | undefined;
-      if (song) { try { await app.timeline.prepare(); mix = await mixSong({ song: app.timeline.song, demo: !!tl.demo, from, to }); } catch { mix = undefined; } }
+      const P = app.timeline, crowd = tl?.crowd?.length && P.crowdOn ? { items: tl.crowd, volume: P.crowdVolume } : undefined;
+      if (song) { try { await P.prepare(); mix = await mixSong({ song: P.song, demo: !!tl.demo, from, to, crowd }); } catch { mix = undefined; } }
+      lastMix = mix ? { secs: mix.duration, rms: rmsOf(mix, 2) } : null;
       if (renderStop) throw new Error('stopped');
       file = handle ? undefined : new ChunkFile();
       const writable = (handle ? await handle.createWritable() : file!.writable()) as WritableStream;
@@ -1133,6 +1341,9 @@
     } finally {
       canvas?.removeEventListener('webglcontextlost', onLost);
       src = null; taking = false; rendering = null; ui.recording = false;
+      // (the render's frames ran on the video's clock, ahead of the real one: the live view would
+      // wait for the real clock to catch up, seconds of black)
+      drawnAt = 0;
       if (!gone) { sizeBack(); last = performance.now(); }
     }
   }
@@ -1189,7 +1400,28 @@
   // about 670; on a phone the click tools, Record and More about 270)
   // (the WebM note next to Record takes about 60 px more)
   // (wide: every tool on one row, the camera moves and the Haze/Glow/Ambient sliders too)
-  const tier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= 700 ? 'mid' : 'narrow');
+  // (mid needs room for the cameras, Select/Move/Turn/Aim, Venue, Record, Render and ⋯ in one row:
+  // ~780 px where you can edit, less where the stage is only watched)
+  // (the camera and Venue stay on the toolbar on a laptop: there Record and Render are their
+  // symbols, their words from 900 px; the mid toolbar needs ~690 px then, it was ~945 with them)
+  // (by the width first; then, when the toolbar still doesn't fit in one row, a step smaller at a
+  // time: wide -> mid, then without the words, then Measure into More, then narrow. Measured, not
+  // guessed: a button more in the toolbar (Selected, Measure) pushed Render and More off its end)
+  const baseTier = $derived(hostW >= (webmOnly ? 1240 : 1195) ? 'wide' : hostW >= (readonly ? 600 : 700) ? 'mid' : 'narrow');
+  let squeeze = $state(0), toolsEl = $state<HTMLDivElement>();
+  // (the steps after the width's own tier: wide has one more, mid -> narrow comes last)
+  const step = $derived(baseTier === 'wide' ? squeeze - 1 : baseTier === 'mid' ? squeeze : 3);
+  const tier = $derived(baseTier === 'narrow' || step >= 3 ? 'narrow' : baseTier === 'wide' && squeeze === 0 ? 'wide' : 'mid');
+  const words = $derived(hostW >= 900 && !(tier === 'mid' && step >= 1));
+  const measureInMore = $derived(tier === 'narrow' || (tier === 'mid' && step >= 2));
+  $effect(() => { void hostW; untrack(() => { squeeze = 0; overWas = []; }); });
+  let overWas: number[] = [];               // (how much didn't fit at each step: for tests)
+  $effect(() => {
+    void tier; void words; void mode; void app.selected.length; void squeeze;
+    const t = toolsEl;
+    if (!t) return;
+    void tick().then(() => { const over = t.scrollWidth - t.clientWidth; overWas[squeeze] = over; if (over > 1 && squeeze < (baseTier === 'wide' ? 4 : 3)) squeeze++; });
+  });
   let more = $state(false);
   let venueBtn = $state<HTMLButtonElement>(), moreBtn = $state<HTMLButtonElement>(), venueEl = $state<HTMLDivElement>();
   // (from More, which closes: the keys go on in the panel, not lost on the page)
@@ -1200,11 +1432,11 @@
   function closeVenue() { venuePanel = false; (venueBtn ?? moreBtn)?.focus(); }
   function keys(e: KeyboardEvent) {
     if (e.key === 'Escape' && venuePanel && shownNow && !dialogOpen()) { e.preventDefault(); closeVenue(); }
+    else if (e.key === 'Escape' && mode === 'measure' && meas && shownNow && !dialogOpen()) { e.preventDefault(); meas = null; }
   }
   // the selection's panel folds to its name (kept per browser)
-  const FOLD_KEY = 'luxdmx.seq.sel3d';
-  let selOpen = $state((() => { try { return localStorage.getItem(FOLD_KEY) !== 'folded'; } catch { return true; } })());
-  function foldSel() { selOpen = !selOpen; try { localStorage.setItem(FOLD_KEY, selOpen ? 'open' : 'folded'); } catch { /* not remembered */ } }
+  let selOpen = $state(SEL_PANEL_OPEN.get());
+  function foldSel() { selOpen = !selOpen; SEL_PANEL_OPEN.set(selOpen); }
 </script>
 
 <svelte:document onfullscreenchange={() => { full = !!document.fullscreenElement; queueMicrotask(resize); }} onvisibilitychange={hiddenTake} />
@@ -1215,6 +1447,7 @@
 {#snippet cameraSeg()}
   <div class="seg" role="group" aria-label="Camera">
     {#each Object.entries(VIEWS) as [k, label] (k)}<button class="ghost" onclick={() => { view(k as ViewKey); more = false; }}>{label}</button>{/each}
+    {#if !readonly}<button class="ghost" onclick={() => { focusSel(); more = false; }} disabled={!app.selected.length} title={app.selected.length ? `The camera to the ${app.selected.length === 1 ? 'selected light' : `${app.selected.length} selected lights`}` : 'Select lights first: the camera goes to them'}>Selected</button>{/if}
     <button class="ghost" class:on={!!camMode} aria-pressed={!!camMode} onclick={() => (camMode ? stopCam() : startCam(camPick))} title={camMode ? `${picked.says}. Click or drag the stage to stop` : picked.says}>{picked.name}</button>
     <button class="ghost caret" data-popover-toggle class:on={camMenu} aria-expanded={camMenu} aria-controls="cam-moves" aria-label="Pick a camera move" title="How the camera moves by itself: Tour, Broadcast, Crane, Steadicam, Drone, Band cam" onclick={openMoves}><Icon name="down" size={12} /></button>
   </div>
@@ -1236,7 +1469,8 @@
 {#snippet sizePick()}
   <label class="slide" title="How big the video is: 1080p is 1920 x 1080 whatever the window, 9:16 is 1080 x 1920 for phones (Reels, Stories), As shown is the 3D stage as it is on the screen">{#if tier !== 'wide'}Video{/if}
     <select bind:value={videoSize} disabled={!!take} aria-label="Video size"><option value="1080p">1080p</option><option value="vertical">9:16</option><option value="shown">As shown</option></select></label>
-  {#if webmOnly}<span class="webm" role="note" aria-label="WebM only" title={WEBM_NOTE}>WebM</span>{/if}
+  <!-- (on the wide toolbar the sliders have its room: Record's own title says it) -->
+  {#if webmOnly && tier !== 'wide'}<span class="webm" role="note" aria-label="WebM only" title={WEBM_NOTE}>WebM</span>{/if}
 {/snippet}
 {#snippet fullBtn(text: boolean)}
   <button class="ghost" onclick={fullscreen} aria-label={full ? 'Leave full screen' : 'Full screen'} title="Full screen (for a presentation)"><Icon name={full ? 'close' : 'eye'} />{#if text}{full ? 'Leave full screen' : 'Full screen'}{/if}</button>
@@ -1248,8 +1482,9 @@
 <div class="s3" class:narrow={tier === 'narrow'} bind:this={host} bind:clientWidth={() => hostW, (v) => { if (v > 0) hostW = v; }}>
   <!-- the canvas comes from the world (built here, or handed on from the last view: see the top) -->
   <div class="cv" bind:this={cvHost}></div>
+  {#if meas && measSaid}<div class="meas" bind:this={measLabel} role="status"><b>{measSaid.big}</b><span>{measSaid.small}</span></div>{/if}
   <div class="top">
-    <div class="tools" role="toolbar" aria-label="3D stage">
+    <div class="tools" class:tight={tier === 'mid' && step >= 1} role="toolbar" aria-label="3D stage" bind:this={toolsEl}>
       {#if tier !== 'narrow'}{@render cameraSeg()}{/if}
       {#if !readonly}
         <div class="seg" role="group" aria-label="What a click does">
@@ -1257,6 +1492,7 @@
           <button class="ghost" class:on={mode === 'move'} aria-pressed={mode === 'move'} onclick={() => (mode = 'move')} title="Drag the arrows to move the selected light; let go near a truss and it hangs on it">Move</button>
           <button class="ghost" class:on={mode === 'turn'} aria-pressed={mode === 'turn'} onclick={() => (mode = 'turn')} title="Drag the rings to turn the selected light">Turn</button>
           <button class="ghost" class:on={mode === 'aim'} aria-pressed={mode === 'aim'} onclick={() => (mode = 'aim')} title="Click on the stage: the selected moving heads point there">Aim</button>
+          {#if !measureInMore}<button class="ghost" class:on={mode === 'measure'} aria-pressed={mode === 'measure'} onclick={() => (mode = 'measure')} title="Click two points (the deck, the floor, a light): how far apart they are. One light: how high it hangs and where its beam lands">Measure</button>{/if}
           {#if app.selected.length === 1 && app.kinds[app.selected[0]] === 'mover'}
             <button class="ghost" class:on={mode === 'calib'} aria-pressed={mode === 'calib'} onclick={() => (mode = 'calib')} title="Point the real head at a spot on the stage (the pan/tilt pad), then click that spot here: the 3D stage and Aim match the room">Calibrate</button>
           {/if}
@@ -1269,21 +1505,22 @@
       {#if take}
         <div class="seg recseg" role="group" aria-label="Recording">
           <span class="rec" role="timer" aria-label="Recording: {clock(recSecs)}"><span class="dot"></span>REC {clock(recSecs)}</span>
-          <button class="ghost" onclick={() => void stopRecording()} aria-label="Stop and save the video" title="Stop recording and save the video file"><Icon name="stop" size={14} />{#if tier !== 'narrow'}Stop{/if}</button>
+          <button class="ghost" onclick={() => void stopRecording()} aria-label="Stop and save the video" title="Stop recording and save the video file"><Icon name="stop" size={14} />{#if tier !== 'narrow' && words}Stop{/if}</button>
         </div>
       {:else}
         <button class="ghost recbtn" class:off={!recordable} onclick={record} aria-label="Record a video"
-          title={recordable ? `Record a video of the 3D stage with the song (${SIZE_SAYS[videoSize]}); Stop saves it${webmOnly ? `. ${WEBM_NOTE}` : ''}` : 'This browser can\'t record video here'}><Icon name="record" size={14} />{#if tier !== 'narrow'}Record{/if}</button>
+          title={recordable ? `Record a video of the 3D stage with the song (${SIZE_SAYS[videoSize]}); Stop saves it${webmOnly ? `. ${WEBM_NOTE}` : ''}` : 'This browser can\'t record video here'}><Icon name="record" size={14} />{#if tier === 'mid' && words}Record{/if}</button>
       {/if}
       {#if rendering}
         <div class="seg recseg" role="group" aria-label="Rendering">
           <span class="rec rend" role="status" aria-label="Rendering {rendering.label}: {rendering.k} of {rendering.n} frames">{rendering.label}
             {rendering.phase === 'sound' ? 'sound…' : rendering.phase === 'saving' ? 'saving…' : `${Math.floor((rendering.k / rendering.n) * 100)} %`}{#if rendering.phase === 'frames' && rendering.left !== undefined}{' '}· {clock(rendering.left)} left{/if}</span>
-          <button class="ghost" onclick={() => (renderStop = true)} aria-label="Stop rendering" title="Stop the render (nothing is saved)"><Icon name="stop" size={14} />{#if tier !== 'narrow'}Stop{/if}</button>
+          <!-- (always with its word: during a render it's the one button that matters) -->
+          <button class="ghost stoprend" onclick={() => (renderStop = true)} aria-label="Stop rendering" title="Stop the render (nothing is saved)"><Icon name="stop" size={14} />Stop</button>
         </div>
       {:else if !take}
         <button class="ghost" data-popover-toggle class:on={renderPanel} aria-expanded={renderPanel} class:off={!renderable} onclick={() => (renderPanel = !renderPanel)} aria-label="Render a video"
-          title={renderable ? 'Render a video frame by frame: up to 8K, never a dropped frame (slower than real time)' : 'This browser can\'t render video here'}><Icon name="film" size={14} />{#if tier !== 'narrow' && tier !== 'wide'}Render{/if}</button>
+          title={renderable ? 'Render a video frame by frame: up to 8K, never a dropped frame (slower than real time)' : 'This browser can\'t render video here'}><Icon name="film" size={14} />{#if tier !== 'narrow' && tier !== 'wide' && words}Render{/if}</button>
       {/if}
       {#if tier === 'wide'}
         {@render sizePick()}{@render fullBtn(false)}
@@ -1301,6 +1538,10 @@
           {@render sizePick()}
           {@render fullBtn(true)}
         </div>
+        <!-- (when the tools row has no room for Measure: it's here) -->
+        {#if measureInMore && !readonly}<div class="row"><button class="ghost" class:on={mode === 'measure'} aria-pressed={mode === 'measure'} onclick={() => { mode = 'measure'; more = false; }}>Measure</button></div>{/if}
+        <!-- (the gallery of what this stage draws: every kind of light and machine, live) -->
+        <div class="row"><button class="ghost" onclick={() => { more = false; ui.modal = 'gallery'; }}><Icon name="image" size={14} />What the 3D stage draws (gallery)</button></div>
       </div>
     {/if}
     {#if renderPanel && !rendering}
@@ -1316,8 +1557,10 @@
             <label class="ck"><input type="radio" name="rwhat" value="song" bind:group={rOpts.what} /> The song, from its start</label>
             <label class="ck"><input type="radio" name="rwhat" value="here" bind:group={rOpts.what} /> The song, from the playhead ({clock(Math.max(0, app.timeline.position))})</label>
           {/if}
-          <label class="ck"><input type="radio" name="rwhat" value="look" checked={rOpts.what === 'look' || !songThere} onchange={() => (rOpts.what = 'look')} /> The look as it is, for
-            <input type="number" min="1" max="3600" bind:value={rOpts.seconds} aria-label="Seconds to render" onkeydown={(e) => e.stopPropagation()} /> s</label>
+          <label class="ck"><input type="radio" name="rwhat" value="look" checked={rOpts.what === 'look' || !songThere} onchange={() => (rOpts.what = 'look')} /> The look as it is, no sound{songThere ? '' : ' (no song on the timeline)'}</label>
+          {#if rOpts.what !== 'song' || !songThere}
+            <label class="ck secs">For <input type="number" min="1" max="3600" bind:value={rOpts.seconds} aria-label="Seconds to render" onkeydown={(e) => e.stopPropagation()} /> s{rOpts.what === 'here' && songThere ? ", at most to the song's end" : ''}</label>
+          {/if}
         </div>
         <label class="ck"><input type="checkbox" bind:checked={rOpts.programmer} /> With what's in the programmer</label>
         <p class="faint note">{clock(renderSecs)} of video, about {megabytes((renderBits(RENDER_SIZES[rOpts.size].w, RENDER_SIZES[rOpts.size].h, rOpts.fps) + 256e3) * renderSecs / 8)} MB.
@@ -1329,12 +1572,29 @@
       <div class="venue" role="group" aria-label="The venue" bind:this={venueEl}>
         <div class="vhead"><b>Venue</b><button class="ghost x" onclick={closeVenue} aria-label="Close the venue panel" title="Close (Esc)"><Icon name="close" size={14} /></button></div>
         <div class="seg rooms" role="group" aria-label="Room">
+          <!-- (concerts and parties, then the rooms people sit in, then the test truss and your own) -->
           <button class="ghost" class:on={room.id === 'hall'} aria-pressed={room.id === 'hall'} onclick={() => setRoom('hall')} title="A big stage in a hall: truss, LED walls, a few hundred people">Big stage</button>
-          <button class="ghost" class:on={room.id === 'pub'} aria-pressed={room.id === 'pub'} onclick={() => setRoom('pub')} title="A small club or pub: a small stage under a low ceiling, a bar at the back, a few dozen people. Lights you placed by hand stay where you put them; Reset puts them on its rig.">Small club / pub</button>
           <button class="ghost" class:on={room.id === 'club'} aria-pressed={room.id === 'club'} onclick={() => setRoom('club')} title="A club: a DJ booth on a stage, LED strips round it, a dance floor with a bar and a mirror ball">Club</button>
           <button class="ghost" class:on={room.id === 'party'} aria-pressed={room.id === 'party'} onclick={() => setRoom('party')} title="No stage: a square of truss over the crowd on four legs, speakers in the corners, the DJ on the floor">Party</button>
+          <button class="ghost" class:on={room.id === 'pub'} aria-pressed={room.id === 'pub'} onclick={() => setRoom('pub')} title="A small club or pub: a small stage under a low ceiling, a bar at the back, a few dozen people. Lights you placed by hand stay where you put them; Reset puts them on its rig.">Small club / pub</button>
+          <button class="ghost" class:on={room.id === 'bar'} aria-pressed={room.id === 'bar'} onclick={() => setRoom('bar')} title="A bar: a long counter with a back bar of bottles and a mirror, stools with people, tables, a little dance floor with a mirror ball">Bar</button>
+          <button class="ghost" class:on={room.id === 'theatre'} aria-pressed={room.id === 'theatre'} onclick={() => setRoom('theatre')} title="A theatre: a proscenium stage with its house curtain and a cyclorama, lighting bars over it, stalls and a balcony with an audience">Theatre</button>
+          <button class="ghost" class:on={room.id === 'cinema'} aria-pressed={room.id === 'cinema'} onclick={() => setRoom('cinema')} title="A big cinema: the screen between red curtains, a stage in front of it, raked rows of seats with an audience">Cinema</button>
+          <button class="ghost" class:on={room.id === 'church'} aria-pressed={room.id === 'church'} onclick={() => setRoom('church')} title="A church: the chancel with the altar, the cross and the choir, pews down the nave with the congregation, stained glass">Church</button>
+          <button class="ghost" class:on={room.id === 'ballroom'} aria-pressed={room.id === 'ballroom'} onclick={() => setRoom('ballroom')} title="A ballroom for a wedding: draped walls for the uplights, round tables with the guests, a parquet dance floor, the head table, the cake, chandeliers">Ballroom</button>
           <button class="ghost" class:on={room.id === 'truss'} aria-pressed={room.id === 'truss'} onclick={() => setRoom('truss')} title="An empty room with one truss on two towers: for trying lights out">Test truss</button>
+          <button class="ghost" class:on={room.id === 'custom'} aria-pressed={room.id === 'custom'} onclick={() => setRoom('custom')} title="Your own stage at its real size: its width and depth, a riser or not, how many trusses and how high">Your stage</button>
         </div>
+        {#if room.id === 'custom'}
+          <!-- (each as it's set: the room is built again; the plan's width and depth are these too) -->
+          <div class="size" role="group" aria-label="Your stage's size">
+            <label class="fld"><span>Width m</span><input type="number" min="2" max="40" step="0.5" value={size.w} aria-label="Stage width (m)" onchange={(e) => setSize('w', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="fld"><span>Depth m</span><input type="number" min="1.5" max="25" step="0.5" value={size.d} aria-label="Stage depth (m)" onchange={(e) => setSize('d', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="fld"><span>Truss m</span><input type="number" min="2.5" max="15" step="0.1" value={size.trussY} aria-label="Truss height (m, its underside above the floor)" title="Its underside above the floor" onchange={(e) => setSize('trussY', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="fld"><span>Trusses</span><input type="number" min="0" max="4" step="1" value={size.trusses} aria-label="Trusses over the stage" onchange={(e) => setSize('trusses', (e.target as HTMLInputElement).valueAsNumber)} onkeydown={(e) => e.stopPropagation()} /></label>
+            <label class="ck"><input type="checkbox" checked={size.riser} onchange={(e) => setSize('riser', (e.target as HTMLInputElement).checked)} /> On a riser ({DECK} m up); off: on the floor</label>
+          </div>
+        {/if}
         <label class="fld bandname"><span>Band name (on the banners and screens)</span>
           <input type="text" maxlength="60" value={app.show.settings.bandName ?? ''} placeholder="Empty: the band's picture" aria-label="Band name"
             oninput={(e) => previewBand((e.target as HTMLInputElement).value)} onchange={(e) => setBandName((e.target as HTMLInputElement).value)} onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Enter') setBandName((e.target as HTMLInputElement).value); }} /></label>
@@ -1347,13 +1607,14 @@
           {/each}
           <button class="ghost" onclick={removeModel}>Remove it</button>
         {/if}
-        <label class="ck"><input type="checkbox" checked={!app.show.settings.stage3d?.hideVenue} onchange={(e) => setHideVenue(!(e.target as HTMLInputElement).checked)} /> The built-in stage (band, truss, crowd)</label>
+        <label class="ck"><input type="checkbox" checked={!app.show.settings.stage3d?.hideVenue} onchange={(e) => setHideVenue(!(e.target as HTMLInputElement).checked)} /> {BUILT[room.id] ?? 'The built-in stage'}</label>
         {#if room.id === 'hall' || room.id === 'pub'}<label class="ck" title="Like a real show's screens: what a TV director's cameras film, live (off: the band's name)"><input type="checkbox" checked={liveScreens} onchange={(e) => setLiveScreens((e.target as HTMLInputElement).checked)} /> The live camera on the screens</label>{/if}
       </div>
     {/if}
     <!-- (up here, under the toolbar: never over the selection's numbers at the bottom) -->
     {#if mode === 'aim' && !readonly}<p class="aimhint">Click on the stage: the selected moving heads point there.</p>{/if}
     {#if mode === 'calib' && !readonly}<p class="aimhint">Point the real head at a spot on the stage (pan/tilt pad), then click that spot here.</p>{/if}
+    {#if mode === 'measure' && !meas}<p class="aimhint">Click two points: the deck, the floor, a wall or a light. One light alone: its height and its beam.</p>{/if}
   </div>
   {#if !readonly && app.selected.length}
     <div class="sel" class:folded={!selOpen} role="group" aria-label="The selected lights">
@@ -1389,6 +1650,10 @@
 
 <style>
   .s3 { position: relative; flex: 1; min-height: 0; border-radius: var(--radius-s); overflow: hidden; background: #040507; }
+  .meas { position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: .05rem; max-width: 22rem;
+          background: #0b0f15e6; border: 1px solid var(--accent); border-radius: var(--radius-s); padding: .25rem .6rem; text-align: center; visibility: hidden; }
+  .meas b { color: var(--accent); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .meas span { color: var(--text); font-size: .78rem; }
   .cv { display: contents; }
   .cv :global(canvas) { display: block; width: 100%; height: 100%; touch-action: none; }
   /* a take of another shape than the window: shown whole, with bars */
@@ -1398,19 +1663,31 @@
   /* one row; what doesn't fit scrolls sideways (the gaps let clicks through to the stage) */
   .tools { align-self: stretch; display: flex; gap: .4rem; align-items: center; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; pointer-events: none; }
   .tools::-webkit-scrollbar { display: none; }
-  .tools > *, .more, .venue, .aimhint, .sel { pointer-events: auto; }
+  /* (the hints are words only: a click on them goes through to the stage under them, a light behind
+     the Measure hint was out of reach) */
+  .tools > *, .more, .venue, .sel { pointer-events: auto; }
+  /* (an open panel above the selected lights' box: on a short 3D view the box lay over Render's
+     button, and a click on it hit the box) */
+  .venue { position: relative; z-index: 3; }
   .tools > * { flex: none; }
   .tools > .grow { flex: 1; pointer-events: none; }
   .seg { display: inline-flex; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: 2px; backdrop-filter: blur(4px); }
   .seg button, .tools > button, .more .row > button { font-size: .8rem; padding: .2rem .55rem; }
+  /* (a step smaller when it didn't fit: closer together before anything goes into More) */
+  .tools.tight :global(.seg button), .tools.tight > button { padding: .2rem .4rem; }
+  .tools.tight { gap: .3rem; }
   .tools > button, .more .row > button { background: #0b0f15cc; border: 1px solid var(--line); }
   .slide { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; color: var(--muted); background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .35rem; }
   .slide input { width: 4.2rem; }
   /* on the toolbar: the four sliders share one frame, a little narrower (so Record, Render and the
      video size fit the one row too) */
-  .slides { display: inline-flex; align-items: center; gap: .55rem; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .45rem; }
+  .slides { display: inline-flex; align-items: center; gap: .3rem; background: #0b0f15cc; border: 1px solid var(--line); border-radius: 8px; padding: .1rem .45rem; }
   .slides .slide { background: none; border: 0; padding: 0; gap: .25rem; }
-  .slides .slide input { width: 3.5rem; }
+  /* (twice as wide where the row has room; where it hasn't they give way down to half that before
+     the toolbar has to put anything into More) */
+  .tools > .slides { flex: 0 1 auto; min-width: 0; }
+  .slides .slide { min-width: 0; }
+  .slides .slide input { width: 4.4rem; min-width: 2.2rem; flex: 0 1 4.4rem; }
   .slide select { font-size: .78rem; padding: .05rem .2rem; background: transparent; border-color: transparent; }
   /* Record: a red dot; while it records, the red REC chip with the time and Stop */
   .recbtn :global(svg) { color: #ff4d55; fill: #ff4d55; }
@@ -1434,14 +1711,17 @@
   .venue .name { flex: 1 1 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .venue .fld input { width: 4.6em; padding: .1rem .25rem; font-size: .8rem; min-height: 0; }
   .venue .ck { flex: 1 1 100%; font-size: .8rem; display: flex; gap: .35rem; align-items: center; }
-  .venue .rooms { flex: 1 1 100%; }
-  .venue .rooms button { flex: 1; font-size: .8rem; padding: .2rem .5rem; }
+  .venue .size { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: .35rem .6rem; align-items: end; padding: .35rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .venue .rooms { flex: 1 1 100%; flex-wrap: wrap; }   /* (six rooms: two rows, never wider than the panel) */
+  .venue .rooms button { flex: 1 1 30%; font-size: .8rem; padding: .2rem .5rem; }
   .venue .bandname { flex: 1 1 100%; }
   .rpanel .what { flex: 1 1 100%; display: flex; flex-direction: column; gap: .2rem; }
   .rpanel .what input[type=number] { width: 4.2em; padding: .05rem .25rem; font-size: .8rem; min-height: 0; }
+  .rpanel .what .secs { padding-left: 1.4rem; }
   .rpanel .note { flex: 1 1 100%; margin: 0; font-size: .76rem; line-height: 1.35; }
   .rpanel .load { flex: 1 1 100%; }
   .rend { background: #2a5bd7; }
+  .stoprend { border-color: #d4202a; color: #ff8a8f; }
   .venue .bandname input { width: 100%; font-size: .85rem; padding: .2rem .4rem; }
   /* a browser that only records WebM: said next to Record (the full sentence is its tooltip) */
   .webm { font-size: .72rem; color: var(--muted); background: #0b0f15cc; border: 1px dashed var(--line); border-radius: 6px; padding: .1rem .4rem; white-space: nowrap; cursor: help; }

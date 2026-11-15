@@ -16,6 +16,7 @@ export const fixtureActions = {
     if (!k) return;
     const r = app.removeFixtures();
     const also = [r.cues ? `${k > 1 ? 'they were' : 'it was'} in ${r.cues} cue${r.cues > 1 ? 's' : ''}` : '', r.groups ? `${r.groups} empty group${r.groups > 1 ? 's' : ''} went too` : '',
+      r.lists.length ? `the list${r.lists.length > 1 ? 's' : ''} only for ${k > 1 ? 'them' : 'it'} went too (${r.lists.join(', ')})` : '',
       r.also ? `${r.also} with nothing left to work on went too` : ''].filter(Boolean).join('; ');
     app.toastUndo(`Removed ${n(k)}${also ? ` (${also})` : ''}`);
   },
@@ -28,7 +29,7 @@ export const fixtureActions = {
     const ids = app.show.fixtures.map((f) => f.id).filter((id) => app.selected.includes(id));
     if (!ids.length) return;
     const first = app.show.fixtures.find((f) => f.id === ids[0])?.num ?? 1;
-    const v = await ui.ask(ids.length > 1 ? `Number the ${ids.length} lights from` : 'Its number', String(first), { ok: 'Number', digits: true, hint: ids.length > 1 ? 'They get this one and the ones after it, in the order of the list.' : 'What the console and typed commands go by.' });
+    const v = await ui.ask(ids.length > 1 ? `Number the ${ids.length} lights from` : 'Its number', String(first), { label: 'Number', ok: 'Number', digits: true, check: (s) => (/^\d+$/.test(s) && +s >= 1 ? '' : 'A whole number from 1'), hint: ids.length > 1 ? 'They get this one and the ones after it, in the order of the list.' : 'What the console and typed commands go by.' });
     if (v === null) return;
     app.checkpoint();
     const why = renumber(app.show.fixtures, ids, Math.round(Number(v)));
@@ -52,6 +53,8 @@ export function fixtureMenu(id: string, extra: MenuItem[] = []): MenuItem[] {
     app.selected.length > 1
       ? { label: `Patch the ${app.selected.length} selected…`, icon: 'edit', keys: 'Enter', run: () => (ui.patchMany = [...app.selected]) }
       : { label: 'Name, address, mode…', icon: 'edit', keys: 'Enter', run: () => { ui.patchTab = 'patch'; ui.patch = id; } },
+    // (the 3D stage opens, the camera flies to them)
+    { label: app.selected.length > 1 ? `Show the ${app.selected.length} selected in 3D` : 'Show it in 3D', icon: 'eye', run: () => { ui.stage3d = true; ui.focus3d = Date.now(); } },
     // (how it hangs and points, in 3D with just these lights: for the selection too)
     ...(app.kinds[id] === 'mover' || app.kinds[id] === 'par' || app.kinds[id] === 'strobe' ? [{ label: app.selected.length > 1 ? `Mounting of the ${app.selected.length} selected…` : 'Mounting…', icon: 'position', run: () => { ui.patchTab = 'mounting'; ui.patch = id; } } as MenuItem] : []),
     // (the moving heads in the selection: steered onto marks, where they really hang worked out)

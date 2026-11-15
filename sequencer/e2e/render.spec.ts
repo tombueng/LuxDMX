@@ -59,9 +59,15 @@ test('the look as it is, rendered: an MP4 at the size and rate asked for, frame 
   // and the stage is back on the live show, at its own size
   expect(await page.evaluate(() => (window as any).__stage3d.rendering())).toBeNull();
   await expect.poll(() => page.evaluate(() => { const c = document.querySelector('.s3 canvas') as HTMLCanvasElement; return c.width !== 1920 || c.height !== 1080; })).toBe(true);
+  // (and drawing again: the render's clock ran ahead of the real one, the view stayed black until
+  // it caught up. Only where a render is faster than real time, a real graphics card; here it's
+  // slower, so this only checks the view draws again at all)
+  const n0 = await page.evaluate(() => (window as any).__stage3d.stats().drawn);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.stats().drawn), { timeout: 3000 }).toBeGreaterThan(n0 + 1);
 });
 
 test('the song from the playhead, with its sound, straight into the file the browser asked for; Stop stops a render and saves nothing', async ({ page }) => {
+  test.setTimeout(480_000);                 // (two 1080p renders: on a busy machine the first alone took the 240 s)
   // a save dialog that hands back a file (the bytes land here, in the page)
   await page.addInitScript(() => {
     (window as any).__saved = null;
@@ -82,12 +88,14 @@ test('the song from the playhead, with its sound, straight into the file the bro
   });
   await openConnected(page);
   await patch(page, 'gen-drgb', 1, 0, 'PAR');
-  await page.evaluate(async () => { const a = (window as any).__luxdmx; a.timeline.useDemo(); await a.timeline.prepare(); a.timeline.seek(a.timeline.end - 1.2); });
+  await page.evaluate(async () => { const a = (window as any).__luxdmx; a.timeline.useDemo(); await a.timeline.prepare(); a.timeline.seek(a.timeline.end - 5); });
   await open3d(page);
   const p = await panel(page);
   await p.getByRole('button', { name: '1080p', exact: true }).click();
   await p.getByLabel('Frames a second').selectOption('30');
   await p.getByRole('radio', { name: /The song, from the playhead/ }).check();
+  await p.getByLabel('Seconds to render').fill('1.2');             // (a short clip with its sound: it went on to the song's end)
+  await expect(p.getByRole('radio', { name: /The look as it is, no sound/ })).toBeVisible();
   await p.getByRole('button', { name: 'Render 1080p' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__saved?.name ?? ''), { timeout: 200_000 }).toMatch(/ 3D 1080p .*\.mp4$/);
   const bytes = new Uint8Array(await page.evaluate(() => (window as any).__saved.bytes));
@@ -103,10 +111,53 @@ test('the song from the playhead, with its sound, straight into the file the bro
   await p2.getByLabel('Seconds to render').fill('600');
   await p2.getByRole('button', { name: 'Render 1080p' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__stage3d.rendering()?.k ?? 0), { timeout: 60_000 }).toBeGreaterThan(3);
+  // while it renders: the picture at the video's shape, not stretched to the window's (a 4K render
+  // showed twice as wide); the dev server holds its updates (the page says it's busy) and leaving
+  // the page would ask first
+  const c = page.locator('.s3 canvas').first();
+  expect(await c.evaluate((el) => getComputedStyle(el).objectFit)).toBe('contain');
+  expect(await page.evaluate(() => (window as any).__ui.recording)).toBe(true);
+  // (the Stop button says so, in words: during a render it's the one that matters)
+  await expect(page.locator('.s3').getByRole('button', { name: 'Stop rendering' })).toHaveText('Stop');
   await page.locator('.s3').getByRole('button', { name: 'Stop rendering' }).click();
   await expect(page.locator('.toast')).toContainText('Render stopped. Nothing saved.');
   expect(await page.evaluate(() => (window as any).__saved)).toBeNull();
   expect(await page.evaluate(() => (window as any).__stage3d.rendering())).toBeNull();
+  expect(await c.evaluate((el) => getComputedStyle(el).objectFit)).not.toBe('contain');      // (back to the window's shape)
+});
+
+test('the crowd is in the render\'s sound: chatting before the song as the show has it; switched off, silence there', async ({ page }) => {
+  test.setTimeout(480_000);
+  await page.addInitScript(() => {
+    (window as any).__saved = null;
+    (window as any).showSaveFilePicker = async (o: { suggestedName: string }) => ({ name: o.suggestedName, createWritable: async () => new WritableStream({ close() { (window as any).__saved = { name: o.suggestedName }; } }) });
+  });
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 1, 0, 'PAR');
+  // the song with ten seconds of show before it, the crowd chatting there (as the festival waits for the band)
+  await page.evaluate(async () => {
+    const a = (window as any).__luxdmx; a.timeline.useDemo(); await a.timeline.prepare();
+    const t = a.timeline.ensure(); t.lead = 10; t.crowd = [{ id: 'c1', at: -10, do: { do: 'crowd', mood: 'chatter', level: 0.8 } }];
+    a.timeline.setCrowd(0.8, true); a.timeline.seek(-8);
+  });
+  await open3d(page);
+  const render = async () => {
+    await page.evaluate(() => { (window as any).__saved = null; });
+    const p = await panel(page);
+    await p.getByRole('button', { name: '1080p', exact: true }).click();
+    await p.getByLabel('Frames a second').selectOption('25');
+    await p.getByRole('radio', { name: /The song, from the playhead/ }).check();
+    await p.getByLabel('Seconds to render').fill('1');
+    await p.getByRole('button', { name: 'Render 1080p' }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).__saved?.name ?? ''), { timeout: 200_000 }).toMatch(/\.mp4$/);
+    return page.evaluate(() => (window as any).__stage3d.lastMix());
+  };
+  const withCrowd = await render();
+  expect(withCrowd.secs).toBeCloseTo(1, 1);
+  expect(withCrowd.rms).toBeGreaterThan(0.005);                    // (8 s before the song: only the crowd)
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.timeline.setCrowd(0.8, false); a.timeline.seek(-8); });
+  const without = await render();
+  expect(without.rms).toBeLessThan(0.0005);                        // (switched off: silence before the song)
 });
 
 test('8K on a graphics card too small for it says so, and renders nothing', async ({ page }) => {

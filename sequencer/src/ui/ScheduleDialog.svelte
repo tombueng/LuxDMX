@@ -60,7 +60,13 @@
     ]);
   }
   const whenShort = (d: Date) => `${d.toDateString() === new Date().toDateString() ? '' : `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]} `}${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  function remove(id: string) { app.checkpoint(); app.show.settings.schedule = entries.filter((e) => e.id !== id); app.markDirty(0); }
+  // (the focus goes to the row that takes its place, else Add a time: it fell out to the page)
+  function remove(id: string) {
+    const i = entries.findIndex((e) => e.id === id), to = entries[i + 1] ?? entries[i - 1];
+    app.checkpoint(); app.show.settings.schedule = entries.filter((e) => e.id !== id); app.markDirty(0);
+    // (the row, not its time field: Delete and Ctrl+Z go on working from there)
+    setTimeout(() => (to ? document.querySelector<HTMLElement>(`[data-entry="${to.id}"]`) : [...document.querySelectorAll<HTMLElement>('[role=dialog] button')].find((b) => b.textContent?.trim() === 'Add a time'))?.focus());
+  }
   function setDo(e: ScheduleEntry, kind: string) {
     const was = e.do, l = ('list' in was ? app.show.cueLists.find((x) => x.id === was.list) : undefined) ?? lists[0];
     const a: CueAction = kind === 'goto' ? { do: 'goto', list: l?.id ?? '', cue: l?.cues[0]?.id ?? '' }
@@ -84,8 +90,18 @@
   }
   // the time is taken when you're done with the field (Chrome reports every digit typed)
   function setTime(e: ScheduleEntry, el: HTMLInputElement) {
+    endTime();
     if (/^\d\d:\d\d$/.test(el.value) && el.value !== e.at) { app.checkpoint(); e.at = el.value; app.markDirty(0); }
   }
+  // (while it's typed: "Next:" follows each whole time, and all of it is one undo step)
+  let timing = false;
+  function liveTime(e: ScheduleEntry, el: HTMLInputElement) {
+    if (!/^\d\d:\d\d$/.test(el.value) || el.value === e.at) return;
+    if (!timing) { app.checkpoint(); app.holdUndo = true; timing = true; }
+    e.at = el.value;
+  }
+  function endTime() { if (timing) { timing = false; app.holdUndo = false; app.markDirty(0); } }
+  $effect(() => () => endTime());              // (closed while typing: the undo step closes too)
   // By the sun ("30 min after sunset"): the time moves with the date. `at` keeps today's, for an
   // older app that doesn't know the sun.
   const OFFSETS = [[-120, '2 h before'], [-60, '1 h before'], [-45, '45 min before'], [-30, '30 min before'], [-15, '15 min before'], [0, 'on the dot'],
@@ -122,10 +138,13 @@
     const v = await ui.ask('Where is the show?', place.guessed ? '' : `${place.lat}, ${place.lon}`, { label: 'Latitude, longitude', ok: 'Use it', hint: 'Like 52.52, 13.40 (a map app shows it when you hold a spot). Empty: guess from the time zone again.', empty: true });
     if (v === null) return;
     app.checkpoint();
-    const m = v.replace(/[°NE]/gi, '').match(/^\s*(-?\d+(?:[.,]\d+)?)\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)\s*$/);
+    // (with their letters as a map writes them: N/S, and E, W or the German O for Ost; S and W
+    // south and west, minus. "48,14° N, 11,58° O" was refused)
+    const m = v.replace(/°/g, '').match(/^\s*(-?\d+(?:[.,]\d+)?)\s*([NS])?\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)\s*([EOW])?\s*$/i);
+    const lat = m ? +m[1].replace(',', '.') * (m[2]?.toUpperCase() === 'S' ? -1 : 1) : NaN, lon = m ? +m[3].replace(',', '.') * (m[4]?.toUpperCase() === 'W' ? -1 : 1) : NaN;
     if (!v.trim()) delete app.show.settings.place;
-    else if (!m || Math.abs(+m[1].replace(',', '.')) > 90 || Math.abs(+m[2].replace(',', '.')) > 180) { ui.toast('That isn\'t a place: two numbers, like 52.52, 13.40', 4000); return; }
-    else app.show.settings.place = { lat: +m[1].replace(',', '.'), lon: +m[2].replace(',', '.') };
+    else if (!m || Math.abs(lat) > 90 || Math.abs(lon) > 180) { ui.toast('That isn\'t a place: two numbers, like 52.52, 13.40', 4000); return; }
+    else app.show.settings.place = { lat, lon };
     sunAt();
     app.markDirty(0);
   }
@@ -141,6 +160,8 @@
     <div class="head">
       {#if next}<p class="next" role="status"><Icon name="clock" /> Next: <b>{whenShort(next.when)}</b> · {actionShort(app.show, next.entry.do)} <span class="faint">({inWords(next.when, now)})</span></p>
       {:else}<p class="faint">Looks by the clock: the opening look at 17:00, the evening one at 21:00, everything off at closing.</p>{/if}
+      <!-- (said here, not only in the help: it's what makes it work on the day) -->
+      {#if entries.length}<p class="faint small keepon">It runs in this tab: keep the tablet or laptop on and this page open.</p>{/if}
       {#if !ro && entries.length}<button class="ghost" onclick={(e) => ui.openMenu(e, pauseItems())} aria-haspopup="menu"><Icon name={off || pausedTill ? 'play' : 'stop'} />{off ? 'Off' : pausedTill ? 'Paused' : 'Pause'}</button>{/if}
       <Help label="About the timetable">
         <p>It runs while this page is open: keep the tablet or laptop on and the tab open. Switched on again later, it plays what came while it was off, at once.</p>
@@ -157,7 +178,7 @@
     <div class="rows">
       {#each sorted as e (e.id)}
         <!-- svelte-ignore a11y_no_static_element_interactions (the menu is also on the keyboard's Menu key, and every item has its own control in the row) -->
-        <div class="ent" data-entry={e.id} oncontextmenu={(ev) => rowMenu(ev, e)}
+        <div class="ent" data-entry={e.id} tabindex="-1" oncontextmenu={(ev) => rowMenu(ev, e)}
              onkeydown={(ev) => { if (ev.key === 'Delete' && !ro && (ev.target as HTMLElement).tagName !== 'INPUT') { ev.preventDefault(); remove(e.id); } }}>
           <div class="when">
             <select value={e.sun ?? 'time'} disabled={ro} aria-label="When" onchange={(ev) => setWhen(e, ev.currentTarget.value)}>
@@ -167,7 +188,7 @@
                 {#each offsets(e) as [m, label] (m)}<option value={m}>{label}</option>{/each}</select>
               <span class="today" title="Today's time (it moves with the sun)">{timeOn(e, now, place) || 'not today'}</span>
             {:else}
-              <input type="time" value={e.at} disabled={ro} aria-label="Time" data-entry-time onblur={(ev) => setTime(e, ev.currentTarget)} onkeydown={(ev) => { if (ev.key === 'Enter') setTime(e, ev.currentTarget); }} />
+              <input type="time" value={e.at} disabled={ro} aria-label="Time" data-entry-time oninput={(ev) => liveTime(e, ev.currentTarget)} onblur={(ev) => setTime(e, ev.currentTarget)} onkeydown={(ev) => { if (ev.key === 'Enter') setTime(e, ev.currentTarget); }} />
             {/if}
           </div>
           <!-- one segmented control; every day (none picked) is the quiet default -->
@@ -245,4 +266,17 @@
     .ent select { grid-column: 1 / -1; width: 100%; }
     .x { grid-row: 1; grid-column: 2; }
   }
+  .ent:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  /* (a dialog too narrow for one line per time, a tablet held upright: the days got squeezed to
+     Mo and Tu, Sunday out of reach. By the dialog's width: the days on a line of their own, then
+     the choices; time and × on top) */
+  .rows { container-type: inline-size; }
+  @container (max-width: 52rem) {
+    .ent { grid-template-columns: 1fr auto; }
+    .days { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, 1fr); }
+    .day { min-width: 0; }
+    .ent select { grid-column: 1 / -1; width: 100%; }
+    .x { grid-row: 1; grid-column: 2; }
+  }
+  .keepon { margin: 0; font-size: .82rem; }
 </style>

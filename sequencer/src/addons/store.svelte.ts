@@ -4,18 +4,14 @@
 import { loadRepo, sourceUrl } from './catalog';
 export { sourceUrl };
 import { readPackage, type EffectPackage } from './package';
+import { ADDON_SOURCES, ADDONS_IMPORTED } from '../store/kept';
 
 // packages someone imported from a file, kept in this browser (a few, a couple of MB at most)
-const KEY = 'luxdmx.seq.addons.imported';
 function stored(): EffectPackage[] {
-  try {
-    const list = JSON.parse(localStorage.getItem(KEY) ?? '[]');
-    return Array.isArray(list) ? list.flatMap((t) => { try { return [readPackage(JSON.stringify(t))]; } catch { return []; } }) : [];
-  } catch { return []; }
+  return ADDONS_IMPORTED.get().flatMap((t) => { try { return [readPackage(JSON.stringify(t))]; } catch { return []; } });
 }
 
 export const DEFAULT_REPO = 'addons/';
-const SOURCES = 'luxdmx.seq.addons.sources';
 
 // Someone else's repository, as it was loaded (or why it couldn't be).
 export interface Source { url: string; name: string; state: 'loading' | 'ready' | 'failed'; packages: EffectPackage[]; problems: string[] }
@@ -30,11 +26,11 @@ class Addons {
   // an imported package (the same id again replaces it); false when this browser can't keep it
   keep(p: EffectPackage): boolean {
     this.imported = [p, ...this.imported.filter((x) => x.id !== p.id)].slice(0, 30);
-    try { localStorage.setItem(KEY, JSON.stringify(this.imported)); return true; } catch { return false; }
+    return ADDONS_IMPORTED.set(this.imported);
   }
   forget(id: string) {
     this.imported = this.imported.filter((x) => x.id !== id);
-    try { localStorage.setItem(KEY, JSON.stringify(this.imported)); } catch { /* fine */ }
+    ADDONS_IMPORTED.set(this.imported);
   }
   async load() {
     if (this.state === 'loading' || this.state === 'ready') return;
@@ -55,9 +51,9 @@ class Addons {
   others = $state.raw<Source[]>([]);
   private started = false;
   private saved(): string[] {
-    try { const v = JSON.parse(localStorage.getItem(SOURCES) ?? '[]'); return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!sourceUrl(x)).slice(0, 20) : []; } catch { return []; }
+    return ADDON_SOURCES.get().filter((x) => !!sourceUrl(x)).slice(0, 20);
   }
-  private save() { try { localStorage.setItem(SOURCES, JSON.stringify(this.others.map((s) => s.url))); } catch { /* fine */ } }
+  private save() { ADDON_SOURCES.set(this.others.map((s) => s.url)); }
   private async fetchSource(url: string): Promise<Source> {
     try {
       const r = await loadRepo(url);

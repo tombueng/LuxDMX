@@ -208,6 +208,16 @@ describe('cue lists', () => {
     r.e.jumpTo('L', 2); expect(out(r, 0.3, 2)).toEqual([128, 255]);
   });
 
+  it('Back in a list of looks is one step back: what only the cue after it switched on goes out (the look the card shows)', () => {
+    const r = rig([fx('a', 'gen-dimmer', 1), fx('b', 'gen-dimmer', 2)], [list('L', [cue({ a: { intensity: 1 } }), cue({ b: { intensity: 1 } })])]);
+    r.e.go('L'); out(r, 0.1); r.e.go('L');
+    expect(out(r, 0.2, 2)).toEqual([255, 255]);                            // the second look adds b (a stays: looks leave the rest)
+    r.e.back('L');
+    expect(out(r, 0.3, 2)).toEqual([255, 0]);                              // back: b goes out again
+    r.e.jumpTo('L', 1); expect(out(r, 0.4, 2)).toEqual([255, 255]);
+    r.e.jumpTo('L', 0); expect(out(r, 0.5, 2)).toEqual([255, 255]);       // (a tap on a look still leaves the rest as it is)
+  });
+
   it('fog and haze run only in the cue that sets them', () => {
     const r = rig([fx('h', 'gen-fog', 1), fx('d', 'gen-dimmer', 2)], [list('L', [
       cue({ h: { fog: 1 } }), cue({ d: { intensity: 1 } }), cue({ h: { fog: 0.5 } }),
@@ -294,6 +304,32 @@ describe('cue lists', () => {
     out(r, 5.04); out(r, 7.06); out(r, 8.07);              // through cues 1, 2 to the end
     out(r, 11);
     expect(r.e.status('L').running).toBe(false);
+  });
+
+  it('a loop of 1-beat cues keeps the tempo: each step counts from when it was due, not the frame that noticed', () => {
+    const r = rig([fx('a', 'gen-dimmer', 1)], [list('L', [0.2, 0.4, 0.6, 0.8].map((v) => cue({ a: { intensity: v } }, 0, { advance: { mode: 'beats', beats: 1 } })), { end: 'loop' })]);
+    r.e.bpm = 120;                                  // a step every 0.5 s
+    r.e.go('L');
+    let steps = 0, was = 0;
+    for (let t = 0.037; t <= 60; t += 0.037) {     // (frames that don't divide the beat: each step noticed up to a frame late)
+      out(r, t);
+      const i = r.e.status('L').index;
+      if (i !== was) { steps++; was = i; }
+    }
+    expect(steps).toBeGreaterThanOrEqual(119);      // 120 steps in a minute (it made about 116: 4 % slow)
+    expect(steps).toBeLessThanOrEqual(120);
+  });
+
+  it('an effect started on the song\'s beat is there at once; by hand it fades in', () => {
+    const r = rig([fx('a', 'gen-dimmer', 1)]);
+    r.show.effects = [{ id: 'e', name: 'e', kind: 'pulse', target: { fixtures: ['a'] }, params: {} } as never];
+    out(r, 1);
+    r.e.startEffect('e', 0);
+    const w = (r.e as unknown as { liveWeight: (id: string) => number }).liveWeight.bind(r.e);
+    expect(w('e')).toBe(1);
+    r.e.stopEffect('e', 0); out(r, 2);
+    r.e.startEffect('e');
+    expect(w('e')).toBeLessThan(0.1);
   });
 
   it('a cue can start and release other lists', () => {
@@ -631,5 +667,32 @@ describe('Lightning', () => {
     expect(black).toBe(0);
     expect(white).toBeGreaterThan(0);
     expect(dark).toBeGreaterThan(200);
+  });
+});
+
+describe('an effect a cue runs, tapped on its button', () => {
+  it('stops (it went on, lit), comes back with a second tap, and with the next cue that runs it', () => {
+    const s = emptyShow();
+    s.fixtures = [{ id: 'p', name: 'P', typeId: 'gen-rgb', mode: '', universe: 0, address: 1, x: 0.5, y: 0.5 }];
+    s.effects = [{ id: 'rb', name: 'Rainbow', kind: 'rainbow', fixtures: ['p'], params: {} }];
+    s.cueLists = [{ id: 'l', name: 'L', end: 'stop', cues: [
+      { id: 'a', name: 'A', values: { p: { intensity: 1 } }, effects: ['rb'], fade: 0, advance: { mode: 'manual' } },
+      { id: 'b', name: 'B', values: { p: { intensity: 1 } }, effects: ['rb'], fade: 0, advance: { mode: 'manual' } },
+    ] }];
+    let t = 0;
+    const e = new Engine(() => s, () => t);
+    e.jumpTo('l', 0); t = 0.1; e.tick(); t = 1; e.tick();
+    expect(e.fxWeights.get('rb')).toBeGreaterThan(0);
+    e.toggleEffect('rb');                               // the button: stop it
+    t = 3; e.tick(); t = 3.1; e.tick();
+    expect(e.fxWeights.get('rb') ?? 0).toBe(0);
+    expect(e.liveEffects()).toEqual([]);                // (not started by hand on top)
+    e.toggleEffect('rb');                               // again: back
+    t = 5; e.tick(); t = 5.1; e.tick();
+    expect(e.fxWeights.get('rb')).toBeGreaterThan(0);
+    e.toggleEffect('rb');                               // stopped once more, then the next cue runs it
+    t = 7; e.tick();
+    e.jumpTo('l', 1); t = 7.1; e.tick(); t = 8; e.tick();
+    expect(e.fxWeights.get('rb')).toBeGreaterThan(0);
   });
 });

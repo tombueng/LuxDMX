@@ -1,73 +1,122 @@
 <script lang="ts">
-  // The welcome: what to do first, a template, or the big demo with the music picked here. A dialog
-  // over everything (the plan and the 3D stage alike). It comes up by itself when the app opens on
-  // a show with nothing in it (Modals.svelte), once per show; "Get started" on an empty stage brings
-  // it back.
+  // The welcome: how to start. Two kinds of start, each a tile that says what it is:
+  // - Demo shows: finished shows on the 3D stage, cued to a song (picked on the tile). They can be
+  //   folded away (remembered in this browser): someone who starts shows every day doesn't need
+  //   the big tiles each time. Folded, they stay as a row of buttons, one click plays one (with the
+  //   song picked for it), and one more brings the tiles back.
+  // - Start a show: an empty stage, a template, or a show file.
+  // Every demo and template also comes as "Lights only": its rig placed, nothing programmed. The
+  // templates play as shows too (Play the show: their looks cued to a song, content/templateShows.ts),
+  // or Start: the rig and its looks to work on, no music.
+  // A dialog over everything (the plan and the 3D stage alike). It comes up by itself when the app
+  // opens on a show with nothing in it (Modals.svelte), once per show; "Get started" on an empty
+  // stage brings it back.
   import Modal from './Modal.svelte';
   import Icon from './Icon.svelte';
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import { ALL_TEMPLATES as TEMPLATES } from '../content/ringMatrix';
+  import type { Template } from '../content/templates';
+  import { lightsOnly } from '../content/lightsOnly';
+  import type { DemoInfo } from '../content/demos';
+  import type { Show } from '../model/types';
   import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
   import { DEMO_SONG, demoSong, startDemo } from './startDemo';
+  import { TEMPLATE_SHOWS } from '../content/templateShows';
   import { onDestroy } from 'svelte';
+  import { WELCOME_DEMOS_HIDDEN, WELCOME_SONGS } from '../store/kept';
 
   let { onclose }: { onclose: () => void } = $props();
 
-  // the demo's music: a song of the catalog, or 'beat' (the demo beat, made here); the last one
-  // picked in this browser
-  const SONG_KEY = 'luxdmx.seq.demoSong';
-  let song = $state((() => { try { const v = localStorage.getItem(SONG_KEY); if (v === 'beat' || demoSong(v)) return v!; } catch { /* storage blocked */ } return DEMO_SONG; })());
-  const picked = $derived(song === 'beat' ? undefined : demoSong(song));
+
+  // the demos (content/demos.ts, loaded with the welcome: the shows' code stays out of the page
+  // until wanted); their names and words are here at once, the rest when it has come
+  type Demo = Pick<DemoInfo, 'id' | 'name' | 'blurb' | 'icon' | 'song'> & { build?: DemoInfo['build'] };
+  let demos = $state<Demo[]>([
+    { id: 'festival', name: 'Festival stage', icon: 'mover', song: DEMO_SONG, blurb: 'A band on a big stage in a hall: over a hundred moving heads hitting the beat, every effect machine, a crowd of hundreds.' },
+  ]);
+  import('../content/demos').then((m) => { demos = m.DEMOS.map((d) => ({ ...d })); count(); }).catch(() => {});
+  const HUE: Record<string, string> = { festival: 'var(--orange)', club: 'var(--violet)', party: 'var(--pink)', truss: 'var(--cyan)' };
+  const TPL_HUES = ['var(--blue)', 'var(--green)', 'var(--violet)', 'var(--orange)', 'var(--cyan)', 'var(--pink)'];
+  // a template as a show to play (its own song; `t:` and its name, as startDemo takes it)
+  const asShow = (t: Template): Demo | undefined => TEMPLATE_SHOWS[t.name] ? { id: `t:${t.name}`, name: t.name, blurb: t.blurb, icon: t.icon, song: TEMPLATE_SHOWS[t.name].song } : undefined;
+
+  // folded away or not (this browser)
+  // (asked for the demos, from Shows or the command palette: shown, the choice kept as it was)
+  let demosHidden = $state(WELCOME_DEMOS_HIDDEN.get() && !ui.welcomeDemos);
+  ui.welcomeDemos = false;
+  // (asked for a new show, from Shows: Empty stage is a new empty show; over an empty show, the
+  // first start or Get started, it only closes: the box connected stays)
+  const forNew = ui.welcomeNew;
+  ui.welcomeNew = false;
+  async function empty() { if (forNew) await app.newShow(); onclose(); }
+  function fold() { demosHidden = !demosHidden; WELCOME_DEMOS_HIDDEN.set(demosHidden); }
+
+  // each demo's music: a song of the catalog, or 'beat' (the demo beat, made here); its own song
+  // unless another was picked on its tile (remembered)
+  let songs = $state<Record<string, string>>(WELCOME_SONGS.get());
+  const songOf = (d: Demo) => { const v = songs[d.id]; return v === 'beat' || demoSong(v) ? v! : d.song ?? DEMO_SONG; };
+  function pickSong(d: Demo, v: string) { songs[d.id] = v; WELCOME_SONGS.set({ ...songs }); }
   const byGenre = (() => {
     const m = new Map<string, CatalogSong[]>();
     for (const s of CATALOG) { const g = GENRES[s.genre] ?? s.genre; m.set(g, [...(m.get(g) ?? []), s]); }
     return [...m];
   })();
   const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
-  function pick(v: string) { song = v; try { localStorage.setItem(SONG_KEY, v); } catch { /* storage blocked */ } }
 
-  // the demo's stage (content/demos.ts, loaded with the welcome: the shows' code stays out of the
-  // page until wanted); picking one picks its own song, another can be picked after
-  const STAGE_KEY = 'luxdmx.seq.demoStage';
-  type Demo = { id: string; name: string; blurb: string; icon: string; song?: string };
-  let demos = $state<Demo[]>([{ id: 'festival', name: 'Festival stage', icon: 'mover', song: DEMO_SONG, blurb: 'A band on a big stage in a hall: over a hundred moving heads hitting the beat, every effect machine, a crowd of hundreds.' }]);
-  let stage = $state((() => { try { return localStorage.getItem(STAGE_KEY) ?? 'festival'; } catch { return 'festival'; } })());
-  import('../content/demos').then((m) => { demos = m.DEMOS.map(({ id, name, blurb, icon, song }) => ({ id, name, blurb, icon, song })); if (!demos.some((d) => d.id === stage)) stage = 'festival'; }).catch(() => {});
-  const cur = $derived(demos.find((d) => d.id === stage) ?? demos[0]);
-  // (a demo without a song of its own, the test truss: no music to pick)
-  const withMusic = $derived(cur.id === 'festival' || !!cur.song);
-  // the arrow keys go round the stages (one tab stop for the group, like any radio group)
-  function stageKey(e: KeyboardEvent) {
-    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-    if (!step) return;
-    e.preventDefault();
-    const i = demos.findIndex((d) => d.id === cur.id), next = demos[(i + step + demos.length) % demos.length];
-    pickStage(next);
-    (e.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-stage="${next.id}"]`)?.focus();
+  // what's in each (lights, cues), worked out once the dialog is up, one at a time
+  let counts = $state<Record<string, { lights: number; cues: number }>>({});
+  const tally = (s: Show) => ({ lights: s.fixtures.length, cues: s.cueLists.reduce((n, l) => n + l.cues.length, 0) });
+  let counting = false;
+  function count() {
+    if (counting) return;
+    counting = true;
+    // (the list again each time: the demos come in while the templates are being counted)
+    const todo = (): [string, () => Show][] => [
+      ...TEMPLATES.map((t) => [`t:${t.name}`, t.build] as [string, () => Show]),
+      ...demos.filter((d) => d.build).map((d) => [`d:${d.id}`, () => d.build!()] as [string, () => Show]),
+    ];
+    const next = () => {
+      const job = todo().find(([k]) => !counts[k]);
+      if (!job || gone) { counting = false; return; }
+      try { counts[job[0]] = tally(job[1]()); } catch { counts[job[0]] = { lights: 0, cues: 0 }; }
+      setTimeout(next, 0);
+    };
+    setTimeout(next, 30);
   }
-  function pickStage(d: Demo) {
-    stage = d.id;
-    try { localStorage.setItem(STAGE_KEY, d.id); } catch { /* storage blocked */ }
-    if (d.song) pick(d.song);
-  }
+  count();
+  const said = (k: string) => { const c = counts[k]; return c ? `${c.lights} light${c.lights === 1 ? '' : 's'} · ${c.cues} cue${c.cues === 1 ? '' : 's'}` : ' '; };
 
-  // the song comes down before the show starts (with its progress here); closing cancels it
-  let dl = $state<{ got: number; total: number; ctl: AbortController } | null>(null);
+  // a demo: the song comes down first (its progress on the tile); closing cancels it
+  let dl = $state<{ id: string; got: number; total: number; ctl: AbortController } | null>(null);
   const pct = (d: { got: number; total: number }) => (d.total ? `${Math.min(99, Math.round((d.got / d.total) * 100))} %` : `${(d.got / 1e6).toFixed(1)} MB`);
-  async function demo() {
+  async function play(d: Demo) {
     if (dl) return;
-    const ctl = new AbortController();
-    dl = { got: 0, total: 0, ctl };
+    const ctl = new AbortController(), song = d.song ? songOf(d) : 'beat';
+    dl = { id: d.id, got: 0, total: 0, ctl };
     try {
-      await startDemo(song === 'beat' || !withMusic ? null : song, (got, total) => { if (dl?.ctl === ctl) { dl.got = got; dl.total = total; } }, ctl.signal, () => { dl = null; onclose(); }, cur.id);
+      await startDemo(song === 'beat' ? null : song, (got, total) => { if (dl?.ctl === ctl) { dl.got = got; dl.total = total; } }, ctl.signal, () => { dl = null; onclose(); }, d.id);
     } catch { /* cancelled */ }
     if (dl?.ctl === ctl) dl = null;
   }
-  function close() { dl?.ctl.abort(); dl = null; onclose(); }
-  onDestroy(() => dl?.ctl.abort());
+  async function rig(name: string, build: () => Show, in3d: boolean) {
+    const s = lightsOnly(build());
+    await app.startShow(s);
+    if (in3d) ui.stage3d = true;
+    onclose();
+    ui.toast(`${name}: ${s.fixtures.length} lights in their places, nothing programmed yet. Select some and pick a colour to start.`, 6000);
+  }
+  async function rigDemo(d: Demo) {
+    const m = await import('../content/demos');
+    const full = m.demoById(d.id);
+    if (full) await rig(d.name, () => full.build(), true);
+  }
+  function template(t: Template) { void app.startShow(t.build()); onclose(); }
 
-  function template(build: () => Parameters<typeof app.startShow>[0]) { void app.startShow(build()); onclose(); }
+  let gone = false;
+  function close() { dl?.ctl.abort(); dl = null; onclose(); }
+  onDestroy(() => { gone = true; dl?.ctl.abort(); });
+
   let showFile = $state<HTMLInputElement>();
   async function open(f: File) {
     try { await app.importShow(f); ui.toast(`Opened "${app.show.meta.name}"`); onclose(); } catch (x) { ui.toast((x as Error).message, 6000); }
@@ -77,81 +126,183 @@
   const tablet = !narrow && typeof window !== 'undefined' && window.innerWidth <= 1100;
 </script>
 
-<Modal title="Let's get some light on stage" onclose={close}>
-  <div class="welcome">
-    <ol>
-      <li><Icon name="plus" /> <b>Add your lights</b> ({narrow ? 'the Lights tab below' : tablet ? 'Fixtures, on the right' : 'on the left'}), or <b>start from a template</b> (below).</li>
-      <li><Icon name="palette" /> <b>Select lights and pick a colour</b> in the programmer ({narrow ? 'the Set tab' : tablet ? 'the Set tab on the right' : 'on the right'}).</li>
-      <li><Icon name="record" /> <b>Record</b> it as a cue, and press {narrow ? 'GO' : 'Space'} for the next one.</li>
-      <li><Icon name="link" /> <b>Connect your LuxDMX</b> ({typeof window !== 'undefined' && window.innerWidth <= 1100 ? 'the dot at the top right' : 'top right, +'}) whenever you want the real lights, then press <b>Blind</b> to send what you do to the stage (every browser starts blind). Everything works without it too.</li>
-    </ol>
+{#snippet music(d: Demo, song: string, s: CatalogSong | undefined)}
+  <label class="music"><Icon name="music" size={15} />
+    <select value={song} onchange={(e) => pickSong(d, (e.target as HTMLSelectElement).value)} disabled={!!dl} aria-label="Music for {d.name}">
+      {#each byGenre as [g, list] (g)}
+        <optgroup label={g}>
+          {#each list as c (c.id)}<option value={c.id}>{c.title} · {c.artist}{c.id === d.song ? ' (its own)' : ''}</option>{/each}
+        </optgroup>
+      {/each}
+      <optgroup label="Made here"><option value="beat">The demo beat</option></optgroup>
+    </select></label>
+  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clock(s.duration)} · {s.license}{:else}Made in the browser, nothing to download{/if}</p>
+{/snippet}
+{#snippet getting(s: CatalogSong | undefined)}
+  <button class="primary" disabled aria-busy="true"><Icon name="play" />{s && dl ? `Getting the song… ${pct(dl)}` : 'Starting…'}</button>
+  <button onclick={() => { dl?.ctl.abort(); dl = null; }}>Cancel</button>
+{/snippet}
 
-    <section class="demo" aria-label="The big demo">
-      <div class="row go">
-        <button class="primary" onclick={demo} disabled={!!dl} aria-busy={!!dl}>
-          <Icon name="play" />{dl ? (picked && withMusic ? `Getting the song… ${pct(dl)}` : 'Starting…') : 'Show me a demo'}
-        </button>
-        {#if dl}<button class="ghost" onclick={() => { dl?.ctl.abort(); dl = null; }}>Cancel</button>{/if}
+<Modal title="Let's get some light on stage" onclose={close} wide>
+  <div class="welcome">
+    <!-- the demo shows -->
+    <section class="sec" aria-labelledby="w-demos">
+      <div class="sh">
+        <h3 id="w-demos">Demo shows</h3>
+        <span class="sub">Finished shows on the 3D stage, cued to a song. No hardware needed.</span>
+        <button class="ghost fold" aria-expanded={!demosHidden} aria-controls="w-demo-tiles" onclick={fold}>
+          {demosHidden ? (demos.length > 1 ? `Show the ${demos.length} demos` : 'Show the demos') : 'Hide the demos'}<Icon name={demosHidden ? 'down' : 'up'} size={14} /></button>
       </div>
-      <div class="stages" role="radiogroup" aria-label="The demo's stage" tabindex="-1" onkeydown={stageKey}>
-        {#each demos as d (d.id)}
-          <button class="stagechip" class:on={d.id === cur.id} role="radio" aria-checked={d.id === cur.id} tabindex={d.id === cur.id ? 0 : -1} data-stage={d.id} onclick={() => pickStage(d)} disabled={!!dl} title={d.blurb}><Icon name={d.icon} size={16} />{d.name}</button>
-        {/each}
-      </div>
-      <p class="faint">{cur.blurb} No hardware needed.</p>
-      {#if withMusic}
-      <label class="music">
-        <span>Music</span>
-        <select value={song} onchange={(e) => pick((e.target as HTMLSelectElement).value)} disabled={!!dl} aria-label="The demo's music">
-          {#each byGenre as [g, list] (g)}
-            <optgroup label={g}>
-              {#each list as s (s.id)}<option value={s.id}>{s.title} · {s.artist}{s.id === DEMO_SONG ? " (the demo's own)" : ''}</option>{/each}
-            </optgroup>
+      {#if !demosHidden}
+        <div class="tiles demos" id="w-demo-tiles">
+          {#each demos as d (d.id)}
+            {@const song = d.song ? songOf(d) : ''}
+            {@const s = song && song !== 'beat' ? demoSong(song) : undefined}
+            <div class="tile" role="group" aria-label={d.name} style:--hue={HUE[d.id] ?? 'var(--orange)'}>
+              <div class="th"><span class="ic"><Icon name={d.icon} size={22} /></span><b>{d.name}</b></div>
+              <p class="blurb">{d.blurb}</p>
+              <p class="meta">{said(`d:${d.id}`)}</p>
+              {#if d.song}
+                {@render music(d, song, s)}
+              {:else}
+                <p class="credit">Its own checks on the timeline, no music.</p>
+              {/if}
+              <div class="acts">
+                {#if dl?.id === d.id}
+                  {@render getting(s)}
+                {:else}
+                  <button class="primary" onclick={() => play(d)} disabled={!!dl} aria-label="Play the show: {d.name}" data-autofocus={d === demos[0] ? '' : undefined}><Icon name="play" />Play the show</button>
+                  <button onclick={() => rigDemo(d)} disabled={!!dl} aria-label="{d.name}, lights only" title="Its lights in their places in its room, nothing programmed">Lights only</button>
+                {/if}
+              </div>
+            </div>
           {/each}
-          <optgroup label="Made here">
-            <option value="beat">The demo beat: ten minutes of club track, nothing to download</option>
-          </optgroup>
-        </select>
-      </label>
-      <p class="faint credit">{#if picked}{picked.title} by {picked.artist}: {GENRES[picked.genre]}, {Math.round(picked.bpm)} BPM, {clock(picked.duration)}, {picked.license}. Comes down from the artist's site first (a few MB).{:else}Builds, drops and breaks at 126 BPM, played by this page.{/if}</p>
+        </div>
+      {:else}
+        <!-- (folded: still there, a button each that plays it) -->
+        <div class="strip" role="group" aria-label="The demo shows">
+          {#each demos as d (d.id)}
+            {@const song = d.song ? songOf(d) : ''}
+            {@const s = song && song !== 'beat' ? demoSong(song) : undefined}
+            <button class="chip" style:--hue={HUE[d.id] ?? 'var(--orange)'} onclick={() => play(d)} disabled={!!dl} aria-label="Play the show: {d.name}"
+                    title="{d.blurb}{s ? ` To "${s.title}".` : ''}">
+              <span class="ic sm"><Icon name={d.icon} size={16} /></span>
+              <span class="cn"><b>{d.name}</b><small>{dl?.id === d.id ? (s ? `Getting the song… ${pct(dl)}` : 'Starting…') : s ? s.title : d.song ? 'the demo beat' : 'no music'}</small></span>
+              <Icon name="play" size={16} />
+            </button>
+          {/each}
+        </div>
       {/if}
     </section>
 
-    <div class="tpls">
-      <span class="faint">Or start from a rig like yours:</span>
-      {#each TEMPLATES as t (t.name)}<button class="tplchip" onclick={() => template(t.build)} title={t.blurb}><Icon name={t.icon} size={16} />{t.name}</button>{/each}
-    </div>
-    <div class="row more">
-      <button class="ghost guide" onclick={() => (ui.modal = 'guide')}><Icon name="help" />How it works, in two minutes</button>
-      <!-- made at home, playing at the venue: the show file from the other computer -->
-      <button class="ghost guide" onclick={() => showFile?.click()}><Icon name="folder" />Open a show file</button>
-      <input type="file" accept=".json,.luxdmx,.qxw,application/json" hidden bind:this={showFile}
-             onchange={(e) => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; i.value = ''; if (f) void open(f); }} />
-    </div>
-    <div class="row end">
-      <p class="hint faint">Program builds the show; Live (top) is for playing it with big buttons. This is an alpha: it works, but things change and some are rough, so keep a copy of your show (Shows, Export).</p>
-      <button class="ghost" onclick={close}>Start with an empty stage</button>
-    </div>
+    <!-- every day: empty, a template, a file -->
+    <section class="sec" aria-labelledby="w-start">
+      <div class="sh">
+        <h3 id="w-start">Start a show</h3>
+        <span class="sub">Your own lights, or a template to change: lights placed, looks and cues ready. <b>Lights only</b> gives the rig with nothing programmed.</span>
+      </div>
+      <div class="tiles">
+        <div class="tile plain" style:--hue="var(--muted)">
+          <div class="th"><span class="ic"><Icon name="plus" size={22} /></span><b>Empty stage</b></div>
+          <p class="blurb">Nothing patched. Add your lights from the library ({narrow ? 'the Lights tab below' : tablet ? 'Fixtures, on the right' : 'on the left'}), then pick colours and record cues.</p>
+          <div class="acts"><button class="primary" onclick={empty} data-autofocus={demosHidden ? '' : undefined}>Start with an empty stage</button></div>
+        </div>
+        {#each TEMPLATES as t, i (t.name)}
+          {@const d = asShow(t)}
+          {@const song = d ? songOf(d) : ''}
+          {@const s = song && song !== 'beat' ? demoSong(song) : undefined}
+          <div class="tile" role="group" aria-label={t.name} style:--hue={TPL_HUES[i % TPL_HUES.length]}>
+            <div class="th"><span class="ic"><Icon name={t.icon} size={22} /></span><b>{t.name}</b></div>
+            <p class="blurb">{t.blurb}</p>
+            <p class="meta">{said(`t:${t.name}`)}</p>
+            {#if d}{@render music(d, song, s)}{/if}
+            <div class="acts">
+              {#if d && dl?.id === d.id}
+                {@render getting(s)}
+              {:else}
+                {#if d}<button class="primary" onclick={() => play(d)} disabled={!!dl} aria-label="Play the show: {t.name}" title="Its looks cued to the song, playing on the 3D stage"><Icon name="play" />Play the show</button>{/if}
+                <button class:primary={!d} onclick={() => template(t)} disabled={!!dl} aria-label="Start {t.name}" title="Its lights and looks to work on, no music">Start</button>
+                <button onclick={() => rig(t.name, t.build, false)} disabled={!!dl} aria-label="{t.name}, lights only" title="Its lights in their places, nothing programmed">Lights only</button>
+              {/if}
+            </div>
+          </div>
+        {/each}
+        <!-- made at home, playing at the venue: the show file from the other computer -->
+        <div class="tile plain" style:--hue="var(--muted)">
+          <div class="th"><span class="ic"><Icon name="folder" size={22} /></span><b>A show file</b></div>
+          <p class="blurb">A show saved on another computer (Shows, Save as file), or a QLC+ workspace.</p>
+          <div class="acts"><button onclick={() => showFile?.click()}>Open a show file</button></div>
+          <input type="file" accept=".json,.luxdmx,.qxw,.zip,application/json,application/zip" hidden bind:this={showFile}
+                 onchange={(e) => { const inp = e.target as HTMLInputElement; const f = inp.files?.[0]; inp.value = ''; if (f) void open(f); }} />
+        </div>
+      </div>
+    </section>
+
+    <!-- how it goes, once there -->
+    <footer class="how">
+      <ol>
+        <li><Icon name="plus" /> <b>Add lights</b></li>
+        <li><Icon name="palette" /> <b>Select, pick a colour</b> ({narrow ? 'the Set tab' : tablet ? 'the Set tab' : 'on the right'})</li>
+        <li><Icon name="record" /> <b>Record</b> a cue, {narrow ? 'GO' : 'Space'} for the next</li>
+        <li><Icon name="link" /> <b>Connect your LuxDMX</b> ({tablet || narrow ? 'the dot at the top right' : 'top right, +'}) and press <b>Blind</b> to go on stage</li>
+      </ol>
+      <div class="row end">
+        <p class="hint">Program builds the show; Live (top) plays it with big buttons. This is an alpha: keep a copy of your show (Shows, Save as file).</p>
+        <span class="row lnk">
+          <button class="ghost" onclick={() => (ui.modal = 'gallery')}><Icon name="image" />What the 3D stage draws</button>
+          <button class="ghost" onclick={() => (ui.modal = 'guide')}><Icon name="help" />How it works, in two minutes</button>
+        </span>
+      </div>
+    </footer>
   </div>
 </Modal>
 
 <style>
-  .welcome { display: flex; flex-direction: column; gap: .7rem; }
-  ol { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .45rem; color: var(--muted); }
-  b { color: var(--text); }
-  .demo { display: flex; flex-direction: column; gap: .35rem; padding: .7rem .8rem; border: 1px solid var(--line2); border-radius: var(--radius); background: var(--panel2); }
-  .go { gap: .5rem; }
-  .demo p { margin: 0; font-size: .85rem; }
-  .music { display: flex; align-items: center; gap: .5rem; font-size: .88rem; color: var(--muted); }
+  .welcome { display: flex; flex-direction: column; gap: 1.1rem; }
+  .sec { display: flex; flex-direction: column; gap: .55rem; }
+  .sh { display: flex; align-items: baseline; gap: .4rem .8rem; flex-wrap: wrap; }
+  .sh h3 { margin: 0; font-size: .95rem; color: var(--text); text-transform: none; letter-spacing: 0; }
+  .sub { color: var(--muted); font-size: .84rem; flex: 1 1 18rem; }
+  .sub b { color: var(--text); }
+  .fold { margin-left: auto; display: inline-flex; align-items: center; gap: .3rem; font-size: .84rem; }
+  .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5rem), 1fr)); gap: .5rem; }
+  .chip { --hue: var(--orange); display: flex; align-items: center; gap: .55rem; text-align: left; min-height: 3.1rem; padding: .45rem .7rem;
+          border: 1px solid color-mix(in srgb, var(--hue) 45%, var(--line2)); border-radius: var(--radius);
+          background: linear-gradient(160deg, color-mix(in srgb, var(--hue) 16%, var(--panel2)) 0%, var(--panel2) 70%); }
+  .chip:hover:not(:disabled) { border-color: var(--hue); }
+  .chip > :global(svg:last-child) { color: var(--hue); flex: none; }
+  .cn { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .cn b { color: var(--text); font-size: .92rem; }
+  .cn small { color: var(--muted); font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic.sm { width: 1.9rem; height: 1.9rem; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14.5rem), 1fr)); gap: .6rem; }
+  .tiles.demos { grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); }
+  .tile { --hue: var(--orange); position: relative; display: flex; flex-direction: column; gap: .4rem; padding: .8rem .85rem .75rem;
+          border: 1px solid var(--line2); border-radius: var(--radius); overflow: hidden;
+          background: linear-gradient(160deg, color-mix(in srgb, var(--hue) 13%, var(--panel2)) 0%, var(--panel2) 55%); }
+  .tile::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--hue); opacity: .85; }
+  .tile.plain { background: var(--panel2); border-style: dashed; }
+  .tile.plain::before { display: none; }
+  .tile:hover, .tile:focus-within { border-color: color-mix(in srgb, var(--hue) 60%, var(--line2)); }
+  .th { display: flex; align-items: center; gap: .55rem; }
+  .th b { font-size: 1rem; color: var(--text); }
+  .ic { display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 50%; flex: none;
+        color: var(--hue); background: color-mix(in srgb, var(--hue) 16%, transparent); }
+  .blurb { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.4; flex: 1; }
+  .meta { margin: 0; font-size: .78rem; color: var(--faint); min-height: 1.1em; font-variant-numeric: tabular-nums; }
+  .music { display: flex; align-items: center; gap: .45rem; font-size: .84rem; color: var(--muted); }
   .music select { flex: 1; min-width: 0; width: 100%; }
-  .credit { font-size: .8rem; }
-  .stages { display: flex; flex-wrap: wrap; gap: .3rem; }
-  .stagechip { display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .65rem; font-size: .86rem; border-radius: 999px; }
-  .stagechip.on { border-color: var(--orange); color: var(--text); background: color-mix(in srgb, var(--orange) 16%, transparent); }
-  .tpls { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
-  .tplchip { padding: .35rem .7rem; font-size: .88rem; border-radius: 999px; }
-  .more { gap: 1rem; flex-wrap: wrap; }
-  .guide { padding-left: 0; }
+  /* (one line, whatever the song: a line more under one tile put its row out of step) */
+  .credit { margin: 0; font-size: .76rem; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .acts { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .15rem; }
+  .acts button { min-height: 2.4rem; padding: .4rem .8rem; font-size: .9rem; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; }
+  .acts .primary { flex: 1 1 auto; }
+  .demos .acts { flex-direction: column; }   /* (side by side "Lights only" fell to a line of its own, half wide) */
+
+  .how { border-top: 1px solid var(--line); padding-top: .8rem; display: flex; flex-direction: column; gap: .5rem; }
+  .how ol { margin: 0; padding-left: 1.2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .3rem 1.4rem; color: var(--muted); font-size: .84rem; }
+  .how b { color: var(--text); }
   .end { justify-content: space-between; align-items: center; gap: .6rem; flex-wrap: wrap; }
-  .hint { margin: 0; font-size: .8rem; }
+  .hint { margin: 0; font-size: .8rem; color: var(--faint); flex: 1 1 20rem; }
 </style>

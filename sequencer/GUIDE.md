@@ -10,8 +10,18 @@ wheels), you just don't have to learn a pro console to use them.
 
 ## Getting started
 
+**When the app opens** (a visit, not a reload) it plays the big demo show on the 3D stage, and the
+first time a short intro runs over it like subtitles, under 20 seconds: that it's a demo show
+rendered live from the DMX it sends, so a show can be built and polished without the rig, and
+where your own lights, your box and the show-night buttons are. It never covers anything and goes
+by itself (× ends it sooner). Beside it, and in **Shows**, **When the app opens** picks the demo
+(the default), **an empty show**, or **the last show**. A reload always opens what was open, a show
+locked for the night or kept on stage never gets another one, and a demo you didn't change is
+replaced by the next visit's rather than piling up (one you changed stays in your shows).
+**Play the demo with its intro** in Shows shows it again.
+
 1. **Connect your LuxDMX.** Top right, `+`, type the box's address (what you'd type to open its
-   web page), then **Connect** and **Allow** in the popup. The popup has to stay open: it's the
+   web page), **Add LuxDMX** (it connects at once: **Connect** on its pill does it again later) and **Allow** in the popup. The popup has to stay open: it's the
    box's own page, and it's what carries the DMX (a browser page can't send Art-Net itself).
    The pill next to the box says how it's going; "no answer" means the address is wrong or the
    box's firmware is too old for the sequencer (it needs v1.0.293 or newer: update it from its
@@ -29,9 +39,22 @@ wheels), you just don't have to learn a pro console to use them.
    whether the site may reach devices on your local network. Choose Allow, or Link can't be
    found; the pill then says "blocked by the browser" and the site settings (the icon left of
    the address) let you allow it later. See `link/README.md`.
-2. **Add your lights** (Fixtures, Add). Most cheap PARs are one of the generic types: look at the
-   channel table in the manual ("CH1 dimmer, CH2 red...") and pick the one that matches. Anything
-   else: search the library, open a GDTF / QLC+ / OFL file, or make your own type, even by trying
+2. **Add your lights** (Fixtures, Add). The dialog opens in its search box: type a maker, a model
+   or what it is ("cameo flat", "robin spot", "moving head", "gobo") and the tiles follow as you
+   type, the built-in types first (nothing to download), then the 2400+ of the Open Fixture
+   Library and QLC+. Every tile plays its light on the 3D stage's own models: a spot sweeps, runs
+   its gobos turning and puts its prism in, a wash breathes its zoom through the colours, a PAR runs
+   the colours, a bar chases along its pixels (**What the 3D stage draws** shows them all, big,
+   machines included: the ⋯ menu at the top, the 3D stage's ⋯, or Ctrl+K "gallery"). A library tile plays a built-in one of its kind
+   ("like this") until it's picked; then it has come down and plays the real thing, in the mode that
+   can do the most. A few lights are drawn as what they really are, from their manuals: the
+   Stairville LED Matrix Blinder 5x5 (a 45 cm plate, 25 warm white lenses, 55° each) and the Showtec
+   Phantom Matrix FX (a moving head with a 5 x 5 RGBW face, each cell its own 45° beam); more to
+   come, the rest keep their kind's look. The one picked
+   is big on the right with its modes and channels (to hold next to the manual's DMX table), how
+   many, where, and Add. Most cheap PARs are one of the generic types: the channel table in the
+   manual ("CH1 dimmer, CH2 red...") says which. Anything
+   else: open a GDTF / QLC+ / OFL file, or make your own type, even by trying
    the channels on the real fixture with the channel wizard. A pixel head or bar (a bee eye, a
    37-LED wash, a 4-lite blinder) is a few head channels and then the same few channels for every
    LED: in your own type **+ Cells…** adds them in one go (red, green, blue, white per LED, or rows
@@ -49,8 +72,10 @@ wheels), you just don't have to learn a pro console to use them.
    light ("Pixel strip, 50 RGB pixels", up to 170 RGB or 128 RGBW: a universe; rings and matrices are
    further down, see "LED rings and matrices"), so a rainbow or a
    chase runs along it.
-   Or skip all that: click the show name (top left) and start from a template. The templates
-   (Band, DJ / Party, Theatre, Church, Cinema, Bar) are well stocked on purpose: 27 to 48 lights
+   Or skip all that: start from a template (the show's name, top left, **New show…**: the same tiles
+   as the welcome; on an empty stage, **or start from a template**). The templates
+   (Band, DJ / Party, Theatre, Church, Cinema, Bar, Wedding; and Ring and matrix, for pixel rings, discs and
+   matrices) are well stocked on purpose: 27 to 48 lights
    each on one universe (PARs, spot and wash heads, pixel bars, strobes, blinders, haze, fog and
    the effect machines that suit the place), groups, 9 to 28 effects (pixel shows among them) and
    11 to 17 looks, so there's something to try at once; delete what you don't own. Types you make or
@@ -58,7 +83,7 @@ wheels), you just don't have to learn a pro console to use them.
    added to a show that already has looks can **play along like one that's there** ("In the
    looks: like PAR 3" in the Add dialog, suggested for a light of the same type or kind): they get
    its part in every look, its groups and its effects. Otherwise they stay dark until you set them.
-3. **Select lights and set them** in the programmer on the right: intensity, colour (presets or
+3. **Select lights and set them** (on the stage Shift or Ctrl adds to the selection, in the fixture list Shift picks a range and Ctrl adds one; on a touch screen, **+ Add** on the stage adds) in the programmer on the right: intensity, colour (presets or
    the wheel), position for moving heads, and every other channel under "All channels". The
    number next to a slider takes a typed value too (click it: 37 %, a channel at 127). A channel
    set by hand under "All channels" shows on the stage plan and in 3D as what its value does (a
@@ -74,20 +99,42 @@ wheels), you just don't have to learn a pro console to use them.
    cue. Select some lights and the effects running on them light up green in the list ("on 2
    selected"), so you see what's moving them.
 6. **Live** (top bar) is for playing: a page of buttons built from your show. Edit it to make it
-   your own. Got a MIDI controller (pads, faders)? In Edit, select a button and press Learn, then
+   your own. More pages with +; right-click a page's tab to rename it, duplicate it or move it left
+   or right. Got a MIDI controller (pads, faders)? In Edit, select a button and press Learn, then
    touch the pad (Chrome and Edge; Firefox and Safari have no Web MIDI).
 
 Press `?` for every keyboard shortcut and `Ctrl+K` to find anything. No lights connected yet?
-The app opens with a **welcome** in front of everything (the plan and the 3D stage alike) while
-the show has nothing in it: the first steps, the templates, opening a show file, and **Show me a
-demo**. It comes up once per show; closed, **Get started** on the empty stage brings it back (and
-Ctrl+K "demo"). The big demo is a festival stage with 233 lights on 22 universes, 114 of them
+With **the last show** chosen, the app opens with a **welcome** in front of everything (the plan
+and the 3D stage alike) while the show has nothing in it. It's two rows of tiles, each saying what it is and what's in it (how
+many lights and cues):
+- **Demo shows**: the festival, a DJ in a club, a house party and a test truss, finished shows on
+  the 3D stage. Each tile has its music (its own song, or any song from the list, or the demo beat)
+  and **Play the show**. **Hide the demos** folds the big tiles away for good in this browser
+  (handy when you start shows every day): the demos stay as a row of buttons, one click plays one
+  with the song picked for it; **Show the 4 demos** brings the tiles back, and Ctrl+K "demo" or
+  **Demo shows…** in the Shows dialog shows them anyway.
+- **Start a show**: an **empty stage**, one of the templates (band, DJ, theatre, church, cinema,
+  bar, wedding, rings and matrices), or **a show file** from another computer. The templates play as shows
+  too: each has its own song (any other, or the demo beat, picked on its tile) and **Play the
+  show** runs its looks cued to that song's parts on the 3D stage, the machines on the drops (as
+  many as the room takes: no CO2 in the church), and the audience on the crowd track: chatting
+  for the eight seconds before the song, then as the room has it (a concert cheers the band on and
+  every chorus, a party its drops, a theatre, church or cinema is quiet until the end, a bar chats
+  all along), cheering at the end (the club and party demos have that party crowd too). **Start** gives the template to work on, its
+  lights and looks, no music. The DJ / Party template is in the club, with the DJ at the decks.
+
+Every demo and template also has **Lights only**: its lights in their places (in its room, for a
+demo), with the groups and palettes, and nothing programmed: no cues, effects, live pages or song.
+A rig to program from scratch. The welcome comes up once per show; closed, an empty stage has one
+way in, **Add lights**, and next to it **or start from a template** brings the welcome back (the
+fixture list and the programmer only say what goes there). **New show…** in Shows is this same
+dialog, the one place a show starts from: its **Empty stage** is then a new empty show. The big demo is a festival stage with 233 lights on 22 universes, 114 of them
 moving heads (washes and beam heads on three trusses, beams standing on the deck, heads on the
 truss towers and in the pit, spots on the side trusses, washes at the deck's front edge; plus a
 wall of pixel strips, a pixel line along the deck edge, LED bars, blinders, strobes, confetti,
 flames, sparks, CO2, bubbles, haze) on the 3D stage, playing a real song: by default a hard rock
 song ("Ready To Go" by Endtape, CC BY-SA), and you can pick any song from the list under
-**Music** (or the demo beat, ten minutes made in the app with nothing to download). Two lists
+music menu on its tile (or the demo beat, ten minutes made in the app with nothing to download). Two lists
 play it: **Show** (the looks: a new one every four bars where the music is busy) and **Moves**
 (where the heads point, above the looks: pairs of shapes taking turns on the beat, every two beats
 in a chorus, every bar in a verse). The demo song's hardest hits were measured beat by beat (the
@@ -131,7 +178,7 @@ Three more demos come with their own room on the 3D stage:
 - **Safe by default.** What you do only goes out to the lights when the top bar says **On stage**
   (red); in **Blind** you see it on the stage here (and on the Live page and a phone remote it says
   so), and the lights keep the look they had, without fog, haze and the machines. **Blackout**
-  always reaches the stage. A new tab starts blind; a reload keeps what it was, and so does a
+  always reaches the stage. A new tab starts blind (one opened from this one or duplicated too); a reload keeps what it was, and so does a
   tablet switched off and on in the middle of a show (it carries on where it was), or a show locked
   for the service. Going on stage asks once, going blind is one click.
 - **The machines wait for a person.** Confetti, flames, sparks and CO2 send nothing until someone
@@ -150,9 +197,10 @@ Three more demos come with their own room on the 3D stage:
   over RDM that no library knows comes in with every channel waiting for Arm, until you tell its
   channels apart. On the box, set the output these machines are on to blackout on signal loss: a
   laptop that crashes mid-shot then can't leave one on. The
-  2D and 3D stage still show what they'd do. Fixture rows say what each machine is: fog,
-  haze or bubbles (repeatable, fog can set off smoke detectors), fires once (confetti, "· safe" or
-  "· armed"), dangerous (flames, sparks, CO2). Cues, live buttons, phone buttons and timeline
+  2D and 3D stage still show what they'd do. Fixture rows say what each machine is, short so the
+  name keeps its room (the whole of it on hover): "fog" for fog, haze or bubbles (repeatable, fog
+  can set off smoke detectors), "1×" for what fires once (confetti), "⚠" for the dangerous ones (flames, sparks, CO2),
+  filled red while the machines are armed. Cues, live buttons, phone buttons and timeline
   items that fire one carry a mark (⚠, or 1× for confetti).
 - **Winches (kinetics).** A winch's height (how far down its load is) moves only while the machines
   are armed, like a flame. Made safe (one click on ARMED, Blind, another show, closing the page, a
@@ -168,6 +216,23 @@ Three more demos come with their own room on the 3D stage:
   sent within them, so set the lowest above the heads of the people under it. Cues that move a
   winch carry the ⚠ mark. A number typed on its height channel in All channels becomes its height;
   raw numbers on that channel (from an old file, say) are never sent, since they'd fade in from 0.
+  **Stage machinery** runs on a winch channel too, with the same safety: a **Curtain track** (a
+  house curtain or a screen curtain: its two halves part from the middle, 0 closed, 1 open), a **Fly
+  curtain** (a house curtain its winch flies out, up into the tower behind the proscenium: 0 down, 1
+  out; its type's travel is how high it rises, a type of your own is one when its model says "fly
+  curtain") and a **Fly bar** with a painted drop (0 flown out above the opening, 1 in, standing on
+  the deck). The 3D stage draws them as what they are (a house curtain in folded velvet with a
+  valance and gold fringes) and moves them at their motors' speed; live and safe they hold, like any
+  winch (Blind shows what the show does). A winch on a universe no connected box plays sends nothing
+  to a motor, so the 3D stage moves it with the show, live too. LuxDMX Link counts as playing a
+  universe when one of its nodes does (Art-Net), or always when it sends sACN, since a receiver it
+  can't see may be listening. The Theatre's house curtain flies out on "Curtain up", and its four drops
+  (a forest, a castle at sunset, a starry sky, a city by night) hang upstage behind the acting area,
+  the first one set behind the closed curtain before the doors open, the others flown in and out
+  for the scenes; the Cinema's screen curtain opens for the feature. The templates put their machinery on
+  universe 15, which no box plays until you give it one. A cloth's size and a drop's picture are
+  the light's own (`cloth` in the show file); a fly bar travels as far as takes its drop from where
+  it hangs down to the deck.
   A controller with several winches as cells: each is its own, pick them in the cell picker like a
   bar's heads, each held on its own (two height channels without cells are one height, a truss
   lifted at both ends). A jump or a scrub on the timeline never moves a winch: it waits until the
@@ -233,6 +298,12 @@ Three more demos come with their own room on the 3D stage:
   running. Change the cue's wait to make a shot longer or shorter. A look can fire them too (a cue
   action "start Confetti", like the templates' finales). Flames, sparks, CO2 and confetti only
   reach the real machines once they're armed; until then the stage shows them and the wire stays at 0.
+- **A list's settings** (the cog next to GO): its name; **At the end** (stay on the last cue,
+  start over, or fade out); **Priority**: normally the list started last wins where two lists set
+  the same light, a list set to *high* wins over newer ones (a house-lights list that mustn't be
+  taken over), *low* gives way to everything; **Release time** (how long Release fades it out);
+  **Tempo** (picking the list in Live sets the show to it); **Run as a play**; its **Colour** on
+  the tabs and the timeline. The loop button next to GO is At the end's "start over", one tap.
 - **A play** (the Theatre template, or "Run as a play" in a list's settings): a GO from any button,
   key, pad or phone is protected against a nervous double press (a second one within 0.3 s on the
   same list is ignored), "back to cue 9" shows cue 9 exactly as it plays from the top, and a
@@ -246,7 +317,9 @@ Three more demos come with their own room on the 3D stage:
   house lights get GO and Back. Any page can have one (Edit, Add, "A whole cue list").
 - **Cue numbers like the script's**: a cue recorded or pasted between 20 and 21 is 20.5, and the
   numbers stay with their cues from then on (on the cards, the GO bar, the cue sheet, the phone).
-  Type a number into a cue's settings to set it; the list's menu has "Renumber the cues 1, 2, 3…".
+  Type a number into a cue's settings to set it: the cue moves to where that number says (0.5 goes
+  before 1), and a number another cue has is said; once the numbers aren't 1, 2, 3 any more the
+  list's menu has "Renumber the cues 1, 2, 3…".
 - **Fog and haze** run only in the cue that sets them (haze one cue started doesn't drift on into the
   next ones). For haze all night, put it in a list of its own: across lists fog and haze go by the
   highest, like intensity, so the moods' "no fog" doesn't stop it (and that list's fader turns
@@ -257,7 +330,9 @@ Three more demos come with their own room on the 3D stage:
   a look sets the lights it names and leaves the rest as they are: "Hall" lights the hall, the
   church stays as it was (an effect on the church's lights keeps going too), and its card shows
   the hall lit and the church as outlines ("not in this look", where a dark light means "off").
-  Fog and haze still stop with the next look. In a play ("Run as a play"; a list with standby notes or follow-ons when it was opened) a
+  Fog and haze still stop with the next look. **Back** is one step back in either kind of list:
+  the cue before, as the list builds it from the top, so what only the cue after it switched on
+  goes out again (tapping an earlier look still just sets what it names). In a play ("Run as a play"; a list with standby notes or follow-ons when it was opened) a
   cue is what the list adds up to at that point, so Back or a jump to cue 9 shows cue 9 whatever
   came before. So does a chase or sequence that steps by itself, so going round comes back to step
   1's look.
@@ -278,9 +353,9 @@ Three more demos come with their own room on the 3D stage:
   Right-click the next-up chip (or Pause in the timetable): skip tonight (until 06:00), pause for
   3 hours, or switch the timetable off; what comes meanwhile is skipped, not played late.
 - **For staff**: a page with just the looks in one go (right-click the + next to the pages, Ctrl+K
-  "staff", or on a touch screen the ⋯ next to the padlock). It has no GO, no Next and no Auto GO:
-  what's on, big, and Blackout. Lock it with the padlock (right-click it, or the ⋯ on a touch
-  screen: Lock with a PIN; the digits show while you set it, so a typo can't lock you out). Locked, only that page shows (also after a restart), the master
+  "staff", or the padlock's menu). It has no GO, no Next and no Auto GO: what's on, big, and
+  Blackout. Lock it with the padlock (a tap asks: with a PIN or without; the digits show while you
+  set a PIN, so a typo can't lock you out). Locked, only that page shows (also after a restart), the master
   slider, Release, Fade out, Release all, tempo and list levels are out of reach (shown greyed,
   on phones too), the staff page of looks has no GO to step into "All off", Blackout takes holding a
   moment (off is a tap; held Space or Enter works too), and the phone dialog only shows how many
@@ -288,7 +363,13 @@ Three more demos come with their own room on the 3D stage:
   `#unlock` on the end and confirm: the show unlocks and the PIN is gone. A locked show sent to
   another device opens unlocked there.
 - **When the lights stop getting anything** (the box's Wi-Fi drops, someone closes the box's little
-  window) a red bar says so at the top, with Reconnect when a tap can fix it; after a restart, the
+  window) a red bar says so at the top, with Reconnect when a tap can fix it. With two boxes it says
+  which universes get nothing, and which box (by its address too when both have the same name).
+  Once the box is back the bar turns green for 15 seconds, so a link that keeps dropping doesn't
+  push the page up and down each time. Connected but **slow** (venue Wi-Fi: the lights get a look
+  every second or so, a chase looks frozen) is said too, in orange, with how much gets through: a
+  cable, or the box nearer the router, helps. The DMX output's universe dots are green only while a
+  connected box plays that universe (orange: there's a look, but nothing goes out). After a restart, the
   same bar asks for the one tap that connects the box again while the show is locked or picked
   up. A tablet switched off and on again (within 3 hours, and only if no other tab is playing the
   show) puts back what was playing, at once, so the box gets the same look it has been holding and
@@ -331,9 +412,12 @@ Three more demos come with their own room on the 3D stage:
   the burst, and a new timer waits for you to switch it on.
 - **Blackout** puts a pink frame round the whole screen while it's on, so it's never missed. In
   Live it's the button on the GO bar (and B on the keyboard).
-- **Lock it for the service** (the padlock on a live page): only playing is left, no Program, no
-  editing, no tempo, no page menu. Unlocking takes holding the padlock for a second, so a stray tap
-  can't do it. Changes made in Program that weren't recorded show as a banner on Live, with Clear.
+- **Lock it for the service** (the padlock on a live page: a tap asks with a PIN or without): only playing is left, no Program, no
+  editing, no tempo, no page menu, no rig (RDM). Unlocking takes holding the padlock for a second, so a stray tap
+  can't do it. The show keeps only a hash of the PIN, so the show file doesn't give it away (it
+  can't be shown again either: **Lock with the PIN…** with nothing typed keeps the one it has,
+  **Lock without a PIN** drops it). Locking and unlocking aren't undo steps: Ctrl+Z after unlocking takes back what was
+  done, it doesn't lock again. Changes made in Program that weren't recorded show as a banner on Live, with Clear.
 - **The live page** works with a touch screen, the keyboard (letters on the buttons, Space for GO, B for blackout)
   and MIDI pads and faders. The GO bar shows what's on, what's next, and the next cue's note (a
   theatre standby: "when the lamp goes off"). While it's open the screen doesn't dim or lock (tablets and laptops
@@ -352,15 +436,17 @@ Three more demos come with their own room on the 3D stage:
   |---|---|
   | `5 @ full`, `5 full` | light 5 at full |
   | `1 thru 4 @ 50`, `1>4 @ 50` | four lights at half (`@ 5` is 50 %, `@ 05` and `@ 5%` are 5 %) |
-  | `1 thru 10 - 5 @ out` | nine lights out (`-` takes out, as on MA and Eos: `1-4` is light 1 without 4) |
+  | `1 thru 10 - 5 @ out` | nine lights out (`-` takes out, as on MA and Eos: `1-4` is light 1 without 4; when 4 wasn't selected it says so, and that a run is `1 thru 4`) |
   | `+ 7`, `@ +10` | add to what's selected; up 10 from where each light is |
-  | `group 2 @ full`, `all @ out` | a group by its number, every light |
+  | `group 2 @ full`, `all @ out` | a group by its number (shown in the Groups list; it keeps it when you drag the groups into another order), every light |
   | `1.3 thru 1.16 @ full` | cells 3 to 16 of light 1 (a desk's sub-fixtures) |
-  | `record`, `record cue 5 time 3` | a new cue in the list Live plays; cue 5 where it belongs, its fade 3 s |
+  | `record`, `record cue 5 time 3`, `record cue 5 "Verse"` | a new cue in the list Live plays; cue 5 where it belongs, its fade 3 s; named Verse |
+  | `cue 5 "Chorus"`, `cue 5 label Chorus` | cue 5's name |
   | `update`, `update cue 5` | the cue on stage; cue 5 |
   | `goto cue 5`, `cue 5 time 3`, `delete cue 5` | by the cue's number, in the list Live plays or in `list 2` |
-  | `go`, `back`, `release`, `go 2` | the list Live plays, or list 2 |
-  | `next`, `prev`, `clear`, `undo`, `blackout`, `highlight` | as the buttons |
+  | `go`, `back`, `release`, `go 2` | the list Live plays, or list 2 (GO on the last cue and Back on the first say so) |
+  | `release all`, `off` | everything lets go |
+  | `next`, `prev`, `clear`, `undo`, `blackout`, `highlight`, `lowlight` | as the buttons (`clear` with nothing set lets go of the selection, as on MA; `undo` says what it undid: the last change to the show) |
 
   - **The command line.** Lights go by their number (the grey one in front of each light in the
     fixture list, on the plan with its # button). It stays when other lights come and go; the patch
@@ -369,15 +455,17 @@ Three more demos come with their own room on the 3D stage:
     whole lights in one command are refused ("1.3 + 2.5" picks cell 3 on light 1 and cell 5 on
     light 2). "record cue 5" is refused when 5 is there; in a play that's running elsewhere the cue
     is stored and the programmer keeps your changes until Clear. Typed go and goto say when a list's
-    machines are safe. Short forms: clr, rec, upd, bo, hl, q (cue), del, oops (undo), ff (full), t
-    and > (thru). Typing anywhere on the console goes to the command line, ↑ brings back the last
+    machines are safe. Short forms: clr, rec, upd, bo, hl, ll (lowlight), q (cue), del, oops (undo),
+    ff (full), t and > (thru). More than full (`@ 150`) is full and says so. On the keypad **Full**
+    ends the command, as on a desk (1 Thru 3 Full, no Enter). Desk words work too: `store` (record), `fade` (time), `go to cue 5`,
+    `fixture 5` or `chan 5` (just 5); `all` while stepping is the stepped selection again. Typing anywhere on the console goes to the command line, ↑ brings back the last
     one; the keypad keeps a phone's own keyboard down (⌫ rubs out the last digit or word, Esc empties
     the line).
   - **Next / Prev** step through the selection one light at a time; with Highlight on each one
     lights up in turn while the rest of the selection stays faintly on (**Lowlight**, 15 %), **All**
     brings the whole selection back; with one light selected they go to the next light by number.
   - **Faders.** A fader, a select and a Flash button for every light in number order (20 at a time,
-    ◀ ▶ for the next; Shift-click or **Add** adds to the selection). A light's fader sets its level
+    ◀ ▶ for the next; Shift-click or **+ Add to selection** adds to it; the same switch as the stage's + Add on a touch screen). A light's fader sets its level
     in the programmer (Record keeps it, Clear lets go). Machines (fog, flames, sparks, CO2, confetti)
     have no strip. Or a **master for every group**: it scales everything its lights do (cues, the
     programmer, flashes; a group of cells just those cells), like the grand master for just them, so
@@ -417,9 +505,22 @@ Three more demos come with their own room on the 3D stage:
     jumps a level or starts a list); a pad is a flash: full while held, back when let go. A control
     a live page's button had goes to the console (learning it says so).
 - **Background tabs** don't slow the output down (the clock runs in a Worker).
-- **No internet at the venue?** Open the app once at home: it keeps itself and works offline after
-  that (shows live in the browser anyway). Chrome and Edge can also install it as an app (the
-  install icon in the address bar), so it opens in its own window without browser bars.
+- **A light's size** (its setup, Mounting: Width m): how wide the 3D stage draws it. A strip's or a
+  bar's length (144 LEDs over the whole back bar), a matrix's or a ring's width, any other light that
+  much bigger or smaller. Empty: as its type has it. Kept with the show (`dims`).
+- **No internet at the venue?** Open the app once at home: it keeps all of itself and works
+  offline after that (shows live in the browser anyway). A Wi-Fi without internet doesn't hold it
+  up: after 4 seconds without an answer it starts from its own copy. Chrome and Edge can also
+  install it as an app (the install icon in the address bar), so it opens in its own window
+  without browser bars.
+- **Songs offline**: a song of the catalog played once while online stays in this browser and plays
+  offline later. Play one of the demos' or templates' songs and all of them come down in the
+  background (ten songs, about 80 MB), so every demo plays at the venue.
+- **Updates come by themselves.** The app looks for a new version when it starts, every half hour
+  and when you come back to it. A new one comes down in the background and goes in at a quiet
+  moment (nothing playing, nothing held in the programmer, the show saved, nobody at the keys for a
+  minute and a half): the page reloads once and says it was updated. Never in the middle of a show:
+  then it waits, and the next start is on the new version anyway.
 - **Colours from a picture**: the picture button in Presets, Colours (or drop an image on the
   panel) turns the main colours of a poster, an album cover or a photo of the room into colour
   presets, and with lights selected offers a slow colour fade through them. Ctrl+K finds it too ("poster", "photo").
@@ -471,13 +572,14 @@ Three more demos come with their own room on the 3D stage:
   cue list, so releasing a list leaves it running (on a pixel bar it lights the cells even when the
   bar's own intensity is 0). A Release says which ones keep running, with a button to stop them, and
   the programmer's "out" reading shows what a selected light really gives (a pixel bar: its
-  brightest cell).
+  brightest cell). An effect's button on Live stops it even when the cue on stage runs it (a second
+  tap, or the next cue that runs it, brings it back).
 - **Contrast** (in an effect's settings, for pixel shows and brightness effects): how hard the light
   falls between dark and bright. Up, what's dim gets dimmer and what's bright gets brighter; down,
   it's softer and more of it glows. Dark stays dark and full stays full; Dim to and Bright to are
   still the ends.
 - **Pixel shows** (Effects, Add, Pixels): the classics from LED strip firmware like WLED, colour
-  and brightness together, on a pixel strip, a few bars or a plain row of PARs. Theater chase,
+  and brightness together, on a pixel strip, a few bars or a plain row of PARs. Theatre chase,
   Flames (rising from the start of each light), Twinkles, Juggle, Sinelon, Colour waves (Pride),
   Bouncing balls, Ripples, Fireworks (a rocket up, then a burst), Matrix rain, Aurora, Plasma,
   Rainbow with glitter, Heartbeat, Dual scanner, Meteor rain, Lightning along the strip, Rain drips,
@@ -486,16 +588,18 @@ Three more demos come with their own room on the 3D stage:
   does: how many balls, how high the flames...). On a wall of strips the ones that rise or fall
   run up every strip on its own; "Back" in Direction turns them round when your strips hang the
   other way up.
-- **LED rings and matrices**: a WS2812 ring, a disc of rings (the usual 241 LEDs on 9 rings, 144, 93,
-  61, 37) or a matrix (8 x 8, 16 x 16, 32 x 8) is one light with a shape. Pick it in Add fixtures, or
-  "Ring or matrix..." for your own: how many LEDs on each ring, or columns and rows, where the data
-  starts and which way it runs. A picture walks the LEDs in data order, to compare with the real
-  one. Once it's patched, its **LEDs** tab (double-click it in the list) has a test picture for the
+- **LED rings, matrices and strips**: a WS2812 ring, a disc of rings (the usual 241 LEDs on 9 rings,
+  144, 93, 61, 37), a matrix (8 x 8, 16 x 16, 32 x 8) or a strip is one light with a shape. Pick it
+  in Add fixtures, or "Ring, matrix or strip..." for your own: how many LEDs on each ring, columns
+  and rows, or a strip's LEDs and its length in metres; where the data starts and which way it runs,
+  and the **colour order** each LED wants (WS2812 strips: GRB; RGBW chips: RGBW). A picture walks the
+  LEDs in data order, to compare with the real one. Once it's patched, its **LEDs** tab (double-click it in the list) has a test picture for the
   real one, turns and mirrors it, and finds the wiring from three LEDs you click. Over 170 RGB pixels (128 RGBW) a light runs on over the next universes, whole pixels on
   each, the way a LuxDMX box's pixel port reads it: patch it on the universe the port starts at.
   A box tells the app what its ports listen on and only gets those universes. If a line under the
-  top bar says "No box plays pixel universe ...", set a pixel port to that universe, or update the
-  box: one on v1.0.293 or older doesn't say, and only gets its DMX universes.
+  top bar says "No box plays universe ..." (lights with cells are on it), set a pixel port (or, for a
+  DMX pixel bar, a DMX output) to that universe, or update the box: one on v1.0.293 or older
+  doesn't say, and only gets its DMX universes.
   Don't put them on a universe a DMX output listens to (the template starts at 10). On the 2D and
   3D stage they're drawn as what they are.
   - **Their effects** (Effects, Add, Rings and matrices) know where every LED is, so wiring order
@@ -503,7 +607,14 @@ Three more demos come with their own room on the 3D stage:
     Radar (short stories that start and end dark; Speed is their length in seconds), Black hole,
     Warp, Galaxy, Hypno, Mandala, Tunnel, Plasma clouds, Lava lamp, Campfire, Code rain, Raindrops,
     Sky rockets, Kick rings, Big heart and Equaliser (on the beat, or the bass with the microphone
-    on), Scrolling text (your words). Spread shifts several lights against each other. Wiring test
+    on), Scrolling text (your words). Ten more with your words (their **Words** field): Letter
+    zoom (a letter at a time grows out of the middle and flies past), Typewriter (with a blinking
+    cursor, a line at a time), Wavy text, Falling letters (they drop in and bounce), Word flip,
+    Glitch text, Word flash (a word on every beat, for a chant), Sparkle text, Spinning sign and
+    Neon sign; a word a little too wide goes without the gaps between its letters ("LUXDMX" whole on
+    a 32 wide banner). And ten more pictures: Snake, Double helix, Confetti fall, Snowfall,
+    Lightning storm, Rising hearts, Vortex, Beat wipes, Block strobe and Rotozoom. Spread shifts
+    several lights against each other. Wiring test
     checks the shape: a colour per ring or row, each one's first LED white, a dot walking in data
     order. If the picture is scrambled, that's the shape (or the LED count), not the effect.
   - **The Ring and matrix template** (Shows, or Ctrl+K) has a disc, a matrix, a ring and a banner
@@ -590,11 +701,13 @@ Three more demos come with their own room on the 3D stage:
   a reload of that tab within a minute; a copy of the tab starts dark, and opening the app fresh
   puts back what was playing only within 3 hours (see "When the lights stop getting anything").
 - **Undo says what it undid** ("Undone: light “Par 3” removed"), and the last steps survive a
-  reload of the tab.
+  reload of the tab. Ctrl+Z works in a number field, a slider or a checkbox too (a light's
+  height, a fade time): the change is undone, the light goes back. Only while you're still typing
+  a number does Ctrl+Z undo your typing.
 - **Timeline** (top, next to Program and Live): a song and what happens on it. Load an mp3/wav/ogg
   (it stays in this browser, the show file only names it) or pick one under **Demo songs…**: real
-  songs with vocals (24: rock'n'roll, techno, house, pop, hip-hop, rock/punk, metal, hard rock,
-  alternative, drum & bass and funk; credits and licences in [SONGS.md](SONGS.md)), free to use under their Creative Commons licences, listed by genre with their
+  songs with vocals (39: rock'n'roll, techno, house, pop, hip-hop, rock/punk, metal, hard rock,
+  alternative, drum & bass, electro, funk, reggae and latin; credits and licences in [SONGS.md](SONGS.md)), free to use under their Creative Commons licences, listed by genre with their
   tempo, length and credit, or the demo beat (ten minutes at 126 BPM, made in the app). Listen
   plays 15 seconds of one first. Picking a song downloads it (with a progress bar; if its own site
   is down or blocked it tries our copy, then the one on the public site, and says so in plain words
@@ -611,21 +724,34 @@ Three more demos come with their own room on the 3D stage:
   unsure), the first downbeat of most and about two thirds of the parts to within a bar. **P** (or
   **Part** in the transport, or a right-click on the ruler) starts a part at the bar line nearest
   the playhead, named after the one before it ("Chorus 2"); double-click a part on the ruler to
-  rename it, right-click it to remove it. The song's credit (title, artist, licence) shows under the tracks while
+  rename it, right-click it to move it to the playhead or remove it. **Loop this part** (in that
+  menu, or **L** for the part the playhead is in) plays it over and over while you work on its
+  looks: at its end it jumps back to its start (a jump, so no moment fires on the way back). A
+  cyan band on the ruler and a "Looping" chip in the transport show it; the chip's × or L again
+  stops it. The loop isn't kept with the show. The song's credit (title, artist, licence) shows under the tracks while
   it's the song, and stays with the show; another browser offers to download it again. A song
   still coming down when another show is opened stays off that show (it says so). While the song
   plays, the effects and Auto GO run at its tempo and on its beats, counted from its first
   downbeat (following the microphone still wins). Coming up to a machine moment that won't fire
   because the machines are safe, the Live page says so ("Confetti at 2:41 · safe").
   Drag a cue, an effect or a moment (confetti, flames, sparks, CO2, bubbles,
-  fog, a strobe or blinder hit, blackout) onto the tracks, or tap it to put it at the playhead.
-  What's placed drags along the beat grid and onto the song's parts (Alt: free), an effect bar's
-  end makes it longer, right-click or Del removes. Play runs the show on the song's clock, in Live and on the 3D stage
+  fog, a strobe or blinder hit, blackout; the machines only those your rig has) onto the tracks, or tap it to put it at the playhead (tap several in a row: they go a bar apart).
+  **Snap** (in the transport) says what a drag lands on: the beat, the bar, or nothing. Besides the
+  machines the moments have **Blackout**, **Blackout off** and **Everything off**.
+  What's placed drags along the beat grid and onto the song's parts (Alt: free), or moves with the
+  arrow keys once it has the focus (a beat, Shift a bar); an effect bar's end makes it longer,
+  right-click or Del removes. The **wheel zooms** round the pointer (Shift+wheel scrolls sideways).
+  The **Effects** track opens (its ▸): a row for each knob its effects have (speed, size, spread...)
+  with a line over every bar at that knob's value. Drag the line up or down to change the effect's
+  own value; double-click it (or Alt+click) for a point there, and the knob follows a **curve**
+  along that bar while the song plays: drag the points, double-click one to take it away. Play runs
+  the show on the song's clock, in Live and on the 3D stage
   too (Live has a play/pause chip with the time at the top). Going through the song is safe: grab
   the green playhead anywhere along its height (or drag on the ruler, click a part, Home, End, the
   arrows) and the stage shows the looks at that point (cues, effects, blackout) while nothing fires.
-  Moments only fire while playing forward, and only with the machines armed (the chip in the
-  transport says which); flames, CO2 and sparks carry a hazard mark on the tracks, confetti a 1×.
+  Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines
+  armed (the chip in the transport says which; a strobe, blinder, fog or bubble hit fires on Safe
+  too); flames, CO2 and sparks carry a hazard mark on the tracks, confetti a 1×.
   Let go while it was playing and it plays on from there. Space plays and pauses; the volume stays with this browser. A reload
   carries on from where the song would be by now (silently until you touch the page, if the
   browser wants a click before it plays sound).
@@ -681,7 +807,14 @@ Three more demos come with their own room on the 3D stage:
   (confetti lies where it lands for half a minute and fades away, the newest burst taking the place
   of the oldest pieces when there's too much; sparks are hard white-hot points brighter than white that light up a warm glow round their fountain, flames a tight see-through column; fog spreads over the stage and is gone about half a minute after
   the machine stops).
-  Drag to look round (camera views: Front, FOH, Side, Top, from the stage; full screen for a
+  Drag to look round (camera views: Front, FOH, Side, Top, from the stage, and **Selected**: the
+  camera flies to the selected lights, near enough to see them; **Show it in 3D** in a light's
+  right-click menu, on the plan or in the fixture list, opens the 3D stage and does the same.
+  **Measure** (next to Aim, or in ⋯ when the toolbar is short of room): click two points, the deck, the floor, a wall, the cyc or a light, and a line between
+  them says how far apart they are, how far across and how far up or down. One light alone says
+  how high it hangs (the same number as its Height field, and above the deck when it's over it),
+  and where its beam lands now (the deck, the floor, a wall, the cyc): how far away and how
+  wide it is there (for the real rig: which lens, which height). Esc clears it; full screen for a
   presentation; a reload keeps the camera where it was). **Camera moves**: the camera films the
   show by itself, picked from the little arrow next to Tour (the button starts and stops the one
   picked). **Tour** goes slowly round the room. **Broadcast** is a live TV director: hard cuts on
@@ -702,7 +835,7 @@ Three more demos come with their own room on the 3D stage:
   lifts a little. A click selects a light (an orange frame round each selected one), the same
   selection as the plan. **Move** and **Turn** put it where it really hangs (let go near a truss and it hangs on it,
   near the deck and it stands on it); Hang, On the deck and In front mount the whole selection.
-  **Aim**: click a spot and the selected moving heads point there (it works out pan and tilt from
+  **Aim**: click a spot (the deck, the floor, a wall, the theatre's cyc, the cinema's screen) and the selected moving heads point there (it works out pan and tilt from
   how each one hangs and its pan/tilt range; Record keeps it). **Calibrate** (one head selected):
   point the real head at a spot on the stage with the pan/tilt pad, click that spot in 3D, and its
   pan and tilt offsets are set so the 3D stage and Aim agree with the room. A head that points
@@ -742,7 +875,9 @@ Three more demos come with their own room on the 3D stage:
   angles when they differ (empty: its type's again). **Spill** (next to Ambient) is how much your lights light up the room round
   them: the band, the deck, the walls and the haze's glow (0 only their beams and where they land;
   it starts lower than it used to be). A spot's gobo shows in 3D as the real pattern: fingers of light in the haze
-  and its picture where the beam lands. Which pattern comes from the slot's name in the fixture
+  and its picture where the beam lands: the deck, the floor (on raked seats, the seats), and the room's walls, its ceiling, the
+  theatre's cyc and the cinema's screen (a wall washer runs its colour up the wall; with the built-in
+  room hidden for your own venue model, only the floor). Which pattern comes from the slot's name in the fixture
   file, in English or German (Stars, Sterne, Flower, Dots, Breakup, Leaves, Water, Spiral, Tunnel,
   Window, Snowflake, Heart, Triangle and so on: 96 of them, symbols and the classic metal ones);
   a slot whose name says nothing ("Gobo 5") gets a pattern of its own, different from the others
@@ -782,7 +917,9 @@ Three more demos come with their own room on the 3D stage:
   lenses. **Ambient** is the room's own light besides yours (the sky, the house,
   reflections, how much of the walls and roof you see): on a curve like the eye's, so most of the
   slider is the dark end; low to start with (the walls near black), 0 for a black venue where only
-  your lights show anything (the camera then doesn't lift a dark look either), kept in this browser. The band plays along on the beat: the guitarists' left hands round the necks (sliding
+  your lights show anything (the camera then doesn't lift a dark look either), kept in this browser.
+  The church's stained glass goes with it too: daylight at the top, only faintly lit from the street
+  by night. The band plays along on the beat: the guitarists' left hands round the necks (sliding
   to the next chord at the bar line), strumming across the strings, hands on the keys, the
   drummer's sticks in his fists hitting the drums, his feet on the kick and hi-hat pedals. The
   more your lights do, the more they move: the singer steps back from the mic at the end of a
@@ -801,16 +938,49 @@ Three more demos come with their own room on the 3D stage:
   it, a PA on poles, TVs on the walls, a bar at the back with its bartender, a few dozen people.
   Your lights move onto its rig (where the plan puts them: a quarter across the plan is a quarter
   across that stage); lights you placed by hand in 3D stay where you put them, and Reset puts them
-  on the room's rig. The camera views go inside the pub. The demos bring rooms of their own: a club
+  on the room's rig. Dragging a light on the plan moves it in 3D too (by as much, at its height).
+  The camera views go inside the pub. The demos bring rooms of their own: a club
   (a stage framed by truss on four towers, a truss over the dance floor, a bar at the back, a
   mirror ball), a party room (a square of truss over the crowd, no stage) and an empty room with
-  one truss; the camera views go inside them too. **Band name**: your band's name on the
+  one truss; the camera views go inside them too. The Cinema, Bar, Theatre, Church and Wedding templates bring theirs: a
+  **Cinema** (a big screen between red curtains, a stage in front of it for premieres, raked rows of
+  red seats with an audience, step lights in the aisles, wall washers, house lights and a starry
+  ceiling, the projection booth at the back) and a **Bar** (a long counter, a back bar of bottles on
+  lit shelves in front of a mirror, pendant lamps, people on the stools and two bartenders, tables
+  along the walls, a little dance floor with a mirror ball), a **Theatre** (a big proscenium stage with
+  its gold frame and red house curtain, a cyclorama at the back, lighting bars over the stage,
+  booms in the wings, footlights, a fly tower for its drops, raked stalls and a balcony full of
+  people, a chandelier) and a
+  **Church** (the chancel up its steps with the altar, candles, the cross and the choir benches,
+  the lectern, pews down the nave with the congregation, stained glass down both walls and a round
+  window over the altar, the roof's beams) and a **Ballroom** for the Wedding template (draped walls
+  the uplights colour, round tables with the guests and a candle each, a parquet dance floor with
+  couples dancing, the head table with the couple, the cake, the DJ, chandeliers); every light of those templates is
+  installed where such a room has it, and the camera moves film them as they are. **Your stage**: your real stage at its size,
+  width and depth in metres, on a riser (1.2 m) or on the floor, 0 to 4 trusses across it on
+  towers and how high their underside is. The room, its crowd and the camera views and moves are
+  built for it; your lights hang on its trusses and the plan is that stage (a quarter across the
+  plan is a quarter of its width), so **Measure** gives real distances. It's kept with the show.
+  The plan (2D) shows the stage's width and depth on its edges, with a tick a metre (a longer one
+  every 5): the hall's 14 x 9 m, the pub's, or your own stage's.
+  **Band name**: your band's name on the
   backdrop, the banners, the screens and the kick drum (painted in the style of the band picture
   that's there by default; leave it empty for the picture; in the club and at the party it's on
   the front of the DJ booth). Both are kept with the show (the screens' live camera in this browser).
+  A mirror ball (the bar's, the club's) turns on its own motor, music or not; light it with the
+  pinspots aimed at it and it throws its dots round the room, walls, ceiling and floor, sweeping
+  round as it turns, with thin rays through the haze. It never hangs dead still: on its chain it
+  sways and twists a little. Add **Mirror ball with a DMX motor** (generic types) and its one
+  channel sets the motor: stopped, turning one way or the other, slow to fast; that ball takes the
+  room's place (the Bar template has one, slow all evening and faster for the disco).
+  The theatre, church and cinema templates put nobody on stage: no band, a calm audience (on
+  your own stage too). Lights keep their places when you change the room; the ones that end up
+  outside it (a church's lights 11.85 m up, on a stage with a 9.6 m ceiling) are said: select
+  them and press **Reset** in the lights' panel to hang them in this room.
   Load your own venue or stage as a 3D model (.glb, or a .gltf with everything inside),
   fitted onto the floor (a model in millimetres or centimetres is scaled down), then size, place
-  and turn it; the built-in stage can go. The model stays in this browser. Its panel closes with
+  and turn it; the built-in room can go (its box says what that is here: in the church the whole
+  church, on the big stage the band, the truss and the crowd). The model stays in this browser. Its panel closes with
   its X or Esc. The tools stay on one row: on a smaller 3D view Haze, Glow, Ambient, the video size and
   full screen are under **More** (⋯), on a phone the camera views and Venue too.
 - **A video of the 3D stage**: **Record** (the red dot in the 3D toolbar) records what the 3D stage
@@ -832,13 +1002,15 @@ Three more demos come with their own room on the 3D stage:
 - **Render a video (up to 8K)**: **Render** (next to Record) draws the video frame by frame instead
   of recording it as it plays, so it never stutters, whatever the computer: **1080p**, **9:16**
   (1080 x 1920), **4K** (3840 x 2160) or **8K** (7680 x 4320), at 25, 30, 50 or 60 frames a second.
-  It renders **the song from its start**, **the song from the playhead**, or **the look as it is**
-  for as many seconds as you say (without a song on the timeline, only that). It starts from the
+  It renders **the song from its start**, **the song from the playhead** for as many seconds as you
+  say (at most to the song's end: a short clip with its sound), or **the look as it is** for as many
+  seconds, with no sound (without a song on the timeline, only that). It starts from the
   look on stage now (the lists playing, the effects on, the masters), then the song's cues come at
   their moments; **With what's in the programmer** takes the programmer along too. The sound is the
   song's file (or the demo beat) mixed at full, not the speakers. The panel says how long the video
   is and about how big the file gets. While it renders the 3D stage shows the frames being drawn and
-  a chip counts the per cent and the time left; **Stop** ends it and saves nothing. It runs its own
+  a chip counts the per cent and the time left (at the video's shape, not stretched to the
+  window's); **Stop** ends it and saves nothing, and closing or reloading the page asks first. It runs its own
   copy of the show: nothing goes out to the lights from it, and the show here (the box, the cues,
   the programmer) goes on as it is. Slower than real time at 4K and 8K (each frame is drawn at full
   size with the glow and the haze), but every frame is there. Where the browser asks where to save
@@ -847,16 +1019,26 @@ Three more demos come with their own room on the 3D stage:
   else HEVC or AV1 (8K usually needs one of those: a graphics card that encodes them, or the
   browser's own slower encoder), VP9 last; the sound AAC, or Opus where AAC isn't there (Chrome on
   Linux). A graphics card that can't draw that big says so before anything starts, one that runs
-  out of memory part way stops the render with a note. The crowd's sound isn't in a render.
+  out of memory part way stops the render with a note. The crowd is in it as you hear it (its track: chatting while they wait before the song, the cheers where they come, at the **Crowd** volume; switched off, it's left out).
+- **Interface size** (the ⋯ menu: − 100 % +, or Ctrl+K "size"): everything bigger or smaller, kept
+  in this browser. The same menu has **Hide the hints** (the little blue notes at the top of the
+  panels) and brings them back.
+- **The live page's own controls** (top right of Live): **Button size**, **Stage** (the 2D/3D stage
+  next to the buttons, or not), **Full screen**. A page's tab menu also has **Rebuild all pages from the show…**
+  for a generated page that should start over from what's in the show now.
 - **Your layout**: drag the gaps between the panels to make the lists, the programmer or the cues
   bigger (double-click a gap for the normal size, or focus it and use the arrows). Remembered in
   the browser. The chips at the top of the programmer (Intensity, Colour, Position, Channels) jump
   to that part and show where you are.
 - **Room for the stage**: the top bar stays one row. When the boxes' pills don't fit on it (a laptop
   screen, several boxes) they fold into one button with a status dot, as on a tablet: its list has
-  every box, Connect and **The rig (RDM)…**. On the stage plan the names never run into each other:
-  each goes under its light, above it, or beside it; one with no room left is shown on hover (a
-  selected light always shows its name).
+  every box, Connect and **The rig (RDM)…**. On a tablet held upright (up to 900 px) Undo and
+  Redo are in the ⋯ menu, as on a phone. On the stage plan the names never run into each other
+  and stay inside the plan: each goes under its light, above it, or beside it; one with no room
+  left is shown on hover (a selected light always shows its name). On a narrow plan the symbols
+  get smaller so neighbours keep apart. Zoom with the wheel or a pinch (on a laptop also +); the
+  zoom figure next to it fits the whole stage again. New lights land clear of the ones there: a
+  row of their own where the stage has room, else each on the freest spot.
 - **A light's patch** (double-click it in the list, or "Name, address, mode…" in its menu): name,
   number (what the console goes by; one no other light has), universe, address (it says when channels are shared and offers the next free spot), the DIP
   switches to click, its type and mode. When it shares channels with the lights after it (a
@@ -880,8 +1062,11 @@ Three more demos come with their own room on the 3D stage:
     marked; its **×** gives it back to the show.
   - **Change what the channels do**: name, what it does, fine, default and the named ranges, right in
     the table. **Save for all N lights of this type** (a type of your own changes in place; one from
-    the library becomes a copy the lights use) or **Only for** this light (a copy for it alone). To
-    add or remove channels, use "Change the channel layout" in the fixture list's menu.
+    the library becomes a copy the lights use) or **Only for** this light (a copy for it alone).
+    **Done** (or closing the window, or another tab) saves what you changed the first way; **Throw
+    the changes away** drops it. A name that only said what the channel does follows it ("Red" made
+    green is "Green"). To add or remove channels, use "Change the channel layout" in the fixture
+    list's menu.
   - **A ring or a matrix** shows one pixel's channels, standing for every pixel: their sliders set
     all pixels at once, and changing what one does (a GRB panel: the first is green, the second red)
     changes it on every pixel.
@@ -976,9 +1161,9 @@ Three more demos come with their own room on the 3D stage:
   at the next venue, steer them again and keep them again, and every cue using them follows. What
   was steered stays while the app is open, also when the dialog is closed.
 - **Big rigs**: past a dozen lights the fixture list gets a filter (name, type, group, or an
-  address: "25" finds whatever sits on channel 25). The library search works from the keyboard
-  (arrows, Enter loads, Enter again uses it) and lists each mode's channels, to hold next to the
-  manual's DMX table.
+  address: "25" finds whatever sits on channel 25). Add fixtures works from the keyboard: it opens
+  in its search box, Enter takes the first one found, Enter again goes on to How many; Down goes
+  into the tiles, the arrows move between them.
 
 ## The ideas, in one minute
 
@@ -997,18 +1182,38 @@ Three more demos come with their own room on the 3D stage:
   once: brightness is highest-wins, everything else is latest-wins. House lights on their own
   list, a fog timer on another, the show on a third.
 - **Effects** are chases, rainbows, circles, fire, lightning... They follow the tempo (Tap).
+  Moving heads have 28 moves: Circle, Figure eight, Pan and Tilt sweep, Fan, Cross, Swing and
+  Ballyhoo, shapes drawn with the beam (Square, Triangle, Star, Heart, Spiral, Flower, Knot,
+  Upright eight, Spirograph), sweeps with a character (Bounce, Zigzag, Searchlight, Wipers, Head
+  bang on the beat, Step between four places on the beat, Wander, Shake) and the group together
+  (Weave: neighbours against each other, Mirror circles, Focus point: the beams meet and open).
 - **Live pages** are grids of buttons and faders: scenes, GO, flash, fog (only while held, with a
-  hard maximum), masters.
+  hard maximum), masters. A fader can be the grand master, the tempo, a cue list's level, an
+  effect's level or a group's (the dance floor, the shelves). In Edit, a control's key is the key
+  you press in its key field (one another button or Space/B uses is said), and Alt+arrows move it
+  (up and down a row).
 
 ## Shows and files
 
 Shows are saved in the browser as you go (the show manager lists them, with a picture of the
-stage). To move a show to another computer or keep a backup, save it as a file: that's an open,
+stage). If the browser won't keep it (its storage full, or blocked), the top bar says **not saved**
+in red: save the show as a file then. To move a show to another computer or keep a backup, save it as a file: that's an open,
 documented JSON format, see [FORMAT.md](FORMAT.md). **Send to another device** (Shows, or the More
 menu on a tablet or phone) hands the file to the share sheet (Nearby Share, AirDrop, mail) where
 there is one, and downloads it where there isn't. On the other side, "Open a show file", or just
 drop the file on the app's window. Copy and paste works between shows too (cues find their
 lights by name).
+
+A show file only names its songs: their audio stays in the browser that loaded them (Save as file
+says so). **Save with its songs** (in Shows, when the show has songs of its own) writes one
+`.luxdmx.zip` with the show and every song's audio, and your own 3D venue if there is one. Open
+that on the other computer the same way ("Open a show file", or drop it on the window) and the
+songs play there straight away, nothing to find again.
+
+**The same show in two tabs** (a bookmark opened twice): the last tab to save wins. The top bar
+says **open in another tab**, and in the tab whose copy is out of date, **changed in another tab**:
+a tap there takes the other tab's version (what you changed in this one since is dropped). A change
+made there instead saves over the other tab's work, so take it, or close one of the two.
 
 **Coming from QLC+?** Open your `.qxw` in the show manager. Fixtures come over with their QLC+
 definitions (dimmer packs become single dimmers), fixture groups become groups, scenes become cues,
@@ -1020,8 +1225,10 @@ out. **Save for QLC+** writes a workspace back: fixtures (library ones with thei
 generic ones as QLC+'s generic types), a scene per cue with the exact DMX values, a chaser per cue
 list, moves as EFX.
 
-**Paper and spreadsheets**: the menu (⋯, top right) prints a cue sheet (every list, cue, fade, what
-happens next, notes; "Save as PDF" in the print dialog) or saves it as CSV. **Print the patch**
+**Paper and spreadsheets**: a list's tab menu prints that list's cue sheet; the menu (⋯, top right) prints one of every list (cue, fade, the lights at their levels, what
+happens next, notes; "Save as PDF" in the print dialog) or saves it as CSV (written the way this
+browser writes numbers: in a German one with ';' between the columns and 2,5 for the times, so
+German Excel opens it as it is). **Print the patch**
 gives the setup sheet for the venue: every fixture by universe and address, its mode, and the DIP
 switches drawn for fixtures that set their address with little switches (the fixture's edit row
 shows them too). Show files can be

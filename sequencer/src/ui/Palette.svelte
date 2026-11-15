@@ -17,15 +17,27 @@
   let listEl = $state<HTMLElement>();
   let input = $state<HTMLInputElement>();
   $effect(() => { input?.focus(); });
+  // Closed: focus back where it was (Escape left it on the page itself), or, when the command took
+  // that away (another view), into the main view, so the keyboard goes on from there.
+  const opener = document.activeElement as HTMLElement | null;
+  $effect(() => () => {
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (at && at !== document.body) return;                    // (a dialog the command opened has it)
+      const back = opener && opener !== document.body && opener.isConnected && opener.offsetParent !== null ? opener : document.querySelector<HTMLElement>('main.view');
+      back?.focus({ preventScroll: true });
+    });
+  });
 
   const items = $derived.by((): Item[] => {
     const s = app.show, out: Item[] = [];
     const cmd = (label: string, icon: string, run: () => unknown, keys?: string, find?: string) => out.push({ label, hint: '', icon, run, keys, find });
-    cmd('Add fixtures…', 'plus', () => (ui.modal = 'addFixtures'));
+    cmd('Add fixtures…', 'plus', () => (ui.modal = 'addFixtures'), undefined, 'add lights light lamps par patch new');
     cmd('Add an effect…', 'effect', () => (ui.modal = 'effects'));
     cmd('Shows: open, new, templates…', 'folder', () => (ui.modal = 'shows'));
     // (the welcome has the demo with its music to pick, and the song's progress as it comes down)
-    cmd('The big demo show (3D, timeline, 230 lights)…', 'play', () => (ui.modal = 'welcome'), undefined, 'demo presentation festival example welcome start');
+    cmd('The big demo show (3D, timeline, 233 lights)…', 'play', () => { ui.welcomeDemos = true; ui.modal = 'welcome'; }, undefined, 'demo presentation festival example welcome start');
+    cmd('What the 3D stage draws (gallery)…', 'image', () => (ui.modal = 'gallery'), undefined, 'gallery gobo prism effects showcase previews fixtures 3d');
     cmd('Save the show as a file', 'download', () => app.exportShow(), 'Ctrl+Shift+S', 'export download backup json');
     cmd('Send the show to another device…', 'upload', () => void app.shareShow(), undefined, 'share tablet phone send airdrop nearby mail transfer');
     cmd('Print a cue sheet', 'printer', () => app.printCueSheet(), undefined, 'paper pdf');
@@ -33,7 +45,9 @@
     cmd('Save for QLC+ (.qxw)', 'download', () => app.exportQxw(), undefined, 'export qlcplus workspace');
     cmd('Record a cue', 'record', () => ui.toast(app.record() ? 'Recorded' : 'Nothing to record'));
     cmd('Clear the programmer', 'close', () => app.clearProgrammer());
-    cmd(app.view === 'live' ? 'Go to Program' : 'Go to Live', app.view === 'live' ? 'program' : 'live', () => (app.view = app.view === 'live' ? 'program' : 'live'));
+    // (every view by its name, not just Live and back)
+    for (const [v, label, icon] of [['program', 'Program', 'program'], ['live', 'Live', 'live'], ['timeline', 'Timeline', 'music']] as const)
+      if (app.view !== v && !(app.locked && v !== 'live')) cmd(`Go to ${label}`, icon, () => (app.view = v));
     if (app.view !== 'console' && !app.locked) cmd('Console: like a lighting desk (command line, faders, encoders)', 'sliders', () => (app.view = 'console'));
     cmd(app.show.settings.recordChanges ? 'Record whole looks again (each touched light as it looks)' : 'Record only changes (what the programmer holds, as desks do)', 'record', () => { app.checkpoint(); if (app.show.settings.recordChanges) delete app.show.settings.recordChanges; else app.show.settings.recordChanges = true; app.markDirty(0); });
     cmd(app.blackout ? 'Blackout off' : 'Blackout on', 'moon', () => (app.blackout = !app.blackout));
@@ -43,6 +57,19 @@
     cmd('Phone as a remote…', 'phone', () => (ui.modal = 'remote'), undefined, 'mobile smartphone tablet qr code play from the crowd');
     out.push({ label: 'Make a fog timer…', hint: '', find: 'fog every few minutes automatic repeat loop haze', icon: 'fog', run: () => fogTimer() });
     cmd('Select all lights', 'check', () => app.selectAll());
+    // (it makes one, as it says: it only went to the Groups tab; with nothing selected it says so there)
+    if (s.fixtures.length) cmd('Groups: make one from the selected lights', 'group', async () => {
+      app.view = 'program'; app.sideTab = 'groups';
+      if (!app.selected.length) return ui.toast('Select some lights first, then make a group of them');
+      const name = await ui.ask('New group', `Group ${app.show.groups.length + 1}`, { ok: 'Make the group' });
+      if (name) app.groupFromSelection(name);
+    }, undefined, 'group groups make new set');
+    // (things that were only on a menu somewhere: "calibrate", "aim", "channels" found nothing)
+    const heads = app.selected.filter((x) => app.kinds[x] === 'mover'), movers = app.show.fixtures.filter((f) => app.kinds[f.id] === 'mover').map((f) => f.id);
+    if (movers.length) cmd(heads.length ? `Focus and calibrate the ${heads.length > 1 ? `${heads.length} heads` : 'head'}…` : 'Focus and calibrate the moving heads…', 'position',
+      () => (ui.focusCal = heads.length ? heads : movers), undefined, 'calibrate focus marks pan tilt offset hung where it points aim');
+    if (movers.length) cmd('Aim the heads at a spot (3D stage, Aim)', 'position', () => { app.view = 'program'; if (!heads.length) app.selected = movers; ui.stage3d = true; ui.toast('Aim (on the 3D stage\'s toolbar), then click where they should point', 5000); }, undefined, 'aim point target follow spot position');
+    if (s.fixtures.length) cmd('All channels of the selected lights', 'grid', () => { app.view = 'program'; if (!app.selected.length) app.selectAll(); ui.progJump = 'pg-all'; }, undefined, 'channels raw dmx values every channel all');
     if (s.fixtures.length) cmd('Make starter looks for this rig (warm, cool, sunset, party...)', 'palette', () => { const n = app.makeStarterLooks(); if (n) { app.view = 'program'; app.toastUndo(`${n} starter looks for your rig`); } });
     cmd('Undo', 'undo', () => app.undo(), 'Ctrl+Z');
     cmd('Redo', 'redo', () => app.redo(), 'Ctrl+Shift+Z');
@@ -58,11 +85,15 @@
     for (const z of [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6]) cmd(`Interface size ${Math.round(z * 100)}%`, 'search', () => ui.setZoom(z), undefined, 'zoom bigger smaller text');
     if (app.view === 'live' && !app.locked) cmd('Lock the live page for the show', 'lock', () => { app.lockShow(true); ui.toast('Locked for the show: only playing. Hold the padlock to unlock.', 3000); }, undefined, 'service kiosk safe');
     if (app.view === 'live' && !app.locked) cmd('Lock with a PIN…', 'lock', () => void app.pinLock(), undefined, 'service kiosk staff pin code password safe');
-    if (app.view === 'live' && !app.locked) cmd('New page with just the looks (for staff)', 'plus', () => window.dispatchEvent(new CustomEvent('luxdmx-looks-page')), undefined, 'staff simple moods only');
+    // (from any view: it found nothing for "staff" outside Live, where the guide sends you to it)
+    if (!app.locked) cmd('New page with just the looks (for staff)', 'plus', () => {
+      const make = () => window.dispatchEvent(new CustomEvent('luxdmx-looks-page'));
+      if (app.view === 'live') make(); else { app.view = 'live'; requestAnimationFrame(() => requestAnimationFrame(make)); }
+    }, undefined, 'staff simple moods only');
     for (const f of s.fixtures) out.push({ label: f.name, hint: `${KIND_LABEL[app.kinds[f.id] ?? 'other']} · ${f.universe}.${f.address}`, icon: app.kinds[f.id] ?? 'other',
       run: () => { app.view = 'program'; app.sideTab = 'fixtures'; app.selected = [f.id]; } });
     for (const g of s.groups) out.push({ label: g.name, hint: `Group · ${g.fixtures.length} lights`, icon: 'group', run: () => { app.view = 'program'; app.selectGroup(g.id); } });
-    for (const p of s.presets) out.push({ label: p.name, hint: `${p.kind} preset${app.selected.length ? ' · put on the selection' : ''}`, icon: 'palette',
+    for (const p of s.presets) out.push({ label: p.name, hint: `${({ color: 'colour', position: 'position', intensity: 'intensity', beam: 'beam' } as Record<string, string>)[p.kind] ?? p.kind} preset${app.selected.length ? ' · put on the selection' : ''}`, icon: 'palette',
       run: () => { if (!app.applyPreset(p.id)) ui.toast('Select lights first'); } });
     for (const e of s.effects) out.push({ label: e.name, hint: `Effect · ${app.liveFx.includes(e.id) ? 'stop' : 'start'}`, icon: 'effect', run: () => app.toggleEffect(e.id) });
     for (const l of s.cueLists) l.cues.forEach((c, i) => out.push({ label: `${cueNumber(l, i)}. ${c.name}`, hint: `Cue in ${l.name} · go`, icon: 'play',

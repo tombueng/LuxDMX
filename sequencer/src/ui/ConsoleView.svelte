@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CONSOLE_STAGE } from '../store/kept';
   // The console: the app laid out like a lighting desk (a compact one, the size of a ChamSys
   // QuickQ), for a mouse, a keyboard or a touch screen. A command line ("1 thru 4 @ 50", "group 2
   // @ full", "1.3 thru 1.16", "go 2"), a fader with a select and a flash button for every light or
@@ -6,14 +7,15 @@
   // saturation, beam, effects), a fader with GO, Flash and Release for every cue list, and the
   // grand master. Everything goes through the programmer and the lists like anywhere else.
   import { app } from '../app.svelte';
-  import { dialogOpen, spaceIsGo, ui } from './ui.svelte';
+  import { dialogOpen, isShortcut, spaceIsGo, ui } from './ui.svelte';
   import Knob from './Knob.svelte';
   import Help from './Help.svelte';
   import { cueNumber } from '../model/cuenum';
+  import { groupNumbers } from '../model/groupnum';
   import { bindingLabel, enableMidi, learnMidi, midiSupported, sameBinding } from '../input/midi';
   import Fader from './Fader.svelte';
   import { listRiskOf } from './risk';
-  import { isMachine, RISK_LABEL } from '../model/safety';
+  import { isMachine, RISK_LABEL, RISK_SHORT } from '../model/safety';
   import type { ChannelAttr, Color, NumAttr } from '../model/types';
   import { slotsOf } from '../engine/render';
   import StageView from './StageView.svelte';
@@ -23,9 +25,8 @@
   let cmd = $state(''), said = $state(''), bad = $state(false), line = $state<HTMLInputElement>();
   // The stage beside the desk (the plan, or 3D with its button): a click on a light selects it, as
   // a desk's visualiser does. Hidden with its button; remembered in the browser.
-  const STAGE_KEY = 'luxdmx.seq.console.stage';
-  let showStage = $state((() => { try { const v = localStorage.getItem(STAGE_KEY); return v === null ? typeof window === 'undefined' || window.innerWidth > 1100 : v === '1'; } catch { return true; } })());
-  $effect(() => { try { localStorage.setItem(STAGE_KEY, showStage ? '1' : '0'); } catch { /* not kept */ } });
+  let showStage = $state(CONSOLE_STAGE.get() ?? (typeof window === 'undefined' || window.innerWidth > 1100));
+  $effect(() => { CONSOLE_STAGE.set(showStage); });
   const history: string[] = [];
   let back = -1;
   function run() {
@@ -47,19 +48,20 @@
   const rubOut = () => { padTyping = true; const t = cmd.trimEnd(); cmd = /\d$/.test(t) ? t.slice(0, -1) : t.replace(/\S+$/, ''); line?.focus(); };
   // (from the keypad on a touch screen the phone's own keyboard stays down: the keypad is the keyboard)
   let padTyping = $state(false);
-  const press = (k: string) => { padTyping = true; cmd = /^[0-9.]$/.test(k) ? cmd + k : `${cmd.trimEnd()} ${k} `; line?.focus(); };
+  // (Full ends the command, as on a desk: "1 thru 4 Full" is done, no Enter after it)
+  const press = (k: string) => { padTyping = true; cmd = /^[0-9.]$/.test(k) ? cmd + k : `${cmd.trimEnd()} ${k} `; line?.focus(); if (k === 'full') run(); };
   // typing anywhere on the console (not in a field) goes to the command line; Space is GO
   // (a fader or an encoder keeps only its own keys: arrows, Page Up/Down, Home/End, Enter)
   const OWN = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Enter']);
   function anyKey(e: KeyboardEvent) {
-    if (app.view !== 'console' || e.ctrlKey || e.metaKey || e.altKey || dialogOpen()) return;
+    if (app.view !== 'console' || isShortcut(e) || dialogOpen()) return;
     const t = e.target as HTMLElement;
     if (t.closest('input:not([type=range]), textarea, select, [contenteditable], .modal')) return;
     if (t.closest('[role="slider"], input[type=range]') && OWN.has(e.key)) return;
     // Space is GO, on the list Live plays (as there: not while it repeats; a focused button too, a
     // Flash button excepted, so Space never presses the last button clicked again)
     if (e.code === 'Space') { if (spaceIsGo(e)) { e.preventDefault(); const l = app.liveList; if (l) app.go(l.id); } else if (e.repeat) e.preventDefault(); return; }
-    if (e.key.length === 1 && /[0-9a-z@+\-.>]/i.test(e.key)) { line?.focus(); }
+    if (e.key.length === 1 && /[0-9a-z@+\-.,>]/i.test(e.key)) { line?.focus(); }
   }
 
   // ---- lights and groups: a fader, a select and a flash button each, 20 at a time
@@ -70,7 +72,7 @@
     // (in the order of their numbers, as a desk's fixture faders: fader 7 is light 7 after a sort too)
     // (no machines: fog, flames, sparks, CO2, confetti have their buttons on Live, not a level here)
     ? app.show.fixtures.flatMap((f, i) => { const c = app.caps(f.id); return c.fog || isMachine(app.modeOf(f.id)) || !(c.intensity || c.color || c.white || c.cct) ? [] : [{ key: f.id, num: f.num ?? i + 1, name: f.name, ids: [f.id] }]; }).sort((a, b) => a.num - b.num)
-    : app.show.groups.map((g, i) => ({ key: g.id, num: i + 1, name: g.name, ids: g.fixtures })));
+    : app.show.groups.map((g, i) => ({ key: g.id, num: groupNumbers(app.show.groups)[i], name: g.name, ids: g.fixtures })));
   const banks = $derived(Math.max(1, Math.ceil(strips.length / PER)));
   const shown = $derived(strips.slice(bank * PER, bank * PER + PER));
   $effect(() => { if (bank >= banks) bank = banks - 1; });
@@ -86,10 +88,10 @@
   }
   function learnFor(to: string) {
     if (learning === to) { learning = null; learnMidi(null); return; }
-    if (boundTo(to) && learning === null) { app.unbindConsoleMidi(to); return; }
+    if (boundTo(to) && learning === null) { app.midiIn.unbind(to); return; }
     learning = to;
     learnMidi((m) => {
-      learning = null; app.bindConsoleMidi(to, m);
+      learning = null; app.midiIn.bind(to, m);
       // (the console has it first: a live page's button or fader on the same control stops answering it)
       const on = app.show.pages.flatMap((p) => p.widgets.filter((w) => sameBinding(w.midi, m)).map((w) => w.label || p.name));
       ui.toast(`${m.kind === 'note' ? 'Note' : 'Control'} ${m.num} moves it now${on.length ? `. It was on ${on.slice(0, 2).join(', ')} on a live page: that one doesn't answer it any more` : ''}`, on.length ? 7000 : 2200);
@@ -97,7 +99,8 @@
   }
   $effect(() => () => learnMidi(null));
   // (Add: a tap adds to the selection or takes out, as Shift does with a mouse; a finger has no Shift)
-  let addMode = $state(false);
+  // (the same switch as the stage's + Add on a touch screen: one way to add to the selection)
+  const addMode = $derived(ui.addSel);
   function pick(ids: string[], e: MouseEvent) {
     if (e.shiftKey || e.ctrlKey || e.metaKey || addMode) app.selected = isSel(ids) ? app.selected.filter((x) => !ids.includes(x)) : [...new Set([...app.selected, ...ids])];
     else app.selected = [...ids];
@@ -227,9 +230,11 @@
   function clearUndo() { const keep = $state.snapshot(app.programmer); app.clearProgrammer(); ui.toast('Cleared: the cues have their lights back', 4000, { label: 'Undo', run: () => (app.programmer = keep) }); }
   function step(d: 1 | -1) { const r = app.runCommand(d > 0 ? 'next' : 'prev'); said = r.said; bad = !r.ok; }
   function record() { const l = app.liveList, ok = app.record(l?.id); ui.toast(ok ? `Recorded as a new cue in ${l?.name ?? app.list?.name ?? 'a new list'}` : 'Nothing to record: set some lights first (5 @ full)'); }
+  // (a laptop's short screen: the cue lists' faders shorter, their GO in view)
+  let vh = $state(typeof window === 'undefined' ? 1000 : window.innerHeight);
 </script>
 
-<svelte:window onkeydown={anyKey} />
+<svelte:window onkeydown={anyKey} bind:innerHeight={vh} />
 
 <!-- (with MIDI on: a fader's control, or a button to give it one) -->
 {#snippet midiBtn(to: string, name: string)}
@@ -258,7 +263,8 @@
     </div>
     <p class="said" class:bad role="status" aria-live="polite">{said || `${app.selected.length} selected${changed ? `, ${changed} changed` : ''}`}</p>
     <div class="pad" aria-label="Keypad">
-      {#each keypad as k (k)}<button onclick={() => press(k)} aria-label={KEY_NAME[k]}>{k}</button>{/each}
+      <!-- (Thru and Full written as the other words on the pad are, Group, Enter; typed lowercase) -->
+      {#each keypad as k (k)}<button onclick={() => press(k)} aria-label={KEY_NAME[k]}>{k === 'thru' ? 'Thru' : k === 'full' ? 'Full' : k}</button>{/each}
       <button onclick={rubOut} aria-label="Rub out the last" title="Rub out the last digit or word">⌫</button>
       <button onclick={() => { cmd = ''; said = ''; }} aria-label="Empty the command line" title="Empty the command line">Esc</button>
       <button class="wide" onclick={() => press('group')}>Group</button>
@@ -323,7 +329,7 @@
         <button role="radio" aria-checked={mode === 'groups'} class:on={mode === 'groups'} onclick={() => { mode = 'groups'; bank = 0; }}>Groups</button>
       </div>
       <div class="seg">
-        <button class:on={addMode} aria-pressed={addMode} onclick={() => (addMode = !addMode)} title="A tap on a strip's name adds it to the selection or takes it out (Shift-click does the same)">Add</button>
+        <button class:on={addMode} aria-pressed={addMode} onclick={() => (ui.addSel = !ui.addSel)} title="A tap on a strip's name adds it to the selection or takes it out (Shift-click does the same)">+ Add to selection</button>
         {#if midiSupported()}<button class:on={midiMode} aria-pressed={midiMode} onclick={midiOnOff} title="Put faders on a MIDI controller: then a fader's MIDI button, then move a fader or knob on the controller">MIDI</button>{/if}
       </div>
       {#if banks > 1}<span class="faint">{bank * PER + 1}–{Math.min(strips.length, bank * PER + PER)} of {strips.length}</span>
@@ -343,7 +349,7 @@
           {/if}
           <span class="pct">{Math.round((mode === 'groups' ? app.groupMasters[s.key] ?? 1 : levelOf(s.ids)) * 100)}</span>
           <!-- (a group: as the groups panel selects it, a group of cells picks its cells) -->
-          <button class="selb" aria-pressed={isSel(s.ids)} onclick={(e) => (mode === 'groups' && !(e.shiftKey || e.ctrlKey || e.metaKey || addMode) ? app.selectGroup(s.key) : pick(s.ids, e))} title="Select (Shift: add or take out)">{s.name}</button>
+          <button class="selb" aria-pressed={isSel(s.ids)} onclick={(e) => (mode === 'groups' && !(e.shiftKey || e.ctrlKey || e.metaKey || addMode) ? app.selectGroup(s.key) : pick(s.ids, e))} title="{s.name}: select (Shift: add or take out)"><span class="nm">{s.name}</span></button>
           <button class="flash" data-own-space use:holdBtn={(down) => app.flashLights(s.key, s.ids, down, mode === 'groups' ? app.show.groups.find((g) => g.id === s.key) : undefined)} aria-label="Flash {s.name}">Flash</button>
         </div>
       {/each}
@@ -364,8 +370,9 @@
         <div class="strip pb" class:on={s?.running && !s?.releasing} data-list={l.name} style="--c:{l.color ?? 'var(--green)'}">
           <span class="num">{pbank * PPER + i + 1}</span>
           {@render midiBtn(`list:${l.id}`, l.name)}
-          {#if risk !== 'light'}<span class="chip risk {risk}" title="{RISK_LABEL[risk]}{risk === 'hazard' || risk === 'once' ? (app.sfxArmed ? ': armed' : ': safe, not armed') : ''}">{RISK_LABEL[risk]}</span>{/if}
-          <Fader label="{l.name} fader" dblFull={false} value={s?.running ? s.master : 0} onset={(v) => (v > 0.03 && !s?.running ? playing(l, () => app.playbackFader(l.id, v)) : app.playbackFader(l.id, v))} />
+          <!-- (a short mark on a strip this narrow, the whole of it in its title) -->
+          {#if risk !== 'light'}<span class="chip risk {risk}" class:armed={app.sfxArmed && (risk === 'hazard' || risk === 'once')} aria-label="{RISK_LABEL[risk]}{risk === 'hazard' || risk === 'once' ? (app.sfxArmed ? ', armed' : ', safe') : ''}" title="{RISK_LABEL[risk]}{risk === 'hazard' || risk === 'once' ? (app.sfxArmed ? ': armed' : ': safe, not armed') : ''}">{RISK_SHORT[risk]}</span>{/if}
+          <Fader label="{l.name} fader" height={vh <= 820 ? 76 : 130} dblFull={false} value={s?.running ? s.master : 0} onset={(v) => (v > 0.03 && !s?.running ? playing(l, () => app.playbackFader(l.id, v)) : app.playbackFader(l.id, v))} />
           <!-- (its cues, numbered: one tapped goes there, as the cue list window on a desk) -->
           <button class="name ghost" onclick={(e) => cuesOf(l, e)} title="{l.name}: its cues (pick one to go to it)" aria-label="Cues of {l.name}">{l.name}</button>
           <span class="cue faint" title="On stage">{s?.running ? (l.cues[s.index]?.name ?? '') : ''}</span>
@@ -379,7 +386,7 @@
           </span>
         </div>
       {/each}
-      {#if !pshown.length}<p class="faint">No cue lists yet: select lights, set them, Record.</p>{/if}
+      {#if !pshown.length}<p class="faint">No cues yet: select lights (1 thru 4), set them (@ 50), then Record.</p>{/if}
     </div>
   </section>
 </div>
@@ -394,7 +401,9 @@
   @media (max-width: 900px) { .console.with-stage { grid-template-columns: 1fr; grid-template-areas: 'cmd' 'stage' 'enc' 'faders' 'pb' 'gm'; } }
   .stage { grid-area: stage; padding: 0; overflow: hidden; display: flex; height: min(58vh, 520px); min-height: 280px; }
   .stage :global(.stage-wrap) { flex: 1; min-width: 0; border: 0; }
-  .stagebtn.on { border-color: var(--accent); color: var(--accent); }
+  /* (an outline in the accent, the background faint: the global button.on fills it orange, and
+     orange text on orange is invisible) */
+  .stagebtn.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: .5rem; min-width: 0; }
   .cmd { grid-area: cmd; display: flex; flex-direction: column; gap: .4rem; }
   .line { display: flex; gap: .3rem; }
@@ -406,7 +415,7 @@
   .pad .wide { grid-column: span 2; }
   .acts { display: flex; flex-wrap: wrap; gap: .25rem; }
   .acts button { flex: 1 0 30%; min-height: 36px; }
-  .acts .on, .seg .on { border-color: var(--accent); color: var(--accent); }
+  .acts .on, .seg .on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .rec { background: #f33abc1a; border-color: #f33abc77; color: #ff7fd6; font-weight: 650; }
   .enc { grid-area: enc; display: flex; flex-direction: column; gap: .4rem; }
   .tabs { display: flex; gap: .25rem; flex-wrap: wrap; }
@@ -414,7 +423,7 @@
   .knobs { display: flex; gap: .8rem; flex-wrap: wrap; padding: .3rem 0; }
   .pals { display: flex; gap: .25rem; flex-wrap: wrap; }
   .pals button { display: inline-flex; align-items: center; gap: .3rem; min-height: 34px; font-size: .8rem; }
-  .pals button.on { border-color: var(--accent); color: var(--accent); }
+  .pals button.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .pals .dot { width: .8rem; height: .8rem; border-radius: 50%; border: 1px solid #0006; }
   .gm { grid-area: gm; display: flex; flex-direction: column; align-items: center; gap: .4rem; }
   .bo { min-height: 40px; }
@@ -433,13 +442,22 @@
   @media (pointer: coarse) { .strip button, .pad button, .acts button { min-height: 44px; } }
   .selb, .flash, .go, .strip button { width: 100%; font-size: .74rem; padding: .25rem .1rem; min-height: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .strip.sel .selb { border-color: var(--orange); color: var(--orange); }
+  /* (a long name cut at its end with an ellipsis: centred in the button it was clipped at both ends, "erfer Bühn") */
+  .selb .nm { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .go { font-weight: 700; }
   .name { font-size: .76rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   button.name { padding: 0 .2rem; min-height: 0; border: 0; color: var(--text); text-decoration: underline dotted; text-underline-offset: 3px; }
   .cue { font-size: .68rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1em; }
   .two { display: flex; gap: .45rem; width: 100%; }
+  /* (as in the fixture list: what the machines on it are, armed in red) */
+  .risk { font-size: .7rem; white-space: nowrap; padding-inline: .35rem; }
+  .risk.atmosphere { color: #9fb4c8; }
+  .risk.once { color: #e8c44a; border-color: #e8c44a55; }
+  .risk.hazard { color: #ff8a5c; border-color: #ff7a1c88; font-weight: 650; }
+  /* armed: hazard stripes, not only a colour (filled and outlined in two reds read alike red-green blind) */
+  .risk.armed { color: #fff; background: repeating-linear-gradient(135deg, #7a1d0c 0 4px, #b4400f 4px 8px); border-color: #ff7a1c; }
   .cue.next { font-size: .68rem; } .two button { flex: 1 1 0; min-width: 0; padding-inline: .2rem; }
   .midi { font-size: .66rem; padding: .05rem .2rem; min-height: 0 !important; width: 100%; }
   .midi.bound { color: var(--green); border-color: var(--green); }
-  .midi.on { color: var(--orange); border-color: var(--orange); }
+  .midi.on { color: var(--orange); border-color: var(--orange); background: #ffaa1c2a; }
 </style>

@@ -6,6 +6,7 @@
   import Icon from './Icon.svelte';
   import qrcode from 'qrcode-generator';
   import { app } from '../app.svelte';
+  import { ui } from './ui.svelte';
 
   let { onclose }: { onclose: () => void } = $props();
   const r = app.remote;
@@ -48,7 +49,7 @@
       {#each app.bridges as b (b.host)}
         <div class="row"><Icon name="link" /> <span class="grow">{b.name || b.host}</span><button class="primary" onclick={() => b.open()}>Connect</button></div>
       {:else}
-        <form class="row" onsubmit={(e) => { e.preventDefault(); if (host.trim()) { app.addDevice(host.trim()); host = ''; } }}>
+        <form class="row" onsubmit={(e) => { e.preventDefault(); if (host.trim()) { const bad = app.addDevice(host.trim()); if (bad) ui.toast(bad, 6000); else host = ''; } else ui.toast('Type your LuxDMX box\'s address first, like 192.168.1.50', 4000); }}>
           <input bind:value={host} placeholder="its address, e.g. 192.168.1.50" aria-label="LuxDMX address" class="grow" />
           <button class="primary">Add your LuxDMX</button>
         </form>

@@ -2,7 +2,7 @@
 // it's on, its fader value. Worked out in one place, so the live page and a phone used as a remote
 // (which only ever gets these, never the show) draw the same tile.
 import type { Widget } from '../model/types';
-import { cueRiskOf, listRiskOf } from './risk';
+import { cueMarkOf, listMarkOf } from './risk';
 import { clockOf, songIndex, songName, songsOf } from '../model/timeline';
 import { partAfter, partsOf } from '../timeline/gig';
 import type { app as theApp } from '../app.svelte';
@@ -26,7 +26,8 @@ export interface Face {
   fader?: { v: number; text: string };
   burst?: number;                 // fog: seconds of the burst button next to it
   fx?: { kind: string; params: Record<string, unknown>; bpm: number };   // an effect's preview
-  risk?: 'once' | 'hazard';       // it fires confetti (once) or flames, sparks or CO2 (model/safety.ts)
+  risk?: 'once' | 'hazard' | 'winch';  // it fires confetti (once), flames, sparks or CO2, or moves a winch (ui/risk.ts)
+  safe?: boolean;                 // on, but the machines aren't armed: nothing fires (it lit up as if it did)
 }
 
 const GLYPH_LIST: Record<string, string> = { go: 'play', back: 'back', release: 'stop', flash: 'bolt', toggle: 'loop', solo: 'eye', select: 'note' };
@@ -43,6 +44,7 @@ export function faderValue(app: App, w: Widget, fresh = false): number {
   if (w.target === 'grand') return app.grandMaster;
   if (w.target === 'bpm') return (app.show.settings.bpm - 40) / 160;
   if (w.target === 'list') return !w.ref ? 1 : fresh ? app.engine.status(w.ref).master : app.status[w.ref]?.master ?? 1;
+  if (w.target === 'group') return w.ref ? app.groupMasters[w.ref] ?? 1 : 1;
   const fx = app.show.effects.find((e) => e.id === w.ref);
   return fx ? app.effectParams(fx).level : 0;
 }
@@ -88,14 +90,14 @@ export function widgetFace(app: App, w: Widget, manyLists = false, now = perform
   if (w.type === 'song') return songFace(app, w);
   const list = w.type === 'list' || w.type === 'cue' || w.type === 'cuelist' ? app.show.cueLists.find((l) => l.id === w.list) : w.type === 'fader' && w.target === 'list' ? app.show.cueLists.find((l) => l.id === w.ref) : undefined;
   const st = list ? app.status[list.id] : undefined;
-  const grp = w.type === 'group' ? app.show.groups.find((g) => g.id === w.group) : undefined;
+  const grp = w.type === 'group' ? app.show.groups.find((g) => g.id === w.group) : w.type === 'fader' && w.target === 'group' ? app.show.groups.find((g) => g.id === w.ref) : undefined;
   const fx = w.type === 'effect' ? app.show.effects.find((e) => e.id === w.effect) : w.type === 'fader' && w.target === 'effect' ? app.show.effects.find((e) => e.id === w.ref) : undefined;
   const cueIndex = w.type === 'cue' && list ? list.cues.findIndex((c) => c.id === w.cue) : -1;
   const cue = cueIndex >= 0 ? list!.cues[cueIndex] : undefined;
   // (an effect whose lights are all gone, the pixel bars deleted, counts as gone too: it lights nothing)
   const noLights = !!fx && !(fx.group ? app.show.groups.find((g) => g.id === fx.group)?.fixtures.length : fx.fixtures?.length);
   const missing = ((w.type === 'list' || w.type === 'cue' || w.type === 'cuelist') && !list) || (w.type === 'cue' && !cue) || (w.type === 'effect' && (!fx || noLights)) || (w.type === 'group' && !grp)
-    || (w.type === 'fader' && (w.target === 'list' || w.target === 'effect') && !list && !fx);
+    || (w.type === 'fader' && (w.target === 'list' || w.target === 'effect') && !list && !fx) || (w.type === 'fader' && w.target === 'group' && !grp);
   // held things (flash a group, blinder, drop) are on while something holds them: a finger, a MIDI pad or a phone
   const on = w.type === 'list' && w.action === 'select' ? app.liveList?.id === w.list
     : w.type === 'list' ? (w.action === 'toggle' || w.action === 'flash' || w.action === 'solo' || w.action === 'go') && !!st?.running && !st.releasing
@@ -106,7 +108,7 @@ export function widgetFace(app: App, w: Widget, manyLists = false, now = perform
     : w.type === 'special' && w.do === 'fadeOut' ? app.fadedOut
     : false;
   const label = w.label || (w.type === 'group' ? grp?.name : w.type === 'list' ? list?.name : w.type === 'cue' ? cue?.name : w.type === 'effect' ? fx?.name
-    : w.type === 'fader' ? (w.target === 'grand' ? 'Grand master' : w.target === 'bpm' ? 'Tempo' : list?.name ?? fx?.name)
+    : w.type === 'fader' ? (w.target === 'grand' ? 'Grand master' : w.target === 'bpm' ? 'Tempo' : w.target === 'group' ? grp?.name : list?.name ?? fx?.name)
     : w.type === 'special' ? SPECIAL_NAME[w.do] : w.type === 'cuelist' ? list?.name : '') || (w.type === 'label' ? '' : '(missing)');
   const glyph = w.type === 'list' ? GLYPH_LIST[w.action] : w.type === 'group' ? 'bolt' : w.type === 'fog' ? 'fog' : w.type === 'special' ? GLYPH_SPECIAL[w.do] : undefined;
   const color = w.color ?? list?.color ?? (w.type === 'effect' ? '#ffaa1c' : w.type === 'fog' ? '#8a94a3' : w.type === 'group' ? '#36d6e7'
@@ -126,7 +128,7 @@ export function widgetFace(app: App, w: Widget, manyLists = false, now = perform
   else if (w.type === 'fog') { sub = on ? `${left.toFixed(1)} s left` : `hold · max ${w.max} s`; if (on) bar = left / w.max; }
   else if (w.type === 'special' && w.do === 'fadeOut') {
     const f = app.gmFade, g = app.grandMaster;     // the bar follows the master (it moves every frame of a fade)
-    sub = f ? (f.to === 0 ? 'fading out' : 'coming back') : app.fadedOut ? 'out · tap to come back' : `${w.seconds ?? 5} s to black`;
+    sub = f ? (f.to === 0 ? 'fading out' : 'coming back') : app.fadedOut ? 'out · tap to come back' : `${w.seconds ?? 5} sec to black`;   // (the face writes it in capitals: "5 S" read oddly)
     if (f) bar = Math.max(0, Math.min(1, f.to === 0 ? 1 - g / Math.max(0.01, f.from) : g / Math.max(0.01, f.to)));
   }
   else if (w.type === 'special') sub = w.do === 'tap' ? `${app.bpm} BPM` : w.do === 'blackout' ? (app.blackout ? 'ON' : '') : w.do === 'blinder' ? 'HOLD · all white' : w.do === 'drop' ? `HOLD · white, strobe${app.show.fixtures.some((f) => app.caps(f.id).fog) ? ', fog' : ''}` : '';
@@ -144,7 +146,7 @@ export function widgetFace(app: App, w: Widget, manyLists = false, now = perform
   if (w.type === 'fog' && !on) face.burst = Math.min(w.burst, w.max);
   if (w.type === 'effect' && fx) face.fx = { kind: fx.kind, params: fx.params, bpm: app.bpm };
   // what it sets off, marked on the tile: a cue's own values and the lists it plays, a list's cues
-  const risk = cue ? cueRiskOf(app.show, cue, app.showRev) : list && (w.type === 'cuelist' || (w.type === 'list' && w.action !== 'select' && w.action !== 'release')) ? listRiskOf(app.show, list, app.showRev) : 'light';
-  if (risk === 'once' || risk === 'hazard') face.risk = risk;
+  const risk = cue ? cueMarkOf(app.show, cue, app.showRev) : list && (w.type === 'cuelist' || (w.type === 'list' && w.action !== 'select' && w.action !== 'release')) ? listMarkOf(app.show, list, app.showRev) : '';
+  if (risk) { face.risk = risk; if (face.on && !app.sfxArmed) face.safe = true; }
   return face;
 }

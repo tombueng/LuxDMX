@@ -4,7 +4,7 @@
 // drawing quality starts at High, a pixel bar lit by an effect reads its real level, and a Release
 // says which effects go on running.
 import type { Page } from '@playwright/test';
-import { channels, full, openConnected, resetFake, patch, fresh, selectAll, test, expect } from './helpers';
+import { channels, full, openConnected, resetFake, patch, fresh, selectAll, test, expect, startTemplate, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -122,7 +122,7 @@ test('a pixel bar lit by an effect reads its real level; a Release says the effe
   await expect(page.locator('.panel.prog')).toContainText(/out (100|[1-9]\d)%/);
   await page.evaluate(() => { const a = (window as any).__luxdmx; a.release(a.show.cueLists[0]?.id); });
   const t = page.locator('.toast').filter({ hasText: 'keeps running' });
-  await expect(t).toContainText('Theater');
+  await expect(t).toContainText('Theatre');
   await t.getByRole('button', { name: 'Stop it' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.engine.liveEffects().length)).toBe(0);
 });
@@ -145,7 +145,7 @@ test('the Ambient slider sets the room\'s own light: starts low, 0 is a dark ven
   await slider.fill('0.1');
   await expect.poll(async () => (await amb()).sky, { timeout: 5000 }).toBeLessThan(0.4375 * 0.01);
   await slider.fill('0');
-  await expect.poll(amb, { timeout: 5000 }).toEqual({ sky: 0, key: 0, env: 0, walls: 0 });
+  await expect.poll(amb, { timeout: 5000 }).toEqual({ sky: 0, key: 0, env: 0, walls: 0, glass: null });
   await slider.fill('1');
   await expect.poll(async () => (await amb()).sky, { timeout: 5000 }).toBeCloseTo(0.4375, 3);
   expect((await amb()).walls).toBeGreaterThan(0.1);
@@ -239,7 +239,7 @@ test('the Spill slider: how much the lights light up the room round them, lower 
   await slider('1');
   await expect.poll(lit).toBeGreaterThan(at45 * 1.8);
   await page.reload();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('luxdmx.seq.spill'))).toBe('1');
+  await expect.poll(() => keptValue(page, 'luxdmx.seq.spill')).toBe(1);
 });
 
 test('a beam as wide as the light\'s data says: a wash from the library 7° to 50° over its zoom; its own angle set in Mounting counts, cleared it\'s its type\'s again', async ({ page }) => {
@@ -274,4 +274,82 @@ test('a beam as wide as the light\'s data says: a wash from the library 7° to 5
   await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures[0].beamDeg ?? null)).toBeNull();
   await page.keyboard.press('Escape');
   await expect.poll(beam).toBeCloseTo(7, 1);
+});
+
+test('the church\'s stained glass glows with the Ambient slider: faintly by night (its default), bright by day', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Church');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('church');
+  const glass = () => page.evaluate(() => (window as any).__stage3d.ambient().glass as number);
+  // (linear light: its full colour is 0.32; by night a sixth of that)
+  await expect.poll(glass, { timeout: 10000 }).toBeLessThan(0.08);
+  expect(await glass()).toBeGreaterThan(0.02);                 // (still there: the street outside)
+  const slider = page.getByLabel('Ambient light'), more = page.locator('.s3').getByRole('button', { name: 'More', exact: true });
+  await expect(slider.or(more).first()).toBeVisible({ timeout: 30000 });
+  if (!(await slider.isVisible())) { await more.click(); await expect(slider).toBeVisible(); }
+  await slider.fill('1');
+  await expect.poll(glass, { timeout: 5000 }).toBeGreaterThan(0.3);
+  await slider.fill('0.6');
+});
+
+test('a dark theatre is dark: every light out, at the default Ambient the picture averages under a few percent', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('theatre');
+  await page.locator('.s3').getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'Front', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.flying()), { timeout: 20000 }).toBe(false);
+  // (the cream proscenium and the pale cyc lit by the room alone made it 0.053; now 0.024)
+  const h = await page.evaluate(() => (window as any).__stage3d.hdr(320));
+  expect(h.nan).toBe(0);
+  expect(h.mean).toBeLessThan(0.035);
+});
+
+test('the drop reads: blinders turned out to the audience light the crowd (and nothing does when they\'re out)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Band');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('hall');
+  const crowd = () => page.evaluate(() => (window as any).__stage3d.stats().crowdLight as number);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures) a.programmer[f.id] = { intensity: 0 }; });
+  await expect.poll(crowd, { timeout: 8000 }).toBe(0);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures.filter((x: any) => /^Blinder/.test(x.name))) a.programmer[f.id] = { intensity: 1 }; });
+  await expect.poll(crowd, { timeout: 8000 }).toBeGreaterThan(150);
+});
+
+test('the bar\'s mirror ball turns (no music needed) and throws its dots round the room when the pinspots hit it', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  await startTemplate(page, 'Bar');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.venue()?.room), { timeout: 45000 }).toBe('bar');
+  const mirror = () => page.evaluate(() => (window as any).__stage3d.mirror());
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures) a.programmer[f.id] = { intensity: 0 }; });
+  await expect.poll(async () => (await mirror()).dots, { timeout: 8000 }).toBe(0);
+  const s0 = (await mirror()).spin[0];
+  await page.waitForTimeout(1200);
+  expect((await mirror()).spin[0]).not.toBe(s0);
+  await page.evaluate(() => { const a = (window as any).__luxdmx; for (const f of a.show.fixtures.filter((x: any) => /^Pinspot/.test(x.name))) a.programmer[f.id] = { intensity: 1, color: { r: 1, g: 1, b: 1 } }; });
+  await expect.poll(async () => (await mirror()).dots, { timeout: 8000 }).toBeGreaterThan(100);
+  expect((await mirror()).hit[0]).toBeGreaterThan(0.9);
+  // one ball: the show's own on its DMX motor (the room's gives way to it). Its motor stopped, it
+  // only sways and twists a little; at speed it goes round
+  expect((await mirror()).spin.length).toBe(1);
+  const motor = (v: number) => page.evaluate((v) => { const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => x.name === 'Mirror ball'); a.programmer[f.id] = { rollRotation: v }; }, v);
+  await motor(0);
+  await page.waitForTimeout(500);
+  const still = [(await mirror()).spin[0]];
+  for (let i = 0; i < 4; i++) { await page.waitForTimeout(500); still.push((await mirror()).spin[0]); }
+  expect(Math.max(...still) - Math.min(...still)).toBeGreaterThan(0.001);                  // (never dead still)
+  expect(Math.max(...still) - Math.min(...still)).toBeLessThan(0.3);
+  expect(Math.abs((await mirror()).tilt[0])).toBeLessThan(0.05);
+  await motor(120 / 255);                                                                 // (clockwise, fast)
+  const a0 = (await mirror()).spin[0];
+  await page.waitForTimeout(1500);
+  const turned = Math.abs((((await mirror()).spin[0] - a0) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+  expect(turned).toBeGreaterThan(0.4);
 });

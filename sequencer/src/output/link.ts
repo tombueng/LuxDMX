@@ -4,6 +4,7 @@
 // the internet, like the app on GitHub Pages, Chrome first asks whether the site may reach devices
 // on the local network: see `access`.) Frames go out as the LuxDMX bridge takes them ('D' frames).
 import { Bridge, portsOf } from './bridge';
+import { due, linkFrame, linkRoutes, type LinkProto } from './wire';
 import type { PortInfo } from '../model/ledCurve';
 import type { RdmReply, RdmRequest } from '../rdm/types';
 
@@ -30,7 +31,7 @@ export class LinkOutput extends Bridge {
   private watching = false;
 
   // wantedProto: what the show says to send as (it follows Undo and a show switch)
-  constructor(changed: () => void, private wantedProto: () => 'artnet' | 'sacn' | 'both' | undefined = () => undefined) {
+  constructor(changed: () => void, private wantedProto: () => LinkProto | undefined = () => undefined) {
     super(LINK, changed);
     this.name = 'This computer (Art-Net / sACN)';
     this.usesWindow = false;
@@ -76,26 +77,21 @@ export class LinkOutput extends Bridge {
   adopt() { /* nothing to adopt: it isn't a window */ }
   // every universe goes to Link; it knows which nodes play which
   wants() { return true; }
+  // Art-Net only goes to the nodes that play a universe: one none of them plays reaches nothing.
+  // sACN is sent to everyone listening, nodes Link can't see too: it may reach a motor.
+  reaches(uni: number) { return this.proto !== 'artnet' || this.nodes.some((n) => n.universes.includes(uni)); }
   // what it sends as: always what the show says now
-  get proto(): 'artnet' | 'sacn' | 'both' { return this.wantedProto() ?? 'artnet'; }
-  setProto(_p?: 'artnet' | 'sacn' | 'both') { this.routes(); }
-  // what to send each universe as (Link picks the nodes for Art-Net, the multicast group for sACN)
+  get proto(): LinkProto { return this.wantedProto() ?? 'artnet'; }
   private routes() {
     if (this.ws?.readyState !== 1) return;
     this.sentProto = this.proto;
-    this.ws.send(JSON.stringify({ type: 'routes', routes: [...this.universes].map((uni) => ({ uni, proto: this.proto, to: 'auto' })) }));
+    this.ws.send(linkRoutes(this.universes, this.proto));
   }
   send(uni: number, data: Uint8Array, now = performance.now()) {
     if (this.state !== 'ready' || this.ws?.readyState !== 1) return;
     if (this.proto !== this.sentProto) this.routes();       // (Undo, another show)
     if (!this.universes.has(uni)) { this.universes.add(uni); this.routes(); }
-    const last = this.sent.get(uni);
-    if (last && now - last.at < 250 && last.data.length === data.length && last.data.every((v, i) => v === data[i])) return;
-    this.sent.set(uni, { data: data.slice(), at: now });
-    const f = new Uint8Array(6 + data.length);
-    f.set([68, 1, uni & 0xff, (uni >> 8) & 0x7f, 100, 0]);
-    f.set(data, 6);
-    this.ws.send(f);
+    if (due(this.sent, uni, data, now)) this.ws.send(linkFrame(uni, data));
   }
   relay() { /* phones come through a LuxDMX box's page, not Link */ }
   // RDM over Art-Net: Link asks the nodes (ArtTodRequest, ArtRdm); a Link without it never answers

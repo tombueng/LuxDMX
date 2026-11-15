@@ -9,6 +9,10 @@
   const patched = $derived(app.show.fixtures.reduce((n, f) => n + (app.modeOf(f.id)?.channels.length ?? 1), 0));
   // a universe is "live" when any channel is above zero
   const live = $derived(new Set([...app.frames].filter(([, d]) => d.some((v) => v > 0)).map(([u]) => u)));
+  // ...and whether it goes anywhere: a connected box that plays it, and the output on stage (it said
+  // "sending" with the box for it gone, or Blind)
+  const served = (u: number) => (void app.bridgeRev, app.output === 'live' && app.bridges.some((b) => b.state === 'ready' && b.wants(u)));
+  const say = (u: number) => !live.has(u) ? 'all at zero' : app.output !== 'live' ? 'blind: nothing goes out (the stages show it)' : served(u) ? 'sending' : 'nothing goes out: no connected box plays it';
   function open(u?: number) { ui.monitorUni = u ?? unis[0] ?? 0; ui.modal = 'monitor'; }
 </script>
 
@@ -17,7 +21,8 @@
     <Icon name="grid" size={14} /><h2>DMX output</h2><Icon name="right" size={12} />
   </button>
   {#each unis as u (u)}
-    <button class="u" class:live={live.has(u)} onclick={() => open(u)} title="Universe {u}: {live.has(u) ? 'sending' : 'all at zero'}"><span class="dot"></span>U{u}</button>
+    <!-- (in words when it doesn't go out: green and orange dots alone looked the same to someone red-green blind) -->
+    <button class="u" class:live={live.has(u) && served(u)} class:held={live.has(u) && !served(u)} onclick={() => open(u)} title="Universe {u}: {say(u)}"><span class="dot"></span>U{u}{#if live.has(u) && !served(u)}<span class="why">{app.output !== 'live' ? 'blind' : 'no box'}</span>{/if}</button>
   {/each}
   <span class="faint">{unis.length ? `${patched} channels patched` : 'nothing patched yet'}</span>
 </div>
@@ -28,5 +33,7 @@
   .u { padding: .05rem .5rem; font-size: .78rem; gap: .3rem; }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line2); }
   .u.live .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .u.held .dot { background: var(--orange); }
+  .why { margin-left: .3rem; font-size: .72rem; color: var(--orange); }
   .faint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

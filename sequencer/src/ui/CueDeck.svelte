@@ -1,17 +1,18 @@
 <script lang="ts">
   import { isLooks, isPlay } from '../model/library';
-  import { cueRiskOf } from './risk';
+  import { cueMarkOf, MARK_TITLE } from './risk';
   import { revealIn } from './reveal';
   import { cueNumber, numbered } from '../model/cuenum';
   // Cue lists as decks of cards. Every card shows a picture of the look at that cue, its timing and
   // what happens next. Select like files, drag to reorder, copy / cut / paste / duplicate, right-click
   // for everything else; the selected cue's details sit on the right.
   import Icon from './Icon.svelte';
+  import NumField from './NumField.svelte';
   import Help from './Help.svelte';
   import CueInspector from './CueInspector.svelte';
   import { app } from '../app.svelte';
-  import { dialogOpen, focusSelect, spaceIsGo, ui, listKeys, menuKey } from './ui.svelte';
-  import { stageSvg, svgImage } from './thumb';
+  import { dialogOpen, focusSelect, spaceIsGo, ui, listKeys, menuKey, asPercent } from './ui.svelte';
+  import { layoutKey, lookSvg, svgImage } from './thumb';
   import type { Advance, Cue } from '../model/types';
   import { whileShown } from './shown.svelte';
 
@@ -32,7 +33,8 @@
     const looks = app.cueLooksOf.get(list.id) ?? [];
     const fixtures = app.plain?.fixtures ?? [];
     const own = isLooks(list);                // a look's card: what it names, the rest as outlines
-    return looks.map((l) => stageSvg(fixtures, l, app.kinds, 160, 90, own, (id) => app.placesOf(id), (id) => app.caps(id).cells));
+    const at = layoutKey(fixtures, app.kinds);
+    return looks.map((l) => lookSvg(fixtures, at, l, app.kinds, 160, 90, own, (id) => app.placesOf(id), (id) => app.caps(id).cells));
   });
   let settings = $state(false);
   let renaming = $state<string | null>(null);
@@ -63,9 +65,9 @@
   }
   const copy = async () => { const n = await app.copyCues(); if (n) ui.toast(`Copied ${n} cue${n > 1 ? 's' : ''}`); };
   const cut = async () => { const n = await app.cutCues(); if (n) ui.toast(`Cut ${n} cue${n > 1 ? 's' : ''}`); };
-  const paste = async () => { const n = await app.pasteCues(); ui.toast(n ? `Pasted ${n} cue${n > 1 ? 's' : ''}` : 'Nothing to paste'); };
+  const paste = async () => { const n = await app.pasteCues(); ui.toast(n ? `Pasted ${n} cue${n > 1 ? 's' : ''}${app.cuePasteNote ? `. ${app.cuePasteNote}.` : ''}` : 'Nothing to paste', app.cuePasteNote ? 8000 : undefined); };
   const dup = async () => { await app.duplicateCues(); };
-  const del = () => { const n = app.cueSel.length; if (n) { app.deleteCues(); ui.toast(`Deleted ${n} cue${n > 1 ? 's' : ''} (Ctrl+Z brings ${n > 1 ? 'them' : 'it'} back)`); } };
+  const del = () => { const n = app.cueSel.length; if (n) { const also = app.deleteCues(); ui.toast(`Deleted ${n} cue${n > 1 ? 's' : ''}${also ? ` and what played ${n > 1 ? 'them' : 'it'}: ${also}` : ''} (Ctrl+Z brings ${n > 1 ? 'them' : 'it'} back)`, also ? 6000 : undefined); } };
 
   function click(e: MouseEvent, id: string) {
     app.selectCue(id, e.shiftKey ? 'range' : e.ctrlKey || e.metaKey ? 'toggle' : 'only');
@@ -99,6 +101,7 @@
       { label: 'Rename…', icon: 'edit', run: async () => { const n = await ui.ask('Rename the list', l.name); if (n) { l.name = n; app.markDirty(0); } } },
       { label: 'Settings', icon: 'gear', run: () => { settings = true; } },
       { label: l.end === 'loop' ? 'Stop looping' : 'Loop', icon: 'loop', run: () => { l.end = l.end === 'loop' ? 'stop' : 'loop'; app.markDirty(0); } },
+      { label: `Print ${l.name}'s cue sheet`, icon: 'printer', disabled: !l.cues.length, run: () => { if (!app.printCueSheet(id)) ui.toast('The browser blocked the window: allow pop-ups for this page'); } },
       ...(numbered(l) ? [{ label: 'Renumber the cues 1, 2, 3…', icon: 'note', run: () => { app.renumberCues(id); app.toastUndo('Renumbered the cues'); } }] : []),
       { sep: true },
       { label: 'Delete the list', icon: 'trash', danger: true, run: () => { const also = app.removeList(id); app.toastUndo(`Deleted the list "${l.name}"${also ? ` (and what played it: ${also})` : ''}`); } },
@@ -198,11 +201,11 @@
     <span class="grow"></span>
     {#if list}
       <label class="lvl" title="This list's level (scales its intensity)"><span class="faint">Level</span>
-        <input type="range" min="0" max="1" step="0.01" value={st?.master ?? 1} oninput={(e) => app.setMaster(list.id, +(e.target as HTMLInputElement).value)} aria-label="List level" /></label>
-      <button onclick={() => app.back()} disabled={!list.cues.length} title="Previous cue (Backspace)" aria-label="Back"><Icon name="back" /></button>
+        <input type="range" min="0" max="1" step="0.01" value={st?.master ?? 1} use:asPercent={st?.master ?? 1} oninput={(e) => app.setMaster(list.id, +(e.target as HTMLInputElement).value)} aria-label="List level" /></label>
+      <button onclick={() => app.back()} disabled={!list.cues.length} title="Previous cue" aria-label="Back"><Icon name="back" /></button>
       <button class="go" onclick={() => app.go()} disabled={!list.cues.length} title="Next cue (Space)">GO <Icon name="play" /></button>
       <button onclick={() => app.release()} disabled={!st?.running} title="Fade this list out">Release</button>
-      <button class="ghost" class:on={list.end === 'loop'} onclick={() => (list.end = list.end === 'loop' ? 'stop' : 'loop')} title="Loop: start over after the last cue" aria-label="Loop"><Icon name="loop" /></button>
+      <button class="ghost" class:on={list.end === 'loop'} aria-pressed={list.end === 'loop'} onclick={() => (list.end = list.end === 'loop' ? 'stop' : 'loop')} title="Loop: start over after the last cue" aria-label="Loop"><Icon name="loop" /></button>
       <button class="ghost" class:on={settings} onclick={() => (settings = !settings)} title="List settings" aria-label="List settings"><Icon name="gear" /></button>
     {/if}
   </div>
@@ -214,7 +217,8 @@
         <option value="stop">stay on the last cue</option><option value="loop">start over (loop)</option><option value="release">fade out</option></select></label>
       <label>Priority <select value={list.priority ?? 'normal'} onchange={(e) => (list.priority = (e.target as HTMLSelectElement).value as 'low' | 'normal' | 'high')} aria-label="Priority">
         <option value="low">low</option><option value="normal">normal</option><option value="high">high: wins over newer lists</option></select></label>
-      <label>Release time <input type="number" min="0" max="60" step="0.5" value={list.releaseTime ?? 2} oninput={(e) => (list.releaseTime = +(e.target as HTMLInputElement).value)} style="width:4.5em" aria-label="Release time" /> s</label>
+      <!-- (a German browser took "1." as no number: it wrote 0 back while you typed and "1.5" became 5 s) -->
+      <label>Release time <NumField value={list.releaseTime ?? 2} min={0} max={60} step={0.5} required label="Release time" width="4.5em" onset={(v) => { if (v !== undefined) { list.releaseTime = v; app.markDirty(0); } }} /> s</label>
       <label title="The song's tempo: picking this list in Live (or with a set list button) sets the show to it">Tempo
         <input type="number" min="20" max="300" placeholder="keep" value={list.bpm ?? ''} style="width:4.5em" aria-label="List tempo"
           onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v) && v >= 20 && v <= 300) list.bpm = Math.round(v); else delete list.bpm; app.markDirty(0); }} /> BPM</label>
@@ -229,10 +233,10 @@
     {#if !list || !list.cues.length}
       <div class="empty">
         {#if !app.show.fixtures.length}
-          <p class="faint">The looks you record show up here as cards.</p>
+          <p class="faint">No cues yet: add lights, set them, then press Record. Each cue shows up here as a card.</p>
         {:else}
           <Icon name="record" size={30} />
-          <p><b>No cues yet.</b> Set up a look on the stage (select lights, pick a colour), then press <b>Record</b>.</p>
+          <p><b>No cues yet.</b> Select lights, set them (a colour, a level), then press <b>Record</b>.</p>
           <p class="hint">Each Record makes one card here. GO (or Space) steps from one to the next with a fade.</p>
           <button class="sm" onclick={() => { const n = app.makeStarterLooks(); if (n) app.toastUndo(`${n} starter looks for your rig. Change them, or keep the ones you like.`); }}>
             <Icon name="palette" size={14} />Or make starter looks for my rig</button>
@@ -246,7 +250,7 @@
           {@const sel = app.cueSel.includes(c.id)}
           {@const next = !!st?.running && st.index + 1 === i}
           {@const n = Object.keys(c.values).length}
-          {@const risk = cueRiskOf(app.show, c, app.showRev)}
+          {@const risk = cueMarkOf(app.show, c, app.showRev)}
           <!-- svelte-ignore a11y_click_events_have_key_events (the listbox handles the keys) -->
           <div class="card" class:sel class:cur class:next
                class:drop-before={dropAt?.index === i && !dropAt.after} class:drop-after={dropAt?.index === i && dropAt.after}
@@ -276,10 +280,11 @@
             <div class="chips">
               <span class="chip" title="Fades in {c.fade} s">{c.fade} s</span>
               <span class="chip" class:blue={c.advance.mode !== 'manual'} title={advTitle(c.advance)}>{adv(c.advance)}</span>
-              {#if risk === 'hazard'}<span class="chip orange" title="Fires a machine (flames, sparks or CO2): only while armed"><Icon name="warn" size={11} /><span class="bt">machine</span></span>
+              {#if risk === 'hazard'}<span class="chip orange" title={MARK_TITLE.hazard}><Icon name="warn" size={11} /><span class="bt">machine</span></span>
+              {:else if risk === 'winch'}<span class="chip winch" title={MARK_TITLE.winch}>⇅<span class="bt">winch</span></span>
               {:else if risk === 'once'}<span class="chip orange" title="Fires confetti (once): only while armed">1×</span>{/if}
               {#if c.actions?.length}<span class="chip violet" title="Also does {c.actions.length} thing{c.actions.length > 1 ? 's' : ''} when it starts"><Icon name="bolt" size={11} />{c.actions.length}</span>{/if}
-              {#if c.note}<span class="chip" title={c.note}><Icon name="note" size={11} /></span>{/if}
+              {#if c.note}<span class="chip notechip" title={c.note}><Icon name="note" size={11} /></span>{/if}
               <!-- how many lights it sets, by the chips (the picture stays clean) -->
               <!-- (a narrow card says it with a lamp and the number: "12 lights" cut to "1…" read as one) -->
               <span class="count" title={n ? `Sets ${n} light${n > 1 ? 's' : ''}` : c.effects?.length ? 'Only runs effects' : 'Sets nothing: the look before carries on'}>{#if n}<Icon name="par" size={11} />{n}<span class="w">&nbsp;light{n > 1 ? 's' : ''}</span>{:else}{c.effects?.length ? 'effects only' : 'carries on'}{/if}</span>
@@ -297,9 +302,11 @@
   .deck { height: 100%; display: flex; flex-direction: column; min-height: 0; gap: .35rem; padding: .55rem; }
   .tabs h2 { margin-right: .2rem; }
   .tab { padding: .2rem .6rem; border-radius: 999px; font-size: .86rem; }
-  .tab.cur { border-color: var(--green); background: #45d85c12; }
+  /* the list open: its name bold too; a running one: its dot a ring, not only lit (by colour alone, a grey
+     list's light dot and dark dot were all there was) */
+  .tab.cur { border-color: var(--green); background: #45d85c12; font-weight: 650; }
   .dot { display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; background: var(--line2); }
-  .dot.on { background: var(--c, var(--green)); box-shadow: 0 0 6px var(--c, var(--green)); }
+  .dot.on { background: var(--c, var(--green)); box-shadow: 0 0 0 2px var(--bg2), 0 0 0 3.5px var(--c, var(--green)), 0 0 6px var(--c, var(--green)); }
   .bar .sep { width: 1px; height: 1.4rem; background: var(--line); }
   .upd .tgt, .record .tgt { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
   .record .tgt { font-weight: 400; opacity: .8; font-size: .8rem; }
@@ -314,7 +321,8 @@
   .cards { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; align-content: start; outline: none; padding: 2px; }
   .card { border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--bg2); padding: .35rem; display: flex; flex-direction: column; gap: .25rem; position: relative; cursor: default; user-select: none; }
   .card:hover { border-color: var(--line2); }
-  .card.sel { border-color: var(--orange); background: #ffaa1c0c; }
+  /* picked: a dashed border (orange picked and green live were the same yellow to someone red-green blind; live has its LIVE tag) */
+  .card.sel { border-color: var(--orange); border-style: dashed; background: #ffaa1c0c; }
   .card.cur { border-color: var(--green); box-shadow: 0 0 0 1px var(--green), 0 0 14px #45d85c33; }
   .card:focus-visible { outline: none; }
   .tag { margin-left: auto; flex: none; font-size: .76rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
@@ -336,7 +344,13 @@
   .count { margin-left: auto; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .76rem; color: var(--faint); display: inline-flex; align-items: center; gap: .15rem; }
   .count :global(svg) { display: none; }
   .card { container: card / inline-size; }
-  @container card (max-width: 210px) { .count .w { display: none; } .count :global(svg) { display: inline; flex: none; } .count { flex: none; } }
+  @container card (max-width: 210px) { .count .w { display: none; } .count :global(svg) { display: inline; flex: none; } .count { flex: none; }
+    /* (the warning sign alone, its title says the rest: with the word, "Big finish"'s chips ran past
+       its edge and hid how many lights it sets) */
+    .chip.orange .bt, .chip.winch .bt { display: none; }
+    /* (four chips and more: the number of lights gives way, cut it read as a smaller number) */
+    .chips:has(> .chip:nth-child(4)) .count { display: none; }
+    .chips:has(> .chip:nth-child(5)) .notechip { display: none; } }
   .bt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pic.carry > .look { opacity: .45; }
   .prog { position: absolute; left: 6px; right: 6px; bottom: 3px; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }

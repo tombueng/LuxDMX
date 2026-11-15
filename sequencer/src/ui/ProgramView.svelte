@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PANEL_SIZES } from '../store/kept';
   // Program: build the show. Three layouts:
   //   desktop  lists | stage + DMX | programmer, the cues along the bottom
   //   tablet   stage | one panel with tabs (Set, Fixtures, Groups, Presets, Effects), cues below
@@ -13,7 +14,7 @@
   import Programmer from './Programmer.svelte';
   import CueDeck from './CueDeck.svelte';
   import { app } from '../app.svelte';
-  import { dialogOpen, tablist, ui } from './ui.svelte';
+  import { dialogOpen, tablist, typesText, ui } from './ui.svelte';
   import { setContext } from 'svelte';
 
   // App.svelte keeps this view while another is shown. Hidden, it rests: the plan and the DMX line
@@ -40,13 +41,12 @@
   let panel = $state<'set' | Side>('set');
   let pane = $state<'stage' | 'set' | 'lists' | 'cues'>('stage');
   // Panel sizes on a desktop: the gaps between them can be dragged; remembered in this browser.
-  const SIZES_KEY = 'luxdmx.seq.panels', NORMAL = { side: 300, right: 300, foot: 0 };
+  const NORMAL = { side: 300, right: 300, foot: 0 };
   // the cues keep a whole row of cards, the stage keeps room to see the lights
   const FOOT_MIN = 210, CENTER_MIN = 350;
-  let sizes = $state({ ...NORMAL });
-  try { sizes = { ...NORMAL, ...JSON.parse(localStorage.getItem(SIZES_KEY) ?? '{}') }; } catch { /* normal sizes */ }
+  let sizes = $state({ ...NORMAL, ...PANEL_SIZES.get() });
   let grid = $state<HTMLElement>();
-  const save = () => { try { localStorage.setItem(SIZES_KEY, JSON.stringify(sizes)); } catch { /* not remembered */ } };
+  const save = () => PANEL_SIZES.set({ ...sizes });
   function drag(e: PointerEvent, which: 'side' | 'right' | 'foot') {
     if (!grid || e.button !== 0) return;
     e.preventDefault();
@@ -78,7 +78,7 @@
   // Keys in Program (not while typing): 1-9 = 10-90 %, 0 = off, F = full for the selection; R records.
   function keys(e: KeyboardEvent) {
     const el = e.target as HTMLElement;
-    if (app.view !== 'program' || dialogOpen() || e.ctrlKey || e.metaKey || e.altKey || el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
+    if (app.view !== 'program' || dialogOpen() || e.ctrlKey || e.metaKey || e.altKey || typesText(el)) return;
     if (/^[0-9]$/.test(e.key) && app.selected.length) { e.preventDefault(); if (e.key === '0') app.off(); else app.set({ intensity: +e.key / 10 }); }
     else if (e.key.toLowerCase() === 'f' && app.selected.length) { e.preventDefault(); app.set({ intensity: 1 }); }
     else if (e.key.toLowerCase() === 'r' && !e.shiftKey) { e.preventDefault(); record(); }
@@ -112,7 +112,7 @@
 {/snippet}
 
 {#if layout === 'desktop'}
-  <div class="prog desktop" bind:this={grid} style="--side-w:min({sizes.side}px, 40vw);--right-w:min({sizes.right}px, 40vw);--foot-h:{sizes.foot ? `min(${sizes.foot}px, 70vh)` : '38%'}">
+  <div class="prog desktop" bind:this={grid} style="--side-w:min({sizes.side}px, 40vw);--right-w:min({sizes.right}px, 40vw);--foot-h:{sizes.foot ? `min(${sizes.foot}px, 70vh)` : 'var(--foot-normal)'}">
     <aside class="side" aria-label="Fixtures, groups, presets, effects">
       {@render sideTabs(false)}
       <div class="tabbody">{@render sideBody(app.sideTab)}</div>
@@ -150,8 +150,11 @@
       <span class="muted">{sel ? `${sel} selected` : ''}</span>
       <span class="grow"></span>
       <button class="bo" class:on={app.blackout} onclick={() => (app.blackout = !app.blackout)} aria-label="Blackout" title="Blackout"><Icon name="moon" /></button>
-      <button class="rec" onclick={record}><Icon name="record" />Record</button>
-      <button class="go" onclick={() => app.go()} disabled={!app.list?.cues.length}>GO <Icon name="play" /></button>
+      <!-- (the cues' pane has its own Record and GO, with the list they go to: not twice) -->
+      {#if pane !== 'cues'}
+        <button class="rec" onclick={record}><Icon name="record" />Record</button>
+        <button class="go" onclick={() => app.go()} disabled={!app.list?.cues.length}>GO <Icon name="play" /></button>
+      {/if}
     </div>
     <nav class="bottom" aria-label="Program panes">
       {#each [['stage', 'Stage', 'eye'], ['lists', 'Lights', 'par'], ['set', 'Set', 'sun'], ['cues', 'Cues', 'record']] as [id, label, icon] (id)}
@@ -162,6 +165,11 @@
 {/if}
 
 <style>
+  /* (the cues' share of the height unless you dragged it: less on a short laptop screen, where every
+     pixel the stage gets counts and one row of cue cards still fits) */
+  /* (never less than a whole row of cards at the interface size in use: they grow with it) */
+  .prog.desktop { --foot-normal: max(38%, 16.5rem); }
+  @media (max-height: 820px) { .prog.desktop { --foot-normal: max(32.5%, 16.5rem); } }
   .prog { flex: 1; min-height: 0; display: grid; gap: .55rem; padding: .55rem; }
   .desktop { grid-template-columns: var(--side-w) minmax(0, 1fr) var(--right-w); grid-template-rows: minmax(0, 1fr) minmax(170px, var(--foot-h)); position: relative;
     grid-template-areas: 'side center right' 'foot foot foot'; }

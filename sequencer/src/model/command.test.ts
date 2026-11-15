@@ -32,7 +32,7 @@ describe('the command line', () => {
     expect(parseCommand('at + 10')).toEqual({ level: { rel: 0.1 } });
     expect(parseCommand('@-25')).toEqual({ level: { rel: -0.25 } });
     expect(parseCommand('@ 12.5')).toEqual({ level: { abs: 0.125 } });
-    expect(parseCommand('@ 150')).toEqual({ level: { abs: 1 } });
+    expect(parseCommand('@ 150')).toEqual({ level: { abs: 1, asked: 150 } });          // (full, and what was typed: said)
     expect(parseCommand('1 thru 4 full')).toEqual({ steps: [add(P([1, 2, 3, 4]))], base: 'new', level: { abs: 1 } });
     expect(parseCommand('2 out')).toEqual({ steps: [add(P([2]))], base: 'new', level: { abs: 0 } });
   });
@@ -89,5 +89,35 @@ describe('numbers too big to be one', () => {
     expect(parseCommand('9007199254740992 thru 9007199254740994').error).toBeTruthy();
     expect(parseCommand('99999 @ full').steps![0].pick.fixtures).toEqual([99999]);
     expect(parseCommand('100000 @ full').error).toBeTruthy();
+  });
+  it('a comma between digits is a point (a German keypad types one): 22,3 @ 50,5', () => {
+    expect(parseCommand('22,3 @ 50,5')).toEqual(parseCommand('22.3 @ 50.5'));
+  });
+  it('desk words: go to, store, fixture/chan, release all, off, fade, lowlight; delay and long words said plainly', () => {
+    expect(parseCommand('go to cue 5')).toEqual(parseCommand('goto cue 5'));
+    expect(parseCommand('go to 5')).toEqual(parseCommand('goto 5'));
+    expect(parseCommand('store cue 9')).toEqual(parseCommand('record cue 9'));
+    expect(parseCommand('fixture 5 @ 50')).toEqual(parseCommand('5 @ 50'));
+    expect(parseCommand('chan 1 thru 4 @ full')).toEqual(parseCommand('1 thru 4 @ full'));
+    expect(parseCommand('release all')).toEqual({ action: 'releaseall' });
+    expect(parseCommand('off')).toEqual({ action: 'releaseall' });
+    expect(parseCommand('cue 5 fade 3')).toEqual(parseCommand('cue 5 time 3'));
+    expect(parseCommand('lowlight')).toEqual({ action: 'lowlight' });
+    expect(parseCommand('cue 5 delay 2').error).toMatch(/delay is in the cue's settings/);
+    expect(parseCommand('x'.repeat(3000)).error!.length).toBeLessThan(120);
+    expect(parseCommand('fade 3').error).toMatch(/goes with a cue/);
+    expect(parseCommand('redo')).toEqual({ action: 'redo' });
+  });
+  it('a cue\'s name in quotes or after "label"; more than full is full and says what was typed', () => {
+    expect(parseCommand('record cue 12 "Verse one"')).toEqual({ action: 'record', cue: 12, label: 'Verse one' });
+    expect(parseCommand('record "Intro"')).toEqual({ action: 'record', label: 'Intro' });
+    expect(parseCommand('cue 12 "Big chorus"')).toEqual({ action: 'label', cue: 12, label: 'Big chorus' });
+    expect(parseCommand('cue 5 label Bridge')).toEqual({ action: 'label', cue: 5, label: 'Bridge' });
+    expect(parseCommand('list 2 cue 3 “Outro”')).toEqual({ action: 'label', cue: 3, list: 2, label: 'Outro' });
+    expect(parseCommand('3 "oops"').error).toMatch(/goes with a cue/);
+    expect(parseCommand('cue 5').error).toMatch(/cue 5 what\?/);
+    expect(parseCommand('cue 5')).toEqual({ error: expect.any(String) });       // (nothing else on an error)
+    expect(parseCommand('1 @ 150').level).toEqual({ abs: 1, asked: 150 });
+    expect(parseCommand('1 @ 100').level).toEqual({ abs: 1 });
   });
 });

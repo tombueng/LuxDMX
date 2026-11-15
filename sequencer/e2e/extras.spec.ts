@@ -1,20 +1,24 @@
 // Small things that make it nicer: the demo, Highlight, group names on fixture rows.
-import { openConnected, resetFake, patch, channels, selectFixtures, tab, test, expect, full, selectAll, selectNone, go, demo } from './helpers';
+import { openConnected, resetFake, patch, channels, selectFixtures, tab, test, expect, full, selectAll, selectNone, go, demo, startTemplate, newBlankShow, swatch, record, cues } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
-test('"Show me a demo" plays the big demo: 3D stage, the timeline running, light on the wire', async ({ page }) => {
+test('"Play the show" on the festival plays the big demo: 3D stage, the timeline running, light on the wire', async ({ page }) => {
   await openConnected(page);
   await demo(page);
   await expect(page.locator('.top .show .name')).toHaveText('We Are Not The Band: live');
   await expect(page.locator('.tlv')).toBeVisible();
-  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 30000 });
-  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing)).toBe(true);
+  // (the biggest scene there is: in a headless browser its 3D stage is built and drawn on the CPU,
+  // and on a busy machine the page doesn't answer for half a minute while it builds (measured: 30 s,
+  // then it plays in real time; on a graphics card it's a third of a second): time enough for that)
+  test.setTimeout(180_000);
+  await expect(page.locator('.s3 canvas')).toBeVisible({ timeout: 90000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 60000 }).toBe(true);
   expect(await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThanOrEqual(200);
-  await expect.poll(async () => (await channels(0, 304)).some((v) => v > 0), { timeout: 8000 }).toBe(true);
+  await expect.poll(async () => (await channels(0, 304)).some((v) => v > 0), { timeout: 20000 }).toBe(true);
   // (it starts with the show's intro, before the song's 0: the clock runs on from wherever it is)
   const p0: number = await page.evaluate(() => (window as any).__luxdmx.timeline.position);
-  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.position), { timeout: 8000 }).toBeGreaterThan(p0 + 1);
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.position), { timeout: 30000 }).toBeGreaterThan(p0 + 1);
 });
 
 test('Highlight puts the selected lights at full white, not into cues', async ({ page }) => {
@@ -34,7 +38,7 @@ test('Highlight puts the selected lights at full white, not into cues', async ({
 test('fixture rows say which groups a light is in', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await tab(page, 'Fixtures');
   await expect(page.locator('.fl li[data-fixture="Front 1"]')).toContainText('Front');
   await expect(page.locator('.fl li[data-fixture="Mover 2"]')).toContainText('Movers');
@@ -43,17 +47,18 @@ test('fixture rows say which groups a light is in', async ({ page }) => {
 test('a cue sheet to print, and as CSV', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Theatre' }).click();
+  await startTemplate(page, 'Theatre');
   await page.locator('.top').getByRole('button', { name: 'More' }).click();
   const [sheet] = await Promise.all([page.waitForEvent('popup'), page.locator('.ctx').getByRole('menuitem', { name: 'Print a cue sheet' }).click()]);
-  await expect(sheet.locator('h1')).toHaveText('Play');
+  await expect(sheet.locator('h1')).toHaveText('Opening night');
   await expect(sheet.locator('table').first()).toContainText('Audience coming in');
   await expect(sheet.locator('table').first()).toContainText('play "House out" on House lights');
   await page.locator('.top').getByRole('button', { name: 'More' }).click();
   const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.ctx').getByRole('menuitem', { name: /CSV/ }).click()]);
   const csv = await (await import('node:fs')).promises.readFile((await dl.path())!, 'utf8');
-  expect(csv.split('\r\n')[0]).toBe('List,Cue,Name,Fade,Then,Lights,Effects,Also,Note');
-  expect(csv).toContain('Show,1,Preset,3 s,GO');
+  expect(csv.charCodeAt(0)).toBe(0xfeff);                                         // (UTF-8 for a spreadsheet: umlauts)
+  expect(csv.slice(1).split('\r\n')[0]).toBe('List,Cue,Name,Fade (s),Delay (s),Fade out (s),Then,Lights,Effects,Also,Note');
+  expect(csv).toContain('Show,1,Preset,3,,,GO');
 });
 
 test('arrange the selection on the stage; a picture of the room underneath', async ({ page }) => {
@@ -106,9 +111,8 @@ test('a fixture type made in one show is there in the next one (My fixtures)', a
   await page.getByRole('button', { name: 'Save type' }).click();
   await add.getByRole('button', { name: /^Add \d+ × / }).click();
   // a new, empty show: the type is offered under My fixtures
-  await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).getByRole('button', { name: 'New blank show' }).click();
-  await page.getByRole('button', { name: 'Add your first lights' }).click();
+  await newBlankShow(page);
+  await page.locator('.stage-wrap').getByRole('button', { name: 'Add lights' }).click();
   await expect(add.locator('.mine .tcard', { hasText: 'Garage PAR' })).toHaveCount(1);
   await add.locator('.mine .tcard', { hasText: 'Garage PAR' }).click();
   await add.getByLabel('How many').fill('1');
@@ -125,7 +129,7 @@ test('a fixture type made in one show is there in the next one (My fixtures)', a
 test('a big rig gets a filter on the fixture list', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await tab(page, 'Fixtures');
   const all = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length as number);
   const filter = page.getByLabel('Filter fixtures');
@@ -186,7 +190,7 @@ test('the DMX output monitor: what goes out on each channel, and whose it is', a
 test('nothing selected: the programmer offers the groups and shows what is playing', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await selectNone(page);
   const prog = page.locator('.prog');
   await prog.locator('.quick').getByRole('button', { name: 'Movers' }).click();
@@ -202,7 +206,7 @@ test('nothing selected: the programmer offers the groups and shows what is playi
 test('the patch on paper, and the DIP switches for an address', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+  await startTemplate(page, 'DJ / Party');
   await page.locator('.top').getByRole('button', { name: 'More' }).click();
   const [sheet] = await Promise.all([page.waitForEvent('popup'), page.locator('.ctx').getByRole('menuitem', { name: /Print the patch/ }).click()]);
   await expect(sheet.locator('h2')).toHaveText(['Universe 0']);
@@ -263,4 +267,33 @@ test('check the patch: one light at a time at full, then everything as it was', 
   await expect(dlg).toBeHidden();
   await expect.poll(() => channels(0, 3)).toEqual([0, 0, 0]);
   await expect(page.locator('.fl li.oitem.sel .nm')).toHaveText(['D 2']);       // the selection is back
+});
+
+test('a cue card\'s picture follows its cue: updated, it shows the new look; the other card\'s picture stays as it was', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-drgb', 2, 0, 'PAR');
+  await selectAll(page); await full(page); await swatch(page, 'Red'); await record(page);
+  await swatch(page, 'Blue'); await record(page);
+  const pic = (i: number) => cues(page).nth(i).locator('img.look').getAttribute('src');
+  await expect.poll(() => pic(1)).not.toBe(await pic(0));
+  const [a0, b0] = [await pic(0), await pic(1)];
+  // the second cue updated to green: its picture changes, the first card's doesn't
+  await cues(page).nth(1).dblclick();
+  await swatch(page, 'Green');
+  await page.locator('.deck').getByRole('button', { name: 'Update' }).click();
+  await expect.poll(() => pic(1), { timeout: 5000 }).not.toBe(b0);
+  expect(await pic(0)).toBe(a0);
+  expect(decodeURIComponent((await pic(1))!)).toMatch(/fill="rgb\(0, ?255, ?0\)|#00ff00|hsl\(1[12]\d/i);
+});
+
+test('removing machines takes their shot lists with them (and the cue actions that started them); the toast says so', async ({ page }) => {
+  await openConnected(page);
+  await startTemplate(page, 'Wedding');
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists.map((l: any) => l.name))).toContain('Confetti');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = a.show.fixtures.filter((f: any) => /^(Confetti|Bubbles)$/.test(f.name)).map((f: any) => f.id); });
+  await page.locator('.fl').getByRole('button', { name: 'Remove fixtures' }).click();
+  await expect(page.locator('.toast')).toContainText(/the lists only for them went too \((Confetti, Bubbles|Bubbles, Confetti)\)/);
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.cueLists.map((l: any) => l.name))).not.toContain('Confetti');
+  const toss = await page.evaluate(() => (window as any).__luxdmx.show.cueLists.find((l: any) => l.name === 'Wedding').cues.find((c: any) => c.name === 'Bouquet toss').actions ?? []);
+  expect(toss).toEqual([]);
 });

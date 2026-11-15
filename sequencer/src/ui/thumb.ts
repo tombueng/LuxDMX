@@ -21,6 +21,24 @@ export function svgImage(svg: string): string {
   return u;
 }
 
+// A card's picture, remembered by its look (the same object while its list hasn't changed:
+// app.cueLooksOf) and where the lights are: an edit redraws only the cards it changed.
+// (one picture per size: a cue's card and its live tile are different sizes)
+const drawn = new WeakMap<object, Map<string, { at: string; svg: string }>>();
+export function lookSvg(fixtures: Fixture[], at: string, look: Record<string, Resolved>, kinds: Record<string, FixtureKind>, w: number, h: number, own: boolean,
+  places?: (id: string) => Places | undefined, cellCount?: (id: string) => number): string {
+  const size = `${w}x${h}|${own ? 1 : 0}`;
+  let m = drawn.get(look);
+  if (!m) drawn.set(look, (m = new Map()));
+  const c = m.get(size);
+  if (c && c.at === at) return c.svg;
+  const svg = stageSvg(fixtures, look, kinds, w, h, own, places, cellCount);
+  m.set(size, { at, svg });
+  return svg;
+}
+// where the lights are and what they are, as one string (the pictures depend on it)
+export const layoutKey = (fixtures: Fixture[], kinds: Record<string, FixtureKind>) => fixtures.map((f) => `${f.id}:${f.x.toFixed(4)},${f.y.toFixed(4)}:${kinds[f.id] ?? ''}:${f.typeId}:${f.mode}`).join(';');
+
 // `own`: a look of a list of looks: a light it doesn't name is drawn as an outline (it stays as it
 // is), one it switches off as a dark light, so the card tells "off" from "not in this look".
 // `places`: which lights are a ring or a matrix (drawn with a few of their pixels: it's a small picture).

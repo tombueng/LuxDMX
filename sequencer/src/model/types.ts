@@ -63,6 +63,9 @@ export type PixelLayout =
   | { kind: 'rings'; rings: number[]; ccw?: boolean; turn?: number }
   | { kind: 'matrix'; cols: number; rows: number; zigzag?: boolean; vertical?: boolean; from?: 'tl' | 'tr' | 'bl' | 'br' };
 
+// A light's size in metres: w across (a bar's or a strip's length), h, d. Each one left out: as it is.
+export interface Dims { w?: number; h?: number; d?: number }
+
 export interface FixtureMode {
   name: string;
   channels: Channel[];
@@ -79,7 +82,8 @@ export interface FixtureType {
   // rollDeg: how far its third axis turns (360 when not said); beamDeg: its beam's opening angle in
   // degrees, narrowest and widest (zoom in and out; the same twice: no zoom), from its data sheet
   // travel, hoistSpeed: a winch's travel in metres (from the top of it down) and how fast it goes (m/s)
-  physical?: { panDeg?: number; tiltDeg?: number; rollDeg?: number; beamDeg?: [number, number]; travel?: number; hoistSpeed?: number };
+  // dims: how big it is in metres, as the 3D stage draws it (w: across, a bar's or a strip's length)
+  physical?: { panDeg?: number; tiltDeg?: number; rollDeg?: number; beamDeg?: [number, number]; travel?: number; hoistSpeed?: number; dims?: Dims };
   // the light's RDM maker (ESTA) and model ids, and which of its modes each RDM personality is (by
   // number): a light found on the line is patched with this type and the right mode
   rdm?: { maker: number; model: number; modes?: Record<string, string> };
@@ -154,9 +158,13 @@ export interface Fixture {
   panDeg?: number;
   tiltDeg?: number;
   beamDeg?: [number, number];   // this light's own beam angle, narrowest and widest (over its type's)
+  dims?: Dims;                  // this light's own size in metres (over its type's): a strip's length, a bigger PAR
   // a winch's soft limits: how high and how low it may go, as parts of its travel (0 the top, 1 the
   // bottom): whatever a cue says, the winch is sent within them
   hoistLimits?: [number, number];
+  // a curtain or a drop on a fly bar (stage machinery): the cloth's width and height (m) and, for a
+  // drop, what's painted on it (DROP_PICTURES); none: its type's size, a forest
+  cloth?: { w?: number; h?: number; picture?: string };
   swapPanTilt?: boolean;
   // its own pan (tilt) turns the other way round from what its type says: the picture, Aim and the
   // 3D stage follow the real one; what goes out on the wire stays the same (invert changes that)
@@ -183,6 +191,7 @@ export interface Group {
   fixtures: string[];     // ordered: effects run along this order
   cells?: number[];       // some cells of its lights only ("Rim": the rings' outer LEDs), in order: selecting it picks them, an effect on it runs on them
   auto?: boolean;         // made by the app from the patch (rebuilt when the patch changes)
+  num?: number;           // its number on the console ("group 5"): stays when the list is reordered (model/groupnum.ts)
 }
 
 export type PresetKind = 'color' | 'position' | 'beam' | 'intensity';
@@ -264,7 +273,7 @@ export type Widget = WidgetBase & (
   | { type: 'list'; list: string; action: ListAction }                  // a cue list button
   | { type: 'cue'; list: string; cue: string }                          // go straight to one cue
   | { type: 'effect'; effect: string; action: 'toggle' | 'flash' }
-  | { type: 'fader'; target: 'grand' | 'list' | 'effect' | 'bpm'; ref?: string }
+  | { type: 'fader'; target: 'grand' | 'list' | 'effect' | 'group' | 'bpm'; ref?: string }
   | { type: 'fog'; fixtures: string[]; level: number; burst: number; max: number }   // seconds
   | { type: 'group'; group: string; level: number; strobe?: number; white?: boolean }    // flash a group while held (white: a blinder)
   | { type: 'special'; do: 'blackout' | 'releaseAll' | 'tap' | 'stopEffects' | 'blinder' | 'drop' | 'fadeOut'; seconds?: number }   // seconds: fadeOut's time (5)
@@ -301,7 +310,8 @@ export interface Show {
   pages: Page[];
   outputs: { devices: Device[] };
   // stage.image: a data: URL drawn under the stage; schedule: the timetable (model/schedule.ts)
-  // lockPin: the PIN that unlocks a show locked for the service (staff-proofing, not security);
+  // lockPin: the PIN that unlocks a show locked for the service, as its hash (model/pin.ts;
+  // staff-proofing, not security);
   // lockPage: the live page it was locked on (the only one shown while locked)
   // place: where the show is, for the timetable's sunrise and sunset (unset: guessed from the time zone)
   // scheduleOff: the timetable switched off; schedulePause: not playing until then (ms since 1970)
@@ -310,7 +320,7 @@ export interface Show {
   // bandName: the band's name on the 3D stage's banners and screens (unset: the band's picture)
   // marks: tape on the real stage, where they are (metres, the 3D stage's frame): heads are steered
   // onto them to work out where they really hang (model/calibrate.ts), and to point at
-  settings: { bpm: number; marks?: StageMark[]; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string; consoleMidi?: ConsoleMidi[]; recordChanges?: boolean };
+  settings: { bpm: number; marks?: StageMark[]; stage?: { image?: string; opacity?: number }; stage3d?: { model?: VenueModel; hideVenue?: boolean; room?: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom'; size?: { w: number; d: number; riser?: boolean; trussY?: number; trusses?: number }; act?: 'band' | 'none' }; bandName?: string; schedule?: ScheduleEntry[]; scheduleOff?: boolean; schedulePause?: number; place?: Place; lockPin?: string; lockPage?: string; consoleMidi?: ConsoleMidi[]; recordChanges?: boolean };
   timeline?: Timeline;              // a song with cues, effects and moments on it (model/timeline.ts): the one that's up
   setlist?: SetList;                // the other songs of the set, before and after it, in order (model/timeline.ts)
   extensions: Record<string, unknown>;

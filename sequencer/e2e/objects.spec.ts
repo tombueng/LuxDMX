@@ -1,7 +1,7 @@
 // Lists of real objects: select like files, drag to reorder, copy / cut / paste / duplicate /
 // delete with the keys and the context menu. Fixtures, cues and groups.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, channels, selectAll, selectFixtures, intensity, record, cues, jumpTo, go, fixturesOnStage, tab, swatch, full , test, expect } from './helpers';
+import { openConnected, resetFake, patch, channels, selectAll, selectFixtures, intensity, record, cues, jumpTo, go, fixturesOnStage, tab, swatch, full , test, expect, startTemplate } from './helpers';
 
 const items = (page: Page) => page.locator('.fl li.oitem');
 const names = async (page: Page) => (await items(page).locator('.nm').allTextContents());
@@ -181,17 +181,20 @@ test('the stage zooms with the wheel and fits again', async ({ page }) => {
   await patch(page, 'gen-rgb', 4, 0, 'P');
   const svg = page.locator('.stage-wrap svg[aria-label="Stage"]');
   const fit = page.locator('.stage-wrap').getByRole('button', { name: 'Fit the stage' });
-  await expect(fit).toHaveText('100%');
+  await expect(fit).toHaveCount(0);                    // (nothing to fit at 100 %: no button taking room)
+  const whole = await svg.getAttribute('viewBox');
   const b = (await svg.boundingBox())!;
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.wheel(0, -400);
+  await expect(fit).toHaveText(/^\d+%$/);
   await expect(fit).not.toHaveText('100%');
   expect(await svg.getAttribute('viewBox')).not.toBe('0.0 0.0 1000.0 560.0');
   // selecting by clicking still hits the right light when zoomed
   await page.locator('.stage-wrap .fx[data-name="P 2"]').click();
   await expect(page.locator('.fl li.oitem.sel .nm')).toHaveText(['P 2']);
   await fit.click();
-  await expect(fit).toHaveText('100%');
+  await expect(fit).toHaveCount(0);
+  expect(await svg.getAttribute('viewBox')).toBe(whole);
 });
 
 test('cue names: double-click renames, new cues are named after their presets', async ({ page }) => {
@@ -269,4 +272,50 @@ test('a clipboard prompt nobody answers holds up nothing', async ({ page }) => {
   await expect.poll(count, { timeout: 3000 }).toBe(3);
   await page.locator('.fl').getByRole('button', { name: 'Duplicate fixtures' }).click();
   await expect.poll(count, { timeout: 3000 }).toBe(4);
+});
+
+test('a light dragged on the plan is one undo step back to where it started, even with a save in the middle of the drag', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 2, 0, 'P');
+  const pos = () => page.evaluate(() => { const f = (window as any).__luxdmx.show.fixtures.find((x: any) => x.name === 'P 1'); return [f.x, f.y]; });
+  const start = await pos();
+  const body = page.locator('.stage-wrap .fx[data-name="P 1"] [stroke-width]').first();
+  const b = (await body.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 40, b.y - 30, { steps: 6 });
+  await page.evaluate(() => (window as any).__luxdmx.checkpoint(true));     // (the save timer, mid-drag)
+  await page.mouse.move(b.x + 90, b.y - 60, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  expect(await pos()).not.toEqual(start);
+  await page.keyboard.press('Control+z');
+  await expect.poll(pos).toEqual(start);
+});
+
+// A cue copied in one show and pasted into another finds its lights by name; the ones this show
+// doesn't have (and the other show's effects) are left out, and the toast says so.
+test('a cue pasted into another show says which of its lights this show doesn\'t have', async ({ page }) => {
+  await openConnected(page);
+  const tpl = async (name: string) => {
+    await page.locator('.top .show').click();
+    await startTemplate(page, name);
+    await expect(page.getByRole('dialog', { name: 'Shows' })).toBeHidden();
+  };
+  await tpl('Band');
+  await cues(page).filter({ hasText: 'Chorus' }).click();
+  await page.locator('.deck .cards').press('Control+c');
+  await tpl('Theatre');
+  await expect(cues(page).first()).toBeVisible();
+  const before = await cues(page).count();
+  await cues(page).last().click();
+  await page.locator('.deck .cards').press('Control+v');
+  await expect(cues(page)).toHaveCount(before + 1);
+  const toast = page.locator('.toast').filter({ hasText: 'Pasted 1 cue' });
+  await expect(toast).toContainText("of its lights aren't in this show");
+  await expect(toast).toContainText('left out');
+  // the lights it did find: by name
+  const names = await page.evaluate(() => { const a = (window as any).__luxdmx; const c = a.list.cues.at(-1); return Object.keys(c.values).map((id) => a.show.fixtures.find((f: any) => f.id === id)?.name); });
+  expect(names).toContain('Front 1');
+  expect(names.every((n: string | undefined) => !!n)).toBe(true);
 });

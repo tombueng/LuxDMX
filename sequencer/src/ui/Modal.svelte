@@ -5,7 +5,9 @@
   import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
   // dock: in the bottom corner without darkening the page (for tools you use while watching the stage)
-  let { title, onclose, children, wide = false, dock = false }: { title: string; onclose: () => void; children: Snippet; wide?: boolean; dock?: boolean } = $props();
+  // `top`: held near the top of the screen instead of centred (a search whose results come and go:
+  // the field mustn't jump up and down as the list grows and shrinks)
+  let { title, onclose, children, wide = false, xl = false, dock = false, top = false }: { title: string; onclose: () => void; children: Snippet; wide?: boolean; xl?: boolean; dock?: boolean; top?: boolean } = $props();
   const me = Symbol();
   const titleId = `dlg-${Math.random().toString(36).slice(2, 8)}`;
   let box = $state<HTMLDivElement>();
@@ -17,12 +19,14 @@
     // after the content is there (an autofocus input may already have taken it)
     queueMicrotask(() => {
       if (!box || box.contains(document.activeElement)) return;
-      (box.querySelector<HTMLElement>('[autofocus]') ?? focusables().find((el) => !el.classList.contains('x')) ?? focusables()[0])?.focus({ preventScroll: true });
+      (box.querySelector<HTMLElement>('[autofocus], [data-autofocus]') ?? focusables().find((el) => !el.classList.contains('x')) ?? focusables()[0])?.focus({ preventScroll: true });
     });
     return () => {
       const i = open.indexOf(me); if (i >= 0) open.splice(i, 1);
       // (an opener that's gone, the Ctrl+K box say: where the focus was before any dialog)
-      const back = opener?.isConnected ? opener : outside?.isConnected ? outside : null;
+      // (nothing to go back to, the first start's welcome say: the main view, so the keyboard
+      // goes on from there and not from the page itself)
+      const back = opener?.isConnected && opener !== document.body ? opener : outside?.isConnected ? outside : document.querySelector<HTMLElement>('main.view');
       if (back && (!document.activeElement || document.activeElement === document.body || box?.contains(document.activeElement))) back.focus({ preventScroll: true });
     };
   });
@@ -47,8 +51,8 @@
 
 <svelte:window onkeydown={keys} />
 
-<div class="backdrop" class:dock role="presentation" onclick={(e) => { if (e.target === e.currentTarget && !dock) onclose(); }}>
-  <div class="modal" class:wide role="dialog" aria-modal="true" aria-labelledby={titleId} bind:this={box}>
+<div class="backdrop" class:dock class:top role="presentation" onclick={(e) => { if (e.target === e.currentTarget && !dock) onclose(); }}>
+  <div class="modal" class:wide class:xl role="dialog" aria-modal="true" aria-labelledby={titleId} bind:this={box}>
     <div class="head row">
       <h2 id={titleId}>{title}</h2>
       <span style="flex:1"></span>
@@ -64,8 +68,10 @@
   .backdrop { position: fixed; inset: 0; background: #000a; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; z-index: 50; padding: 1rem; }
   .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; width: min(640px, 100%); max-height: 92vh; display: flex; flex-direction: column; box-shadow: var(--shadow); }
   .modal.wide { width: min(1000px, 100%); }
+  .modal.xl { width: min(1320px, 100%); }
   /* bottom left: over the lists, the stage and the programmer stay in view */
   .backdrop.dock { background: none; pointer-events: none; place-items: end start; }
+  .backdrop.top { align-items: start; padding-top: 5vh; }
   .backdrop.dock .modal { pointer-events: auto; width: min(420px, 100%); box-shadow: 0 12px 40px #000c, 0 0 0 1px var(--line2); }
   .head { padding: .7rem .9rem .3rem; } .head h2 { margin: 0; font-size: 1.05rem; color: var(--text); text-transform: none; letter-spacing: 0; }
   .body { padding: .3rem .9rem .9rem; overflow: auto; }

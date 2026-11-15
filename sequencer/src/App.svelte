@@ -9,6 +9,7 @@
   import ConnectionBanner from './ui/ConnectionBanner.svelte';
   import { app } from './app.svelte';
   import { ui } from './ui/ui.svelte';
+  import Intro from './ui/Intro.svelte';
   import { onMount, tick, untrack } from 'svelte';
   type View = typeof app.view;
   // A view is built the first time it's opened and stays (hidden) when another one is shown, so
@@ -64,7 +65,7 @@
   <TopBar />
   <ConnectionBanner />
   <!-- menus and messages sit in the main region too (they float, but a screen reader finds them) -->
-  <main class="view" aria-label={app.view === 'program' ? 'Program' : app.view === 'timeline' ? 'Timeline' : app.view === 'console' ? 'Console' : 'Live'}>
+  <main class="view" tabindex="-1" aria-label={app.view === 'program' ? 'Program' : app.view === 'timeline' ? 'Timeline' : app.view === 'console' ? 'Console' : 'Live'}>
     {#if open.has('program')}<div class="pane" class:laying={laying === 'program'} hidden={app.view !== 'program'} inert={app.view !== 'program'}><ProgramView /></div>{/if}
     {#if open.has('timeline')}<div class="pane" class:laying={laying === 'timeline'} hidden={app.view !== 'timeline'} inert={app.view !== 'timeline'}><TimelineView /></div>{/if}
     {#if open.has('live')}<div class="pane" class:laying={laying === 'live'} hidden={app.view !== 'live'} inert={app.view !== 'live'}><LiveView /></div>{/if}
@@ -72,11 +73,13 @@
     <Overlays /></main>
 </div>
 <Modals />
+<Intro />
 <!-- Blackout must never be missed: a frame round the whole screen while it's on. -->
 {#if app.blackout}<div class="bo-frame" aria-hidden="true"><span>Blackout</span></div>{/if}
 
 <style>
-  .app { height: 100%; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  /* (a container: the top bar's steps go by its width in rem, so the interface size counts) */
+  .app { height: 100%; display: flex; flex-direction: column; min-height: 0; overflow: hidden; container: app / inline-size; }
   .view { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
   .pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* A hidden view keeps its boxes laid out (content-visibility skips drawing and laying out what's
@@ -94,4 +97,5 @@
   .bo-frame { position: fixed; inset: 0; pointer-events: none; z-index: 90; box-shadow: inset 0 0 0 3px var(--pink), inset 0 0 40px #f33abc33; }
   .bo-frame span { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); background: var(--pink); color: #1a0010; font-weight: 800;
     font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; padding: .1rem .7rem; border-radius: 6px 6px 0 0; }
+  .view:focus { outline: none; }
 </style>

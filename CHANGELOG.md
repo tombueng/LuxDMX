@@ -6,6 +6,231 @@ itself. The sequencer has no version number of its own: it's the page at
 [tombueng.github.io/LuxDMX/sequencer](https://tombueng.github.io/LuxDMX/sequencer/) and you always
 get the newest one.
 
+## Unreleased
+
+**Sequencer**
+
+A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
+a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
+
+- **Changing what a light's channels do is kept when you press Done.** Before, only the Save button
+  under the table kept it, and Done threw it away without a word (swap red and green, Done, and
+  they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and
+  "Throw the changes away" is the way to drop it. A channel called just "Red" that you make green is
+  called "Green" too.
+- **The app opens on the demo show.** A visit starts with the big festival demo playing, and the
+  first time a short intro runs over the stage like subtitles (under 20 seconds): what you're
+  looking at, and where your lights, your box and the show-night buttons are. "When the app opens"
+  (beside it and in Shows) picks the demo, an empty show or the last one; a reload keeps what was
+  open, and an untouched demo doesn't pile up in your shows.
+- **Curtains and drops on the plan are cloths, not dots.** The 2D stage draws them as wide as they
+  are, across the stage: solid while they hang in view (a curtain shut, a drop flown in), faint and
+  dashed when they're out of the way; a curtain track's halves part.
+- **Sharing an add-on works on a slow computer too.** Its little preview was made under the same
+  30 ms a frame limit as the stage, so a busy laptop got "it takes too long to work out" instead of
+  the file. The preview is made once, so it isn't timed any more (the step limit still holds).
+- **The Theatre's curtain flies out, its scenery hangs at the back.** The house curtain is a fly
+  curtain now (a new type: its winch lifts the whole cloth up into the tower, the valance stays), in
+  front of the stage; the four painted drops hang upstage behind where the actors play, the first
+  one already set behind the closed curtain. With LuxDMX Link connected the machinery held still
+  even when no node played its universe: over Art-Net Link only counts the universes its nodes play.
+- **A pinspot on the mirror ball stops on the ball** on the 3D stage, instead of shining on
+  through it and laying a grey disc on the bar's wall. The Bar's first pinspot hangs between the
+  PARs now, not inside a beam light.
+- **A template started twice is "Bar" and "Bar 2"**, not two shows both called "Bar" in the Shows
+  list. Any new show gets a name no other show here has.
+- **A lighter 3D stage**: the camera-like exposure no longer makes the page wait for the graphics
+  card to answer a question every few frames (about a sixth of the page's time with the 3D stage
+  open), and the stage stopped making the browser lay the page out again every frame. Switching
+  views no longer compares the whole show for saving on each tab click.
+- **The Theatre's curtain opens, live too.** The templates' curtains and fly bars sit on universe 15,
+  which no box plays: a winch nobody's box plays sends nothing to a motor, so the 3D stage moves it
+  with the show. A real one on a box still holds until the machines are armed.
+- **An opera house's stage**: the theatre's opening is 26 x 14.5 m now, the stage 40 m wide and 23 m
+  deep, the cyc 32 x 19 m, two front-of-house bars, the fly tower up to 32 m. The house curtain is
+  folded velvet with a valance and gold fringes; the front light is softer and the deck dark, so
+  the scenes don't glare white, and the castle lost its zebra stripes.
+- **Real fixtures, the first two**: the Stairville LED Matrix Blinder 5x5 and the Showtec Phantom
+  Matrix FX are drawn as what they are on the 3D stage and in the library: the size, the 25 cells
+  in the manual's order, each cell's own beam, the blinder's warm white, the Phantom's head moving
+  on its yoke. A library tile plays the mode that can do the most, so a pixel light shows its pixels.
+- **Curves on the timeline**: the Effects track opens into a row per knob (speed, size, spread...);
+  drag the line to change the effect's own value, double-click for a curve that changes the knob
+  along the bar while the song plays (the output thread plays it too; nothing in the show is
+  rewritten as it plays). And the wheel zooms the timeline now, without Ctrl.
+- **Round LEDs** on the 3D stage: a matrix's, a ring's and a strip's pixels are little discs now, not
+  boxes (as cheap: they're still drawn all at once).
+- **LED strips of your own**: the LED maker makes strips too (how many LEDs, how long, the colour
+  order each LED wants: GRB for WS2812, RGBW...), and any light can have its own size on the 3D stage
+  (setup, Mounting: Width), a strip's length or a bigger PAR. The Bar has 144-LED strips the whole
+  width of the back bar behind the bottles on every shelf and one under the counter, and its
+  bottles are see-through glass now (and drawn in a dozen batches instead of 416 meshes).
+- **A mirror ball on a DMX motor**: a new generic type with one motor channel (stop, either way,
+  slow to fast). The ball never hangs dead still, it sways and twists a little on its chain. The
+  Bar has one: slow all evening, faster for the disco.
+- **Offline, properly.** The app keeps all of itself when it's first opened (before, only what had
+  been loaded), and a Wi-Fi without internet no longer holds the start up. Catalog songs played once
+  stay for offline; the demos' songs all come down as soon as one is used.
+- **Updates by themselves**: looked for at the start, every half hour and on coming back, put in
+  at a quiet moment without asking, never mid-show. A short note says when it happened.
+- **Settings keep their version.** Everything the app keeps in the browser has a version now, and
+  one place brings old settings along (STORAGE.md). Nothing is thrown away: what can't be read is
+  put aside.
+- **Space pauses a template's show** after Play the show (it opened the shows instead).
+- **A scene change on a winch says winch**, not "fires a machine": the Theatre's drops and the
+  curtains no longer look like pyro on every card.
+- The 3D stage's sliders are twice as wide where the toolbar has the room.
+- **A much bigger Theatre** for its big stage: 89 lights (ten front-of-house, gobo profiles on the box
+  booms with leaves, water and snowflakes, eight each of cyc floods, booms, specials, spots and washes,
+  footlights, ground rows) and a play in nineteen scenes, each with its drop flown in: curtain up, a
+  forest, moonlight, a castle at sunrise, a storm, an escape through the city, snow, underwater, a
+  battle, the finale (the one confetti shot).
+- **A much bigger Cinema**: 67 lights (house lights over the rows, twelve wall washers, the marquee round
+  the screen, an eight-light stage wash, spots, sky beams for the premieres, step lights, a starry
+  ceiling) and 23 looks: Hollywood searchlights, a countdown, awards night, space opera, an action
+  movie, a western, a silent film, deep sea. The curtain opens for the films. Confetti only for the
+  winner.
+- **A much bigger Bar**: 45 lights (ten PARs, six shelf bars, an LED strip on the counter, heads, beam
+  heads, strobes) and an LED sign beside the neon (BAR in neon, HAPPY HOUR typed out, SHOTS on the beat,
+  GOAL for the match). Twenty-two moods: rooftop sunset, quiz night, football, Latin night, disco,
+  shots, ladies' night, the lock-in. Confetti only for the birthday.
+- **A much bigger Wedding**: 67 lights (16 uplights, a pinspot on all 13 tables, eight heads, four
+  spots, beam heads, the dance floor's own), an LED sign over the head table (Just married, LOVE in
+  neon, Mr & Mrs) and a heart panel on the DJ's table, and 24 looks from the guests arriving to the
+  sparkler send-off; the heads draw a heart. Confetti only for the bouquet.
+- **A much bigger Band**: 78 lights (beam heads, uplights on the deck, more spots, washes, movers,
+  pixel bars, blinders and strobes) and 25 looks full of the new moves and pixel shows. Confetti only
+  once, at the very end. The plan's group buttons scroll in one row when a rig has many groups.
+- **A real mirror ball** in the bar and the club: it turns on its own motor (it stood still without
+  music) and throws its dots round the room when the pinspots hit it, with thin rays in the haze.
+- **Stage machinery**: a curtain track and a fly bar with a painted drop (a forest, a castle, a
+  starry sky, a city...), on a winch channel with a winch's safety. The theatre (three times the
+  size now, with a fly tower) opens its house curtain and flies its drops in and out with its cues;
+  the cinema (bigger too) opens its screen curtain for the feature.
+- **40 more effects.** For a matrix or a disc, ten with your words (Letter zoom, Typewriter, Wavy
+  text, Falling letters, Word flip, Glitch text, Word flash, Sparkle text, Spinning sign, Neon sign)
+  and ten pictures (Snake, Double helix, Confetti fall, Snowfall, Lightning storm, Rising hearts,
+  Vortex, Beat wipes, Block strobe, Rotozoom). For moving heads, twenty more moves: a square, a
+  star, a heart, a spirograph, a searchlight, wipers, a head bang on the beat, heads weaving
+  against each other, the beams meeting in one point...
+- **Loop this part** on the timeline (right-click a part, or L): it plays over and over while you
+  work on its looks.
+- **Save with its songs** (Shows): one .luxdmx.zip with the show and its songs' audio (and your own
+  3D venue), for another computer. A plain show file only names its songs, which you had to find
+  and load again over there, one by one. Opening the zip puts them in place.
+- Recording a rainbow (or any colour or move effect that switches its lights on) gave a cue that
+  played the lights dark. It plays them lit, as they were.
+- Undo of a Record puts the stage back as it was, not just the list; the lock for the service isn't
+  an undo step any more (Ctrl+Z after unlocking locked again); a locked page has no rig.
+- Groups keep their number when you reorder them, so `group 5` stays the same group.
+- A tap on the padlock asks: with a PIN or without. On a touch screen, **+ Add** adds lights and
+  groups to the selection.
+- An effect button on Live stops the effect even when the cue on stage runs it.
+- The timeline shows what lies after a shorter song (and moves it in on a tap), Fit fits, an effect
+  dropped on a part of the song runs to the end of that part, parts move to the playhead.
+- Live's cue list follows the list GO plays; GO at the end of a list says so.
+- The cue sheet says each light's level, and a list prints its own.
+- New lights land clear of the ones on stage; names on the plan stay inside it and read as their own
+  light's; the plan keeps its lights apart on a narrow screen.
+- The top bar fits an upright iPad and counts the interface size (120 % on a laptop).
+- The box's window can be reloaded: the app takes it back by itself.
+- Big rigs are quick again: a Record with 320 lights and 40 cues took 5 s, adding 200 lights to a
+  big rig froze the page for 12 s. Both take moments now.
+- The same show in two tabs: the out-of-date one says **changed in another tab** and takes the
+  newer version on a tap, instead of quietly saving over it.
+- A browser that won't keep the show (storage full or blocked) says **not saved** in red, instead
+  of "saving…" for ever.
+- By keyboard alone the whole thing works now without the focus getting lost: Space presses a
+  Live button you tabbed to, the arrows move a cue on the timeline, Escape cancels a rename, and
+  a screen reader hears percentages and headings where it heard 0.7 and buttons that did nothing.
+- A box on slow Wi-Fi is said (in orange, with how much gets through) instead of looking fine while
+  a chase stood still; a box that keeps dropping out doesn't make the page jump; with two boxes the
+  red bar says which universes and which box.
+- On the beat: the BPM field takes only real tempos (typing 90 went through 9 BPM), Tap puts the
+  beat where you tap, cues that go on after N beats don't drift any more, and the stage, Auto GO
+  and the effects on the wire stay on the same beat after the page was busy for a moment.
+- In a German browser: the cue sheet CSV opens in German Excel (';', 2,5, umlauts), decimals with a
+  comma work everywhere, AltGr+Q gives @ on the console, file names keep their umlauts.
+- Colour is never the only sign: On stage and ARMED in words on a phone too, armed chips striped,
+  a patch clash marked, picked cue cards dashed, faint text lighter.
+- The printed cue sheet and patch: page numbers and the show's name on every page, lights in runs
+  (the big demo's cue sheet went from 62 pages to 12), long notes wrap instead of shrinking the page.
+- A show night doesn't wear the app down: an hour of playing, switching and editing left memory,
+  listeners and the output rate flat, and playing (GO, Live buttons) no longer saves after each press.
+- Add fixtures is one dialog with the search box on top, live as you type over the built-in types
+  and the 2400+ library fixtures. Every tile plays its light in 3D: spots sweep and run their gobos
+  and prisms, washes breathe, PARs run the colours, bars chase. All in one WebGL context, only the
+  tiles on the screen, so it stays smooth. The old library popup is gone.
+- 3D: the Cinema and Bar templates play in real rooms of their own, not on the concert stage: a
+  big cinema (screen, curtains, a premiere stage, raked rows with an audience, step lights, wall
+  washers, a starry ceiling) and a bar (a long counter, a back bar of lit bottles, people on the
+  stools, bartenders, tables, a dance floor with a mirror ball), every light installed there.
+- A new template, **Wedding**, in a ballroom of its own: 14 uplights washing the draped walls,
+  pinspots on ten table centrepieces, gobo spots for the first dance, wash heads and PARs over the
+  dance floor, the head table, the cake, chandeliers, low fog, cold sparks, bubbles and confetti.
+  Cues from the guests arriving to the lights going up, and its show plays to a pop song.
+- 3D: the Theatre and Church templates too: a theatre (proscenium with the house curtain, a cyc,
+  lighting bars, booms in the wings, footlights, stalls and a full balcony) and a church (the
+  chancel with altar, cross and choir, pews with the congregation, stained glass windows).
+- The gallery is in the ⋯ menu at the top and in the 3D stage's ⋯ now, not only behind Ctrl+K.
+- Live's **Stop effects** stops everything moving, the cue's own effects too (its look stays; the
+  next cue brings its effects back). It only stopped the ones started by hand.
+- From a wedding DJ's evening (a tester trimming the Wedding template to a small rig): a light
+  dragged on the plan moves in 3D too; removing a machine takes its shot list and the cue actions
+  that started it; cues tapped onto the timeline in a row go a bar apart; the timeline's Moments
+  offer only the machines the rig has; a machine's Live button pressed while safe says "Safe: not
+  firing"; a locked page's Blackout says "hold"; Add LuxDMX connects at once; a phone's GO bar
+  says what's next; overlapping addresses are said under the light list too.
+- Small ones from a tester's round: pressing Edit on Live moves none of the bar's buttons, "open in
+  another tab" goes away when that tab is closed, Play the show on a phone opens on the 3D stage,
+  the lock PIN is kept as a hash (not readable in the show file), a tab opened from an on-stage
+  tab starts blind, the bar's guests stopped sitting with their arms crossed.
+- The templates play as shows: each has a song of its own (Band to hard rock, DJ / Party to house,
+  the theatre to a pop number, and so on; any other can be picked) and **Play the show** runs its
+  looks on that song's parts with the machines on the drops. DJ / Party moved into the club, DJ
+  included. Folded demos stay as a row of play buttons now, so the festival show can't get lost.
+  Each has its audience on the crowd track too: waiting before the song, cheering as the room
+  would (a concert on every chorus, a theatre only at the end, a bar chatting all along).
+  The club and house party demos get theirs as well (they had hundreds of people and no sound).
+- Undo on a big show is quicker: it changes only what differs instead of swapping in the whole
+  show, so the screen redraws just that (the festival: 0.86 s frozen per undo, now about 0.5). An
+  edit there redraws only the cue pictures it changed and works out the risk marks in one go
+  (0.56 s down to about 0.42; most of what's left is the show being written out to save it).
+- 3D: light lands on walls now, not only on the floor: wall washers and uplights paint the walls
+  (the church between its windows, the cinema's side walls), a gobo shows on the theatre's cyc or
+  the cinema's screen, a head pointed up lights the ceiling.
+- A render has the crowd in its sound now, as you hear it when the show plays: the chatting before
+  the band comes on, the cheers on the big moments, at the Crowd volume.
+- The plans of the church and the cinema cover the whole room now, not just the stage: their lights
+  hang all over it. The theatre's covers the stage and the stalls, so its front-of-house bar and
+  house lights are out in the house on the plan too, not at the stage's edge.
+- 3D: **Your stage** in the Venue panel: your real stage at its size (width, depth, a riser or
+  not, how many trusses and how high). The room, crowd and camera moves are built for it, the
+  lights hang on its trusses, the plan is that stage.
+- 3D: **Measure** next to Aim: two clicks give the distance (across, up or down); one light gives
+  its height above the deck or floor and where its beam lands, how far and how wide.
+- 3D: **Selected** next to the camera views flies the camera to the selected lights, and **Show it
+  in 3D** in a light's right-click menu opens the 3D stage and does the same. The camera finds a
+  clear spot (never inside the rows, the tables or the people; checked on every light of every
+  template).
+- A gallery, **What the 3D stage draws** (Ctrl+K "gallery", or from Add fixtures and the
+  welcome): 23 live tiles, uplights on a wall, gobos turning, prisms, heads in a fan, pixel bars, discs, winches,
+  flames, sparks, confetti, CO2, fog with a light through it. The README has them as animations,
+  made by the app itself (`tools/gallery/capture.mjs`).
+- One place to start a show: **New show…** in Shows opens the start dialog (Shows lost its own
+  template list); its **Empty stage** is a new show; an empty show has one **Add lights** on the
+  stage instead of four buttons in four places.
+- The welcome is two rows of tiles: the demo shows (each with its own music menu, and they fold away
+  for good once you don't need them), and the everyday starts (empty, the templates, a show file).
+  Every demo and template also comes as **Lights only**: the rig placed, nothing programmed.
+- Render: the 3D view keeps the video's shape while it renders (a 4K render showed twice as wide),
+  and closing or reloading the page during a render asks first. On the dev server, code changes
+  wait until the render is done instead of breaking it off.
+- Render: "the song from the playhead" takes a length, so a short clip has its sound. The only short
+  one used to be "the look as it is", which has no sound and didn't say so.
+- Lots of smaller things: cut-off numbers, dialogs that closed on a typo, focus after dialogs, help
+  notes off the screen, empty states that now say what to do, one name for saving a show file.
+
 ## 2026-11-12
 
 **Sequencer**

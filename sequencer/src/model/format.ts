@@ -3,6 +3,7 @@
 //   - A file listing a `requiredFeatures` entry the reader doesn't know is refused, everything
 //     else unknown is kept and written back as it was (we never rebuild objects field by field).
 //   - Older files are brought up to date by one migration step per version, in order.
+import { isPinHash, pinHash } from './pin';
 import { MAX_NUM } from './numbers';
 import { validEntry } from './schedule';
 import { cleanLayout, MAX_PIXELS } from './pixelLayout';
@@ -143,8 +144,14 @@ function withDefaults(s: any, notes: string[]): Show {
   s.groups = withIds(s.groups, 'Groups', note);
   // (numbers: whole, from 1; the app gives out missing and doubled ones when it opens the show)
   for (const f of s.fixtures) if (f.num !== undefined && !(Number.isInteger(f.num) && f.num >= 1 && f.num <= MAX_NUM)) { note(`${f.name}: its number "${String(f.num)}" isn't one, it gets a new one`); delete f.num; }
+  const groupNums = new Set<number>();
   for (const g of s.groups) {
     g.fixtures = strings(g.fixtures);
+    // (its console number: whole, from 1, its own; else it counts by its place)
+    if (g.num !== undefined) {
+      if (!(Number.isInteger(g.num) && g.num >= 1 && g.num <= MAX_NUM) || groupNums.has(g.num)) { note(`Group ${String(g.name)}: its number "${String(g.num)}" ${groupNums.has(g.num) ? 'is another group\'s' : "isn't one"}, it counts by its place`); delete g.num; }
+      else groupNums.add(g.num);
+    }
     // (a group of cells: whole numbers from 0; none that can be read: the whole lights)
     if (g.cells !== undefined) {
       const was = Array.isArray(g.cells) ? g.cells.length : 1;
@@ -228,10 +235,24 @@ function mendSettings(st: Obj, note: Note) {
   }
   if (st.stage3d !== undefined && !isObj(st.stage3d)) delete st.stage3d;
   // the 3D stage's room: one it knows, or the big stage (a room from a newer version: that one)
-  if (isObj(st.stage3d) && st.stage3d.room !== undefined && !['hall', 'pub', 'club', 'party', 'truss'].includes(st.stage3d.room as string)) delete st.stage3d.room;
+  if (isObj(st.stage3d) && st.stage3d.room !== undefined && !['hall', 'pub', 'club', 'party', 'truss', 'custom', 'cinema', 'bar', 'theatre', 'church', 'ballroom'].includes(st.stage3d.room as string)) delete st.stage3d.room;
+  // your own stage's size: numbers in metres, brought into range (geometry.ts stageSize); not an
+  // object: none (8 x 5 m)
+  if (isObj(st.stage3d) && st.stage3d.size !== undefined) {
+    const z = st.stage3d.size;
+    if (!isObj(z)) delete st.stage3d.size;
+    else {
+      const num = (k: string, lo: number, hi: number, d: number) => { const v = z[k]; z[k] = typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
+      num('w', 2, 40, 8); num('d', 1.5, 25, 5); num('trussY', 2.5, 15, 5); num('trusses', 0, 4, 2); z.trusses = Math.round(z.trusses as number);
+      if (typeof z.riser !== 'boolean') z.riser = true;
+    }
+  }
+  if (isObj(st.stage3d) && st.stage3d.act !== undefined && !['band', 'none'].includes(st.stage3d.act as string)) delete st.stage3d.act;
   // the band's name: words, at most 60 characters, or none (their picture)
   if (st.bandName !== undefined) { if (typeof st.bandName === 'string' && st.bandName.trim()) st.bandName = st.bandName.trim().slice(0, 60); else delete st.bandName; }
   for (const k of ['lockPin', 'lockPage']) if (st[k] !== undefined && typeof st[k] !== 'string') delete st[k];
+  // the PIN kept as its hash (model/pin.ts): a show from before that kept the digits gets it now
+  if (typeof st.lockPin === 'string') { if (!st.lockPin.trim()) delete st.lockPin; else if (!isPinHash(st.lockPin)) st.lockPin = pinHash(st.lockPin); }
 }
 
 // the timeline: well-formed or gone; items that aren't, dropped. Its tempo and length bounded (the
@@ -333,6 +354,7 @@ function mendType(t: Obj, note: Note) {
       for (const k of ['panDeg', 'tiltDeg', 'rollDeg']) fixNum(t.physical, k, 1, 1080, where, note);
       fixNum(t.physical, 'travel', 0.1, 100, where, note); fixNum(t.physical, 'hoistSpeed', 0.01, 10, where, note);
       if (t.physical.beamDeg !== undefined) { const b = beamDegOf(t.physical.beamDeg); if (b) t.physical.beamDeg = b; else { note(`${where}: beam angle ${shown(t.physical.beamDeg)} can't be right, left out`); delete t.physical.beamDeg; } }
+      if (t.physical.dims !== undefined) { const d = dimsOf(t.physical.dims); if (d) t.physical.dims = d; else { note(`${where}: size ${shown(t.physical.dims)} can't be right, left out`); delete t.physical.dims; } }
     }
   }
 }
@@ -354,6 +376,7 @@ function mendFixture(f: Obj, note: Note): boolean {
   // its own pan / tilt range (degrees): a number a head can have, or gone (the type's, or 540 / 270)
   for (const k of ['panDeg', 'tiltDeg']) if (f[k] !== undefined && !(typeof f[k] === 'number' && f[k] >= 1 && f[k] <= 1080)) { note(`${where}: ${k} ${shown(f[k])} can't be right, left out`); delete f[k]; }
   if (f.beamDeg !== undefined) { const b = beamDegOf(f.beamDeg); if (b) f.beamDeg = b; else { note(`${where}: beam angle ${shown(f.beamDeg)} can't be right, left out`); delete f.beamDeg; } }
+  if (f.dims !== undefined) { const d = dimsOf(f.dims); if (d) f.dims = d; else { note(`${where}: size ${shown(f.dims)} can't be right, left out`); delete f.dims; } }
   // (a winch's soft limits: two parts of its travel, the top one first; anything else isn't kept, and
   // the winch has its whole travel)
   if (f.hoistLimits !== undefined) {
@@ -376,6 +399,13 @@ function mendFixture(f: Obj, note: Note): boolean {
   return true;
 }
 
+// a light's size: w, h, d in metres, each from 2 cm to 100 m (one that isn't: left out); none: no size
+function dimsOf(x: unknown): { w?: number; h?: number; d?: number } | undefined {
+  if (!isObj(x)) return undefined;
+  const out: { w?: number; h?: number; d?: number } = {};
+  for (const k of ['w', 'h', 'd'] as const) { const v = (x as Record<string, unknown>)[k]; if (typeof v === 'number' && v >= 0.02 && v <= 100) out[k] = v; }
+  return Object.keys(out).length ? out : undefined;
+}
 // a beam's opening angle, narrowest and widest: two numbers from half a degree to 180, the narrow one first
 function beamDegOf(x: unknown): [number, number] | undefined {
   if (!Array.isArray(x) || x.length !== 2 || !x.every((v) => typeof v === 'number' && v >= 0.5 && v <= 180)) return undefined;

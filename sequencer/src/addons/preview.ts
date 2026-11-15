@@ -16,7 +16,8 @@ const MATRIX = placesFor({ kind: 'matrix', cols: 16, rows: 16 });
 // [r, g, b] 0..1 per element for one moment
 type Px = [number, number, number];
 function frameOf(kind: string, params: Record<string, unknown>, where: Where[], t: number): Px[] {
-  const def = EFFECT_MAP.get(kind)!, p = { ...paramsOf(kind, params), look: true };
+  // (made once, on a slow machine too: not stopped for taking long, as the stage's frames are)
+  const def = EFFECT_MAP.get(kind)!, p = { ...paramsOf(kind, params), look: true, untimed: true };
   const total = p.tempo ? (t * 2) / p.speed : t / p.speed;
   return runEffect(def, p, where.length, total, 7, where, { beats: t * 2, secs: t }).map((o): Px => {
     const c = o.color ?? { r: 1, g: 1, b: 1 }, i = o.intensity ?? (o.color ? 1 : 0), s = o.strike ?? 0;
@@ -46,7 +47,7 @@ export function previewOf(pkg: EffectPackage): string {
     } else if (pkg.category === 'move') {
       // heads from above: where each one points, a dot moving round its own place
       const n = 6, where = Array.from({ length: n }, (_, i): Where => ({ u: i / (n - 1), row: i, rows: n }));
-      const def = EFFECT_MAP.get(kind)!, p = { ...paramsOf(kind, params), look: true }, total = p.tempo ? (t * 2) / p.speed : t / p.speed;
+      const def = EFFECT_MAP.get(kind)!, p = { ...paramsOf(kind, params), look: true, untimed: true }, total = p.tempo ? (t * 2) / p.speed : t / p.speed;
       runEffect(def, p, n, total, 7, where, { beats: t * 2, secs: t }).forEach((o, i) => {
         const cx = 3 + (i * (S - 6)) / (n - 1), cy = S / 2;
         put(cx + ((o.pan ?? 0.5) - 0.5) * 10, cy + ((o.tilt ?? 0.5) - 0.5) * 20, [1, 0.85, 0.5], 1);

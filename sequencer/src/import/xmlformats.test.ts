@@ -181,3 +181,9 @@ describe('GDTF: a moving bar\'s heads', () => {
     expect(m.channels.map((c) => [c.attr, !!c.fine, c.cell ?? null])).toEqual([['tilt', false, 0], ['tilt', true, 0], ['intensity', false, 0], ['tilt', false, 1], ['tilt', true, 1], ['intensity', false, 1]]);
   });
 });
+
+describe('a broken XML file', () => {
+  it('says where it breaks, in words, not the browser parser\'s own text', () => {
+    expect(() => fromQxf('<FixtureDefinition><Model>x</Model><Mode Name="a"></FixtureDefinition>', 'bad.qxf')).toThrow(/^not valid XML( \(it breaks at line \d+(, column \d+)?\))?: the file is damaged, or isn't a fixture file$/);
+  });
+});

@@ -12,11 +12,14 @@
   import Modal from './Modal.svelte';
   import StageView from './StageView.svelte';
   import { app, newId } from '../app.svelte';
-  import { ui, dialogOpen } from './ui.svelte';
+  import { ui, dialogOpen, asPercent, spaceIsGo } from './ui.svelte';
   import { cueNumber } from '../model/cuenum';
   import { isFogTimer } from '../model/library';
   import { isMachineList } from '../content/busking';
-  import { cueRiskOf, listRiskOf } from './risk';
+  import { cueMarkOf, listMarkOf, MARK_SHORT } from './risk';
+  import TimelineCurves from './TimelineCurves.svelte';
+  import { CURVE_KNOBS } from '../model/timeline';
+  import { LIVE_KNOBS } from '../engine/knobs';
   import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
   import { BAR_S, DEMO_SECONDS, playDemo, sectionStarts } from '../timeline/beat';
   import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
@@ -50,6 +53,10 @@
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
   const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   // one lane per list that's on the timeline or could be, then effects, then moments
+  // the Effects track opened: a row for each knob its effects have, their values over the bars
+  let fxOpen = $state(false);
+  const fxBars = $derived(items.filter((i) => i.lane === 'fx' && i.len !== undefined && i.do.do === 'effect' && i.do.on));
+  const fxKnobs = $derived(CURVE_KNOBS.filter((k) => fxBars.some((i) => { const e = app.show.effects.find((x) => x.id === (i.do as { effect: string }).effect); return !!e && (LIVE_KNOBS[e.kind] ?? CURVE_KNOBS).includes(k as never); })));
   const lanes = $derived([...lists.map((l) => ({ id: `list:${l.id}`, name: l.name, color: l.color ?? '#45d85c' })),
     { id: 'fx', name: 'Effects', color: '#ffaa1c' }, { id: 'crowd', name: 'Crowd', color: '#7fc8ff' }, { id: 'special', name: 'Moments', color: '#f33abc' }]);
   // the crowd's moments: how it sounds from there on (got to over the bar's length), or a cheer
@@ -70,12 +77,41 @@
     { attr: 'confetti', label: 'Confetti', s: 1 }, { attr: 'flame', label: 'Flames', s: 1.5 }, { attr: 'sparks', label: 'Sparks', s: 4 },
     { attr: 'co2', label: 'CO2 jet', s: 2 }, { attr: 'bubbles', label: 'Bubbles', s: 8 }, { attr: 'fog', label: 'Fog', s: 5 },
     { attr: 'strobe', label: 'Strobe hit', s: 2 }, { attr: 'blinder', label: 'Blinder hit', s: 1 }];
+  const ARMED_ONLY: string[] = ['confetti', 'flame', 'sparks', 'co2'];
+  // (the machine moments the rig can do: one for a confetti cannon it hasn't got did nothing. A strobe
+  // or blinder hit uses any light)
+  const bursts = $derived.by(() => {
+    const attrs = new Set(app.show.fixtures.flatMap((f) => app.modeOf(f.id)?.channels.map((c) => c.attr) ?? []));
+    const fog = app.show.fixtures.some((f) => app.caps(f.id).fog);
+    return BURSTS.filter((b) => b.attr === 'strobe' || b.attr === 'blinder' || (b.attr === 'fog' ? fog : attrs.has(b.attr)));
+  });
 
   // ---- scale and scrolling
   let tracks = $state<HTMLDivElement>();
   let width = $state(800);
   let pps = $state(0);                       // pixels a second (0: fit the song)
-  const fit = $derived(Math.max(2, (width - 8) / Math.max(10, span.to - span.from)));
+  // what the view shows: the song with its time around it, and anything placed further out (a
+  // shorter song put in afterwards leaves cues after its end: Fit still shows them)
+  const shownTo = $derived(Math.max(span.to, ...(tl?.items ?? []).map((i) => i.at + (i.len ?? 0) + 1)));
+  // (32 px kept at the end: a thing placed at the very end still shows a bit of its name)
+  const fit = $derived(Math.max(2, (width - 40) / Math.max(10, shownTo - span.from)));
+  // Another song, shorter than where things were placed: say so, and offer to bring them in (they'd
+  // never fire: the show's ending, its "all off", would be lost after the song)
+  let lastDur = -1, lastShow = '';
+  $effect(() => {
+    const d = tl?.duration ?? 0, show = app.showId;
+    if (show === lastShow && lastDur > 0 && d > 0 && d < lastDur && tl) {
+      const end = d + (tl.tail ?? 0), past = tl.items.filter((i) => i.at > end);
+      if (past.length) ui.toast(`${past.length} thing${past.length === 1 ? ' is' : 's are'} placed after the end of this song (${clockOf(end, false)}): ${past.length === 1 ? 'it' : 'they'} won't play`, 10000, {
+        label: 'Move them to the end', run: () => {
+          app.checkpoint();
+          const last = Math.max(...past.map((i) => i.at + (i.len ?? 0))), by = Math.max(0, end - 0.5) - last;
+          for (const i of past) i.at = Math.max(0, i.at + by);
+          app.markDirty(0);
+        } });
+    }
+    lastDur = d; lastShow = show;
+  });
   const scale = $derived(pps || fit);
   // (the ruler starts where the show does: before the song's 0 when there's time before it)
   const x = (t: number) => (t - span.from) * scale;
@@ -97,9 +133,17 @@
   const grid = $derived.by(() => {
     // (a tempo that isn't a sane number would loop for ever here: 120)
     const raw = tl?.bpm ?? app.show.settings.bpm, bpm = Number.isFinite(raw) && raw >= 20 && raw <= 300 ? raw : 120;
-    const beat = 60 / bpm, d = P.duration || tl?.duration || 240, out: { t: number; bar: boolean; n: number }[] = [];
+    const beat = 60 / bpm, d = P.duration || tl?.duration || 240, out: { t: number; bar: boolean; n: number; label: boolean }[] = [];
     const every = scale * beat < 6 ? (scale * beat * 4 < 14 ? 4 * Math.ceil(14 / (scale * beat * 4)) : 4) : 1;
-    for (let i = 0, t = tl?.offset ?? 0; t <= d; i += every, t = (tl?.offset ?? 0) + i * beat) out.push({ t, bar: i % 4 === 0, n: i / 4 + 1 });
+    // (the bar numbers as far apart as they need: "121" is wider than "9", so past bar 99 only
+    // every second or fourth bar is numbered where they'd run into each other)
+    const barStep = Math.max(1, every / 4), barPx = scale * beat * 4 * barStep;
+    const need = String(Math.max(1, Math.ceil(d / (beat * 4)))).length * 6.6 + 6;
+    const lab = barStep * ([1, 2, 4, 8, 16, 32].find((k) => barPx * k >= need) ?? 64);
+    for (let i = 0, t = tl?.offset ?? 0; t <= d; i += every, t = (tl?.offset ?? 0) + i * beat) {
+      const n = i / 4 + 1;
+      out.push({ t, bar: i % 4 === 0, n, label: i % 4 === 0 && (n - 1) % lab === 0 });
+    }
     return out;
   });
   // the song's parts: the demo beat's own, the ones a demo song came with, the ones found in a song
@@ -131,10 +175,13 @@
     app.markDirty(0);
     return s;
   }
+  // The wheel zooms, round the pointer (a trackpad's pinch too, gently); sideways (Shift, or a
+  // trackpad swiped across) it scrolls, as the browser does it
   function wheel(e: WheelEvent) {
-    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || !e.deltaY) return;
     e.preventDefault();
-    zoom(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - tracks!.getBoundingClientRect().left + tracks!.scrollLeft);
+    const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    zoom(Math.exp(-Math.max(-300, Math.min(300, px)) * 0.0022), e.clientX - tracks!.getBoundingClientRect().left + tracks!.scrollLeft);
   }
   // follow the playhead while it plays (from what's known: reading the scroll position each frame
   // would make the browser lay the page out again every frame)
@@ -149,7 +196,8 @@
   const around = $derived.by(() => {
     const song = P.duration || tl?.duration || 0, out: { cls: string; name: string; from: number; to: number }[] = [];
     if (span.from < 0) out.push({ cls: 'lead', name: 'Before the song', from: span.from, to: 0 });
-    if (span.to > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: span.to });
+    // (no song yet: there's no "after" it, the whole ruler said so)
+    if (song > 0 && shownTo > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: shownTo });
     return out;
   });
 
@@ -192,10 +240,24 @@
   function chipAt(c: Chip, at: number) {
     const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
     if (c.kind === 'cue') place({ do: 'goto', list: c.list, cue: c.cue }, at, `list:${c.list}`);
-    else if (c.kind === 'fx') place({ do: 'effect', effect: c.effect, on: true }, at, 'fx', bar * 8);
+    // (an effect runs to the end of the part of the song it lands in, the chorus it's for, not a
+    // fixed 8 bars that stopped short of it; a song without parts: 8 bars)
+    else if (c.kind === 'fx') {
+      const part = sections.find((x) => x.at <= at + 0.05 && at < x.end - 0.05);
+      place({ do: 'effect', effect: c.effect, on: true }, at, 'fx', part && part.end - at > 0.5 ? part.end - at : bar * 8);
+    }
     else if (c.kind === 'burst') place({ do: 'burst', attr: c.attr, seconds: c.s }, at, 'special');
     else if (c.kind === 'crowd') placeCrowd(c.a, at, c.len);
     else place(c.a, at, 'special');
+  }
+  // A tap on a chip: at the playhead, or, when its lane already has something there (the last tap),
+  // a bar after it, so taps in a row go one after the other instead of on top of each other
+  function tapChip(c: Chip) {
+    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4, lane = c.kind === 'cue' ? `list:${c.list}` : c.kind === 'fx' ? 'fx' : c.kind === 'crowd' ? null : 'special';
+    const taken = (t: number) => (lane === null ? (tl?.crowd ?? []).some((i) => Math.abs(i.at - t) < 0.05) : (tl?.items ?? []).some((i) => i.lane === lane && Math.abs(i.at - t) < 0.05));
+    let at = sn(P.position);
+    for (let k = 0; k < 64 && taken(at); k++) at = sn(at + bar);
+    chipAt(c, at);
   }
   // anything on the tracks (a crowd moment has no lane of its own in the file: it's the crowd's)
   type Placed = TimelineItem | (CrowdItem & { lane?: undefined });
@@ -231,6 +293,22 @@
     const t = sn(tAt(e.clientX) - drag.dx, e.altKey), crowdy = isCrowd(it), max = crowdy ? (it.do.do === 'cheer' ? CHEER_MAX : 60) : Infinity, least = crowdy && it.do.do !== 'cheer' ? 0 : 0.5;
     if (drag.end) it.len = Math.max(least, Math.min(max, span.to - it.at, t - it.at));
     else { it.at = inSpan(t); if (it.len !== undefined) it.len = Math.max(least, Math.min(it.len, span.to - it.at)); }
+  }
+  // The keyboard's way to move one (there was none): arrows, a beat (with Shift a bar; a bar each
+  // when it snaps to bars; half a second with snap off or outside the song)
+  function itemKey(e: KeyboardEvent, id: string) {
+    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || !tl) return;
+    const it = placed(id);
+    if (!it) return;
+    e.preventDefault(); e.stopPropagation();
+    const song = P.duration || tl.duration || 0, beat = 60 / (tl.bpm ?? app.show.settings.bpm);
+    const inSong = it.at >= 0 && it.at <= song && snapTo !== 'off';
+    const step = inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5;
+    app.checkpoint();
+    it.at = inSpan(Math.round((it.at + (e.key === 'ArrowRight' ? step : -step)) * 1000) / 1000);
+    if (it.len !== undefined) it.len = Math.max(0.5, Math.min(it.len, span.to - it.at));
+    if (tl.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at);
+    app.markDirty(0);
   }
   function itemUp() {
     // (the crowd's track stays in time order)
@@ -272,6 +350,13 @@
   function scrubEnd() { P.scrubEnd(scrubT); }
   // a jump (a key, a click on a part of the song, Go to): a scrub that's over at once
   function jump(t: number) { scrubStart(); scrubTo(t); scrubEnd(); }
+  // A right-click on the playhead is for what's under it (a part's name, an item): it caught them
+  function underPlayhead(e: MouseEvent) {
+    const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => !el.classList.contains('playhead'));
+    if (!under) return;
+    e.preventDefault();
+    under.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY }));
+  }
   // dragging the playhead (anywhere along it) or on the ruler
   let scrubbing = $state(false);
   let toldScrub = false;
@@ -301,8 +386,7 @@
     if (a.do === 'burst') return HAZARD.has(a.attr) ? 'hazard' : a.attr === 'confetti' ? 'once' : '';
     if (a.do !== 'goto' && a.do !== 'start' && a.do !== 'go') return '';
     const l = app.show.cueLists.find((x) => x.id === a.list), c = a.do === 'goto' ? l?.cues.find((x) => x.id === a.cue) : undefined;
-    const r = c ? cueRiskOf(app.show, c, app.showRev) : l && a.do !== 'goto' ? listRiskOf(app.show, l, app.showRev) : 'light';
-    return r === 'hazard' || r === 'once' ? r : '';
+    return c ? cueMarkOf(app.show, c, app.showRev) : l && a.do !== 'goto' ? listMarkOf(app.show, l, app.showRev) : '';
   };
 
   // ---- the song
@@ -353,7 +437,9 @@
   function ownParts(): TimelineSection[] {
     const t = app.timeline.ensure();
     if (!t.sections?.length && t.demo && !t.audio) t.sections = sectionStarts().map((x) => ({ name: x.name, at: x.at, ...(x.energy !== undefined ? { energy: x.energy } : {}) }));
-    return (t.sections ??= []);
+    // (set, then read back: the list as the show has it, not the plain one assigned; Svelte warned)
+    if (!t.sections) t.sections = [];
+    return t.sections;
   }
   function nextName(list: TimelineSection[], base: string) {
     let n = 0;
@@ -398,14 +484,44 @@
     app.markDirty(0);
     app.toastUndo(`"${s.name}" is gone (the part before it runs on)`);
   }
-  function partMenu(e: MouseEvent, s: { name: string; at: number }) {
+  // A part's start moved to the playhead (on the bar, as a new part is): there was no way to
+  // move one but removing it and adding it again
+  function movePart(at: number) {
+    const T = app.timeline.ensure(), bpm = T.bpm ?? app.show.settings.bpm;
+    const to = Math.round(snap(P.position, bpm, 4, T.offset ?? 0) * 100) / 100;
+    const list = ownParts(), s = list.find((x) => x.at === at);
+    if (!s || Math.abs(s.at - to) < 0.05) return;
+    const other = list.find((x) => x !== s && Math.abs(x.at - to) < 0.05);
+    if (other) { ui.toast(`"${other.name}" already starts there (${clockOf(to)})`, 3500); return; }
+    app.checkpoint();
+    s.at = to;
+    list.sort((a, b) => a.at - b.at);
+    app.markDirty(0);
+  }
+  function partMenu(e: MouseEvent, s: { name: string; at: number; end: number }) {
     e.preventDefault(); e.stopPropagation();
     ui.openMenu(e, [
       { label: `Go to ${s.name}`, icon: 'play', run: () => jump(s.at) },
       { label: 'Rename…', icon: 'edit', run: () => renamePart(s.at) },
+      { label: `Move it to the playhead (${clockOf(P.position, false)})`, icon: 'right', disabled: Math.abs(P.position - s.at) < 0.05, run: () => movePart(s.at) },
+      looping(s) ? { label: 'Stop looping it', icon: 'loop', keys: 'L', run: () => (P.loop = null) } : { label: 'Loop this part', icon: 'loop', keys: 'L', run: () => loopPart(s) },
       { sep: true },
       { label: 'Remove this part', icon: 'trash', danger: true, run: () => removePart(s.at) },
     ]);
+  }
+  // Loop a part: it plays from its start, over and over, until stopped (L again, its chip's ×)
+  const looping = (s: { at: number; end: number }) => !!P.loop && Math.abs(P.loop.from - s.at) < 1e-3 && Math.abs(P.loop.to - s.end) < 1e-3;
+  function loopPart(s: { name: string; at: number; end: number }) {
+    P.loop = { name: s.name, from: s.at, to: s.end };
+    jump(s.at);
+    if (!P.playing) void P.play(false);
+  }
+  // L: the part the playhead is in, looped (or not any more)
+  function loopHere() {
+    const t = P.position, s = sections.find((x) => t >= x.at - 1e-3 && t < x.end) ?? sections.find((x) => x.at >= t);
+    if (P.loop) { P.loop = null; return; }
+    if (!s) { ui.toast('No parts on this song to loop: add one with P or + Part', 4000); return; }
+    loopPart(s);
   }
   function rulerMenu(e: MouseEvent) {
     e.preventDefault();
@@ -490,6 +606,7 @@
     t.bpm = s.bpm; t.offset = s.offset;
     t.sections = s.sections.map((x) => ({ name: x.name, at: x.at, ...(Number.isFinite(x.energy) ? { energy: x.energy } : {}) }));
     if (t.audio) { t.audio.catalog = s.id; t.audio.credit = creditOf(s); }
+    t.name = s.title;                // (the set list said the file's name: the artist first, cut off)
     app.markDirty(0);
     picking = false; pps = 0;
     ui.toast(`"${s.title}" by ${s.artist} is the song now (${s.bpm} BPM, ${clockOf(P.duration, false)}). Its parts are on the ruler.`, 4000);
@@ -570,13 +687,16 @@
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
-    if (e.code === 'Space' && !(e.target as HTMLElement).closest('button')) { e.preventDefault(); P.toggle(); }
+    // (Space on a button the mouse last pressed is the show's too: the welcome hands the focus back
+    // to the show's name, and Space must pause the song, not open the shows. Tabbed to, the button's)
+    if (e.code === 'Space') { if (spaceIsGo(e)) { e.preventDefault(); P.toggle(); } else if (e.repeat) e.preventDefault(); }
     else if (e.key === 'Home') { e.preventDefault(); jump(P.start); }
     else if (e.key === 'End') { e.preventDefault(); jump(P.end); }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); remove(sel); }
     else if (e.key === 'ArrowRight' && !e.altKey) { e.preventDefault(); jump(P.position + bar); }
     else if (e.key === 'ArrowLeft' && !e.altKey) { e.preventDefault(); jump(P.position - bar); }
     else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); addPart(); }
+    else if (e.key.toLowerCase() === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); loopHere(); }
   }
   const peaksPath = $derived.by(() => {
     const p = P.peaks, d = P.duration || 1, w = d * scale;
@@ -597,10 +717,10 @@
         <p>A song and what happens on it: drag a cue, an effect or a moment onto the tracks (or tap it: it goes where the playhead is). Drag what's placed to move it; it snaps to the beat (Alt: free). An effect bar's end makes it longer.</p>
         <p>Play runs the show on the song: cues, effects and moments happen when the song gets there, in Live and on the 3D stage too. A click on the ruler jumps there, and the stage is as it would be at that point.</p>
         <p>Demo songs: real songs with vocals, free to use under their Creative Commons licences, downloaded when you pick one; or the demo beat made in the app. Their parts (intro, verse, chorus, drop...) show on the ruler: a click on one goes there, and cues snap to them.</p>
-        <p>A song file of your own: its tempo, first downbeat and parts are found from the sound (check them: BPM, and the parts on the ruler). P or Add a part starts a part at the bar line nearest the playhead; on the ruler a double-click renames a part, a right-click removes it.</p>
+        <p>A song file of your own: its tempo, first downbeat and parts are found from the sound (check them: BPM, and the parts on the ruler). P or <b>+ Part</b> starts a part at the bar line nearest the playhead; on the ruler a double-click renames a part, a right-click removes it.</p>
         <p>Before and after the song: give the show time before the song starts (an intro, the band walking on) and after it ends (the cheer, the house lights up). Things go there like anywhere else; Play from the start begins at the very start, and the song comes in at its own 0:00.</p>
         <p>The crowd: Chatter, Cheering, Roar and Quiet change how the crowd sounds from there on, over the length of the bar; a Cheer! swells up and dies away. Right-click one for how loud. The crowd's own volume sits next to the song's.</p>
-        <p>Space plays and pauses, Home goes back to the very start, the arrows a bar, P adds a part, Del removes what's selected, Ctrl+wheel zooms. A song stays in this browser; the show file only names it.</p>
+        <p>Space plays and pauses, Home goes back to the very start, the arrows a bar, P adds a part, L loops the part the playhead is in (right-click a part: Loop this part; L again or its chip's × stops it), Del removes what's selected, the wheel zooms (Shift+wheel scrolls sideways). A song stays in this browser; the show file only names it.</p>
         <p>A gig: put every song in the set list, in order, each with its own file and cues (the lights, cues and effects are the whole set's). On Live, Next song gets the next one ready without the lights going dark, and Play from the start comes in on the first downbeat.</p>
       </Help>
     </div>
@@ -622,7 +742,7 @@
       <button class="ghost add" onclick={newSong} title="A song at the end of the set, with its own file and cues"><Icon name="plus" size={14} />Add a song</button>
       {#if songs.length}
         <label class="opt">Count-in <select value={app.show.setlist?.countIn ?? 0} aria-label="Count-in" onchange={(e) => setCountIn(+(e.target as HTMLSelectElement).value)}>
-          <option value={0}>none (the drummer counts)</option><option value={1}>1 bar of clicks</option></select></label>
+          <option value={0}>none</option><option value={1}>1 bar of clicks</option></select></label>
         <label class="opt">Between songs <select value={between} aria-label="Between songs" onchange={(e) => setBetween((e.target as HTMLSelectElement).value)}>
           <option value="">the last look stays</option>
           {#each lists as l (l.id)}<optgroup label={l.name}>{#each l.cues as c, k (c.id)}<option value={JSON.stringify([l.id, c.id])}>{cueNumber(l, k)}. {c.name}</option>{/each}</optgroup>{/each}
@@ -648,9 +768,9 @@
       <div class="chips">
         {#each l.cues as c, i (c.id)}
           {@const chip = { kind: 'cue', list: l.id, cue: c.id } as Chip}
-          {@const risk = cueRiskOf(app.show, c, app.showRev)}
-          <button class="chip" class:risky={risk === 'hazard' || risk === 'once'} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))}
-                  title="Drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {/if}{cueNumber(l, i)}. {c.name}</button>
+          {@const risk = cueMarkOf(app.show, c, app.showRev)}
+          <button class="chip" class:risky={!!risk} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)}
+                  title="{cueNumber(l, i)}. {c.name}: drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : risk === 'winch' ? '. Moves a winch (scenery) while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {:else if risk === 'winch'}⇅ {/if}<span class="t">{cueNumber(l, i)}. {c.name}</span></button>
         {/each}
         {#if !l.cues.length}<span class="faint">No cues yet</span>{/if}
       </div>
@@ -660,27 +780,28 @@
       <div class="chips">
         {#each app.show.effects as e (e.id)}
           {@const chip = { kind: 'fx', effect: e.id } as Chip}
-          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => chipAt(chip, sn(P.position))}>{e.name}</button>
+          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => tapChip(chip)} title="{e.name}: a bar that runs it from where it starts to where it ends. Drag onto the timeline, or tap: at the playhead">{e.name}</button>
         {/each}
       </div>
     {/if}
     <h3>Moments</h3>
-    <p class="note">Moments only fire while playing forward, and only with the machines armed.</p>
+    <!-- (only the machines wait for Arm: a strobe, blinder, fog or bubble hit fires on Safe too; it said all of them did) -->
+    <p class="note">Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed.</p>
     <div class="chips">
-      {#each BURSTS as b (b.attr)}
+      {#each bursts as b (b.attr)}
         {@const chip = { kind: 'burst', attr: b.attr, s: b.s } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))}>{b.label}</button>
+        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{b.label} for {b.s} s{ARMED_ONLY.includes(b.attr) ? ', only while armed' : ''}. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
       {/each}
       {#each [{ label: 'Blackout', a: { do: 'blackout', on: true } }, { label: 'Blackout off', a: { do: 'blackout', on: false } }, { label: 'Everything off', a: { do: 'off' } }] as m (m.label)}
         {@const chip = { kind: 'act', a: m.a as TimelineAction } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))}>{m.label}</button>
+        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{m.label} at that moment. Drag onto the timeline, or tap: at the playhead">{m.label}</button>
       {/each}
     </div>
     <h3>Crowd</h3>
     <div class="chips">
       {#each CROWD as c (c.label)}
         {@const chip = { kind: 'crowd', a: c.a, len: c.len } as Chip}
-        <button class="chip cr" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => chipAt(chip, sn(P.position))} title="{c.tip}. Drag onto the timeline, or tap: at the playhead">{c.label}</button>
+        <button class="chip cr" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{c.tip}. Drag onto the timeline, or tap: at the playhead">{c.label}</button>
       {/each}
     </div>
   </aside>
@@ -690,19 +811,21 @@
     <div class="transport" role="toolbar" aria-label="Transport">
       <button class="ghost" onclick={() => jump(P.start)} aria-label="Back to the start" title="Back to the start (Home)"><Icon name="back" /></button>
       <button class="primary play" onclick={() => P.toggle()} aria-label={P.playing ? 'Pause' : 'Play'} title="Play / pause (Space)"><Icon name={P.playing ? 'stop' : 'play'} />{P.playing ? 'Pause' : 'Play'}</button>
-      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(P.duration, false)}</span></span>
-      <label class="bpm">BPM <input type="number" min="40" max="240" value={tl?.bpm ?? app.show.settings.bpm} aria-label="Timeline BPM"
+      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(P.duration || tl?.duration || span.to, false)}</span></span>
+      <!-- (a found tempo has its tenth: shown whole, as the top bar shows it while the song plays) -->
+      <label class="bpm">BPM <input type="number" min="40" max="240" step="0.1" value={Math.round((tl?.bpm ?? app.show.settings.bpm) * 10) / 10} aria-label="Timeline BPM"
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (v >= 40 && v <= 240) { app.timeline.ensure().bpm = v; app.markDirty(0); } }} /></label>
       <span class="vol"><button class="ghost snd" class:off={!P.soundHere} aria-pressed={P.soundHere} onclick={() => P.setSoundHere(!P.soundHere)} aria-label="Sound here"
         title={P.soundHere ? "The song plays out of this device. Click for no sound here (a band playing live): the song's clock runs on" : 'No sound here: the song runs silently (a video of the 3D stage still gets it). Click for sound here'}><Icon name="music" size={14} /></button><input
-        type="range" min="0" max="1" step="0.05" value={P.volume} oninput={(e) => P.setVolume(+(e.target as HTMLInputElement).value)} aria-label="Volume" title="How loud the song is (this browser)" /></span>
+        type="range" min="0" max="1" step="0.05" value={P.volume} use:asPercent={P.volume} oninput={(e) => P.setVolume(+(e.target as HTMLInputElement).value)} aria-label="Volume" title="How loud the song is (this browser)" /></span>
       {#if crowd.length}<span class="vol crowdvol"><button class="ghost snd" class:off={!P.crowdOn} aria-pressed={P.crowdOn} onclick={() => P.setCrowd(P.crowdVolume, !P.crowdOn)} aria-label="Crowd sound"
         title={P.crowdOn ? 'The crowd cheers along with the song. Click to leave it out' : 'No crowd sound. Click to hear the crowd again'}>Crowd</button><input
-        type="range" min="0" max="1" step="0.05" value={P.crowdVolume} oninput={(e) => P.setCrowd(+(e.target as HTMLInputElement).value, true)} aria-label="Crowd volume" title="How loud the crowd is against the song (this browser)" /></span>{/if}
+        type="range" min="0" max="1" step="0.05" value={P.crowdVolume} use:asPercent={P.crowdVolume} oninput={(e) => P.setCrowd(+(e.target as HTMLInputElement).value, true)} aria-label="Crowd volume" title="How loud the crowd is against the song (this browser)" /></span>{/if}
       <label>Snap <select bind:value={snapTo} aria-label="Snap"><option value="bar">to the bar</option><option value="beat">to the beat</option><option value="off">off</option></select></label>
       <button class="ghost" onclick={() => addPart()} aria-label="Add a part here" title="A new part of the song starts at the bar line nearest the playhead (P)"><Icon name="plus" size={14} />Part</button>
       <span class="grow"></span>
-      <span class="chip armed" class:on={app.sfxArmed} title="Moments only fire while playing forward, and only with the machines armed (the button at the top)">{app.sfxArmed ? 'Machines armed' : 'Machines safe'}</span>
+      {#if P.loop}<span class="chip looping" role="status"><Icon name="loop" size={13} />Looping {P.loop.name}<button class="ghost x" onclick={() => (P.loop = null)} aria-label="Stop looping {P.loop.name}" title="Stop looping (L)">×</button></span>{/if}
+      <span class="chip armed" class:on={app.sfxArmed} title="Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed (the button at the top)">{app.sfxArmed ? 'Machines armed' : 'Machines safe'}</span>
       {#if tl?.audio}<span class="faint name" title={tl.audio.name}>♪ {tl.audio.name}</span>{:else if tl?.demo}<span class="faint name">♪ demo beat</span>{/if}
       <button class="ghost" onclick={() => zoom(0.8)} aria-label="Zoom out"><Icon name="search" size={14} />−</button>
       <button class="ghost" onclick={() => (pps = 0)} title="The whole song">Fit</button>
@@ -711,11 +834,17 @@
     <div class="board">
       <div class="names">
         <div class="nr" title={songs.length > 1 ? `Song ${cur + 1} of ${songs.length}: ${songName(tl, cur)}` : undefined}>{songs.length > 1 ? `${cur + 1}. ${songName(tl, cur)}` : 'Song'}</div>
-        {#each lanes as ln (ln.id)}<div class="nl" style="--c:{ln.color}">{ln.name}</div>{/each}
+        {#each lanes as ln (ln.id)}
+          {#if ln.id === 'fx' && fxBars.length}
+            <div class="nl" style="--c:{ln.color}" title={ln.name}><button class="ghost open" aria-expanded={fxOpen} onclick={() => (fxOpen = !fxOpen)} aria-label="{fxOpen ? 'Close' : 'Open'} the effects' knobs" title="The effects' knobs over time: speed, size and the rest, as lines and curves under the bars">{fxOpen ? '▾' : '▸'}</button>{ln.name}</div>
+            {#if fxOpen}{#each fxKnobs as k (k)}<div class="nl sub" style="--c:{ln.color}">{k}</div>{/each}{/if}
+          {:else}<div class="nl" style="--c:{ln.color}" title={ln.name}>{ln.name}</div>{/if}
+        {/each}
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions (drops from the palette; every item is a button of its own) -->
       <div class="tracks" bind:this={tracks} bind:clientWidth={() => width, (v) => { if (v > 0) width = v; }} onscroll={() => (scrolled = tracks!.scrollLeft)} ondragover={over} ondragleave={() => (dropAt = null)} ondrop={drop} onwheel={wheel}>
-        <div class="inner" style="width:{Math.max(width, x(span.to) + 40)}px">
+        <!-- (fitted: exactly the view's width, nothing to scroll) -->
+        <div class="inner" style="width:{Math.max(width, x(shownTo) + (pps ? 40 : 0))}px">
           {#each around as a (a.cls)}<span class="shade {a.cls}" style="left:{x(a.from)}px;width:{x(a.to) - x(a.from)}px" aria-hidden="true"></span>{/each}
           <!-- svelte-ignore a11y_no_static_element_interactions (the transport and the arrow keys do the same) -->
           <div class="ruler" onpointerdown={(e) => scrubDown(e, true)} onpointermove={scrubMove} onpointerup={scrubUp} onpointercancel={scrubUp} oncontextmenu={rulerMenu}>
@@ -723,39 +852,45 @@
               <button class="span {a.cls}" style="left:{x(a.from)}px;width:{Math.max(6, x(a.to) - x(a.from) - 1)}px" onpointerdown={(e) => e.stopPropagation()} onclick={() => jump(a.from)}
                 title="{a.name}: {clockOf(a.from, false)} to {clockOf(a.to, false)}. Click to go there." aria-label="Go to {a.name} ({clockOf(a.from, false)})">{a.name}</button>
             {/each}
-            {#each grid as g (g.t)}<span class="tick" class:bar={g.bar} style="left:{x(g.t)}px">{#if g.bar}{g.n}{/if}</span>{/each}
+            {#each grid as g (g.t)}<span class="tick" class:bar={g.bar} style="left:{x(g.t)}px">{#if g.label}{g.n}{/if}</span>{/each}
             {#each sections as s, i (s.at)}
               <button class="sec" style="left:{x(s.at)}px;width:{Math.max(6, (s.end - s.at) * scale - 1)}px;--mix:{Math.round(8 + (s.energy ?? (i % 2 ? 0.25 : 0.5)) * 30)}%"
                 onpointerdown={(e) => e.stopPropagation()} onclick={() => jump(s.at)} ondblclick={() => renamePart(s.at)} oncontextmenu={(e) => partMenu(e, s)}
                 title="{s.name}: {clockOf(s.at, false)} to {clockOf(s.end, false)}. Click to go there, double-click to rename, right-click for more." aria-label="Go to {s.name} ({clockOf(s.at, false)})">{s.name}</button>
             {/each}
+            {#if P.loop}<span class="loopband" style="left:{x(P.loop.from)}px;width:{Math.max(6, (P.loop.to - P.loop.from) * scale)}px" aria-hidden="true"></span>{/if}
             <svg class="wave" style="left:{x(0)}px" width={(P.duration || 240) * scale} height="44" aria-hidden="true"><path d={peaksPath} /></svg>
           </div>
           {#each lanes as ln (ln.id)}
             <div class="lane" style="--c:{ln.color}">
               {#each built ? (ln.id === 'crowd' ? crowd : items.filter((i) => i.lane === ln.id)) : [] as it (it.id)}
                 {@const mark = markOf(it)}
-                <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : ''}"
-                  onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)}
-                  aria-label="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ', fires a machine' : mark === 'once' ? ', fires once' : ''}"
-                  title="{labelOf(it)} at {clockOf(it.at)}{mark === 'hazard' ? ' (fires a machine)' : mark === 'once' ? ' (fires once)' : ''}: drag to move, right-click for more">
-                  {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{/if}
+                <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : `max-width:min(18rem, ${Math.max(28, Math.max(width, x(shownTo)) - x(it.at) - 2)}px)`}"
+                  onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)} onkeydown={(e) => itemKey(e, it.id)}
+                  aria-label="{labelOf(it)} at {clockOf(it.at)}{mark ? `, ${MARK_SHORT[mark]}` : ''}"
+                  title="{labelOf(it)} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move, right-click for more">
+                  {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{:else if mark === 'winch'}<span class="mark winch" aria-hidden="true">⇅</span>{/if}
                   <span class="t">{labelOf(it)}</span>
                   {#if it.len !== undefined}<!-- svelte-ignore a11y_no_static_element_interactions -->
                     <span class="end" onpointerdown={(e) => itemDown(e, it, true)} onpointermove={itemMove} onpointerup={itemUp}></span>{/if}
                 </button>
               {/each}
             </div>
+            {#if ln.id === 'fx' && fxOpen && built}
+              {#each fxKnobs as k (k)}<div class="lane sub" style="--c:{ln.color}"><TimelineCurves knob={k} bars={fxBars} {x} {scale} /></div>{/each}
+            {/if}
           {/each}
           {#if dropAt !== null}<span class="drop" style="left:{x(dropAt)}px"></span>{/if}
           <!-- svelte-ignore a11y_no_static_element_interactions (Home, End and the arrows move it from the keyboard) -->
-          <span class="playhead" class:held={scrubbing} style="left:{x(at)}px" onpointerdown={(e) => scrubDown(e)} onpointermove={scrubMove} onpointerup={scrubUp} onpointercancel={scrubUp}
+          <span class="playhead" class:held={scrubbing} style="left:{x(at)}px" oncontextmenu={underPlayhead} onpointerdown={(e) => scrubDown(e)} onpointermove={scrubMove} onpointerup={scrubUp} onpointercancel={scrubUp}
             title="Drag to go through the song: the looks follow, nothing fires"></span>
         </div>
       </div>
     </div>
     {#if credit}<p class="credit">♪ {credit.text}{#if credit.s} · <a href={credit.s.licenseUrl} target="_blank" rel="noopener noreferrer">the licence</a> · <a href={credit.s.page} target="_blank" rel="noopener noreferrer">where it's from</a>{/if}</p>{/if}
-    {#if !items.length}<p class="hint empty">Drag a cue from the left onto the tracks (or tap it), pick a song or a demo song, and press Play.</p>{/if}
+    <!-- (with no cues there's nothing in the list to drag: it said so all the same) -->
+    {#if !items.length && !lists.some((l) => l.cues.length)}<p class="hint empty">No cues yet: record some in Program, then put them on the tracks here. <button class="ghost link" onclick={() => (app.view = 'program')}>Go to Program</button></p>
+    {:else if !items.length}<p class="hint empty">Drag a cue from the list onto the tracks (or tap it), pick a song or a demo song, and press Play.</p>{/if}
   </section>
 </div>
 
@@ -820,20 +955,33 @@
   .snd.off { color: var(--faint); text-decoration: line-through; }
   .vol .snd { min-height: 0; padding: .15rem .3rem; }
   .chips { display: flex; flex-wrap: wrap; gap: .25rem; }
-  .chip { cursor: grab; font-size: .8rem; padding: .15rem .5rem; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); min-height: 0; }
+  /* (a long name stops at the panel's edge, the whole of it in the title) */
+  .chip { cursor: grab; font-size: .8rem; padding: .15rem .5rem; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); min-height: 0;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .chip.fx { border-color: #ffaa1c66; } .chip.mo { border-color: #f33abc66; } .chip.cr { border-color: #7fc8ff66; }
   /* the time before and after the song: two small fields under the song */
   .around { display: flex; flex-wrap: wrap; gap: .2rem .6rem; font-size: .8rem; color: var(--muted); }
   .around label { display: inline-flex; align-items: center; gap: .3rem; }
-  .around input { width: 4.2em; font-size: .8rem; }
+  /* (600, the most, whole next to the spin arrows) */
+  .around input { width: calc(3ch + 3em); font-size: .8rem; padding-inline: .3rem; }
   .chip.risky { color: var(--orange); display: inline-flex; align-items: center; gap: .2rem; }
   .main { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(140px, 1fr) auto minmax(160px, auto) auto; gap: .45rem; }
   .preview { min-height: 0; display: flex; overflow: hidden; }      /* (never over the transport) */
   .preview :global(.stage-wrap) { flex: 1; }
   .transport { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: .35rem .5rem; }
+  /* (one row on a laptop: the song's name gets shorter, then the volumes. In rem of the app's width,
+     not px of the window: at 140 % interface size a 1366 px laptop is narrower than that, and the
+     row ran past the edge with Fit and Zoom in off the screen) */
+  @container app (min-width: 95.72rem) {
+    .transport { flex-wrap: nowrap; min-width: 0; }
+    .transport > :global(*) { flex-shrink: 0; }
+    .transport > .name { flex-shrink: 1; min-width: 2rem; }
+  }
+  @container app (min-width: 95.72rem) and (max-width: 107.14rem) { .vol input { width: 4.5rem; } }
   .play { min-width: 6.5rem; }
   .clock { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
-  .bpm input { width: 4.2em; }
+  .bpm input { width: 5.4em; }
   .vol { display: inline-flex; align-items: center; gap: .3rem; } .vol input { width: 6rem; }
   .name { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .grow { flex: 1; }
@@ -842,7 +990,7 @@
   .board { max-height: 52vh; overflow-y: auto; }
   .names { border-right: 1px solid var(--line); }
   .nr { height: 78px; display: flex; align-items: flex-end; padding: .3rem .5rem; color: var(--muted); font-size: .8rem; border-bottom: 1px solid var(--line); overflow: hidden; overflow-wrap: anywhere; }
-  .nl { height: 38px; display: flex; align-items: center; padding: 0 .5rem; font-size: .82rem; border-bottom: 1px solid var(--line); border-left: 3px solid var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nl { height: 38px; line-height: 37px; padding: 0 .5rem; font-size: .82rem; border-bottom: 1px solid var(--line); border-left: 3px solid var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tracks { overflow-x: auto; overflow-y: hidden; position: relative; }
   .inner { position: relative; }
   .ruler { height: 78px; position: relative; border-bottom: 1px solid var(--line); cursor: text; background: #0b0f15; }
@@ -853,6 +1001,10 @@
     background: color-mix(in srgb, var(--accent) var(--mix), #0b0f15); color: var(--text); font-size: .66rem; line-height: 16px; text-align: left;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; z-index: 1; }
   .sec:hover { filter: brightness(1.3); }
+  /* the part that loops: a band under its name on the ruler, and its chip in the transport */
+  .loopband { position: absolute; top: 31px; height: 4px; background: var(--cyan); border-radius: 2px; pointer-events: none; }
+  .chip.looping { display: inline-flex; align-items: center; gap: .3rem; color: var(--cyan); border-color: var(--cyan); cursor: default; }
+  .chip.looping .x { padding: 0 .3rem; min-height: 0; line-height: 1; font-size: 1rem; }
   .wave { position: absolute; left: 0; top: 32px; pointer-events: none; }
   /* before and after the song: hatched, named on the ruler, faintly behind the tracks */
   .span { position: absolute; top: 15px; height: 16px; min-height: 0; display: block; padding: 0 4px; border: 0; border-radius: 0; z-index: 1; cursor: pointer;
@@ -864,6 +1016,10 @@
   .vol .snd:not(:has(svg)) { font-size: .78rem; }
   .wave path { fill: #6aa2ff55; stroke: #6aa2ff; stroke-width: .5; }
   .lane { height: 38px; position: relative; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(90deg, transparent 0 1px, transparent 1px 100%); }
+  /* (the Effects track opened: a thinner row per knob under it, named in small type) */
+  .lane.sub { height: 34px; background: #ffffff05; }
+  .nl.sub { height: 34px; line-height: 33px; padding-left: 1.6rem; font-size: .74rem; color: var(--muted); border-left-style: dotted; }
+  .nl .open { padding: 0 .25rem; margin-right: .2rem; font-size: .8rem; min-height: 0; line-height: 1; }
   .it { position: absolute; top: 5px; height: 28px; transform: translateX(-1px); min-width: 0; max-width: 18rem; padding: 0 .45rem 0 .5rem; border-radius: 6px; border: 1px solid var(--c);
     background: color-mix(in srgb, var(--c) 22%, var(--panel2)); color: var(--text); font-size: .74rem; display: flex; align-items: center; cursor: grab; touch-action: none; overflow: hidden; }
   .it::before { content: ''; position: absolute; left: -1px; top: -5px; bottom: -5px; width: 2px; background: var(--c); }
@@ -877,7 +1033,7 @@
   .playhead::before { content: ''; position: absolute; top: 0; bottom: 0; left: -7px; width: 16px; }
   .playhead.held, .playhead:hover { box-shadow: 0 0 0 1px #45d85c66, 0 0 12px #45d85caa; }
   .mark { flex: none; display: inline-flex; align-items: center; margin-right: .25rem; pointer-events: none; }
-  .mark.hazard { color: var(--orange); }
+  .mark.hazard, .mark.winch { color: var(--orange); }
   .mark.once { font-size: .64rem; font-weight: 700; padding: 0 .2rem; border-radius: 3px; background: #ffffff1c; }
   .note { margin: 0; font-size: .74rem; color: var(--faint); }
   .armed.on { color: var(--pink); border-color: #f33abc88; background: #f33abc1a; }

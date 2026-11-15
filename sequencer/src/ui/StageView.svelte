@@ -13,7 +13,9 @@
   import { cellLookAt } from '../engine/resolve';
   import { fixtureActions, fixtureMenu } from './actions';
   import { EFFECT_MAP } from '../engine/effects';
-  import type { Resolved } from '../model/types';
+  import type { Fixture, Resolved } from '../model/types';
+  import { roomFor } from '../stage3d/geometry';
+  import { machineryOf, type Machinery } from '../model/library';
 
   // compact: no toolbar. readonly: only to look at (the Live page): zoom and pan, no selecting or moving.
   // blindChip: says "Blind: only here" itself (the Live page has its own, one you can press)
@@ -31,6 +33,11 @@
   let box = $state({ w: 1000, h: 560 });
   const W = $derived(Math.max(300, Math.round(H * box.w / Math.max(1, box.h))));
   const px = $derived(H / Math.max(1, box.h) / view.k);
+  // the plan in metres: the room's stage (the hall's 14 x 9 m, the pub's, your own stage's size): a
+  // tick a metre along the back edge and the side, a longer one every 5
+  const stageM = $derived(roomFor(app.show.settings.stage3d));
+  const mTicks = (n: number) => Array.from({ length: Math.floor(n + 1e-6) + 1 }, (_, i) => i);
+  const mSaid = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)} m`;
   let area = $state<HTMLDivElement>();
   $effect(() => {
     if (!area) return;
@@ -55,7 +62,7 @@
     e.stopPropagation();
     if (e.button !== 0 || readonly) return;        // right-click: the menu, the selection stays; Live only looks
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    const multi = e.shiftKey || e.ctrlKey || e.metaKey;
+    const multi = ui.adding(e);
     if (multi) app.select(id, true);
     else if (!app.selected.includes(id)) app.select(id, false);
     const ids = app.selected.includes(id) ? [...app.selected] : [id];
@@ -73,6 +80,9 @@
     const p = pt(e);
     let dx = p.x - drag.start.x, dy = p.y - drag.start.y;
     if (!drag.moved && Math.hypot(dx, dy) < 0.004) return;
+    // (one undo step for the whole drag, back to where it started: no save in between makes a
+    // step out of a point on the way, as the 3D stage's handles do)
+    if (!drag.moved) { app.checkpoint(); app.holdUndo = true; }
     drag.moved = true;
     const g: { x?: number; y?: number } = {};
     if (!e.altKey) {
@@ -87,6 +97,8 @@
     guides = g;
     for (const id of drag.ids) app.moveFixture(id, drag.orig[id].x + dx, drag.orig[id].y + dy);
   }
+  // (a drag the browser broke off, a finger taken for a scroll: the undo step closes all the same)
+  function endDrag() { if (drag?.moved) { app.holdUndo = false; app.markDirty(0); } drag = null; guides = {}; }
   function upFixture(e: PointerEvent, id: string) {
     if (readonly) return;
     // Alt-click on a pixel (no drag): pick that cell on this light (and the selected ones shaped like it)
@@ -94,7 +106,8 @@
       if (!app.selected.includes(id)) app.select(id, false);
       const now = app.cellsPicked(id), k = drag.cell;
       app.selectCells(now.includes(k) ? now.filter((x) => x !== k) : [...now, k].sort((a, b) => a - b));
-    } else if (drag && !drag.moved && !(e.shiftKey || e.ctrlKey || e.metaKey)) app.select(id, false);
+    } else if (drag && !drag.moved && !ui.adding(e)) app.select(id, false);
+    if (drag?.moved) { app.holdUndo = false; app.markDirty(0); }
     drag = null; guides = {};
   }
   // Arrow keys nudge the selected lights on the stage (Shift: bigger steps), like any drawing tool.
@@ -114,7 +127,13 @@
     app.markDirty();
   }
   // ---- zoom and pan: wheel or pinch zooms around the pointer, middle button or two fingers pan.
-  const vb = $derived(`${view.x.toFixed(1)} ${view.y.toFixed(1)} ${(W / view.k).toFixed(1)} ${(H / view.k).toFixed(1)}`);
+  // (a margin round what's in view, the same share each way so nothing stretches: a light at the very
+  // edge of the plan, its label and a machine's chip, stays whole instead of half cut off)
+  const EDGE = 0.035;
+  const vb = $derived.by(() => {
+    const w = W / view.k, h = H / view.k, mx = w * EDGE, my = h * EDGE;
+    return `${(view.x - mx).toFixed(1)} ${(view.y - my).toFixed(1)} ${(w + 2 * mx).toFixed(1)} ${(h + 2 * my).toFixed(1)}`;
+  });
   function zoomAt(px: number, py: number, k: number) {     // px, py in stage units (0..W, 0..H)
     k = Math.max(1, Math.min(8, k));
     const x = px - (px - view.x) * view.k / k, y = py - (py - view.y) * view.k / k;
@@ -136,7 +155,7 @@
   let pinch: { d: number; k: number; cx: number; cy: number } | null = null;
   let pan: { x: number; y: number; vx: number; vy: number } | null = null;
   function panBy(dxPx: number, dyPx: number) {
-    const r = svg!.getBoundingClientRect(), scale = Math.max(W / r.width, H / r.height) / view.k;
+    const r = svg!.getBoundingClientRect(), scale = Math.max(W / r.width, H / r.height) * (1 + 2 * EDGE) / view.k;
     view = { ...view, x: Math.max(0, Math.min(W - W / view.k, view.x - dxPx * scale)), y: Math.max(0, Math.min(H - H / view.k, view.y - dyPx * scale)) };
   }
 
@@ -158,7 +177,7 @@
     if (readonly) return;                          // Live: zoom and pan, no selecting
     const p = pt(e);
     band = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
-    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) app.selectNone();
+    if (!ui.adding(e)) app.selectNone();
   }
   function moveBg(e: PointerEvent) {
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
@@ -247,7 +266,41 @@
   // Symbol radius in drawing units: 11-22 screen pixels (bigger on touch screens).
   const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   // Zooming in makes them a bit bigger too (not as much as the room: they'd overlap again).
-  const size = $derived(Math.max(coarse ? 16 : 11, Math.min(22, 200 / Math.sqrt(app.show.fixtures.length + 3))) * px * Math.sqrt(view.k));
+  // (and no bigger than the room between neighbours on the screen: a tablet held upright squeezes
+  // the plan's width, and a row of heads became one blob. A quarter of the lights may be closer
+  // than that: two hung together don't shrink the rest.)
+  const room = $derived.by(() => {
+    const fx = app.show.fixtures;
+    if (fx.length < 2) return Infinity;
+    const near = fx.map((f) => { let d = Infinity; for (const o of fx) if (o !== f) d = Math.min(d, Math.hypot((o.x - f.x) * box.w, (o.y - f.y) * box.h)); return d; }).sort((a, b) => a - b);
+    return near[Math.floor(near.length / 4)];
+  });
+  const size = $derived(Math.max(coarse ? 16 : 11, Math.min(22, 200 / Math.sqrt(app.show.fixtures.length + 3), room * 0.42)) * px * Math.sqrt(view.k));
+  // A pixel bar's half length: 2.2 symbols, but not into the next light along its row (four bars
+  // in a row on a narrow plan ran together into one)
+  const barHalf = $derived.by(() => {
+    const out = new Map<string, number>();
+    for (const f of app.show.fixtures) {
+      if (app.kinds[f.id] !== 'bar') continue;
+      let gap = Infinity;
+      for (const o of app.show.fixtures) if (o !== f && Math.abs(o.y - f.y) * H < size * 1.2) gap = Math.min(gap, Math.abs(o.x - f.x) * W);
+      out.set(f.id, Math.max(size * 1.1, Math.min(size * 2.2, gap * 0.46)));
+    }
+    return out;
+  });
+  // Stage machinery drawn as what it is on the plan: its cloth as wide as it really is (a drop, a
+  // curtain: a line across the stage), not a dot
+  const machines = $derived.by(() => {
+    const out = new Map<string, { how: Machinery; half: number }>();
+    for (const f of app.show.fixtures) {
+      const t = app.types.get(f.typeId), how = machineryOf(t?.model);
+      if (!how || !app.modeOf(f.id)?.channels.some((c) => c.attr === 'hoist')) continue;
+      // (its cloth's width: its own, else a curtain track spans its travel, as on the 3D stage)
+      const w = f.cloth?.w ?? (how === 'curtain' ? t?.physical?.travel ?? 18 : 18);
+      out.set(f.id, { how, half: Math.max(size, (w / 2 / stageM.W) * W) });
+    }
+    return out;
+  });
   const css = (l: Resolved | undefined) => lookColor(l);
   const cells = (id: string) => app.caps(id).cells;
   // the cells picked on a light (outlined on the plan)
@@ -260,11 +313,29 @@
   // fits nowhere is left out (hover shows it; a selected light always gets its name). Like the
   // labels on a map.
   type At = { x: number; y: number; anchor: 'middle' | 'start' | 'end' };
-  const labelAt = $derived.by(() => {
+  // (its number and address with the name when # is on, in the same label: placed as one, so they
+  // don't land on each other's or on the names, as they did drawn on their own)
+  const addrOf = (f: Fixture) => `${f.num ? `#${f.num} ` : ''}${oneUni ? f.address : `${f.universe}.${f.address}`}`;
+  const labelText = (f: Fixture) => [labels ? f.name : '', addrs ? addrOf(f) : ''].filter(Boolean).join('  ');
+  // (a crowded plan, a short screen: when not even 70 % of the names fit, they're tried a size
+  // smaller, and the size that fits more wins)
+  // (the names grow with the interface size like every other text: at 140 % for weak eyes they
+  // stayed 11 px; a size that doesn't fit falls back as below)
+  const lpx = $derived(px * Math.max(1, ui.zoom));
+  const placed = $derived.by(() => {
+    if (!labels && !addrs) return { at: new Map<string, At | null>(), fs: 12 * lpx };
+    const a = placeAt(12 * lpx), n = app.show.fixtures.length, shown = (m: Map<string, At | null>) => [...m.values()].filter(Boolean).length;
+    if (shown(a) >= n * 0.7) return { at: a, fs: 12 * lpx };
+    const b = placeAt(10.5 * lpx);
+    if (shown(b) >= n * 0.7 || lpx === px) return shown(b) > shown(a) ? { at: b, fs: 10.5 * lpx } : { at: a, fs: 12 * lpx };
+    // (bigger than they fit: the normal sizes then)
+    const c = placeAt(10.5 * px);
+    return [{ at: a, fs: 12 * lpx }, { at: b, fs: 10.5 * lpx }, { at: c, fs: 10.5 * px }].reduce((x, y) => (shown(y.at) > shown(x.at) ? y : x));
+  });
+  const labelAt = $derived(placed.at);
+  function placeAt(fs: number) {
     const out = new Map<string, At | null>();
-    if (!labels) return out;
-    const fs = 12 * px;
-    const halfW = (id: string) => { const k = app.kinds[id]; return size * (k === 'bar' ? 2.2 : k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72); };
+    const halfW = (id: string) => { const k = app.kinds[id]; return machines.get(id)?.half ?? (k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72)); };
     // Boxes (the lights' bodies, then each placed name) go into columns of the stage, so a name
     // only checks what's near it: a big rig stays quick while a light is dragged around.
     type Box = { x0: number; x1: number; y0: number; y1: number; id?: string };
@@ -275,23 +346,41 @@
     for (const f of app.show.fixtures) { const w = halfW(f.id), x = f.x * W, y = f.y * H; put({ id: f.id, x0: x - w, x1: x + w, y0: y - size * 0.7, y1: y + size * 0.7 }); }
     // the word "audience" at the front edge is in the way too
     put({ id: 'audience', x0: W / 2 - 34 * px, x1: W / 2 + 34 * px, y0: H - 30, y1: H - 12 });
+    // and so are the stage's measurements, "14 m wide" at the top and "9 m deep" at the side
+    put({ id: 'wide', x0: W / 2 - 32 * px, x1: W / 2 + 32 * px, y0: 2 * px, y1: 24 * px });
+    put({ id: 'deep', x0: 8 * px, x1: 22 * px, y0: H / 2 - 28 * px, y1: H / 2 + 28 * px });
+    // (a name reads as the light nearest to it: every other light clearly further from the label
+    // than its own, else it's left out rather than mistaken for that one's)
+    // (above it, the last resort, it has to be clearly its own: that's where a name read as the
+    // light in the row before)
+    // (distances to the edge of a light's symbol: a long bar's name at its end is next to it)
+    const gapTo = (o: Fixture, cx: number, cy: number) => { const w = halfW(o.id), h = size * 0.7, x = o.x * W, y = o.y * H; return Math.hypot(Math.max(x - w - cx, 0, cx - x - w), Math.max(y - h - cy, 0, cy - y - h)); };
+    const ownest = (f: Fixture, b: Box, k: number) => {
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, own = gapTo(f, cx, cy);
+      for (const o of app.show.fixtures) if (o !== f && Math.abs(cx - o.x * W) < own * k + halfW(o.id) && gapTo(o, cx, cy) < own * k) return false;
+      return true;
+    };
     const sel = new Set(app.selected);
     const order = [...app.show.fixtures].sort((a, b) => Number(sel.has(b.id)) - Number(sel.has(a.id)));
     for (const f of order) {
-      const x = f.x * W, y = f.y * H, half = f.name.length * fs * 0.3 + 2 * px, side = halfW(f.id) + 4 * px;
+      const x = f.x * W, y = f.y * H, half = labelText(f).length * fs * 0.3 + 2 * px, side = halfW(f.id) + 4 * px;
       const below = y + size * 1.15 + 13 * px, above = y - size * 1.1 - 4 * px, mid = y + fs * 0.35;
-      const vert: At[] = (y > H * 0.86 ? [above, below] : [below, above]).map((by) => ({ x, y: by, anchor: 'middle' }));
-      const tries: At[] = [...vert, { x: x + side, y: mid, anchor: 'start' }, { x: x - side, y: mid, anchor: 'end' }];
+      // under it, else beside it (level with it: it can't be read as another's), above only last
+      // (a name above sat right under the light in the row before and read as that one's); the
+      // front row the other way round, clear of the audience's edge
+      const [first, last] = y > H * 0.86 ? [above, below] : [below, above];
+      const tries: At[] = [{ x, y: first, anchor: 'middle' }, { x: x + side, y: mid, anchor: 'start' }, { x: x - side, y: mid, anchor: 'end' }, { x, y: last, anchor: 'middle' }];
       let at: At | null = null;
-      for (const t of tries) {
+      for (const [n, t] of tries.entries()) {
         const x0 = t.anchor === 'middle' ? t.x - half : t.anchor === 'start' ? t.x : t.x - 2 * half, x1 = x0 + 2 * half;
         const b: Box = { x0, x1, y0: t.y - fs * 0.9, y1: t.y + fs * 0.3, id: `label:${f.id}` };
-        if (x0 >= 0 && x1 <= W && !hits(b, f.id)) { at = t; put(b); break; }
+        // (inside the plan both ways: a name over a light in the back row stuck out of the top)
+        if (x0 >= 0 && x1 <= W && b.y0 >= -H * EDGE && b.y1 <= H * (1 + EDGE) && !hits(b, f.id) && (n < 3 || ownest(f, b, 1.15))) { at = t; put(b); break; }
       }
       out.set(f.id, at ?? (sel.has(f.id) ? tries[0] : null));
     }
     return out;
-  });
+  }
 </script>
 
 <div class="panel stage-wrap" data-marks="show">
@@ -314,20 +403,31 @@
     <span class="grow"></span>
     {#if !compact}
     <div class="toolbar">
+      <!-- (a big rig's groups in a strip of their own that scrolls sideways: ten of them took the
+           toolbar to three rows on a laptop) -->
+      <span class="grps">
       {#each app.show.groups as g (g.id)}
-        <button class="grp" onclick={(e) => app.selectGroup(g.id, e.shiftKey || e.ctrlKey || e.metaKey)} title="Select the group (Shift adds)">{g.name}</button>
+        <button class="grp" onclick={(e) => app.selectGroup(g.id, ui.adding(e))} title="Select the group (Shift adds)">{g.name}</button>
       {/each}
+      </span>
       <span class="sep"></span>
       <button class="ghost" onclick={() => app.selectAll()} aria-label="Select all">All</button>
       <button class="ghost" onclick={() => app.selectNone()} aria-label="Select none">None</button>
       <button class="ghost" onclick={invert} title="Invert the selection">Invert</button>
+      <!-- (on a touch screen: a finger has no Shift to add to the selection) -->
+      <!-- (and whenever it's on: Console's switch is the same one, and with a mouse it stayed on here with nothing to switch it off) -->
+      {#if (coarse || ui.addSel) && !readonly}<button class="ghost" class:on={ui.addSel} aria-pressed={ui.addSel} onclick={() => (ui.addSel = !ui.addSel)} title="On: a tap adds a light or a group to the selection (or takes it out), as Shift does with a mouse">+ Add</button>{/if}
       {#if !ui.stage3d}
+      <!-- (the plan's own tools stay together: on a tablet the magnifier wrapped to a line alone) -->
+      <span class="tset">
       <span class="sep"></span>
       <button class="ghost" class:on={labels} onclick={() => (labels = !labels)} title="Show the names (with each light's number)" aria-label="Names" aria-pressed={labels}>Aa</button>
       <button class="ghost" class:on={addrs} onclick={() => (addrs = !addrs)} title="Show each light's number (what the console goes by) and DMX address" aria-label="Numbers and DMX addresses" aria-pressed={addrs}>#</button>
       <span class="sep"></span>
-      <button class="ghost" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="plus" size={14} /></button>
-      <button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} disabled={view.k === 1} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>
+      <button class="ghost zoomin" onclick={() => zoomAt(W / 2 / view.k + view.x, H / 2 / view.k + view.y, view.k * 1.4)} title="Zoom in (or the mouse wheel, or pinch)" aria-label="Zoom in"><Icon name="search" size={14} />+</button>
+      <!-- (only while zoomed in: a greyed-out "100%" took a toolbar row of its own on a laptop) -->
+      {#if view.k > 1}<button class="ghost" onclick={() => { view = { x: 0, y: 0, k: 1 }; }} title="Show the whole stage" aria-label="Fit the stage">{Math.round(view.k * 100)}%</button>{/if}
+      </span>
       {/if}
     </div>
     {/if}
@@ -360,6 +460,12 @@
       {/if}
       <rect x="40" y={H - 30} width={W - 80} height="16" rx="4" fill="#ffffff05" stroke="#ffffff0d" />
       <text x={W / 2} y={H - 18} text-anchor="middle" class="edge" font-size={11 * px}>audience</text>
+      <g class="dims" pointer-events="none" data-w={stageM.W} data-d={stageM.D}>
+        {#each mTicks(stageM.W) as i (i)}<line x1={(i / stageM.W) * W} y1="0" x2={(i / stageM.W) * W} y2={(i % 5 ? 4 : 9) * px} />{/each}
+        {#each mTicks(stageM.D) as i (i)}<line x1="0" y1={(i / stageM.D) * H} x2={(i % 5 ? 4 : 9) * px} y2={(i / stageM.D) * H} />{/each}
+        <text x={W / 2} y={18 * px} text-anchor="middle" font-size={10 * px}>{mSaid(stageM.W)} wide</text>
+        <text transform="translate({16 * px} {H / 2}) rotate(-90)" text-anchor="middle" font-size={10 * px}>{mSaid(stageM.D)} deep</text>
+      </g>
 
       <!-- Light on the floor first (under everything, names included): a soft pool in front of each
            lit PAR or bar (all blurred in one go), the beam of each moving head. -->
@@ -401,8 +507,24 @@
         <g class="fx" data-name={f.name} role="button" tabindex="-1" aria-label={f.name} aria-pressed={sel}
            class:dropping={dropFx === f.id} oncontextmenu={(e) => fxMenu(e, f.id)}
            ondragover={(e) => { if (isPreset(e)) { e.preventDefault(); dropFx = f.id; } }} ondragleave={() => { if (dropFx === f.id) dropFx = null; }} ondrop={(e) => presetDrop(e, f.id)}
-           onpointerdown={(e) => downFixture(e, f.id)} onpointermove={moveFixture} onpointerup={(e) => upFixture(e, f.id)}>
-          {#if kind === 'mover'}
+           onpointerdown={(e) => downFixture(e, f.id)} onpointermove={moveFixture} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
+          {#if machines.has(f.id)}
+            <!-- a curtain or a drop: its cloth across the stage, solid where it hangs in view (a curtain
+                 closed, a drop flown in), dashed where it's out of the way; a track's halves part -->
+            {@const mc = machines.get(f.id)!}
+            {@const v = Math.max(0, Math.min(1, (l as { hoist?: number } | undefined)?.hoist ?? 0))}
+            {@const shown = mc.how === 'flybar' ? v : 1 - v}
+            {@const th = size * 0.36}
+            {@const fill = mc.how === 'flybar' ? '#4f6a4a' : '#7a1420'}
+            <rect class="cloth" x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill="none" stroke="#4a5463" stroke-width={1.2 * px} stroke-dasharray="{4 * px} {3 * px}" />
+            {#if mc.how === 'curtain'}
+              {@const part = mc.half * Math.max(0.08, 1 - v)}
+              <rect x={x - mc.half} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
+              <rect x={x + mc.half - part} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
+            {:else}
+              <rect x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill={fill} opacity={0.15 + 0.85 * shown} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
+            {/if}
+          {:else if kind === 'mover'}
             <circle cx={x} cy={y} r={size * 1.25} fill={c.css} opacity={c.glow * 0.45} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
             <rect x={x - size * 0.9} y={y - size * 0.25} width={size * 1.8} height={size * 0.5} rx="3" fill="#2a313c" />
             <circle cx={x} cy={y} r={size * 0.62} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
@@ -425,12 +547,13 @@
             {/each}
           {:else if kind === 'bar'}
             {@const n = cells(f.id)}
-            <rect x={x - size * 2.2} y={y - size * 0.55} width={size * 4.4} height={size * 1.1} rx="4" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-            <rect x={x - size * 2.2} y={y - size * 0.42} width={size * 4.4} height={size * 0.84} rx="4" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
+            {@const bw = barHalf.get(f.id) ?? size * 2.2}
+            <rect x={x - bw} y={y - size * 0.55} width={bw * 2} height={size * 1.1} rx="4" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
+            <rect x={x - bw} y={y - size * 0.42} width={bw * 2} height={size * 0.84} rx="4" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
             <!-- its cells (a long pixel strip: the pixels touch, no gaps) -->
             {#each Array(n) as _, i (i)}
               {@const cc = css(cellLookAt(l, i, n))}
-              <rect class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} x={x - size * 2.05 + (i * size * 4.1) / n} y={y - size * 0.28} width={Math.max(0.5, (size * 4.1) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
+              <rect class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} x={x - bw * 0.93 + (i * bw * 1.86) / n} y={y - size * 0.28} width={Math.max(0.5, (bw * 1.86) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
             {/each}
           {:else if kind === 'sfx'}
             <!-- an effect machine: what it is, lit while it runs -->
@@ -460,12 +583,9 @@
       <!-- names and addresses on top of every light, beam and glow, with a dark halo -->
       <g class="labels" pointer-events="none">
         {#each app.show.fixtures as f (f.id)}
-          {@const x = f.x * W}
-          {@const y = f.y * H}
           {@const sel = !readonly && app.selected.includes(f.id)}
-          {@const at = labels ? labelAt.get(f.id) : null}
-          {#if at}<text x={at.x} y={at.y} text-anchor={at.anchor} class="lbl" class:sel font-size={12 * px}>{f.name}</text>{/if}
-          {#if addrs}<text x={x} y={y > H * 0.86 ? y + size * 1.1 + 11 * px : y - size * 0.95 - 4 * px} text-anchor="middle" class="adr" font-size={10.5 * px}>{#if f.num}<tspan class="no">#{f.num} </tspan>{/if}{oneUni ? f.address : `${f.universe}.${f.address}`}</text>{/if}
+          {@const at = labels || addrs ? labelAt.get(f.id) : null}
+          {#if at}<text x={at.x} y={at.y} text-anchor={at.anchor} class="lbl" class:sel font-size={placed.fs} data-for={f.name}>{#if labels}{f.name}{/if}{#if addrs}<tspan class="adr" font-size={placed.fs * 0.875}>{labels ? '  ' : ''}{#if f.num}<tspan class="no">#{f.num} </tspan>{/if}{oneUni ? f.address : `${f.universe}.${f.address}`}</tspan>{/if}</text>{/if}
         {/each}
       </g>
 
@@ -482,7 +602,8 @@
     {#if app.show.fixtures.length === 0}
       <div class="empty" class:compact class:low={ui.stage3d}>
         <span>Nothing on stage yet.</span>
-        <button class="primary" onclick={() => (ui.modal = 'welcome')}><Icon name="play" />Get started</button>
+        <button class="primary" onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add lights</button>
+        <button class="ghost tplbtn" onclick={() => (ui.modal = 'welcome')}>or start from a template</button>
       </div>
     {/if}
   </div>
@@ -498,8 +619,13 @@
   .three { position: absolute; inset: 0; z-index: 3; display: flex; }
   .loading { margin: auto; }
   .head { margin-bottom: .35rem; flex-wrap: wrap; }
-  .grp { padding: .12rem .5rem; font-size: .8rem; border-radius: 999px; }
+  .tset { display: inline-flex; align-items: center; gap: .25rem; flex: none; }
+  .grp { padding: .12rem .5rem; font-size: .8rem; border-radius: 999px; flex: none; }
+  /* (a small basis: it takes the row's free room and scrolls in it, instead of wrapping the tools) */
+  .grps { display: flex; gap: .25rem; align-items: center; overflow-x: auto; min-width: 8rem; flex: 1 1 12rem; scrollbar-width: thin; padding-bottom: 1px; }
   .area { position: relative; flex: 1; min-height: 0; }
+  /* (a phone pinches: the button took a toolbar row of its own) */
+  @media (max-width: 760px) { .zoomin { display: none; } }
   svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
   .fx { cursor: grab; }
   .px.picked { stroke: #ffaa1c; stroke-width: 1.5px; }   /* (picked: orange, as selection is everywhere) */
@@ -511,6 +637,8 @@
   .adr { fill: var(--faint); font-family: ui-monospace, monospace; pointer-events: none; paint-order: stroke; stroke: #0b0e13; stroke-width: 3px; stroke-linejoin: round; }
   .glyph { fill: var(--muted); font-weight: 700; pointer-events: none; }
   .edge { fill: var(--faint); letter-spacing: .25em; text-transform: uppercase; }
+  .dims line { stroke: #ffffff2e; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .dims text { fill: var(--faint); opacity: .8; }
   .beam { filter: blur(2px); }
   .puff { animation: puff 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
   .puff.still { animation: none; }
@@ -518,11 +646,14 @@
   .flash { animation: flash .2s steps(2, jump-none) infinite; }
   @keyframes flash { 50% { opacity: 0; } }
   /* over the 3D stage too (it sits at z-index 3) */
+  .tplbtn { font-size: .85rem; color: var(--muted); padding: .2rem .45rem; }
   .empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; justify-content: center;
     background: #0f141bee; border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem 1rem; box-shadow: var(--shadow); color: var(--muted); max-width: 90%; }
   .empty.compact { padding: .4rem .6rem; font-size: .85rem; gap: .5rem; }
   /* (over the 3D stage: at the bottom, clear of its toolbar's panels at the top) */
   .empty.low { top: auto; bottom: 1rem; transform: translateX(-50%); }
+  /* (and out of the way while one of those panels is open: a tall Venue panel reached down under it) */
+  .stage-wrap:has(:global(.s3 .venue), :global(.s3 .more)) .empty.low { display: none; }
   .snapguide { stroke: var(--cyan); stroke-dasharray: 4 3; opacity: .8; pointer-events: none; }
   svg:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
   .adr .no { fill: var(--orange); }

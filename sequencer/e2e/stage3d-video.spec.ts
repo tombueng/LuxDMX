@@ -5,7 +5,7 @@
 // browser that only makes WebM says so next to Record, and a take that survives the window
 // getting narrower. Read through the dev hook window.__stage3d, not off the pixels.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, test, expect } from './helpers';
+import { openConnected, resetFake, test, expect, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 // (the 3D stage draws in software in the test browser: slow when the machine is busy)
@@ -136,7 +136,7 @@ test('9:16 for phones: the take draws at 1080 x 1920 with a lens wide enough acr
   await expect.poll(() => canvasSize(page)).toEqual(before);
   expect(await page.evaluate(() => (window as any).__stage3d.internals.camera.fov)).toBeLessThan(lens.fov + 0.01);
   // the choice is remembered
-  expect(await page.evaluate(() => localStorage.getItem('luxdmx.seq.video3d'))).toBe('vertical');
+  expect(await keptValue(page, 'luxdmx.seq.video3d')).toBe('vertical');
 });
 
 test('a choppy take says so at Stop, with what to try; a smooth one doesn\'t', async ({ page }) => {

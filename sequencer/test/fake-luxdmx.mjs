@@ -15,7 +15,8 @@
 //                       category 0x0402)
 //   POST /pixels?ports=10:2,12:1   pixel ports on these universes (GET /pixels.json reads them);
 //                                  10:2:150:500 also says its brightness and power cap
-//   POST /ws/test       { ackDelay: ms } answer each message that much later, { noAck: true } never
+//   POST /ws/test       { ackDelay: ms } answer each message that much later, { noAck: true } never,
+//                       { down: ms } off the network that long: every socket dropped, none taken
 //   GET  /ws/stats.json { acks, early }: answers sent, and messages that came before the answer to
 //                       the one before (the pages must wait: see the ack in the README)
 //   GET  /rdm.json, /rdm/discover, /rdm/identify, /rdm/setaddr, /rdm/setpers, /rdm/setlabel
@@ -70,7 +71,7 @@ function rdmState() {
     rdmLines: unis.map((u, i) => ({ line: i, uni: u })), outputs: unis.map((u, i) => ({ i, uni: u, merge: 1 })), devices: shown.map(rdmDev) };
 }
 let history = [];         // { t, uni, data }   (capped)
-let ackDelay = 0, noAck = false, wsStats = { acks: 0, early: 0 };
+let ackDelay = 0, noAck = false, wsStats = { acks: 0, early: 0 }, downUntil = 0;
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -107,7 +108,7 @@ const server = http.createServer((req, res) => {
     json(history.filter((h) => h.uni === u).map((h) => [h.t, h.data[ch - 1] ?? 0]));
   } else if (url.pathname === '/reset' && req.method === 'POST') {
     pixelPorts = [];
-    frames = new Map(); history = []; ackDelay = 0; noAck = false; wsStats = { acks: 0, early: 0 }; for (const c of wss.clients) c.pending = false; rig = RIG();
+    frames = new Map(); history = []; ackDelay = 0; noAck = false; downUntil = 0; wsStats = { acks: 0, early: 0 }; for (const c of wss.clients) c.pending = false; rig = RIG();
     if (url.searchParams.get('pyro') === '1') rig.push({ uid: '7A70:00000001', uni: unis[0], addr: 100, model: 0x0042, mfg: 'Spark Co', modelName: 'Jet 2', label: '', cat: 0x0402,
       modes: [{ n: 1, name: '2 channel', footprint: 2 }], pers: 1, sw: '1.0', swVer: 0x0100 });
     rdmScan = { busy: false, stage: 0, found: 0, scanned: false, at: 0 }; quiet = new Set(); json({ ok: true });
@@ -115,7 +116,7 @@ const server = http.createServer((req, res) => {
     json(wsStats);
   } else if (url.pathname === '/ws/test' && req.method === 'POST') {
     let body = ''; req.on('data', (c) => { body += c; }); req.on('end', () => {
-      try { const m = JSON.parse(body || '{}'); if ('ackDelay' in m) ackDelay = +m.ackDelay || 0; if ('noAck' in m) noAck = !!m.noAck; } catch { /* ignore */ }
+      try { const m = JSON.parse(body || '{}'); if ('ackDelay' in m) ackDelay = +m.ackDelay || 0; if ('noAck' in m) noAck = !!m.noAck; if ('down' in m) { downUntil = Date.now() + (+m.down || 0); for (const c of wss.clients) c.terminate(); } } catch { /* ignore */ }
       json({ ok: true });
     });
   } else if (url.pathname === '/rdm.json') {
@@ -138,7 +139,8 @@ const server = http.createServer((req, res) => {
   } else { res.writeHead(404); res.end('not found'); }
 });
 
-const wss = new WebSocketServer({ server, path: '/ws' });
+// (while 'down': no sockets taken, as a box that's off the network; the HTTP stays up for the test)
+const wss = new WebSocketServer({ server, path: '/ws', verifyClient: () => Date.now() >= downUntil });
 // Like the box: one byte ('K') back for every DMX frame and relay message, none for the subscribes.
 const ACK = Buffer.from('K');
 function ack(ws) {

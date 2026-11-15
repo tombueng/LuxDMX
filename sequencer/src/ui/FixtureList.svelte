@@ -9,7 +9,7 @@
   import { app, type CellMaps } from '../app.svelte';
   import { spansOf } from '../model/pixelLayout';
   import { KIND_LABEL, typeLabel } from '../model/library';
-  import { RISK_HINT, RISK_LABEL, riskOf } from '../model/safety';
+  import { RISK_HINT, RISK_LABEL, riskOf, RISK_SHORT } from '../model/safety';
   import { levelOf, lookColor } from '../engine/cuelook';
   import { ui, listKeys, navKeys, gripDrag, menuKey } from './ui.svelte';
   import { fixtureActions, fixtureMenu } from './actions';
@@ -49,6 +49,11 @@
     for (const f of app.show.fixtures) for (const s of spansOf(f, app.modeOf(f.id))) u.set(s.universe, (u.get(s.universe) ?? 0) + s.count);
     return [...u.entries()].sort((a, b) => a[0] - b[0]);
   });
+  // (a big rig's many universes: one line saying how many and which are over-full, the chips on a
+  // click, so they never push the lights out of the list)
+  const MANY_UNIS = 4;
+  const overFull = $derived(usage.filter(([, n]) => n > 512).map(([u]) => u));
+  const usedChannels = $derived(usage.reduce((a, [, n]) => a + n, 0));
 
   let listEl = $state<HTMLElement>();
   // A light selected on the stage (2D or 3D; on a big rig often far down this list): the list scrolls
@@ -70,7 +75,7 @@
     if (e.shiftKey && anchor && visible().includes(anchor)) {
       const ids = visible(), a = ids.indexOf(anchor), b = ids.indexOf(id);
       app.selected = [...new Set([...app.selected, ...ids.slice(Math.min(a, b), Math.max(a, b) + 1)])];
-    } else app.select(id, e.ctrlKey || e.metaKey);
+    } else app.select(id, e.ctrlKey || e.metaKey || ui.addSel);
     anchor = id;
   }
   const { copy, cut, paste, duplicate: dup, remove: del, group } = fixtureActions;
@@ -118,9 +123,13 @@
     if (drag && dropAt) app.moveFixtures(drag, dropAt.index + (dropAt.after ? 1 : 0));
     drag = null; dropAt = null;
   }
+  // A short panel (a laptop with the interface at 120 % or more: the cues take the bottom half)
+  // keeps its rows: the hint goes (it's in the panel's "?" too), or there was no light left to see.
+  let flH = $state(0);
+  const short = $derived(flH > 0 && flH < 14 * ui.zoom * 26);
 </script>
 
-<div class="panel fl" data-marks="show">
+<div class="panel fl" data-marks="show" bind:clientHeight={flH}>
   <div class="row head">
     <h2>Fixtures</h2>
     <span class="chip">{app.show.fixtures.length}</span>
@@ -131,7 +140,7 @@
     </Help>
     <button class="primary" onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add</button>
   </div>
-  {#if app.show.fixtures.length}<Hint>Your lights: select them here or on the stage, then set them in the programmer.</Hint>{/if}
+  {#if app.show.fixtures.length && !short}<Hint>Your lights: select them here or on the stage, then set them in the programmer.</Hint>{/if}
 
   <!-- Always there (buttons greyed out without a selection), so the list never jumps under the mouse. -->
   {#if app.show.fixtures.length}
@@ -147,10 +156,10 @@
   {/if}
 
   {#if app.show.fixtures.length === 0}
-    <!-- quiet: the stage's welcome card is where a first-timer starts -->
+    <!-- quiet: one way in, the stage's Add lights (four "add" buttons at once on an empty show were a
+         jumble); this list's own + Add is up there -->
     <div class="empty">
-      <p class="muted">No lights yet.</p>
-      <button onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add your first lights</button>
+      <p class="muted">No lights yet: <b>Add</b> brings them in.</p>
     </div>
   {:else}
     {#if app.show.fixtures.length > 12 || filter}
@@ -183,20 +192,36 @@
           </span>
           {#if f.num}<span class="num" title="Its number: the console and typed commands go by it">{f.num}</span>{/if}
           <span class="txt">
-            <span class="nm">{f.name}</span>
+            <span class="nm" title={f.name}>{f.name}</span>
             <span class="faint">{t ? typeLabel(t) : f.typeId}{t && t.modes.length > 1 ? ` · ${f.mode}` : ''}{groupsOf[f.id] ? ` · ${groupsOf[f.id]}` : ''}</span>
           </span>
-          {#if risk !== 'light'}<span class="chip risk {risk}" title="{RISK_LABEL[risk]}: {RISK_HINT[risk]}{(risk === 'once' || risk === 'hazard') ? (app.sfxArmed ? ' Armed right now.' : ' Safe right now (not armed).') : ''}">{RISK_LABEL[risk]}{#if risk === 'once' || risk === 'hazard'} · {app.sfxArmed ? 'armed' : 'safe'}{/if}</span>{/if}
-          <span class="chip addr" title={clash.has(f.id) ? 'Overlaps another fixture!' : `Universe ${f.universe}, DMX ${f.address} to ${f.address + width(f.id) - 1}`}>{oneUni ? f.address : `U${f.universe} · ${f.address}`}</span>
+          <!-- (short on the row, so the light's name keeps its room; the whole of it in the title) -->
+          <!-- (armed: striped, safe: plain; the top bar says it in words) -->
+          {#if risk !== 'light'}<span class="chip risk {risk}" class:armed={app.sfxArmed && (risk === 'once' || risk === 'hazard')} aria-label="{RISK_LABEL[risk]}{(risk === 'once' || risk === 'hazard') ? (app.sfxArmed ? ', armed' : ', safe') : ''}" title="{RISK_LABEL[risk]}: {RISK_HINT[risk]}{(risk === 'once' || risk === 'hazard') ? (app.sfxArmed ? ' Armed right now.' : ' Safe right now (not armed).') : ''}">{RISK_SHORT[risk]}</span>{/if}
+          <span class="chip addr" title={clash.has(f.id) ? 'Overlaps another fixture!' : `Universe ${f.universe}, DMX ${f.address} to ${f.address + width(f.id) - 1}`}>{#if clash.has(f.id)}<span aria-hidden="true">⚠ </span>{/if}{oneUni ? f.address : `U${f.universe} · ${f.address}`}</span>
           <span class="lvl" title="Intensity right now"><span style="height:{Math.round(levelOf(l) * 100)}%"></span></span>
         </li>
         {/if}
       {/each}
     </ul>
     <div class="usage">
-      {#each usage as [u, n] (u)}
-        <span class="chip" class:orange={n > 512} title="Channels used on universe {u}">U{u}: {n}/512</span>
-      {/each}
+      {#if usage.length <= MANY_UNIS}
+        {#each usage as [u, n] (u)}
+          <span class="chip" class:orange={n > 512} title="Channels used on universe {u}">U{u}: {n}/512</span>
+        {/each}
+      {:else}
+        <details class="many">
+          <summary title="Channels used on each universe">{usage.length} universes · {usedChannels.toLocaleString('en')} channels{#if overFull.length} · <span class="over">{overFull.map((u) => `U${u}`).join(', ')} over 512</span>{/if}</summary>
+          <div class="unis">
+            {#each usage as [u, n] (u)}
+              <span class="chip" class:orange={n > 512} title="Channels used on universe {u}">U{u}: {n}/512</span>
+            {/each}
+          </div>
+        </details>
+      {/if}
+      <!-- (lights sharing channels: said down here too, with a way to them: in a long list the row's
+           mark was out of sight) -->
+      {#if clash.size}<button class="ghost sm clashnote" onclick={() => { app.selected = app.show.fixtures.filter((f) => clash.has(f.id)).map((f) => f.id); }} title="Select the lights whose addresses overlap"><span aria-hidden="true">⚠ </span>{clash.size} overlap{clash.size === 1 ? 's' : ''}</button>{/if}
       <button class="ghost sm check" onclick={() => (ui.modal = 'patchCheck')} title="Light one fixture at a time to check the addresses in the room"><Icon name="sun" size={13} />Check the patch</button>
     </div>
   {/if}
@@ -217,15 +242,23 @@
   .txt .faint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .addr { font-variant-numeric: tabular-nums; }
   .clash .addr { color: var(--pink); border-color: var(--pink); }
+  .clashnote { color: var(--pink); font-weight: 650; }
   .lvl { width: 5px; height: 26px; background: var(--line); border-radius: 3px; display: flex; align-items: flex-end; overflow: hidden; flex: none; }
   .lvl span { width: 100%; background: var(--orange); }
   .check { margin-left: auto; font-size: .78rem; padding: .1rem .4rem; }
   .filter { width: 100%; padding: .3rem .5rem; font-size: .85rem; }
   .usage { display: flex; gap: .3rem; flex-wrap: wrap; align-items: center; }
+  .many { flex: 1; min-width: 0; font-size: .78rem; color: var(--muted); }
+  .many summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .many .over { color: var(--orange); }
+  .many .unis { display: flex; gap: .3rem; flex-wrap: wrap; max-height: 6.4rem; overflow: auto; margin-top: .3rem; }
+  .many[open] { flex-basis: 100%; }
   .empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .5rem; padding: 1.5rem .5rem; color: var(--muted); }
   .risk { font-size: .7rem; white-space: nowrap; }
   .risk.atmosphere { color: #9fb4c8; }
   .risk.once { color: #e8c44a; border-color: #e8c44a55; }
   .risk.hazard { color: #ff8a5c; border-color: #ff7a1c88; font-weight: 650; }
+  /* armed: hazard stripes, not only a colour (filled and outlined in two reds read alike red-green blind) */
+  .risk.armed { color: #fff; background: repeating-linear-gradient(135deg, #7a1d0c 0 4px, #b4400f 4px 8px); border-color: #ff7a1c; }
   .num { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8rem; min-width: 1.6em; text-align: right; flex: none; }
 </style>

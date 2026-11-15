@@ -95,6 +95,13 @@ export const CROWDS: Partial<Record<RoomId, CrowdArea>> = {
   pub: { z0: 9 / 2 + 1.2, z1: 14.6 - 3.0, half: () => 4.6 - 0.7, top: 2.6 },
   club: { z0: 9 / 2 + 1.0, z1: 22 - 3.4, half: () => 10 - 1.4, top: 2.6, high: [9 / 2 + 3, 9 / 2 + 10, 2.9] },
   party: { z0: 2.2, z1: 14.8, half: () => 10 - 1.6, top: 2.6, high: [4.2, 11.2, 2.9] },
+  // the cinema's front rows (the ones a camera films; the rows behind rise: GEAR has them) and the
+  // bar's dance floor
+  cinema: { z0: 5.8, z1: 9.1, half: () => 14.6, top: 2.3 },
+  bar: { z0: 2.6, z1: 7.2, half: () => 3.6, top: 1.9 },
+  theatre: { z0: 5, z1: 9, half: () => 19.5, top: 2.0 },
+  church: { z0: 1.0, z1: 8.5, half: () => 7.4, top: 1.6 },
+  ballroom: { z0: 3.0, z1: 10.0, half: () => 4, top: 1.9 },
 };
 export interface Space { room: Room; lo: V3; hi: V3; deck: Box | null; boxes: Box[]; caps: Cap[]; crowd?: CrowdArea }
 const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, what: string, c = CLEAR): Box =>
@@ -103,7 +110,7 @@ const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: numb
 const both = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, what: string) => [bx(x0, x1, y0, y1, z0, z1, what), bx(-x1, -x0, y0, y1, z0, z1, what)];
 const cap = (a: P3, b: P3, r: number, what: string): Cap => ({ a: P(a), b: P(b), r: r + CLEAR, what });
 // the big things in each room that a camera could fly into (metres, as venue.ts / rooms.ts build them)
-const GEAR: Record<RoomId, Box[]> = {
+const GEAR: Partial<Record<RoomId, Box[]>> = {
   hall: [
     ...both(4.55, 5.45, DECK, DECK + 1.7, -0.85, -0.15, 'an amp'), ...both(6.5, 7.4, DECK, DECK + 1.6, 0.9, 1.8, 'a side fill'),
     bx(7.5, 9.0, DECK, DECK + 1.9, 0.2, 1.5, 'monitor world'), bx(8.2, 8.9, DECK, DECK + 1.2, -0.7, 0, 'the in-ear rack'),
@@ -126,11 +133,33 @@ const GEAR: Record<RoomId, Box[]> = {
     ...both(8.2, 9.6, 0, 2.8, -2.8, -1.4, 'the PA'), ...both(8.2, 9.6, 0, 2.8, 16.4, 17.8, 'the PA'), bx(-2.9, -1.9, 0, 1.7, -2.75, -2.1, 'road cases'),
   ],
   truss: [bx(6.2, 7.0, 0, 1.0, 6.2, 7.8, 'the table'), bx(-7.4, -6.6, 0, 1.7, 7.4, 9.9, 'road cases')],
+  // the cinema's rows, three at a time, up to the heads of the audience in them (scenes.ts CINEMA)
+  cinema: [0, 1, 2, 3, 4, 5, 6, 7].map((k) => bx(-15.6, 15.6, 0, (3 * k + 3) * 0.34 + 1.3, 5.8 + 3 * k * 1.1, 5.8 + (3 * k + 3) * 1.1, 'the rows')),
+  // the theatre: its stalls four rows at a time, the balcony, the proscenium's walls round the opening
+  theatre: [...[0, 1, 2, 3].map((k) => bx(-21, 21, 0, (4.5 * k + 4.5) * 0.16 + 1.3, 5 + 4.5 * k, 9.5 + 4.5 * k, 'the stalls')), bx(-21, 21, 5.2, 10.6, 17.5, 28.5, 'the balcony'),
+    bx(-21, -13, 0, 32, 1.8, 2.6, 'the proscenium'), bx(13, 21, 0, 32, 1.8, 2.6, 'the proscenium'), bx(-13, 13, 15.5, 32, 1.8, 2.6, 'the proscenium')],
+  // the church: its pews six rows at a time, the altar, the choir benches, the lectern
+  church: [...[0, 1, 2].map((k) => bx(-7.6, 7.6, 0, 1.75, 1.0 + 6.3 * k, 7.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
+    bx(-5.2, -3.6, 0, 2.2, -6.5, -2.7, 'the choir'), bx(3.6, 5.2, 0, 2.2, -6.5, -2.7, 'the choir'), bx(-4.6, -3.8, 0, 2.6, -2.8, -2.0, 'the lectern')],
+  // the ballroom: its round tables (chairs and guests round them), the head table, the cake, the
+  // DJ's table, the chandeliers, the couples dancing
+  ballroom: [
+    ...([[-7.8, 0.5], [-7.8, 4.5], [-7.8, 8.5], [-7.8, 12.5], [7.8, 0.5], [7.8, 4.5], [7.8, 8.5], [7.8, 12.5], [-4, 14], [0, 14], [4, 14], [-2, 17.5], [2, 17.5]] as const).map(([x, z]) => bx(x - 1.7, x + 1.7, 0, 1.5, z - 1.7, z + 1.7, 'a table')),
+    bx(-4.3, 4.3, 0, 1.6, -4.7, -2.9, 'the head table'), bx(6.7, 8.1, 0, 1.9, -4.1, -2.7, 'the cake'), bx(-9.6, -5.3, 0, 1.3, -4.2, -3.0, 'the DJ'),
+    ...([[-5, 6.5], [5, 6.5], [0, 12.6]] as const).map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
+    ...([[-1.6, 5.2], [1.6, 6.2], [-0.2, 8.2]] as const).map(([x, z]) => bx(x - 0.6, x + 0.6, 0, 1.9, z - 0.6, z + 0.6, 'the dancers')),
+  ],
+  // the bar: its counter, the stools and the people on them, the back counter, the tables at the
+  // sides, the mirror ball (scenes.ts BAR)
+  bar: [bx(-6.1, 6.1, 0, 1.2, -2.7, -1.9, 'the counter'), bx(-6.0, 6.0, 0, 1.85, -1.9, -1.0, 'the stools'), bx(-6.2, 6.2, 0, 3.4, -4.6, -3.8, 'the back bar'),
+    bx(-7.8, -5.7, 0, 1.5, 0.2, 6.8, 'the tables'), bx(5.7, 7.8, 0, 1.5, 0.2, 6.8, 'the tables'), bx(-3.55, -2.85, 2.9, 3.9, 3.25, 3.95, 'the mirror ball')],
 };
 // the truss pieces of a room (the hall's and the pub's are built in venue.ts from `truss`)
 function trussOf(r: Room): Seg[] {
   if (r.frame) return r.frame;
-  if (r.id === 'pub') return r.truss.map((t) => [[-r.walls.x, t.y + 0.15, t.z], [r.walls.x, t.y + 0.15, t.z]] as Seg);
+  // (a room's own spans from wall to wall: the pub's, the bar's rail, the church's beams; the hall's
+  // truss on its towers below)
+  if (r.id !== 'hall') return r.truss.map((t) => [[-r.walls.x, t.y + 0.15, t.z], [r.walls.x, t.y + 0.15, t.z]] as Seg);
   const xl = -W / 2 - 0.9, xr = W / 2 + 0.9, segs: Seg[] = [];
   for (const t of TRUSS) {
     segs.push([[xl, t.y + 0.15, t.z], [xr, t.y + 0.15, t.z]]);
@@ -139,18 +168,19 @@ function trussOf(r: Room): Seg[] {
   for (const x of [xl, xr]) segs.push([[x, TRUSS[0].y + 0.6, TRUSS[0].z], [x, TRUSS[2].y + 0.6, TRUSS[2].z]]);
   return segs;
 }
-const spaces = new WeakMap<Cast, Map<RoomId, Space>>();
+const spaces = new WeakMap<Cast, Map<string, Space>>();
 export function spaceOf(r: Room, c: Cast): Space {
   let m = spaces.get(c);
   if (!m) spaces.set(c, (m = new Map()));
-  let s = m.get(r.id);
+  let s = m.get(r.key ?? r.id);
   if (s) return s;
-  const w = r.walls, caps: Cap[] = [], boxes: Box[] = [...GEAR[r.id]];
+  const w = r.walls, caps: Cap[] = [], boxes: Box[] = [...(GEAR[r.id] ?? [])];
   for (const [a, b] of trussOf(r)) {
     caps.push(cap(a, b, 0.15, 'the truss'));
-    // a level piece has lights under it (a head hangs about a metre and a quarter below its middle)
+    // a level piece has lights under it (a head hangs about a metre and a quarter below its middle;
+    // under a low room's rail, the bar's, about half a metre)
     if (Math.abs(a[1] - b[1]) < 0.01) {
-      const lo = a[1] - 1.25, x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), z0 = Math.min(a[2], b[2]), z1 = Math.max(a[2], b[2]);
+      const lo = a[1] - (r.ceiling < 5 ? 0.6 : 1.25), x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), z0 = Math.min(a[2], b[2]), z1 = Math.max(a[2], b[2]);
       boxes.push(bx(x0 - 0.45, x1 + 0.45, lo, a[1], z0 - 0.45, z1 + 0.45, 'the lights on the truss'));
     }
   }
@@ -168,7 +198,7 @@ export function spaceOf(r: Room, c: Cast): Space {
   const deck = r.deck.x > 0 ? bx(-r.deck.x, r.deck.x, 0, DECK + 0.6, r.deck.z0 - (r.id === 'hall' ? 0.4 : 0), r.deck.z1, 'the deck') : null;
   // inside the walls (half a metre off them), under the ceiling's beams, over what stands on the floor
   s = { room: r, lo: v3(-w.x + 0.5, 1.3, w.z0 + 0.5), hi: v3(w.x - 0.5, r.ceiling - 0.8, w.z1 - 0.5), deck, boxes, caps, crowd: CROWDS[r.id] };
-  m.set(r.id, s);
+  m.set(r.key ?? r.id, s);
   return s;
 }
 const inBox = (b: Box, p: V3) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1 && p.z > b.z0 && p.z < b.z1;
@@ -259,7 +289,7 @@ interface Crew {
 }
 const mirror = (f: Fixed): Fixed => ({ ...f, pos: [-f.pos[0], f.pos[1], f.pos[2]], at: [-f.at[0], f.at[1], f.at[2]], move: f.move && [-f.move[0], f.move[1], f.move[2]], pan: f.pan && [-f.pan[0], f.pan[1], f.pan[2]] });
 const side = (f: Fixed): { left: Fixed; right: Fixed } => ({ left: f, right: mirror(f) });
-export const CREW: Record<RoomId, Crew> = {
+export const CREW: Partial<Record<RoomId, Crew>> = {
   hall: {
     wide: { pos: [0, 4.6, 23.9], at: [0, 3.4, 0.5], fov: 30, pan: [1.6, 0, 0], zoom: 0.8 },
     high: { pos: [-15, 10.5, 16], at: [0, 2.8, 0.5], fov: 36, move: [3, 0, 0] },
@@ -320,6 +350,92 @@ export const CREW: Record<RoomId, Crew> = {
     },
     drone: { zc: 1, rx: 8, rz: 14, y: 6.65, bob: 0.3, arc: 0.9, gate: 6.65, near: [1.2, 3.4, 2.5], phase: [0, 0, 0, 0.75, 0.55, 1], lookFar: [0, 1.8, 4], lookNear: [0, 1.6, 0.3] },
   },
+  // the cinema: from the back rows, high on the side, the front of the stalls, over the front rows;
+  // the stage filmed, and the audience from the stage
+  cinema: {
+    wide: { pos: [0, 10.5, 32], at: [0, 5, -2], fov: 32, pan: [2, 0, 0], zoom: 0.8 },
+    high: { pos: [-14, 13, 20], at: [0, 4.5, -1], fov: 36, move: [3, 0, 0] },
+    ...side({ pos: [-9, 3.6, 1.8], at: [-1.5, 3.4, -1], fov: 34, move: [1.0, 0, -0.2], pan: [1.0, 0, 0], shake: 0.025 }),
+    crowd: { pos: [-3.0, 6.6, 16], at: [0, 4.4, -1], fov: 36, move: [1.4, 0, 0.6], pan: [1.0, 0, 0], shake: 0.02 },
+    front: { pos: [-12.5, 5.6, 12], at: [0, 4.6, -1], fov: 42, move: [2, 0, 0], pan: [1, 0, 0] },
+    back: { pos: [3.0, 4.4, -3.2], at: [0, 3.2, 9], fov: 52, move: [-3, 0, 0], pan: [-2.5, 0, 0] },
+    pit: { z: 3.6, y: 2.4, x: 4 },
+    crane: { pivot: [-12, 1.8, 4.0], a: [-4.0, 8.5, 9.0], b: [-1.5, 3.6, 3.6], rise: 0.5, lookA: [0, 3.0, 4.0], lookB: [0, 4.6, -1.5], period: 32 },
+    walk: {
+      y: 1.65, way: [[-8.5, 4.0], [-4.2, 3.9], [0, 3.95], [4.2, 3.9], [8.5, 4.0]],
+      look: [[-7, 4.2, -2], [-3.5, 4.4, -2], [0, 4.6, -2], [3.5, 4.4, -2], [7, 4.2, -2]],
+    },
+    drone: { zc: 9, rx: 11, rz: 13, y: 10.5, bob: 0.3, arc: 0.9, gate: 9, near: [2, 4.2, 3.8], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 4.4, -1], lookNear: [0, 4.6, -1] },
+  },
+  // the bar: the counter filmed from the dance floor, from its corners, from behind the bar
+  bar: {
+    wide: { pos: [0, 1.9, 8.6], at: [0, 1.5, -2.8], fov: 34, pan: [1.2, 0, 0], zoom: 0.85 },
+    high: { pos: [-6.5, 2.9, 8.4], at: [0, 1.4, -2.5], fov: 40, move: [2, 0, 0] },
+    ...side({ pos: [-5.0, 1.8, 1.0], at: [-1.5, 1.4, -2.6], fov: 32, move: [0.6, 0, 0.2], pan: [0.6, 0, 0], shake: 0.02 }),
+    crowd: { pos: [1.2, 1.7, 1.5], at: [0, 1.3, -2.4], fov: 38, move: [0, 0, 0.6], pan: [0.6, 0, 0], shake: 0.015 },
+    front: { pos: [-4.0, 2.1, 7.8], at: [0, 1.5, -2.5], fov: 40, move: [1.2, 0, 0], pan: [0.6, 0, 0] },
+    back: { pos: [1.5, 2.0, -3.3], at: [0, 1.5, 4.5], fov: 50, move: [-2.0, 0, 0], pan: [-1.5, 0, 0] },
+    pit: { z: 0.4, y: 1.4, x: 1.6 },
+    // (between the heads on the dance floor and the lights under the low rail: a narrow band)
+    crane: { pivot: [6.6, 1.5, 7.8], a: [2.5, 2.65, 5.6], b: [0.8, 2.5, 1.2], rise: 0.05, lookA: [0, 1.2, 4.5], lookB: [0, 1.4, -2.4], period: 30 },   // (on the right: the mirror ball's on the left)
+    walk: {
+      y: 1.6, way: [[-5.0, 0.6], [-2.5, 0.45], [0, 0.5], [2.5, 0.45], [5.0, 0.6]],
+      look: [[-5.0, 1.4, -2.4], [-2.5, 1.4, -2.4], [0, 1.4, -2.4], [2.5, 1.4, -2.4], [5.0, 1.4, -2.4]],
+    },
+    drone: { zc: 2.5, rx: 5.0, rz: 4.6, y: 2.68, bob: 0.04, arc: 0.8, gate: 2.6, near: [1.2, 2.4, 1.5], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 1.4, -2.2], lookNear: [0, 1.4, -2.4] },
+  },
+  // the theatre: from the stalls (under the balcony's front), its front corner, the front of the
+  // stalls; the audience from the stage
+  theatre: {
+    wide: { pos: [0, 4.6, 16.4], at: [0, 6, -6], fov: 38, pan: [2.5, 0, 0], zoom: 0.8 },
+    high: { pos: [-18, 15, 19], at: [0, 6, -6], fov: 40, move: [4, 0, 0] },
+    ...side({ pos: [-13.5, 4.2, 3.3], at: [-2, 4.4, -5], fov: 36, move: [1.4, 0, -0.2], pan: [1.4, 0, 0], shake: 0.025 }),
+    crowd: { pos: [-4.0, 3.4, 12.5], at: [0, 5.5, -6], fov: 38, move: [1.8, 0, 0.6], pan: [1.4, 0, 0], shake: 0.02 },
+    front: { pos: [-17, 5, 8.5], at: [0, 5.5, -4], fov: 44, move: [2.5, 0, 0], pan: [1.4, 0, 0] },
+    back: { pos: [3.5, 4.6, -9], at: [0, 3.0, 9.5], fov: 54, move: [-4, 0, 0], pan: [-3.5, 0, 0] },
+    pit: { z: 4.3, y: 2.3, x: 6 },
+    crane: { pivot: [-15, 1.8, 4.3], a: [-5.5, 6, 8.5], b: [-2, 4.6, 4.3], rise: 0.5, lookA: [0, 3, 7], lookB: [0, 5.5, -4], period: 34 },
+    walk: {
+      y: 1.65, way: [[-12, 4.3], [-6, 4.22], [0, 4.25], [6, 4.22], [12, 4.3]],
+      look: [[-10, 5, -5], [-5, 5.3, -5], [0, 5.5, -5], [5, 5.3, -5], [10, 5, -5]],
+    },
+    drone: { zc: 7.5, rx: 13, rz: 7, y: 6, bob: 0.12, arc: 0.8, gate: 4.4, near: [2.5, 4.4, 4.3], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 5.5, -5], lookNear: [0, 5.5, -5] },
+  },
+  // the church: from the back of the nave, high over the pews, the side aisle, the central aisle;
+  // the congregation from behind the altar
+  church: {
+    wide: { pos: [0, 2.6, 20.6], at: [0, 3, -4], fov: 30, pan: [1.2, 0, 0], zoom: 0.8 },
+    high: { pos: [-6.4, 7.5, 12], at: [0, 2.6, -4], fov: 36, move: [2, 0, 0] },
+    ...side({ pos: [-7.8, 2.2, 0.0], at: [-1.0, 2.4, -4], fov: 32, move: [0.6, 0, -0.2], pan: [0.6, 0, 0], shake: 0.02 }),
+    crowd: { pos: [0, 2.3, 4.5], at: [0, 2.6, -4], fov: 36, move: [0, 0, 0.6], pan: [0.6, 0, 0], shake: 0.015 },
+    front: { pos: [-6.0, 3.2, 2.0], at: [0, 2.6, -4], fov: 40, move: [1.2, 0, 0], pan: [0.6, 0, 0] },
+    back: { pos: [2.4, 2.9, -6.7], at: [0, 1.6, 6], fov: 50, move: [-2.0, 0, 0], pan: [-1.5, 0, 0] },
+    pit: { z: -0.4, y: 2.0, x: 2.5 },
+    crane: { pivot: [-7.6, 1.5, 0.2], a: [-3.0, 3.6, 4.0], b: [-1.2, 2.8, -0.6], rise: 0.3, lookA: [0, 1.4, 4], lookB: [0, 2.6, -4.5], period: 44 },
+    walk: {
+      y: 1.6, way: [[-5.4, 0.15], [-2.7, 0.1], [0, 0.12], [2.7, 0.1], [5.4, 0.15]],
+      look: [[-4.0, 2.4, -4], [-2.0, 2.5, -4], [0, 2.6, -4.5], [2.0, 2.5, -4], [4.0, 2.4, -4]],
+    },
+    drone: { zc: 6, rx: 6.2, rz: 8, y: 5.2, bob: 0.2, arc: 0.8, gate: 4.4, near: [1.4, 2.8, -0.3], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 2.6, -4], lookNear: [0, 2.8, -4.5] },
+  },
+  // the ballroom: from the back of the room, high in a corner, from the side between the tables,
+  // from the edge of the dance floor; the room from behind the head table
+  ballroom: {
+    wide: { pos: [0, 3.0, 19.0], at: [0, 1.4, 5], fov: 34, pan: [1.4, 0, 0], zoom: 0.8 },
+    high: { pos: [-9.4, 5.0, 18.2], at: [0, 1.2, 5], fov: 38, move: [2, 0, 0] },
+    ...side({ pos: [-10.2, 2.4, 6.5], at: [0, 1.3, 6], fov: 32, move: [0, 0, 0.2], pan: [0.8, 0, 0], shake: 0.02 }),
+    crowd: { pos: [0, 2.2, 11.4], at: [0, 1.2, 5], fov: 36, move: [0, 0, -0.5], pan: [0.8, 0, 0], shake: 0.015 },
+    front: { pos: [-5.0, 2.6, 11.0], at: [0, 1.2, 6], fov: 40, move: [1.2, 0, 0], pan: [0.8, 0, 0] },
+    back: { pos: [2.4, 2.6, -5.3], at: [0, 1.2, 8], fov: 50, move: [-2.0, 0, 0], pan: [-1.5, 0, 0] },
+    pit: { z: 1.8, y: 1.8, x: 3 },
+    crane: { pivot: [9.7, 1.5, 6.5], a: [4.6, 3.6, 11.8], b: [2.6, 2.8, 1.4], rise: 0.3, lookA: [0, 1.2, 4], lookB: [0, 1.3, 8.5], period: 46 },
+    walk: {
+      y: 1.6, way: [[-3.6, 2.2], [-1.8, 2.1], [0, 2.2], [1.8, 2.1], [3.6, 2.2]],
+      look: [[-1.8, 1.3, 6], [-0.9, 1.3, 6], [0, 1.3, 6.5], [0.9, 1.3, 6], [1.8, 1.3, 6]],
+    },
+    // (round behind the dance floor, never over it: looking straight down at the dancers its view spun)
+    drone: { zc: 14, rx: 6.4, rz: 4, y: 4.2, bob: 0.12, arc: 0.8, gate: 3.6, near: [1.4, 2.6, 10.6], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 1.2, 6], lookNear: [0, 1.3, 6] },
+  },
   truss: {
     wide: { pos: [0, 2.5, 12.5], at: [0, 2.9, 1.5], fov: 34, pan: [1, 0, 0], zoom: 0.82 },
     high: { pos: [-6.0, 4.8, 9.0], at: [0, 2.6, 2.0], fov: 42, move: [2.0, 0, 0] },
@@ -336,6 +452,30 @@ export const CREW: Record<RoomId, Crew> = {
     drone: { zc: 1.5, rx: 7, rz: 10, y: 4.7, bob: 0.25, arc: 0.95, gate: 4.7, near: [1.5, 2.7, 5.0], phase: [0, 0, 0, 0.85, 0.15, 1], lookFar: [0, 3.0, 1.5], lookNear: [0, 3.3, 1.5] },
   },
 };
+// your own stage: the test truss's crew, moved and stretched to its size (the truss room's stage
+// is ~11 m wide round its truss at z 1.5, 4 m up)
+const crews = new Map<string, Crew>();
+export function crewOf(r: Room): Crew {
+  const own = CREW[r.id];
+  if (own) return own;
+  const had = crews.get(r.key ?? r.id);
+  if (had) return had;
+  const t = CREW.truss!, kx = Math.max(0.8, r.W / 11), kz = Math.max(0.8, r.D / 6), ty = r.truss[0]?.y ?? 5, ky = Math.max(0.8, ty / 4.0);
+  const lift = r.deck.x > 0 ? DECK : 0, top = r.ceiling - 0.4;
+  // (moved to its middle, never over its ceiling: the bar's is low)
+  const p = ([x, y, z]: P3): P3 => [x * kx, Math.min(top, y * ky + lift * 0.5), (z - 1.5) * kz + r.zc];
+  const v = ([x, y, z]: P3): P3 => [x * kx, y * ky, z * kz];
+  const fx = (f: Fixed): Fixed => ({ ...f, pos: p(f.pos), at: p(f.at), ...(f.move ? { move: v(f.move) } : {}), ...(f.pan ? { pan: v(f.pan) } : {}) });
+  const c: Crew = {
+    wide: fx(t.wide), high: fx(t.high), left: fx(t.left), right: fx(t.right), crowd: fx(t.crowd), back: fx(t.back), front: fx(t.front),
+    pit: { z: (t.pit.z - 1.5) * kz + r.zc, y: Math.min(top, t.pit.y * ky + lift * 0.5), x: t.pit.x * kx },
+    crane: { ...t.crane, pivot: p(t.crane.pivot), a: p(t.crane.a), b: p(t.crane.b), lookA: p(t.crane.lookA), lookB: p(t.crane.lookB) },
+    walk: { y: Math.min(top, t.walk.y * ky + lift * 0.5), way: t.walk.way.map(([x, z]) => [x * kx, (z - 1.5) * kz + r.zc] as [number, number]), look: t.walk.look.map(p) },
+    drone: { ...t.drone, zc: r.zc, rx: t.drone.rx * kx, rz: t.drone.rz * kz, y: Math.min(top, t.drone.y * ky), gate: Math.min(top, t.drone.gate * ky), near: p(t.drone.near), lookFar: p(t.drone.lookFar), lookNear: p(t.drone.lookNear) },
+  };
+  crews.set(r.key ?? r.id, c);
+  return c;
+}
 
 // ---- what a crew remembers between frames
 export interface Memory {
@@ -411,7 +551,7 @@ function fixedAt(f: Fixed, s: number, seed: number, t: number, cam: string): Sho
 // ---- Crane: an arm from the pivot, swinging and telescoping from over the crowd (a) to the stage (b)
 function sph(c: V3, p: V3) { const d = add(p, c, -1), r = Math.hypot(d.x, d.y, d.z); return { r, yaw: Math.atan2(d.x, d.z), pitch: Math.asin(clamp(d.y / r, -1, 1)) }; }
 function craneAt(r: Room, t: number, loud: number): Shot {
-  const c = CREW[r.id].crane, piv = P(c.pivot), A = sph(piv, P(c.a)), B = sph(piv, P(c.b));
+  const c = crewOf(r).crane, piv = P(c.pivot), A = sph(piv, P(c.a)), B = sph(piv, P(c.b));
   // out and back: slowing to a stop at each end (s 0 over the crowd, 1 at the stage)
   const s = 0.5 - 0.5 * Math.cos((TAU * t) / c.period);
   const rr = A.r + (B.r - A.r) * s, yaw = A.yaw + (B.yaw - A.yaw) * s;
@@ -428,7 +568,7 @@ interface Path { pts: V3[]; cum: Float64Array; us: Float64Array; len: number; lo
 // (what it looks at, every LOOK_STEP metres along the way, averaged over a few metres: an operator
 // turns smoothly from the drummer to the singer, not as fast as the points change)
 const LOOK_STEP = 0.1, LOOK_SPAN = 2.4;
-const paths = new Map<RoomId, Path>();
+const paths = new Map<string, Path>();
 function cr(a: number, b: number, c: number, d: number, u: number) {
   const u2 = u * u, u3 = u2 * u;
   return 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (3 * b - a - 3 * c + d) * u3);
@@ -439,9 +579,9 @@ function along(list: V3[], u: number): V3 {
   return v3(cr(a.x, b.x, c.x, d.x, f), cr(a.y, b.y, c.y, d.y, f), cr(a.z, b.z, c.z, d.z, f));
 }
 function pathOf(r: Room): Path {
-  let p = paths.get(r.id);
+  let p = paths.get(r.key ?? r.id);
   if (p) return p;
-  const w = CREW[r.id].walk, pts = w.way.map(([x, z]) => v3(x, w.y, z)), looks = w.look.map(P);
+  const w = crewOf(r).walk, pts = w.way.map(([x, z]) => v3(x, w.y, z)), looks = w.look.map(P);
   const N = 48 * (pts.length - 1), cum = new Float64Array(N + 1), us = new Float64Array(N + 1);
   let last = along(pts, 0);
   for (let i = 1; i <= N; i++) { const u = (i / N) * (pts.length - 1), q = along(pts, u); cum[i] = cum[i - 1] + Math.hypot(q.x - last.x, q.y - last.y, q.z - last.z); us[i] = u; last = q; }
@@ -458,7 +598,7 @@ function pathOf(r: Room): Path {
   const h = Math.round(LOOK_SPAN / 2 / LOOK_STEP), mid = new Float64Array(n * 3);
   box(raw, mid, h); box(mid, look, h);
   p = tmp;
-  paths.set(r.id, p);
+  paths.set(r.key ?? r.id, p);
   return p;
 }
 function lookAt(p: Path, d: number): V3 {
@@ -488,7 +628,7 @@ function steadicamAt(r: Room, t: number): Shot {
 
 // ---- Drone: big arcs out high, diving in on a drop
 function droneAt(r: Room, t: number, dive: number): Shot {
-  const c = CREW[r.id].drone, [g0, g1, x0, x1, n0, n1] = c.phase;
+  const c = crewOf(r).drone, [g0, g1, x0, x1, n0, n1] = c.phase;
   const w1 = TAU / 72, w2 = TAU / 27, a = c.arc * (0.75 * Math.sin(w1 * t) + 0.25 * Math.sin(w2 * t + 1.3));
   const da = c.arc * (0.75 * w1 * Math.cos(w1 * t) + 0.25 * w2 * Math.cos(w2 * t + 1.3));
   const far = v3(c.rx * Math.sin(a), c.y + c.bob * Math.sin((TAU * t) / 37), c.zc + c.rz * Math.cos(a));
@@ -532,7 +672,11 @@ function subjects(r: Room, c: Cast): ((k: number) => Close)[] {
         return l.y > 1.8 ? { pos: add(l, v3(sx * 0.7, -1.35, 1.9)), at: add(l, v3(0, -0.1, 0)), fov: 28, cam: kind } : { pos: add(l, v3(sx * 0.6, 1.4, 2.0)), at: add(l, v3(0, 0.35, 0)), fov: 30, cam: kind };
       });
     }
-    if (!out.length) out.push(() => ({ pos: v3(1.5, 2.0, 5.5), at: v3(0, 3.6, 1.5), fov: 34, cam: 'the truss' }));
+    // (no lights in it either: the test truss's own view; another room's from its side)
+    if (!out.length) {
+      const f = crewOf(r).left;
+      out.push(r.id === 'truss' ? () => ({ pos: v3(1.5, 2.0, 5.5), at: v3(0, 3.6, 1.5), fov: 34, cam: 'the truss' }) : () => ({ pos: P(f.pos), at: P(f.at), fov: f.fov, cam: 'the room' }));
+    }
   }
   return out;
 }
@@ -545,7 +689,7 @@ function closeAt(c: Close, s: number, t: number, seed: number): Shot {
 }
 // Broadcast's long lens from the pit (or from in front of the DJ, or on a light)
 function pitShot(r: Room, c: Cast, pick: number): Close {
-  const crew = CREW[r.id];
+  const crew = crewOf(r);
   const ppl = c.people.filter((p) => p.who !== 'drums' || r.id !== 'hall');
   if (!ppl.length) { const s = subjects(r, c); return s[pick % s.length](pick); }
   // (the singer or the DJ half the time)
@@ -592,7 +736,7 @@ function broadcast(r: Room, m: Music, c: Cast, mem: Memory, crane: () => Shot): 
     else if (since >= 8 || (since >= 2 && since >= Math.min(mem.hold, want))) { cut(mem, bar, m.t, nextCam(mem, bar), want); did = true; }
   }
   mem.tick = bar;
-  const s = Math.max(0, m.t - mem.cutT), crew = CREW[r.id], name = CAMS[mem.cam];
+  const s = Math.max(0, m.t - mem.cutT), crew = crewOf(r), name = CAMS[mem.cam];
   const shot = name === 'crane' ? crane() : name === 'close' ? closeAt(pitShot(r, c, mem.cutAt), s, m.t, mem.seed)
     : name === 'frontL' || name === 'frontR' ? fixedAt(name === 'frontL' ? crew.front : mirror(crew.front), s, mem.seed, m.t, name) : fixedAt(crew[name], s, mem.seed, m.t, name);
   shot.cut = did;

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { LIVE_VIEW } from '../store/kept';
+  import { pinMatches } from '../model/pin';
   import { looksPage } from '../content/busking';
   import { whatsNew } from '../content/whatsNew';
   import { clockOf } from '../model/timeline';
@@ -17,7 +19,7 @@
   import GoStrip from './GoStrip.svelte';
   import { fogTimer as makeFogTimer } from './actions';
   import { app, newId } from '../app.svelte';
-  import { dialogOpen, spaceIsGo, tablist, ui } from './ui.svelte';
+  import { dialogOpen, isShortcut, spaceIsGo, tablist, typesText, ui } from './ui.svelte';
   import type { Widget } from '../model/types';
   import { enableMidi, midiReady, midiSupported, onMidiInputs } from '../input/midi';
   import { hhmm, pauseItems } from './schedulePause';
@@ -40,18 +42,18 @@
   // locked for the service: the page it was locked on, and no other (also after a restart)
   const lockedOn = $derived(app.locked ? pages.find((p) => p.id === app.show.settings.lockPage) : undefined);
   const page = $derived(lockedOn ?? pages.find((p) => p.id === app.page) ?? pages[0]);
+  const PLAYS = ['cue', 'cuelist', 'list', 'effect', 'song', 'fog', 'group'];
+  const playable = $derived(page?.widgets.some((w) => PLAYS.includes(w.type) || (w.type === 'fader' && (w.target === 'list' || w.target === 'effect'))) ?? false);
   const tabs = $derived(lockedOn ? [lockedOn] : pages);
   let selW = $state<string | null>(null);
   let drag = $state<string | null>(null);
   let dropAt = $state<string | null>(null);
   // the stage next to the buttons on a big screen; on a tablet the buttons get the room (the eye shows it)
   // the button size and the stage: remembered on this device (a reload by the cleaner keeps them)
-  const VIEW_KEY = 'luxdmx.seq.liveview';
-  let saved: { stage?: boolean; tile?: number } = {};
-  try { saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}'); } catch { /* defaults */ }
+  const saved = LIVE_VIEW.get();
   let showStage = $state(saved.stage ?? (typeof window === 'undefined' || window.innerWidth > 1100));
   let tile = $state(saved.tile ?? 130);
-  $effect(() => { const v = JSON.stringify({ stage: showStage, tile }); try { localStorage.setItem(VIEW_KEY, v); } catch { /* not kept */ } });
+  $effect(() => { LIVE_VIEW.set({ stage: showStage, tile }); });
   const selected = $derived(page?.widgets.find((w) => w.id === selW));
   const progHeld = $derived(Object.keys(app.programmer).length);
   // Look buttons name their list only when this page has looks from more than one list.
@@ -107,13 +109,24 @@
   // unlocking asks for it.
   async function pinLock() { if (await app.pinLock()) selW = null; }
   // `keys`: locked from the keyboard (the focus stays on the padlock; after a click Space is GO again)
+  function lockMenu(e: MouseEvent) {
+    const keys = e.detail === 0;
+    ui.openMenu(e, [
+      { heading: 'Lock for the show: only playing' },
+      { label: app.show.settings.lockPin ? 'Lock with the PIN…' : 'Lock with a PIN…', icon: 'lock', run: pinLock },
+      { label: 'Lock without a PIN (hold the padlock to unlock)', icon: 'lock', run: () => { delete app.show.settings.lockPin; void setLocked(true, keys); } },
+      // (a locked page still has the machines and Blackout on it: for staff, a page of just the looks)
+      { sep: true },
+      { label: 'First, a page with just the looks (for staff)', icon: 'plus', run: looksOnly },
+    ]);
+  }
   async function setLocked(on: boolean, keys = false) {
     if (!on && app.show.settings.lockPin) {
       // a wrong PIN: the question again, saying so (no holding the padlock all over)
       for (let tries = 0; ; tries++) {
         const pin = await ui.ask('Unlock', '', { label: 'PIN', ok: 'Unlock', pin: true, body: tries ? "That wasn't it. Try again." : undefined });
         if (pin === null) return;
-        if (pin.trim() === app.show.settings.lockPin) break;
+        if (pinMatches(app.show.settings.lockPin, pin)) break;
         if (tries >= 4) { ui.toast('Wrong PIN', 2500); return; }
       }
     }
@@ -239,13 +252,24 @@
     app.page = p.id;
     app.editPage = true;
   }
+  function movePage(id: string, by: number) {
+    app.checkpoint();
+    const own = app.ownPages(), i = own.findIndex((x) => x.id === id), j = i + by;
+    if (i < 0 || j < 0 || j >= own.length) return;
+    const [p] = own.splice(i, 1);
+    own.splice(j, 0, p);
+    app.markDirty(0);
+  }
   function pageMenu(e: MouseEvent, id: string) {
     const p = pages.find((x) => x.id === id)!;
     ui.openMenu(e, [
       { label: 'Rename', icon: 'edit', run: async () => { const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === id); if (q) q.name = n; app.markDirty(0); } } },
       { label: 'Duplicate', icon: 'duplicate', run: () => { app.ownPages(); const q = app.show.pages.find((x) => x.id === id)!; const c = { ...JSON.parse(JSON.stringify(q)), id: newId('pg'), name: `${q.name} (copy)`, locked: false }; c.widgets.forEach((w: Widget) => (w.id = newId('w'))); app.show.pages.push(c); app.page = c.id; } },
+      // (the pages in another order: there was no way to)
+      { label: 'Move left', icon: 'left', disabled: pages.findIndex((x) => x.id === id) < 1, run: () => movePage(id, -1) },
+      { label: 'Move right', icon: 'right', disabled: pages.findIndex((x) => x.id === id) >= pages.length - 1, run: () => movePage(id, 1) },
       { label: fresh.length ? `Add what's new from the show (${fresh.length})` : "Nothing new in the show for it", icon: 'plus', disabled: !fresh.length, run: addNew },
-      { label: 'Rebuild from the show…', icon: 'update', disabled: !app.show.pages.length, run: async () => {
+      { label: 'Rebuild all pages from the show…', icon: 'update', disabled: !app.show.pages.length, run: async () => {
         if (!(await ui.confirm('Rebuild the pages?', 'Your pages are replaced by one built from the show (your own buttons, keys and MIDI go). Undo brings them back.', 'Rebuild', false))) return;
         const lock = app.show.pages.some((x) => x.locked);
         app.checkpoint(); app.show.pages = []; app.page = ''; app.editPage = false;
@@ -253,7 +277,14 @@
         app.markDirty(0); app.toastUndo('Pages rebuilt from the show');
       } },
       { sep: true },
-      { label: 'Delete page', icon: 'trash', danger: true, disabled: app.show.pages.length < 2, run: () => { app.show.pages = app.show.pages.filter((x) => x.id !== id); app.page = ''; } },
+      // (the page next to it comes up, not the first; undo brings it back; it's saved: it wasn't)
+      { label: 'Delete page', icon: 'trash', danger: true, disabled: app.show.pages.length < 2, run: () => {
+        const i = app.show.pages.findIndex((x) => x.id === id), name = app.show.pages[i]?.name ?? 'The page';
+        app.checkpoint();
+        app.show.pages = app.show.pages.filter((x) => x.id !== id);
+        app.page = (app.show.pages[i] ?? app.show.pages[i - 1])?.id ?? '';
+        app.markDirty(0); app.toastUndo(`${name} deleted`);
+      } },
     ]);
   }
   function drop(e: DragEvent, target: string) {
@@ -275,14 +306,19 @@
     app.markDirty(0);
   }
   // one place earlier or later (the menu, Alt+arrows); the focus stays on it
+  // (Alt+Up and Alt+Down: a row, as many places as the grid has columns; they went one place, like left and right)
+  const gridCols = () => { const g = document.querySelector('.live .grid'); return g ? Math.max(1, getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length) : 1; };
   function moveBy(id: string, by: number) {
     app.ownPages();
     const p = app.show.pages.find((x) => x.id === page.id);
-    const i = p?.widgets.findIndex((x) => x.id === id) ?? -1, j = i + by;
-    if (!p || i < 0 || j < 0 || j >= p.widgets.length) return;
+    const i = p?.widgets.findIndex((x) => x.id === id) ?? -1;
+    if (!p || i < 0) return;
+    const j = Math.max(0, Math.min(p.widgets.length - 1, i + by));
+    if (j === i) return;
     app.checkpoint();
     const list = [...p.widgets];
-    [list[i], list[j]] = [list[j], list[i]];
+    const [it] = list.splice(i, 1);
+    list.splice(j, 0, it);
     p.widgets = list;
     app.markDirty(0);
     queueMicrotask(() => document.querySelector<HTMLElement>(`.live .grid [data-widget="${CSS.escape(id)}"]`)?.focus());
@@ -311,9 +347,8 @@
   }
   // Keyboard: a widget's key presses it (held keys hold flash and fog), Space is GO.
   function keydown(e: KeyboardEvent) {
-    if (app.view !== 'live' || app.editPage || dialogOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
-    const tag = (e.target as HTMLElement).tagName;
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (app.view !== 'live' || app.editPage || dialogOpen() || isShortcut(e)) return;
+    if (typesText(e.target)) return;                  // (a fader, e.g. the master, takes no keys: the page's work there)
     if (e.key === 'Enter' && (e.target as HTMLElement).closest?.('.tile')) return;   // Enter presses the focused button
     if (e.code === 'Space') {
       if (!spaceIsGo(e)) { if (e.repeat) e.preventDefault(); return; }
@@ -411,13 +446,16 @@
     <div class="pages" role="tablist" aria-label="Pages" use:tablist>
       {#each tabs as p (p.id)}
         <button role="tab" aria-selected={p.id === page?.id} class:cur={p.id === page?.id} onclick={() => { app.page = p.id; selW = null; }} oncontextmenu={(e) => { if (app.locked) e.preventDefault(); else pageMenu(e, p.id); }}
-                ondblclick={async () => { if (app.locked) return; const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === p.id); if (q) q.name = n; app.markDirty(0); } }} title="Double-click to rename, right-click for more">
+                ondblclick={async () => { if (app.locked) return; const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === p.id); if (q) q.name = n; app.markDirty(0); } }} title="{p.name}: double-click to rename, right-click for more (move it, duplicate...)">
           {#if p.locked}<Icon name="lock" size={12} />{/if}{p.name}</button>
       {/each}
     </div>
     {#if !app.locked}<button class="ghost" onclick={newPage} title="New page (right-click: one with just the looks)" aria-label="New page"
       oncontextmenu={(e) => { e.preventDefault(); ui.openMenu(e, [{ label: 'Empty page', icon: 'plus', run: newPage }, { label: 'Just the looks (for staff)', icon: 'plus', run: looksOnly }]); }}><Icon name="plus" /></button>{/if}
-    <span class="grow"></span>
+    <!-- (editing with nothing picked: what to do, here in the bar's free room: above the controls it
+         pushed them all down as Edit was pressed, floating over them it covered some; on a phone,
+         where the bar has no room, above the controls) -->
+    <span class="grow">{#if app.editPage && !narrow}<button onclick={addMenu} aria-label="Add"><Icon name="plus" />Add</button>{/if}{#if app.editPage && !selected && !narrow}<span class="ehint">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</span>{#if fresh.length}<button class="chip" onclick={addNew} title="New in the show, not on a page yet: {freshNames}">Add the {fresh.length} new here</button>{/if}{/if}</span>
     {#if app.output === 'blind' && app.bridges.length}
       <!-- blind: said here too (on a phone the top bar only has a dot), one tap asks to go on stage -->
       <button class="chip nextup blind" onclick={() => void app.askOnStage()} title="Blind: you see it here, the lights don't get it. Click to send it to the stage.">
@@ -484,19 +522,22 @@
     {/if}
     {/if}
     {#if page}
-      <!-- Locking is one click; unlocking takes holding the padlock for a second (so a stray tap
-           during the service can't do it). -->
+      <!-- Locking: a tap gives the choice, with or without a PIN (the PIN was only on a right-click,
+           which a tablet doesn't have); unlocking takes holding the padlock for a second (so a stray
+           tap during the service can't do it). -->
       <button class="ghost lockbtn" class:holding={unlockAt > 0} style="--hold:{HOLD_MS}ms"
-              onclick={(e) => { if (justUnlocked) { justUnlocked = false; return; } if (!page.locked) setLocked(true, e.detail === 0); else if (!unlockAt) ui.toast('Hold the padlock for a second to unlock', 2500); }}
+              onclick={(e) => { if (justUnlocked) { justUnlocked = false; return; } if (!page.locked) lockMenu(e); else if (!unlockAt) ui.toast('Hold the padlock for a second to unlock', 2500); }}
               onpointerdown={() => { justUnlocked = false; if (page.locked) startUnlock(); }} onpointerup={stopUnlock} onpointerleave={stopUnlock} onpointercancel={stopUnlock}
               onkeydown={(e) => { if (page.locked && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) startUnlock(false); } }} onkeyup={stopUnlock}
-              oncontextmenu={(e) => { e.preventDefault(); if (!page.locked) ui.openMenu(e, [{ label: 'Lock', icon: 'lock', run: () => setLocked(true) }, { label: app.show.settings.lockPin ? 'Lock with the PIN…' : 'Lock with a PIN…', icon: 'lock', run: pinLock }]); }}
-              title={page.locked ? 'Locked for the show: hold to unlock' : 'Lock the page for the show: only playing, no editing (right-click: with a PIN)'} aria-label={page.locked ? 'Unlock page (hold)' : 'Lock page'}>
+              oncontextmenu={(e) => { e.preventDefault(); if (!page.locked) lockMenu(e); }}
+              title={page.locked ? 'Locked for the show: hold to unlock' : 'Lock the page for the show: only playing, no editing (with a PIN or without)'} aria-label={page.locked ? 'Unlock page (hold)' : 'Lock page'}>
         <Icon name={page.locked ? 'lock' : 'unlock'} /></button>
     {/if}
     {#if !narrow}<button class="ghost" onclick={full} title="Full screen" aria-label="Full screen"><Icon name="live" /></button>{/if}
-    {#if app.editPage}<button onclick={addMenu} aria-label="Add"><Icon name="plus" />{#if !narrow}Add{/if}</button>{/if}
-    {#if !app.locked}<button class:on={app.editPage} onclick={edit}><Icon name="edit" />{app.editPage ? 'Done' : 'Edit'}</button>{/if}
+    <!-- (on a phone Add sits by Done; elsewhere it's in the bar's free room with the hint, so pressing
+         Edit moves none of the buttons on the right) -->
+    {#if app.editPage && narrow}<button onclick={addMenu} aria-label="Add"><Icon name="plus" /></button>{/if}
+    {#if !app.locked}<button class="editbtn" class:on={app.editPage} onclick={edit}><Icon name="edit" />{app.editPage ? 'Done' : 'Edit'}</button>{/if}
   </div>
 
   {#if built}<GoStrip />{/if}
@@ -513,12 +554,23 @@
   <div class="body" class:with-stage={showStage} class:editing={app.editPage}>
     {#if showStage}<div class="stagebox">{#if shown || ui.stage3d}<StageView compact readonly blindChip={false} />{/if}</div>{/if}
     <div class="grid" style="--tile:{tile}px" role="list">
+      <!-- (on a phone: what to do while editing, above the controls; elsewhere it's in the bar) -->
+      {#if app.editPage && !selected && narrow}
+        {#if fresh.length}<aside class="hint pick inflow">New in the show, not on a page yet: {freshNames}. <button class="ghost" onclick={addNew}>Add them here</button></aside>{/if}
+        <aside class="hint pick inflow">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</aside>
+      {/if}
+      <!-- (a new show's page has only its masters: nothing said where the buttons would come from) -->
+      <!-- (and only when the show has cues: with none the GO bar above already says what to do, it asked three times) -->
+      {#if built && page?.widgets.length && !playable && !app.editPage && !app.locked && app.show.cueLists.some((l) => l.cues.length)}
+        <div class="empty">Nothing to play yet: your cues, effects and machines get their buttons here once you make them in Program.
+          <button class="ghost link" onclick={() => (app.view = 'program')}>Go to Program</button></div>
+      {/if}
       {#each built ? (page?.widgets ?? []) : [] as w (w.id)}
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions (Alt+arrows come from the control inside it) -->
         <div class="cell" class:wide={w.size === 2} class:full={w.type === 'label' || w.type === 'cuelist'} class:drop={dropAt === w.id} class:dragging={drag === w.id} role="listitem" data-w={w.id}
              draggable={app.editPage} ondragstart={() => (drag = w.id)} ondragover={(e) => { if (drag) { e.preventDefault(); dropAt = w.id; } }}
              ondrop={(e) => drop(e, w.id)} ondragend={() => { drag = null; dropAt = null; }}
-             onkeydown={(e) => { if (app.editPage && e.altKey && /^Arrow/.test(e.key)) { e.preventDefault(); moveBy(w.id, e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1); } }}>
+             onkeydown={(e) => { if (app.editPage && e.altKey && /^Arrow/.test(e.key)) { e.preventDefault(); moveBy(w.id, e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : (e.key === 'ArrowUp' ? -1 : 1) * gridCols()); } }}>
           <WidgetTile {w} {manyLists} editing={app.editPage} selected={selW === w.id} onselect={(e) => pick(w.id, e)} onmenu={(e) => tileMenu(e, w)} />
           {#if app.editPage}<span class="grip" onpointerdown={(e) => gridGrip(e, w.id)} aria-hidden="true" title="Drag to move"><Icon name="grip" size={14} /></span>{/if}
         </div>
@@ -527,15 +579,10 @@
         <div class="empty">This page is empty. {app.editPage ? 'Add controls with the Add button.' : 'Press Edit to add buttons and faders.'}</div>
       {/if}
     </div>
-    {#if app.editPage && shown}
+    {#if app.editPage && shown && selected}
       <!-- Floats over the page (the buttons don't move), on the side away from the one being changed. -->
       <div class="float" class:left={editLeft}>
-        {#if selected}
-          {#key selected.id}<WidgetEditor page={page.id} id={selected.id} onremove={() => removeW(selected.id)} onclose={closeEditor} />{/key}
-        {:else}
-          {#if fresh.length}<aside class="hint pick">New in the show, not on a page yet: {freshNames}. <button class="ghost" onclick={addNew}>Add them here</button></aside>{/if}
-          <aside class="hint pick">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</aside>
-        {/if}
+        {#key selected.id}<WidgetEditor page={page.id} id={selected.id} onremove={() => removeW(selected.id)} onclose={closeEditor} />{/key}
       </div>
     {/if}
   </div>
@@ -550,7 +597,8 @@
   }
   .bar { flex-wrap: wrap; }
   .pages { display: flex; gap: .25rem; flex-wrap: wrap; }
-  .pages button { border-radius: 999px; padding: .25rem .8rem; }
+  /* (a long name ends in …, the whole of it on hover: it pushed the bar onto a second row) */
+  .pages button { border-radius: 999px; padding: .25rem .8rem; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
   .pages button.cur { border-color: var(--green); background: #45d85c14; }
   .zoom { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); } .zoom input { width: 90px; }
   .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; gap: .6rem; position: relative; }
@@ -558,8 +606,15 @@
   .float { position: absolute; top: 0; right: 0; z-index: 20; max-height: 100%; overflow: auto; border-radius: var(--radius);
     box-shadow: 0 10px 40px #000a, 0 0 0 1px var(--line2); background: var(--panel); }
   .float.left { right: auto; left: 0; }
-  .float .pick { margin: 0; border: 0; max-width: 240px; }
+  .pick.inflow { grid-column: 1 / -1; margin: 0; }
+  .grow { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+  .editbtn { min-width: 5.4rem; justify-content: center; }     /* (Edit and Done the same width: nothing next to it moves) */
+  .ehint { color: var(--muted); font-size: .82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ehint :global(b) { color: var(--text); }
   .stagebox { min-height: 0; display: flex; align-self: start; height: min(62vh, 460px); }
+  /* (the stage's own least height is for a page of its own: in this box it fits the box, it ran
+     40 px over the heading under it on a phone) */
+  .stagebox > :global(.stage-wrap) { min-height: 0; }
   .pick { align-self: start; padding: .8rem; border: 1px dashed var(--line2); border-radius: var(--radius); }
   .grid { min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr)); gap: .5rem; align-content: start; padding: 2px; }
   .cell { display: grid; position: relative; }
@@ -574,10 +629,12 @@
   .cell :global(.tile) { min-height: calc(var(--tile) * .72); }
   .empty { grid-column: 1 / -1; color: var(--muted); padding: 2rem; text-align: center; border: 1px dashed var(--line2); border-radius: var(--radius); }
   /* phones: the controls above the buttons in one row that scrolls sideways, no button-size slider */
+  /* (the page tabs scroll on their own and the controls stay: when the whole row scrolled, Lock and
+     Edit were past the edge with nothing to say so) */
   @media (max-width: 700px) {
-    .bar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .bar { flex-wrap: nowrap; }
     .bar > :global(*) { flex: none; }             /* nothing squeezed under its neighbour */
-    .pages { flex-wrap: nowrap; }
+    .bar > .pages { flex: 1 1 auto; min-width: 3rem; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
     .bar .zoom { display: none; }
     /* the bar scrolls: the hold-to-unlock line goes along the top of the screen instead */
     .bar.unlocking::after { position: fixed; top: 0; bottom: auto; z-index: 50; }

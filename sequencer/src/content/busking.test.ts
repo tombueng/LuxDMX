@@ -85,3 +85,15 @@ describe('fog or haze', () => {
     expect(buskingPage(s).widgets.find((w) => w.type === 'fog')?.label).toBe('Fog');
   });
 });
+
+describe('the generated page and the list GO plays', () => {
+  it('a play picked for GO is the one its whole-list panel shows (not the first list)', () => {
+    const s = emptyShow();
+    s.fixtures = [{ id: 'p', name: 'P', typeId: 'gen-dimmer', mode: '', universe: 0, address: 1, x: 0.5, y: 0.5 }];
+    const a = { ...list('show', [cue('a1', { p: { intensity: 1 } })]), play: true }, b = { ...list('play', [cue('b1', { p: { intensity: 0.5 } })]), play: true };
+    s.cueLists = [a, b];
+    expect(buskingPage(s).widgets.find((w) => w.type === 'cuelist')).toMatchObject({ list: 'show' });
+    expect(buskingPage(s, 'play').widgets.find((w) => w.type === 'cuelist')).toMatchObject({ list: 'play' });
+    expect(buskingPage(s, 'gone').widgets.find((w) => w.type === 'cuelist')).toMatchObject({ list: 'show' });   // (one that isn't there: the first)
+  });
+});

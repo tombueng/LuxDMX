@@ -8,7 +8,8 @@
 // "@ 75", "@ full", "@ out", "@ +10" / "@ -10" from where each light is; "full" and "out" also
 // without the "@". Parsing only: the app does what it says (app.runCommand).
 
-export type Level = { abs: number } | { rel: number };
+// (`asked`: more than full was typed, 150: it's full, and said so)
+export type Level = { abs: number; asked?: number } | { rel: number };
 export interface Pick { fixtures: number[]; groups: number[]; cells: { fixture: number; cells: number[] }[]; all?: boolean }
 // One step of a selection: add it, or take it out. `base`: start from nothing (a new selection)
 // or from what's selected now (a command starting with + or -).
@@ -17,10 +18,11 @@ export interface Command {
   steps?: Step[];
   base?: 'new' | 'current';
   level?: Level;            // on what was said, or on the selection
-  action?: 'clear' | 'record' | 'go' | 'back' | 'release' | 'blackout' | 'highlight' | 'update' | 'next' | 'prev' | 'goto' | 'delete' | 'time' | 'undo' | 'help';
+  action?: 'clear' | 'record' | 'go' | 'back' | 'release' | 'releaseall' | 'blackout' | 'highlight' | 'lowlight' | 'update' | 'next' | 'prev' | 'goto' | 'delete' | 'time' | 'undo' | 'redo' | 'help' | 'label';
   list?: number;            // which list (from 1); none: the one Live plays
   cue?: number;             // a cue by its number (goto, record, update, delete, time)
   time?: number;            // a fade in seconds (cue 5 time 3, record cue 5 time 3)
+  label?: string;           // a cue's name, in quotes (record cue 5 "Verse", cue 5 "Chorus"), or after "label"
   error?: string;
 }
 
@@ -33,12 +35,20 @@ const WORDS: Record<string, string> = {
   highlight: 'highlight', hl: 'highlight', list: 'list', l: 'list',
   next: 'next', prev: 'prev', previous: 'prev', last: 'prev',
   goto: 'goto', cue: 'cue', q: 'cue', time: 'time', delete: 'delete', del: 'delete',
-  undo: 'undo', oops: 'undo', help: 'help', '?': 'help',
+  undo: 'undo', oops: 'undo', redo: 'redo', help: 'help', '?': 'help',
+  // (desk words from MA and Eos: store is record, fade is time, a fixture or channel number is just
+  // the number, "release all" and "off" let go of everything; lowlight as the panel's button)
+  store: 'record', sto: 'record', fade: 'time', lowlight: 'lowlight', ll: 'lowlight', off: 'releaseall', releaseall: 'releaseall',
+  fixture: '', fix: '', fixt: '', chan: '', ch: '', channel: '',
 };
 
 // "-" takes out, as on MA and Eos desks ("1-4" is light 1 without 4; a run is "1 thru 4" or "1>4").
 function tokens(text: string): string[] {
-  return text.toLowerCase().replace(/%/g, ' % ').replace(/([@+\-.>])/g, ' $1 ').split(/\s+/).filter(Boolean).map((t) => WORDS[t] ?? t);
+  // (a comma between digits is a point: a German keypad's decimal key types one, "22,3", "@ 50,5")
+  // ("go to" is goto as on Eos, "to" read as thru; "release all" one word; desk words that only name
+  // what the number is, fixture, chan, dropped)
+  return text.toLowerCase().replace(/(\d),(\d)/g, '$1.$2').replace(/\bgo\s+to\b/g, 'goto').replace(/\brel(?:ease)?\s+all\b/g, 'releaseall')
+    .replace(/%/g, ' % ').replace(/([@+\-.>])/g, ' $1 ').split(/\s+/).filter(Boolean).map((t) => WORDS[t] ?? t).filter(Boolean);
 }
 // (a number a light, a cell, a group or a cue can have: no bigger than 99999, so a typo of twenty
 // digits is said, not counted to)
@@ -55,14 +65,17 @@ function levelOf(v: string[]): Level | string {
   if (v[v.length - 1] === '%') { const n = v.slice(0, -1); if (n.length === 1 && /^\d+(\.\d+)?$/.test(n[0])) return { abs: Math.min(100, +n[0]) / 100 }; return bad; }
   if (v.length === 1 && v[0] === 'full') return { abs: 1 };
   if (v.length === 1 && v[0] === 'out') return { abs: 0 };
-  if (v.length === 1 && /^\d+$/.test(v[0])) return { abs: Math.min(100, v[0].length === 1 ? +v[0] * 10 : +v[0]) / 100 };   // (one digit: tens)
+  if (v.length === 1 && /^\d+$/.test(v[0])) { const n = v[0].length === 1 ? +v[0] * 10 : +v[0]; return n > 100 ? { abs: 1, asked: n } : { abs: n / 100 }; }   // (one digit: tens)
   if (v.length === 2 && (v[0] === '+' || v[0] === '-') && /^\d+$/.test(v[1])) return { rel: (v[0] === '+' ? 1 : -1) * Math.min(100, +v[1]) / 100 };
   if (v.length === 3 && isNum(v[0]) && v[1] === '.' && isNum(v[2])) return { abs: Math.min(100, +`${v[0]}.${v[2]}`) / 100 };
   return bad;
 }
 
-const ACTS = ['clear', 'record', 'go', 'back', 'release', 'blackout', 'highlight', 'update', 'next', 'prev', 'goto', 'delete', 'undo', 'help'];
-const PLAIN = ['clear', 'blackout', 'highlight', 'next', 'prev', 'undo', 'help'];
+// (a word it doesn't know, cut short: 3000 characters ran across the panels; a delay said plainly)
+const unknown = (w: string) => w === 'delay' ? 'a delay is in the cue\'s settings (More timing), not on the command line yet'
+  : `"${w.length > 24 ? `${w.slice(0, 24)}…` : w}"? Try 1 thru 4 @ 50, group 2, goto cue 5, go, clear`;
+const ACTS = ['clear', 'record', 'go', 'back', 'release', 'releaseall', 'blackout', 'highlight', 'lowlight', 'update', 'next', 'prev', 'goto', 'delete', 'undo', 'redo', 'help'];
+const PLAIN = ['clear', 'releaseall', 'blackout', 'highlight', 'lowlight', 'next', 'prev', 'undo', 'redo', 'help'];
 function actionOf(t: string[]): Command {
   let action: string | undefined, list: number | undefined, cue: number | undefined, time: number | undefined, i = 0;
   // (a number, "2.5" too)
@@ -83,12 +96,13 @@ function actionOf(t: string[]): Command {
       }
       continue;
     }
-    return { error: `"${w}"? Try 1 thru 4 @ 50, group 2, goto cue 5, go, clear` };
+    return { error: unknown(w) };
   }
   if (action === 'go' && cue !== undefined) action = 'goto';             // ("go cue 5": to cue 5)
   if (!action) {
     if (cue !== undefined && time !== undefined) action = 'time';
-    else return { error: cue !== undefined ? `cue ${cue} what? goto cue ${cue}, update cue ${cue}, delete cue ${cue}, cue ${cue} time 3` : 'list what? go list 2, goto list 2 cue 5' };
+    else if (cue !== undefined) return { cue, ...(list !== undefined ? { list } : {}), error: `cue ${cue} what? goto cue ${cue}, update cue ${cue}, delete cue ${cue}, cue ${cue} time 3, cue ${cue} "Chorus"` };
+    else return { error: 'list what? go list 2, goto list 2 cue 5' };
   }
   if (PLAIN.includes(action) && (list !== undefined || cue !== undefined || time !== undefined)) return { error: `"${action}" takes nothing after it` };
   if ((action === 'goto' || action === 'delete') && cue === undefined) return { error: `"${action}" takes a cue: ${action} cue 5` };
@@ -102,8 +116,23 @@ function actionOf(t: string[]): Command {
 }
 
 export function parseCommand(text: string): Command {
+  // a cue's name: in quotes ("Verse", “Chorus”), or the rest after "label" (as on Eos); kept as typed
+  let label: string | undefined;
+  const q = /["“”„]([^"“”„]*)["“”]?/.exec(text) ?? /\blabel\s+(.+)$/i.exec(text);
+  if (q) { label = q[1].trim().slice(0, 60); text = text.slice(0, q.index) + text.slice(q.index + q[0].length); }
+  const c = parseWords(text);
+  if (label === undefined) return c.error ? { error: c.error } : c;
+  // ("cue 5 "Chorus"": that cue's new name)
+  if (!c.action && !c.steps && !c.level && c.cue !== undefined) return label ? { action: 'label', cue: c.cue, ...(c.list !== undefined ? { list: c.list } : {}), label } : { error: 'a name goes in quotes: cue 5 "Chorus"' };
+  if (c.error) return { error: c.error };
+  if (c.action === 'record') return label ? { ...c, label } : c;
+  return { error: 'a name in quotes goes with a cue: record cue 5 "Verse", cue 5 "Chorus"' };
+}
+function parseWords(text: string): Command {
   const t = tokens(text);
   if (!t.length) return {};
+  // (a time on its own, "fade 3": it quoted "time" back, a word not typed)
+  if (t[0] === 'time') return { error: 'a fade goes with a cue: cue 5 time 3 (or fade 3)' };
   // a word on its own, or about a list and a cue
   if (ACTS.includes(t[0]) || t[0] === 'cue' || t[0] === 'list') return actionOf(t);
   const steps: Step[] = [];
@@ -152,7 +181,7 @@ export function parseCommand(text: string): Command {
       put((p) => pushAll(p.fixtures, run(a, b)));
       continue;
     }
-    return { error: `"${w}"? Try 1 thru 4 @ 50, group 2, goto cue 5, go, clear` };
+    return { error: unknown(w) };
   }
   const cmd: Command = {};
   if (steps.length) { cmd.steps = steps; cmd.base = base; }

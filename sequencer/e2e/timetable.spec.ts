@@ -1,7 +1,7 @@
 // The timetable (the bar persona): looks by the clock, a tablet switched on later picking up what
 // should be on, and the next change on the Live header. Measured on the engine and the wire.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, test, expect } from './helpers';
+import { openConnected, resetFake, channels, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -15,7 +15,7 @@ test('a time that comes plays its look; a later one shows as next; switched on l
   await page.clock.setFixedTime(now);
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('body').press('Control+k');
   await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('schedule');
   await page.keyboard.press('Enter');
@@ -52,7 +52,7 @@ test('a time that comes plays its look; a later one shows as next; switched on l
 test('timetable rows stay where they are while you edit them (sorted again next time)', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('body').press('Control+k');
   await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('schedule');
   await page.keyboard.press('Enter');
@@ -60,7 +60,10 @@ test('timetable rows stay where they are while you edit them (sorted again next 
   await dlg.getByRole('button', { name: 'Add a time' }).click();
   await dlg.getByRole('button', { name: 'Add a time' }).click();
   const times = dlg.getByLabel('Time', { exact: true });
-  await times.first().fill('23:00'); await times.first().press('Tab');
+  await times.first().fill('23:00');
+  // taken while it's typed (Next: follows), before Tab or Enter
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.settings.schedule.some((e: any) => e.at === '23:00'))).toBe(true);
+  await times.first().press('Tab');
   await expect(times.first()).toHaveValue('23:00');                         // still the first row
   await dlg.getByRole('button', { name: 'Su' }).first().click();            // and this tap lands on it
   const days = await page.evaluate(() => (window as any).__luxdmx.show.settings.schedule.map((e: any) => e.days ?? null));
@@ -75,7 +78,7 @@ test('timetable rows stay where they are while you edit them (sorted again next 
 test('a new row takes the days of the one above; the last day says so in its row; right-click duplicates, Delete removes', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('body').press('Control+k');
   await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('schedule');
   await page.keyboard.press('Enter');
@@ -104,7 +107,7 @@ test('a new row takes the days of the one above; the last day says so in its row
 test('at sunset: the time moves with the sun, for the show\'s place (the device\'s location or typed in); the clock passing it plays the look', async ({ page, context }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('body').press('Control+k');
   await page.getByRole('dialog', { name: 'Find anything' }).getByRole('combobox').fill('schedule');
   await page.keyboard.press('Enter');
@@ -138,7 +141,7 @@ test('at sunset: the time moves with the sun, for the show\'s place (the device\
 test('a party tonight: right-click the next-up chip, skip tonight; nothing plays by the clock till 06:00, then it plays again', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   const soon = new Date(Date.now() + 60e3);
   await page.evaluate((a) => {
     const app = (window as any).__luxdmx, l = app.show.cueLists[0];
@@ -161,4 +164,27 @@ test('a party tonight: right-click the next-up chip, skip tonight; nothing plays
   await dlg.getByRole('button', { name: 'Paused' }).click();
   await page.locator('.ctx').getByRole('menuitem', { name: 'Play the timetable again now' }).click();
   await expect(dlg.getByRole('status').filter({ hasText: 'Paused until' })).toHaveCount(0);
+});
+
+test.describe('the timetable on a tablet held upright', () => {
+  test.use({ viewport: { width: 768, height: 1024 }, hasTouch: true });
+  test('all seven days are there to tap, Sunday too', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await startTemplate(page, 'Church');   // (its looks' long names)
+    await expect(page.locator('.top .show .name')).toHaveText('Sunday service');
+    await page.locator('.top').getByRole('button', { name: 'More' }).click();
+    await page.getByRole('menuitem', { name: /Timetable/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Timetable' });
+    await dlg.getByRole('button', { name: 'Add a time' }).click();
+    await expect(dlg.getByText('It runs in this tab: keep the tablet or laptop on and this page open.')).toBeVisible();
+    const days = dlg.locator('.days').first().locator('.day');
+    await expect(days).toHaveCount(7);
+    for (let i = 0; i < 7; i++) await expect(days.nth(i)).toBeInViewport({ ratio: 1 });
+    const box = (await dlg.locator('.days').first().boundingBox())!;
+    const su = (await days.nth(6).boundingBox())!;
+    expect(su.x + su.width).toBeLessThanOrEqual(box.x + box.width + 1);       // (not clipped by its box)
+    await days.nth(6).click();
+    await expect(days.nth(6)).toHaveClass(/on/);
+  });
 });

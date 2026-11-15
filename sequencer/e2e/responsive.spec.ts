@@ -1,6 +1,6 @@
 // The layouts people will actually use: a laptop, a tablet on a stand (touch), a phone in a hand.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, patch, test, expect } from './helpers';
+import { openConnected, resetFake, channels, patch, test, expect, startTemplate } from './helpers';
 
 const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
@@ -13,7 +13,7 @@ test.describe('phone', () => {
     expect(await noSideScroll(page)).toBe(true);
     const nav = page.getByRole('navigation', { name: 'Program panes' });
     await nav.getByRole('button', { name: 'Lights' }).click();
-    await page.getByRole('button', { name: 'Add your first lights' }).click();
+    await page.locator('.fl').getByRole('button', { name: 'Add', exact: true }).click();          // (the list's own Add: its empty state only says it)
     const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
     await dlg.locator('[data-type="gen-dimmer"]').click();
     await dlg.getByLabel('How many').fill('2');
@@ -25,6 +25,9 @@ test.describe('phone', () => {
     await page.locator('.actionbar').getByRole('button', { name: 'Record' }).click();
     await nav.getByRole('button', { name: 'Cues' }).click();
     await expect(page.locator('.deck .card')).toHaveCount(1);
+    // (one Record and one GO there: the deck's, not the bottom bar's as well)
+    await expect(page.getByRole('button', { name: /^GO/ })).toHaveCount(1);
+    await expect(page.locator('.actionbar').getByRole('button', { name: 'Record' })).toHaveCount(0);
     await nav.getByRole('button', { name: 'Stage' }).click();
     await expect(page.locator('.stage-wrap .fx')).toHaveCount(2);
     expect(await noSideScroll(page)).toBe(true);
@@ -32,6 +35,21 @@ test.describe('phone', () => {
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     await expect(page.locator('.strip').getByRole('button', { name: /^GO/ })).toBeVisible();
     expect(await noSideScroll(page)).toBe(true);
+  });
+});
+
+test.describe('a phone on Live', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test('the GO bar says what comes next too; the buttons have no key badges (a finger has no keys)', async ({ page }) => {
+    await openConnected(page);
+    await startTemplate(page, 'Wedding');
+    // (on the cue before the speeches: next says them)
+    await page.evaluate(() => { const a = (window as any).__luxdmx, l = a.show.cueLists[0]; a.view = 'live'; a.jump(l.id, l.cues.findIndex((c: any) => c.name === 'Speeches') - 1); });
+    await expect(page.locator('.strip .nxt')).toBeVisible();
+    await expect(page.locator('.strip .nxt')).toContainText('Speeches');
+    const keys = page.locator('.live .tile .key');
+    expect(await keys.count()).toBeGreaterThan(0);
+    for (const k of await keys.all()) await expect(k).toBeHidden();
   });
 });
 
@@ -95,7 +113,7 @@ test.describe('touch on the live page', () => {
   test('Edit: a finger moves a control by its grip; Alt+arrows move the focused one', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+    await startTemplate(page, 'Bar');
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     await page.locator('.live').getByRole('button', { name: 'Edit' }).click();
     const ids = () => page.evaluate(() => { const a = (window as any).__luxdmx; return a.livePage.widgets.map((w: any) => w.id); });
@@ -117,7 +135,7 @@ test.describe('touch on the live page', () => {
   test('a swipe across a look does not fire it, a tap does; holding fog never opens a menu', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     const cdp = await page.context().newCDPSession(page);
     const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
@@ -153,7 +171,7 @@ test.describe('faders on a phone', () => {
   test('a swipe over a fader scrolls the page; hold it a moment and it moves', async ({ page }) => {
     await openConnected(page);
     await page.locator('.top .show').click();
-    await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'DJ / Party' }).click();
+    await startTemplate(page, 'DJ / Party');
     await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
     const cdp = await page.context().newCDPSession(page);
     const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
@@ -179,5 +197,96 @@ test.describe('faders on a phone', () => {
     await touch('touchEnd', 0, 0);
     expect(await value()).toBeLessThan(before);
     await expect(fader).not.toHaveClass(/grabbed/);
+  });
+});
+
+test.describe('a laptop (1366 x 768)', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test('the top bar stays one row with a machine to arm and a box connected, and doesn\'t jump on save; a big rig\'s universes fold into one line', async ({ page }) => {
+    await openConnected(page);
+    // (on stage now: the "you are blind" note from connecting is gone)
+    await expect(page.getByText('Connected. You are blind')).toHaveCount(0);
+    await patch(page, 'gen-flame', 1, 0, 'Flame');
+    for (const u of [1, 2, 3, 4, 5]) await patch(page, 'gen-dimmer', 2, u, `Dim U${u}`);
+    const bar = page.locator('header.top');
+    await expect(page.locator('.top .arm')).toBeVisible();
+    const box = await bar.boundingBox();
+    expect(box!.height).toBeLessThan(56);                                       // one row
+    expect(await bar.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+    for (const sel of ['.top .out', '.top .arm', '[role=tab][aria-label=Timeline]']) await expect(page.locator(sel)).toBeInViewport();
+    // "saved" and "…" take the same room
+    const w = await page.evaluate(async () => {
+      const s = document.querySelector('.top .saved')!, b = document.querySelector('.top .show')!;
+      const a = b.getBoundingClientRect().width, t = s.textContent;
+      s.textContent = t === 'saved' ? '…' : 'saved';
+      await new Promise((r) => requestAnimationFrame(r));
+      const z = b.getBoundingClientRect().width; s.textContent = t; return Math.abs(a - z);
+    });
+    expect(w).toBeLessThan(1);
+    // six universes: one line, the lights stay in view
+    const fl = page.locator('.fl');
+    await expect(fl.locator('.usage summary')).toHaveText(/^6 universes · \d+ channels/);
+    await expect(fl.locator('.usage .unis')).toBeHidden();
+    expect((await fl.locator('ul').first().boundingBox())!.height).toBeGreaterThan(120);   // (rows of lights, not a stub)
+    await fl.locator('.usage summary').click();
+    await expect(fl.locator('.usage .unis .chip')).toHaveCount(6);
+  });
+});
+
+for (const width of [768, 834]) {
+  test.describe(`a tablet held upright (${width} px)`, () => {
+    test.use({ viewport: { width, height: 1024 }, hasTouch: true });
+    test('every top bar control is on the screen with a machine to arm and a box connected; undo is in the ⋯ menu', async ({ page }) => {
+      await openConnected(page);
+      await patch(page, 'gen-flame', 1, 0, 'Flame');
+      const bar = page.locator('header.top');
+      await expect(page.locator('.top .arm')).toBeVisible();
+      expect(await bar.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+      const off = await bar.evaluate((t) => [...t.querySelectorAll('button, input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > innerWidth + 0.5 || r.left < -0.5); }).map((e) => e.getAttribute('aria-label') ?? e.textContent));
+      expect(off).toEqual([]);
+      const bpm = page.getByLabel('BPM', { exact: true });
+      expect(await bpm.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);        // (120 whole)
+      await page.locator('.top').getByRole('button', { name: 'More' }).click();
+      await expect(page.getByRole('menuitem', { name: 'Undo' })).toBeVisible();
+    });
+  });
+}
+
+test.describe('the 2D plan on a tablet held upright', () => {
+  test.use({ viewport: { width: 768, height: 1024 }, hasTouch: true });
+  test('the Band stage\'s four pixel bars stay apart, from each other and from the machines beside them', async ({ page }) => {
+    await openConnected(page);
+    await page.locator('.top .show').click();
+    await startTemplate(page, 'Band');
+    await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.fixtures.length)).toBeGreaterThan(30);
+    const stage = page.locator('.stage-wrap');
+    const two = stage.getByRole('button', { name: '2D', exact: true });
+    if (await two.isVisible()) await two.click();
+    await expect(stage.locator('.fx[data-name="Bar 1"]')).toBeVisible();
+    await page.waitForTimeout(500);
+    const touching = await page.evaluate(() => {
+      const bodies = [...document.querySelectorAll<SVGGElement>('.stage-wrap .fx')].flatMap((g) => { const b = g.querySelector('[stroke-width]'); return b ? [{ n: g.dataset.name ?? '', r: b.getBoundingClientRect() }] : []; });
+      const out: string[] = [];
+      for (const a of bodies.filter((x) => /^Bar /.test(x.n))) for (const b of bodies) {
+        if (a === b) continue;
+        const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+        if (w > 1 && h > 1) out.push(`${a.n}/${b.n}`);
+      }
+      return out;
+    });
+    expect(touching).toEqual([]);
+  });
+});
+
+test.describe('a bigger interface (120 %) on a wide screen', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } });
+  test('the top bar takes the bigger size into account: the show\'s name stays readable, one row, nothing off the edge', async ({ page }) => {
+    await page.addInitScript(() => { try { localStorage.setItem('luxdmx.seq.zoom', '1.2'); } catch { /* */ } });
+    await openConnected(page);
+    await patch(page, 'gen-flame', 1, 0, 'Flame');
+    await expect(page.locator('.top .arm')).toBeVisible();
+    const bar = page.locator('header.top');
+    expect(await bar.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+    expect((await page.locator('.top .show .name').boundingBox())!.width).toBeGreaterThan(30);
   });
 });

@@ -13,7 +13,7 @@
   import { cellLookAt } from '../engine/resolve';
   import ColorWheel from './ColorWheel.svelte';
   import { app } from '../app.svelte';
-  import { ui } from './ui.svelte';
+  import { ui, asPercent } from './ui.svelte';
   import type { ChannelAttr, Color, NumAttr, Values } from '../model/types';
   import { EFFECT_MAP } from '../engine/effects';
   import { slotsOf } from '../engine/render';
@@ -46,7 +46,11 @@
   ] as [string, string][]);
   // where the programmer is scrolled to (the chip for it lights up); Channels opens the list too
   let here = $state('');
+  // (the chip clicked stays lit until you scroll by hand: a part near the bottom can't reach the
+  // top, and "scrolled to the end" would light the last chip instead)
+  let pinned = '';
   async function jump(id: string) {
+    pinned = id; here = id;
     // the list draws once the details has told Svelte it opened (its toggle event comes a moment later)
     if (id === 'pg-all') {
       const d = document.getElementById('pg-all-ch') as HTMLDetailsElement | null;
@@ -54,6 +58,8 @@
     }
     document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
+  // (Find anything's "All channels": there once it's drawn)
+  $effect(() => { const id = ui.progJump; if (id) { ui.progJump = ''; void tick().then(() => jump(id)); } });
   // the part whose top has passed the top of the scrolled panel (the last one at the very bottom)
   let jumpBar = $state<HTMLElement>();
   $effect(() => {
@@ -67,11 +73,14 @@
       const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
       let cur = ids[0];
       for (const id of ids) { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top <= top) cur = id; }
-      here = atEnd && scroller.scrollTop > 0 ? ids[ids.length - 1] : cur;
+      here = pinned && ids.includes(pinned) ? pinned : atEnd && scroller.scrollTop > 0 ? ids[ids.length - 1] : cur;
     };
+    const hand = () => { pinned = ''; };
+    const hands = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
     spy();
     scroller.addEventListener('scroll', spy, { passive: true });
-    return () => scroller.removeEventListener('scroll', spy);
+    for (const h of hands) scroller.addEventListener(h, hand, { passive: true });
+    return () => { scroller.removeEventListener('scroll', spy); for (const h of hands) scroller.removeEventListener(h, hand); };
   });
   const playing = $derived(app.show.cueLists.filter((l) => app.status[l.id]?.running && !app.status[l.id]?.releasing));
   // Effects running on the selection (what you see on stage may be them, not the values here).
@@ -79,7 +88,9 @@
   // (a pixel bar: its brightest cell, a pixel chase lights it at intensity 0)
   // (picked cells: the first one's)
   const out = $derived.by(() => { if (!sel.length) return undefined; const s = app.stage[sel[0].id], k = app.cellsPicked(sel[0].id)[0]; return k === undefined ? levelOf(s) : cellLookAt(s, k, app.caps(sel[0].id).cells)?.intensity ?? 0; });
-  const CAT: Record<string, string> = { move: 'position', color: 'colour', intensity: 'brightness' };
+  // (what an effect works on, said after its name; 'pixel' was missing: "Bar twinkles (undefined)")
+  const CAT: Record<string, string> = { move: 'position', color: 'colour', intensity: 'brightness', pixel: 'cells' };
+  const fxSaid = (e: { name: string; kind: string }) => { const c = CAT[EFFECT_MAP.get(e.kind)?.category ?? '']; return c ? `${e.name} (${c})` : e.name; };
   const presets = $derived(app.show.presets);
   const colorPresets = $derived(presets.filter((p) => p.kind === 'color'));
   // Whites: what a warm/cool white fixture can take from the colour presets.
@@ -210,7 +221,7 @@
           <div class="pl" style="--c:{l.color ?? 'var(--green)'}">
             <span class="dot"></span>
             <span class="nm"><b>{l.name}</b> <span class="faint">{l.cues[st.index]?.name ?? ''}</span></span>
-            <input type="range" min="0" max="1" step="0.01" value={st.master} oninput={(e) => app.setMaster(l.id, +(e.target as HTMLInputElement).value)} aria-label="{l.name} level" title="Level {Math.round(st.master * 100)}%" />
+            <input type="range" min="0" max="1" step="0.01" value={st.master} use:asPercent={st.master} oninput={(e) => app.setMaster(l.id, +(e.target as HTMLInputElement).value)} aria-label="{l.name} level" title="Level {Math.round(st.master * 100)}%" />
             <button class="sm" onclick={() => app.release(l.id)} title="Fade {l.name} out">Release</button>
           </div>
         {/each}
@@ -236,7 +247,7 @@
     {#if running.length}
       <div class="fxnote">
         <Icon name="effect" size={14} />
-        <span>{running.map((e) => `${e.name} (${CAT[EFFECT_MAP.get(e.kind)?.category ?? 'intensity']})`).join(', ')} {running.length > 1 ? 'are' : 'is'} running on these lights, on top of what you set here.</span>
+        <span>{running.map(fxSaid).join(', ')} {running.length > 1 ? 'are' : 'is'} running on these lights, on top of what you set here.</span>
         {#each running.filter((e) => app.liveFx.includes(e.id)) as e (e.id)}<button class="ghost" onclick={() => app.toggleEffect(e.id)} title="Stop {e.name}"><Icon name="stop" size={12} /></button>{/each}
       </div>
     {/if}
@@ -245,7 +256,7 @@
     {#if hasLight}
     <section id="pg-int">
       <div class="lab"><span>Intensity</span><b><ValueEdit text={`${pct(first?.intensity)}%`} value={pct(first?.intensity)} label="Intensity" onset={(v) => app.set({ intensity: v / 100 })} />{#if out !== undefined && Math.abs(out - (first?.intensity ?? 0)) > 0.02}<span class="faint" title="What the light gives right now, after effects and the masters">&nbsp;· out {pct(out)}%</span>{/if}</b></div>
-      <input class="big" type="range" min="0" max="1" step="0.01" value={first?.intensity ?? 0} oninput={setNum('intensity')} aria-label="Intensity" />
+      <input class="big" type="range" min="0" max="1" step="0.01" value={first?.intensity ?? 0} use:asPercent={first?.intensity ?? 0} oninput={setNum('intensity')} aria-label="Intensity" />
       <div class="quick">
         {#each [0, 0.25, 0.5, 0.75, 1] as v (v)}<button onclick={() => (v === 0 ? app.off() : app.set({ intensity: v }))}>{v === 0 ? 'Off' : v === 1 ? 'Full' : `${v * 100}`}</button>{/each}
       </div>
@@ -263,7 +274,7 @@
         <div class="lab"><span>White</span></div>
         <div class="swatches">
           {#each whitePresets as p (p.id)}
-            <button class="sw" class:on={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+            <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
           {/each}
         </div>
       </section>
@@ -275,7 +286,7 @@
           <div class="swatches">
             {#each colorPresets as p (p.id)}
               {@const c = p.values.color && !('preset' in p.values.color) ? p.values.color : { r: 1, g: 1, b: 1 }}
-              <button class="sw" class:on={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+              <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
             {/each}
           </div>
         {/if}
@@ -335,7 +346,7 @@
               {#each named as r (r.from)}<button class:on={inByte(first?.[k] as number | undefined, r)} onclick={() => app.set({ [k]: Math.round((r.from + r.to) / 2) / 255 } as Values)} title="{r.label} ({r.from}–{r.to})">{r.label}</button>{/each}
             </div>
           {/if}
-          <input type="range" min="0" max="1" step="0.01" value={first?.[k] ?? (k === 'cct' ? 0.5 : 0)} oninput={setNum(k)} aria-label={label} class:cctbar={k === 'cct'} />
+          <input type="range" min="0" max="1" step="0.01" value={first?.[k] ?? (k === 'cct' ? 0.5 : 0)} use:asPercent={first?.[k] ?? (k === 'cct' ? 0.5 : 0)} oninput={setNum(k)} aria-label={label} class:cctbar={k === 'cct'} />
         </section>
       {/if}
     {/each}
@@ -398,7 +409,7 @@
   .quick button { flex: 1; padding: .25rem .2rem; font-size: .8rem; }
   .quick.wrap { flex-wrap: wrap; } .quick.wrap button { flex: 1 0 28%; }
   .pick .quick.wrap button { flex: 0 1 auto; display: inline-flex; align-items: center; gap: .25rem; }
-  .pick .quick.wrap button.on { border-color: var(--accent); color: var(--accent); }
+  .pick .quick.wrap button.on { border-color: var(--accent); color: var(--accent); background: #ffaa1c2a; }
   .pick .dot { width: .7rem; height: .7rem; border-radius: 50%; border: 1px solid #0006; }
   .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 40px)); gap: .35rem; justify-content: start; }
   .sw { aspect-ratio: 1; padding: 0; border-radius: 50%; border: 2px solid #0006; }

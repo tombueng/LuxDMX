@@ -1,7 +1,7 @@
 // A list of looks (the church persona): a look sets the lights it names and leaves the rest as they
 // are, whatever order they're tapped in; its card shows just that. Locked, only the locked page
 // shows and its masters are greyed. Measured on the wire.
-import { openConnected, resetFake, channels, patch, selectFixtures, intensity, record, test, expect } from './helpers';
+import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, intensity, record, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -31,14 +31,14 @@ test('"Hall" lights the hall and leaves the church as it was, in any order', asy
 test('locked, only the locked page shows, its masters are greyed and stay put; the looks play', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   // a second page, then lock on the first (Main, with its masters)
   await page.locator('.live').getByRole('button', { name: 'New page' }).click();
   await page.locator('.live').getByRole('button', { name: /Done/ }).click();
   await page.locator('.live .pages').getByRole('tab').first().click();
   await expect(page.locator('.live .pages').getByRole('tab')).toHaveCount(2);
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await expect(page.locator('.live .pages').getByRole('tab')).toHaveCount(1);
   const gm = page.locator('.live .tile.fader', { hasText: 'Grand master' });
   await expect(gm).toHaveClass(/missing/);
@@ -57,9 +57,9 @@ test('locked, only the locked page shows, its masters are greyed and stay put; t
 test('locking with a click hands Space back to GO; unlocking stays on the page that was locked', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Bar$/ }) }).click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await page.keyboard.press('Space');                                   // straight after the click: GO, not the padlock's hint
   await expect.poll(() => page.evaluate(() => { const a = (window as any).__luxdmx; return a.engine.status(a.show.cueLists[0].id).running; })).toBe(true);
   // a second page, locked on it, unlocked: still on it
@@ -68,7 +68,7 @@ test('locking with a click hands Space back to GO; unlocking stays on the page t
   await page.locator('.live').getByRole('button', { name: 'New page' }).click();
   await page.locator('.live').getByRole('button', { name: /Done/ }).click();
   const second = await page.evaluate(() => (window as any).__luxdmx.page);
-  await page.locator('.live').getByRole('button', { name: 'Lock page' }).click();
+  await lockPage(page);
   await page.locator('.live').getByRole('button', { name: /Unlock page/ }).focus();
   await page.keyboard.down(' '); await page.waitForTimeout(1200); await page.keyboard.up(' ');
   await expect(page.locator('.live').getByRole('button', { name: 'Lock page' })).toBeVisible();

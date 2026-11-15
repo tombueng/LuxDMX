@@ -2,7 +2,7 @@
 // along (the toast says what), so no button on Live says "its target is gone" and no moment on the
 // timeline plays a list that isn't there.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, test, expect } from './helpers';
+import { openConnected, resetFake, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -10,7 +10,7 @@ const gone = (page: Page) => page.locator('.live').getByText('its target is gone
 async function band(page: Page) {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Band$/ }) }).click();
+  await startTemplate(page, 'Band');
   // (Live makes its page from the show's lists, effects and machines)
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.live')).toBeVisible();

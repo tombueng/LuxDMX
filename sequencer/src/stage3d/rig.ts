@@ -9,13 +9,30 @@ import type { Resolved } from '../model/types';
 import { cellLookAt } from '../engine/resolve';
 import { wholeLook } from '../engine/cuelook';
 import type { FixtureKind } from '../model/library';
-import { headAngles, headLocal, hitFloor, RAD, toWorld, type Optics, type Rot, type V3 } from './geometry';
+import { headAngles, headLocal, hitRoom, RAD, toWorld, type Optics, type Rot, type V3 } from './geometry';
 import { PAN_SPEED, ROLL_SPEED, TILT_SPEED, slew, type Axis } from './motion';
-import { body, headBarParts, headParts, HEADBAR_LENS, HEADBAR_PITCH, HEADBAR_PIVOT, lensOf, PIVOT, WINCH_BALL, WINCH_BOX, winchParts, type Look } from './models';
+import { body, headBarParts, headParts, HEADBAR_LENS, HEADBAR_PITCH, HEADBAR_PIVOT, lensOf, matrixHeadParts, PIVOT, WINCH_BALL, WINCH_BOX, winchParts, type Look } from './models';
 import { ATLAS_CELLS, PLAIN_WHEEL, prismOf, rotationOf } from './gobos';
+import { dropTexture } from './drops';
+import { pleats } from './textures';
+import { ballMotion, mirrorBall, type Ball } from './mirrorBall';
+import { cellAt, whiteOf, type Profile } from './profiles';
+// (a curtain's pleats: many across its width, the same texture for every curtain)
+let pleatTex: THREE.Texture | undefined;
+// A curtain's cloth: a metre square with real folds (a fold every 1/n of its width, `depth` deep), so
+// light rakes across them; scaled to its half's width the folds bunch up as it's drawn back
+function pleated(n: number, depth: number) {
+  const g = new THREE.PlaneGeometry(1, 1, n * 6, 1), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setZ(i, depth * Math.sin((p.getX(i) + 0.5) * n * Math.PI * 2));
+  g.computeVertexNormals();
+  return g;
+}
+const pleatsRepeat = () => { if (!pleatTex) { pleatTex = pleats().clone(); pleatTex.wrapS = THREE.RepeatWrapping; pleatTex.repeat.set(10, 1); pleatTex.needsUpdate = true; } return pleatTex; };
 
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
-export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number;
+// (barLen: a bar's or a strip's length in metres when it says; scale: a light drawn bigger or smaller,
+// its own size against its kind's)
+export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number; barLen?: number; scale?: number; profile?: Profile;
   gobos?: GoboWheel[]; prism?: { ranges?: Ranges; rot?: Ranges }; anim?: { rot?: Ranges };
   // more than two axes: endless pan / tilt (their turning channels' ranges; null: a channel without
   // ranges), a third axis (roll: how far it turns), and its endless turning
@@ -27,7 +44,9 @@ export interface RigFixture { id: string; name: string; kind: FixtureKind; look:
   headPan?: boolean;      // its heads pan each on their own too
   barPan?: boolean;       // the bar itself pans (a pan channel of the whole light)
   // a winch: its travel (m) and speed (m/s), its soft limits (parts of its travel)
-  winch?: { travel: number; speed: number; limits?: [number, number] } }   // a moving bar's heads (its cells that tilt on their own)
+  winch?: { travel: number; speed: number; limits?: [number, number] };
+  // a curtain or a drop on a fly bar: its cloth (m), what's painted on a drop
+  cloth?: { w: number; h: number; picture?: string; rises?: boolean } }   // a moving bar's heads (its cells that tilt on their own)
 type Ranges = { from: number; to: number; label?: string }[];
 // A gobo wheel of a light (gobos.ts): the pattern of each of its slots (null: open; none listed: a
 // plain level, a few patterns spread over it), and its rotation channel's ranges
@@ -58,6 +77,9 @@ const goboAttr = (n: number) => { const a = new THREE.InstancedBufferAttribute(n
 const fxAttr = (n: number) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4); a.setUsage(THREE.DynamicDrawUsage); return a; };
 // the throw a focus value is sharp at: near at 0, far at 1 (a head focused for the floor is soft on a
 // wall twice as close)
+// a mirror ball on a motor: its radius, its chain, and its motor's top speed (radians a second: six
+// turns a minute, as the faster motors go)
+const BALL_R = 0.3, BALL_CHAIN = 0.35, BALL_TOP = 0.65;
 const FOCUS_NEAR = 2, FOCUS_FAR = 22;
 const MAX_BEAM = 26;           // metres: a beam that hits nothing fades out by then
 const LENS_GAP = 0.018;        // the glowing lens sits this far in front of its face (no flicker against it)
@@ -65,7 +87,15 @@ const UP = new THREE.Vector3(0, 1, 0);
 // scratch objects for the frame (a few hundred lights: no garbage every frame)
 const E = new THREE.Euler(), BASE = new THREE.Matrix4(), YOKE = new THREE.Matrix4(), HEAD = new THREE.Matrix4(), TMP = new THREE.Matrix4(), TMP2 = new THREE.Matrix4();
 const LP = new THREE.Vector3(), DIR = new THREE.Vector3(), CP = new THREE.Vector3(), C2 = new THREE.Color();
+const CQ = new THREE.Quaternion(), UPY = new THREE.Vector3(0, 1, 0);
 const PU = new THREE.Vector3(), PW = new THREE.Vector3(), PD = new THREE.Vector3(), XAX = new THREE.Vector3(1, 0, 0);
+const NV = new THREE.Vector3(), PZ = new THREE.Vector3(), PX = new THREE.Vector3(), BASIS = new THREE.Matrix4();
+// How far along a beam (from p, dir a unit vector) it meets a ball of radius r at c; Infinity: it misses
+export function hitBall(p: THREE.Vector3, dir: THREE.Vector3, c: THREE.Vector3, r: number) {
+  const vx = c.x - p.x, vy = c.y - p.y, vz = c.z - p.z, along = vx * dir.x + vy * dir.y + vz * dir.z;
+  const off2 = vx * vx + vy * vy + vz * vz - along * along;
+  return along <= 0 || off2 > r * r ? Infinity : along - Math.sqrt(r * r - off2);
+}
 
 export interface Lit { key: number; p: THREE.Vector3; d: THREE.Vector3; c: THREE.Color; level: number; deg: number }
 // The gobo atlas read in the shaders (gobos.ts drawAtlas: CELLS x CELLS patterns, each on a round
@@ -114,6 +144,7 @@ export class Rig {
   private lens!: THREE.InstancedMesh;
   private beams!: THREE.InstancedMesh;
   private pools!: THREE.InstancedMesh;
+  wallPools = 0;                 // of the pools last drawn, how many landed on a wall, the ceiling, a cyc or a screen
   private cells!: THREE.InstancedMesh;
   private hit!: THREE.InstancedMesh;
   private beamLevel!: THREE.InstancedBufferAttribute;
@@ -151,6 +182,16 @@ export class Rig {
   // a winch's load: how far down it is now (m), at the winch's speed
   private winches = new Map<string, Axis>();
   private winchNow = new Map<string, number>();
+  // the curtains' and the drops' cloths (each its own size and picture: not instanced)
+  private cloths = new Map<string, THREE.Mesh[]>();
+  // the mirror balls on their motors: the ball and its chain, hung under the motor
+  private balls = new Map<string, { holder: THREE.Group; ball: THREE.Mesh }>();
+  // their middles this frame: a beam aimed at a ball stops on it (a pinspot's light goes into the
+  // mirrors, not on through to the wall behind)
+  private ballMids: THREE.Vector3[] = [];
+  get mirrorBalls(): Ball[] { return [...this.balls.values()].map((b) => ({ obj: b.ball, r: BALL_R })); }
+  private clothMats: THREE.Material[] = [];
+  readonly scenery = new THREE.Group();
   winchOf(id: string) { return this.winchNow.get(id); }
   private barHeads = new Map<string, { p: Axis; t: Axis[]; hp: Axis[]; pan?: number; tilts: number[]; pans: number[] }>();
   barOf(id: string) { const m = this.barHeads.get(id); return m ? { pan: m.pan ?? 0, tilts: [...m.tilts], pans: [...m.pans] } : undefined; }
@@ -240,6 +281,9 @@ export class Rig {
         void main() {
           vec2 p = (vUv - 0.5) * 2.0;
           float r = length(p), a = vLevel * (1.0 - smoothstep(0.45, 1.0, r)) * 0.7;
+          // (a wash grazing a wall: brightest at the light's end (the picture's top, +y), fading the
+          // further up it runs, and softly to both ends)
+          if (vFx.w > 0.5) { r = length(vec2(p.x, p.y * 0.75)); a = vLevel * (1.0 - smoothstep(0.4, 1.0, r)) * 0.7 * mix(0.35, 1.35, clamp((p.y + 1.0) * 0.5, 0.0, 1.0)); }
           vec3 c = vColor;
           // a gobo: its picture, sharp (as sharp as the focus and the frost let it be), a glass one in colour
           if (uHasGobos > 0.5 && hasGobo(vGobo, vFx)) {
@@ -256,6 +300,42 @@ export class Rig {
 
   // lights come or go (or another type): build the instances again
   build(list: RigFixture[]) {
+    // (the cloths of the curtains and the drops: made again for these lights)
+    for (const ms of this.cloths.values()) for (const m of ms) { this.scenery.remove(m); m.geometry.dispose(); }
+    for (const m of this.clothMats) m.dispose();
+    this.cloths.clear(); this.clothMats = [];
+    for (const { holder, ball } of this.balls.values()) {
+      this.scenery.remove(holder); holder.traverse((o) => { if (o instanceof THREE.Mesh && o !== ball) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
+      ball.geometry.dispose(); const bm = ball.material as THREE.MeshStandardMaterial; bm.map?.dispose(); bm.dispose();
+    }
+    this.balls.clear();
+    if (!this.scenery.parent) this.group.add(this.scenery);
+    for (const f of list) {
+      if (f.look !== 'mirrorball') continue;
+      const holder = new THREE.Group(), ball = mirrorBall(BALL_R);
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, BALL_CHAIN, 5).translate(0, -0.1 - BALL_CHAIN / 2, 0), new THREE.MeshStandardMaterial({ color: 0xc8ccd4, metalness: 0.9, roughness: 0.25 }));
+      ball.position.y = -0.1 - BALL_CHAIN - BALL_R;
+      holder.add(chain, ball); this.scenery.add(holder); this.balls.set(f.id, { holder, ball });
+    }
+    const velvet = list.some((f) => f.look === 'curtain') ? new THREE.MeshStandardMaterial({ map: pleatsRepeat(), color: 0x8a0f1c, roughness: 0.85, emissive: 0x2a0306, emissiveIntensity: 0.9, side: THREE.DoubleSide }) : undefined;
+    const gold = velvet ? new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.75, roughness: 0.35 }) : undefined;
+    if (velvet && gold) this.clothMats.push(velvet, gold);
+    for (const f of list) {
+      if (!f.cloth) continue;
+      if (f.look === 'curtain' && velvet && gold) {
+        // its two halves (folded velvet), the valance across the top, a gold fringe along each one's hem;
+        // one that flies out: one cloth the whole width, its fringe, the valance and its fringe
+        const mk = (g: THREE.BufferGeometry, m: THREE.Material) => { const x = new THREE.Mesh(g, m); this.scenery.add(x); return x; };
+        const fringe = (h: number) => mk(new THREE.BoxGeometry(1, h, 0.05), gold);
+        this.cloths.set(f.id, f.cloth.rises ? [mk(pleated(80, 0.12), velvet), fringe(0.22), mk(pleated(70, 0.1), velvet), fringe(0.26)]
+          : [mk(pleated(40, 0.12), velvet), mk(pleated(40, 0.12), velvet), mk(pleated(70, 0.1), velvet), fringe(0.22), fringe(0.22), fringe(0.26)]);
+      }
+      else if (f.look === 'flybar') {
+        const tex = dropTexture(f.cloth.picture ?? 'forest'), mat = new THREE.MeshStandardMaterial({ map: tex ?? undefined, color: tex ? 0xffffff : 0x4a6a4a, roughness: 0.95, side: THREE.DoubleSide });
+        this.clothMats.push(mat);
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); this.scenery.add(m); this.cloths.set(f.id, [m]);
+      }
+    }
     // (the old ones let go of their buffers and materials: lights come and go a lot while patching)
     for (const m of this.meshes) {
       this.group.remove(m); m.geometry.dispose(); m.dispose();
@@ -265,7 +345,9 @@ export class Rig {
     this.list = list;
     const n = Math.max(1, list.length);
     const lamps = list.reduce((s, f) => s + (f.look === 'blinder' ? 2 : f.look === 'headbar' ? (f.heads ?? 1) : 1), 0) + 1;
-    const cells = Math.max(1, list.reduce((s, f) => s + (f.kind === 'bar' ? f.cells : 0), 0));
+    // (a real fixture's cells: round ones with the rest, square ones a part of their own; each has a beam)
+    const profCells = (sq: boolean) => list.reduce((s, f) => s + (f.profile && !!f.profile.cells.square === sq ? f.profile.cells.cols * f.profile.cells.rows : 0), 0);
+    const cells = Math.max(1, list.reduce((s, f) => s + (f.kind === 'bar' && !f.profile ? f.cells : 0), 0) + profCells(false));
     const add = (geo: THREE.BufferGeometry, mat: THREE.Material, count: number) => {
       const m = new THREE.InstancedMesh(geo, mat, count);
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; m.count = 0;
@@ -277,7 +359,18 @@ export class Rig {
     const looks = new Set(list.map((f) => f.look));
     for (const look of looks) {
       const count = list.filter((f) => f.look === look).length;
-      if (look === 'winch') {
+      if (look === 'matrixhead') {
+        // (one set of parts for each real head there is: their shapes differ)
+        for (const name of new Set(list.filter((f) => f.look === look && f.profile).map((f) => f.profile!.name))) {
+          const prof = list.find((f) => f.profile?.name === name)!.profile!, n = list.filter((f) => f.profile?.name === name).length, mp = matrixHeadParts(prof);
+          this.parts.set(`mh:${name}:base`, add(mp.base, paint, n)); this.parts.set(`mh:${name}:yoke`, add(mp.yoke, yokeMat, n)); this.parts.set(`mh:${name}:head`, add(mp.head, paint, n));
+        }
+        continue;
+      }
+      if (look === 'curtain' || look === 'flybar') {
+        // a curtain's track, a fly bar's pipe: a metre long here, scaled to its cloth's width
+        this.parts.set(look, add(look === 'curtain' ? new THREE.BoxGeometry(1, 0.1, 0.14) : new THREE.CylinderGeometry(0.03, 0.03, 1, 8).rotateZ(Math.PI / 2), yokeMat, count));
+      } else if (look === 'winch') {
         const w = winchParts();
         this.parts.set('winch:box', add(w.box, yokeMat, count));
         this.parts.set('winch:cable', add(w.cable, new THREE.MeshStandardMaterial({ color: 0x8a8f99, roughness: 0.3, metalness: 0.8 }), count));
@@ -302,7 +395,8 @@ export class Rig {
     this.lens = add(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), lamps);
     const cone = new THREE.CylinderGeometry(1, 0, 1, 28, 1, true).translate(0, 0.5, 0);
     // (a head with a prism has up to 8 beams and pictures)
-    const facets = list.reduce((s, f) => s + (f.prism ? 7 : 0), 0);
+    const facets = list.reduce((s, f) => s + (f.prism ? 7 : 0), 0) + profCells(true) + profCells(false);
+    if (profCells(true)) { const sq = add(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), profCells(true)); sq.setColorAt(0, new THREE.Color(0)); this.parts.set('sqcell', sq); }
     this.beams = add(cone, this.beamMat, lamps + facets + cells);
     this.beamLevel = new THREE.InstancedBufferAttribute(new Float32Array(lamps + facets + cells), 1); this.beamLevel.setUsage(THREE.DynamicDrawUsage);
     this.beams.geometry.setAttribute('aLevel', this.beamLevel);
@@ -313,7 +407,8 @@ export class Rig {
     this.pools.geometry.setAttribute('aLevel', this.poolLevel);
     this.poolGobo = goboAttr(lamps + facets); this.pools.geometry.setAttribute('aGobo', this.poolGobo);
     this.poolFx = fxAttr(lamps + facets); this.pools.geometry.setAttribute('aFx', this.poolFx);
-    this.cells = add(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), cells);
+    // (an LED is round: a flat disc facing the light's up, as cheap drawn a thousand times as a box)
+    this.cells = add(new THREE.CylinderGeometry(0.5, 0.5, 1, 14), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), cells);
     // what a click finds (invisible boxes round each light)
     this.hit = add(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ visible: false }), n);
     // the selected lights: an orange frame round each, drawn over everything
@@ -416,10 +511,14 @@ export class Rig {
     this.sel.visible = selMat.opacity > 0.02;
     const marked = this.marks > 0.5;
     this.beamMat.uniforms.uHaze.value = haze;
+    // (where the balls hung last frame: they move only when their light does)
+    let bi = 0;
+    for (const { ball } of this.balls.values()) this.group.worldToLocal(ball.getWorldPosition(this.ballMids[bi++] ??= new THREE.Vector3()));
+    this.ballMids.length = bi;
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
     const counts = new Map<string, number>();
     const put = (key: string, m: THREE.Matrix4) => { const mesh = this.parts.get(key); if (!mesh) return; const i = counts.get(key) ?? 0; if (i >= mesh.instanceMatrix.count) return; mesh.setMatrixAt(i, m); counts.set(key, i + 1); };
-    let nl = 0, nb = 0, np = 0, nc = 0, nh = 0, ns = 0;
+    let nl = 0, nb = 0, np = 0, nc = 0, nh = 0, ns = 0, nw = 0;
     this.hitIds = [];
     this.lit.length = 0;
     // (the same objects every frame: no garbage for hundreds of lights)
@@ -437,7 +536,9 @@ export class Rig {
     let lastSoft = 0;
     const beamAt = (p: THREE.Vector3, dir: THREE.Vector3, deg: number, level: number, c: THREE.Color, maxLen = MAX_BEAM, pool = true, gobo: readonly number[] = NO_GOBO) => {
       if (level < 0.01 || nb >= this.beams.instanceMatrix.count) return;
-      const hit = hitFloor(p, dir), L = Math.max(0.05, hit ? Math.min(maxLen, Math.hypot(hit.x - p.x, hit.y - p.y, hit.z - p.z)) : maxLen), r = Math.max(0.01, L * Math.tan((deg / 2) * RAD));
+      let hit = hitRoom(p, dir), L = Math.max(0.05, hit ? Math.min(maxLen, Math.hypot(hit.x - p.x, hit.y - p.y, hit.z - p.z)) : maxLen);
+      for (const c of this.ballMids) { const b = hitBall(p, dir, c, BALL_R); if (b < L) { L = Math.max(0.05, b); hit = undefined; } }
+      const r = Math.max(0.01, L * Math.tan((deg / 2) * RAD));
       // the picture's blur: the frost, and how far the focus is off for this throw
       const soft = Math.min(1, gobo[6] + (gobo[7] >= 0 ? Math.abs(gobo[7] - Math.max(0, Math.min(1, (L - FOCUS_NEAR) / (FOCUS_FAR - FOCUS_NEAR)))) * 1.6 : 0));
       lastSoft = soft;
@@ -445,10 +546,32 @@ export class Rig {
       if (!Number.isFinite(L + r + dir.x + dir.y + dir.z)) return;
       qb.setFromUnitVectors(UP, dir); mb.compose(p, qb, sb.set(r, L, r)); this.beams.setMatrixAt(nb, mb); this.beams.setColorAt(nb, c); this.beamLevel.setX(nb, level); nb++;
       if (pool && hit && L < maxLen && np < this.pools.instanceMatrix.count) {
-        const rr = Math.max(0.15, r) / Math.max(0.35, Math.abs(dir.y));
-        qb.setFromAxisAngle(UP, Math.atan2(dir.x, dir.z)); mb.compose(pb.set(hit.x, hit.y + 0.01, hit.z), qb, sb.set(Math.max(0.15, r), 1, rr));
-        this.pools.setMatrixAt(np, mb); this.pools.setColorAt(np, c); this.poolLevel.setX(np, level * (1 - L / MAX_BEAM) * 1.2);
-        this.poolGobo.setXYZW(np, gobo[0], gobo[1], gobo[2], gobo[3]); this.poolFx.setXYZW(np, gobo[4], gobo[5], soft, 0); np++;
+        // (flat on what it lands on, the floor or a wall: stretched along the beam's way across it)
+        // (a wash grazing a wall runs a long way up it: stretched further there than on the floor, at
+        // most three times as long as it's wide, and the more it grazes the more it spreads its light
+        // thin: dimmer, as on a real wall)
+        const n = NV.set(hit.n.x, hit.n.y, hit.n.z), cos = Math.abs(dir.dot(n)), wall = n.y <= 0.5, r0 = Math.max(0.15, r);
+        PZ.copy(dir).addScaledVector(n, -dir.dot(n)); if (PZ.lengthSq() < 1e-8) PZ.set(0, n.y ? 0 : 1, n.y ? 1 : 0); PZ.normalize();
+        PX.crossVectors(n, PZ).normalize(); BASIS.makeBasis(PX, n, PZ); qb.setFromRotationMatrix(BASIS);
+        let w = r0, rr = r0 / Math.max(0.35, cos), dim = 1;
+        pb.set(hit.x, hit.y, hit.z);
+        if (wall) {
+          // On a wall the light is the cone cut by the wall: from where its near edge meets it to
+          // where its far edge does (an uplight close to a wall: from just above the floor, a long
+          // way up), as wide as the cone is there, and its light spread over all that (dimmer)
+          const d = Math.max(0.02, (p.x - hit.x) * n.x + (p.y - hit.y) * n.y + (p.z - hit.z) * n.z);
+          const th = Math.asin(Math.min(1, cos)), half = Math.min(1.3, (deg / 2) * RAD), sAxis = d / Math.max(1e-3, Math.tan(th));
+          // (its far end at most a few metres on: further up a real wash is too faint to see)
+          const sNear = d / Math.tan(Math.min(1.55, th + half)), reach = Math.max(2.5, 4 * r0), sFar = Math.min(sNear + reach, th > half + 0.02 ? d / Math.tan(th - half) : sNear + reach);
+          const sMid = (sNear + sFar) / 2;
+          rr = Math.max(0.15, (sFar - sNear) / 2); w = Math.max(0.15, Math.hypot(d, sMid) * Math.tan(half));
+          pb.addScaledVector(PZ, sMid - sAxis);
+          dim = Math.max(0.35, Math.min(1, (1.3 * r0 * r0) / (w * rr)));
+        }
+        mb.compose(pb.addScaledVector(n, 0.01), qb, sb.set(w, 1, rr));
+        if (n.y < 0.5) nw++;
+        this.pools.setMatrixAt(np, mb); this.pools.setColorAt(np, c); this.poolLevel.setX(np, level * dim * (1 - L / MAX_BEAM) * 1.2);
+        this.poolGobo.setXYZW(np, gobo[0], gobo[1], gobo[2], gobo[3]); this.poolFx.setXYZW(np, gobo[4], gobo[5], soft, wall && cos < 0.7 ? 1 : 0); np++;
       }
     };
     const lightOf = (v: Resolved | undefined, strobeT: number) => {
@@ -465,12 +588,14 @@ export class Rig {
       const f = this.list[fi], v = stage[f.id];
       pos.set(f.p.x, f.p.y, f.p.z);
       q.setFromEuler(E.set(f.rot.pitch * RAD, f.rot.yaw * RAD, f.rot.roll * RAD, 'YXZ'));
-      const base = BASE.compose(pos, q, sc.set(1, 1, 1));
+      const s1 = f.scale ?? 1, base = BASE.compose(pos, q, sc.set(s1, s1, s1));
       const level = lightOf(wholeLook(v), t), inSel = selected.has(f.id), isSel = inSel && marked;   // (a head lit only by its cells has a beam too)
       if (f.shape) m4.compose(pos, q, sc.set(f.size! * shapeW(f.shape) + 0.06, 0.2, f.size! * shapeH(f.shape) + 0.06));
       else if (f.look === 'headbar') m4.compose(pos, q, sc.set(HEADBAR_PITCH * (f.heads ?? 1) + 0.15, 0.45, 0.35));
       else if (f.look === 'winch') m4.compose(pos, q, sc.set(0.4, 0.4, 0.4));
-      else m4.compose(pos, q, sc.set(f.kind === 'bar' ? Math.max(1, f.cells / 30) : 0.6, 0.7, 0.6));
+      else if (f.cloth) m4.compose(pos, CQ.setFromAxisAngle(UPY, f.rot.yaw * RAD), sc.set(f.cloth.w, 0.5, 0.5));
+      else if (f.profile?.panel) m4.compose(pos, q, sc.set(f.profile.panel.w, 0.2, f.profile.panel.h));
+      else m4.compose(pos, q, sc.set(f.kind === 'bar' ? (f.barLen ?? Math.max(1, f.cells / 30)) : 0.6 * s1, 0.7 * s1, 0.6 * s1));
       this.hit.setMatrixAt(nh++, m4); this.hitIds.push(f.id);
       if (inSel && ns < this.sel.instanceMatrix.count) this.sel.setMatrixAt(ns++, m4);   // (placed while it fades out too)
       if (f.look === 'spot' || f.look === 'wash') {
@@ -554,6 +679,54 @@ export class Rig {
           m.tilts[k] = ta;
         }
         m.pan = pa;
+      } else if ((f.look === 'curtain' || f.look === 'flybar') && f.winch && f.cloth) {
+        // a curtain opening (each half drawn back to its side, gathering there) or a drop flying in
+        // and out, at its motor's real speed, never past its soft limits; turned only about the
+        // vertical (a cloth hangs straight down)
+        const w = f.winch, lim = w.limits ?? [0, 1], cl = f.cloth;
+        let a = this.winches.get(f.id);
+        if (!a) this.winches.set(f.id, (a = { at: NaN, v: 0 }));
+        const wire = this.winchWire?.(f.id);
+        const here = Number.isFinite(a.at) ? a.at / w.travel : lim[0];
+        const want = wire === null ? here : wire !== undefined ? wire : typeof v?.hoist === 'number' ? Math.max(lim[0], Math.min(lim[1], v.hoist)) : here;
+        const moved = slew(a, want * w.travel, dt, w.speed, Math.max(0.2, w.speed * 2));
+        this.winchNow.set(f.id, moved);
+        const yq = CQ.setFromAxisAngle(UPY, f.rot.yaw * RAD), ms = this.cloths.get(f.id) ?? [];
+        const hang = (m: THREE.Mesh | undefined, x: number, y: number, sw: number, sh: number) => {
+          if (!m) return;
+          m.position.set(x, y, 0).applyQuaternion(yq).add(pos); m.quaternion.copy(yq); m.scale.set(Math.max(0.01, sw), Math.max(0.01, sh), 1);
+        };
+        // (the valance stays: a band across the top, in front of the cloth, its fringe under it)
+        const vh = Math.min(1.8, cl.h * 0.12);
+        const valance = (band: THREE.Mesh | undefined, edge: THREE.Mesh | undefined) => {
+          hang(band, 0, -vh / 2, cl.w + 0.3, vh); band?.position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
+          hang(edge, 0, -vh + 0.13, cl.w + 0.3, 1); edge?.position.addScaledVector(PZ.set(0, 0, 0.22).applyQuaternion(yq), 1);
+        };
+        if (f.look === 'curtain' && cl.rises) {
+          // flown out: the whole cloth up into the tower behind the proscenium, its fringed hem last
+          put('curtain', TMP.compose(pos, yq, sc.set(cl.w, 1, 1)));
+          hang(ms[0], 0, -cl.h / 2 + moved, cl.w, cl.h); hang(ms[1], 0, -cl.h + 0.11 + moved, cl.w, 1);
+          valance(ms[2], ms[3]);
+        } else if (f.look === 'curtain') {
+          put('curtain', TMP.compose(pos, yq, sc.set(cl.w, 1, 1)));
+          const half = cl.w / 2, gather = Math.min(half, 0.4 + half * 0.08), pw = Math.max(gather, half - moved);
+          hang(ms[0], -half + pw / 2, -cl.h / 2, pw, cl.h); hang(ms[1], half - pw / 2, -cl.h / 2, pw, cl.h);
+          hang(ms[3], -half + pw / 2, -cl.h + 0.11, pw, 1); hang(ms[4], half - pw / 2, -cl.h + 0.11, pw, 1);
+          valance(ms[2], ms[5]);
+        } else {
+          put('flybar', TMP.compose(CP.set(0, -moved, 0).applyQuaternion(yq).add(pos), yq, sc.set(cl.w, 1, 1)));
+          hang(ms[0], 0, -moved - cl.h / 2 - 0.03, cl.w, cl.h);
+        }
+      } else if (f.look === 'mirrorball') {
+        // its motor at the top, the ball under it on its chain: turning as the motor channel says
+        // (slow to fast either way, stopped), and never dead still (mirrorBall.ts)
+        put('mirrorball', TMP.makeTranslation(pos.x, pos.y, pos.z));
+        const b = this.balls.get(f.id);
+        if (b) {
+          b.holder.position.copy(pos);
+          const r = typeof v?.rollRotation === 'number' ? rotationOf(f.axes?.rollRot ?? undefined, v.rollRotation) : { speed: 0 };
+          ballMotion(b.ball, t, 'speed' in r ? (r.speed / (2 * Math.PI)) * BALL_TOP : 0);
+        }
       } else if (f.look === 'winch' && f.winch) {
         // a winch: the cable straight down from its box (whichever way the box is hung), the ball
         // on it going down and up at the winch's real speed, never past its soft limits
@@ -573,6 +746,36 @@ export class Rig {
         if (ball) { const i = counts.get('winch:ball') ?? 0; put('winch:ball', TMP.makeTranslation(bp.x, bp.y, bp.z)); ball.setColorAt(i, level > 0.01 ? C2.copy(col).multiplyScalar(0.35 + level * 1.2) : isSel ? sel : C2.set(0x24262c)); }
         if (level > 0.01) pushLit(fi, bp, DIR.set(0, -1, 0), col, level * 0.35, 150);
         this.winchNow.set(f.id, drop);
+      } else if (f.profile && (f.profile.panel || f.profile.head)) {
+        // a real fixture (profiles.ts): a panel where it hangs, or a moving head turned as its motors
+        // have got; its cells on its face as the manual numbers them, each with its own beam
+        const pr = f.profile, n = pr.cells.cols * pr.cells.rows, white = pr.white ? whiteOf(pr.white) : null;
+        let face: THREE.Matrix4 = base, lift = 0.004;
+        if (pr.head) {
+          const key = `mh:${pr.name}`, want = headAngles(typeof v?.pan === 'number' ? v.pan : 0.5, typeof v?.tilt === 'number' ? v.tilt : 0.5, f.optics);
+          let m = this.heads.get(f.id);
+          if (!m) this.heads.set(f.id, (m = { p: { at: NaN, v: 0 }, t: { at: NaN, v: 0 }, r: { at: NaN, v: 0 } }));
+          const pa = axisTo(m.p, want.p, dt, PAN_SPEED, f.axes?.panRot, v?.panRotation), ta = axisTo(m.t, want.t, dt, TILT_SPEED, f.axes?.tiltRot, v?.tiltRotation);
+          put(`${key}:base`, base);
+          const yoke = YOKE.copy(base).multiply(TMP.makeRotationY(pa * RAD)); put(`${key}:yoke`, yoke);
+          face = HEAD.copy(yoke).multiply(TMP.makeTranslation(0, pr.head.pivot, 0)).multiply(TMP2.makeRotationX(ta * RAD)); put(`${key}:head`, face);
+          lift = pr.head.depth / 2 + 0.004;
+        } else put('panel', TMP.copy(base).multiply(TMP2.makeScale(pr.panel!.w, pr.panel!.d / 0.02, pr.panel!.h)));
+        const fq = CQ.setFromRotationMatrix(face), dir = DIR.set(0, 1, 0).transformDirection(face), sq = this.parts.get('sqcell');
+        this.beamNow.set(f.id, pr.beamDeg);
+        for (let i = 0; i < n; i++) {
+          const cl = lightOf(cellLookAt(v, i, f.cells) ?? v, t);
+          // (a white fixture's channels are dimmers: its LEDs' own warm white)
+          if (white && !(cellLookAt(v, i, f.cells) ?? v)?.color) col.setRGB(white[0], white[1], white[2]);
+          const [cx, cz] = cellAt(pr, i), cp = CP.set(cx, lift, cz).applyMatrix4(face);
+          const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off, sz = pr.cells.size;
+          m4.compose(cp, fq, sc.set(sz, pr.cells.square ? 0.008 : 0.012, sz));
+          if (pr.cells.square && sq) { const k = counts.get('sqcell') ?? 0; put('sqcell', m4); sq.setColorAt(k, cc); }
+          else { this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++; }
+          // (25 beams side by side: each a share of the light, together as bright as one big one)
+          if (cl > 0.01) beamAt(CP.addScaledVector(dir, 0.01), dir, pr.beamDeg, cl * 0.22, col, MAX_BEAM, i % 4 === 0);
+        }
+        pushLit(fi, CP.set(0, lift, 0).applyMatrix4(face), dir, lightOf(v, t) > 0 ? col : C2.set(0, 0, 0), level, pr.beamDeg);
       } else if (f.shape) {
         // a ring or a matrix: its board in the light's x-z plane, its pixels on it, facing its up
         const at = f.shape, S = f.size! / 2, dot = Math.max(0.006, 2 * at.dot * S);
@@ -588,7 +791,7 @@ export class Rig {
         pushLit(fi, pos, dir, col, level * 0.4, 60);
       } else if (f.kind === 'bar') {
         // the bar lies along its x; its cells shine along its up
-        const L = f.cells > 24 ? f.cells / 30 : 1;
+        const L = f.barLen ?? (f.cells > 24 ? f.cells / 30 : 1);
         put('bar', TMP.copy(base).multiply(TMP2.makeScale(L + 0.04, 1, 1)));
         const dir = DIR.copy(UP).applyQuaternion(q);
         for (let i = 0; i < f.cells; i++) {
@@ -596,7 +799,8 @@ export class Rig {
           const cl = lightOf(cv, t);
           const cp = CP.set(-L / 2 + (L * (i + 0.5)) / f.cells, 0.012, 0).applyMatrix4(base);
           const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off;
-          m4.compose(cp, q, sc.set((L / f.cells) * 0.86, 0.016, 0.07)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
+          const d = Math.min((L / f.cells) * 0.86, 0.07);
+          m4.compose(cp, q, sc.set(d, 0.016, d)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
           if (f.cells <= 24) beamAt(cp, dir, 30, cl * 0.6, col, 5, false);
         }
         pushLit(fi, pos, dir, col, level * 0.6, 40);
@@ -618,6 +822,7 @@ export class Rig {
       }
     }
     for (const [k, mesh] of this.parts) { mesh.count = counts.get(k) ?? 0; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
+    this.wallPools = nw;
     this.lens.count = nl; this.beams.count = nb; this.pools.count = np; this.cells.count = nc; this.hit.count = nh; this.sel.count = ns;
     for (const m of [this.lens, this.beams, this.pools, this.cells, this.hit, this.sel]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
     for (const a of [this.beamGobo, this.beamFx, this.poolGobo, this.poolFx]) a.needsUpdate = true;

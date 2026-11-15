@@ -144,8 +144,10 @@ fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in
 - The venue is built once. Static parts are baked into a few meshes per material (`gear.ts`
   `bake`); the crowd is instanced and moves in its own shader (`crowd.ts`: jumps on the beat, arms
   turning about the shoulders); the band and the screens update themselves in `animate()`.
-- Two rooms (`geometry.ts` `ROOMS`, `settings.stage3d.room`): the big stage in a hall and a small
-  club / pub. Anything that asks "is this on the deck" or "where's the floor" goes through the room
+- The rooms (`geometry.ts` `ROOMS`, `settings.stage3d.room`): the big stage in a hall, a small
+  club / pub, the demos' rooms, the templates' (`cinema`, `bar`, `theatre`, `church`, `ballroom`:
+  built in `scenes.ts` with their sizes in `sceneSizes.ts`; `content/scenePlaces.ts` puts each
+  template light where such a room has it, by its name), and `custom` (your own stage at its size). Anything that asks "is this on the deck" or "where's the floor" goes through the room
   shown (`floorAt`, `onDeck`), never through `W`/`D` directly: lights, beams and particles must land
   in the room you see. A light without its own 3D place goes where its plan position puts it in
   that room; one placed by hand keeps its metres.
@@ -234,6 +236,35 @@ fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in
 - Budget: 60 fps with the big demo at 1600 x 900 on a modest GPU (we measure on a Radeon RX 6400:
   about 7 ms of script and 10 ms of GPU a frame). Draw calls cost more than triangles here: merge
   a person's or a prop's parts per material, instance repeated things.
+- Previews (Add fixtures' tiles, the gallery): `stage3d/preview.ts`, one WebGL renderer for all
+  of them (a page gets a dozen or so contexts at most). Each light is placed 400 m off to the side
+  in its own little room (no deck, wide walls: `showRoom()` is switched to it while a preview is
+  drawn, so `hitFloor` and the fog behave; light lands on its floor only, unless the light is
+  shown on a wall of its own, the gallery's uplights), plays its `microShow.ts` loop, and its picture is
+  copied into the tile's 2D canvas. Only tiles on the screen are drawn, the hovered one every
+  frame, the rest in turn within a few ms a frame (less when `load` says the page is busy).
+  `stage3d/rigOf.ts` is the one mapping from a fixture to what the rig draws, for the stage and
+  the previews alike.
+- Where light lands: `hitRoom` (geometry.ts) finds the first thing a beam meets in the room shown:
+  the deck, the floor (a raked one, `Room.floor`, marched along the ray), the walls, the ceiling, or a `Room.screens` plane (the theatre's cyc, the
+  cinema's screen). `rig.ts` lays the pool flat on it; on a wall it's the cone cut by the wall
+  (from just above an uplight, a few metres up, fading), dimmer the thinner it's spread. With the
+  built-in room hidden (`showWalls(false)`, your own venue model) only the floor counts.
+  `__stage3d.pools()` says how many landed on walls last frame, `__stage3d.lit()` lists the lit
+  lights (where from, which way, how wide).
+- The camera crews (`director.ts`): every room has a hand-made `CREW` (or one worked out from its
+  size), `GEAR` (what a camera mustn't fly into) and `CROWDS` (where the action is); its tests
+  fly every move for minutes and check the camera stays inside, clear of everything, on the
+  action and below speed limits (a drone circling over what it films spins its view: keep the
+  orbit off the target).
+- While a page records a take or renders a video, the dev server holds its hot updates
+  (`src/dev/holdWhileBusy.ts`, wired in `vite.config.ts`): a code change swapped the 3D stage out
+  under the render. The page says it's busy (`ui.recording`, over the hot-update socket); what
+  changed meanwhile comes as one reload when it's done or its tab is closed.
+- The README's gallery animations: `node tools/gallery/capture.mjs` (dev server running) draws
+  each item of `src/content/gallery.ts` frame by frame with `frames()` and makes animated WebPs in
+  `docs/media/gallery/` (`--gif` for GIFs, `--only gobos,prism` for some). The frames stay in its
+  `.frames/` folder (gitignored) to look at. Run it again after changing how lights look.
 
 ## The UI
 
@@ -367,3 +398,13 @@ lists and effects a hand-made live page doesn't have yet.)
 - Per-mode facts (which channels are 16 bit, gated, the shutter's ranges) are worked out once per
   mode in a `WeakMap` (`capsOf`, `planOf`, `gatedChannels`). That's only right because a fixture
   type is never edited in place: saving one makes a new object. Keep it that way.
+
+## Undo keeps what didn't change
+
+Undo and redo don't swap in a new show object: `model/reconcile.ts` brings the live show (a
+Svelte `$state` proxy) to the step's text by changing only what differs, so unchanged fixtures,
+cues and lists keep their identity and only what changed is drawn again. Two rules come with it:
+objects with their own prototype (the raw fixture types and cell maps) and an effect's `params`
+are never changed in place (a changed one is a new object: the engine caches by them); and the
+show's text after an undo is the step's own unless a field came back into an object that was
+there (then it's made again, as its key order may differ). `src/undo.app.test.ts` checks both.

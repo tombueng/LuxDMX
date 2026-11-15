@@ -54,6 +54,14 @@ test('save the selection as a new preset, and the standard set comes back when i
   await tab(page, 'Presets');
   await page.locator('.pp').getByRole('button', { name: 'New Colours preset' }).click();
   const ask = page.getByRole('dialog', { name: 'New colour preset' });
+  // an empty name: OK waits for one (it used to close, make nothing and throw)
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await ask.getByLabel('Name').fill('');
+  await expect(ask.getByRole('button', { name: 'Save preset' })).toBeDisabled();
+  await ask.getByLabel('Name').press('Enter');
+  await expect(ask).toBeVisible();
+  expect(errors).toEqual([]);
   await ask.getByLabel('Name').fill('Stage blue');
   await ask.getByRole('button', { name: 'Save preset' }).click();
   await expect(tile(page, 'Stage blue')).toHaveCount(1);
@@ -95,4 +103,18 @@ test('colours from a picture: presets, and a colour fade in them on the selected
   await expect.poll(() => channels(0, 3), { timeout: 4000 }).toEqual([255, 0, 0]);
   await tile(page, 'poster 2').click();
   await expect.poll(async () => { const [r, g, b] = await channels(0, 3); return r < 30 && g < 40 && b === 255; }, { timeout: 4000 }).toBe(true);
+});
+
+test('the Beam presets are tiles like the others: their names inside them, nothing on top of them', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await tab(page, 'Presets');
+  const tiles = page.locator('.pp .tile.beam');
+  expect(await tiles.count()).toBeGreaterThan(0);
+  const colour = (await page.locator('.pp .tile.color').first().boundingBox())!;
+  for (const t of await tiles.all()) {
+    const b = (await t.boundingBox())!;
+    expect(Math.abs(b.height - colour.height)).toBeLessThan(2);                     // (it was 30 px, its name spilling out)
+    expect(await t.locator('.name').evaluate((n) => { const r = n.getBoundingClientRect(), p = n.parentElement!.getBoundingClientRect(); return r.bottom <= p.bottom + 1; })).toBe(true);
+  }
 });

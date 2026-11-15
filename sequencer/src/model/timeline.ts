@@ -16,6 +16,38 @@ export interface TimelineItem {
   lane: string;            // 'list:<id>', 'fx', 'special'
   do: TimelineAction;
   len?: number;            // seconds an effect bar runs (on at `at`, off at at + len)
+  curves?: Curve[];        // an effect bar's knobs changing over its length (its own values else)
+}
+// A knob of an effect over an effect bar: points along the bar (0 its start, 1 its end) with the
+// knob's value there, straight lines between them; before the first and after the last, theirs.
+export const CURVE_KNOBS = ['speed', 'size', 'spread', 'width', 'low', 'high', 'contrast'] as const;
+export type CurveKnob = (typeof CURVE_KNOBS)[number];
+export interface Curve { knob: CurveKnob; pts: [number, number][] }
+// the knob's value at a point along the bar (0..1)
+export function curveAt(c: Curve, f: number): number {
+  const p = c.pts;
+  if (f <= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) if (f <= p[i][0]) { const [a, va] = p[i - 1], [b, vb] = p[i]; return b > a ? va + ((f - a) / (b - a)) * (vb - va) : vb; }
+  return p[p.length - 1][1];
+}
+// What the effect bars playing at `t` set their effects' knobs to: { effect id: { knob: value } }
+export function curvesAt(items: readonly TimelineItem[], t: number): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const i of items) {
+    if (!i.curves?.length || i.do.do !== 'effect' || !i.do.on || !i.len || t < i.at || t >= i.at + i.len) continue;
+    const f = (t - i.at) / i.len, o = (out[i.do.effect] ??= {});
+    for (const c of i.curves) o[c.knob] = curveAt(c, f);
+  }
+  return out;
+}
+// A curve as a file has it: a knob there is, two points or more along the bar in order, each a number
+// (else undefined: the bar goes on with its effect's own value)
+export function cleanCurve(c: unknown): Curve | undefined {
+  if (!c || typeof c !== 'object') return undefined;
+  const { knob, pts } = c as Curve;
+  if (!(CURVE_KNOBS as readonly string[]).includes(knob) || !Array.isArray(pts)) return undefined;
+  const ok = pts.filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite) && p[0] >= 0 && p[0] <= 1).sort((a, b) => a[0] - b[0]);
+  return ok.length >= 2 ? { knob, pts: ok } : undefined;
 }
 // The crowd's sound (audio/crowd.ts makes it), on its own track: from a mood moment on the crowd
 // waits and chats or cheers, this loud (0..1), got to over `len` seconds; a cheer swells up and
@@ -125,6 +157,8 @@ export const validItem = (i: unknown): i is TimelineItem => {
   const it = i as TimelineItem, a = it.do as { do?: string; seconds?: unknown };
   if (typeof it.id !== 'string' || !Number.isFinite(it.at) || typeof it.lane !== 'string' || !a || typeof a !== 'object') return false;
   if (it.len !== undefined && !(Number.isFinite(it.len) && it.len >= 0)) return false;
+  // (curves that can't be one go, the bar stays)
+  if (it.curves !== undefined) { const cs = Array.isArray(it.curves) ? it.curves.map(cleanCurve).filter((c): c is Curve => !!c) : []; if (cs.length) it.curves = cs; else delete it.curves; }
   // a moment says how long (its machines must stop by themselves)
   return a.do !== 'burst' || (typeof a.seconds === 'number' && Number.isFinite(a.seconds) && a.seconds > 0 && a.seconds <= 30);
 };

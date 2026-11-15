@@ -1,7 +1,7 @@
 // The trouble spots a usability test with a first-time user ("Sam", covers band, 4 PARs, a moving
 // head, fog) ran into, each pinned so it stays fixed.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, tab, selectAll, swatch, record, cues, test, expect, intensity, patch, selectFixtures, full, welcome } from './helpers';
+import { openConnected, resetFake, channels, tab, selectAll, swatch, record, cues, test, expect, intensity, patch, selectFixtures, full, welcome, startTemplate } from './helpers';
 
 const add = (page: Page) => page.getByRole('dialog', { name: 'Add fixtures' });
 test.beforeEach(async () => { await resetFake(); });
@@ -73,7 +73,7 @@ test('an effect recorded on its own keeps its lights\' look, whatever played bef
 test('Live GO plays the main list, not the list last opened in Program', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Band' }).click();
+  await startTemplate(page, 'Band');
   await page.locator('.deck .tab', { hasText: 'Fog timer' }).click();
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await expect(page.locator('.strip .go')).toContainText('Songs');
@@ -83,15 +83,15 @@ test('Ctrl+S says it saved; templates are on the empty stage; help stays on scre
   await openConnected(page);
   await page.locator('body').press('Control+s');
   await expect(page.locator('.toast')).toContainText('Saved in this browser');
-  await welcome(page);
-  await expect(page.locator('.welcome .tpls').getByRole('button')).toHaveCount(7);
+  const w = await welcome(page);
+  // (every template a tile with its Start: Band, DJ / Party, Theatre, Church, Cinema, Bar, Wedding, Ring and matrix)
+  await expect(w.getByRole('button', { name: /^Start (?!with)/ })).toHaveCount(8);
   await page.keyboard.press('Escape');
   await page.locator('.deck').getByRole('button', { name: 'What is this?' }).click();
   const pop = (await page.locator('.deck .pop').boundingBox())!;
   expect(pop.x).toBeGreaterThanOrEqual(0);
   expect(pop.x + pop.width).toBeLessThanOrEqual(1400);
-  await welcome(page);
-  await page.locator('.welcome .tpls').getByRole('button', { name: 'Church' }).click();
+  await startTemplate(page, 'Church');
   await expect(page.locator('.top .show .name')).toHaveText('Sunday service');
 });
 
@@ -136,7 +136,7 @@ test('the selection follows GO; picking another card makes Update go there, and 
 test('adapting a template: an 8-ch PAR card, a warning before overlapping, tidy removal, change a type', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ has: page.locator('b', { hasText: /^Church$/ }) }).click();
+  await startTemplate(page, 'Church');
   await page.locator('.fl').getByRole('button', { name: /Add/ }).first().click();
   const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
   await dlg.locator('[data-type="gen-drgbwsms"]').click();

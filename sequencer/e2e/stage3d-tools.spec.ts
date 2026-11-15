@@ -129,3 +129,20 @@ test.describe('a wide screen', () => {
     await expect(venue).toHaveCount(0);
   });
 });
+
+test('at every width the toolbar is one row with nothing cut off: what doesn\'t fit steps into More (measured, not guessed)', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => (window as any).__luxdmx.addFixtures('gen-mover8', '', 2, 0, 'Head'));
+  await open3d(page);
+  for (const [w, h] of [[1920, 1080], [1600, 1000], [1400, 900], [1280, 800], [1100, 800], [1024, 768]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await expect.poll(async () => (await oneRow(page)).over, { timeout: 5000, message: `${w}` }).toBeLessThanOrEqual(1);
+    // Record and Render are there, in the row
+    await expect(page.locator('.s3 .tools').getByRole('button', { name: 'Record a video' })).toBeVisible();
+    await expect(page.locator('.s3 .tools').getByRole('button', { name: 'Render a video' })).toBeVisible();
+    // with a head selected (Calibrate comes in): still one row
+    await page.evaluate(() => { const a = (window as any).__luxdmx; a.selected = [a.show.fixtures[0].id]; });
+    await expect.poll(async () => (await oneRow(page)).over, { timeout: 5000, message: `${w}, selected` }).toBeLessThanOrEqual(1);
+    await page.evaluate(() => { (window as any).__luxdmx.selected = []; });
+  }
+});

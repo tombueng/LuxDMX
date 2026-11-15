@@ -68,7 +68,7 @@ describe('a winch', () => {
     app.programmer = { w: { hoist: 0.5 } };
     out();
     app.armMachines(false);
-    const kept = JSON.parse(localStorage.getItem('luxdmx.seq.held') ?? '{}');
+    const kept = JSON.parse(localStorage.getItem('luxdmx.seq.held') ?? '{}').data ?? {};
     expect(kept['w:hoist'].v).toBe(128);
     const e = new Engine(() => app.show);
     e.heldSeed = { 'w:hoist': 128 };
@@ -86,7 +86,7 @@ describe('a winch', () => {
     app.programmer = { w: { hoist: 0.5 } };
     out();
     app.armMachines(false);
-    expect(JSON.parse(localStorage.getItem('luxdmx.seq.held')!)['w:hoist'].v).toBe(200);
+    expect(JSON.parse(localStorage.getItem('luxdmx.seq.held')!).data['w:hoist'].v).toBe(200);
   });
   it('armed with nothing saying where: it stays where it was; where it is unknown, its enable stays shut', async () => {
     const { app, out } = await winch();
@@ -133,6 +133,15 @@ describe('a winch', () => {
     app.programmer = { w: { hoist: 0.9 } };
     out();
     expect(app.winchHeldAt('w')).toBeCloseTo(0.5, 2);
+  });
+  it('a winch no connected box plays isn\'t held on the 3D stage: nothing goes out to a motor, it shows the show', async () => {
+    const { app, out } = await winch();
+    app.bridges[0].wants = (uni: number) => uni !== 0;
+    app.programmer = { w: { hoist: 0.7 } };
+    out();
+    expect(app.winchHeldAt('w')).toBeUndefined();
+    app.bridges[0].wants = () => true;
+    expect(app.winchHeldAt('w')).toBeNull();                    // (played again: held, nobody knows where)
   });
   it('Blind freezes it where the wire held it', async () => {
     const { app, out } = await winch();

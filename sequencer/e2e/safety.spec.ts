@@ -1,7 +1,7 @@
 // Safety on the wire: blind keeps the stage as it was (nothing new goes out until you go live);
 // confetti, flames, sparks and CO2 send 0 until someone holds Arm; a timeline jumped about over a
 // flame moment never fires it, playing through it does (armed).
-import { openConnected, resetFake, channels, history, patch, selectAll, full, test, expect } from './helpers';
+import { openConnected, resetFake, channels, history, patch, selectAll, full, goLive, welcome, demoTile, startTemplate, test, expect, keptValue } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -145,4 +145,70 @@ test('a machine moment coming while safe is said on the Live page; a reload says
   await page.reload();
   await expect(page.locator('.toast')).toContainText('The reload made the machines safe');
   await expect(page.locator('.top .arm')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('a tab opened from this one starts blind (it gets a copy of this tab\'s storage); a reload of this tab stays on stage', async ({ page }) => {
+  await openConnected(page);
+  await goLive(page);
+  const out = (p: typeof page) => p.evaluate(() => (window as any).__luxdmx.output);
+  expect(await out(page)).toBe('live');
+  // (a new tab from this one, as a link or the browser's Duplicate does: session storage copied)
+  const [tab] = await Promise.all([page.context().waitForEvent('page'), page.evaluate(() => { window.open(location.href, '_blank'); })]);
+  await tab.waitForFunction(() => !!(window as any).__luxdmx, null, { timeout: 30000 });
+  expect(await keptValue(tab, 'luxdmx.seq.output', true)).toBe('live');   // (the copy is there)
+  expect(await out(tab)).toBe('blind');
+  await tab.close();
+  // this tab reloaded: still on stage
+  await page.reload();
+  await page.waitForFunction(() => !!(window as any).__luxdmx, null, { timeout: 30000 });
+  expect(await out(page)).toBe('live');
+});
+
+test('a template\'s show: its cold-spark moment on the song sends 0 while the machines are safe, and fires when they\'re armed', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openConnected(page);
+  const w = await welcome(page), t = demoTile(w, 'Wedding');
+  await t.getByLabel('Music for Wedding').selectOption('beat');
+  await t.getByRole('button', { name: 'Play the show: Wedding' }).click();
+  await expect(w).toBeHidden({ timeout: 30000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.timeline.playing), { timeout: 30000 }).toBe(true);
+  const m = await page.evaluate(() => {
+    // (the show's machine moments: cold sparks on the last chorus; confetti is the bouquet's own,
+    // once, not a moment on the song any more)
+    const s = (window as any).__luxdmx.show, f = s.fixtures.find((x: any) => /^Sparks/.test(x.name));
+    const b = s.timeline.items.find((i: any) => i.do.do === 'burst' && i.do.attr === 'sparks');
+    return { ch: f.address, at: b.at, confetti: s.timeline.items.some((i: any) => i.do.do === 'burst' && i.do.attr === 'confetti') };
+  });
+  expect(m.confetti).toBe(false);
+  const through = async () => {
+    const t0 = Date.now();
+    await page.evaluate((at) => (window as any).__luxdmx.timeline.seek(at - 1.5), m.at);
+    await page.waitForTimeout(3500);
+    return (await history(0, m.ch)).filter(([at]) => at >= t0).map(([, v]) => v);
+  };
+  // safe: played through the moment, nothing
+  expect(Math.max(0, ...(await through()))).toBe(0);
+  // armed: the same moment fires it (once the first is over: a moment already running when the
+  // machines are armed stays quiet, arming never fires one half way through)
+  await expect.poll(() => page.evaluate(() => { const a = (window as any).__luxdmx, f = a.show.fixtures.find((x: any) => /^Sparks 1$/.test(x.name)); return a.stageNow[f.id]?.sparks ?? 0; }), { timeout: 10000 }).toBe(0);
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(true));
+  expect(Math.max(0, ...(await through()))).toBeGreaterThan(0);
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(false));
+});
+
+test('a machine\'s button pressed while safe says so ("Safe: not firing"), instead of lighting up as if it fired; armed it lights up', async ({ page }) => {
+  await openConnected(page);
+  await startTemplate(page, 'Wedding');
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const sparks = page.locator('.live .tile.list').filter({ hasText: 'Sparks' }).first();
+  await sparks.click();
+  await expect(sparks).toHaveClass(/\bsafe\b/);
+  await expect(sparks).toContainText('Safe: not firing');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.engine.status((window as any).__luxdmx.show.cueLists.find((l: any) => l.name === 'Sparks').id).running), { timeout: 5000 }).toBe(false);
+  // armed: pressed, it lights up as it fires
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(true));
+  await sparks.click();
+  await expect(sparks).toHaveClass(/\bon\b/);
+  await expect(sparks).not.toHaveClass(/\bsafe\b/);
+  await page.evaluate(() => (window as any).__luxdmx.armMachines(false));
 });

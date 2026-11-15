@@ -1,5 +1,5 @@
-// The engine: runs the cue lists, mixes them, renders DMX. Pure TypeScript, no DOM, so it can be
-// unit-tested and moved into a Worker later.
+// The engine: runs the cue lists, mixes them, renders DMX. Pure TypeScript, no DOM: the output
+// thread runs one for the wire (output/thread.ts), the page one for the screen, and the tests theirs.
 //
 // Mixing, per fixture:
 //   - intensity: highest wins across lists (HTP), each scaled by its list master and weight
@@ -13,13 +13,14 @@ import { isHeld, enableValue, isGated, isMachine, MACHINE_PROGRAMS, MAX_ON, KINE
 import type { CueAction, CueList, Effect, FixtureMode, Preset, Resolved, Show, Values, Fixture } from '../model/types';
 import { headCellsOf, capsOf, modeOf, typeMap } from '../model/library';
 import { isWide, placesOfLight, spansOf } from '../model/pixelLayout';
-// fog, haze and the effect machines: highest wins across lists, like a level (a haze list runs all
-// night whatever the moods say; two lists firing confetti fire it)
-const SMOKE = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 import { ListPlayer, type PlayerStatus } from './player';
 import { lerpResolved, resolveValues, spreadCells, stripCells } from './resolve';
 import { DARK, fitLook, renderFixture, level } from './render';
 import { EFFECT_MAP, applyFx, hash, paramsOf, runEffect, type EffectDef, type EffectParams, type Target } from './effects';
+
+// fog, haze and the effect machines: highest wins across lists, like a level (a haze list runs all
+// night whatever the moods say; two lists firing confetti fire it)
+const SMOKE = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 
 const PRIO = { low: 0, normal: 1, high: 2 } as const;
 const FX_FADE = 0.4;            // seconds an effect started or stopped by hand takes to fade
@@ -109,10 +110,25 @@ function gatedChannels(m: FixtureMode | undefined): { i: number; max: number; of
 export class Engine {
   readonly players = new Map<string, ListPlayer>();
   programmer: Record<string, Values> = {};
+  // effects' knobs as the timeline's curves have them right now (an effect's id: its knobs), over the
+  // effects' own values; nothing in the show changes
+  fxOver: Record<string, Record<string, number>> = {};
   grandMaster = 1;
   // keep each list's tracked look from one GO to the next: only where the show is a new copy after
   // every edit (the output thread), so an edit can never leave an old look in it
   cacheTracks = false;
+  // what Record would store (tick()'s `look`): made unless this engine never records (the thread's)
+  wantLook = true;
+  private modesShow: Show | null = null;
+  private modesMap: Map<string, FixtureMode | undefined> | null = null;
+  // each light's mode: kept while it's the same show copy (the thread's, a fresh copy after each
+  // edit); the page's show changes in place, worked out each frame
+  private modesOf(show: Show) {
+    if (this.cacheTracks && this.modesShow === show && this.modesMap) return this.modesMap;
+    const types = typeMap(show), m = new Map(show.fixtures.map((f) => [f.id, modeOf(types.get(f.typeId), f.mode)]));
+    if (this.cacheTracks) { this.modesShow = show; this.modesMap = m; }
+    return m;
+  }
   // a group's master (the console's group faders): its lights' levels times this, like the grand
   // master for just them (a light in two groups: both)
   groupMasters: Record<string, number> = {};
@@ -138,8 +154,16 @@ export class Engine {
   private seq = 0;
   private depth = 0;                          // cue actions starting lists that start lists...
   private lastStage: Record<string, Resolved> = {};
+  // how firmly a list or the programmer held each light's level, last frame (Record asks: a light
+  // only an effect lit isn't stored dark)
+  lastHeld = new Map<string, number>();
   private liveFx = new Map<string, Ramp>();   // effects started by hand
   private fxFlash = new Set<string>();
+  // Effects a cue runs, stopped by hand (its button tapped): faded out until a tap brings them back,
+  // or a cue starts again (any list's cue changing: what's on stage is new then)
+  private fxMuted = new Map<string, Ramp>();
+  private mutedFor = '';
+  private cueFx = new Set<string>();          // effects running from a cue, last frame
   private fxSince = new Map<string, { beats: number; seconds: number }>();
   private beats = 0;
   private seconds = 0;
@@ -159,16 +183,18 @@ export class Engine {
   back(id: string) {
     const l = this.list(id), p = this.player(id);
     if (l) p.sync(l);
-    // (without the cue's actions: going back to the preset doesn't bring the house lights up again)
-    if (p.running && p.index > 0) this.jumpTo(id, p.index - 1, undefined, false);
+    // (without the cue's actions: going back to the preset doesn't bring the house lights up again;
+    // the cue as the list builds it from the top, as its card shows it: what only the cue after it
+    // switched on goes out, in a list of looks too)
+    if (p.running && p.index > 0) this.jumpTo(id, p.index - 1, undefined, false, false, true);
   }
   // `exact`: only that cue's own values (see ListPlayer.jump)
-  jumpTo(id: string, i: number, fade?: number, actions = true, exact = false) {
+  jumpTo(id: string, i: number, fade?: number, actions = true, exact = false, asPlay = false) {
     const l = this.list(id);
     if (!l) return;
     this.jumped.delete(id);
     this.wake(id);
-    const cue = this.player(id).jump(l, i, this.now(), this.presetMap(), ++this.seq, fade, this.lastStage, exact, this.fxLights(), this.getShow().presets);
+    const cue = this.player(id).jump(l, i, this.now(), this.presetMap(), ++this.seq, fade, this.lastStage, exact, this.fxLights(), this.getShow().presets, asPlay);
     // Actions can start lists whose cues start lists: a few levels deep is a show, more is a loop.
     if (actions && cue?.actions && this.depth < 8) {
       this.depth++;
@@ -245,11 +271,19 @@ export class Engine {
   forget(id?: string) { if (id) this.players.delete(id); else this.players.clear(); }
 
   // ---- effects started by hand (the Effects panel, live buttons)
-  startEffect(id: string) { this.liveFx.set(id, { from: this.liveWeight(id), to: 1, start: this.now(), dur: FX_FADE }); }
+  startEffect(id: string, fade = FX_FADE) { this.liveFx.set(id, { from: this.liveWeight(id), to: 1, start: this.now(), dur: fade }); }
   stopEffect(id: string, fade = FX_FADE) {
     if (this.liveFx.has(id)) this.liveFx.set(id, { from: this.liveWeight(id), to: 0, start: this.now(), dur: fade });
   }
-  toggleEffect(id: string) { if (this.isEffectLive(id)) this.stopEffect(id); else this.startEffect(id); }
+  // A tap: by hand it stops; one a cue runs stops too (it did nothing: lit, and on it went); a tap on
+  // one stopped that way brings it back
+  toggleEffect(id: string) {
+    if (this.isEffectLive(id)) { this.stopEffect(id); return; }
+    const m = this.fxMuted.get(id);
+    if (m && m.to > 0) { this.fxMuted.set(id, { from: rampAt(m, this.now()), to: 0, start: this.now(), dur: FX_FADE }); return; }
+    if (this.cueFx.has(id)) { this.fxMuted.set(id, { from: m ? rampAt(m, this.now()) : 0, to: 1, start: this.now(), dur: FX_FADE }); return; }
+    this.startEffect(id);
+  }
   flashEffect(id: string, down: boolean) {
     if (down && !this.isEffectLive(id)) { this.liveFx.set(id, { from: 1, to: 1, start: this.now(), dur: 0 }); this.fxFlash.add(id); }
     else if (!down && this.fxFlash.delete(id)) this.liveFx.delete(id);
@@ -260,7 +294,16 @@ export class Engine {
   heldEffects(): string[] { return [...this.fxFlash]; }
   // Hand the running effects over (to a cue that was just recorded): gone from here without a fade.
   takeLiveEffects(): string[] { const ids = this.liveEffects(); for (const id of ids) this.liveFx.delete(id); return ids; }
+  // (Undo of a Record: the effects the cue took over run by hand again, at full, no fade in)
+  giveBackEffects(ids: string[]) { for (const id of ids) this.liveFx.set(id, { from: 1, to: 1, start: this.now(), dur: 0 }); }
   stopAllEffects() { for (const id of this.liveFx.keys()) this.stopEffect(id); }
+  // and the ones the cues on stage run, until a cue changes (the next GO brings that cue's own);
+  // the ids it stopped
+  muteCueEffects(): string[] {
+    const ids = [...this.cueFx];
+    for (const id of ids) { const m = this.fxMuted.get(id); this.fxMuted.set(id, { from: m ? rampAt(m, this.now()) : 0, to: 1, start: this.now(), dur: FX_FADE }); }
+    return ids;
+  }
   private liveWeight(id: string) { const r = this.liveFx.get(id); return r ? rampAt(r, this.now()) : 0; }
 
   // a cue action (also run by the timetable: `from` '' is nobody's list)
@@ -318,7 +361,10 @@ export class Engine {
     const show = this.getShow();
     const presets = this.presetMap();
     // The effect clocks: seconds, and beats at the tempo (so a tempo change doesn't jump).
-    const dt = this.last < 0 ? 0 : Math.max(0, Math.min(0.25, now - this.last));
+    // (by the clock, not capped: a page busy for half a second lost that half second here while the
+    // output thread's clock went on, and the stage and Auto GO ran half a beat off the effects on
+    // the wire from then on)
+    const dt = this.last < 0 ? 0 : Math.max(0, now - this.last);
     this.last = now;
     this.seconds += dt;
     this.beats += dt * this.bpm / 60;
@@ -331,7 +377,13 @@ export class Engine {
       const next = p.update(l, now, this.bpm);
       // (a list the timeline jumped onto stays quiet through its own waits and follow-ons: only a
       // GO, or the timeline playing into it, wakes its machines)
-      if (next >= 0) { const q = this.jumped.has(id); this.jumpTo(id, next); if (q) this.jumped.add(id); }
+      if (next >= 0) {
+        const q = this.jumped.has(id); this.jumpTo(id, next); if (q) this.jumped.add(id);
+        // (the next cue counts from when it was due, not from the frame that noticed: a loop of
+        // 1-beat cues ran 4 % slow and drifted off the beat, a frame late at every step)
+        const late = now - p.dueAt;
+        if (late > 0 && late < 0.25) p.since(late);
+      }
     }
 
     const order = [...this.players.values()].filter((p) => p.running)
@@ -354,8 +406,7 @@ export class Engine {
     const cellLevels = new Map<string, { lvl: Float64Array; rec: Float64Array }>();
     const plain: Record<string, number> = {}, plainRec: Record<string, number> = {};
     for (const f of show.fixtures) { stage[f.id] = { ...DARK, color: { ...DARK.color! } }; htp[f.id] = 0; }
-    const types = typeMap(show);
-    const modes = new Map(show.fixtures.map((f) => [f.id, modeOf(types.get(f.typeId), f.mode)]));
+    const modes = this.modesOf(show);
 
     for (const { p } of order) {
       const w = p.weightAt(now);
@@ -421,7 +472,9 @@ export class Engine {
       // (a cell the programmer sets is held, not the rest of its light)
       if (pr?.cellVals) for (const [k, c] of Object.entries(pr.cellVals)) { if (c.intensity !== undefined) held.set(`${f.id}#${k}`, 1); if (c.color) colored.add(f.id); }
       if (pr?.color) colored.add(f.id);
-      // what Record stores: what the cues set, not where the masters and fades have it
+      // what Record stores: what the cues set, not where the masters and fades have it (the output
+      // thread has no use for it: it isn't made there)
+      if (!this.wantLook) continue;
       const lk: Resolved = { ...s, color: s.color && { ...s.color } };
       // (the cells as they are: nothing changes them in place after this)
       if (s.cellVals) lk.cellVals = s.cellVals;
@@ -437,6 +490,7 @@ export class Engine {
     }
 
     this.runEffects(show, order.map((o) => o.p), stage, modes, now, held, colored);
+    this.lastHeld = held;
     // what the lists and effects made, before the live layer (Highlight, flashes, the patch
     // check), the masters and the fitting to each fixture: new cues fade from this (without the
     // cells an effect drew; with the cells' own colours, and their levels to tell a lit light)
@@ -617,12 +671,12 @@ export class Engine {
     for (const k of kin.keys()) this.orphans.delete(k);
     this.kinWas = kin;
     if (!this.orphans.size) return;
-    // (what the patch uses now: an orphan under a light patched there gives way)
-    const used = new Set<string>();
-    for (const f of show.fixtures) for (const s of spansOf(f, modes.get(f.id))) for (let i = 0; i < s.count; i++) used.add(`${s.universe}:${s.at + i}`);
+    // (an orphan under a light patched there now gives way; orphans are a handful, so each is
+    // checked against the patch's spans, no set of every channel made every frame)
+    const spans = show.fixtures.flatMap((f) => spansOf(f, modes.get(f.id)));
     for (const [k, v] of this.orphans) {
-      if (used.has(k)) { this.orphans.delete(k); continue; }
       const [u, at] = k.split(':').map(Number);
+      if (spans.some((sp) => sp.universe === u && at >= sp.at && at < sp.at + sp.count)) { this.orphans.delete(k); continue; }
       let b = frames.get(u);
       if (!b) { b = new Uint8Array(512); frames.set(u, b); }
       b[at] = v;
@@ -672,18 +726,28 @@ export class Engine {
       const v = rampAt(r, now);
       if (v <= 0 && r.to === 0 && now >= r.start + r.dur) this.liveFx.delete(id); else add(id, v);
     }
+    const on = players.map((p) => (p.running ? p.cueId : '')).join();
+    if (on !== this.mutedFor) { this.mutedFor = on; this.fxMuted.clear(); }
+    const cueFx = new Set<string>();
     for (const p of players) {
       const pw = p.weightAt(now) * p.master;
-      for (const [id, v] of p.effects(now)) add(id, v * pw);
+      for (const [id, v] of p.effects(now)) {
+        if (v * pw > 0) cueFx.add(id);
+        const m = this.fxMuted.get(id), mute = m ? rampAt(m, now) : 0;
+        add(id, v * pw * (1 - mute));
+      }
     }
+    this.cueFx = cueFx;
     const run: { e: Effect; def: EffectDef; p: EffectParams; f: number }[] = [];
     for (const e of show.effects) {
       const def = EFFECT_MAP.get(e.kind), f = w.get(e.id) ?? 0;
       if (!def || f <= 0) continue;
-      run.push({ e, def, p: { ...paramsOf(e.kind, e.params), sound: this.sound }, f });
+      const over = this.fxOver[e.id];
+      run.push({ e, def, p: { ...paramsOf(e.kind, over ? { ...e.params, ...over } : e.params), sound: this.sound }, f });
     }
     run.sort((a, b) => FX_ORDER[a.def.category] - FX_ORDER[b.def.category]);
     const base = run.some((r) => r.p.lightUp) ? new Map(Object.entries(stage).map(([id, s]) => [id, s.intensity ?? 0])) : undefined;
+    const lightOf = new Map(show.fixtures.map((x) => [x.id, x]));      // (each element's light, for the pixel shows)
     for (const { e, def, p, f } of run) {
       let since = this.fxSince.get(e.id);
       // Tempo effects count from the last whole beat, so their steps land on the beat (and on the
@@ -692,7 +756,7 @@ export class Engine {
       const total = (p.tempo ? this.beats - since.beats : this.seconds - since.seconds) / p.speed;
       const targets = effectTargets(show, e, def, p, modes);
       // each element's light and its place on it (pixel shows and pictures use them)
-      const rowOf = new Map<string, number>(), lightOf = new Map(show.fixtures.map((f) => [f.id, f]));
+      const rowOf = new Map<string, number>();
       for (const t of targets) if (!rowOf.has(t.fixture)) rowOf.set(t.fixture, rowOf.size);
       const where = targets.map((t) => {
         const m = modes.get(t.fixture)!, n = t.cell === undefined ? 1 : capsOf(m).cells;

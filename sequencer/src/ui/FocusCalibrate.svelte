@@ -9,13 +9,13 @@
   import Modal from './Modal.svelte';
   import { app, newId } from '../app.svelte';
   import { ui } from './ui.svelte';
-  import { groundAt, roomOf, worldToPlan } from '../stage3d/geometry';
+  import { groundAt, roomFor, worldToPlan } from '../stage3d/geometry';
   import { aimHead, calMarks, motors, opticsOf, placeOf, upOf, type PanTilt } from '../model/fixtureSetup';
   import { canMeasureRanges, solvePose, type Fit } from '../model/calibrate';
   import type { Fixture, StageMark, Values } from '../model/types';
 
   let { ids, onclose }: { ids: string[]; onclose: () => void } = $props();
-  const room = $derived(roomOf(app.show.settings.stage3d?.room));
+  const room = $derived(roomFor(app.show.settings.stage3d));
   const heads = $derived(ids.map((x) => app.show.fixtures.find((f) => f.id === x)).filter((f): f is Fixture => !!f && app.kinds[f.id] === 'mover'));
   $effect(() => { if (!heads.length) onclose(); });
   const r2 = (v: number) => Math.round(v * 100) / 100 + 0;

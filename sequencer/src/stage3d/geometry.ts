@@ -11,6 +11,7 @@
 // then pitch about x, then roll about z (hanging = roll 180: up is down, front still the audience).
 import type { Fixture } from '../model/types';
 import type { FixtureKind } from '../model/library';
+import { CINEMA, THEATRE, cinemaFloor, theatreFloor } from './sceneSizes';
 
 export const W = 14, D = 9, DECK = 1.2;
 export const TRUSS = [{ z: -3.3, y: 8.2 }, { z: 0, y: 7.6 }, { z: 3.4, y: 7.0 }];   // back, mid, front (bottom chord heights)
@@ -43,13 +44,19 @@ export const toLocal = (v: V3, r: Rot) => rz(rx(ry(v, -r.yaw), -r.pitch), -r.rol
 // legs, a DJ table on the floor at one end) and an empty room with one straight truss for trying
 // lights out. Their truss is a list of pieces (`frame`); a room without a stage has no deck
 // (deck.x < 0: nothing is on it, what's put down stands on the floor).
-export type RoomId = 'hall' | 'pub' | 'club' | 'party' | 'truss';
+//
+// And your own stage ('custom'): its size from the show (StageSize), built from that like the demo
+// rooms are (a deck or none, spans of truss on towers over it, walls round it).
+// The Cinema and Bar templates bring rooms of their own too (scenes.ts): a cinema with its screen,
+// stage and raked seats; a bar with a long counter, a back bar and a little dance floor.
+export type RoomId = 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom';
 export type ViewKey = 'front' | 'foh' | 'side' | 'top' | 'band';
 type P3 = [number, number, number];
 // a piece of truss: the middle line of the box from one end to the other
 export type Seg = [P3, P3];
 export interface Room {
   id: RoomId;
+  key?: string;                                 // your own stage: its size too (what's built for it is kept by this)
   W: number; D: number; zc: number;             // the plan's area on the deck: width, depth, its middle (z)
   truss: { z: number; y: number }[];            // the trusses (bottom chord heights), back to front
   deck: { x: number; z0: number; z1: number };  // the deck's top: -x..x, z0..z1, at DECK
@@ -62,13 +69,21 @@ export interface Room {
   walls: { x: number; z0: number; z1: number };
   // every piece of its truss, towers and legs included (the rooms built from a list)
   frame?: Seg[];
+  // flat things standing across the room that light lands on, facing the audience (+z): the
+  // theatre's cyclorama, the cinema's screen (z; -x..x wide; y0..y1 high)
+  screens?: { z: number; x: number; y0: number; y1: number }[];
+  // where light meets the side walls, when something stands off them (the cinema's panels)
+  inset?: number;
+  // the floor's height at (x, z) where it isn't flat (raked seats: the theatre's stalls, the cinema's
+  // rows): light lands on the seats there, not on the floor under them
+  floor?: (x: number, z: number) => number;
 }
 // a 0.3 m box truss whose bottom chord is at y: its middle line is 0.15 m higher
 const mid = (y: number) => y + 0.15;
 // a span across the room at z (bottom chord at y) from -x to x, and the towers under its ends
 const span = (x: number, y: number, z: number): Seg => [[-x, mid(y), z], [x, mid(y), z]];
 const towers = (x: number, y: number, z: number): Seg[] => [[[-x, 0, z], [-x, mid(y) + 0.15, z]], [[x, 0, z], [x, mid(y) + 0.15, z]]];
-export const ROOMS: Record<RoomId, Room> = {
+export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
   hall: {
     id: 'hall', W, D, zc: 0, truss: TRUSS, deck: { x: W / 2 + 2, z0: -D / 2, z1: D / 2 }, ceiling: 15, band: { x: 5.3, z0: -3.9, z1: 3.4 }, walls: { x: 24, z0: -10, z1: 31 },
     views: { front: { pos: [0, 4.2, 24], at: [0, 3.2, 0] }, foh: { pos: [0, 3.6, D / 2 + 17], at: [0, 3.4, 0] }, side: { pos: [-22, 6, 6], at: [0, 3, 0] }, top: { pos: [0, 30, 0.01], at: [0, 0, 0] }, band: { pos: [0, 3.2, -1.2], at: [0, 4.5, 14] } },
@@ -88,7 +103,7 @@ export const ROOMS: Record<RoomId, Room> = {
     band: { x: 4, z0: -1.6, z1: 4.5 }, walls: { x: 10, z0: -2.4, z1: 22 },
     frame: [span(6.6, 5.8, -1.0), span(6.6, 5.8, 3.8), ...towers(6.6, 5.8, -1.0), ...towers(6.6, 5.8, 3.8),
       [[-6.6, mid(5.8), -1.0], [-6.6, mid(5.8), 3.8]], [[6.6, mid(5.8), -1.0], [6.6, mid(5.8), 3.8]], span(7.5, 6.2, 9.5)],
-    views: { front: { pos: [0, 3.4, 18], at: [0, 3.0, 1.5] }, foh: { pos: [3.5, 2.9, 14.5], at: [0, 3.0, 1.5] }, side: { pos: [-8.6, 4.6, 9.5], at: [0, 2.8, 2] }, top: { pos: [0, 28, 8.01], at: [0, 0, 8] }, band: { pos: [0.9, 3.4, 0.2], at: [0, 2.4, 14] } },
+    views: { front: { pos: [0, 3.4, 18], at: [0, 3.0, 1.5] }, foh: { pos: [3.5, 2.9, 14.5], at: [0, 3.0, 1.5] }, side: { pos: [-8.6, 4.6, 9.5], at: [0, 2.8, 2] }, top: { pos: [0, 28, 8.01], at: [0, 0, 8] }, band: { pos: [2.6, 3.8, -0.3], at: [0, 2.2, 14] } },
     tour: { rx: 7, rz: 7.5, z0: 9, y: 3.6, dy: 1, at: [0, 3, 1.5] },
   },
   // a party room (a warehouse, no stage): a 12 x 12 m square of truss over the crowd on four legs,
@@ -104,6 +119,58 @@ export const ROOMS: Record<RoomId, Room> = {
   },
   // an empty room with one straight truss on two towers: two of every kind of light on it, the
   // machines on the floor in front (for trying things out)
+  // a big cinema (scenes.ts buildCinema): the stage in front of the screen is the deck and the plan;
+  // the rows rise behind it to the projection booth; a truss over the stage, a bar for the spots
+  // over the front rows
+  cinema: {
+    // (the plan: the whole cinema, wall to wall and from the screen to the back rows: its lights are
+    // all over it, on the walls, in the ceiling, on the steps)
+    id: 'cinema', W: 32, D: 41.2, zc: 15.7, truss: [{ z: CINEMA.stageTruss.z, y: CINEMA.stageTruss.y }, { z: CINEMA.foh.z, y: CINEMA.foh.y }], deck: { ...CINEMA.deck }, ceiling: CINEMA.ceiling,
+    band: { ...CINEMA.deck }, walls: { x: CINEMA.wallX, z0: CINEMA.screenZ - 0.4, z1: CINEMA.backZ }, screens: [{ z: CINEMA.screenZ, x: CINEMA.screenW / 2, y0: CINEMA.screenY, y1: CINEMA.screenY + CINEMA.screenH }], inset: 0.14,
+    floor: (_x, z) => cinemaFloor(z),
+    frame: [span(11, CINEMA.stageTruss.y, CINEMA.stageTruss.z), span(12.5, CINEMA.foh.y, CINEMA.foh.z)],
+    views: { front: { pos: [0, 12, 34], at: [0, 6, -2] }, foh: { pos: [4.5, 6.4, 16], at: [0, 6, -3] }, side: { pos: [-14.5, 11, 14], at: [0, 5.5, 0] }, top: { pos: [0, 66, 15.01], at: [0, 0, 15] }, band: { pos: [0, 3.2, -3.4], at: [0, 6, 30] } },
+    tour: { rx: 12, rz: 15, z0: 14, y: 10, dy: 2, at: [0, 5.5, -1] },
+  },
+  // a bar (scenes.ts buildBar): the long counter along the back wall, the floor in front of it the
+  // plan, a ceiling rail for the lights, no deck
+  bar: {
+    id: 'bar', W: 14, D: 10, zc: 2.4, truss: [{ z: -0.6, y: 3.55 }, { z: 2.4, y: 3.55 }, { z: 5.0, y: 3.55 }, { z: 7.4, y: 3.55 }], deck: { x: -1, z0: -4.4, z1: -4.4 }, ceiling: 3.9,
+    band: { x: 6, z0: -4.4, z1: -1.0 }, walls: { x: 8, z0: -4.6, z1: 9.2 },
+    views: { front: { pos: [0, 1.75, 8.6], at: [0, 1.6, -3] }, foh: { pos: [5.6, 2.2, 6.4], at: [-1, 1.5, -2.6] }, side: { pos: [-7.3, 2.5, 4], at: [2, 1.4, -2] }, top: { pos: [0, 24, 2.31], at: [0, 0, 2.3] }, band: { pos: [0, 1.7, -3.7], at: [0, 1.5, 8] } },
+    tour: { rx: 5.6, rz: 4.6, z0: 2.6, y: 2.2, dy: 0.35, at: [0, 1.5, -1.5] },
+  },
+  // a theatre (scenes.ts buildTheatre): the stage behind the proscenium and its apron are the deck
+  // and the plan; the lighting bars over the stage, one front-of-house bar over the stalls
+  theatre: {
+    // (the plan: the stage and the stalls, the front-of-house bar and the house lights out over them;
+    // the balcony at the back is left off, the stage would be a sliver)
+    id: 'theatre', W: 42, D: 38, zc: -2.5,
+    truss: [...THEATRE.electrics.map((e) => ({ z: e.z, y: e.y })), { z: THEATRE.foh2.z, y: THEATRE.foh2.y }, { z: THEATRE.foh.z, y: THEATRE.foh.y }], deck: { x: THEATRE.stage.x, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, ceiling: THEATRE.ceiling,
+    band: { x: THEATRE.arch.w / 2, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, walls: { x: THEATRE.wallX, z0: THEATRE.stage.z0 - 0.4, z1: THEATRE.backZ }, screens: [{ z: THEATRE.cycZ, x: THEATRE.cyc.w / 2, y0: DECK, y1: DECK + THEATRE.cyc.h }],
+    floor: (_x, z) => theatreFloor(z),
+    frame: [...THEATRE.electrics.map((e) => span(THEATRE.arch.w / 2 + 3, e.y, e.z)), span(THEATRE.arch.w / 2 + 2, THEATRE.foh2.y, THEATRE.foh2.z), span(THEATRE.arch.w / 2 + 2, THEATRE.foh.y, THEATRE.foh.z)],
+    views: { front: { pos: [0, 14, 27.5], at: [0, 7, -6] }, foh: { pos: [6, 5.5, 19], at: [0, 7, -6] }, side: { pos: [-20, 15, 21], at: [0, 6.5, -6] }, top: { pos: [0, 64, -6.01], at: [0, 0, -6] }, band: { pos: [0, 4.6, -12], at: [0, 6, 26] } },
+    tour: { rx: 16, rz: 12, z0: 9, y: 6.5, dy: 0.5, at: [0, 6.5, -6] },
+  },
+  // a church (scenes.ts buildChurch): the chancel is the deck; the plan is the whole church, wall to
+  // wall, the chancel at its top (its lights are all over it: over the nave, on the walls); the lights
+  // hang from the roof's beams
+  church: {
+    id: 'church', W: 18, D: 29.8, zc: 7.1, truss: [{ z: -5.8, y: 12.2 }, { z: -1.8, y: 12.2 }, { z: 2.2, y: 12.2 }, { z: 6.2, y: 12.2 }], deck: { x: 6, z0: -7.4, z1: -1.2 }, ceiling: 13,
+    band: { x: 6, z0: -7.4, z1: -1.2 }, walls: { x: 9, z0: -7.8, z1: 22 },
+    views: { front: { pos: [0, 2.6, 20.6], at: [0, 3, -4] }, foh: { pos: [3.2, 2.3, 10], at: [0, 2.6, -4] }, side: { pos: [-7.6, 7.5, 12], at: [0, 2.6, -4] }, top: { pos: [0, 44, 7.01], at: [0, 0, 7] }, band: { pos: [0, 2.9, -6.6], at: [0, 2, 12] } },
+    tour: { rx: 6.2, rz: 8, z0: 6, y: 4.5, dy: 0.8, at: [0, 2.6, -4] },
+  },
+  // a ballroom for a wedding (scenes.ts buildBallroom): no stage; the plan is the whole room; two
+  // ceiling pipes over the dance floor; the band area is the dance floor (a take frames it)
+  ballroom: {
+    id: 'ballroom', W: 22, D: 26, zc: 7, truss: [{ z: 3.0, y: 6.1 }, { z: 10.0, y: 6.1 }], deck: { x: -1, z0: -5.9, z1: -5.9 }, ceiling: 6.5,
+    band: { x: 4, z0: 3, z1: 10 }, walls: { x: 11, z0: -6, z1: 20 },
+    frame: [span(4.6, 6.1, 3.0), span(4.6, 6.1, 10.0)],
+    views: { front: { pos: [0, 4.7, 19.2], at: [0, 1.0, 4] }, foh: { pos: [6.2, 2.9, 15.6], at: [0, 1.0, 4] }, side: { pos: [-10.2, 4.2, 15], at: [0, 1.2, 4] }, top: { pos: [0, 40, 7.01], at: [0, 0, 7] }, band: { pos: [0, 1.7, -2.6], at: [0, 1.3, 10] } },
+    tour: { rx: 7.5, rz: 8.5, z0: 7, y: 3.2, dy: 0.4, at: [0, 1.3, 5] },
+  },
   truss: {
     id: 'truss', W: 11, D: 6, zc: 3, truss: [{ z: 1.5, y: 4.0 }], deck: { x: -1, z0: -1.7, z1: -1.7 }, ceiling: 6,
     band: { x: 6.5, z0: 0.5, z1: 5 }, walls: { x: 8, z0: -2, z1: 14 },
@@ -120,7 +187,53 @@ export const DJ_BOOTH: Partial<Record<RoomId, { booth: V3; dj: V3 }>> = {
   party: { booth: { x: 0, y: 0, z: 0.6 }, dj: { x: 0, y: 0, z: 0.05 } },
 };
 // the room a show asks for (anything else: the hall)
-export const roomOf = (id: unknown): Room => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(ROOMS, id) ? ROOMS[id as RoomId] : ROOMS.hall);
+export const roomOf = (id: unknown): Room => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(ROOMS, id) ? ROOMS[id as Exclude<RoomId, 'custom'>] : ROOMS.hall);
+
+// ---- your own stage: how big it is (metres). The deck `w` wide and `d` deep (on a riser, DECK
+// high, or on the floor), `trusses` spans across it (0 to 4, back to front) on towers at its sides,
+// their bottom chord `trussY` above the floor.
+export interface StageSize { w: number; d: number; riser?: boolean; trussY?: number; trusses?: number }
+export const STAGE_SIZE: Required<StageSize> = { w: 8, d: 5, riser: true, trussY: 5, trusses: 2 };
+const lim = (x: unknown, a: number, b: number, d: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(a, Math.min(b, x)) : d);
+export function stageSize(s: Partial<StageSize> | undefined): Required<StageSize> {
+  return {
+    w: lim(s?.w, 2, 40, STAGE_SIZE.w), d: lim(s?.d, 1.5, 25, STAGE_SIZE.d), riser: s?.riser ?? STAGE_SIZE.riser,
+    trussY: lim(s?.trussY, 2.5, 15, STAGE_SIZE.trussY), trusses: Math.round(lim(s?.trusses, 0, 4, STAGE_SIZE.trusses)),
+  };
+}
+const custom = new Map<string, Room>();
+export function customRoom(given: Partial<StageSize> | undefined): Room {
+  const z = stageSize(given), key = `custom:${z.w}:${z.d}:${z.riser ? 1 : 0}:${z.trussY}:${z.trusses}`;
+  const had = custom.get(key);
+  if (had) return had;
+  const { w, d, riser, trussY: ty, trusses: n } = z, floor = riser ? DECK : 0, half = w / 2;
+  // the spans: one in the middle, or from just inside the back edge to the front edge
+  const zs = n === 1 ? [0] : Array.from({ length: n }, (_, i) => -d / 2 + 0.5 + ((d - 0.8) * i) / Math.max(1, n - 1));
+  const truss = zs.map((tz) => ({ z: tz, y: ty }));
+  const sx = half + 0.6;
+  const frame: Seg[] = zs.flatMap((tz) => [span(sx, ty, tz), ...towers(sx, ty, tz)]);
+  const ceiling = Math.max(6, ty + 2.6), far = Math.max(12, d * 2.4 + w * 0.6);
+  const front = d / 2 + Math.max(6, w * 1.25), lookY = floor + Math.min(ty - floor, 4) * 0.55;
+  const r: Room = {
+    id: 'custom', key, W: w, D: d, zc: 0, truss, ceiling,
+    deck: riser ? { x: half, z0: -d / 2, z1: d / 2 } : { x: -1, z0: -d / 2, z1: -d / 2 },
+    band: { x: half, z0: -d / 2, z1: d / 2 },
+    walls: { x: Math.max(half + 6, 9), z0: -d / 2 - 2, z1: d / 2 + far },
+    frame,
+    views: {
+      front: { pos: [0, floor + 2.2, front], at: [0, lookY, 0] },
+      foh: { pos: [w * 0.3, floor + 1.4, front * 0.8], at: [0, lookY, 0] },
+      side: { pos: [-(half + 5), lookY + 1.2, d / 2 + 3], at: [0, lookY, 0] },
+      top: { pos: [0, Math.max(w, d) * 1.6 + 8, 0.01], at: [0, 0, 0] },
+      band: { pos: [0, floor + 1.7, -d / 2 + 0.6], at: [0, floor + 1.5, d / 2 + 8] },
+    },
+    tour: { rx: half + 4, rz: d / 2 + 6, z0: d / 2 + 2, y: lookY + 1, dy: 0.8, at: [0, lookY, 0] },
+  };
+  custom.set(key, r);
+  return r;
+}
+// the room for a show's 3D settings: one of the built-in ones, or your own stage at its size
+export const roomFor = (s3: { room?: string; size?: Partial<StageSize> } | undefined): Room => (s3?.room === 'custom' ? customRoom(s3.size) : roomOf(s3?.room));
 // The room the 3D stage shows now: where beams land (hitFloor). Only the 3D stage sets it.
 let shown: Room = HALL;
 export function showRoom(r: Room) { shown = r; }
@@ -221,9 +334,54 @@ export function hitFloor(p: V3, d: V3, r: Room = shown): V3 | undefined {
   for (const [y, inside] of [[DECK, (x: number, z: number) => onDeck(x, z, r)], [0, () => true]] as const) {
     if (d.y >= -1e-4 || p.y <= y) continue;
     const k = (y - p.y) / d.y, x = p.x + d.x * k, z = p.z + d.z * k;
-    if (inside(x, z)) return { x, y, z };
+    if (!inside(x, z)) continue;
+    // (a raked floor: along the ray to where it first goes under it, then closer in; the floor is
+    // never above the light, so the flat hit is the furthest it can be)
+    if (r.floor && y === 0) return rakedHit(p, d, k, r.floor) ?? { x, y, z };
+    return { x, y, z };
   }
   return undefined;
+}
+function rakedHit(p: V3, d: V3, kMax: number, floor: (x: number, z: number) => number): V3 | undefined {
+  const at = (k: number) => ({ x: p.x + d.x * k, y: p.y + d.y * k, z: p.z + d.z * k }), under = (k: number) => { const q = at(k); return q.y <= floor(q.x, q.z); };
+  const step = 0.2;
+  let lo = 0;
+  for (let k = step; k < kMax + step; k += step) {
+    const kk = Math.min(k, kMax);
+    if (under(kk)) { let hi = kk; for (let i = 0; i < 8; i++) { const m = (lo + hi) / 2; if (under(m)) hi = m; else lo = m; } const q = at(hi); return { x: q.x, y: floor(q.x, q.z), z: q.z }; }
+    lo = kk;
+  }
+  return undefined;
+}
+
+// Where a beam from p along d lands in the room shown: the deck, the floor, and (while the room is
+// there to see) its walls, its ceiling and what stands across it (the cyc, the screen), with the
+// surface's normal (towards the light); undefined if it lands nowhere
+let wallsOn = true;
+// the built-in room shown, or hidden (your own venue model instead: its walls aren't known)
+export function showWalls(on: boolean) { wallsOn = on; }
+export const wallsShown = () => wallsOn;
+export function hitRoom(p: V3, d: V3, r: Room = shown): (V3 & { n: V3 }) | undefined {
+  const f = hitFloor(p, d, r);
+  let best: (V3 & { n: V3 }) | undefined = f ? { ...f, n: { x: 0, y: 1, z: 0 } } : undefined;
+  let bk = f ? Math.hypot(f.x - p.x, f.y - p.y, f.z - p.z) / Math.hypot(d.x, d.y, d.z) : Infinity;
+  if (!wallsOn) return best;
+  const W = r.walls, top = r.ceiling;
+  const take = (k: number, n: V3, ok: (x: number, y: number, z: number) => boolean) => {
+    if (!(k > 1e-6) || k >= bk) return;
+    const x = p.x + d.x * k, y = p.y + d.y * k, z = p.z + d.z * k;
+    if (!ok(x, y, z)) return;
+    bk = k; best = { x, y, z, n };
+  };
+  const inX = (x: number) => Math.abs(x) <= W.x + 1e-6, inZ = (z: number) => z >= W.z0 - 1e-6 && z <= W.z1 + 1e-6, inY = (y: number) => y >= 0 && y <= top + 1e-6;
+  const sx = W.x - (r.inset ?? 0);
+  if (d.x < -1e-6) take((-sx - p.x) / d.x, { x: 1, y: 0, z: 0 }, (_, y, z) => inY(y) && inZ(z));
+  if (d.x > 1e-6) take((sx - p.x) / d.x, { x: -1, y: 0, z: 0 }, (_, y, z) => inY(y) && inZ(z));
+  if (d.z < -1e-6) take((W.z0 - p.z) / d.z, { x: 0, y: 0, z: 1 }, (x, y) => inY(y) && inX(x));
+  if (d.z > 1e-6) take((W.z1 - p.z) / d.z, { x: 0, y: 0, z: -1 }, (x, y) => inY(y) && inX(x));
+  if (d.y > 1e-6) take((top - p.y) / d.y, { x: 0, y: -1, z: 0 }, (x, _, z) => inX(x) && inZ(z));
+  for (const s of r.screens ?? []) if (d.z < -1e-6 && p.z > s.z) take((s.z - p.z) / d.z, { x: 0, y: 0, z: 1 }, (x, y) => Math.abs(x) <= s.x && y >= s.y0 && y <= s.y1);
+  return best;
 }
 
 // Calibration: the head really points at `target` with these DMX values; the pan and tilt

@@ -3,16 +3,22 @@
 // Record stores the fixtures you touched (the programmer), each with its full current look.
 // Fixtures you didn't touch stay out of the cue, so playing it leaves them alone: that's what
 // lets a fog timer or a house-light list run next to the show without being recorded into it.
-import { emptyShow, parseShow, serializeShow, FormatError } from './model/format';
-import { GENERIC, caps, capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
+import { planToWorld, roomFor } from './stage3d/geometry';
+import { reconcile } from './model/reconcile';
+import { pinHash } from './model/pin';
+import { placeNew } from './model/place';
+import { freezeGroupNumbers, nextGroupNumber } from './model/groupnum';
+import { cleanHost, hostProblem } from './model/host';
+import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
+import { capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
-import { curveOfPort, curveTable, isPixelType, onPort, onScreen, powerScale, WS2812, type LedCurve, type PortInfo } from './model/ledCurve';
-import { CELL_ATTRS, CELL_MOVES, type CellMove, type CellValues, type Channel, type Color, type NumAttr, type Cue, type CueList, type Effect, type Fixture, type Group, type FixtureMode, type FixtureType, type Page, type Preset, type PresetKind, type Resolved, type Show, type Values, type Widget } from './model/types';
+import { ledOfLight, ledShown, unservedPixels } from './app/leds';
+import { CELL_ATTRS, CELL_MOVES, type CellMove, type CellValues, type Channel, type Color, type NumAttr, type Cue, type CueList, type Effect, type Fixture, type Group, type FixtureType, type Page, type Preset, type PresetKind, type Resolved, type Show, type Values, type Widget } from './model/types';
 import { EFFECT_MAP, hsv, paramsOf } from './engine/effects';
 import { pictureOf } from './engine/custom';
-import { isGated, isHeld, isKinetic, isMachine, listRisk } from './model/safety';
-import { machines } from './ui/risk';
-import { addStandardPresets } from './content/presets';
+import { cueRisk, isGated, isHeld, isKinetic, isMachine, listRisk } from './model/safety';
+import { machines, plainFrom } from './ui/risk';
+import { addStandardPresets, standardPresets } from './content/presets';
 import { buskingPage, isMachineList } from './content/busking';
 import { fromQxw, type QxwReport } from './import/qxw';
 import { toQxw } from './export/qxw';
@@ -21,27 +27,33 @@ import { patchSheetHtml } from './export/patchsheet';
 import { pictureColors } from './content/pictureColors';
 import { starterLooks } from './content/looks';
 import { findQlc } from './library/catalog';
-import { onMidi, onMidiInputs, sameBinding, type MidiBinding, type MidiMsg } from './input/midi';
+import { onMidi, onMidiInputs } from './input/midi';
+import { MidiIn } from './app/midi.svelte';
 import { describeChange } from './model/diff';
-import { cueNum, cueNumber, fmtNum, freezeNumbers, numbersFor, renumber } from './model/cuenum';
+import { cueNum, cueNumber, freezeNumbers, numbersFor, renumber } from './model/cuenum';
+import { rawCellMap, rawCells, rawType, rawTypes } from './model/raw';
+import { BEAM_ATTRS, dropCellKeys, groupFlash, refsIn, splitCell, stripResolved, toHsv, trimCells, withProgrammer } from './model/values';
 import { current, passed, validEntry, whenSaid, type ScheduleEntry } from './model/schedule';
 import { guessPlace, type Place } from './model/sun';
 import { actionText } from './model/actions';
-import { cctColor, fitLook, rawLook, slotsOf, whiteTemperature } from './engine/render';
+import { cctColor, fitLook, slotsOf, whiteTemperature } from './engine/render';
 import { MusicListener, type MusicState } from './input/audio';
 import { listShows, readShow, writeShow, deleteShow as dbDelete, listMyTypes, saveMyType, deleteMyType, setOnBlocked, type ShowMeta } from './store/shows';
 import { ui } from './ui/ui.svelte';
 import { copyClip, readClip } from './store/clipboard';
+import { bundle, isZip, storedOf, unbundle } from './store/bundle';
+import { CURRENT_SHOW, HELD, LAST_PLAYED, OUTPUT_LOCKED_LIVE, OUTPUT_TAB, PLAYING_TAB, SCHEDULE_LOOKED, UNDO_TAB, WAS_ARMED } from './store/kept';
+import { getModel, getSong, putModel, putSong } from './store/audio';
 import { prune, prunedText } from './model/prune';
 import { stageSvg } from './ui/thumb';
 import { cueLooks } from './engine/cuelook';
 import { cellLookAt, resolveValues } from './engine/resolve';
-import { byNum, numberFixtures } from './model/numbers';
-import { parseCommand } from './model/command';
+import { numberFixtures } from './model/numbers';
+import { runCommand } from './app/command';
 import { untrack } from 'svelte';
 import { Engine, LIGHT } from './engine/engine';
 import { load } from './perf/load.svelte';
-import { ATMOS_AND_MACHINES as ATMOS, machinesSafe, zeroedFrames } from './output/safe';
+import { atmosAndMachines, machinesSafe, zeroedFrames } from './output/safe';
 import { OutputThread } from './output/host.svelte';
 import type { PlayerStatus } from './engine/player';
 import { Bridge, listen } from './output/bridge';
@@ -49,37 +61,23 @@ import { LINK, LinkOutput } from './output/link';
 import { RemoteHost } from './remote/host.svelte';
 import { TimelinePlayer } from './timeline/player.svelte';
 import type { BurstAttr, TimelineAction, TimelineItem } from './model/timeline';
-import { firstLook, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
+import { curvesAt, firstLook, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
 
-// What a group's flash puts on one of its lights: the whole light, or for a group of cells ("Rim")
-// just those cells (the light itself left as it is)
-function groupFlash(g: Group, id: string, n: number, v: Values): Values {
-  if (!g.cells?.length || n < 2) return v;
-  const { intensity, color, strobe } = v;
-  const cell: CellValues = { intensity: intensity ?? 1, ...(color ? { color } : {}) };
-  return { ...(strobe ? { strobe } : {}), cells: Object.fromEntries(g.cells.filter((k) => k < n).map((k) => [k, { ...cell }])) };
-}
+
 // per mode name: old cell -> new cell (null: gone); cells not in it stay where they are
 export type CellMaps = Record<string, Record<string, number | null>>;
-// a light's values without cells past `n` (none at all when it has no cells)
-function trimCells(v: Values | undefined, n: number) {
-  if (!v?.cells) return;
-  if (n < 2) { delete v.cells; return; }
-  if (Object.keys(v.cells).some((k) => +k >= n)) { const kept = Object.fromEntries(Object.entries(v.cells).filter(([k]) => +k < n)); if (Object.keys(kept).length) v.cells = rawCellMap(kept); else delete v.cells; }
-}
-// (a cue by its number in a list: its place, -1 if there's none)
-const cueAt = (l: CueList, n: number) => l.cues.findIndex((_, i) => Math.abs(cueNum(l, i) - n) < 1e-9);
-
+const selKey = (ids: string[]) => [...ids].sort().join('\n');
 
 const KEY = 'luxdmx.seq.show';
-const CUR = 'luxdmx.seq.current';   // id of the show that's open
 const FPS = 40;
 const UNDO_DEPTH = 100;
 const UNDO_BYTES = 30_000_000;      // and never more than this much text in the undo history
-const UNDO_KEY = 'luxdmx.seq.undo';
-const PLAYBACK_KEY = 'luxdmx.seq.playing';
 const RESUME_WITHIN = 60_000;       // ms: a reload, not a tab restored hours later
-const OUTPUT_KEY = 'luxdmx.seq.output';  // 'live' or 'blind': this tab (session), or a locked show's browser
+// Is this page a reload of its tab? (Not a new tab opened from another, nor a duplicated one: those
+// get a copy of the tab's session storage, and must start afresh. Unknown: as a reload.)
+function reloaded() {
+  try { const nav = (performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined)?.type; return !nav || nav === 'reload'; } catch { return true; }
+}
 // runs after the current task and the screen updates it caused (a message to ourselves)
 const pingAfter = (() => {
   if (typeof MessageChannel === 'undefined') return (f: () => void) => setTimeout(f, 0);
@@ -87,25 +85,20 @@ const pingAfter = (() => {
   ch.port1.onmessage = () => todo.shift()?.();
   return (f: () => void) => { todo.push(f); ch.port2.postMessage(0); };
 })();
-const HELD_KEY = 'luxdmx.seq.held';           // where the winches were last sent armed (held there over a reload)
-// (what's kept: { "fixture:hoist": { v: byte, at: ms } }; anything else isn't)
+// (said when a box connects while blind; gone the moment you go on stage)
+const BLIND_TOAST = 'Connected. You are blind';
+const NO_OVER: Record<string, Record<string, number>> = {};
+// where the winches were last sent armed (held there over a reload): { "fixture:hoist": { v: byte,
+// at: ms } }, anything else isn't kept
 function keptHeld(): Record<string, { v: number; at: number }> {
-  try {
-    const h = JSON.parse(localStorage.getItem(HELD_KEY) ?? '{}');
-    if (!h || typeof h !== 'object') return {};
-    return Object.fromEntries(Object.entries(h).flatMap(([k, x]) => {
-      const e = x as { v?: unknown; at?: unknown };
-      return e && typeof e.v === 'number' && e.v >= 0 && e.v <= 255 ? [[k, { v: e.v, at: typeof e.at === 'number' ? e.at : 0 }]] : [];
-    }));
-  } catch { return {}; }
+  return Object.fromEntries(Object.entries(HELD.get()).flatMap(([k, x]) => {
+    const e = x as { v?: unknown; at?: unknown };
+    return e && typeof e.v === 'number' && e.v >= 0 && e.v <= 255 ? [[k, { v: e.v, at: typeof e.at === 'number' ? e.at : 0 }]] : [];
+  }));
 }
-const WAS_ARMED_KEY = 'luxdmx.seq.wasArmed';   // this tab had the machines armed (a reload says they're safe now)
-const ATMOS_AND_MACHINES = ATMOS;
-const MACHINES_SAFE = machinesSafe;
-const LASTPLAY_KEY = 'luxdmx.seq.lastplay.';   // + show id: what was playing, for a cold start
 const hasLocks = () => typeof navigator !== 'undefined' && !!(navigator as unknown as { locks?: LockManager }).locks?.request;
 const COLD_WITHIN = 3 * 3600_000;   // ms: a tablet restarted during the evening, not the next morning (the box may have been off)
-export const GO_GUARD_MS = 300;     // a second GO this soon on the same list is a double press (a beat at 200 BPM still gets through)
+const GO_GUARD_MS = 300;     // a second GO this soon on the same list is a double press (a beat at 200 BPM still gets through)
 const GROUP_FLASH_MAX = 30;         // seconds a held flash button stays on at most
 export const MAX_FOG = 60;          // and a fog button, whatever its own maximum says
 // A fog timer's pause is at least this long, and at least as long as its burst (machines reheat).
@@ -113,26 +106,6 @@ export const fogPause = (minutes: number, seconds: number) => Math.max(minutes *
 // A box every show without one gets (local setups: VITE_DEFAULT_DEVICE in .env.local).
 const DEFAULT_DEVICE = (import.meta.env.VITE_DEFAULT_DEVICE as string | undefined)?.trim() || '';
 
-// Fixture types are big (a pro moving head is hundreds of channel ranges) and never edited in
-// place (the editor works on a copy and saves a new object). Giving them their own prototype keeps
-// Svelte from wrapping them in proxies, so reading them (every frame, every save) costs nothing.
-const RawType = Object.create(Object.prototype);
-export function rawType<T extends object>(t: T): T { return Object.getPrototypeOf(t) === RawType ? t : Object.setPrototypeOf(t, RawType); }
-// A cue's cells the same way: a rainbow over a few matrices is thousands of small objects, and
-// wrapping each one made every save (after every click) and every undo take seconds. A map of cells
-// is replaced, never changed in place. (only before it goes into the show: a proxy can't be turned)
-export function rawCells<T extends Values | undefined>(v: T): T {
-  if (v?.cells) try { if (Object.getPrototypeOf(v.cells) !== RawType) Object.setPrototypeOf(v.cells, RawType); } catch { /* already the show's: stays as it is */ }
-  return v;
-}
-export const rawCellMap = <T extends object>(m: T): T => { try { Object.setPrototypeOf(m, RawType); } catch { /* a proxy */ } return m; };
-export function rawCue<T extends { values: Record<string, Values> }>(c: T): T { for (const v of Object.values(c.values)) rawCells(v); return c; }
-export function rawTypes(s: Show): Show {
-  s.fixtureTypes = s.fixtureTypes.map(rawType);
-  for (const l of s.cueLists) for (const c of l.cues) rawCue(c);
-  for (const p of s.presets) { rawCells(p.values); for (const v of Object.values(p.perFixture ?? {})) rawCells(v); }
-  return s;
-}
 
 let seq = 0;
 export const newId = (prefix: string) => `${prefix}${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -148,20 +121,21 @@ let fromLocal = false;
 function loadShow(): Show {
   let text: string | null = null;
   try {
-    const cur = localStorage.getItem(CUR), owner = localStorage.getItem(KEY_ID);
-    if (!owner || owner === cur) text = localStorage.getItem(KEY) ?? localStorage.getItem('luxdmx.seq.show.v1');
+    const cur = CURRENT_SHOW.get(), owner = localStorage.getItem(KEY_ID);
+    if (!owner || owner === cur) text = localStorage.getItem(KEY);
   } catch { /* storage blocked */ }
   if (text) {
     try { const s = parseShow(text); fromLocal = true; return s; } catch (e) {
       loadError = `The show that was open can't be opened by this version (${(e as Error).message}). It's still saved; this is a new show.`;
-      try { localStorage.setItem(`${KEY}.unreadable`, text); localStorage.removeItem(CUR); } catch { /* keep going */ }
+      try { localStorage.setItem(`${KEY}.unreadable`, text); } catch { /* keep going */ }
+      CURRENT_SHOW.remove();
     }
   }
   const s = emptyShow();
   addStandardPresets(s);
   return s;
 }
-const storedId = () => { try { return loadError ? null : localStorage.getItem(CUR); } catch { return null; } };
+const storedId = () => (loadError ? null : CURRENT_SHOW.get() || null);
 
 class App {
   show = $state<Show>(rawTypes(loadShow()));
@@ -227,9 +201,12 @@ class App {
   // smoothly as it draws, whatever the panels' update rate: perf/load.svelte.ts)
   stageNow: Record<string, Resolved> = {};
   // what the stage pictures draw: the stage, with pixel lights shown as their LEDs really light
-  // (the box's curve: what it turns off is dark, see ledShown); every frame for the 3D stage, and
-  // as the screen's copy for the 2D one
-  drawnNow: Record<string, Resolved> = {};
+  // (the box's curve: what it turns off is dark, see ledShown); for the 3D stage as it draws, and as
+  // the screen's copy for the 2D one. Worked out when it's first asked for after a frame: a frame
+  // nobody draws (the 3D hidden, the panels updated every few frames) doesn't make it.
+  private ledFrom: { stage: Record<string, Resolved>; frames: Map<number, Uint8Array> } | null = null;
+  private ledMemo: Record<string, Resolved> | null = null;
+  get drawnNow(): Record<string, Resolved> { return (this.ledMemo ??= this.ledFrom ? this.ledShown(this.ledFrom.stage, this.ledFrom.frames) : {}); }
   drawn = $state.raw<Record<string, Resolved>>({});
   look = $state.raw<Record<string, Resolved>>({});     // before grand master / blackout
   frames = $state.raw<Map<number, Uint8Array>>(new Map());
@@ -243,6 +220,8 @@ class App {
   live = $state<Record<string, Values>>({});          // fog buttons: on top, never recorded
   fogUntil = $state.raw<Record<string, number>>({});  // fog widget id -> when it switches off (ms)
   page = $state('');                                  // live page on screen
+  // a MIDI controller's notes and controls (app/midi.svelte.ts)
+  readonly midiIn: MidiIn = new MidiIn(this);
   goList = $state('');                                // the list GO (and Space) plays in Live
   highlight = $state(false);                          // selected lights at full white, to find them in the room
   recordedAside = false;                             // the last Record went into a play away from where it is (the programmer kept it)
@@ -282,15 +261,22 @@ class App {
   // sent, merged with what's kept (the newest wins: another tab closing late can't put an old
   // height back). Written when it changes, at most ten times a second.
   private heldMine: Record<string, { v: number; at: number }> = {};
-  // A winch's height as the wire holds it while it's live and not armed (part of its travel; null:
-  // nobody knows where it is); undefined when it isn't held (blind, or armed: the show's height)
-  winchHeldAt(id: string): number | null | undefined {
-    if (this.output !== 'live' || this.sfxArmed) return undefined;
-    const h = { ...this.engine.heldSeed, ...this.heldWire() }, k = h[`${id}:hoist`] !== undefined ? `${id}:hoist` : `${id}:hoist@0`;
-    if (h[k] === undefined) return null;
-    const fine = h[`${k}:fine`];
-    return fine !== undefined ? ((h[k] << 8) | fine) / 65535 : h[k] / 255;
+  // Every winch's height as the wire holds it while it's live and not armed (part of its travel;
+  // null: nobody knows where it is). Null when nothing's held (blind, or armed: the show's heights);
+  // a winch no connected box plays isn't in it (nothing goes out to its motor: the 3D shows the
+  // show). Worked out once for a whole frame of the 3D stage.
+  winchesHeld(): Map<string, number | null> | null {
+    if (this.output !== 'live' || this.sfxArmed) return null;
+    const h = { ...this.engine.heldSeed, ...this.heldWire() }, out = new Map<string, number | null>();
+    for (const f of this.show.fixtures) {
+      if (!isKinetic(this.modeOf(f.id)) || !this.bridges.some((b) => b.state === 'ready' && b.reaches(f.universe))) continue;
+      const k = h[`${f.id}:hoist`] !== undefined ? `${f.id}:hoist` : `${f.id}:hoist@0`, fine = h[`${k}:fine`];
+      out.set(f.id, h[k] === undefined ? null : fine !== undefined ? ((h[k] << 8) | fine) / 65535 : h[k] / 255);
+    }
+    return out;
   }
+  // one winch's (undefined: it isn't held)
+  winchHeldAt(id: string): number | null | undefined { return this.winchesHeld()?.get(id); }
   // (what the wire holds: the output thread's, while it's the one sending; else this page's engine)
   private heldWire(): Record<string, number> { return this.thread.running && this.thread.held ? this.thread.held : this.engine.heldOwn(); }
   private heldAt = 0;
@@ -303,12 +289,14 @@ class App {
     if (!changed) return;
     const kept = keptHeld();
     for (const [k, x] of Object.entries(this.heldMine)) if (!kept[k] || kept[k].at <= x.at) kept[k] = x;
-    try { localStorage.setItem(HELD_KEY, JSON.stringify(kept)); } catch { /* not kept */ }
+    HELD.set(kept);
   }
   // The DMX output on a thread of its own (output/thread.ts): its frames go out on time whatever
   // this page draws. This page's engine is its mirror, for the screen.
   readonly thread = new OutputThread();
   private undoStack: string[] = [];
+  // Undo starts from the show as it is now (another show, a demo that has just set itself up)
+  forgetUndo() { this.undoStack = []; this.redoStack = []; this.canUndo = false; this.canRedo = false; this.lastSnap = JSON.stringify(this.show); }
   private recentUnis = new Map<number, number>();   // universe -> last time something was patched/driven there
   private redoStack: string[] = [];
   private lastSnap = '';
@@ -329,18 +317,26 @@ class App {
     }
     return n;
   });
-  // What every cue of every list looks like (for pictures), from the plain copy.
+  // What every cue of every list looks like (for pictures), from the plain copy. A list whose cues,
+  // the presets and the lights' types are as they were keeps its looks (the same objects: its cards'
+  // pictures aren't drawn again; on the festival every edit redrew every card)
+  private looksMemo = new Map<string, { key: string; looks: Record<string, Resolved>[] }>();
   cueLooksOf = $derived.by(() => {
     const p = this.plain, m = new Map<string, Record<string, Resolved>[]>();
     if (!p) return m;
     const presets = new Map(p.presets.map((x) => [x.id, x]));
     const types = typeMap(p), capsById = new Map(p.fixtures.map((f) => [f.id, capsOf(modeOf(types.get(f.typeId), f.mode))]));
+    const common = JSON.stringify(p.presets) + JSON.stringify(p.fixtures.map((f) => [f.id, f.typeId, f.mode])) + p.fixtureTypes.length;
+    const memo = new Map<string, { key: string; looks: Record<string, Resolved>[] }>();
     for (const l of p.cueLists) {
+      const key = common + JSON.stringify(l), was = this.looksMemo.get(l.id);
+      if (was && was.key === key) { m.set(l.id, was.looks); memo.set(l.id, was); continue; }
       const looks = cueLooks(l, presets, isLooks(l));
       // fitted like the stage: a dimmer in a "Purple" cue looks like a dimmer on its card too
       for (const look of looks) for (const [id, v] of Object.entries(look)) { const c = capsById.get(id); if (c) fitLook(v, c, !!v.color); }
-      m.set(l.id, looks);
+      m.set(l.id, looks); memo.set(l.id, { key, looks });
     }
+    untrack(() => { this.looksMemo = memo; });
     return m;
   });
   private dirtyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -352,6 +348,7 @@ class App {
   loadError = loadError;
 
   constructor() {
+    plainFrom(() => this.plain);       // (the cards' risk marks, all at once from the plain copy)
     listen(() => this.bridges, () => this.started);
     // phones: say when one joins (a guest who scanned the code shows up here), and when one is
     // waiting for a remote that's off (this tab was closed and opened again)
@@ -361,17 +358,19 @@ class App {
     this.bridges = this.show.outputs.devices.map((d) => this.makeBridge(d.host));
     this.currentList = this.show.cueLists[0]?.id ?? '';
     this.lastSnap = JSON.stringify(this.show);
-    try { localStorage.setItem(CUR, this.showId); } catch { /* storage blocked */ }
+    CURRENT_SHOW.set(this.showId);
     this.thread.start(this.engine, () => this.show);
+    // (the thread's frame failing while this page's doesn't: said, its look went on with the machines off)
+    this.thread.onBroken = (why) => ui.toast(`The DMX output hit a problem (${why}): the look stays, fog and the machines are off. A reload starts it afresh.`, 10000);
     // (a command right after an edit in a form, a GO clicked after changing a cue's action: the
     // save that's due runs first, so the thread has the edit; a GO from the keyboard comes before
     // its key's own "maybe changed" and costs nothing)
     this.thread.beforeCommand = () => { if (this.savePending && !this.holdUndo) this.checkpoint(true); };
     this.startClock();
-    onMidi((m) => this.midi(m));
+    onMidi((m) => this.midiIn.take(m));
     // A controller unplugged while a pad was down: what it held is let go.
     let inputs = 0;
-    onMidiInputs((names) => { if (names.length < inputs) this.releaseMidi(); inputs = names.length; });
+    onMidiInputs((names) => { if (names.length < inputs) this.midiIn.releaseAll(); inputs = names.length; });
     this.refreshMyTypes();
     // (the winches' heights as the wire holds them: kept, at once when they're made safe)
     this.thread.onHeld = () => {
@@ -386,8 +385,17 @@ class App {
     // saved, and becomes an undo step. Code that changes the show on its own calls markDirty().
     // (only the save is booked: it compares, and hands a changed show to the output thread as text.
     // Telling the thread here would turn the whole show into text on every click, GO included.)
+    // (not for what only plays the show: GO, Blackout, a Live button, Space. Each booked a compare of
+    // the whole show a moment later, a tenth of a second on the big demo after every GO)
+    const plays = (e: Event) => {
+      const t = e.target as Element | null;
+      if (!t?.closest) return false;
+      // (and a view's tab: switching views changes nothing in the show)
+      if (t.closest('[data-plays], button.go, button.bo, button.tile:not(.editing), .top .modes [role="tab"]')) return true;
+      return e.type === 'keyup' && (e as KeyboardEvent).code === 'Space' && !t.closest('input, textarea, select, [contenteditable]');
+    };
     for (const ev of ['input', 'change', 'pointerup', 'keyup', 'drop'])
-      window.addEventListener(ev, () => this.markDirty(350, false), { capture: true, passive: true });
+      window.addEventListener(ev, (e) => { if (!plays(e)) this.markDirty(350, false); }, { capture: true, passive: true });
     // Closing the tab: save what's pending (the localStorage part is immediate). No "leave the
     // page?" question: a reload picks the show up where it was, the box holds the look meanwhile,
     // and fog goes to 0 first (fogSafe).
@@ -403,7 +411,7 @@ class App {
       const handled = e.defaultPrevented;
       e.preventDefault();
       const f = e.dataTransfer.files[0];
-      if (handled || !f || !/\.(json|luxdmx|qxw)$/i.test(f.name) || this.locked) return;
+      if (handled || !f || !/\.(json|luxdmx|qxw|zip)$/i.test(f.name) || this.locked) return;
       const playing = !this.quiet;
       void (async () => {
         if (playing && !(await ui.confirm(`Open "${f.name}"?`, 'The show playing now stops (it stays in Shows).', 'Open it', false))) return;
@@ -414,22 +422,55 @@ class App {
     try {
       this.channel = new BroadcastChannel('luxdmx-sequencer');
       this.channel.onmessage = (e) => {
-        if (e.data?.saved === this.showId && e.data.tab !== this.tabId) this.otherTab = true;
+        // (newer only when it differs: a tab just opened saves the same show once; and back to not
+        // newer when the other tab undid its change. Both sides fingerprint the text as written:
+        // the file fixes a few fields the live show doesn't have yet)
+        if (e.data?.saved === this.showId && e.data.tab !== this.tabId) {
+          this.otherTabs.add(e.data.tab);
+          this.otherTab = true; this.otherSaves++;
+          this.otherNewer = e.data.sum !== textSum(serializeShow(JSON.parse(this.lastSnap), false));
+        }
         // a tab starting cold asks whether this show is playing somewhere already
         if (e.data?.playing === this.showId && e.data.tab !== this.tabId && !this.quiet)
           this.channel?.postMessage({ isPlaying: this.showId, tab: this.tabId });
         if (e.data?.isPlaying === this.showId && e.data.tab !== this.tabId) this.othersPlay = true;
+        // another tab closed (or went to another show): the warning goes when no other tab on this
+        // show is left (it stayed on for good)
+        if (e.data?.gone && e.data.tab !== this.tabId && this.otherTabs.delete(e.data.tab) && !this.otherTabs.size) { this.otherTab = false; this.otherNewer = false; }
       };
+      addEventListener('pagehide', () => this.sayGone());
     } catch { /* no BroadcastChannel: fine */ }
   }
   otherTab = $state(false);
+  private otherTabs = new Set<string>();   // (the other tabs heard saving this show)
+  // (the channel may be closed by then: going away never throws)
+  private sayGone() { try { this.channel?.postMessage({ gone: true, tab: this.tabId }); } catch { /* closed */ } }
+  // ...and the other tab's save is the newer one: what's in this tab is out of date, and its next
+  // save would quietly drop what was done over there. The top bar offers to take that version.
+  otherNewer = $state(false);
+  private otherSaves = 0;          // (saves heard from other tabs: one heard while a write was on its way still counts)
+  async takeOtherTab() {
+    clearTimeout(this.dirtyTimer);
+    const seen = this.otherSaves;
+    try {
+      const text = await readShow(this.showId);
+      if (!text) throw new Error('the other tab\'s copy is gone');
+      const notes: string[] = [];
+      this.replaceShow(parseShow(text, notes));            // (throws for a show from a newer version)
+      this.setLocal(text);
+      if (this.otherSaves === seen) this.otherNewer = false;
+      this.sayRepaired(notes);
+    } catch (e) { ui.toast(`Couldn't take the other tab's version: ${(e as Error).message}`, 8000); }
+  }
   // Is what you do going to the stage? 'blind': the 2D and 3D stages show it, the boxes get nothing
   // new (they keep the look that was out, frozen, without fog and machines); 'live': everything goes
   // out. Live is kept over a reload of this tab; a new tab or browser starts blind, going live is a
   // deliberate step (the top bar says which). A show locked for the service keeps it in the
   // browser too: after a power cut its page carries on without anyone at the controls.
+  // (A tab opened from this one, or duplicated, gets a copy of this tab's session storage: it starts
+  // blind all the same, as any new tab. Only a reload of the tab itself keeps live.)
   output = $state<'live' | 'blind'>((() => {
-    try { return sessionStorage.getItem(OUTPUT_KEY) === 'live' || localStorage.getItem(OUTPUT_KEY) === 'live' ? 'live' : 'blind'; } catch { return 'blind'; }
+    return (OUTPUT_TAB.get() === 'live' && reloaded()) || OUTPUT_LOCKED_LIVE.get() ? 'live' : 'blind';
   })());
   private frozen: Map<number, Uint8Array> | null = null;
   private frozenDark: Map<number, Uint8Array> | null = null;   // the same with every light off (Blackout)
@@ -442,10 +483,10 @@ class App {
       // machines are made safe (going live again starts safe)
       this.armMachines(false);
       // (the winches where the wire held them)
-      const frozen = this.lastSent && this.zeroed(this.lastSent, (a) => ATMOS_AND_MACHINES.includes(a));
+      const frozen = this.lastSent && this.zeroed(this.lastSent, atmosAndMachines);
       if (frozen) this.engine.putHeld(frozen, this.heldWire());
       this.setFrozen(frozen);
-    } else this.setFrozen(null);
+    } else { this.setFrozen(null); ui.untoast(BLIND_TOAST); }
     this.output = o;
     this.keepOutput();
   }
@@ -465,11 +506,9 @@ class App {
   }
   private setFrozen(f: Map<number, Uint8Array> | null) { this.frozen = f; this.frozenDark = null; }
   private keepOutput() {
-    try { sessionStorage.setItem(OUTPUT_KEY, this.output); } catch { /* this tab only */ }
-    try {
-      if (this.output === 'live' && this.show.pages.some((p) => p.locked)) localStorage.setItem(OUTPUT_KEY, 'live');
-      else localStorage.removeItem(OUTPUT_KEY);
-    } catch { /* this tab only */ }
+    OUTPUT_TAB.set(this.output);
+    if (this.output === 'live' && this.show.pages.some((p) => p.locked)) OUTPUT_LOCKED_LIVE.set(true);
+    else OUTPUT_LOCKED_LIVE.remove();
   }
   // What a blind tab sends: the frozen look; with Blackout on, that look with every light off
   // (Blackout always reaches the stage).
@@ -490,9 +529,9 @@ class App {
     this.thread.inputsNow(this.engine);              // (the output thread: at once)
     if (!on) this.keepHeld(true);
     // (only to say so after a reload: arming itself is never kept)
-    try { if (on) sessionStorage.setItem(WAS_ARMED_KEY, '1'); else if (!(leaving && was)) sessionStorage.removeItem(WAS_ARMED_KEY); } catch { /* not said */ }
+    if (on) WAS_ARMED.set(true); else if (!(leaving && was)) WAS_ARMED.remove();
     // (disarmed while blind: the frozen look loses them too)
-    if (!on && this.frozen) this.setFrozen(this.zeroed(this.frozen, MACHINES_SAFE));
+    if (!on && this.frozen) this.setFrozen(this.zeroed(this.frozen, machinesSafe));
   }
   // the show's machines that wait for arming
   // (and the winches: they move only while armed)
@@ -515,13 +554,13 @@ class App {
     // (blind: the frozen look goes out again, its machines off; nothing new)
     if (this.output === 'blind') {
       if (!this.frozen) return;
-      const off = this.zeroed(this.frozen, (a) => ATMOS_AND_MACHINES.includes(a));
+      const off = this.zeroed(this.frozen, atmosAndMachines);
       for (const b of this.bridges) { if (b.sendFinal) b.sendFinal(off, t); else for (const [uni, data] of off) b.send(uni, data, t); }
       return;
     }
     this.engine.live = { ...this.engine.live, ...Object.fromEntries(fog.map((f) => [f.id, { fog: 0, haze: 0, confetti: 0, bubbles: 0, flame: 0, sparks: 0, co2: 0 }])) };
     // (and their channels at 0 whatever set them: a raw number in "All channels" too)
-    const off = this.zeroed(this.engine.tick().frames, (a) => ATMOS_AND_MACHINES.includes(a));
+    const off = this.zeroed(this.engine.tick().frames, atmosAndMachines);
     for (const b of this.bridges) { if (b.sendFinal) b.sendFinal(off, t); else for (const [uni, data] of off) b.send(uni, data, t); }
   }
 
@@ -634,27 +673,26 @@ class App {
     // (a reload also picks the song up where it was: only this tab's copy says where)
     // (and which song of the set: the show itself may not be saved yet after a Next song)
     const tl = this.timeline.playing || this.timeline.position > 0 ? { pos: Math.round(this.timeline.position * 100) / 100, playing: this.timeline.playing, song: songIndex(this.show) } : undefined;
-    try { sessionStorage.setItem(PLAYBACK_KEY, tl ? JSON.stringify({ ...JSON.parse(saved), tl }) : saved); } catch { /* fine: no resume */ }
+    PLAYING_TAB.set(tl ? { ...JSON.parse(saved), tl } : JSON.parse(saved));
     // and for a cold start (the tablet switched off and on again): this show's, in localStorage
-    if (!this.quiet) { try { localStorage.setItem(LASTPLAY_KEY + this.showId, saved); } catch { /* fine: a cold start is quiet */ } }
+    if (!this.quiet) LAST_PLAYED.of(this.showId).set(JSON.parse(saved));
   }
   private pbStamped = 0;
   private started = false;          // the saved state was read (ticks before that mustn't overwrite it)
   quiet = true;                     // fresh start, nothing played yet: nothing goes out (see tick)
   coldStart = $state(false);        // picked up what was playing after a cold start: the lights are expected to be on
   // (read before anything disarms: the start opens the show, and that makes them safe)
-  private wasArmed = (() => { try { return sessionStorage.getItem(WAS_ARMED_KEY) === '1'; } catch { return false; } })();
+  private wasArmed = WAS_ARMED.get() && reloaded();
   private resumePlayback() {
     if (this.wasArmed && this.gatedMachines.length) ui.toast('The reload made the machines safe: confetti, flames, sparks and CO2 send nothing, winches stay where they were, until you hold Arm again.', 8000);
     this.wasArmed = false;
     type Saved = { id: string; lists: [string, number, number, number?, (string | number)[]?, number?][]; fx: string[]; gm: number; gms?: unknown; bo: boolean; at?: number; view?: 'program' | 'live'; autoGo?: number; music?: boolean; goList?: string; quiet?: boolean; hz?: string[]; live?: number };
-    let p: Saved | null = null;
-    try { p = JSON.parse(sessionStorage.getItem(PLAYBACK_KEY) ?? 'null'); sessionStorage.removeItem(PLAYBACK_KEY); } catch { /* nothing */ }
+    let p = PLAYING_TAB.get() as Saved | null;
+    PLAYING_TAB.remove();
     this.started = true;
     // A reload of this tab (or a crashed tab coming back). A duplicated tab gets a copy of the
     // session storage too, and must not start a second copy of the show.
-    const nav = (performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined)?.type;
-    if ((nav && nav !== 'reload') || !p || p.id !== this.showId || !(Date.now() - (p.at ?? 0) < RESUME_WITHIN)) p = null;
+    if (!reloaded() || !p || p.id !== this.showId || !(Date.now() - (p.at ?? 0) < RESUME_WITHIN)) p = null;
     // A cold start (the tablet switched off and on, the browser restarted): what was playing when
     // this show was last open comes back silently if that was this evening and no other tab is
     // playing it right now (they're asked). The box has been holding that look,
@@ -668,8 +706,7 @@ class App {
       if (tl && Number.isFinite(tl.pos)) this.timeline.resumeAt(tl.pos + (tl.playing ? (Date.now() - (p.at ?? Date.now())) / 1000 : 0), tl.playing);
       return;
     }
-    let q: Saved | null = null;
-    try { q = JSON.parse(localStorage.getItem(LASTPLAY_KEY + this.showId) ?? 'null'); } catch { /* nothing to pick up */ }
+    const q = LAST_PLAYED.of(this.showId).get() as Saved | null;
     if (!q || q.id !== this.showId || !(Date.now() - (q.at ?? 0) < COLD_WITHIN) || q.quiet || !(q.lists.length || q.fx.length)) return;
     // another tab may be playing this show right now (a second tab): then this one stays quiet. The
     // tab that sends holds the show's output lock; without Web Locks the other tabs are asked.
@@ -682,12 +719,10 @@ class App {
   // One tab plays a show to the box at a time: the one sending holds a lock named after the show (a
   // closed or crashed tab lets go of it by itself). False: another tab holds it.
   private outLock?: () => void;
-  private outAsked = '';
-  private outLockFor = '';
+  private outLockFor = '';            // (the show it was asked for)
   private takeOutput(): Promise<boolean> {
     if (this.outLock && this.outLockFor === this.showId) return Promise.resolve(true);   // (already ours)
     this.outLock?.(); this.outLock = undefined;
-    this.outAsked = this.showId;
     this.outLockFor = this.showId;
     if (!hasLocks()) return Promise.resolve(true);
     return new Promise((ok) => {
@@ -761,7 +796,6 @@ class App {
   // without its fade or actions: the box has been holding a look all along.
   private schedAt = -1e9;
   private schedLast = 0;            // when it last looked (ms since 1970); 0: not since the app started
-  private schedKey() { return `luxdmx.seq.sched.${this.showId}`; }
   runSchedule(now = new Date()) {
     if (!this.started || this.coldPending) return;
     // One tab runs the timetable: the one holding the show's output. A second tab on the same show
@@ -780,9 +814,9 @@ class App {
     }
     const t = now.getTime();
     let from = this.schedLast;
-    if (!from) { try { from = Number(localStorage.getItem(this.schedKey())) || 0; } catch { /* never looked */ } }
+    if (!from) from = SCHEDULE_LOOKED.of(this.showId).get();
     this.schedLast = t;
-    try { localStorage.setItem(this.schedKey(), String(t)); } catch { /* it looks again after a restart */ }
+    SCHEDULE_LOOKED.of(this.showId).set(t);
     // switched off, or paused (a party tonight): what comes meanwhile is skipped, not caught up later
     const st = this.show.settings;
     if (st.scheduleOff || (st.schedulePause ?? 0) > t) return;
@@ -817,6 +851,13 @@ class App {
   // ---- shows in this browser
   // `thread`: the show did change (the output thread gets it with the next frame, and before any
   // command); false: it may have (a click, a key), the save finds out
+  // Nothing a reload would cut short (for an update put in by itself, src/pwa.ts): no song playing,
+  // no list running, nothing held in the programmer or on the live buttons, the show saved
+  quietForUpdate(): boolean {
+    if (this.timeline.playing || [...this.engine.players.values()].some((p) => p.running)) return false;
+    if (Object.keys(this.programmer).length || this.engine.liveEffects().length || Object.keys(this.live).length) return false;
+    return this.saved && !this.savePending && !this.sfxArmed;
+  }
   markDirty(delay = 350, thread = true) {
     if (thread) this.thread.showChanged();
     if (!thread) this.savePending = true;
@@ -827,19 +868,40 @@ class App {
     const n = ++this.writes;
     this.saved = false;
     const text = serializeShow(JSON.parse(json), false);
-    this.setLocal(text);
+    const local = this.setLocal(text);
+    const seen = this.otherSaves;
     try {
       await writeShow(this.metaOf(), text);
-      if (n === this.writes) this.saved = true;          // an older write finishing late doesn't count
-      this.channel?.postMessage({ saved: this.showId, tab: this.tabId });
+      if (n === this.writes) { this.saved = true; this.saveFailed = false; this.savedAt = Date.now(); }    // an older write finishing late doesn't count
+      if (this.otherSaves === seen) this.otherNewer = false;    // (this one's is the newer now; the other tab hears so)
+      this.channel?.postMessage({ saved: this.showId, tab: this.tabId, sum: textSum(text) });
       this.refreshShows();
-    } catch { /* IndexedDB unavailable (private mode): the localStorage copy still holds the open show */ }
+    } catch {
+      // IndexedDB unavailable (private mode): the localStorage copy still holds the open show. Neither
+      // (the browser's storage full or blocked): nothing is kept, and that's said, not a "saving…"
+      // that never ends: a show file is the way out.
+      if (n !== this.writes) return;
+      this.saved = local; this.saveFailed = !local;
+      if (!local && !this.saidSaveFailed) {
+        this.saidSaveFailed = true;
+        ui.toast("This browser isn't keeping the show (its storage is full or blocked). Save it as a file: Shows, Save as file.", 12000);
+      }
+    }
   }
+  saveFailed = $state(false);
+  savedAt = 0;                      // when this show was last saved (the save stamps a copy, the show on screen keeps its old meta)
+  // the show for paper: with when it was really last saved (it said when it was opened)
+  private forPaper(): Show {
+    const s = $state.snapshot(this.show) as Show;
+    if (this.savedAt) s.meta = { ...s.meta, modified: new Date(this.savedAt).toISOString() };
+    return s;
+  }
+  private saidSaveFailed = false;
   // The quick copy, labelled with its show. If it doesn't fit, there's no copy at all rather than an
   // old one (IndexedDB has the show either way).
   private setLocal(text: string) {
-    try { localStorage.setItem(KEY_ID, this.showId); localStorage.setItem(KEY, text); }
-    catch { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY_ID); } catch { /* blocked */ } }
+    try { localStorage.setItem(KEY_ID, this.showId); localStorage.setItem(KEY, text); return true; }
+    catch { try { localStorage.removeItem(KEY); localStorage.removeItem(KEY_ID); } catch { /* blocked */ } return false; }
   }
   private metaOf(show = this.show, id = this.showId): ShowMeta {
     return {
@@ -854,14 +916,24 @@ class App {
     return out;
   }
   async refreshShows() { try { this.shows = await listShows(); } catch { this.shows = []; } }
+  // A show with nothing in it (the blank one a first start makes, a "New blank show" never used):
+  // left for another one, it goes, rather than sitting in the list as an empty "New show".
+  isBlank(): boolean {
+    const s = this.show, std = new Set(standardPresets(emptyShow()).map((p) => p.id));
+    return !s.fixtures.length && !s.groups.length && !s.effects.length && !s.pages.length && !s.outputs.devices.length
+      && s.cueLists.every((l) => !l.cues.length) && s.presets.every((p) => std.has(p.id)) && !s.timeline?.items?.length && !s.timeline?.audio
+      && !s.setlist && s.meta.name === emptyShow().meta.name;
+  }
   async openShow(id: string) {
-    this.checkpoint();                         // the last edits of the open show first
+    const blank = id !== this.showId && this.isBlank() ? this.showId : '';
+    if (!blank) this.checkpoint();             // the last edits of the open show first
     const text = await readShow(id);
     if (!text) throw new Error('that show is gone');
     const notes: string[] = [];
     const s = parseShow(text, notes);          // throws (and nothing changes) if it can't be read
     this.replaceShow(s);
     this.setShowId(id);
+    if (blank) { await dbDelete(blank).catch(() => {}); await this.refreshShows(); }
     this.setLocal(text);
     this.sayRepaired(notes);
   }
@@ -872,16 +944,23 @@ class App {
   }
   // Save the current show first, then switch to a fresh one (blank or from a template).
   async startShow(s: Show, saveCurrent = true) {
-    if (saveCurrent) this.checkpoint(); else clearTimeout(this.dirtyTimer);
+    const blank = this.isBlank() ? this.showId : '';
+    if (saveCurrent && !blank) this.checkpoint(); else clearTimeout(this.dirtyTimer);
+    // (a name no other show here has: a template played twice is "Bar" and "Bar 2", not two "Bar"s)
+    const taken = new Set(this.shows.filter((x) => x.id !== blank).map((x) => x.name)), name = s.meta.name;
+    for (let n = 2; taken.has(s.meta.name); n++) s.meta.name = `${name} ${n}`;
     this.replaceShow(s);
     this.setShowId(newId('s'));
     await this.persist(this.lastSnap);
+    if (blank) { await dbDelete(blank).catch(() => {}); await this.refreshShows(); }
   }
   private setShowId(id: string) {
     this.showId = id;
     this.schedLast = Date.now();               // another show: its timetable goes on from now (no catching up)
-    this.otherTab = false;
-    try { localStorage.setItem(CUR, id); } catch { /* storage blocked */ }
+    // (this tab is on another show now: the others on the old one hear it's gone)
+    if (this.otherTabs.size) this.sayGone();
+    this.otherTab = false; this.otherNewer = false; this.otherTabs.clear();
+    CURRENT_SHOW.set(id);
   }
   async duplicateShow(id: string) {
     const text = id === this.showId ? serializeShow(JSON.parse(JSON.stringify(this.show))) : await readShow(id);
@@ -908,7 +987,10 @@ class App {
   }
   modeOf(fixtureId: string) { return this.modes.get(fixtureId); }
   // where a ring's or a matrix's pixels are: the light's own wiring when it has one, else its type's
-  placesOf(fixtureId: string) { const f = this.show.fixtures.find((x) => x.id === fixtureId); return f ? placesOfLight(f, this.modes.get(fixtureId)) : undefined; }
+  // (by id: a card's picture asks for every light, and a find through the rig for each was a few
+  // seconds of Record in a rig of 300 lights with 50 cues)
+  private layouts = $derived(new Map(this.show.fixtures.map((f) => [f.id, f.layout])));
+  placesOf(fixtureId: string) { return this.layouts.has(fixtureId) ? placesOfLight({ layout: this.layouts.get(fixtureId) }, this.modes.get(fixtureId)) : undefined; }
   caps(fixtureId: string) { return capsOf(this.modes.get(fixtureId)); }
 
   // One frame. Nothing in a show may stop the output for good: when a frame throws, the look that
@@ -925,7 +1007,7 @@ class App {
       try {
         const last = this.output === 'live' ? this.lastSent : this.frozen;
         if (!last || this.quiet) return;
-        const off = this.zeroed(last, (a) => ATMOS_AND_MACHINES.includes(a)), t = performance.now();
+        const off = this.zeroed(last, atmosAndMachines), t = performance.now();
         for (const b of this.bridges) { if (this.thread.serves(b)) continue; for (const [uni, data] of off) b.send(uni, data, t); }
       } catch { /* nothing more to do: the boxes hold what they had */ }
     }
@@ -950,14 +1032,17 @@ class App {
     const st: Record<string, PlayerStatus> = {};
     for (const l of this.show.cueLists) st[l.id] = this.engine.status(l.id);
     this.status = st;
+    // (a fog stop lasts until a cue that fogs comes on: looked at against the same copy of where the
+    // lists are that it was taken from, so a reload's or a lowered panel rate's older copy can't end it)
+    if (this.hazeStopAt) this.hazeNext();
     // the open list's cue on stage changed (GO, an auto-advance, a jump): the selection comes along
     const on = st[this.currentList]?.cue ?? '';
     if (on !== this.followed) { this.followed = on; if (on && this.followSel) this.cueSel = [on]; }
-    if (this.engine.blackout !== this.bo) this.bo = this.engine.blackout;   // a cue action changed it
     // (the pictures update right after this task: timed from here to the next one)
     pingAfter(() => load.did(performance.now() - t0));
   }
   private saidBroken = new Set<string>();
+  private beatSyncAt = 0;
   private frame() {
     this.engine.programmer = this.progSnap;
     this.stepFade();
@@ -974,6 +1059,10 @@ class App {
     // (the clock, not the position: counting in, it runs before the song's start, and the beats with it)
     if (this.timeline.playing && tl && tb !== undefined && !(this.music.on && this.music.confidence >= 0.5) && this.bpm === tb)
       this.engine.syncBeats((this.timeline.clock - (tl.offset ?? 0)) * tb / 60);
+    // Otherwise the output thread's beat clock is put on this page's once a second: they started at
+    // different moments, so the effects on the wire ran up to half a beat off Auto GO and the steps
+    // the stage here shows.
+    else if (performance.now() - this.beatSyncAt > 1000) { this.beatSyncAt = performance.now(); this.engine.syncBeats(this.engine.beatCount); }
     const live = $state.snapshot(this.live) as Record<string, Values>;
     // (picked cells: just them, the rest of their light dark, so they're easy to find)
     if (this.highlight) for (const id of this.selected) {
@@ -991,16 +1080,24 @@ class App {
       for (const id of this.stepAll) if (!this.selected.includes(id) && !live[id]) live[id] = { intensity: this.lowlight, color: { r: 1, g: 1, b: 1 }, strobe: 0 };
     this.engine.live = live;
     this.engine.overlay = this.testOverlay;      // (the channel wizard: under the machines' gate)
+    // the timeline's curves: its effect bars' knobs where the song is (only while it plays; the same
+    // object while nothing changes, so the output thread isn't told again)
+    const song = this.show.timeline;
+    this.engine.fxOver = this.timeline.playing && song?.items.some((i) => i.curves) ? curvesAt(song.items, this.timeline.position) : NO_OVER;
     // the output thread gets what changed (its own engine works out the frames that go out)
     // (blind with nothing frozen, a tab that started blind: the thread sends nothing either)
     const blindOut = this.output === 'live' ? null : this.blindFrames();
     this.thread.sync(this.engine, this.show, this.quiet || (this.output !== 'live' && !blindOut), blindOut, this.bridges,
       this.show.outputs.devices.find((d) => d.host === LINK)?.proto ?? 'artnet');
     const { frames, stage, look } = this.engine.tick();
+    if (this.engine.blackout !== this.bo) this.bo = this.engine.blackout;   // a cue action changed it (at once: the Blackout key toggles from it)
     if (this.engine.armed) this.keepHeld();
     this.stageNow = stage;
-    load.outputSafe = this.thread.running;
-    // ---- the output first: nothing the screen does comes before it
+    // (nothing from this page reaches a box: the thread serves every one that's there, or nothing goes
+    // out; and how late the thread itself is)
+    load.outputSafe = this.quiet || (this.output !== 'live' && !blindOut) || this.bridges.every((b) => b.state !== 'ready' || this.thread.serves(b));
+    load.threadLate = this.thread.running && !this.thread.stats.quiet ? this.thread.stats.late : 0;
+    // ---- what goes out from this page (a box the thread doesn't serve, older firmware), before the screen
     // A universe nothing drives any more (last fixture removed, wizard closed) gets zeros for a
     // couple of seconds, so the box doesn't keep showing the last value until its source timeout.
     const t = performance.now();
@@ -1014,7 +1111,7 @@ class App {
     // off and on again mustn't black out the bar it was lighting).
     if (this.quiet && ([...this.engine.players.values()].some((p) => p.running) || Object.keys(this.programmer).length || this.engine.liveEffects().length
       || Object.keys(this.live).length || this.testOverlay || this.highlight || this.blackout || this.grandMaster < 1)) this.quiet = false;
-    if (!this.quiet && this.outAsked !== this.showId) void this.takeOutput();
+    if (!this.quiet && this.outLockFor !== this.showId) void this.takeOutput();
     // live: this frame; blind: the look that was out when it went blind, nothing new
     const out = this.output === 'live' ? frames : this.blindFrames();
     // (not where the output thread sends: a late frame from here would put an older look back)
@@ -1022,7 +1119,7 @@ class App {
     for (const b of this.bridges) b.watch?.();      // (a box's window shut: said at once, whoever sends to it)
     if (this.output === 'live' && !this.quiet) this.lastSent = frames;
     // (what the pictures draw, after the frame has gone out: nothing the screen does comes before it)
-    this.drawnNow = this.ledShown(stage, frames);
+    this.ledFrom = { stage, frames }; this.ledMemo = null;
     // ---- then the rest
     // an effect that can't run is left out (engine.ts): said once, by name
     for (const [id, why] of this.engine.broken) if (!this.saidBroken.has(id)) {
@@ -1047,8 +1144,7 @@ class App {
     for (const [w, until] of Object.entries(this.fogUntil)) if (nowMs >= until) this.expire(w);
     // ---- what the screen shows: every frame, or every n-th while the output needs the time
     // (perf/load.svelte.ts); a fresh start or a change of look shows at once
-    if (++this.uiN >= load.uiEvery || !this.status || this.shownRev !== this.rev) { this.uiN = 0; this.shownRev = this.rev; this.publish(stage, look, frames); }
-    if (this.hazeStopAt) this.hazeNext();
+    if (++this.uiN >= load.uiEvery || this.shownRev !== this.rev) { this.uiN = 0; this.shownRev = this.rev; this.publish(stage, look, frames); }
     this.remote.tick(t);
     this.timeline.tick();
     if (t - this.schedAt > 5000) { this.schedAt = t; this.runSchedule(); }
@@ -1093,18 +1189,16 @@ class App {
   private saveUndo(now = false) {
     clearTimeout(this.undoTimer);
     if (!now) { this.undoTimer = setTimeout(() => this.saveUndo(true), 1500); return; }
-    try {
-      const keep: string[] = [];
-      let bytes = 0;
-      for (let i = this.undoStack.length - 1; i >= 0 && keep.length < 12; i--) { bytes += this.undoStack[i].length; if (bytes > 1_500_000) break; keep.unshift(this.undoStack[i]); }
-      sessionStorage.setItem(UNDO_KEY, JSON.stringify({ id: this.showId, top: this.lastSnap.length, steps: keep }));
-    } catch { /* too big or blocked: undo just doesn't survive a reload */ }
+    // (too big or blocked: undo just doesn't survive a reload)
+    const keep: string[] = [];
+    let bytes = 0;
+    for (let i = this.undoStack.length - 1; i >= 0 && keep.length < 12; i--) { bytes += this.undoStack[i].length; if (bytes > 1_500_000) break; keep.unshift(this.undoStack[i]); }
+    UNDO_TAB.set({ id: this.showId, top: this.lastSnap.length, steps: keep, fv: FORMAT_VERSION });
   }
   private loadUndo() {
-    try {
-      const u = JSON.parse(sessionStorage.getItem(UNDO_KEY) ?? 'null');
-      if (u?.id === this.showId && u.top === this.lastSnap.length && Array.isArray(u.steps)) { this.undoStack = u.steps; this.canUndo = u.steps.length > 0; }
-    } catch { /* nothing to restore */ }
+    const u = UNDO_TAB.get();
+    // (steps from another version of the show format, before an update: not brought back)
+    if (u?.id === this.showId && u.top === this.lastSnap.length && u.fv === FORMAT_VERSION && Array.isArray(u.steps)) { this.undoStack = u.steps; this.canUndo = u.steps.length > 0; }
   }
   undo() { this.checkpoint(); this.step(this.undoStack, this.redoStack, 'Undone'); }
   // "Done. [Undo]": the Undo undoes this, and only while nothing else has changed since.
@@ -1123,10 +1217,21 @@ class App {
     to.push(this.lastSnap);
     const now = this.plain;                  // the version being left, for saying what changed
     const back = JSON.parse(prev) as Show;
+    const rec = verb === 'Undone' && this.recUndo?.snap === prev ? this.recUndo : null;
+    const lockedNow = this.show.pages.some((p) => p.locked), lockPage = this.show.settings.lockPage;
+    const recLive = !!rec && this.engine.status(rec.list).cue === rec.cue;     // (not moved on since)
     let said = '';
     try { said = verb === 'Undone' ? describeChange(back, now) : describeChange(now, back); } catch { /* only the message */ }
-    this.show = rawTypes(back);
-    this.lastSnap = prev;
+    // (only what differs changes: the rest keeps its identity, so only that is drawn again; the whole
+    // show replaced took most of a second on a big rig, H8)
+    const lockedBack = back.pages.some((p) => p.locked) || !!back.settings.lockPage, note = { moved: false };
+    reconcile(this.show, rawTypes(back), note);
+    // (the lock as it is now, whatever the step had)
+    for (const p of lockedNow ? this.ownPages() : this.show.pages) { if (lockedNow) p.locked = true; else delete p.locked; }
+    if (lockedNow && lockPage) this.show.settings.lockPage = lockPage; else delete this.show.settings.lockPage;
+    // (the show's text is the step's, unless the lock changed it or a field came back in another
+    // place: making it again from the live show is most of the undo's time on a big rig)
+    this.lastSnap = lockedNow || lockedBack || note.moved ? JSON.stringify(this.show) : prev;
     this.rev++;
     this.canUndo = this.undoStack.length > 0; this.canRedo = this.redoStack.length > 0;
     // a selection can't point at things that are gone now
@@ -1142,11 +1247,23 @@ class App {
     if (!lists.some((l) => l.id === this.currentList)) this.currentList = lists[0]?.id ?? '';
     if (this.goList && !lists.some((l) => l.id === this.goList)) this.goList = '';
     if (this.page && !this.pages.some((p) => p.id === this.page)) this.page = '';
+    // a Record taken back: its programmer, its list where it was, its effects by hand again
+    if (rec && !this.show.cueLists.some((l) => l.cues.some((c) => c.id === rec.cue))) {
+      this.recUndo = null;
+      // (what was set since stays: it's newer)
+      this.programmer = { ...rec.prog, ...($state.snapshot(this.programmer) as Record<string, Values>) };
+      const l = this.show.cueLists.find((x) => x.id === rec.list), i = l ? l.cues.findIndex((c) => c.id === rec.was) : -1;
+      if (recLive && l && i >= 0) this.engine.jumpTo(l.id, i, 0);
+      else if (recLive && l) this.engine.stop(l.id);
+      if (rec.fx.length) { this.engine.giveBackEffects(rec.fx); this.liveFx = this.engine.liveEffects(); }
+    }
     this.syncBridges();
-    this.persist(prev);
+    this.persist(this.lastSnap);
     this.saveUndo();
     if (said) ui.toast(`${verb}: ${said}`, 2500);
+    this.stepSaid = said;
   }
+  stepSaid = '';                    // what the last undo or redo did (the console's line says it)
   // One bridge per box in the show; boxes that stay keep their connection.
   private syncBridges() {
     const hosts = this.show.outputs.devices.map((d) => d.host);
@@ -1163,16 +1280,15 @@ class App {
     const m0 = modeOf(t, mode), width = m0?.channels.length ?? 1;
     const need = isWide(m0) ? spansOf({ universe: 0, address: 1 }, m0).length : 0;
     let nextUni = universe;
-    // A row of their own on the stage, clear of the lights already there: the middle first, then
-    // spreading out; on a crowded stage the row with the most room.
-    const xs = Array.from({ length: count }, (_, i) => (i + 1) / (count + 1));
-    const room = (y: number) => Math.min(1, ...this.show.fixtures.flatMap((f) => xs.map((x) => Math.hypot((f.x - x) * 1.6, f.y - y))));
-    const rows = [0.5, 0.35, 0.65, 0.25, 0.8, 0.42, 0.58, 0.15, 0.9, 0.3, 0.7, 0.2, 0.85, 0.1];
-    const row = (rows.find((y) => room(y) >= 0.09) ?? rows.reduce((a, b) => (room(b) > room(a) ? b : a))) * 10;
+    // On the stage clear of the lights already there (a row of their own, or the freest spots)
+    const spots = placeNew(this.show.fixtures, count);
     // more of a name already there carry on its numbering (Front 7 to 12, not a second Front 1)
     const same = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: (\\d+))?$`);
     const taken = this.show.fixtures.map((f) => same.exec(f.name)).filter((m): m is RegExpExecArray => !!m).map((m) => Number(m[1] ?? 1));
     const first = taken.length ? Math.max(...taken) + 1 : 1;
+    // (a start address that runs them past channel 512: said before any goes in, not half a patch)
+    if (start && !need && start + count * width - 1 > 512)
+      return `${count} × ${width} channels from ${start} would run past channel 512 of universe ${universe}: start at ${Math.max(1, 513 - count * width)} at most, or put them on another universe`;
     for (let i = 0; i < count; i++) {
       // A given start address puts them back to back from there; otherwise after what's patched.
       // Too big for one universe: from channel 1 of the first run of free universes.
@@ -1181,7 +1297,7 @@ class App {
       if (address < 1 || (!need && address + width - 1 > 512)) { numberFixtures(this.show.fixtures); return `universe ${universe} is full`; }
       this.show.fixtures.push({
         id: newId('f'), name: count > 1 || taken.length ? `${name} ${first + i}` : name, typeId, mode: modeOf(t, mode)?.name ?? mode,
-        universe: need ? nextUni : universe, address, x: xs[i], y: row / 10,
+        universe: need ? nextUni : universe, address, x: spots[i].x, y: spots[i].y,
       });
       if (need) nextUni += need;
     }
@@ -1232,101 +1348,10 @@ class App {
   }
   // Universes pixel lights are patched on that no connected box says it plays: a pixel port set to
   // another universe, or a box too old to name its pixel ports.
-  // ---- how a pixel light's LEDs really light (model/ledCurve.ts): what it was set to by hand, else
-  // what the box playing it says about its pixel port (the same universe and start channel), else a
-  // port as it comes. Not a pixel light (a DMX bar, a PAR): undefined, drawn as its values say.
-  boxPortOf(f: Fixture): PortInfo | undefined {
-    for (const b of this.bridges) {
-      if (b.state !== 'ready' && b.state !== 'reconnecting') continue;
-      // (through LuxDMX Link: every box it found says its own; through a box's bridge: that box)
-      const lists: [PortInfo[], string][] = b instanceof LinkOutput ? b.nodes.map((n) => [n.pixelPorts ?? [], n.short || n.ip]) : [[b.ports ?? [], b.name || b.host]];
-      for (const [ports, box] of lists) {
-        const p = ports.find((q) => onPort(q, f));
-        if (p) return { ...p, box };
-      }
-    }
-    return undefined;
-  }
-  ledOf(id: string): { curve: LedCurve; from: 'own' | 'box' | 'usual'; port?: PortInfo } | undefined {
-    const f = this.show.fixtures.find((x) => x.id === id);
-    return f ? this.ledOfLight(f) : undefined;
-  }
-  // (once per mode: whether it's a pixel light doesn't change while the mode is the same object)
-  private pixelModes = new WeakMap<object, boolean>();
-  private ledOfLight(f: Fixture): { curve: LedCurve; from: 'own' | 'box' | 'usual'; port?: PortInfo } | undefined {
-    const m = this.modeOf(f.id);
-    if (!m) return undefined;
-    let px = this.pixelModes.get(m);
-    if (px === undefined) { px = isPixelType(this.types.get(f.typeId), m); this.pixelModes.set(m, px); }
-    if (!px) return undefined;
-    const port = this.boxPortOf(f), base = port ? curveOfPort(port) : WS2812;
-    if (f.led && Object.keys(f.led).length) return { curve: { ...base, ...f.led }, from: 'own', port };
-    return { curve: base, from: port ? 'box' : 'usual', port };
-  }
-  // The stage with every pixel light's cells as the LEDs show them: its channels as they go out,
-  // through its port's table, the power cap over everything on that port (as the box adds it up),
-  // back on the screen's own curve.
-  ledShown(stage: Record<string, Resolved>, frames: Map<number, Uint8Array>): Record<string, Resolved> {
-    type One = { f: Fixture; m: FixtureMode; cells: number; out: Uint8Array; curve: LedCurve };
-    const ports = new Map<string, { curve: LedCurve; pixels: number; sum: number; lights: One[] }>();
-    for (const f of this.show.fixtures) {
-      if (!stage[f.id]) continue;
-      const led = this.ledOfLight(f), m = this.modeOf(f.id);
-      if (!led || !m) continue;
-      const n = m.channels.length, out = new Uint8Array(n), cells = capsOf(m).cells, tab = curveTable(led.curve);
-      for (const s of spansOf(f, m)) { const buf = frames.get(s.universe); if (buf) out.set(buf.subarray(s.at, Math.min(512, s.at + s.count)), s.from); }
-      let sum = 0;
-      for (let i = 0; i < n; i++) { out[i] = tab[out[i]]; sum += out[i]; }
-      // (one port, one budget: its lights add up, and all its pixels draw their idle current)
-      const key = led.port ? `${led.port.box}|${led.port.uni}|${led.port.start}` : `light ${f.id}`;
-      let g = ports.get(key);
-      if (!g) { g = { curve: led.curve, pixels: led.port?.count ?? cells, sum: 0, lights: [] }; ports.set(key, g); }
-      g.sum += sum;
-      g.lights.push({ f, m, cells, out, curve: led.curve });
-    }
-    let shownAll = stage;
-    for (const g of ports.values()) {
-      const scale = powerScale(g.curve, g.sum, g.pixels);
-      for (const { f, m, cells, out } of g.lights) {
-        if (scale < 256) for (let i = 0; i < out.length; i++) out[i] = (out[i] * scale) >> 8;
-        const rgbw = new Float32Array(cells * 4);
-        m.channels.forEach((c, i) => {
-          const k = c.attr === 'red' ? 0 : c.attr === 'green' ? 1 : c.attr === 'blue' ? 2 : c.attr === 'white' ? 3 : -1;
-          if (k >= 0 && c.cell !== undefined && c.cell < cells) rgbw[c.cell * 4 + k] = onScreen(out[i]);
-        });
-        const shown: Resolved[] = [];
-        let top = 0;
-        for (let c = 0; c < cells; c++) {
-          const r = rgbw[c * 4], gg = rgbw[c * 4 + 1], b = rgbw[c * 4 + 2], w = rgbw[c * 4 + 3], d = Math.max(r, gg, b, w);
-          top = Math.max(top, d);
-          shown.push(d > 0 ? { intensity: d, color: { r: r / d, g: gg / d, b: b / d }, ...(w ? { white: w / d } : {}) } : { intensity: 0, color: { r: 0, g: 0, b: 0 } });
-        }
-        if (shownAll === stage) shownAll = { ...stage };
-        shownAll[f.id] = { ...stage[f.id], intensity: top, cells: shown };
-      }
-    }
-    // channels set by hand ("All channels"): the pictures show what their bytes do (render.ts rawLook)
-    for (const f of this.show.fixtures) {
-      const v = shownAll[f.id];
-      if (!v?.raw) continue;
-      const m = this.modeOf(f.id);
-      if (!m) continue;
-      const bytes = new Uint8Array(m.channels.length);
-      for (const s of spansOf(f, m)) { const buf = frames.get(s.universe); if (buf) bytes.set(buf.subarray(s.at, Math.min(512, s.at + s.count)), s.from); }
-      const look = rawLook(f, m, v, bytes);
-      if (look === v) continue;
-      if (shownAll === stage) shownAll = { ...stage };
-      shownAll[f.id] = look;
-    }
-    return shownAll;
-  }
-  unservedPixels(): number[] {
-    const up = this.bridges.filter((b) => b.state === 'ready');
-    if (!up.length) return [];
-    const unis = new Set<number>();
-    for (const f of this.show.fixtures) { const m = this.modeOf(f.id); if (capsOf(m).cells > 1) for (const s of spansOf(f, m)) unis.add(s.universe); }
-    return [...unis].filter((u) => !up.some((b) => b.wants(u))).sort((a, b) => a - b);
-  }
+  // ---- how a pixel light's LEDs really light (app/leds.ts)
+  ledOf(id: string) { const f = this.show.fixtures.find((x) => x.id === id); return f ? ledOfLight(this, f) : undefined; }
+  ledShown(stage: Record<string, Resolved>, frames: Map<number, Uint8Array>) { return ledShown(this, stage, frames); }
+  unservedPixels() { return unservedPixels(this); }
   // nothing patched on these universes
   universesFree(universe: number, n: number): boolean {
     return !this.show.fixtures.some((f) => spansOf(f, this.modeOf(f.id)).some((s) => s.universe >= universe && s.universe < universe + n));
@@ -1367,9 +1392,17 @@ class App {
     if (c.color && !c.cct && typeof v.cct === 'number') { if (!v.color) v.color = cctColor(v.cct); delete v.cct; }
     else if (c.cct && !c.color && v.cct === undefined && v.color && 'r' in v.color) { const w = whiteTemperature(v.color); if (w !== undefined) v.cct = w; delete v.color; }
   }
+  // (a light with its own place in 3D moves there too, by as much as on the plan, at the same height
+  // and turned the same: the plan is that place seen from above; a template's lights all have one)
   moveFixture(id: string, x: number, y: number) {
     const f = this.show.fixtures.find((g) => g.id === id);
-    if (f) { f.x = Math.max(0.02, Math.min(0.98, x)); f.y = Math.max(0.04, Math.min(0.96, y)); }
+    if (!f) return;
+    const nx = Math.max(0.02, Math.min(0.98, x)), ny = Math.max(0.04, Math.min(0.96, y));
+    if (f.p3 && (nx !== f.x || ny !== f.y)) {
+      const r = roomFor(this.show.settings.stage3d), a = planToWorld(f.x, f.y, r), b = planToWorld(nx, ny, r);
+      f.p3 = { ...f.p3, x: +(f.p3.x + b.x - a.x).toFixed(3), z: +(f.p3.z + b.z - a.z).toFixed(3) };
+    }
+    f.x = nx; f.y = ny;
   }
 
   // ---- fixture order, copy / paste
@@ -1387,7 +1420,8 @@ class App {
     await copyClip('fixtures', items, types);
     return items.length;
   }
-  async cutFixtures() { this.checkpoint(); const n = await this.copyFixtures(); for (const id of [...this.selected]) this.removeFixture(id); return n; }
+  // Copy, then Remove: what goes with the lights on Remove (a group of only them, a list only for them) goes on Cut too
+  async cutFixtures() { const ids = [...this.selected], n = await this.copyFixtures(ids); if (n) this.removeFixtures(ids); return n; }
   // The first place a light fits: on this universe, or the next one with room (a ring or a long strip
   // can fill one; another of them would otherwise have nowhere to go).
   private roomFor(universe: number, width: number): { universe: number; address: number } | null {
@@ -1416,7 +1450,11 @@ class App {
       const id = newId('f');
       // (its own number when it's free: cut and paste keeps it, a copy next to it gets a new one)
       const num = f.num && !this.show.fixtures.some((x) => x.num === f.num) ? f.num : undefined;
-      this.show.fixtures.push({ ...f, id, name: this.uniqueName(f.name), num, universe: room.universe, address: room.address, y: Math.min(0.96, f.y + 0.08) });
+      // (the real light it's linked to over RDM likewise: a copy is another light, it would claim
+      // the original's and offer to readdress it)
+      const { uid, ...rest } = f;
+      const own = uid && !this.show.fixtures.some((x) => x.uid === uid) ? { uid } : {};
+      this.show.fixtures.push({ ...rest, ...own, id, name: this.uniqueName(f.name), num, universe: room.universe, address: room.address, y: Math.min(0.96, f.y + 0.08) });
       added.push(id);
     }
     numberFixtures(this.show.fixtures);
@@ -1425,7 +1463,6 @@ class App {
     this.markDirty();
     return added.length;
   }
-  duplicateFixtures() { this.copyFixtures().then(() => this.pasteFixtures()); }
   // Removes the lights; groups that only had them go too (and their live buttons). Says how many
   // cues lose them, so a template's lights don't vanish from its looks without a word.
   // what points at something deleted goes too (model/prune.ts): said in the delete's toast
@@ -1436,18 +1473,28 @@ class App {
     this.liveFx = this.engine.liveEffects();
     return prunedText(p);
   }
-  removeFixtures(ids = this.selected): { cues: number; groups: number; also: string } {
+  removeFixtures(ids = this.selected): { cues: number; groups: number; lists: string[]; also: string } {
     this.checkpoint();
     const gone = new Set(ids);
     const cues = this.show.cueLists.flatMap((l) => l.cues).filter((c) => Object.keys(c.values).some((id) => gone.has(id))).length;
     const emptied = new Set(this.show.groups.filter((g) => g.fixtures.length && g.fixtures.every((f) => gone.has(f))).map((g) => g.id));
+    // (a list that only ever set the lights going, a machine's shot: it goes with them, and with it
+    // what started it, a cue's "start Confetti" and its button. A list that does anything else stays)
+    const deadLists = this.show.cueLists.filter((l) => l.cues.length && l.cues.every((c) => !c.effects?.length && !c.actions?.length && Object.keys(c.values).length > 0 && Object.keys(c.values).every((id) => gone.has(id))));
     for (const id of [...ids]) this.removeFixture(id);
+    if (deadLists.length) {
+      for (const l of deadLists) { this.engine.stop(l.id); this.engine.forget(l.id); }
+      const dead = new Set(deadLists.map((l) => l.id));
+      this.show.cueLists = this.show.cueLists.filter((l) => !dead.has(l.id));
+      if (dead.has(this.currentList)) this.currentList = this.show.cueLists[0]?.id ?? '';
+    }
     if (emptied.size) {
       for (const e of this.show.effects) if (e.group && emptied.has(e.group)) { delete e.group; e.fixtures = []; }
+      freezeGroupNumbers(this.show.groups);
       this.show.groups = this.show.groups.filter((g) => !emptied.has(g.id));
       for (const p of this.show.pages) p.widgets = p.widgets.filter((w) => !(w.type === 'group' && emptied.has(w.group)));
     }
-    return { cues, groups: emptied.size, also: this.prune() };
+    return { cues, groups: emptied.size, lists: deadLists.map((l) => l.name), also: this.prune() };
   }
   private uniqueName(name: string) {
     const names = new Set(this.show.fixtures.map((f) => f.name));
@@ -1521,6 +1568,8 @@ class App {
     // (a group of cells: of the lights they're picked on)
     const inOrder = this.show.fixtures.map((f) => f.id).filter((id) => ids.includes(id));
     const g: Group = { id: newId('g'), name, fixtures: cells?.length ? this.samePicks(inOrder, cells, 'A group') : inOrder, ...(cells?.length ? { cells: [...cells] } : {}) };
+    freezeGroupNumbers(this.show.groups);
+    g.num = nextGroupNumber(this.show.groups);
     this.show.groups.push(g);
     return g.id;
   }
@@ -1538,6 +1587,7 @@ class App {
     if (!g) return '';
     for (const e of this.show.effects) if (e.group === id) { delete e.group; e.fixtures = [...g.fixtures]; }
     for (const p of this.show.pages) p.widgets = p.widgets.filter((w) => !(w.type === 'group' && w.group === id));
+    freezeGroupNumbers(this.show.groups);          // (the others keep theirs)
     this.show.groups = this.show.groups.filter((x) => x.id !== id);
     return this.prune();
   }
@@ -1548,6 +1598,7 @@ class App {
     this.checkpoint();
     const g = this.show.groups.find((x) => x.id === id);
     if (!g) return;
+    freezeGroupNumbers(this.show.groups);          // (moved, each keeps its number)
     const rest = this.show.groups.filter((x) => x.id !== id);
     rest.splice(Math.max(0, Math.min(rest.length, to)), 0, g);
     this.show.groups = rest;
@@ -1584,142 +1635,20 @@ class App {
   // the cells picked on this light (none: the whole light)
   cellsPicked(id: string): number[] { return this.cellSel[id] ?? []; }
   // ---- the console (ConsoleView): what a desk's command line, encoders and faders do
-  // A command typed on the command line (model/command.ts). Says what it did, or what's wrong.
-  runCommand(text: string): { ok: boolean; said: string } {
-    const c = parseCommand(text);
-    if (c.error) return { ok: false, said: c.error };
-    if (c.action) {
-      const list = c.list ? this.show.cueLists[c.list - 1] : this.liveList;
-      if (c.list && !list) return { ok: false, said: `there's no list ${c.list} (${this.show.cueLists.length === 0 ? 'no cue lists yet' : this.show.cueLists.length === 1 ? 'there is 1' : `there are ${this.show.cueLists.length}`})` };
-      const needList = () => ({ ok: false, said: 'No cue list to play yet: select lights, set them, record' });
-      switch (c.action) {
-        case 'clear': this.clearProgrammer(); return { ok: true, said: 'Cleared' };
-        case 'record': {
-          const into = c.list ? list : this.liveList;
-          if (c.cue !== undefined && into) { const k = cueAt(into, c.cue); if (k >= 0) return { ok: false, said: `${into.name} has cue ${fmtNum(c.cue)} (${into.cues[k].name}): update cue ${fmtNum(c.cue)}, or another number` }; }
-          if (!this.record(into?.id, { num: c.cue, fade: c.time })) return { ok: false, said: 'Nothing to record yet' };
-          const l = into ?? this.list;
-          return { ok: true, said: `Recorded${c.cue !== undefined ? ` cue ${fmtNum(c.cue)}` : ''} into ${l?.name ?? 'a new list'}${this.recordedAside ? ' (the play stays where it is; Clear lets go of your changes)' : ''}` };
-        }
-        case 'update': {
-          if (c.cue === undefined) return this.updateOnStage(c.list ? list : undefined);
-          if (!list) return needList();
-          const k = cueAt(list, c.cue);
-          if (k < 0) return { ok: false, said: `${list.name} has no cue ${fmtNum(c.cue)}` };
-          return this.updateCue(list.cues[k].id, list.id) ? { ok: true, said: `Updated cue ${fmtNum(c.cue)} in ${list.name}` } : { ok: false, said: 'Nothing changed to update' };
-        }
-        case 'goto': case 'delete': case 'time': {
-          if (!list) return needList();
-          const k = cueAt(list, c.cue!);
-          if (k < 0) return { ok: false, said: `${list.name} has no cue ${fmtNum(c.cue!)}` };
-          const q = list.cues[k];
-          if (c.action === 'goto') { this.jump(list.id, k); return { ok: true, said: `Cue ${fmtNum(c.cue!)} ${q.name} in ${list.name}${this.safeNote(list.id)}` }; }
-          this.checkpoint();
-          if (c.action === 'delete') { freezeNumbers(list); list.cues.splice(k, 1); this.cueSel = this.cueSel.filter((id) => id !== q.id); return { ok: true, said: `Deleted cue ${fmtNum(c.cue!)} ${q.name} (Undo brings it back)` }; }
-          q.fade = c.time!;
-          return { ok: true, said: `Cue ${fmtNum(c.cue!)} fades in ${fmtNum(c.time!)} s` };
-        }
-        case 'go': if (!list) return needList(); this.go(list.id); return { ok: true, said: `GO ${list.name}${this.safeNote(list.id)}` };
-        case 'back': if (!list) return needList(); this.back(list.id); return { ok: true, said: `Back ${list.name}` };
-        case 'release': if (!list) return needList(); this.release(list.id); return { ok: true, said: `Released ${list.name}` };
-        case 'blackout': this.blackout = !this.blackout; return { ok: true, said: this.blackout ? 'Blackout' : 'Blackout off' };
-        case 'highlight': this.highlight = !this.highlight; return { ok: true, said: this.highlight ? 'Highlight on' : 'Highlight off' };
-        case 'undo': {
-          if (!this.canUndo) return { ok: false, said: 'Nothing to undo' };
-          this.undo();
-          return { ok: true, said: 'Undone' };
-        }
-        case 'help': return { ok: true, said: 'Try: 5 @ full · 1 thru 4 @ 50 · 1 - 3 · group 2 @ out · 1.3 thru 1.8 · record cue 5 · goto cue 5 · update · next · clear · undo' };
-        case 'next': case 'prev': {
-          this.stepSel(c.action === 'next' ? 1 : -1);
-          const f = this.show.fixtures.find((x) => x.id === this.selected[0]), all = this.stepAll;
-          return f ? { ok: true, said: `${f.num ?? ''} ${f.name}${all ? ` (${all.indexOf(f.id) + 1} of ${all.length})` : ''}`.trim() } : { ok: false, said: 'No lights yet' };
-        }
-      }
-    }
-    const said: string[] = [], gaps: number[] = [], tail: string[] = [];
-    if (c.steps) {
-      const fx = this.show.fixtures;
-      numberFixtures(fx);
-      const lightNo = (n: number) => byNum(fx, n);
-      const problems: string[] = [];
-      for (const st of c.steps) {
-        // (a number without a light: in a run with others it's a gap, skipped as desks do; all on
-        // its own it's said)
-        const nums = st.pick.fixtures, have = nums.filter((n) => lightNo(n));
-        if (nums.length && !have.length) problems.push(nums.length === 1 ? `no light ${nums[0]}` : `no lights ${nums[0]} to ${nums[nums.length - 1]}`);
-        else gaps.push(...nums.filter((n) => !lightNo(n)));
-        st.pick.fixtures = have;
-        for (const n of st.pick.cells.map((x) => x.fixture)) if (!lightNo(n)) problems.push(`no light ${n}`);
-        for (const g of st.pick.groups) if (!this.show.groups[g - 1]) problems.push(`no group ${g}`);
-        for (const x of st.pick.cells) {
-          const f = lightNo(x.fixture);
-          if (!f) continue;
-          const n = this.caps(f.id).cells, over = x.cells.filter((k) => k >= n);
-          if (n < 2) problems.push(`light ${x.fixture} has no cells`);
-          else if (over.length) problems.push(`light ${x.fixture} has only ${n} cells (${x.fixture}.1 to ${x.fixture}.${n})`);
-        }
-      }
-      if (problems.length) return { ok: false, said: [...new Set(problems)].join('; ') };
-      // the steps one after the other, from nothing or from what's selected; cells by light
-      let ids = c.base === 'current' ? [...this.selected] : [];
-      const cells = new Map<string, number[]>(c.base === 'current' ? Object.entries(this.cellSel) : []);
-      for (const st of c.steps) {
-        // whole lights, and cells by light (a group of cells: its cells on each of its lights)
-        const whole: string[] = [], picks: { id: string; cells: number[] }[] = [];
-        if (st.pick.all) whole.push(...fx.map((f) => f.id));
-        for (const n of st.pick.fixtures) whole.push(lightNo(n)!.id);
-        for (const g of st.pick.groups) {
-          const grp = this.show.groups[g - 1];
-          if (!grp) continue;
-          if (!grp.cells?.length) { whole.push(...grp.fixtures); continue; }
-          for (const id of grp.fixtures) { const n = this.caps(id).cells, cs = grp.cells.filter((k) => k < n); if (n > 1 && cs.length) picks.push({ id, cells: cs }); }
-        }
-        for (const x of st.pick.cells) picks.push({ id: lightNo(x.fixture)!.id, cells: x.cells });
-        if (st.sign === '+') {
-          for (const id of whole) { if (!ids.includes(id)) ids.push(id); cells.delete(id); }
-          for (const x of picks) {
-            if (!ids.includes(x.id)) ids.push(x.id);
-            const had = cells.get(x.id) ?? [];
-            cells.set(x.id, [...had, ...x.cells.filter((k) => !had.includes(k))]);
-          }
-        } else {
-          ids = ids.filter((id) => !whole.includes(id));
-          for (const id of whole) cells.delete(id);
-          for (const x of picks) {
-            const left = (cells.get(x.id) ?? []).filter((k) => !x.cells.includes(k));
-            if (left.length) cells.set(x.id, left); else { cells.delete(x.id); ids = ids.filter((y) => y !== x.id); }
-          }
-        }
-      }
-      // cells on some lights and whole lights next to them can't go in one selection (what would a
-      // colour do to the whole ones?): said, not guessed
-      if (cells.size && ids.some((id) => !cells.has(id))) return { ok: false, said: 'cells and whole lights in one command: say them one after the other (1.3 thru 1.8, then 5 @ 50)' };
-      this.selected = ids;
-      this.cellSel = Object.fromEntries([...cells].filter(([id]) => ids.includes(id)));
-      const nc = [...cells.values()].reduce((a, x) => a + x.length, 0);
-      said.push(ids.length ? `${ids.length} light${ids.length > 1 ? 's' : ''}${nc ? `, ${nc} cell${nc > 1 ? 's' : ''}` : ''}` : 'nothing selected');
-      // (what "-" took out, said: "1-4" is light 1 without 4 here, as on MA and Eos)
-      const out = c.steps.filter((st) => st.sign === '-').flatMap((st) => st.pick.fixtures);
-      if (out.length && out.length <= 3) tail.push(`(${out.join(', ')} taken out)`);
-    }
-    if (c.level) {
-      if (!this.selected.length) return { ok: false, said: 'Select lights first (1 thru 4, group 2)' };
-      if ('abs' in c.level) { if (c.level.abs === 0) this.off(); else this.set({ intensity: c.level.abs }); }
-      else this.nudge('intensity', c.level.rel);
-      said.push('abs' in c.level ? `at ${Math.round(c.level.abs * 100)}%` : `${c.level.rel > 0 ? '+' : ''}${Math.round(c.level.rel * 100)}%`);
-      // (a group master pulled down holds some of them lower: said, or "5 @ full" staying dim is a mystery)
-      const down = this.show.groups.filter((g) => (this.groupMasters[g.id] ?? 1) < 0.995 && g.fixtures.some((id) => this.selected.includes(id)));
-      if (down.length) tail.push(`(${down.map((g) => `${g.name}'s master at ${Math.round(this.groupMasters[g.id] * 100)}%`).join(', ')})`);
-    }
-    if (gaps.length && gaps.length <= 3) said.push(`(no ${gaps.join(', ')})`);
-    return { ok: true, said: [...said, ...tail].join(' ') };
-  }
+  // A command typed on the command line (app/command.ts). Says what it did, or what's wrong.
+  runCommand(text: string) { return runCommand(this, text); }
   // Update the cue on stage in the list Live plays (not whatever is picked in Program).
   // a fixture that's a machine (its own programs fire it): for telling machine lists from looks
   readonly isMachineFx = (fid: string) => isMachine(this.modeOf(fid));
   // (a list that fires machines, played while they aren't armed: said, so nothing firing isn't a surprise)
-  private safeNote(listId: string) { const r = listRisk(this.show, listId, machines(this.show)); return (r === 'hazard' || r === 'once') && !this.sfxArmed ? ' (safe, nothing fires: not armed)' : ''; }
+  // (about the cue it went to: every GO in a list with a confetti cue somewhere said "nothing fires",
+  // a verse with no machine in it too)
+  safeNote(listId: string) {
+    if (this.sfxArmed) return '';
+    const l = this.show.cueLists.find((x) => x.id === listId), id = this.engine.status(listId).cue, c = l?.cues.find((x) => x.id === id);
+    const r = c ? cueRisk(this.show, c, undefined, machines(this.show)) : listRisk(this.show, listId, machines(this.show));
+    return r === 'hazard' || r === 'once' ? ' (safe, nothing fires: not armed)' : '';
+  }
   // (the cue on stage in the list Live plays, or in `in`)
   updateOnStage(inList?: CueList): { ok: boolean; said: string } {
     const l = inList ?? this.liveList, st = l ? this.engine.status(l.id) : undefined;
@@ -1778,7 +1707,7 @@ class App {
     for (const k of [...this.holds.keys()]) if (k.startsWith('console:')) { this.holdOff(k); this.capHold(k, false, () => {}); }
     for (const k of [...this.capped.keys()]) if (k.startsWith('console:list:')) this.expire(k);
   }
-  flashList(id: string, down: boolean) { if (down) this.wakeMaster(id); this.engine.flash(id, down); this.capHold(`console:list:${id}`, down, () => this.engine.flash(id, false)); }
+  flashList(id: string, down: boolean) { if (down) this.engine.wake(id); this.engine.flash(id, down); this.capHold(`console:list:${id}`, down, () => this.engine.flash(id, false)); }
   // A playback fader: its level; up from 0 starts the list, down to 0 lets it go (fader start),
   // with a little room between the two so a finger resting at the bottom doesn't start it again
   // and again. A list let go this way comes back at full when GO plays it.
@@ -1791,7 +1720,6 @@ class App {
     else if (v <= 0.004 && was.running && !was.releasing) { this.engine.release(id); this.engine.faderReleased(id); }
   }
   // a list that isn't playing and whose level was left at 0 (by its fader) plays at full again
-  private wakeMaster(id: string) { this.engine.wake(id); }
   // A gobo, a built-in effect or a colour program, picked by its name: each selected light that has
   // one by that name gets its own (the same gobo sits at different places on different heads); one
   // without it is left as it is (one light alone takes the one at that place).
@@ -1850,8 +1778,15 @@ class App {
   // cells are picked on some selected light (the others are left alone meanwhile)
   get picking(): boolean { return Object.keys(this.cellSel).length > 0; }
   set(partial: Values) {
+    this.putValues(this.selected, partial);
+    if ([partial.fog, partial.haze].some((v) => typeof v === 'number' && v > 0)) this.letHazeGo();   // fog asked for by hand: a Live "Stop" doesn't sit on it
+  }
+  // Values into the programmer (set by hand, a preset): on the picked cells just there (while
+  // picking, a light with none picked gets only what isn't per cell); else the whole light, its
+  // cells' own values for the same things dropped (all blue means every cell blue)
+  private putValues(ids: string[], partial: Values) {
     const picking = this.picking;
-    for (const id of this.selected) {
+    for (const id of ids) {
       // (on a moving bar, where picked heads point is theirs too)
       const { cell, rest } = splitCell(partial, this.caps(id).cellMoves);
       const cs = this.cellsPicked(id);
@@ -1862,15 +1797,12 @@ class App {
         if (cs.length) this.setCells(id, cs, cell);
         continue;
       }
-      if (picking && !cs.length && cell) { if (Object.keys(rest).length) this.programmer[id] = { ...this.programmer[id], ...rest }; continue; }
-      // the whole light: cells it had in the programmer follow it (all blue means every cell blue)
       const was = this.programmer[id];
       const v: Values = { ...was, ...partial };
       if (was?.cells && cell) v.cells = dropCellKeys(was.cells, Object.keys(cell) as (keyof CellValues)[]);
       if (v.cells && !Object.keys(v.cells).length) delete v.cells;
       this.programmer[id] = v;
     }
-    if ([partial.fog, partial.haze].some((v) => typeof v === 'number' && v > 0)) this.letHazeGo();   // fog asked for by hand: a Live "Stop" doesn't sit on it
   }
   // Cells of one light in the programmer: the same values for all, or each its own (by its place
   // in `cells`).
@@ -1904,7 +1836,7 @@ class App {
     const ids = this.hazing;
     this.holdOn('haze-stop', Object.fromEntries(ids.map((id) => [id, { fog: 0, haze: 0 }])));
     this.hazeStopped = ids;
-    this.hazeStopAt = Object.fromEntries(this.show.cueLists.map((l) => [l.id, this.status[l.id]?.cue ?? '']));
+    this.hazeStopAt = Object.fromEntries(this.show.cueLists.map((l) => [l.id, this.engine.status(l.id).cue]));
   }
   private letHazeGo() { this.holdOff('haze-stop'); this.hazeStopAt = null; }
   // the cue on stage of each list when fog was stopped, and which machines: the stop lasts until a
@@ -1922,18 +1854,20 @@ class App {
   }
   clearProgrammer() { this.programmer = {}; }
   // Picking a colour for lights that are off would show nothing: switch them on too (picked cells:
-  // the ones of them that are dark).
+  // the ones of them that are dark, unless the light's own level is set here; every cell picked is
+  // the whole light).
   lightUpIfDark(ids = this.selected) {
     for (const id of ids) {
       const c = this.caps(id);
       if (!(c.intensity || c.color || c.white)) continue;
-      const cs = this.cellsPicked(id), l = this.look[id], n = c.cells;
-      if (cs.length) {
+      const cs = this.cellsPicked(id), l = this.look[id], n = c.cells, every = cs.length > 0 && cs.length >= n;
+      if (cs.length && !every) {
+        if (this.programmer[id]?.intensity !== undefined) continue;
         const dark = cs.filter((k) => this.programmer[id]?.cells?.[k]?.intensity === undefined && (cellLookAt(l, k, n)?.intensity ?? 0) <= 0);
         if (dark.length) this.setCells(id, dark, { intensity: 1 });
         continue;
       }
-      if (this.picking) continue;
+      if (this.picking && !every) continue;
       if (this.programmer[id]?.intensity !== undefined || (l?.intensity ?? 0) > 0) continue;
       this.programmer[id] = { ...this.programmer[id], intensity: 1 };
     }
@@ -2113,8 +2047,13 @@ class App {
   // `into`: a list other than the one open in Program (Live records into the list GO plays).
   // `opt.num`: the new cue's number (it goes where that number belongs; the caller makes sure no
   // other cue has it), `opt.fade`: its fade (2 s otherwise)
-  record(into?: string, opt: { num?: number; fade?: number } = {}): boolean {
+  // What a Record changed besides the show (the programmer it emptied, where its list was, the
+  // effects the cue took over): Undo puts those back as well, so after Ctrl+Z the stage and the
+  // cards say the same thing (it said the cue before was LIVE while the new one's look stayed up)
+  private recUndo: { snap: string; list: string; cue: string; prog: Record<string, Values>; was: string; fx: string[] } | null = null;
+  record(into?: string, opt: { num?: number; fade?: number; name?: string } = {}): boolean {
     this.checkpoint();
+    const before = this.lastSnap;
     const ids = Object.keys(this.programmer);
     if (!ids.length && !this.engine.liveEffects().length) return false;
     const list = (into ? this.show.cueLists.find((l) => l.id === into) : undefined) ?? this.list ?? this.newList('Main');
@@ -2135,8 +2074,15 @@ class App {
     // played before it.
     if (!onlyChanges) for (const eid of this.engine.liveEffects()) {
       const e = this.show.effects.find((x) => x.id === eid);
+      // (a colour or move effect that switches its lights on: one only it switched on keeps the
+      // level it showed. Its look's 0 was stored and held it dark when the cue played: a rainbow
+      // cue came out black. An effect on the level itself, a pulse, makes the level: not this.)
+      const lifts = !!e && paramsOf(e.kind, e.params).lightUp && EFFECT_MAP.get(e.kind)?.category !== 'intensity';
       for (const fid of e ? (e.group ? this.show.groups.find((g) => g.id === e.group)?.fixtures ?? [] : e.fixtures ?? []) : [])
-        if (!values[fid] && this.look[fid]) values[fid] = stripResolved(this.look[fid], this.caps(fid));
+        if (!values[fid] && this.look[fid]) {
+          values[fid] = stripResolved(this.look[fid], this.caps(fid));
+          if (lifts && (this.engine.lastHeld.get(fid) ?? 0) < 0.5) values[fid].intensity = Math.round((this.stage[fid]?.intensity ?? 0) * 1000) / 1000;
+        }
     }
     // In a list that's playing, the new cue goes right after the one on stage (a cue between 20 and
     // 21 at the tech, a fix mid-show): GO carries on with what was next. Otherwise at the end.
@@ -2144,7 +2090,9 @@ class App {
     const st = this.engine.status(list.id);
     let at = isPlay(list) && st.running && st.index >= 0 && st.index < list.cues.length - 1 ? st.index + 1 : list.cues.length;
     if (opt.num !== undefined) { freezeNumbers(list); const k = list.cues.findIndex((_, i) => cueNum(list, i) > opt.num!); at = k < 0 ? list.cues.length : k; }
-    const named = this.suggestName(values, this.engine.liveEffects());   // (before the cue takes the effects over)
+    // (by what was set by hand: the effects' own lights are said by the effects' names)
+    const named = this.suggestName(Object.fromEntries(ids.map((id) => [id, values[id]])), this.engine.liveEffects());   // (before the cue takes the effects over)
+    const was = st.running && !st.releasing ? st.cue : '', prog = $state.snapshot(this.programmer) as Record<string, Values>;
     const cue: Cue = { id: newId('c'), name: '', values, fade: opt.fade ?? 2, advance: { mode: 'manual' } };
     // Effects running by hand go into the cue too, and the cue takes them over.
     const fx = this.engine.takeLiveEffects();
@@ -2152,7 +2100,7 @@ class App {
     this.liveFx = [];
     if (opt.num !== undefined) cue.num = opt.num; else numbersFor(list, at, [cue]);   // 20.5 when it goes between 20 and 21
     list.cues.splice(at, 0, cue);
-    cue.name = named || `Cue ${cueNumber(list, at)}`;
+    cue.name = opt.name || named || `Cue ${cueNumber(list, at)}`;
     // A page of your own with buttons for this list's looks gets one for the new look too, next
     // to the others (the generated page follows the list by itself).
     for (const pg of this.show.pages) {
@@ -2163,12 +2111,14 @@ class App {
     // stored, the play stays where it is, and the programmer keeps what it holds (nothing changes
     // on stage; Clear lets go), as on a desk.
     if (opt.num !== undefined && isPlay(list) && st.running && at !== st.index + 1) {
+      this.recUndo = null;
       this.cueSel = [cue.id];
       this.markDirty(30);
       this.recordedAside = true;
       return true;
     }
     this.recordedAside = false;
+    this.recUndo = { snap: before, list: list.id, cue: cue.id, prog, was, fx };
     // The new cue takes over what's on stage, then the programmer lets go: nothing changes on
     // stage, but the cue list owns it now.
     this.engine.programmer = {};
@@ -2196,7 +2146,22 @@ class App {
     const hazer = (id: string) => !!this.modeOf(id)?.channels.some((c) => c.attr === 'haze') && !this.modeOf(id)?.channels.some((c) => c.attr === 'fog');
     const smoke = !making.length ? '' : making.every(hazer) ? 'Haze' : 'Fog';
     const parts = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => this.show.presets.find((p) => p.id === id)?.name).filter(Boolean) as string[];
-    for (const id of effects.slice(0, 2)) { const e = this.show.effects.find((x) => x.id === id); if (e) parts.push(e.name); }
+    const fxNames = effects.map((id) => this.show.effects.find((x) => x.id === id)?.name).filter((n): n is string => !!n);
+    // Lights set by hand while effects run: the lights first ("Fresnels 60 % + Spots: circles"), not
+    // just the effect that happened to be running (a Fresnel look named "Spots: circles")
+    if (!parts.length && fxNames.length) {
+      const litIds = Object.entries(values).filter(([, v]) => typeof v.intensity === 'number' && v.intensity > 0).map(([id]) => id);
+      if (litIds.length) {
+        const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+        const who = this.show.groups.find((g) => same(g.fixtures, litIds))?.name
+          ?? (litIds.length === 1 ? this.show.fixtures.find((f) => f.id === litIds[0])?.name : undefined) ?? `${litIds.length} lights`;
+        const pcts = new Set(litIds.map((id) => Math.round((values[id].intensity as number) * 100)));
+        const pct = pcts.size === 1 ? [...pcts][0] : undefined;
+        parts.push(pct !== undefined && pct < 100 ? `${who} ${pct} %` : who);
+      }
+    }
+    parts.push(...fxNames.slice(0, 2));
+    if (fxNames.length > 2) parts.push(`${fxNames.length - 2} more`);
     // the machines it fires, by name (a cue with flames in it says so, whatever else it does)
     const MACHINE_NAME = { flame: 'Flames', sparks: 'Sparks', co2: 'CO2', confetti: 'Confetti', bubbles: 'Bubbles' } as const;
     for (const [k, name] of Object.entries(MACHINE_NAME)) if (Object.values(values).some((v) => typeof v[k as keyof Values] === 'number' && (v[k as keyof Values] as number) > 0)) parts.push(name);
@@ -2210,11 +2175,6 @@ class App {
     if (!l) return;
     this.checkpoint();
     renumber(l);
-  }
-  removeCue(listId: string, i: number) {
-    this.checkpoint();
-    const l = this.show.cueLists.find((x) => x.id === listId);
-    if (l) l.cues.splice(i, 1);
   }
 
   // ---- cue selection, order, clipboard (all on the current list)
@@ -2263,12 +2223,13 @@ class App {
     const target = (id: string) => (foreign ? byName.get(clip.names?.[id] ?? '\u0000') : known.has(id) ? id : undefined);
     const fxIds = new Set(this.show.effects.map((e) => e.id)), listIds = new Set(this.show.cueLists.map((x) => x.id));
     const added: string[] = [], made: Cue[] = [];
+    const lost = new Set<string>(); let lostFx = 0;
     for (const c of clip.items as Cue[]) {
       const values: Record<string, Values> = {};
-      for (const [id, v] of Object.entries(c.values)) { const t = target(id); if (t) values[t] = rawCells(v); }
+      for (const [id, v] of Object.entries(c.values)) { const t = target(id); if (t) values[t] = rawCells(v); else lost.add(clip.names?.[id] ?? id); }
       const { num: _n, ...rest } = c;                                    // a number of its own, here
       const cue: Cue = { ...rest, id: newId('c'), values };
-      if (cue.effects) { cue.effects = cue.effects.filter((x) => fxIds.has(x)); if (!cue.effects.length) delete cue.effects; }
+      if (cue.effects) { const n = cue.effects.length; cue.effects = cue.effects.filter((x) => fxIds.has(x)); lostFx += n - cue.effects.length; if (!cue.effects.length) delete cue.effects; }
       if (cue.actions) { cue.actions = cue.actions.filter((a) => !('list' in a) || listIds.has(a.list)); if (!cue.actions.length) delete cue.actions; }
       made.push(cue);
       added.push(cue.id);
@@ -2277,8 +2238,16 @@ class App {
     l.cues.splice(at, 0, ...made);
     this.cueSel = added;
     this.markDirty();
+    // (said, not dropped quietly: a cue from another show that came over with half its lights looked
+    // like a different cue)
+    const names = [...lost];
+    this.cuePasteNote = [
+      names.length ? `${names.length} of its light${names.length > 1 ? 's' : ''} ${names.length > 1 ? "aren't" : "isn't"} in this show (${names.slice(0, 3).join(', ')}${names.length > 3 ? ', …' : ''}), so ${names.length > 1 ? 'they were' : 'it was'} left out` : '',
+      lostFx ? `${lostFx === 1 ? 'an effect' : `${lostFx} effects`} of the other show too` : '',
+    ].filter(Boolean).join('; ');
     return added.length;
   }
+  cuePasteNote = '';
   async duplicateCues() { if (await this.copyCues()) await this.pasteCues(); }
   deleteCues(ids = this.cueSel) {
     this.checkpoint();
@@ -2289,6 +2258,8 @@ class App {
     // Like a file manager: the selection moves on to what's now in that place.
     const next = l.cues[Math.min(first, l.cues.length - 1)];
     this.cueSel = first >= 0 && next ? [next.id] : [];
+    // (what played them goes too, and is said: the Live buttons for them stayed as "(missing)")
+    return this.prune();
   }
   // Re-record a cue: the programmer's fixtures, with their current look, replace what the cue had
   // for them. Everything else in the cue stays.
@@ -2350,7 +2321,9 @@ class App {
   // A cue list of moods made for this rig (warm, cool, sunset, ocean... and a party look), as a
   // start to change from. Returns how many looks.
   makeStarterLooks(): number {
-    const caps = (id: string) => { const c = this.caps(id); return { color: c.color, position: c.position, cct: c.cct, light: !c.fog && (c.intensity || c.color || c.white || c.cct) }; };
+    // (not strobes, not the machines: a strobe at 85 % in "Warm wash" could flash at the room;
+    // they're for their own buttons)
+    const caps = (id: string) => { const c = this.caps(id), k = this.kinds[id]; return { color: c.color, position: c.position, cct: c.cct, light: !c.fog && k !== 'strobe' && k !== 'sfx' && !this.isMachineFx(id) && (c.intensity || c.color || c.white || c.cct) }; };
     if (!this.show.fixtures.some((f) => caps(f.id).light)) return 0;
     this.checkpoint();
     const { list, effects } = starterLooks($state.snapshot(this.show) as Show, caps, newId);
@@ -2419,11 +2392,14 @@ class App {
     const clip = await readClip('effects');
     if (!clip) return [];
     const added: string[] = [];
+    // (next to the effect selected, the one copied say, not at the end of a long list)
+    const sel = ui.fxSel.map((id) => this.show.effects.findIndex((x) => x.id === id)).filter((i) => i >= 0);
+    let at = sel.length ? Math.max(...sel) + 1 : this.show.effects.length;
     for (const e of clip.items as Effect[]) {
       const ok = e.group ? this.show.groups.some((g) => g.id === e.group) : (e.fixtures ?? []).some((id) => this.show.fixtures.some((f) => f.id === id));
       const n: Effect = { ...e, id: newId('e'), name: this.show.effects.some((x) => x.name === e.name) ? `${e.name} (copy)` : e.name,
         ...(ok ? {} : { group: undefined, fixtures: [...this.selected] }) };
-      this.show.effects.push(n);
+      this.show.effects.splice(at++, 0, n);
       added.push(n.id);
     }
     this.markDirty();
@@ -2435,24 +2411,15 @@ class App {
     return this.show.effects.filter((e) => (this.fx[e.id] ?? 0) > 0 &&
       (e.group ? this.show.groups.find((g) => g.id === e.group)?.fixtures ?? [] : e.fixtures ?? []).some((f) => ids.includes(f)));
   }
-  effectTargetCount(e: Effect) { return e.group ? this.show.groups.find((g) => g.id === e.group)?.fixtures.length ?? 0 : e.fixtures?.length ?? 0; }
 
   // ---- presets (cues keep references, so changing one changes every cue that uses it)
   applyPreset(id: string, to = this.selected) {
-    const picking = this.picking;
     const p = this.show.presets.find((x) => x.id === id);
     if (!p || !to.length) return false;
     const keys = new Set([...Object.keys(p.values), ...Object.values(p.perFixture ?? {}).flatMap((v) => Object.keys(v))]);
     const v: Values = {};
     for (const k of keys) if (k !== 'raw' && k !== 'cells') (v as Record<string, unknown>)[k] = { preset: id };
-    for (const fid of to) {
-      const { cell, rest } = splitCell(v, this.caps(fid).cellMoves);
-      const cs = this.cellsPicked(fid);
-      if ((cs.length || picking) && cell) { if (Object.keys(rest).length) this.programmer[fid] = { ...this.programmer[fid], ...rest }; if (cs.length) this.setCells(fid, cs, cell); continue; }
-      const was = this.programmer[fid];
-      this.programmer[fid] = { ...was, ...v };
-      if (was?.cells && cell) { const left = dropCellKeys(was.cells, Object.keys(cell) as (keyof CellValues)[]); if (Object.keys(left).length) this.programmer[fid].cells = left; else delete this.programmer[fid].cells; }
-    }
+    this.putValues(to, v);
     if (p.kind === 'color') this.lightUpIfDark(to);
     return true;
   }
@@ -2527,8 +2494,9 @@ class App {
       plainOf(fid, v as Record<string, unknown>);
       for (const cv of Object.values(v.cells ?? {})) plainOf(fid, cv as Record<string, unknown>);
     }
-    const dropRefs = (o: Record<string, unknown>) => { for (const [k, x] of Object.entries(o)) if (x && typeof x === 'object' && ids.includes((x as { preset?: string }).preset ?? '')) delete o[k]; };
-    for (const prog of Object.values(this.programmer)) { dropRefs(prog as Record<string, unknown>); for (const cv of Object.values(prog.cells ?? {})) dropRefs(cv as Record<string, unknown>); }
+    // the programmer too: its lights keep the colour the preset gave them (they went white, and
+    // an Undo brought the preset back but not their colour)
+    for (const [fid, prog] of Object.entries(this.programmer)) { plainOf(fid, prog as Record<string, unknown>); for (const cv of Object.values(prog.cells ?? {})) plainOf(fid, cv as Record<string, unknown>); }
     this.show.presets = this.show.presets.filter((p) => !ids.includes(p.id));
   }
   movePreset(id: string, before: string | null) {
@@ -2556,19 +2524,22 @@ class App {
   // (and `livePage`) several times a tick. Built on every read, a phone on the demo froze the laptop.
   get pages(): Page[] {
     if (this.show.pages.length) return this.show.pages;
-    const show = this.show, rev = this.rev, c = this.generated;
-    if (c && c.show === show && c.rev === rev) return c.pages;
-    const pages = [untrack(() => buskingPage(show))];
-    this.generated = { show, rev, pages };
+    const show = this.show, rev = this.rev, go = this.goList, c = this.generated;
+    if (c && c.show === show && c.rev === rev && c.go === go) return c.pages;
+    const pages = [untrack(() => buskingPage(show, go))];
+    this.generated = { show, rev, go, pages };
     return pages;
   }
-  private generated: { show: Show; rev: number; pages: Page[] } | null = null;
+  private generated: { show: Show; rev: number; go: string; pages: Page[] } | null = null;
   // A locked live page is the service mode for the whole show: only playing, nothing that edits
   // or leaves it (other pages can still be played, they're locked too).
   // Pages first: with nothing locked this never reads the view, so switching views doesn't rebuild Live's GO strip.
   get locked() { return this.show.pages.some((p) => p.locked) && this.view === 'live'; }
   // Lock (or unlock) every page for the service; locking also leaves Edit mode, whoever asks.
+  // Not an undo step: Ctrl+Z never locks or unlocks (after unlocking, it locked the page again
+  // instead of taking back what was done); every step Undo restores keeps the lock as it is now.
   lockShow(on: boolean) {
+    this.checkpoint();                       // (what came before is its own step)
     const pages = this.ownPages();
     for (const p of pages) p.locked = on;
     if (on) {
@@ -2577,7 +2548,15 @@ class App {
     }
     else { if (this.show.settings.lockPage && pages.some((p) => p.id === this.show.settings.lockPage)) this.page = this.show.settings.lockPage; delete this.show.settings.lockPage; }
     this.keepOutput();
-    this.markDirty(0);
+    this.quietSave();
+  }
+  // The show saved as it is now without making an undo step of the change (the lock)
+  private quietSave() {
+    const json = JSON.stringify(this.show);
+    this.thread.showChanged(); this.thread.showJsonIs(json);
+    if (json === this.lastSnap) return;
+    this.lastSnap = json; this.rev++;
+    this.persist(json);
   }
   // A forgotten PIN (or a show someone else locked): open the app with #unlock and confirm.
   async unlockByLink() {
@@ -2589,15 +2568,18 @@ class App {
   }
   // Lock with a PIN: asks for it (empty: none), keeps it with the show, locks. False: cancelled.
   async pinLock(): Promise<boolean> {
-    const pin = await ui.ask('Lock with a PIN', this.show.settings.lockPin ?? '', { label: 'PIN', ok: 'Lock', digits: true, empty: true,
-      hint: '3 to 8 digits. Empty: no PIN, holding the padlock unlocks.',
+    // (the show keeps only the PIN's hash: it can't be shown again; empty keeps the one it has)
+    const has = !!this.show.settings.lockPin;
+    const pin = await ui.ask('Lock with a PIN', '', { label: 'PIN', ok: 'Lock', digits: true, empty: true,
+      hint: has ? '3 to 8 digits. Empty: the PIN it has now.' : '3 to 8 digits. Empty: no PIN, holding the padlock unlocks.',
+      check: (v) => (!v ? '' : /\D/.test(v) ? 'Digits only' : v.length < 3 || v.length > 8 ? 'A PIN is 3 to 8 digits' : ''),
       body: 'This page only, for playing: no other pages, no editing, no masters. Holding the padlock asks for the PIN.' });
     if (pin === null) return false;
     const p = pin.trim();
     if (p && !/^\d{3,8}$/.test(p)) { ui.toast('A PIN is 3 to 8 digits'); return false; }
-    if (p) this.show.settings.lockPin = p; else delete this.show.settings.lockPin;
+    if (p) this.show.settings.lockPin = pinHash(p);
     this.lockShow(true);
-    ui.toast(p ? 'Locked for the show. Hold the padlock and type the PIN to unlock.' : 'Locked for the show: only playing. Hold the padlock to unlock.', 4000);
+    ui.toast(p || has ? 'Locked for the show. Hold the padlock and type the PIN to unlock.' : 'Locked for the show: only playing. Hold the padlock to unlock.', 4000);
     return true;
   }
   // A box the red bar speaks for: it was live and dropped, or it isn't connected while the lights
@@ -2616,13 +2598,14 @@ class App {
   }
   // The generated page becomes a real one the moment you edit it.
   ownPages() {
-    if (!this.show.pages.length) { this.show.pages.push(buskingPage(this.show)); this.page = this.show.pages[0].id; }
+    if (!this.show.pages.length) { this.show.pages.push(buskingPage(this.show, this.goList)); this.page = this.show.pages[0].id; }
     return this.show.pages;
   }
   // On a page locked for the service the masters are out of reach: a slip of the thumb mustn't take
   // the room dark or stop the show (Blackout: holding the one at the top).
   lockedOut(w: Widget) {
-    return this.locked && ((w.type === 'fader' && (w.target === 'grand' || w.target === 'list' || w.target === 'bpm'))
+    // (every level fader alike: an effect's went on working while a list's was greyed)
+    return this.locked && ((w.type === 'fader' && (w.target === 'grand' || w.target === 'list' || w.target === 'bpm' || w.target === 'effect' || w.target === 'group'))
       || (w.type === 'special' && (w.do === 'fadeOut' || w.do === 'releaseAll' || w.do === 'tap' || w.do === 'blackout')));
   }
   fireWidget(w: Widget, down: boolean) {
@@ -2713,59 +2696,18 @@ class App {
         else if (w.do === 'releaseAll') this.releaseAll();
         else if (w.do === 'tap') this.tap();
         else if (w.do === 'stopEffects') {
-          // the ones started by hand stop; the ones a playing cue runs go with their cue, say which
-          const fromCues = Object.keys(this.fx).filter((id) => !this.liveFx.includes(id));
+          // everything stops moving: the ones started by hand, and the ones the cues on stage run
+          // (their looks stay; the next cue brings its own effects again), said so
           this.stopAllEffects();
+          const fromCues = this.engine.muteCueEffects();
           if (fromCues.length) {
             const names = fromCues.map((id) => this.show.effects.find((e) => e.id === id)?.name).filter(Boolean);
-            const lists = this.show.cueLists.filter((l) => this.status[l.id]?.running && l.cues[this.status[l.id].index]?.effects?.some((e) => fromCues.includes(e))).map((l) => l.name);
-            ui.toast(`${names.join(', ')} ${names.length > 1 ? 'run' : 'runs'} from a cue${lists.length ? ` in ${lists.join(', ')}` : ''}: release that to stop ${names.length > 1 ? 'them' : 'it'}`, 6000,
-              lists.length ? { label: `Release ${lists.join(', ')}`, run: () => { for (const l of this.show.cueLists) if (lists.includes(l.name)) this.engine.release(l.id); } } : undefined);
+            ui.toast(`Stopped, ${names.join(', ')} too (${names.length > 1 ? 'they come' : 'it comes'} back with the next cue that runs ${names.length > 1 ? 'them' : 'it'})`, 5000);
           }
         }
         return;
     }
   }
-  // A MIDI note or control: the controls on the live page on screen (or the first page) that
-  // learned it. Faders follow a knob or fader; buttons press on note on (or CC above half).
-  // What each MIDI control is holding down right now (by the control, not by the button: a button
-  // removed or re-learned while held is still released when the pad comes up).
-  private midiDown = new Map<string, Widget[]>();
-  private midiHintAt = -1e9;
-  midi(m: MidiMsg) {
-    const key = `${m.kind}:${m.ch}:${m.num}`;
-    // the console's faders on MIDI controls: they move wherever you are (a desk's faders do), not
-    // while the show is locked for the service
-    const cm = (this.show.settings.consoleMidi ?? []).filter((b) => sameBinding(b.midi, m));
-    if (cm.length && !this.locked) for (const b of cm) this.midiConsole(b.to, m);
-    if (cm.length) return;
-    const down = m.value > 0.5 || (m.kind === 'note' && m.value > 0);
-    if (!down) {
-      for (const w of this.midiDown.get(key) ?? []) this.fireWidget(w, false);
-      this.midiDown.delete(key);
-    }
-    const page = this.pages.find((p) => p.id === this.page) ?? this.pages[0];
-    // a pad nothing listens to: say so once in a while, with how to give it a job
-    if (down && !(page?.widgets ?? []).some((w) => sameBinding(w.midi, m)) && performance.now() - this.midiHintAt > 8000) {
-      this.midiHintAt = performance.now();
-      ui.toast(`${m.kind === 'note' ? 'Pad' : 'Control'} ${m.num} isn't on a button of this page yet: Live, Edit, pick a button, Learn, then touch it.`, 5000);
-    }
-    for (const w of page?.widgets ?? []) {
-      if (!sameBinding(w.midi, m)) continue;
-      if (w.type === 'fader') { this.setFader(w, m.value); continue; }
-      if (down && !this.midiDown.get(key)?.some((x) => x.id === w.id)) {
-        // a copy: a button edited while the pad is down still lets go of what it pressed
-        this.midiDown.set(key, [...(this.midiDown.get(key) ?? []), $state.snapshot(w) as Widget]);
-        this.fireWidget(w, true);
-      }
-    }
-  }
-  // A console fader on a MIDI control. A fader or knob takes over only once it reaches where the
-  // fader is (soft takeover: a controller sending its positions when plugged in, or after a bank
-  // change, doesn't jump the level or start a list). A pad is a flash: full while held, back to
-  // where it was when let go, never longer than a held flash may stay.
-  private midiAt = new Map<string, number>();          // (a control's last value, by fader, until it's taken over)
-  private midiHeld = new Map<string, number>();        // (a pad held: the fader's value before)
   consoleLevel(to: string): number {
     const [k, id] = to.split(/:(.*)/s);
     if (k === 'grand') return this.grandMaster;
@@ -2773,21 +2715,6 @@ class App {
     if (k === 'group') return this.groupMasters[id] ?? 1;
     return this.look[id]?.intensity ?? 0;
   }
-  private midiConsole(to: string, m: MidiMsg) {
-    if (m.kind === 'note') {
-      const key = `midi:${to}`;
-      if (m.value > 0) { if (!this.midiHeld.has(to)) { this.midiHeld.set(to, this.consoleLevel(to)); this.consoleFader(to, 1); this.capHold(key, true, () => this.midiLetGo(to)); } }
-      else if (this.midiHeld.has(to)) { this.midiLetGo(to); this.capHold(key, false, () => {}); }
-      return;
-    }
-    const now = this.consoleLevel(to), was = this.midiAt.get(to);
-    // (taken over: it moves the fader; not yet: only once it's within a step of it, or crosses it)
-    if (was !== undefined && Number.isNaN(was)) { this.consoleFader(to, m.value); return; }
-    const near = Math.abs(m.value - now) <= 0.04, crossed = was !== undefined && (was - now) * (m.value - now) <= 0;
-    if (near || crossed) { this.midiAt.set(to, NaN); this.consoleFader(to, m.value); }
-    else this.midiAt.set(to, m.value);
-  }
-  private midiLetGo(to: string) { const v = this.midiHeld.get(to); this.midiHeld.delete(to); if (v !== undefined) this.consoleFader(to, v); }
   // A console fader by what it moves ('grand', 'list:<id>', 'group:<id>', 'light:<id>')
   consoleFader(to: string, v: number) {
     v = Math.max(0, Math.min(1, v));
@@ -2802,36 +2729,17 @@ class App {
     else if (k === 'group' && this.show.groups.some((g) => g.id === id)) this.groupMasters = { ...this.groupMasters, [id]: v };
     else if (k === 'light' && this.show.fixtures.some((f) => f.id === id)) this.setLevelOf([id], v);
   }
-  // a console fader learns a control (one control, one fader: either one's old pairing goes)
-  bindConsoleMidi(to: string, midi: MidiBinding) {
-    this.checkpoint();
-    this.midiAt.set(to, NaN);                  // (learned by moving it: it's where you put it)
-    const keep = (this.show.settings.consoleMidi ?? []).filter((b) => b.to !== to && !sameBinding(b.midi, { ...midi, value: 0 }));
-    this.show.settings.consoleMidi = [...keep, { to, midi: { kind: midi.kind, ch: midi.ch, num: midi.num } }];
-  }
-  unbindConsoleMidi(to: string) {
-    const was = this.show.settings.consoleMidi ?? [];
-    if (!was.some((b) => b.to === to)) return;
-    this.checkpoint();
-    const keep = was.filter((b) => b.to !== to);
-    if (keep.length) this.show.settings.consoleMidi = keep; else delete this.show.settings.consoleMidi;
-  }
-  // A controller went away: let go of everything it held.
-  releaseMidi() {
-    for (const ws of this.midiDown.values()) for (const w of ws) this.fireWidget(w, false);
-    this.midiDown.clear();
-    // (pads held on console faders let go too; faders take over again by reaching where they are)
-    for (const to of [...this.midiHeld.keys()]) { this.midiLetGo(to); this.capHold(`midi:${to}`, false, () => {}); }
-    this.midiAt.clear();
-  }
   setFader(w: Widget, v: number) {
     if (w.type !== 'fader' || this.lockedOut(w)) return;
-    if (w.target === 'bpm' || w.target === 'effect') this.markDirty();
+    // (the tempo goes to the output thread as it is, not in the show: only a save then)
+    if (w.target === 'bpm') this.markDirty(350, false);
+    else if (w.target === 'effect') this.markDirty();
     v = Math.max(0, Math.min(1, v));
     if (w.target === 'grand') this.grandMaster = v;
     else if (w.target === 'bpm') this.show.settings.bpm = Math.round(40 + v * 160);
     else if (w.target === 'list' && w.ref) this.setMaster(w.ref, v);
     else if (w.target === 'effect') { const fx = this.show.effects.find((e) => e.id === w.ref); if (fx) fx.params = { ...fx.params, level: v }; }
+    else if (w.target === 'group' && w.ref) this.groupMasters = { ...this.groupMasters, [w.ref]: v };
   }
 
   // Held buttons (flash, fog) put values on the live layer: on top of everything, never recorded,
@@ -2852,7 +2760,7 @@ class App {
   // MIDI pad, a phone): fogUntil carries the deadline, expire() lets go of what the widget pressed.
   // What to let go of is taken when it's pressed: the button edited or removed meanwhile still lets go.
   private capped = new Map<string, () => void>();
-  private capHold(id: string, down: boolean, letGo: () => void) {
+  capHold(id: string, down: boolean, letGo: () => void) {
     if (down) { this.capped.set(id, letGo); this.fogUntil = { ...this.fogUntil, [id]: performance.now() + GROUP_FLASH_MAX * 1000 }; }
     else { this.capped.delete(id); this.fogOff(id); }
   }
@@ -2884,7 +2792,7 @@ class App {
   // cues (Auto GO and follow cues don't come through here).
   private lastGo = { id: '', at: -1e9 };
   go(id = this.currentList) {
-    this.wakeMaster(id);
+    this.engine.wake(id);
     const now = performance.now();
     if (id === this.lastGo.id && now - this.lastGo.at < GO_GUARD_MS) return;
     this.lastGo = { id, at: now };
@@ -2893,6 +2801,11 @@ class App {
     // (a list fading out on its last cue: GO brings it back from the top, it doesn't just finish going)
     const st = this.engine.status(id), l = this.show.cueLists.find((x) => x.id === id);
     if (st.releasing && l && l.end !== 'loop' && st.index >= l.cues.length - 1) { this.engine.start(id); return; }
+    // (at the end of a list that stops there GO does nothing, on purpose: said, it was silent)
+    if (st.running && l && l.end === 'stop' && l.cues.length && st.index >= l.cues.length - 1) {
+      ui.toast(`That was the last cue of ${l.name}. Release lets it go, then GO starts it from the top.`, 4500);
+      return;
+    }
     this.engine.go(id);
   }
   // A look goes up by hand or by the clock: a blackout ends (the look you asked for shows), a
@@ -2906,7 +2819,6 @@ class App {
   }
   back(id = this.currentList) { this.played(id); this.followSel = true; this.engine.back(id); }
   jump(id: string, i: number) { this.played(id); this.followSel = true; this.engine.jumpTo(id, i); }
-  toggle(id: string) { this.engine.toggle(id); }
   release(id = this.currentList) {
     this.engine.release(id);
     // effects started on their own (on Live, by the timeline) aren't the list's and go on lighting
@@ -2947,7 +2859,7 @@ class App {
     const hazeStop = this.holds.get('haze-stop');
     this.holds.clear(); this.live = {};
     if (hazeStop) this.holdOn('haze-stop', hazeStop);
-    this.releaseMidi();
+    this.midiIn.releaseAll();
     this.engine.releaseFlashes();
   }
   setMaster(id: string, v: number) { this.engine.setMaster(id, v); }
@@ -2960,6 +2872,10 @@ class App {
       const d = (this.tapTimes[this.tapTimes.length - 1] - this.tapTimes[0]) / (this.tapTimes.length - 1);
       this.show.settings.bpm = Math.round(Math.max(20, Math.min(300, 60 / d)));
       this.markDirty();
+      // (and where the beat falls: on the tap, as with the microphone; it set only the speed, the
+      // chases' steps landed anywhere between the taps)
+      this.engine.alignBeat();
+      this.engine.syncBeats(this.engine.beatCount);
     }
   }
 
@@ -2971,7 +2887,7 @@ class App {
       this.bridgeRev++;
       if (b?.state === 'ready' && this.output === 'blind' && !this.toldBlind && !this.locked) {
         this.toldBlind = true;
-        ui.toast('Connected. You are blind: the lights don\'t follow yet. Press Blind at the top to send what you do to the stage.', 8000);
+        ui.toast(`${BLIND_TOAST}: the lights don't follow yet. Press Blind at the top to send what you do to the stage.`, 8000);
       }
     };
     // LuxDMX Link on this computer: Art-Net / sACN to any node (output/link.ts)
@@ -2981,18 +2897,20 @@ class App {
     return out;
   }
   private toldBlind = false;
-  addDevice(host: string) {
-    this.checkpoint();
-    host = host.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  // (what's wrong with the address, when something is: nothing is added then)
+  addDevice(host: string): string | undefined {
+    const bad = host === LINK ? undefined : hostProblem(host);
+    if (bad) return bad;
+    host = cleanHost(host);
     if (!host || this.show.outputs.devices.some((d) => d.host === host)) return;
+    this.checkpoint();
     this.show.outputs.devices.push({ host });
     this.bridges = [...this.bridges, this.makeBridge(host)];
   }
   // what LuxDMX Link sends: Art-Net, sACN or both (kept with the show)
   setLinkProto(p: 'artnet' | 'sacn' | 'both') {
     const d = this.show.outputs.devices.find((x) => x.host === LINK);
-    if (d) { this.checkpoint(); d.proto = p; this.markDirty(0); }
-    (this.bridges.find((b) => b.host === LINK) as LinkOutput | undefined)?.setProto(p);   // (now; the next frame would too)
+    if (d) { this.checkpoint(); d.proto = p; this.markDirty(0); }      // (Link's routes follow on the next frame)
   }
   removeDevice(host: string) {
     this.checkpoint();
@@ -3003,8 +2921,18 @@ class App {
 
   // ---- files
   exportShow() {
-    ui.toast(`Saved ${fileName(this.show)}.luxdmx.json in your downloads. On a tablet or another computer: open the app, "Open a show file" (or drop the file on it).`, 6000);
+    // (its songs stay in this browser: said, with the way to take them along)
+    const n = storedOf(this.show).songs.length;
+    ui.toast(`Saved ${fileName(this.show)}.luxdmx.json in your downloads. On a tablet or another computer: open the app, "Open a show file" (or drop the file on it).${n ? ` Its song${n === 1 ? '' : 's'} (the audio) stay${n === 1 ? 's' : ''} in this browser: "Save with its songs" takes ${n === 1 ? 'it' : 'them'} along.` : ''}`, n ? 10000 : 6000);
     download(new Blob([serializeShow(JSON.parse(JSON.stringify(this.show)))], { type: 'application/json' }), `${fileName(this.show)}.luxdmx.json`);
+  }
+  // The show and its songs (and its own 3D venue) in one .zip, for another computer (store/bundle.ts)
+  async exportShowWithSongs() {
+    const json = serializeShow(JSON.parse(JSON.stringify(this.show)));
+    const b = await bundle(json, this.show, { song: getSong, model: getModel });
+    download(b.blob, `${fileName(this.show)}.luxdmx.zip`);
+    const mb = (b.blob.size / 1e6).toFixed(1);
+    ui.toast(`Saved ${fileName(this.show)}.luxdmx.zip (${mb} MB) with ${b.songs} song${b.songs === 1 ? '' : 's'} in it. On another computer: "Open a show file" and pick it.${b.missing.length ? ` Not in this browser, so not in it: ${b.missing.join(', ')}.` : ''}`, 9000);
   }
   // To the tablet (or anyone): the device's share sheet with the show file (Nearby Share, AirDrop,
   // mail, a messenger); where there's none (most desktop browsers), the download.
@@ -3016,21 +2944,27 @@ class App {
     this.exportShow();
   }
   // The cue sheet, in a new tab ready to print (or save as PDF from the print dialog).
-  printCueSheet() {
+  // (`only`: one list's sheet, from its own menu: the show's other lists left out)
+  printCueSheet(only?: string) {
     const w = window.open('', '_blank');
     if (!w) return false;
-    w.document.write(cueSheetHtml($state.snapshot(this.show) as Show));
+    w.document.write(cueSheetHtml(this.forPaper(), only));
     w.document.close();
     return true;
   }
   printPatch() {
     const w = window.open('', '_blank');
     if (!w) return false;
-    w.document.write(patchSheetHtml($state.snapshot(this.show) as Show));
+    w.document.write(patchSheetHtml(this.forPaper()));
     w.document.close();
     return true;
   }
-  exportCsv() { download(new Blob([cueSheetCsv($state.snapshot(this.show) as Show)], { type: 'text/csv' }), `${fileName(this.show)}-cues.csv`); }
+  // (as this browser writes numbers: a German one gets ';' and 2,5; with the byte-order mark a
+  // spreadsheet reads it as UTF-8, umlauts and all)
+  exportCsv() {
+    const decimal = (1.5).toLocaleString().includes(',') ? ',' : '.';
+    download(new Blob(['\uFEFF' + cueSheetCsv($state.snapshot(this.show) as Show, decimal)], { type: 'text/csv;charset=utf-8' }), `${fileName(this.show)}-cues.csv`);
+  }
   // The show as a QLC+ workspace. Returns what couldn't go over.
   exportQxw(): string[] {
     const { xml, skipped } = toQxw($state.snapshot(this.show) as Show);
@@ -3039,6 +2973,13 @@ class App {
   }
   // A show file, or a QLC+ workspace (converted; the report says what came over).
   async importShow(file: File): Promise<QxwReport | undefined> {
+    // (a show with its songs: they go into this browser's store, the show opens as from its file)
+    if (isZip(new Uint8Array(await file.slice(0, 4).arrayBuffer()))) {
+      const b = unbundle(new Uint8Array(await file.arrayBuffer()));
+      for (const s of b.songs) await putSong(s.key, s.blob).catch(() => {});
+      if (b.model) await putModel(b.model.key, b.model.blob).catch(() => {});
+      file = new File([b.json], file.name.replace(/\.zip$/i, '.json'), { type: 'application/json' });
+    }
     const text = await file.text();
     if (/\.qxw$/i.test(file.name) || /<Workspace[\s>]/.test(text.slice(0, 500))) {
       const { show, report } = await fromQxw(text, findQlc, file.name.replace(/\.qxw$/i, ''));
@@ -3052,6 +2993,11 @@ class App {
     // a show someone locked opens unlocked here (its PIN stays with it for locking again)
     for (const pg of s.pages) pg.locked = false;
     delete s.settings.lockPage;
+    // (one of that name already in Shows, the file opened again say: "Test truss (2)", so the two
+    // can be told apart)
+    await this.refreshShows();
+    const taken = new Set(this.shows.map((m) => m.name));
+    if (taken.has(s.meta.name)) { let k = 2; while (taken.has(`${s.meta.name} (${k})`)) k++; s.meta.name = `${s.meta.name} (${k})`; }
     await this.startShow(s);          // a show of its own in the browser, next to the one that was open
     this.sayRepaired(notes);
     return undefined;
@@ -3068,7 +3014,8 @@ class App {
   }
   // ---- the timeline (timeline/player.svelte.ts plays the song and calls these on its clock)
   doTimeline(a: TimelineAction, _catchUp: boolean) {
-    if (a.do === 'effect') { if (a.on) this.engine.startEffect(a.effect); else this.engine.stopEffect(a.effect); this.liveFx = this.engine.liveEffects(); return; }
+    // (on the song's beat: at once, not faded in over 0.4 s as by hand, its first beat came in soft and late)
+    if (a.do === 'effect') { if (a.on) this.engine.startEffect(a.effect, 0); else this.engine.stopEffect(a.effect, 0.1); this.liveFx = this.engine.liveEffects(); return; }
     if (a.do === 'burst') { this.burst(a.attr, a.seconds); return; }
     if (a.do === 'goto' || a.do === 'start' || a.do === 'go') this.played(a.list);
     this.engine.act(a);
@@ -3203,6 +3150,7 @@ class App {
     this.engine.stopAllEffects(); this.engine.takeLiveEffects(); this.liveFx = [];
     for (const w of Object.keys(this.fogUntil)) this.fogOff(w);
     this.holds.clear(); this.live = {}; this.groupMasters = {};   // (another show's groups: their masters at full)
+    this.hazeStopAt = null;                                         // (another show's lists: its fog stop is gone with its holds)
     this.page = ''; this.editPage = false; this.highlight = false;
     // The boxes are your hardware, not part of a look: a show without any keeps the ones you have,
     // and a box that stays connected isn't asked again.
@@ -3214,8 +3162,7 @@ class App {
     this.bridges = s.outputs.devices.map((d) => this.bridges.find((b) => b.host === d.host) ?? this.makeBridge(d.host));
     this.currentList = s.cueLists[0]?.id ?? '';
     this.selected = []; this.programmer = {};
-    this.undoStack = []; this.redoStack = []; this.canUndo = false; this.canRedo = false;
-    this.lastSnap = JSON.stringify(s);
+    this.forgetUndo();
     this.rev++;
     if (s.pages.some((p) => p.locked)) this.view = 'live';     // a show locked for the service opens on its page
     this.keepOutput();
@@ -3225,7 +3172,16 @@ class App {
   }
 }
 
-const fileName = (s: Show) => (s.meta.name || 'show').replace(/[^\w-]+/g, '_');
+// A quick fingerprint of a saved show (FNV-1a over the text): two tabs tell whether they hold the same.
+// (not counting when it was saved: a save stamps meta.modified, the show is the same)
+function textSum(text: string) {
+  const t = text.replace(/"modified":"[^"]*"/, '');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193);
+  return `${t.length}:${h >>> 0}`;
+}
+// (letters of any language stay: "Bühnenshow Größe" was saved as B_hnenshow_Gr_e)
+const fileName = (s: Show) => (s.meta.name || 'show').replace(/[^\p{L}\p{N}_-]+/gu, '_');
 function download(blob: Blob, name: string) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -3234,90 +3190,5 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-// What a recorded cue keeps from the stage for one fixture: only the attributes it can do.
-function stripResolved(s: Resolved, c: ReturnType<typeof caps>): Values {
-  const v: Values = { intensity: s.intensity ?? 0 };
-  if (c.color && s.color) v.color = { ...s.color };
-  if (c.white && s.white !== undefined) v.white = s.white;
-  if (c.amber && s.amber !== undefined) v.amber = s.amber;
-  if (c.uv && s.uv !== undefined) v.uv = s.uv;
-  if (c.cct && s.cct !== undefined) v.cct = s.cct;
-  if (c.position) { v.pan = s.pan; v.tilt = s.tilt; }
-  for (const k of ['panRotation', 'tiltRotation', 'roll', 'rollRotation', 'hoist'] as const) if (s[k] !== undefined) v[k] = s[k];
-  if (c.strobe && s.strobe !== undefined) v.strobe = s.strobe;
-  // (no fog or haze: those are only recorded when set in the programmer; a cue recorded while an
-  // earlier cue's haze runs mustn't take that haze with it)
-  for (const k of BEAM_ATTRS) if (k !== 'strobe' && s[k] !== undefined) v[k] = s[k];
-  if (s.raw) v.raw = { ...s.raw };
-  // single cells: only where one shows something other than the light as a whole
-  if ((s.cellVals || s.cellLvl) && c.cells > 1) {
-    const cells: Record<string, CellValues> = {};
-    const near = (a: number, b: number | undefined) => b !== undefined && Math.abs(a - b) < 0.002;
-    const keys = new Set(Object.keys(s.cellVals ?? {}));
-    if (s.cellLvl) s.cellLvl.forEach((x, k) => { if (!near(x, v.intensity as number)) keys.add(String(k)); });
-    for (const k of keys) {
-      if (+k >= c.cells) continue;
-      const x = s.cellVals?.[k] ?? {}, lvl = s.cellLvl ? s.cellLvl[+k] : x.intensity;
-      const o: CellValues = {};
-      if (lvl !== undefined && !near(lvl, v.intensity as number)) o.intensity = lvl;
-      if (c.color && x.color && !(s.color && near(x.color.r, s.color.r) && near(x.color.g, s.color.g) && near(x.color.b, s.color.b))) o.color = { ...x.color };
-      for (const a of ['white', 'amber', 'uv'] as const) if (c[a] && x[a] !== undefined && !near(x[a]!, s[a])) o[a] = x[a];
-      for (const a of c.cellMoves) if (x[a] !== undefined && !near(x[a]!, s[a] ?? (a === 'hoist' ? undefined : 0.5))) o[a] = x[a];
-      if (Object.keys(o).length) cells[k] = o;
-    }
-    if (Object.keys(cells).length) v.cells = cells;
-  }
-  return v;
-}
-// what a beam preset holds and Record keeps of a light's beam (strobe: only in presets)
-const BEAM_ATTRS = ['strobe', 'zoom', 'focus', 'iris', 'frost', 'prism', 'gobo', 'goboRotation', 'gobo2', 'gobo2Rotation', 'prismRotation',
-  'animation', 'animationRotation', 'effectMacro', 'effectSpeed', 'colorMacro', 'goboShake', 'goboScroll', 'gobo2Shake', 'gobo2Scroll'] as const;
-// a colour as hue, saturation and value (0..1 each)
-function toHsv(c: Color): [number, number, number] {
-  const mx = Math.max(c.r, c.g, c.b), mn = Math.min(c.r, c.g, c.b), d = mx - mn;
-  let h = 0;
-  if (d > 1e-9) h = mx === c.r ? ((c.g - c.b) / d + 6) % 6 : mx === c.g ? (c.b - c.r) / d + 2 : (c.r - c.g) / d + 4;
-  return [h / 6, mx > 0 ? d / mx : 0, mx];
-}
-const selKey = (ids: string[]) => [...ids].sort().join('\n');
-// The presets a light's values refer to, its cells' included.
-function refsIn(v: Values): string[] {
-  const out: string[] = [];
-  const of = (o: object) => { for (const x of Object.values(o)) { const ref = x && typeof x === 'object' && (x as { preset?: string }).preset; if (ref) out.push(ref); } };
-  of(v);
-  for (const c of Object.values(v.cells ?? {})) of(c);
-  return out;
-}
-// A light's whole look with the programmer on top, its cells merged cell by cell (Record, Update).
-// What the programmer sets for the whole light takes the look's cells with it (all blue means
-// every cell blue), even when the look is a frame older than the programmer's last change.
-function withProgrammer(look: Values, prog: Values | undefined): Values {
-  const v: Values = { ...look, ...prog };
-  if (look.cells || prog?.cells) {
-    const wide = [...CELL_ATTRS, ...CELL_MOVES, 'color' as const].filter((k) => prog?.[k] !== undefined);
-    const cells: Record<string, CellValues> = wide.length ? dropCellKeys(look.cells ?? {}, wide) : { ...(look.cells ?? {}) };
-    for (const [k, c] of Object.entries(prog?.cells ?? {})) cells[k] = { ...(cells[k] ?? {}), ...c };
-    if (Object.keys(cells).length) v.cells = cells; else delete v.cells;
-  }
-  return v;
-}
-// Values split into what a single cell can show (brightness, colour; on a moving bar where its head
-// points too) and the rest.
-function splitCell(v: Values, moves: readonly CellMove[] = []): { cell?: CellValues; rest: Values } {
-  const cell: CellValues = {}, rest: Values = { ...v };
-  for (const k of [...CELL_ATTRS, ...moves, 'color'] as const) if (v[k] !== undefined) { (cell as Record<string, unknown>)[k] = v[k]; delete rest[k]; }
-  return { cell: Object.keys(cell).length ? cell : undefined, rest };
-}
-// cell values without these attributes (cells left with nothing go)
-function dropCellKeys(cells: Record<string, CellValues>, keys: (keyof CellValues)[]): Record<string, CellValues> {
-  const out: Record<string, CellValues> = {};
-  for (const [k, c] of Object.entries(cells)) {
-    const x = { ...c };
-    for (const d of keys) delete x[d];
-    if (Object.keys(x).length) out[k] = x;
-  }
-  return out;
-}
 
 export const app = new App();
-export { GENERIC };

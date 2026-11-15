@@ -5,7 +5,7 @@
 // Read through the dev hook window.__stage3d, not off the pixels.
 import type { Page } from '@playwright/test';
 import { GOBOS } from '../src/stage3d/gobos';
-import { channels, fresh, full, openConnected, patch, resetFake, selectAll, test, welcomeDialog, expect } from './helpers';
+import { channels, demoTile, fresh, full, openConnected, patch, resetFake, selectAll, test, welcomeDialog, expect } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 test.describe.configure({ timeout: 120_000 });
@@ -92,7 +92,7 @@ test('a profile spot as touring rigs have it: glass gobos, prisms that turn, the
   await expect.poll(async () => (await gobo())?.prism).toMatchObject({ facets: 3, linear: false });
   await ranges('Prism').getByRole('button', { name: '5-facet linear prism' }).click();
   await expect.poll(async () => (await gobo())?.prism).toMatchObject({ facets: 5, linear: true });
-  expect(await dmx(16)).toBe(130);
+  await expect.poll(() => dmx(16), { timeout: 3000 }).toBe(130);           // (the wire a frame after the stage: polled)
   await ranges('Prism').getByRole('button', { name: '8-facet prism' }).click();
   await expect.poll(async () => (await gobo())?.prism?.facets).toBe(8);
   // turning: an index is an angle, CW turns it on
@@ -139,9 +139,8 @@ test('the demos use gobos: the festival from its first look, the test truss with
   const start = async (name: string, music: boolean) => {
     await fresh(page, true);
     const w = welcomeDialog(page);
-    await w.getByRole('radio', { name }).click();
-    if (music) await w.getByLabel("The demo's music").selectOption('beat');
-    await w.getByRole('button', { name: 'Show me a demo' }).click();
+    if (music) await demoTile(w, name).getByLabel(`Music for ${name}`).selectOption('beat');
+    await demoTile(w, name).getByRole('button', { name: /^Play the show/ }).click();
     await expect(w).toBeHidden({ timeout: 30000 });
     // (the demo opens on the timeline; its show plays on while the Program view shows the stage)
     await page.locator('.top .modes').getByRole('tab', { name: 'Program' }).click();

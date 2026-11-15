@@ -28,14 +28,15 @@ function pixelStrip(pixels: number, white = false): FixtureType {
   return gen(`gen-strip${pixels}${white ? 'w' : ''}`, `Pixel strip, ${pixels} ${white ? 'RGBW pixels (SK6812)' : 'RGB pixels (WS2811/WS2812)'}`, channels);
 }
 
-// A ring, a disc of rings or a matrix: a strip with a shape, so effects can draw on it.
-// (app-made ones come from here too: the ring and matrix maker)
-export function pixelShape(id: string, model: string, layout: PixelLayout, white = false, source: FixtureType['source'] = 'generic'): FixtureType {
-  const n = layoutCells(layout), channels: Channel[] = [];
-  for (let c = 0; c < n; c++) {
-    channels.push(ch(`Red ${c + 1}`, 'red', { cell: c }), ch(`Green ${c + 1}`, 'green', { cell: c }), ch(`Blue ${c + 1}`, 'blue', { cell: c }));
-    if (white) channels.push(ch(`White ${c + 1}`, 'white', { cell: c }));
-  }
+// The order a pixel's colours come in on the wire, as strips and chips have them (WS2812 is GRB)
+export const PIXEL_ORDERS = ['RGB', 'GRB', 'BRG', 'RBG', 'BGR', 'GBR', 'RGBW', 'GRBW'] as const;
+const COLOR_OF = { R: ['Red', 'red'], G: ['Green', 'green'], B: ['Blue', 'blue'], W: ['White', 'white'] } as const;
+// A ring, a disc of rings, a matrix or a strip (a matrix one LED high): pixels with a shape, so
+// effects can draw on them. `order`: each pixel's colours in the order they come (RGB unless it
+// says; with a W, white too). (app-made ones come from here too: the LED maker)
+export function pixelShape(id: string, model: string, layout: PixelLayout, white = false, source: FixtureType['source'] = 'generic', order?: (typeof PIXEL_ORDERS)[number]): FixtureType {
+  const n = layoutCells(layout), channels: Channel[] = [], seq = (order ?? (white ? 'RGBW' : 'RGB')).split('') as (keyof typeof COLOR_OF)[];
+  for (let c = 0; c < n; c++) for (const k of seq) channels.push(ch(`${COLOR_OF[k][0]} ${c + 1}`, COLOR_OF[k][1], { cell: c }));
   const t = gen(id, model, channels);
   t.source = source;
   if (source !== 'generic') t.manufacturer = '';
@@ -98,6 +99,13 @@ const BEAMS: Record<string, [number, number]> = {
   'gen-mover8': [14, 14], 'gen-mover16': [12, 12], 'gen-wash': [7, 50], 'gen-spotgobo': [13, 30], 'gen-profile': [5, 50],
   'gen-endless': [3, 42], 'gen-roll': [2, 18], 'gen-headbar4': [4, 4],
 };
+// Stage machinery on a winch channel, by its type's model name: a curtain track (its halves part),
+// a fly curtain (flown out, up), a fly bar with a painted drop (flown in, down); else none
+export type Machinery = 'curtain' | 'flycurtain' | 'flybar';
+export function machineryOf(model = ''): Machinery | undefined {
+  return /fly curtain|flies out/i.test(model) ? 'flycurtain' : /curtain/i.test(model) ? 'curtain' : /fly bar/i.test(model) ? 'flybar' : undefined;
+}
+
 export const GENERIC: FixtureType[] = [
   gen('gen-dimmer', 'Dimmer', [I]),
   gen('gen-rgb', 'RGB', [R, G, B]),
@@ -168,6 +176,17 @@ export const GENERIC: FixtureType[] = [
     ch('Height', 'hoist'), ch('Height fine', 'hoist', { fine: true }), ch('Speed', 'speed'),
     ch('Motion enable', 'enable', { ranges: [{ from: 0, to: 99, label: 'Safe' }, { from: 100, to: 255, label: 'Motion enabled' }] }),
     I, R, G, B]), physical: { travel: 4, hoistSpeed: 0.5 } },
+  // a mirror ball's motor: the ball turns one way or the other, slow to fast (0 and the middle: stopped)
+  gen('gen-mirrorball', 'Mirror ball with a DMX motor (1 ch)', [ch('Motor', 'rollRotation', { ranges: [
+    { from: 0, to: 9, label: 'Stop' }, { from: 10, to: 127, label: 'Turning clockwise slow..fast' },
+    { from: 128, to: 137, label: 'Stop' }, { from: 138, to: 255, label: 'Turning anticlockwise slow..fast' }] })]),
+  // stage machinery, driven by a winch channel each (kinetics: only armed on the wire): a curtain
+  // track, its two halves parting from the middle (0 closed, 1 open; travel: the width it spans),
+  // and a fly bar lowering a painted drop in (0 flown out, 1 in; travel: how far it flies)
+  { ...gen('gen-curtain', 'Curtain track (a house or screen curtain, 2 ch)', [ch('Open', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 18, hoistSpeed: 1.2 } },
+  // (a house curtain on a winch that flies it out, up into the tower: travel is how far it rises)
+  { ...gen('gen-flycurtain', 'Fly curtain (a house curtain that flies out, 2 ch)', [ch('Open', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 10.4, hoistSpeed: 2 } },
+  { ...gen('gen-flybar', 'Fly bar with a painted drop (2 ch)', [ch('Fly in', 'hoist'), ch('Speed', 'speed')]), physical: { travel: 10.2, hoistSpeed: 1.5 } },
   // a big profile spot as touring rigs have them: CMY and a colour wheel, a rotating gobo wheel (each
   // gobo can shake; the wheel can run round), a fixed wheel with glass gobos, an animation wheel,
   // three prisms that turn, iris, zoom, focus and frost; the rotation channels index or spin
@@ -191,8 +210,11 @@ export function isLooks(l: { play?: boolean; cues: { note?: string; advance: { m
 }
 
 export function isFogTimer(l: { cues: { values: Record<string, Record<string, unknown>> }[] }): boolean {
-  const vals = l.cues.flatMap((c) => Object.values(c.values));
-  return vals.some((v) => 'fog' in v || 'haze' in v) && vals.every((v) => Object.keys(v).every((k) => k === 'fog' || k === 'haze'));
+  // (out at the first value that's anything else: a list of looks says so at once; going through
+  // every value of every cue took 30 ms a change on the festival, read through the show's proxies)
+  let fog = false;
+  for (const c of l.cues) for (const id in c.values) for (const k in c.values[id]) { if (k !== 'fog' && k !== 'haze') return false; fog = true; }
+  return fog;
 }
 
 export function typeMap(show: Pick<Show, 'fixtureTypes'>): Map<string, FixtureType> {

@@ -129,7 +129,7 @@
   .chs input[type=range] { width: 100%; min-width: 80px; }
   .its { display: flex; flex-wrap: wrap; gap: .2rem; }
   .its button { padding: .1rem .45rem; font-size: .78rem; }
-  .its button.on { border-color: var(--orange); color: var(--orange); }
+  .its button.on { border-color: var(--orange); color: var(--orange); background: #ffaa1c2a; }
   .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin: .3rem 0; }
   label { color: var(--muted); font-size: .88rem; display: inline-flex; gap: .3rem; align-items: center; }
   .note { color: #9fc0ff; font-size: .88rem; }

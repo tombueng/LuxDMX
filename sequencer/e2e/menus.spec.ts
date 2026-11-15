@@ -1,7 +1,7 @@
 // Right-click everywhere it makes sense, and drag things where they belong: a preset onto a light,
 // an effect onto a cue.
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, tab, full, test, expect } from './helpers';
+import { openConnected, resetFake, patch, channels, selectAll, intensity, record, cues, tab, full, test, expect, startTemplate } from './helpers';
 
 const menuItem = (page: Page, name: string | RegExp) => page.locator('.ctx').getByRole('menuitem', { name });
 const onStage = (page: Page, n: string) => page.locator(`.stage-wrap .fx[data-name="${n}"]`);
@@ -64,7 +64,7 @@ test('right-click a cue list tab to rename it; the programmer says when an effec
 test('right-click a live button to change it', async ({ page }) => {
   await openConnected(page);
   await page.locator('.top .show').click();
-  await page.getByRole('dialog', { name: 'Shows' }).locator('.tpl').filter({ hasText: 'Bar' }).last().click();
+  await startTemplate(page, 'Bar');
   await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
   await page.locator('.live .tile.cue').first().click({ button: 'right' });
   await menuItem(page, 'Change this control…').click();

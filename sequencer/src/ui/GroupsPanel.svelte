@@ -2,6 +2,7 @@
   // Groups: named, ordered sets of fixtures. One click selects them; effects run along their order.
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
+  import { freezeGroupNumbers, groupNumbers, nextGroupNumber } from '../model/groupnum';
   import { app, newId } from '../app.svelte';
   import { focusSelect, ui } from './ui.svelte';
   import { lookColor } from '../engine/cuelook';
@@ -26,7 +27,8 @@
     for (const [typeId, ids] of byType) {
       if (ids.length < 2 || app.show.groups.some((g) => g.fixtures.length === ids.length && ids.every((i) => g.fixtures.includes(i)))) continue;
       const t = app.types.get(typeId);
-      app.show.groups.push({ id: newId('g'), name: `All ${t?.model ?? 'fixtures'}`, fixtures: ids, auto: true });
+      freezeGroupNumbers(app.show.groups);
+      app.show.groups.push({ id: newId('g'), name: `All ${t?.model ?? 'fixtures'}`, fixtures: ids, auto: true, num: nextGroupNumber(app.show.groups) });
       n++;
     }
     ui.toast(n ? `Made ${n} group${n > 1 ? 's' : ''}` : 'Every fixture type is grouped already');
@@ -47,6 +49,7 @@
       { label: 'Delete group', icon: 'trash', danger: true, run: () => del(id) },
     ]);
   }
+  const nums = $derived(groupNumbers(app.show.groups));
 </script>
 
 <div class="panel gp" data-marks="show">
@@ -58,8 +61,14 @@
   {#if !app.show.groups.length}
     <div class="empty">
       <Icon name="group" size={30} />
-      <p>No groups yet. Select lights and press <b>From selection</b>, or let the app group them by type.</p>
-      <button onclick={auto} disabled={!app.show.fixtures.length}>Group by fixture type</button>
+      {#if app.show.fixtures.length}
+        <p>No groups yet. Select lights and press <b>From selection</b>, or let the app group them by type.</p>
+        <button onclick={auto}>Group by type</button>
+      {:else}
+        <!-- (it offered a greyed-out button: groups need lights first) -->
+        <p>No lights yet: add them first, then group them here.</p>
+        <button onclick={() => (ui.modal = 'addFixtures')}><Icon name="plus" />Add lights</button>
+      {/if}
     </div>
   {:else}
     <!-- A plain list: each group is a button (select it; F2 renames, Delete removes) plus its ⋯. -->
@@ -79,9 +88,9 @@
                    onkeydown={(e) => { if (e.key !== 'Enter' && e.key !== 'Escape') return; e.preventDefault(); e.stopPropagation(); if (e.key === 'Escape' || !g.name.trim()) g.name = was; const row = e.currentTarget.closest('li'); renaming = null; queueMicrotask(() => row?.querySelector<HTMLElement>('button.main')?.focus()); }} />
           {:else}
             <button class="main" aria-pressed={allSel} title="Select {g.name} (Shift or Ctrl adds)"
-                    onclick={(e) => app.selectGroup(g.id, e.shiftKey || e.ctrlKey || e.metaKey)}
-                    onkeydown={(e) => { if (e.key === 'F2') { e.preventDefault(); renaming = g.id; } else if (e.key === 'Delete') del(g.id); }}>
-              <span class="txt"><span class="nm">{g.name}</span><span class="faint" title="Group {i + 1}: &quot;group {i + 1}&quot; on the console">{i + 1} · {g.fixtures.length} light{g.fixtures.length === 1 ? '' : 's'}{g.cells?.length ? `, ${g.cells.length} cell${g.cells.length === 1 ? '' : 's'} each` : ''}</span></span>
+                    onclick={(e) => app.selectGroup(g.id, ui.adding(e))}
+                    onkeydown={(e) => { if (e.key === 'F2') { e.preventDefault(); renaming = g.id; } else if (e.key === 'Delete') del(g.id); else if (e.key === 'Escape' && app.selected.length) { e.preventDefault(); app.selectNone(); } }}>
+              <span class="txt"><span class="nm">{g.name}</span><span class="faint" title="Group {nums[i]}: &quot;group {nums[i]}&quot; on the console (it keeps it when you move it)">{nums[i]} · {g.fixtures.length} light{g.fixtures.length === 1 ? '' : 's'}{g.cells?.length ? `, ${g.cells.length} cell${g.cells.length === 1 ? '' : 's'} each` : ''}</span></span>
               <span class="dots">
                 {#each g.fixtures.slice(0, 12) as id (id)}{@const lc = lookColor(stage()[id])}<span class="d" style="background:{lc.glow > 0.02 ? lc.css : 'var(--line)'}"></span>{/each}
               </span>

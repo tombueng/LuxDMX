@@ -3,6 +3,7 @@
 export const ICONS: Record<string, string> = {
   // fixture kinds
   par: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/>',
+  heart: '<path d="M12 20s-7.5-4.6-9.2-9.3A4.7 4.7 0 0 1 12 7.6a4.7 4.7 0 0 1 9.2 3.1C19.5 15.4 12 20 12 20z"/>',
   sfx: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/><circle cx="12" cy="12" r="2"/>',
   mover: '<path d="M6 20h12M9 20v-4M15 20v-4"/><path d="M5 9a7 7 0 0 1 14 0v3a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><circle cx="12" cy="10" r="2.5"/>',
   bar: '<rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M7 9v6M12 9v6M17 9v6"/>',
@@ -31,7 +32,8 @@ export const ICONS: Record<string, string> = {
   save: '<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
-  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  // (a cog with teeth: the circle with eight rays it was read as the sun, Highlight's icon)
+  gear: '<path d="M19.2 9.7 L21.9 10.4 L21.9 13.6 L19.2 14.3 L18.7 15.5 L20.1 17.9 L17.9 20.1 L15.5 18.7 L14.3 19.2 L13.6 21.9 L10.4 21.9 L9.7 19.2 L8.5 18.7 L6.1 20.1 L3.9 17.9 L5.3 15.5 L4.8 14.3 L2.1 13.6 L2.1 10.4 L4.8 9.7 L5.3 8.5 L3.9 6.1 L6.1 3.9 L8.5 5.3 L9.7 4.8 L10.4 2.1 L13.6 2.1 L14.3 4.8 L15.5 5.3 L17.9 3.9 L20.1 6.1 L18.7 8.5Z"/><circle cx="12" cy="12" r="3"/>',
   group: '<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19a5 5 0 0 1 10 0M11 19a5 5 0 0 1 10 0"/>',
   palette: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/>',
   effect: '<path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/>',

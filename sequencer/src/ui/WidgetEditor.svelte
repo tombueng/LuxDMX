@@ -1,4 +1,5 @@
 <script lang="ts">
+  import NumField from './NumField.svelte';
   import { SONG_NAME, SPECIAL_NAME } from './widgetFace';
   // Settings of the live control selected in Edit mode.
   import Icon from './Icon.svelte';
@@ -15,6 +16,24 @@
     ['release', 'Fade out'], ['solo', 'Solo: start it, fade the others out'], ['select', 'Make GO play it (set list)'],
   ];
   const listOf = (id: string) => app.show.cueLists.find((l) => l.id === id);
+  // the page's own keys: Space is GO, B Blackout (unless a button takes B); the others' keys
+  const RESERVED: Record<string, string> = { ' ': 'GO (Space)', b: 'Blackout (B)' };
+  function setKey(v: string) {
+    const k = v.slice(-1).toLowerCase();
+    if (k) w.key = k; else delete w.key;
+    app.markDirty(0);
+  }
+  function keyDown(e: KeyboardEvent) {
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setKey(e.key === ' ' ? '' : e.key); (e.target as HTMLInputElement).value = w.key ?? ''; }
+    else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); setKey(''); (e.target as HTMLInputElement).value = ''; }
+  }
+  const clash = $derived.by(() => {
+    const k = w?.key?.toLowerCase();
+    if (!k) return '';
+    const other = app.show.pages.find((p) => p.id === page)?.widgets.find((x) => x.id !== id && x.key?.toLowerCase() === k);
+    if (other) return `${k.toUpperCase()} is also ${other.label || 'another button'}'s key here: the first one wins.`;
+    return RESERVED[k] ? `${k.toUpperCase()} is ${RESERVED[k]} on this page; this button takes it over.` : '';
+  });
   let learning = $state(false);
   async function learn() {
     try { await enableMidi(); } catch (e) { ui.toast((e as Error).message); return; }
@@ -43,18 +62,22 @@
     <label>Effect <select bind:value={w.effect} aria-label="Effect">{#each app.show.effects as e (e.id)}<option value={e.id}>{e.name}</option>{/each}</select></label>
     <label>Does <select bind:value={w.action} aria-label="Action"><option value="toggle">On / off</option><option value="flash">Flash while held</option></select></label>
   {:else if w.type === 'fader'}
-    <label>Controls <select value={w.target === 'list' || w.target === 'effect' ? `${w.target}:${w.ref}` : w.target} aria-label="Fader target" onchange={(e) => {
+    <label>Controls <select value={w.target === 'list' || w.target === 'effect' || w.target === 'group' ? `${w.target}:${w.ref}` : w.target} aria-label="Fader target" onchange={(e) => {
       const [t, ref] = (e.target as HTMLSelectElement).value.split(':');
       w.target = t as typeof w.target; w.ref = ref;
     }}>
       <option value="grand">Grand master</option><option value="bpm">Tempo</option>
       <optgroup label="Cue list level">{#each app.show.cueLists as l (l.id)}<option value="list:{l.id}">{l.name}</option>{/each}</optgroup>
       <optgroup label="Effect level">{#each app.show.effects as e (e.id)}<option value="effect:{e.id}">{e.name}</option>{/each}</optgroup>
+      <!-- (a group's level: the dance floor, the shelves; the first fader a bar owner reaches for, and it wasn't there) -->
+      {#if app.show.groups.length}<optgroup label="Group level">{#each app.show.groups as g (g.id)}<option value="group:{g.id}">{g.name}</option>{/each}</optgroup>{/if}
     </select></label>
   {:else if w.type === 'fog'}
     <p class="faint">Fog only runs while the button is held, and switches off after the maximum even if it's still held.</p>
-    <label>Output <input type="range" min="0.1" max="1" step="0.05" bind:value={w.level} aria-label="Fog output" /></label>
-    <label>Maximum (s) <input type="number" min="1" max="60" value={w.max} aria-label="Maximum seconds" onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (Number.isFinite(v)) w.max = Math.max(1, Math.min(60, v)); }} /></label>
+    <!-- (the number beside each: a slider alone didn't say how much) -->
+    <label>Output <span class="rng"><input type="range" min="0.1" max="1" step="0.05" bind:value={w.level} aria-label="Fog output" /><output>{Math.round((w.level ?? 1) * 100)}%</output></span></label>
+    <!-- (emptied, it comes back with the maximum it has: it stayed blank while the button said 60 s) -->
+    <label>Maximum (s) <NumField value={w.max} min={1} max={60} required label="Maximum seconds" onset={(v) => { if (v !== undefined) w.max = v; }} /></label>
     <div class="fx">
       {#each app.show.fixtures.filter((f) => app.caps(f.id).fog) as f (f.id)}
         <label class="ck"><input type="checkbox" checked={w.fixtures.includes(f.id)} onchange={(e) => { w.fixtures = (e.target as HTMLInputElement).checked ? [...w.fixtures, f.id] : w.fixtures.filter((x) => x !== f.id); }} />{f.name}</label>
@@ -62,8 +85,8 @@
     </div>
   {:else if w.type === 'group'}
     <label>Group <select bind:value={w.group} aria-label="Group">{#each app.show.groups as g (g.id)}<option value={g.id}>{g.name}</option>{/each}</select></label>
-    <label>Level <input type="range" min="0" max="1" step="0.05" bind:value={w.level} aria-label="Flash level" /></label>
-    <label>Strobe while held <input type="range" min="0" max="1" step="0.05" value={w.strobe ?? 0} oninput={(e) => (w.strobe = +(e.target as HTMLInputElement).value || undefined)} aria-label="Strobe" /></label>
+    <label>Level <span class="rng"><input type="range" min="0" max="1" step="0.05" bind:value={w.level} aria-label="Flash level" /><output>{Math.round((w.level ?? 1) * 100)}%</output></span></label>
+    <label>Strobe while held <span class="rng"><input type="range" min="0" max="1" step="0.05" value={w.strobe ?? 0} oninput={(e) => (w.strobe = +(e.target as HTMLInputElement).value || undefined)} aria-label="Strobe" /><output>{w.strobe ? `${Math.round(w.strobe * 100)}%` : 'off'}</output></span></label>
     <label class="ck"><input type="checkbox" checked={!!w.white} onchange={(e) => { w.white = (e.target as HTMLInputElement).checked || undefined; }} /> White while held (a blinder), whatever colour they had</label>
   {:else if w.type === 'song'}
     <!-- the set list (Timeline): a name that was only the old action's goes with it -->
@@ -78,7 +101,7 @@
     <!-- a name that was only the old action's ("Blackout") goes with it: a blinder must never read Blackout -->
     <label>Does <select value={w.do} aria-label="Special action" onchange={(e) => { if (w.label === SPECIAL_NAME[w.do]) w.label = undefined; w.do = (e.target as HTMLSelectElement).value as typeof w.do; }}>
       <option value="blackout">Blackout on / off</option><option value="releaseAll">Release everything</option>
-      <option value="tap">Tap the tempo</option><option value="stopEffects">Stop effects started by hand</option>
+      <option value="tap">Tap the tempo</option><option value="stopEffects">Stop effects (the cues' own too, until the next cue)</option>
       <option value="blinder">Blinder: every light white while held</option><option value="drop">Drop: white, strobes and a fog burst while held</option>
       <option value="fadeOut">Fade out to black (and back in on the next press)</option></select></label>
     {#if w.do === 'fadeOut'}
@@ -89,7 +112,10 @@
 
   {#if w.type !== 'label'}
     <div class="two">
-      <label>Key <input maxlength="1" bind:value={w.key} placeholder="none" aria-label="Keyboard key" /></label>
+      <!-- (a key pressed in the field is the key, replacing the one there: it took nothing until
+           Backspace; and one another button or the page's own keys use is said) -->
+      <label>Key <input maxlength="1" value={w.key ?? ''} placeholder="none" aria-label="Keyboard key" onkeydown={keyDown} oninput={(e) => setKey((e.target as HTMLInputElement).value)} /></label>
+      {#if clash}<span class="clash" role="status">{clash}</span>{/if}
       <label title="The button's own colour on this page (not the lights')">Button colour <input type="color" value={w.color ?? '#45d85c'} oninput={(e) => (w.color = (e.target as HTMLInputElement).value)} aria-label="Colour" /></label>
     </div>
     <div class="midi">
@@ -104,6 +130,9 @@
 </aside>
 
 <style>
+  .rng { display: flex; align-items: center; gap: .4rem; }
+  .rng input { flex: 1; min-width: 0; }
+  .rng output { min-width: 2.6em; text-align: right; font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--text); }
   .we { width: 260px; display: flex; flex-direction: column; gap: .45rem; background: var(--panel); border: 0; border-radius: var(--radius); padding: .6rem; font-size: .86rem; }
   .we :global(input:not([type=checkbox]):not([type=color])), .we :global(select) { width: 100%; min-width: 0; }
   .two > :global(*) { min-width: 0; }
@@ -117,4 +146,5 @@
   .learn { color: var(--orange); font-size: .82rem; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
   @media (max-width: 900px) { .we { width: auto; } }
+  .clash { color: var(--orange); font-size: .8rem; }
 </style>

@@ -12,19 +12,28 @@ export interface MenuItem {
   run?: () => unknown;
 }
 
-export type ModalName = 'welcome' | 'shows' | 'addFixtures' | 'effects' | 'shortcuts' | 'palette' | 'guide' | 'monitor' | 'fogTimer' | 'patchCheck' | 'remote' | 'schedule' | 'rig';
-const ZOOM_KEY = 'luxdmx.seq.zoom';
-const HINTS_KEY = 'luxdmx.seq.hints';
+export type ModalName = 'welcome' | 'shows' | 'addFixtures' | 'gallery' | 'effects' | 'shortcuts' | 'palette' | 'guide' | 'monitor' | 'fogTimer' | 'patchCheck' | 'remote' | 'schedule' | 'rig';
+import { HINTS, STAGE_3D, ZOOM } from '../store/kept';
 
 class Ui {
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   modal = $state<ModalName | null>(null);   // the one big dialog that's open
+  welcomeDemos = false;
+  intro = $state(false);                      // the short intro over the demo show (ui/Intro.svelte)
+  welcomeNew = false;                         // the welcome opened for a new show (Shows, New show…): Empty stage makes one
+  addType: string | null = null;
+  focus3d = $state(0);                       // when the 3D stage was asked to fly to the selected lights ("Show in 3D")             // Add fixtures opens with this type picked (from the gallery)                      // the welcome opened for its demos: shown, even when folded away
   monitorUni = 0;                            // the universe the DMX monitor opens on
   fogFor: string[] | undefined;              // the machines a fog timer starts with (all when unset)
   patch = $state<string | null>(null);       // the fixture whose patch dialog is open
   patchTab = $state<'patch' | 'channels' | 'leds' | 'mounting'>('patch');   // the tab it opens on
   patchMany = $state<string[] | null>(null); // ...or the lights patched together
   focusCal = $state<string[] | null>(null);  // the heads in Focus and calibrate
+  progJump = $state('');
+  // a finger has no Shift: with this on, a tap on a light or a group adds it to the selection (or
+  // takes it out), as Shift or Ctrl does with a mouse
+  addSel = $state(false);
+  adding = (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => e.shiftKey || e.ctrlKey || e.metaKey || this.addSel;                      // a part of the programmer to go to ('pg-all': every channel), from Find anything
   panTiltFind = $state<string | null>(null);  // a light whose pan and tilt channels are being found
   // what Focus and calibrate has seen this session: per head, per mark, the pan and tilt (a cue's)
   // that put the real beam on it (kept when the dialog closes, gone with a reload)
@@ -43,9 +52,9 @@ class Ui {
   }
   zoom = $state(1);                          // UI size, saved per browser
   // the stage in 3D instead of the plan (saved per browser)
-  private s3 = $state((() => { try { return localStorage.getItem('luxdmx.seq.stage3d') === '1'; } catch { return false; } })());
+  private s3 = $state(STAGE_3D.get());
   get stage3d() { return this.s3; }
-  set stage3d(v: boolean) { this.s3 = v; this.s3now = v; try { localStorage.setItem('luxdmx.seq.stage3d', v ? '1' : '0'); } catch { /* not remembered */ } }
+  set stage3d(v: boolean) { this.s3 = v; this.s3now = v; STAGE_3D.set(v); }
   // the same, plain: what it is now even in a teardown (Svelte gives a teardown the value from before
   // the change that's tearing it down: the 3D stage closing because 2D was picked would read "3D")
   private s3now = this.s3;
@@ -56,13 +65,15 @@ class Ui {
   // The question dialog (instead of the browser's prompt / confirm).
   // pin: digits, hidden, the number pad on a tablet; empty: an empty answer counts (not a Cancel)
   // digits: the number pad and big digits, shown (setting a PIN: a typo mustn't lock you out); hint: a line under the field
-  question = $state<{ title: string; body?: string; label?: string; value?: string; ok: string; danger?: boolean; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string; done: (v: string | null) => void } | null>(null);
+  // (`check`: what's wrong with what's typed, said in the dialog, which waits for it to be right: it
+  // used to close and say so in a toast, the typing lost)
+  question = $state<{ title: string; body?: string; label?: string; value?: string; ok: string; danger?: boolean; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string; check?: (v: string) => string; done: (v: string | null) => void } | null>(null);
   toastText = $state('');
   toastAction = $state<{ label: string; run: () => unknown } | null>(null);
   // The one-line hints at the top of the panels: on until someone hides them (remembered).
   private hintsOn = $state(true);
   get help() { return this.hintsOn; }
-  set help(v: boolean) { this.hintsOn = v; try { localStorage.setItem(HINTS_KEY, v ? '1' : '0'); } catch { /* not remembered */ } }
+  set help(v: boolean) { this.hintsOn = v; HINTS.set(v); }
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   // A context menu at the pointer, or under the button that opened it (so it never covers it).
@@ -77,9 +88,9 @@ class Ui {
   }
   closeMenu() { this.menu = null; }
   // Ask for a name. Resolves to the text, or null when cancelled.
-  ask(title: string, value = '', o: { label?: string; ok?: string; body?: string; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string } = {}): Promise<string | null> {
+  ask(title: string, value = '', o: { label?: string; ok?: string; body?: string; pin?: boolean; digits?: boolean; empty?: boolean; hint?: string; check?: (v: string) => string } = {}): Promise<string | null> {
     this.question?.done(null);                // a question still open counts as cancelled
-    return new Promise((done) => (this.question = { title, value, label: o.label ?? 'Name', ok: o.ok ?? 'OK', body: o.body, pin: o.pin, digits: o.digits, empty: o.empty, hint: o.hint, done }));
+    return new Promise((done) => (this.question = { title, value, label: o.label ?? 'Name', ok: o.ok ?? 'OK', body: o.body, pin: o.pin, digits: o.digits, empty: o.empty, hint: o.hint, check: o.check, done }));
   }
   // Ask yes or no. Resolves to true for yes.
   confirm(title: string, body: string, ok = 'Delete', danger = true): Promise<boolean> {
@@ -88,13 +99,13 @@ class Ui {
   }
 
   constructor() {
-    try { this.zoom = Math.max(0.7, Math.min(1.6, +(localStorage.getItem(ZOOM_KEY) ?? 1) || 1)); } catch { /* storage blocked */ }
-    try { this.hintsOn = localStorage.getItem(HINTS_KEY) !== '0'; } catch { /* shown */ }
+    this.zoom = ZOOM.get();
+    this.hintsOn = HINTS.get();
     this.applyZoom();
   }
   setZoom(z: number) {
     this.zoom = Math.round(Math.max(0.7, Math.min(1.6, z)) * 100) / 100;
-    try { localStorage.setItem(ZOOM_KEY, String(this.zoom)); } catch { /* not saved, still applied */ }
+    ZOOM.set(this.zoom);
     this.applyZoom();
   }
   private applyZoom() { if (typeof document !== 'undefined') document.documentElement.style.fontSize = `${87.5 * this.zoom}%`; }
@@ -105,10 +116,25 @@ class Ui {
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => { this.toastText = ''; this.toastAction = null; }, action ? Math.max(ms, 6000) : ms);
   }
+  // a message that isn't true any more goes at once (one starting with `prefix`)
+  untoast(prefix: string) {
+    if (!this.toastText.startsWith(prefix)) return;
+    clearTimeout(this.toastTimer); this.toastText = ''; this.toastAction = null;
+  }
 }
 export const ui = new Ui();
 
 const mod = (e: KeyboardEvent) => e.ctrlKey || e.metaKey;
+// Is the focus on something typed into (a text or number field, a list to pick from by letter)? A
+// fader, a checkbox or a colour well takes no letters: the page's keys (R records, F full, Space GO)
+// work there too. R after touching the programmer's fader did nothing at all.
+const NO_TEXT = new Set(['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file', 'image']);
+export const typesText = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null;
+  if (!el?.tagName) return false;
+  if (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+  return el.tagName === 'INPUT' && !NO_TEXT.has((el as HTMLInputElement).type);
+};
 // A dialog is open: page-wide keys (GO, intensity, live buttons) leave it alone, its keys are its own.
 export const dialogOpen = () => typeof document !== 'undefined' && !!document.querySelector('[aria-modal="true"]');
 // Space is GO everywhere, except on the few controls that need it themselves (a menu item, the
@@ -117,11 +143,33 @@ export const dialogOpen = () => typeof document !== 'undefined' && !!document.qu
 // presses the button, tab or switch they tabbed to. A click or a tap puts it back to GO (a mouse
 // on Blackout, then Space, is GO, not Blackout again).
 let tabbing = false;
+// Focus that falls to the page itself (the button you were on went away: Record's bar once the cue
+// is in, Back at the first cue, a command that changed the view) made the next Tab start again at
+// the top bar, or leave the page. Tab picks up in the part of the app it was in instead: its
+// first control (Shift+Tab: its last), else the main view's.
+const TABBABLE = 'button:not([disabled]), [href], input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const ZONE = '[role="dialog"], [role="menu"], .panel, .strip, .deck, main.view, .top';
+let lastZone: Element | null = null;
 if (typeof window !== 'undefined') {
-  window.addEventListener('keydown', (e) => { if (e.key === 'Tab') tabbing = true; }, true);
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    tabbing = true;
+    const at = document.activeElement;
+    if ((at && at !== document.body) || !lastZone) return;             // (a page just opened: Tab as usual, from the top)
+    const zone = lastZone.isConnected ? lastZone : document.querySelector('main.view');
+    const all = [...(zone?.querySelectorAll<HTMLElement>(TABBABLE) ?? [])].filter((el) => el.offsetParent !== null);
+    const to = e.shiftKey ? all[all.length - 1] : all[0];
+    if (to) { e.preventDefault(); to.focus(); }
+  }, true);
+  window.addEventListener('focusin', (e) => { lastZone = (e.target as Element).closest?.(ZONE) ?? lastZone; }, true);
   window.addEventListener('pointerdown', () => { tabbing = false; }, true);
 }
-const PRESSABLE = 'button, summary, a[href], [role="tab"], [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"]';
+// A key with Ctrl, Alt or Cmd is a shortcut, not something typed: except the characters AltGr gives
+// (Ctrl+Alt on Windows: @ € { on a German keyboard) and Option on a Mac (@ is Option+L there), which
+// were swallowed ("@50" typed on the console lost its @).
+export const isShortcut = (e: KeyboardEvent) => e.metaKey || ((e.ctrlKey || e.altKey)
+  && !(e.key.length === 1 && (e.getModifierState?.('AltGraph') || (e.ctrlKey && e.altKey) || (e.altKey && !e.ctrlKey && !/^[a-z0-9]$/i.test(e.key)))));
+const PRESSABLE = 'button, summary, a[href], [role="tab"], [role="button"], [role="switch"], [role="checkbox"], [role="menuitem"], input[type="checkbox"], input[type="radio"]';
 export const spaceIsGo = (e: KeyboardEvent) => e.code === 'Space' && !e.repeat
   && !(e.target as HTMLElement).closest?.('.ctx, .lockbtn, .dip, .gp .main, [data-own-space]')
   && !(tabbing && (e.target as HTMLElement).matches?.(PRESSABLE));
@@ -268,4 +316,21 @@ export function tablist(node: HTMLElement) {
   sync();
   node.addEventListener('keydown', key);
   return { destroy() { mo.disconnect(); node.removeEventListener('keydown', key); } };
+}
+
+// A 0..1 slider read out as a percentage ("70 %", not "0.7"): use:asPercent={value}
+export function asPercent(el: HTMLInputElement, v: number | undefined) {
+  const set = (x: number | undefined) => el.setAttribute('aria-valuetext', `${Math.round((x ?? +el.value) * 100)} %`);
+  set(v);
+  return { update: set };
+}
+
+// While a take or a render runs: the dev server holds its hot updates (vite.config.ts, one reload
+// after), and leaving or reloading the page asks first (the browser's own "Leave site?")
+if (typeof window !== 'undefined') {
+  const tab = Math.random().toString(36).slice(2);
+  $effect.root(() => {
+    $effect(() => { const on = ui.recording; if (import.meta.hot) import.meta.hot.send('luxdmx:busy', { id: tab, on }); });
+  });
+  window.addEventListener('beforeunload', (e) => { if (ui.recording) { e.preventDefault(); e.returnValue = ''; } });
 }

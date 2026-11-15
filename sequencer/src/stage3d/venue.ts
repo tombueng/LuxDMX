@@ -22,7 +22,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { D, DECK, ROOMS, TRUSS, W, type RoomId } from './geometry';
+import { D, DECK, ROOMS, TRUSS, W, type Room, type RoomId } from './geometry';
 import { banner, boards, brick, concrete, darkWood, exitSign, grille, liveBanner, liveCanvas, nameLayout, neonSign, paintKick, pleats, rackFront, rug, screen, sparkle, stageFloor } from './textures';
 import { ARM, HIP, Person, SOLE, twoBone, type Look } from './people';
 import { bandSurface, type BandSurface } from './bandArt';
@@ -97,10 +97,13 @@ export interface Venue extends Stage {
 }
 
 // The hall or the pub, with the band (a Venue); any other room is one of the demos' (a Stage).
-export function buildVenue(o?: { crowd?: number; room?: 'hall' | 'pub'; band?: string }): Venue;
-export function buildVenue(o?: { crowd?: number; room?: RoomId; band?: string }): Stage;
-export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string } = {}): Venue | Stage {
-  if (isDemoRoom(o.room)) return buildRoom(o.room, o);
+// `act`: who is on the stage. 'band' (the default) plays; 'none' is a stage without them (a play, a
+// service, a premiere): no band, no drum kit or backline, no flags or shoulders in the audience, the
+// banners and screens with the show's own name.
+export function buildVenue(o?: { crowd?: number; room?: 'hall' | 'pub'; band?: string; act?: 'band' | 'none' }): Venue;
+export function buildVenue(o?: { crowd?: number; room?: RoomId; band?: string; act?: 'band' | 'none'; custom?: Room }): Stage;
+export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string; act?: 'band' | 'none'; custom?: Room } = {}): Venue | Stage {
+  if (isDemoRoom(o.room)) return buildRoom(o.room, o);   // (your own stage: its room in o.custom)
   const room = o.room === 'pub' ? 'pub' : 'hall', pub = room === 'pub', L = LAYOUT[room];
   const M = {
     ...gearMats(),
@@ -382,6 +385,8 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string } =
     scrim.rotation.y = -sx * 0.25; add(scrim, sx * (W / 2 + 4.6), 4.6 - SH / 2, D / 2 - 0.6);
   }
   }
+  // (everything from here to the people at work is the band's: left out when nobody plays)
+  const bandFrom = group.children.length, noBand = o.act === 'none';
   // a drum riser with a carpet, and the drummer's rug on it
   add(box(L.riser[2], 0.4, L.riser[3], [M.drape, M.drape, std({ color: 0x2a1418, roughness: 1 }), M.black, M.drape, M.drape]), L.riser[0], DECK + 0.2, L.riser[1]);
   add(new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.9).rotateX(-Math.PI / 2), std({ map: rug(), roughness: 1 })), L.kit[0], DECK + 0.402, L.kit[1] - 0.05);
@@ -880,6 +885,7 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string } =
     cableTo(htip.clone().addScaledVector(hh.clone().sub(htip).normalize(), -0.14), 1, 0.08);
   }
 
+  const bandTo = group.children.length;
   // the people at work (their hands on desks, a pan bar, handles, a counter)
   const crew: Venue['crew'] = [];
   const work = (look: Look, x: number, y: number, z: number, yaw: number, hands: { L?: THREE.Vector3; R?: THREE.Vector3 }, lean?: number) => {
@@ -905,7 +911,7 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string } =
     W / 2 + 1.62, DECK, 0.85, -Math.PI / 2, { L: inVenue(mon, mon.userData.hands.L), R: inVenue(mon, mon.userData.hands.R) });
   put(iemRack(M), W / 2 + 1.55, DECK, -0.35);
   for (const sx of [-1, 1]) put(sideFill(M), sx * 6.95, DECK, 1.35, sx > 0 ? -1.28 : 1.28);
-  ([['single', 0xc04a1a], ['acoustic', 0xc8a070], ['bass', 0x141414]] as const).forEach(([kind, c], i) => put(guitarOnStand(M, kind, c), -(W / 2 + 1.35), DECK, 0.75 + i * 0.55, Math.PI / 2));
+  if (!noBand) ([['single', 0xc04a1a], ['acoustic', 0xc8a070], ['bass', 0x141414]] as const).forEach(([kind, c], i) => put(guitarOnStand(M, kind, c), -(W / 2 + 1.35), DECK, 0.75 + i * 0.55, Math.PI / 2));
   const tech = put(roadCase(M, 0.9, 0.78, 0.55, { stencil: 4 }), -(W / 2 + 1.4), DECK, 2.7, Math.PI / 2);
   { const lap = new THREE.Group(); lap.add(at(box(0.33, 0.015, 0.23, M.plastic), 0, 0.008, 0)); const l = box(0.33, 0.22, 0.01, M.plastic); l.add(at(new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.19), new THREE.MeshBasicMaterial({ map: screen('laptop') })), 0, 0, 0.006)); lap.add(at(l, 0, 0.11, -0.12, [-0.25, 0, 0])); lap.position.set(0.1, 0.79, 0); tech.add(lap); }
   put(waterCrate(M), -(W / 2 + 0.85), DECK, 3.35, 0.3); put(waterCrate(M), W / 2 + 1.5, DECK, 2.1, -0.2);
@@ -966,7 +972,7 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string } =
     })
     : buildCrowd(o.crowd ?? (softwareGL() ? 160 : 420), {
       z0: D / 2 + 2.6, z1: D / 2 + 15.8, spread: (z) => Math.min(14.5, 6 + (z - D / 2) * 0.6),
-      keepOut: (x, z) => Math.abs(x) < 3.75 && z > FZ - 2.6, banner: backdrop, flags: 10,
+      keepOut: (x, z) => Math.abs(x) < 3.75 && z > FZ - 2.6, banner: backdrop, flags: noBand ? 0 : 10, ...(noBand ? { riders: 0, calm: true } : {}),
     });
   group.add(crowd.group);
   let shown = 0;
@@ -1002,7 +1008,8 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string } =
   function animate(t: number, beat: number, energy: number, col: THREE.Color, music = true) {
     // (the crowd comes in on the second frame: the first, with the stage and the hall, shows sooner)
     if (!crowd.group.visible && ++shown > 1) crowd.group.visible = true;
-    crowd.update(t, beat, energy, col);
+    // (an audience at a play or a service doesn't jump to the lights)
+    crowd.update(t, beat, noBand ? Math.min(energy, 0.15) : energy, col);
     // the band moves with the crowd's excitement (it follows the lights: calm in a quiet intro, all
     // out at a drop). No music: they stop where the last bar began (sticks down on the drums, the
     // strumming hands still) and wait, not miming to nothing
@@ -1016,6 +1023,11 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string } =
   // Everything that never moves is baked into a few meshes (hundreds of props: a few dozen draws).
   // What moves is found by playing a few moments and looking (the band; the crowd and the screens
   // move through their shaders and pictures). What's left gets its matrices once.
+  // nobody playing: the band's part goes before anything is baked (merged meshes can't lose a part)
+  if (noBand) {
+    for (const c of group.children.slice(bandFrom, bandTo)) group.remove(c);
+    band.length = 0; drumMics.length = 0; mics.length = 0; strummers.length = 0;
+  }
   const white = new THREE.Color(1, 1, 1);
   const live = movingMeshes(group, (k) => animate(k * 1.37, k ? 2.3 + k * 3.9 : 0, k ? 0.85 : 0, white));
   // (the band's bodies and limbs, the pedals and the hi-hat's top move whatever the moments played
