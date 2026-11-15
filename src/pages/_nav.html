@@ -169,7 +169,8 @@ window.LuxNav = (function(){
     links[i].classList.toggle('btn-primary',on); links[i].classList.toggle('btn-outline-secondary',!on); }
   paintNav();   // paint the last-known values instantly so a tab switch never flashes empty
   fetch('/info.json').then(function(r){return r.json();}).then(function(d){
-    document.getElementById('nav-sub').innerHTML=(d.hostname||'')+'.local &nbsp;&middot;&nbsp; '+(d.ip||'')+' &nbsp;&middot;&nbsp; v'+(d.version||'');
+    // as text: the hostname is whatever was typed into /config (a name with markup in it ran on every page)
+    document.getElementById('nav-sub').textContent=(d.hostname||'')+'.local \u00a0\u00b7\u00a0 '+(d.ip||'')+' \u00a0\u00b7\u00a0 v'+(d.version||'');
     saveNav();
   }).catch(function(){});
   // The page's live /ws socket, kept open only while someone can see the page (issue #135). A tab

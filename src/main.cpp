@@ -2728,6 +2728,19 @@ static String jsonEsc(const String& s) {
     return o;
 }
 
+// The hostname is free text from /config (nothing limits it to [a-z0-9-]); a .local name only
+// resolves with letters, digits and hyphens anyway, so a link or a file name made from it keeps
+// just those (a quote in the name broke out of the setup-done page's href and its script, and out
+// of the backup's Content-Disposition file name).
+static String safeHost(const String& s) {
+    String o; o.reserve(s.length());
+    for (size_t i = 0; i < s.length(); i++) {
+        char c = s[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') o += c;
+    }
+    return o.length() ? o : String("dmx-gateway");   // (the default name, templates/_base.ini)
+}
+
 // Escape a value for interpolation into HTML text (the setup-done page shows the SSID /
 // hostname the user typed). Covers the five HTML-significant characters.
 static String htmlEsc(const String& s) {
@@ -3094,9 +3107,9 @@ static const char* resetWhy() {
 
 static void handleInfoJson(AsyncWebServerRequest* req) {
     String j = "{";
-    j += "\"ssid\":\"";     j += netSSID();              j += "\",";
+    j += "\"ssid\":\"";     j += jsonEsc(netSSID());     j += "\",";   // (a network's name can hold a quote)
     j += "\"ip\":\"";       j += netLocalIP().toString(); j += "\",";
-    j += "\"hostname\":\""; j += cfg.hostname;           j += "\",";
+    j += "\"hostname\":\""; j += jsonEsc(cfg.hostname);  j += "\",";   // (free text from /config)
     // Art-Net node names (issue #129). Empty = the reply falls back to the hostname; the /config
     // page shows that fallback as the placeholder rather than pretending the field is set.
     j += "\"artShort\":\""; j += jsonEsc(cfg.artShortName); j += "\",";
@@ -3870,7 +3883,7 @@ static void handleConfigExport(AsyncWebServerRequest* req) {
     if (heapBlock() < j.length() + JSON_MARGIN) { req->send(503, "application/json", "{\"busy\":1}"); return; }   // as sendJsonSafe
     try {
         AsyncWebServerResponse* r = req->beginResponse(200, "application/json", j);
-        r->addHeader("Content-Disposition", String("attachment; filename=\"") + cfg.hostname + "-config.json\"");
+        r->addHeader("Content-Disposition", String("attachment; filename=\"") + safeHost(cfg.hostname) + "-config.json\"");
         req->send(r);
     } catch (...) {}
 }
@@ -4055,7 +4068,7 @@ static void handleSetupPost(AsyncWebServerRequest* req) {
         title    = "Joining your WiFi";
         msg      = "LuxDMX is restarting and connecting to \"" + htmlEsc(ssid) +
                    "\". Reconnect this device to that network, then it opens automatically at:";
-        url      = "http://" + cfg.hostname + ".local";     // hostname is [a-z0-9-]; safe in href/JS
+        url      = "http://" + safeHost(cfg.hostname) + ".local";   // goes into an href AND a JS string
         urlLabel = htmlEsc(cfg.hostname) + ".local";
         hint     = "If the name doesn't resolve on your network, check your router for the device's IP.";
     }

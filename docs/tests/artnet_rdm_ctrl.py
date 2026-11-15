@@ -209,14 +209,15 @@ class ArtRdmController:
         self.tn = 1
         # Bind to the interface that routes to the node (like a real console binds to its
         # Art-Net NIC), so a broadcast ArtPoll leaves the correct interface on a multi-homed host.
+        # Never to all interfaces: with no route to the node nothing could reach it anyway.
         probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            probe.connect((node_ip, 6454)); self.local_ip = probe.getsockname()[0]
-        except Exception:
-            self.local_ip = "0.0.0.0"
+            probe.connect((node_ip, ART_PORT)); self.local_ip = probe.getsockname()[0]
+        except OSError as e:
+            raise OSError("no route to %s (%s): is this machine on the node's network?" % (node_ip, e)) from e
         finally:
             probe.close()
-        self.bcast = self.local_ip.rsplit(".", 1)[0] + ".255" if self.local_ip != "0.0.0.0" else "255.255.255.255"
+        self.bcast = self.local_ip.rsplit(".", 1)[0] + ".255"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -341,7 +342,10 @@ def main():
         man, dev = s.split(":")
         return (int(man, 16), int(dev, 16))
 
-    c = ArtRdmController(args.node, verbose=args.verbose)
+    try:
+        c = ArtRdmController(args.node, verbose=args.verbose)
+    except OSError as e:
+        sys.exit(str(e))
 
     if args.cmd == "poll":
         r = c.poll()
