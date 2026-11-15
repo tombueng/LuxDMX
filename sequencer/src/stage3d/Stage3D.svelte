@@ -312,6 +312,7 @@
   function feedFrame(t: number, energy: number, frameDt = 1 / 60) {
     const scr = venue.screens;
     if (!scr) return;
+    scr.still = load.level < 1;
     if (!liveScreens || load.level < 1) { if (scr.mat.map !== scr.painted) scr.mat.map = scr.painted; return; }
     if (!feed) {
       const mk = () => new THREE.WebGLRenderTarget(512, 288, { type: THREE.HalfFloatType });

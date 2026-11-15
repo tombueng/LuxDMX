@@ -137,6 +137,31 @@ test('held back for a late page, the 3D draws at most 20 frames a second, as sha
   expect(await gap(0, 1)).toBe(48);
 });
 
+// At the lowest drawing quality (the page at its busiest) the hall's screens hold their painted
+// picture: painted again only for a new name, not ten times a second (a big canvas with a soft glow,
+// uploaded each time). (Review 5, R5-P7)
+test('drawing at Low: the screens\' picture holds still, a new name still shows', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 30000 }).toBe('hall');
+  const screens = () => page.evaluate(() => (window as any).__stage3d.venue().band.surfaces.find((s: any) => s.what === 'screens'));
+  const drawn = () => page.evaluate(() => (window as any).__stage3d.stats().drawn as number);
+  await page.evaluate(() => (window as any).__luxload.setQuality(0));
+  // (a few frames for it to settle: the painted picture on, painted once)
+  const n0 = await drawn();
+  await expect.poll(drawn, { timeout: 20000 }).toBeGreaterThan(n0 + 3);
+  const was = await screens();
+  const n1 = await drawn();
+  await expect.poll(drawn, { timeout: 20000 }).toBeGreaterThan(n1 + 4);
+  expect((await screens()).version).toBe(was.version);
+  // a new name: painted once more, with it
+  await page.evaluate(() => { (window as any).__luxdmx.show.settings.bandName = 'Night Owl'; });
+  await expect.poll(async () => (await screens()).shows, { timeout: 10000 }).toBe('NIGHT OWL');
+  await expect.poll(async () => (await screens()).version, { timeout: 10000 }).toBeGreaterThan(was.version);
+  await page.evaluate(() => (window as any).__luxload.setQuality(2));
+});
+
 test('a pixel bar lit by an effect reads its real level; a Release says the effect goes on, and stops it', async ({ page }) => {
   await openConnected(page);
   await patch(page, 'gen-bar12', 1, 0, 'Bar');

@@ -942,7 +942,8 @@ Three more demos come with their own room on the 3D stage:
   pole, swinging round at each turn, drooping when it slows and rippling when it's fast.
   The LED screens beside the stage show the show the way a TV director films it (the **Broadcast**
   camera move, its own cuts, live; in the pub the TVs show it too). Off in the Venue panel (**The
-  live camera on the screens**) they show the band's name; at the lowest drawing quality too.
+  live camera on the screens**) they show the band's name; at the lowest drawing quality too, held still there
+  (painted again only for a new name: the page is busiest then).
   **Venue**: the room, **Big stage** (the hall) or **Small club / pub**: the same band on a smaller
   stage across the end of a room with brick walls and a low ceiling, two little trusses hung from
   it, a PA on poles, TVs on the walls, a bar at the back with its bartender, a few dozen people.

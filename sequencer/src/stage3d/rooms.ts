@@ -32,7 +32,8 @@ export interface Stage {
   crowd?: Crowd;
   // the LED screens' (and TVs') material, where the room has them: its picture is the painted one
   // (`painted`) unless the 3D view puts the live camera on it
-  screens?: { mat: THREE.MeshBasicMaterial; painted: THREE.Texture };
+  // (`still`: the 3D view at its lowest quality: the painted picture only painted again for a new name)
+  screens?: { mat: THREE.MeshBasicMaterial; painted: THREE.Texture; still?: boolean };
   // the DJ (for the tests): the person, how far the left hand is up, the booth (the person's parent)
   dj?: { p: Person; raised: () => number; booth: THREE.Object3D };
   // its mirror balls (turning: the scene spins them), for what they throw round the room

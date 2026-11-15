@@ -132,6 +132,7 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string; ac
   const scrTex = new THREE.CanvasTexture(scr); scrTex.colorSpace = THREE.SRGBColorSpace;
   const scrMat = new THREE.MeshBasicMaterial({ map: scrTex, toneMapped: false });
   scrMat.userData.live = true;            // (never baked: see Stage.screens)
+  const screens = { mat: scrMat, painted: scrTex as THREE.Texture, still: false };
   function paintScreens(t: number, beat: number, energy: number, col: THREE.Color) {
     const g = scr.getContext('2d'), w = scr.width, h = scr.height;
     if (!g) return;                     // (no 2D canvas: a test runner)
@@ -1017,8 +1018,10 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string; ac
     else rest = null;
     const b = rest ?? beatAt(t, beat), e = rest === null ? crowd.excitement() : 0;
     for (const m of band) m.play(b, e, t);
-    // the screens: ten times a second is plenty (not while they show the live camera)
-    if (scrMat.map === scrTex && (t - lastScreen > 0.1 || t < lastScreen)) { lastScreen = t; paintScreens(t, beat, energy, col); }
+    // the screens: ten times a second is plenty (not while they show the live camera). Held still
+    // at the lowest drawing quality, when the page is busiest: painted again only for a new name
+    // (a big canvas with a soft glow and its upload, 10 times a second, exactly then)
+    if (scrMat.map === scrTex && (lastScreen < 0 || (!screens.still && (t - lastScreen > 0.1 || t < lastScreen)))) { lastScreen = t; paintScreens(t, beat, energy, col); }
   }
   // Everything that never moves is baked into a few meshes (hundreds of props: a few dozen draws).
   // What moves is found by playing a few moments and looking (the band; the crowd and the screens
@@ -1039,5 +1042,5 @@ export function buildVenue(o: { crowd?: number; room?: RoomId; band?: string; ac
   group.children.forEach(freeze);
   crowd.group.visible = false;
   setBand(o.band);
-  return { group, animate, crowdCount: crowd.count, band: band.map((b) => b.p), mics, drums: kitInfo, strummers, crowd, crew, drumMics, baked, room, setBand, bandInfo, screens: { mat: scrMat, painted: scrTex } };
+  return { group, animate, crowdCount: crowd.count, band: band.map((b) => b.p), mics, drums: kitInfo, strummers, crowd, crew, drumMics, baked, room, setBand, bandInfo, screens };
 }
