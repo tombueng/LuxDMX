@@ -44,7 +44,10 @@ export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === '
 
 // Is WebGL drawn in software here (no graphics chip: SwiftShader, llvmpipe)? Hundreds of people cost
 // a second a frame there.
-export function softwareGL() {
+// (asked once a page: it made a WebGL2 context every time a room was built, up to three a build)
+let soft: boolean | undefined;
+export function softwareGL() { return (soft ??= askGL()); }
+function askGL() {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
     if (!gl) return false;
