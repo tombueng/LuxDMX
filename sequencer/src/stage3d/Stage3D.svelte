@@ -211,8 +211,14 @@
     };
     let p1: THREE.Vector3 | undefined, clear: THREE.Vector3 | undefined;   // (clear but not seeing it: the next best)
     // (clear with a little room above too: a spot right on the edge of a rail of lights ended up a
-    // hair inside it once the controls settled)
-    const solid = (q: THREE.Vector3) => !!(blocked(sp, { x: q.x, y: q.y, z: q.z }) || blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z }));
+    // hair inside it once the controls settled. Not the ceiling: `inside` keeps the camera off that,
+    // and a light under it is looked at from right at that limit; its 5 cm went a hair over it and
+    // no spot was left, the camera stuck a metre off with the light at the picture's edge)
+    const solid = (q: THREE.Vector3) => {
+      if (blocked(sp, { x: q.x, y: q.y, z: q.z })) return true;
+      const up = blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z });
+      return !!up && up !== 'the ceiling';
+    };
     const ok = (q: THREE.Vector3) => { if (!inside(q) || solid(q)) return false; if (seen(q)) return true; clear ??= q; return false; };
     for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
       if (p1) break;
