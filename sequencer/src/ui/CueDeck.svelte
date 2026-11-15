@@ -88,7 +88,7 @@
       { label: 'Duplicate', icon: 'duplicate', keys: 'Ctrl+D', run: dup },
       { label: 'Move earlier', icon: 'left', keys: 'Alt+←', disabled: i === 0, run: () => app.moveCues(app.cueSel, Math.max(0, i - 1)) },
       { label: 'Move later', icon: 'right', keys: 'Alt+→', disabled: i === list!.cues.length - 1, run: () => app.moveCues(app.cueSel, i + 2) },
-      ...others.map((l) => ({ label: `Move to "${l.name}"`, icon: 'folder', run: async () => { await app.cutCues(); app.currentList = l.id; await app.pasteCues(); } })),
+      ...others.map((l) => ({ label: `Move to "${l.name}"`, icon: 'folder', run: () => app.moveCuesToList(app.cueSel, l.id) })),
       { sep: true },
       { label: 'Delete', icon: 'trash', keys: 'Del', danger: true, run: del },
     ]);

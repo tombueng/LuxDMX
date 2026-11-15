@@ -44,7 +44,7 @@ import { copyClip, readClip } from './store/clipboard';
 import { bundle, isZip, storedOf, unbundle } from './store/bundle';
 import { CURRENT_SHOW, HELD, LAST_PLAYED, OUTPUT_LOCKED_LIVE, OUTPUT_TAB, PLAYING_TAB, SCHEDULE_LOOKED, UNDO_TAB, WAS_ARMED } from './store/kept';
 import { getModel, getSong, putModel, putSong } from './store/audio';
-import { prune, prunedText } from './model/prune';
+import { moveCueRefs, prune, prunedText } from './model/prune';
 import { stageSvg } from './ui/thumb';
 import { cueLooks } from './engine/cuelook';
 import { cellLookAt, resolveValues } from './engine/resolve';
@@ -2200,6 +2200,25 @@ class App {
     const moving = l.cues.filter((c) => ids.includes(c.id)), rest = l.cues.filter((c) => !ids.includes(c.id));
     const at = Math.max(0, Math.min(rest.length, to - l.cues.slice(0, to).filter((c) => ids.includes(c.id)).length));
     l.cues = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
+  }
+  // Cues to another list, at its end: the same cues (their ids, everything in them, a number of
+  // their own there), and what played them follows (a Live button, a moment on the timeline...).
+  // One step to undo; the clipboard isn't touched.
+  moveCuesToList(ids: string[], to: string): number {
+    const from = this.show.cueLists.find((l) => l.cues.some((c) => ids.includes(c.id)));
+    const dest = this.show.cueLists.find((l) => l.id === to);
+    if (!from || !dest || from === dest) return 0;
+    this.checkpoint();
+    const moving = from.cues.filter((c) => ids.includes(c.id));
+    from.cues = from.cues.filter((c) => !ids.includes(c.id));
+    for (const c of moving) delete c.num;
+    numbersFor(dest, dest.cues.length, moving);
+    dest.cues = [...dest.cues, ...moving];
+    moveCueRefs(this.show, new Set(moving.map((c) => c.id)), from.id, dest.id);
+    this.currentList = dest.id;
+    this.cueSel = moving.map((c) => c.id);
+    this.markDirty(0);
+    return moving.length;
   }
   async copyCues(ids = this.cueSel) {
     const items = this.list?.cues.filter((c) => ids.includes(c.id)) ?? [];

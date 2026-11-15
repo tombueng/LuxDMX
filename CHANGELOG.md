@@ -18,6 +18,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   list's fader, the output thread plays it too), and the Moments track into how long each moment
   lasts, as a bar whose end you drag (or the arrow keys on it). Before, a moment's length could only
   be changed by placing it again.
+- **Moving a cue to another list keeps it whole.** "Move to" in a cue's menu was a cut and a
+  paste: the cut took every Live button and timeline moment that played the cue with it, and the
+  paste gave it a new id. Now the cue itself moves, what plays it follows, and one Undo takes it back.
+- **The console no longer leaves a second 3D stage running** when you switch to another view.
 - **Changing what a light's channels do is kept when you press Done.** Before, only the Save button
   under the table kept it, and Done threw it away without a word (swap red and green, Done, and
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and
