@@ -592,6 +592,9 @@ export class Rig {
     const addCell = (cl: number) => { if (cl > 0) { mean.r += col.r * cl; mean.g += col.g * cl; mean.b += col.b * cl; meanW += cl; } };
     const cellsMean = () => (meanW > 0 ? mean.multiplyScalar(1 / meanW) : mean);   // (none lit: black, it lights nothing)
 
+    // (a light's key in `lit` is its place in the list; a moving bar's heads get theirs after all the
+    // lights, one each: 64 * place + head ran into light 64 and up, its fog lit by another light)
+    let headKey = this.list.length;
     for (let fi = 0; fi < this.list.length; fi++) {
       const f = this.list[fi], v = stage[f.id];
       pos.set(f.p.x, f.p.y, f.p.z);
@@ -658,7 +661,8 @@ export class Rig {
       } else if (f.look === 'headbar') {
         // a moving bar: the bar pans as one; each head tilts on its own (its cell's tilt, else the
         // bar's), each motor at a real head's speed; each head its own beam in its cell's colour
-        const n = f.heads ?? 1;
+        const n = f.heads ?? 1, key0 = headKey;
+        headKey += n;
         let m = this.barHeads.get(f.id);
         if (!m || m.t.length !== n) this.barHeads.set(f.id, (m = { p: { at: NaN, v: 0 }, t: Array.from({ length: n }, () => ({ at: NaN, v: 0 })), hp: Array.from({ length: n }, () => ({ at: NaN, v: 0 })), tilts: [], pans: [] }));
         // (heads that pan each: the bar turns only by a pan of its own; their motors at the middle
@@ -683,7 +687,7 @@ export class Rig {
           const deg = f.beam ? f.beam[0] + (f.beam[1] - f.beam[0]) * (typeof cv?.zoom === 'number' ? cv.zoom : 0) : 4;
           lensAt(lp, dir, 0.06, cl > 0.01 ? C2.copy(col).multiplyScalar(0.6 + cl * 1.4) : isSel ? sel : off);
           beamAt(CP.copy(lp).addScaledVector(dir, 0.02), dir, deg, cl * 1.1, col);
-          if (cl > 0.01) pushLit(fi * 64 + k, lp, dir, col, cl, deg);
+          if (cl > 0.01) pushLit(key0 + k, lp, dir, col, cl, deg);
           m.tilts[k] = ta;
         }
         m.pan = pa;

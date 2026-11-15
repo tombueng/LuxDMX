@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { Rig, type RigFixture } from './rig';
 import { PROFILES } from './profiles';
 import { placesFor } from '../model/pixelLayout';
+import { Particles } from './particles';
 import type { Resolved } from '../model/types';
 
 const optics = { panDeg: 540, tiltDeg: 270, panOffset: 0, tiltOffset: 0, invertPan: false, invertTilt: false };
@@ -52,5 +53,31 @@ describe('the room lit by pixel lights', () => {
     expect(got.ring.c).toEqual([0.67, 0, 0.33]);
     // (a head without cells of its own: every cell its colour)
     expect(got.head.c).toEqual([0, 0, 1]);
+  });
+});
+
+// A moving bar's heads each have a key in `lit` of their own, after all the lights. They were
+// 64 * place + head: with 65 lights or more a head shared its key with another light, and the fog
+// in the head's beam took that light's level and colour. (Review 5, R5-B7.)
+describe('a moving bar\'s heads in a big rig', () => {
+  it('70 lights, a 4-head bar second: no key twice, the fog lit by the head', () => {
+    const list: RigFixture[] = Array.from({ length: 70 }, (_, i) => light({ id: `p${i}`, kind: 'par', look: 'par', cells: 1, p: { x: (i % 14) - 7, y: 6, z: 0 } }));
+    list[1] = light({ id: 'mbar', kind: 'mover', look: 'headbar', cells: 4, heads: 4 });
+    const rig = new Rig();
+    rig.build(list);
+    const stage: Record<string, Resolved> = {};
+    for (const f of list) stage[f.id] = { intensity: 1, color: BLUE };
+    stage.p64 = { intensity: 0, color: BLUE };
+    stage.mbar = { intensity: 1, color: RED, cells: Array.from({ length: 4 }, () => ({ intensity: 1, color: RED })) };
+    rig.update(stage, 1, 0.5, new Set());
+    const keys = rig.lit.map((l) => l.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    const heads = rig.lit.filter((l) => l.key >= list.length);
+    expect(heads.map((l) => l.key)).toEqual([70, 71, 72, 73]);
+    // the fog's table: each head's entry its own level and red
+    const p = new Particles();
+    p.light(rig.lit);
+    const L = (p as unknown as { smoke: { levels: Float32Array } }).smoke.levels;
+    for (const k of [70, 71, 72, 73]) expect([...L.slice(k * 4, k * 4 + 4)].map((x) => +x.toFixed(2))).toEqual([1, 1, 0, 0]);
   });
 });
