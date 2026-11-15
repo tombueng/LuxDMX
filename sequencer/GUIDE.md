@@ -1044,7 +1044,9 @@ Three more demos come with their own room on the 3D stage:
   every box, Connect and **The rig (RDM)…**. On a tablet held upright (up to 900 px) Undo and
   Redo are in the ⋯ menu, as on a phone. On the stage plan the names never run into each other
   and stay inside the plan: each goes under its light, above it, or beside it; one with no room
-  left is shown on hover (a selected light always shows its name). On a narrow plan the symbols
+  left is shown on hover (a selected light always shows its name). A curtain or a drop is a line
+  across the stage with its name at one end; names of the lights along it may sit on the line. A
+  crowded plan writes its names a size smaller when that fits more of them. On a narrow plan the symbols
   get smaller so neighbours keep apart. Zoom with the wheel or a pinch (on a laptop also +); the
   zoom figure next to it fits the whole stage again. New lights land clear of the ones there: a
   row of their own where the stage has room, else each on the freest spot.
