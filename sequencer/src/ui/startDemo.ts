@@ -26,7 +26,7 @@ export const demoSong = (id: string | null) => (id ? CATALOG.find((s) => s.id ==
 // show is about to open. `stage`: which demo (content/demos.ts: festival, club, party, truss), or
 // `t:` and a template's name: the template with its show (content/templateShows.ts).
 // Thrown only when `signal` aborts it.
-export async function startDemo(song: string | null = DEMO_SONG, progress: (got: number, total: number) => void = () => {}, signal?: AbortSignal, ready?: () => void, stage = 'festival') {
+export async function startDemo(song: string | null = DEMO_SONG, progress: (got: number, total: number) => void = () => {}, signal?: AbortSignal, ready?: () => void, stage = 'festival', say = true) {
   const s = demoSong(song);
   let file: File | undefined, why = '';
   if (s) {
@@ -56,12 +56,14 @@ export async function startDemo(song: string | null = DEMO_SONG, progress: (got:
       app.markDirty(0);
     } catch { why = `"${s.title}" came down, but it doesn't play in this browser: the show runs without sound`; }
   }
+  // (the show as it came, its song on it, is where Undo stops)
+  app.forgetUndo();
   await app.timeline.play();
   // a demo's song used: the other demos' and templates' songs come down too, in the background, so
   // they all play offline later (store/songCache.ts)
   if (file && s) void keepTheDemoSongs();
   const len = Math.round(app.timeline.duration / 60), what = `${d.name}: ${app.show.fixtures.length} lights`;
   if (why) ui.toast(`${why.replace(/\.$/, '')}. The demo plays on the demo beat instead (made here, nothing to download).`, 7000);
-  else ui.toast(file && s ? `${what}, to "${s.title}" by ${s.artist} (${GENRES[s.genre]}), cued to its parts. Space pauses; Live (top) for the buttons; full screen on the 3D stage.`
+  else if (say) ui.toast(file && s ? `${what}, to "${s.title}" by ${s.artist} (${GENRES[s.genre]}), cued to its parts. Space pauses; Live (top) for the buttons; full screen on the 3D stage.`
     : `${what}, ${len} minute${len === 1 ? '' : 's'} on the demo beat. Space pauses; Live (top) for the buttons; full screen on the 3D stage.`, 6000);
 }

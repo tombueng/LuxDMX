@@ -10,6 +10,16 @@ wheels), you just don't have to learn a pro console to use them.
 
 ## Getting started
 
+**When the app opens** (a visit, not a reload) it plays the big demo show on the 3D stage, and the
+first time a short intro runs over it like subtitles, under 20 seconds: that it's a demo show
+rendered live from the DMX it sends, so a show can be built and polished without the rig, and
+where your own lights, your box and the show-night buttons are. It never covers anything and goes
+by itself (× ends it sooner). Beside it, and in **Shows**, **When the app opens** picks the demo
+(the default), **an empty show**, or **the last show**. A reload always opens what was open, a show
+locked for the night or kept on stage never gets another one, and a demo you didn't change is
+replaced by the next visit's rather than piling up (one you changed stays in your shows).
+**Play the demo with its intro** in Shows shows it again.
+
 1. **Connect your LuxDMX.** Top right, `+`, type the box's address (what you'd type to open its
    web page), **Add LuxDMX** (it connects at once: **Connect** on its pill does it again later) and **Allow** in the popup. The popup has to stay open: it's the
    box's own page, and it's what carries the DMX (a browser page can't send Art-Net itself).
@@ -94,8 +104,8 @@ wheels), you just don't have to learn a pro console to use them.
    touch the pad (Chrome and Edge; Firefox and Safari have no Web MIDI).
 
 Press `?` for every keyboard shortcut and `Ctrl+K` to find anything. No lights connected yet?
-The app opens with a **welcome** in front of everything (the plan and the 3D stage alike) while
-the show has nothing in it. It's two rows of tiles, each saying what it is and what's in it (how
+With **the last show** chosen, the app opens with a **welcome** in front of everything (the plan
+and the 3D stage alike) while the show has nothing in it. It's two rows of tiles, each saying what it is and what's in it (how
 many lights and cues):
 - **Demo shows**: the festival, a DJ in a club, a house party and a test truss, finished shows on
   the 3D stage. Each tile has its music (its own song, or any song from the list, or the demo beat)

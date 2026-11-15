@@ -18,6 +18,11 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and
   "Throw the changes away" is the way to drop it. A channel called just "Red" that you make green is
   called "Green" too.
+- **The app opens on the demo show.** A visit starts with the big festival demo playing, and the
+  first time a short intro runs over the stage like subtitles (under 20 seconds): what you're
+  looking at, and where your lights, your box and the show-night buttons are. "When the app opens"
+  (beside it and in Shows) picks the demo, an empty show or the last one; a reload keeps what was
+  open, and an untouched demo doesn't pile up in your shows.
 - **Curtains and drops on the plan are cloths, not dots.** The 2D stage draws them as wide as they
   are, across the stage: solid while they hang in view (a curtain shut, a drop flown in), faint and
   dashed when they're out of the way; a curtain track's halves part.

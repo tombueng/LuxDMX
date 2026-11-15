@@ -295,6 +295,8 @@ class App {
   // this page draws. This page's engine is its mirror, for the screen.
   readonly thread = new OutputThread();
   private undoStack: string[] = [];
+  // Undo starts from the show as it is now (another show, a demo that has just set itself up)
+  forgetUndo() { this.undoStack = []; this.redoStack = []; this.canUndo = false; this.canRedo = false; this.lastSnap = JSON.stringify(this.show); }
   private recentUnis = new Map<number, number>();   // universe -> last time something was patched/driven there
   private redoStack: string[] = [];
   private lastSnap = '';
@@ -916,7 +918,7 @@ class App {
   async refreshShows() { try { this.shows = await listShows(); } catch { this.shows = []; } }
   // A show with nothing in it (the blank one a first start makes, a "New blank show" never used):
   // left for another one, it goes, rather than sitting in the list as an empty "New show".
-  private isBlank(): boolean {
+  isBlank(): boolean {
     const s = this.show, std = new Set(standardPresets(emptyShow()).map((p) => p.id));
     return !s.fixtures.length && !s.groups.length && !s.effects.length && !s.pages.length && !s.outputs.devices.length
       && s.cueLists.every((l) => !l.cues.length) && s.presets.every((p) => std.has(p.id)) && !s.timeline?.items?.length && !s.timeline?.audio
@@ -3160,8 +3162,7 @@ class App {
     this.bridges = s.outputs.devices.map((d) => this.bridges.find((b) => b.host === d.host) ?? this.makeBridge(d.host));
     this.currentList = s.cueLists[0]?.id ?? '';
     this.selected = []; this.programmer = {};
-    this.undoStack = []; this.redoStack = []; this.canUndo = false; this.canRedo = false;
-    this.lastSnap = JSON.stringify(s);
+    this.forgetUndo();
     this.rev++;
     if (s.pages.some((p) => p.locked)) this.view = 'live';     // a show locked for the service opens on its page
     this.keepOutput();

@@ -9,6 +9,7 @@
   import ConnectionBanner from './ui/ConnectionBanner.svelte';
   import { app } from './app.svelte';
   import { ui } from './ui/ui.svelte';
+  import Intro from './ui/Intro.svelte';
   import { onMount, tick, untrack } from 'svelte';
   type View = typeof app.view;
   // A view is built the first time it's opened and stays (hidden) when another one is shown, so
@@ -72,6 +73,7 @@
     <Overlays /></main>
 </div>
 <Modals />
+<Intro />
 <!-- Blackout must never be missed: a frame round the whole screen while it's on. -->
 {#if app.blackout}<div class="bo-frame" aria-hidden="true"><span>Blackout</span></div>{/if}
 

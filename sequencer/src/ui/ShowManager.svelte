@@ -7,12 +7,16 @@
   import { app } from '../app.svelte';
   import { storedOf } from '../store/bundle';
   import { ui, focusSelect } from './ui.svelte';
+  import { START_WITH } from '../store/kept';
+  import { playDemo } from './opening';
 
   let { onclose }: { onclose: () => void } = $props();
   let renaming = $state<string | null>(null);
   let name = $state('');
   let fileInput: HTMLInputElement;
   let err = $state('');
+  // what the app opens on: the demo show (with its intro the first time), an empty show, the last one
+  let start = $state(START_WITH.get());
 
   $effect(() => { app.refreshShows(); });
   const ago = (iso: string) => {
@@ -59,6 +63,10 @@
     {#if err}<span class="err">{err}</span>{/if}
   </div>
 
+  <label class="opens">When the app opens: <select value={start} onchange={(e) => { start = (e.currentTarget as HTMLSelectElement).value as typeof start; START_WITH.set(start); }} aria-label="When the app opens">
+    <option value="demo">the demo show</option><option value="empty">an empty show</option><option value="last">the last show</option>
+  </select> <button class="ghost link" onclick={() => { onclose(); void playDemo(true); }}>Play the demo with its intro</button></label>
+
   <h2>In this browser</h2>
   <div class="grid">
     {#each app.shows as s (s.id)}
@@ -86,6 +94,7 @@
 </Modal>
 
 <style>
+  .opens { display: flex; align-items: center; gap: .4rem; font-size: .82rem; color: var(--muted); margin: .2rem 0 .6rem; }
   h2 { margin: 1rem 0 .5rem; }
   .new { margin: .4rem 0; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .7rem; }

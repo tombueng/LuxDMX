@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { WELCOMED } from '../store/kept';
+  import { START_WITH, WELCOMED } from '../store/kept';
   // The big dialogs, one at a time, opened from anywhere (buttons, the command palette, keys).
   // Also the keys that open them: ? for the shortcuts, Ctrl+K for the command palette.
   import ShowManager from './ShowManager.svelte';
@@ -27,8 +27,10 @@
 
   const close = () => (ui.modal = null);
   // The welcome comes up by itself when the app opens on a show with nothing in it, once per show
-  // (a reload doesn't bring it back; "Get started" on the empty stage does). Never over a locked page.
+  // (a reload doesn't bring it back; "Get started" on the empty stage does). Never over a locked page,
+  // and not when the app opens on the demo or on an empty show by choice (ui/opening.ts).
   onMount(() => {
+    if (START_WITH.get() !== 'last') return;
     if (ui.modal || app.show.fixtures.length || app.locked || WELCOMED.get() === app.showId) return;
     ui.modal = 'welcome';
     WELCOMED.set(app.showId);

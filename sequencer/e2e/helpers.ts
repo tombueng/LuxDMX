@@ -6,6 +6,9 @@ import { test as base, expect, type Locator, type Page } from '@playwright/test'
 // assertions happen to pass.
 export const test = base.extend<{ pageErrors: void }>({
   pageErrors: [async ({ page }, use) => {
+    // (the tests start where they always did, on the last show: a visit otherwise opens the demo,
+    // e2e/intro.spec.ts. A test's own init script can take this away again)
+    await page.addInitScript(() => { try { if (!localStorage.getItem('luxdmx.seq.startwith')) localStorage.setItem('luxdmx.seq.startwith', JSON.stringify({ v: 1, data: 'last' })); } catch { /* storage blocked */ } });
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.stack ?? e.message));
     // (the app never asks before leaving; a stray dialog is dismissed)

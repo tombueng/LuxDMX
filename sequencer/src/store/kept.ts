@@ -131,6 +131,14 @@ export const PANEL_SIZES = kept<Record<string, number>>('luxdmx.seq.panels', 1, 
 export const LIVE_VIEW = kept<{ stage?: boolean; tile?: number }>('luxdmx.seq.liveview', 1, {}, {}, isObj);
 export const CONSOLE_STAGE = kept<boolean | null>('luxdmx.seq.console.stage', 1, null, { 1: (o) => (o === null ? null : boolFromText(o)) }, (v) => v === null || isBool(v));
 export const WELCOMED = kept<string>('luxdmx.seq.welcomed', 1, '', {}, isStr);
+// what the app opens on (a visit, not a reload): the demo show playing, an empty show, or the last one
+export const START_WITH = kept<'demo' | 'empty' | 'last'>('luxdmx.seq.startwith', 1, 'demo', {}, oneOf('demo', 'empty', 'last'));
+// the demo show it opened on, while nobody has changed it (it goes when the next one comes)
+export const DEMO_SHOW = kept<string>('luxdmx.seq.demoshow', 1, '', {}, isStr);
+// the short intro over the demo, seen
+export const INTRO_SEEN = kept('luxdmx.seq.introseen', 1, false, {}, isBool);
+// this tab has opened already (a reload opens what was open)
+export const OPENED = kept('luxdmx.seq.opened', 1, false, {}, isBool, 'session');
 export const WELCOME_DEMOS_HIDDEN = kept('luxdmx.seq.welcomeDemos', 1, false, { 1: (o) => o === 'hidden' }, isBool);
 export const WELCOME_SONGS = kept<Record<string, string>>('luxdmx.seq.demoSongs', 1, {}, {}, isObj);
 export const QUALITY = kept<0 | 1 | 2>('luxdmx.seq.quality', 1, 2, { 1: (o) => (Number(o) === 0 || Number(o) === 1 ? Number(o) : 2) }, oneOf(0, 1, 2));
