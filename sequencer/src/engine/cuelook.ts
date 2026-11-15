@@ -1,18 +1,25 @@
-// What every cue of a list looks like on its own, without playing it: for cue thumbnails and the
-// show manager. In a play a cue keeps what the cues before it set for fixtures it doesn't mention,
-// exactly like playback does, so each picture shows the real look at that point in the list. In a
-// list of looks (`own`) a look is what it names, so that's its picture ("Hall": the hall).
+// What every cue of a list looks like on its own, without playing it: for the cue cards and the
+// QLC+ export. In a play a cue keeps what the cues before it set for fixtures it doesn't mention,
+// as playback does (player.ts trackedLook): fog, haze and the machines only in the cue that sets
+// them, never carried on (an exported scene after a flame cue fired the flame again, and QLC+ has
+// no Arm). In a list of looks (`own`) a look is what it names, so that's its picture.
 import type { Color, CueList, Preset, Resolved } from '../model/types';
+import { FOGGY } from './player';
 import { overlay, resolveValues, topLevel } from './resolve';
 
 export function cueLooks(list: CueList, presets: Map<string, Preset>, own = false): Record<string, Resolved>[] {
   const out: Record<string, Resolved>[] = [];
-  let cur: Record<string, Resolved> = {};
+  let left: Record<string, Resolved> = {};          // what the cues so far leave for the next ones
   for (const c of list.cues) {
-    const next = own ? {} : { ...cur };
-    for (const [id, v] of Object.entries(c.values)) next[id] = own ? resolveValues(v, id, presets) : overlay(cur[id], resolveValues(v, id, presets));
-    out.push(next);
-    cur = next;
+    if (own) { out.push(Object.fromEntries(Object.entries(c.values).map(([id, v]) => [id, resolveValues(v, id, presets)]))); continue; }
+    const look = { ...left }, next = { ...left };
+    for (const [id, v] of Object.entries(c.values)) {
+      const r = overlay(left[id], resolveValues(v, id, presets)), kept = { ...r };
+      for (const f of FOGGY) delete kept[f];
+      look[id] = r; next[id] = kept;
+    }
+    out.push(look);
+    left = next;
   }
   return out;
 }

@@ -24,7 +24,7 @@ interface Track { from: Resolved; to: Resolved; at: number; fade: number; fadeOu
 // doesn't set goes to 0 (back to cue 9 switches off what cue 10 switched on).
 const LEVELS = ['intensity', 'white', 'amber', 'uv', 'fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 // what belongs to its cue (a look's fog, a confetti shot, a flame): the next look stops it
-const FOGGY = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
+export const FOGGY = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 // a level at its highest: the light's own, or one of its cells' (a ring with only its rim lit is lit)
 const CELLY = new Set<string>(CELL_ATTRS);
 const lv = (r: Resolved | undefined, k: (typeof LEVELS)[number]) => (!r ? 0 : CELLY.has(k) ? topLevel(r, k as CellAttr) : (r[k] ?? 0));

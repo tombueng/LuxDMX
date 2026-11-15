@@ -21,6 +21,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - **"Stop effects" stops them on stage, not just on the screen.** The effects your cues run kept
   going on the wire after the button (the screen said they'd stopped), and tapping one of them
   afterwards flipped the two around. The output now hears it like every other command.
+- **The QLC+ export no longer fires a machine again in every scene after it.** In a play, the
+  cue cards and the export carried flames, CO2, confetti and haze on into every later cue (playback
+  never did). An exported workspace opened those channels again, and QLC+ has no Arm.
 - **Moving a cue to another list keeps it whole.** "Move to" in a cue's menu was a cut and a
   paste: the cut took every Live button and timeline moment that played the cue with it, and the
   paste gave it a new id. Now the cue itself moves, what plays it follows, and one Undo takes it back.
