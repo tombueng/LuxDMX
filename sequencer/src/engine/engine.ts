@@ -720,6 +720,30 @@ export class Engine {
   // a list's master as it is now: its fader's, times its level on the timeline while the song plays
   private masterOf(p: ListPlayer) { return p.master * (this.levelOver[p.id] ?? 1); }
 
+  // What an effect runs with and on: its knobs (the timeline's curves over its own), its elements,
+  // each one's light and place on it. Kept per effect where the show is a fresh copy after every
+  // edit (the output thread: an effect object is that edit's), worked out again when the curves'
+  // knobs change; on the page, where the show changes in place, every frame. (All of it every frame
+  // was 0.3 ms of the thread's 4.)
+  private fxSetups = new WeakMap<Effect, FxSetup>();
+  private setupOf(show: Show, e: Effect, def: EffectDef, modes: Map<string, FixtureMode | undefined>, lights: () => Map<string, Fixture>): FxSetup {
+    const over = this.fxOver[e.id], key = over ? JSON.stringify(over) : '';
+    const had = this.cacheTracks ? this.fxSetups.get(e) : undefined;
+    if (had && had.key === key && had.modes === modes) return had;
+    const p = paramsOf(e.kind, over ? { ...e.params, ...over } : e.params);
+    const targets = effectTargets(show, e, def, p, modes);
+    // each element's light and its place on it (pixel shows and pictures use them)
+    const rowOf = new Map<string, number>(), lightOf = lights();
+    for (const t of targets) if (!rowOf.has(t.fixture)) rowOf.set(t.fixture, rowOf.size);
+    const where = targets.map((t) => {
+      const m = modes.get(t.fixture)!, n = t.cell === undefined ? 1 : capsOf(m).cells;
+      return { u: n > 1 ? t.cell! / (n - 1) : 0.5, row: rowOf.get(t.fixture)!, rows: rowOf.size, at: t.cell === undefined ? undefined : placesOfLight(lightOf.get(t.fixture) ?? {}, m), cell: t.cell };
+    });
+    const setup = { key, modes, p, targets, where };
+    if (this.cacheTracks) this.fxSetups.set(e, setup);
+    return setup;
+  }
+
   // Every effect that runs (from a cue, or by hand), mixed onto the stage.
   private runEffects(show: Show, players: ListPlayer[], stage: Record<string, Resolved>, modes: Map<string, FixtureMode | undefined>, now: number,
     held = new Map<string, number>(), colored = new Set<string>()) {
@@ -741,30 +765,22 @@ export class Engine {
       }
     }
     this.cueFx = cueFx;
-    const run: { e: Effect; def: EffectDef; p: EffectParams; f: number }[] = [];
+    const run: { e: Effect; def: EffectDef; p: EffectParams; f: number; setup: FxSetup }[] = [];
+    let lightOf: Map<string, Fixture> | undefined;
     for (const e of show.effects) {
       const def = EFFECT_MAP.get(e.kind), f = w.get(e.id) ?? 0;
       if (!def || f <= 0) continue;
-      const over = this.fxOver[e.id];
-      run.push({ e, def, p: { ...paramsOf(e.kind, over ? { ...e.params, ...over } : e.params), sound: this.sound }, f });
+      const setup = this.setupOf(show, e, def, modes, () => (lightOf ??= new Map(show.fixtures.map((x) => [x.id, x]))));
+      run.push({ e, def, p: { ...setup.p, sound: this.sound }, f, setup });
     }
     run.sort((a, b) => FX_ORDER[a.def.category] - FX_ORDER[b.def.category]);
     const base = run.some((r) => r.p.lightUp) ? new Map(Object.entries(stage).map(([id, s]) => [id, s.intensity ?? 0])) : undefined;
-    const lightOf = new Map(show.fixtures.map((x) => [x.id, x]));      // (each element's light, for the pixel shows)
-    for (const { e, def, p, f } of run) {
+    for (const { e, def, p, f, setup: { targets, where } } of run) {
       let since = this.fxSince.get(e.id);
       // Tempo effects count from the last whole beat, so their steps land on the beat (and on the
       // music's kicks when the beat clock follows a microphone).
       if (!since) { since = { beats: Math.floor(this.beats), seconds: this.seconds }; this.fxSince.set(e.id, since); }
       const total = (p.tempo ? this.beats - since.beats : this.seconds - since.seconds) / p.speed;
-      const targets = effectTargets(show, e, def, p, modes);
-      // each element's light and its place on it (pixel shows and pictures use them)
-      const rowOf = new Map<string, number>();
-      for (const t of targets) if (!rowOf.has(t.fixture)) rowOf.set(t.fixture, rowOf.size);
-      const where = targets.map((t) => {
-        const m = modes.get(t.fixture)!, n = t.cell === undefined ? 1 : capsOf(m).cells;
-        return { u: n > 1 ? t.cell! / (n - 1) : 0.5, row: rowOf.get(t.fixture)!, rows: rowOf.size, at: t.cell === undefined ? undefined : placesOfLight(lightOf.get(t.fixture) ?? {}, m), cell: t.cell };
-      });
       const clock = { beats: this.beats - since.beats, secs: this.seconds - since.seconds };
       // one effect that can't run (a formula, a picture, a value from a file) stops itself, never
       // the frame: everything else goes on going out (the app says which one, from `broken`)
@@ -780,6 +796,11 @@ export class Engine {
     for (const id of this.fxSince.keys()) if (!w.has(id)) this.fxSince.delete(id);
     this.fxWeights = w;
   }
+}
+
+interface FxSetup {
+  key: string; modes: Map<string, FixtureMode | undefined>; p: EffectParams; targets: Target[];
+  where: { u: number; row: number; rows: number; at: ReturnType<typeof placesOfLight> | undefined; cell: number | undefined }[];
 }
 
 // Values on top of a look: like Object.assign, but channel-by-channel for raw values (setting one
