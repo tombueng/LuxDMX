@@ -45,7 +45,7 @@ then the app, so a deployed site has the downloads next to it.
 | Folder | What's in it |
 |---|---|
 | `src/app.svelte.ts` | The app state (one `app` object): the show, selection, programmer, playback, outputs, undo, saving, the timetable, cold start and reload restore. Most UI actions are methods here. |
-| `src/model/` | The show: `types.ts` (every type), `format.ts` (load, validate, upgrade, save), `library.ts` (built-in fixture types, capabilities), `timeline.ts`, `schedule.ts`, `sun.ts`, cue numbering, diffs. |
+| `src/model/` | The show: `types.ts` (every type), `format.ts` (load, upgrade, save), `mend.ts` (what a file holds made usable, with notes), `library.ts` (built-in fixture types, capabilities), `timeline.ts`, `schedule.ts`, `sun.ts`, cue numbering, diffs. |
 | `src/engine/` | What goes out each frame: `engine.ts` (lists, effects, merging, rendering to universes), `player.ts` (a cue list playing: fades, follow-ons, tracking), `resolve.ts`, `render.ts` (values to DMX channels per fixture mode), effects (`fxkit.ts` shared parts, `effects.ts` built-in, `pixels.ts` pixel shows, `custom.ts` formula and picture). |
 | `src/output/` | `bridge.ts` (a LuxDMX box through its bridge popup and websocket), `link.ts` (LuxDMX Link on this computer). Both also carry RDM requests (`rdm()`: answered by id, a timeout when the other end has none). |
 | `src/rdm/` | RDM: `types.ts` (the light as RDM says it), `box.ts` (a box's `/rdm.json` read), `match.ts` (the rig against the patch, the fixes, which library profile a light is; pure, tested), `rig.svelte.ts` (scan, watch, history, the fixes applied); the screen is `ui/RigCheck.svelte`. The bridge page relays `rdm` messages to the box's own `/rdm*` endpoints; the fake box has a small simulated rig. |
@@ -79,8 +79,9 @@ stage and the output agree and tests can check exact values.
 
 ## The show file
 
-`types.ts` is the truth; `format.ts` reads and checks a file (`upgrade()` for older ones),
-`FORMAT.md` explains it, `schema/luxdmx-show.schema.json` describes it. Change all four together;
+`types.ts` is the truth; `format.ts` reads a file (`upgrade()` for older ones) and `mend.ts`
+checks and mends what it holds, `FORMAT.md` explains it, `schema/luxdmx-show.schema.json` describes
+it. Change them together;
 `model/schema.test.ts` checks that saved shows pass the schema. Unknown keys are kept, wrong ones
 dropped with a note. Anything that can make a machine run (fog, flames, CO2) must have a bounded
 duration in the file (a burst says its seconds, at most 30).
