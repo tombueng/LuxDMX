@@ -266,10 +266,20 @@
     own.splice(j, 0, p);
     app.markDirty(0);
   }
+  // (the page's menu and a double-click on its tab: one step to undo; a page made from the show
+  // becomes your own first)
+  async function renamePage(id: string, was: string) {
+    const n = await ui.ask('Rename the page', was);
+    if (!n || n === was) return;
+    app.checkpoint(); app.ownPages();
+    const q = app.show.pages.find((x) => x.id === id);
+    if (q) q.name = n;
+    app.markDirty(0);
+  }
   function pageMenu(e: MouseEvent, id: string) {
     const p = pages.find((x) => x.id === id)!;
     ui.openMenu(e, [
-      { label: 'Rename', icon: 'edit', run: async () => { const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === id); if (q) q.name = n; app.markDirty(0); } } },
+      { label: 'Rename', icon: 'edit', run: () => renamePage(id, p.name) },
       { label: 'Duplicate', icon: 'duplicate', run: () => { app.ownPages(); const q = app.show.pages.find((x) => x.id === id)!; const c = { ...JSON.parse(JSON.stringify(q)), id: newId('pg'), name: `${q.name} (copy)`, locked: false }; c.widgets.forEach((w: Widget) => (w.id = newId('w'))); app.show.pages.push(c); app.page = c.id; } },
       // (the pages in another order: there was no way to)
       { label: 'Move left', icon: 'left', disabled: pages.findIndex((x) => x.id === id) < 1, run: () => movePage(id, -1) },
@@ -460,7 +470,7 @@
     <div class="pages" role="tablist" aria-label="Pages" use:tablist>
       {#each tabs as p (p.id)}
         <button role="tab" aria-selected={p.id === page?.id} class:cur={p.id === page?.id} onclick={() => { app.page = p.id; selW = null; }} oncontextmenu={(e) => { if (app.locked) e.preventDefault(); else pageMenu(e, p.id); }}
-                ondblclick={async () => { if (app.locked) return; const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === p.id); if (q) q.name = n; app.markDirty(0); } }} title="{p.name}: double-click to rename, right-click for more (move it, duplicate...)">
+                ondblclick={() => { if (!app.locked) void renamePage(p.id, p.name); }} title="{p.name}: double-click to rename, right-click for more (move it, duplicate...)">
           {#if p.locked}<Icon name="lock" size={12} />{/if}{p.name}</button>
       {/each}
     </div>

@@ -51,6 +51,11 @@ test('right-click a cue list tab to rename it; the programmer says when an effec
   await ask.getByLabel('Name').fill('Songs');
   await ask.getByLabel('Name').press('Enter');
   await expect(page.locator('.deck .tab').first()).toContainText('Songs');
+  // (a step to undo, like any change to the show)
+  await page.locator('body').press('Control+z');
+  await expect(page.locator('.deck .tab').first()).not.toContainText('Songs');
+  await page.locator('body').press('Control+Shift+z');
+  await expect(page.locator('.deck .tab').first()).toContainText('Songs');
 
   await selectAll(page);
   await tab(page, 'Effects');

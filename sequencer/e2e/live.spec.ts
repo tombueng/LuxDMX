@@ -1,7 +1,7 @@
 // Live: the busking page built from a show, every kind of control, keys, hold-to-fog with its hard
 // maximum, flash, and editing the page (add, change, move, remove, lock).
 import type { Page } from '@playwright/test';
-import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, test, expect, startTemplate } from './helpers';
+import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, selectAll, full, record, test, expect, startTemplate } from './helpers';
 
 const tile = (page: Page, id: string) => page.locator(`.live [data-widget="${id}"]`);
 const tileByText = (page: Page, text: string) => page.locator('.live .tile', { hasText: text }).first();
@@ -621,4 +621,22 @@ test('the GO bar holds still: Release and Auto GO stay where they are whatever t
   expect(new Set(ax).size, ax.join(',')).toBe(1);
   // (the long name cut short, all of it in the tooltip, while it was up or next)
   expect(titles.some((t) => /thunder and the rain$/.test(t))).toBe(true);
+});
+
+test('a page renamed from its menu and by a double-click on its tab', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await selectAll(page); await full(page); await record(page);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const tabs = page.locator('.live .pages [role=tab]');
+  await tabs.first().click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Rename' }).click();
+  const ask = page.getByRole('dialog', { name: 'Rename the page' });
+  await ask.getByLabel('Name').fill('Main show');
+  await ask.getByLabel('Name').press('Enter');
+  await expect(tabs.first()).toContainText('Main show');
+  await tabs.first().dblclick();
+  await ask.getByLabel('Name').fill('Encore');
+  await ask.getByLabel('Name').press('Enter');
+  await expect(tabs.first()).toContainText('Encore');
 });

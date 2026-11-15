@@ -13,7 +13,7 @@
   import { app } from '../app.svelte';
   import { dialogOpen, focusSelect, spaceIsGo, ui, listKeys, menuKey, asPercent } from './ui.svelte';
   import { layoutKey, lookSvg, svgImage } from './thumb';
-  import type { Advance, Cue } from '../model/types';
+  import type { Advance, Cue, CueList } from '../model/types';
   import { whileShown } from './shown.svelte';
 
   const list = $derived(app.list);
@@ -93,12 +93,18 @@
       { label: 'Delete', icon: 'trash', keys: 'Del', danger: true, run: del },
     ]);
   }
+  // (the tab's menu and its double-click: one step to undo)
+  async function renameList(l: CueList) {
+    const n = await ui.ask('Rename the list', l.name);
+    if (!n || n === l.name) return;
+    app.checkpoint(); l.name = n; app.markDirty(0);
+  }
   function tabMenu(e: MouseEvent, id: string) {
     const l = app.show.cueLists.find((x) => x.id === id)!;
     app.currentList = id;
     ui.openMenu(e, [
       { label: app.status[id]?.running ? 'Release (fade out)' : 'Start', icon: app.status[id]?.running ? 'stop' : 'play', run: () => (app.status[id]?.running ? app.release(id) : app.engine.start(id)) },
-      { label: 'Rename…', icon: 'edit', run: async () => { const n = await ui.ask('Rename the list', l.name); if (n) { l.name = n; app.markDirty(0); } } },
+      { label: 'Rename…', icon: 'edit', run: () => renameList(l) },
       { label: 'Settings', icon: 'gear', run: () => { settings = true; } },
       { label: l.end === 'loop' ? 'Stop looping' : 'Loop', icon: 'loop', run: () => { l.end = l.end === 'loop' ? 'stop' : 'loop'; app.markDirty(0); } },
       { label: `Print ${l.name}'s cue sheet`, icon: 'printer', disabled: !l.cues.length, run: () => { if (!app.printCueSheet(id)) ui.toast('The browser blocked the window: allow pop-ups for this page'); } },
@@ -177,7 +183,7 @@
     </Help>
     {#each app.show.cueLists as l (l.id)}
       <button class="tab" class:cur={l.id === app.currentList} onclick={() => { app.currentList = l.id; app.cueSel = []; }} oncontextmenu={(e) => tabMenu(e, l.id)}
-              ondblclick={async () => { const n = await ui.ask('Rename the list', l.name); if (n) { l.name = n; app.markDirty(0); } }} title="Double-click to rename, right-click for more">
+              ondblclick={() => renameList(l)} title="Double-click to rename, right-click for more">
         <span class="dot" class:on={status()[l.id]?.running} style={l.color ? `--c:${l.color}` : ''}></span>{l.name}
         <span class="faint">{l.cues.length}</span>
       </button>
