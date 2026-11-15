@@ -169,6 +169,7 @@ export class Engine {
   private beats = 0;
   private seconds = 0;
   private last = -1;
+  private beatsSetAt = -1;     // (when the beat clock was last set from a song: beatsAt counts on from there)
 
   constructor(private getShow: () => Show, readonly now: () => number = () => performance.now() / 1000) {}
 
@@ -238,8 +239,15 @@ export class Engine {
     if (!Number.isFinite(b)) return;
     if (Math.abs(b - this.beats) > 0.5) this.fxSince.clear();
     this.beats = b;
+    this.beatsSetAt = this.now();
   }
   get beatCount() { return this.beats; }
+  // the beat clock as it stands now, between ticks (the page's engine sits out frames under load:
+  // Auto GO still goes on the bar)
+  beatsAt(now: number) {
+    const from = Math.max(this.last, this.beatsSetAt);
+    return from < 0 ? this.beats : this.beats + Math.max(0, now - from) * this.bpm / 60;
+  }
   releaseFlashes() { for (const p of this.players.values()) if (p.flashing) p.stop(); for (const id of this.fxFlash) this.liveFx.delete(id); this.fxFlash.clear(); }
   setMaster(id: string, v: number) { this.player(id).master = Math.max(0, Math.min(1, v)); if (v > 0.004) this.faderOut.delete(id); }
   // A list let go by the console's fader (pulled to 0, its level left there) plays at full when

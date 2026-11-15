@@ -347,8 +347,12 @@ fake box, and a line in GUIDE.md. New knobs go into `EffectParams` and `BASE` in
   seconds. Anything new that draws every frame reads `load.level` and reports its time with
   `load.did(ms)`. Never put drawing work before the send, and never wait for the screen in it.
   With the output thread running (`load.outputSafe`) the page's late frames can't make the output
-  late: `load.level` (the 3D stage) stays at the quality chosen; `uiEvery` (to 3 at most) and
-  `load.level2d` (the plan's blur and animations: most of a busy page on a big rig) step down.
+  late: `load.level` (the 3D stage) keeps the quality chosen but draws less often first
+  (`load.slow3d`: at most 30, then 20 frames a second); `uiEvery` (to 3 at most) and
+  `load.level2d` (the plan's blur and animations: most of a busy page on a big rig) step down. The
+  page's own engine then ticks only on the frames the screen shows (every `uiEvery`-th; Auto GO
+  counts the beat on with `engine.beatsAt`, the timeline and the fog's timers go on every frame);
+  not with the machines armed, a box the page sends to itself, or right after a change.
   Without the thread both levels move together. The quality
   with nothing stored is High (`Number(null)` is 0: it once made everyone's default Low).
 - Big pictures go on the page as one image, not as shapes: the cue and tile thumbnails

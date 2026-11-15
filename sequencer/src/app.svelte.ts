@@ -1091,13 +1091,23 @@ class App {
     const blindOut = this.output === 'live' ? null : this.blindFrames();
     this.thread.sync(this.engine, this.show, this.quiet || (this.output !== 'live' && !blindOut), blindOut, this.bridges,
       this.show.outputs.devices.find((d) => d.host === LINK)?.proto ?? 'artnet');
+    // (nothing from this page reaches a box: the thread serves every one that's there, or nothing goes
+    // out; and how late the thread itself is)
+    load.outputSafe = this.quiet || (this.output !== 'live' && !blindOut) || this.bridges.every((b) => b.state !== 'ready' || this.thread.serves(b));
+    // Under load, with nothing from this page going out, its engine works out only the frames the
+    // screen shows (every n-th, perf/load.svelte.ts): it was a sixth of the page's time on the
+    // festival demo, and most of it never drawn. Auto GO, the fog's timers, the timeline go on every
+    // frame. (Not with the machines armed: what they hold is kept every frame; nor after a change.)
+    if (load.outputSafe && load.uiEvery > 1 && this.uiN + 1 < load.uiEvery && this.shownRev === this.rev && !this.engine.armed) {
+      this.uiN++;
+      this.onBeatAndTimers();
+      this.afterScreen(performance.now());
+      return;
+    }
     const { frames, stage, look } = this.engine.tick();
     if (this.engine.blackout !== this.bo) this.bo = this.engine.blackout;   // a cue action changed it (at once: the Blackout key toggles from it)
     if (this.engine.armed) this.keepHeld();
     this.stageNow = stage;
-    // (nothing from this page reaches a box: the thread serves every one that's there, or nothing goes
-    // out; and how late the thread itself is)
-    load.outputSafe = this.quiet || (this.output !== 'live' && !blindOut) || this.bridges.every((b) => b.state !== 'ready' || this.thread.serves(b));
     load.threadLate = this.thread.running && !this.thread.stats.quiet ? this.thread.stats.late : 0;
     // ---- what goes out from this page (a box the thread doesn't serve, older firmware), before the screen
     // A universe nothing drives any more (last fixture removed, wizard closed) gets zeros for a
@@ -1129,14 +1139,22 @@ class App {
       ui.toast(`"${this.show.effects.find((e) => e.id === id)?.name ?? id}" can't run (${why}), so it's left out. Everything else goes on.`, 8000);
     }
     for (const id of this.saidBroken) if (!this.engine.broken.has(id)) this.saidBroken.delete(id);
+    this.onBeatAndTimers();
+    // ---- what the screen shows: every frame, or every n-th while the output needs the time
+    // (perf/load.svelte.ts); a fresh start or a change of look shows at once
+    if (++this.uiN >= load.uiEvery || this.shownRev !== this.rev) { this.uiN = 0; this.shownRev = this.rev; this.publish(stage, look, frames); }
+    this.afterScreen(t);
+  }
+  // (every frame, also the ones this page's engine sits out)
+  private onBeatAndTimers() {
     // Auto GO: on every n-th bar (4 beats) of the beat clock, GO on the list Live plays. Never on a
     // staff page of looks (no GO there: its looks are tapped, not stepped).
     if (this.autoGo > 0 && this.livePage?.go !== false) {
-      const bar = Math.floor(this.engine.beatCount / (4 * this.autoGo));
+      const beats = this.engine.beatsAt(this.engine.now()), bar = Math.floor(beats / (4 * this.autoGo));
       // Auto GO goes round: at the end of the list it starts over (a party doesn't stop on the last look)
       const l = this.liveList;
       // (not right after a GO by hand: the next one waits for the bar after, staying on the beat)
-      if (this.autoBar >= 0 && bar !== this.autoBar && l && l.cues.length > 1 && this.engine.beatCount >= this.autoSkip) {      // one look has nowhere to go
+      if (this.autoBar >= 0 && bar !== this.autoBar && l && l.cues.length > 1 && beats >= this.autoSkip) {      // one look has nowhere to go
         const st = this.engine.status(l.id);
         if (st.running && st.index >= l.cues.length - 1) this.engine.jumpTo(l.id, 0); else this.engine.go(l.id);
       }
@@ -1144,9 +1162,8 @@ class App {
     } else this.autoBar = -1;
     const nowMs = performance.now();
     for (const [w, until] of Object.entries(this.fogUntil)) if (nowMs >= until) this.expire(w);
-    // ---- what the screen shows: every frame, or every n-th while the output needs the time
-    // (perf/load.svelte.ts); a fresh start or a change of look shows at once
-    if (++this.uiN >= load.uiEvery || this.shownRev !== this.rev) { this.uiN = 0; this.shownRev = this.rev; this.publish(stage, look, frames); }
+  }
+  private afterScreen(t: number) {
     this.remote.tick(t);
     this.timeline.tick();
     if (t - this.schedAt > 5000) { this.schedAt = t; this.runSchedule(); }
