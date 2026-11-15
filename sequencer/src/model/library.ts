@@ -272,7 +272,7 @@ export function capsOf(m: FixtureMode | undefined) {
 export type FixtureKind = 'mover' | 'bar' | 'fog' | 'sfx' | 'strobe' | 'par' | 'dimmer' | 'other';
 export function kindOf(m: FixtureMode | undefined): FixtureKind {
   if (!m) return 'other';
-  const c = caps(m);
+  const c = capsOf(m);
   if (c.position || c.heads) return 'mover';
   if (c.cells > 1) return 'bar';
   if (c.sfx) return 'sfx';
