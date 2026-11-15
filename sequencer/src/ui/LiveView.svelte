@@ -3,6 +3,7 @@
   import { pinMatches } from '../model/pin';
   import { looksPage } from '../content/busking';
   import { whatsNew } from '../content/whatsNew';
+  import { newWidget, nothingFor, songWidgets, type NewKind } from '../content/newWidget';
   import { clearProgrammer } from './clear.svelte';
   // Live: play the show with big buttons. Starts with a page built from the show; Edit makes it
   // yours (add, move, change, remove controls; more pages). Keys on the buttons work as shortcuts,
@@ -142,32 +143,20 @@
     app.editPage = !app.editPage;
     selW = null;
   }
-  function add(kind: Widget['type'] | 'drop') {
+  // a new control (content/newWidget.ts makes it from what the show has), after the one picked
+  function add(kind: NewKind) {
     const p = app.ownPages().find((x) => x.id === (app.page || app.show.pages[0].id)) ?? app.show.pages[0];
-    // the set list's three: Play / pause and Next song big, Next part next to them
+    const at = selW ? p.widgets.findIndex((x) => x.id === selW) + 1 : p.widgets.length;
+    const id = () => newId('w');
     if (kind === 'song') {
-      const at = selW ? p.widgets.findIndex((x) => x.id === selW) + 1 : p.widgets.length;
-      const three: Widget[] = [{ id: newId('w'), type: 'song', do: 'play', size: 2 }, { id: newId('w'), type: 'song', do: 'next', size: 2 }, { id: newId('w'), type: 'song', do: 'part' }];
+      const three = songWidgets(id);
       p.widgets.splice(at, 0, ...three);
       selW = three[0].id;
       if (!app.show.timeline) ui.toast('Put a song on the Timeline (or a few: the set list) for these to play', 5000);
       return;
     }
-    const l = app.liveList, fx = app.show.effects[0];
-    const base = { id: newId('w') };
-    const w: Widget | undefined =
-      kind === 'list' ? (l ? { ...base, type: 'list', list: l.id, action: 'go' } : undefined)
-      : kind === 'cue' ? (l?.cues[0] ? { ...base, type: 'cue', list: l.id, cue: l.cues[0].id } : undefined)
-      : kind === 'effect' ? (fx ? { ...base, type: 'effect', effect: fx.id, action: 'toggle' } : undefined)
-      : kind === 'fader' ? { ...base, type: 'fader', target: 'grand' }
-      : kind === 'group' ? (app.show.groups[0] ? { ...base, type: 'group', group: app.show.groups[0].id, level: 1 } : undefined)
-      : kind === 'fog' ? { ...base, type: 'fog', fixtures: app.show.fixtures.filter((f) => app.caps(f.id).fog).map((f) => f.id), level: 1, burst: 3, max: 10, label: 'Fog' }
-      : kind === 'special' ? { ...base, type: 'special', do: 'blackout' }      // no label: it follows what it does
-      : kind === 'cuelist' ? (l ? { ...base, type: 'cuelist', list: l.id } : undefined)
-      : kind === 'drop' ? { ...base, type: 'special', do: 'drop', label: 'Drop' }
-      : { ...base, type: 'label', label: 'New section' };
-    if (!w) return ui.toast(kind === 'effect' ? 'Make an effect first (Program, Effects)' : kind === 'group' ? 'Make a group first (Program, Groups)' : 'Record some cues first');
-    const at = selW ? p.widgets.findIndex((x) => x.id === selW) + 1 : p.widgets.length;
+    const w = newWidget(app.show, kind, { list: app.liveList, fog: app.show.fixtures.filter((f) => app.caps(f.id).fog).map((f) => f.id), id });
+    if (!w) return ui.toast(nothingFor(kind));
     p.widgets.splice(at, 0, w);
     selW = w.id;
   }
