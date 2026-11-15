@@ -287,6 +287,14 @@
     if (raw) chipAt(JSON.parse(raw) as Chip, at);
   }
 
+  // how long a placed thing can be: a crowd change from an instant to a minute, a cheer up to
+  // CHEER_MAX, anything else half a second or more; never past the end of the show
+  function lenFor(it: Placed, len: number) {
+    const crowdy = isCrowd(it), max = crowdy ? (it.do.do === 'cheer' ? CHEER_MAX : 60) : Infinity, least = crowdy && it.do.do !== 'cheer' ? 0 : 0.5;
+    return Math.max(least, Math.min(max, span.to - it.at, len));
+  }
+  // (the crowd's track stays in time order)
+  function sortCrowd() { if (tl?.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at); }
   // dragging what's placed (and the end of an effect bar, a crowd change or a cheer)
   let drag: { id: string; dx: number; end: boolean; moved: boolean } | null = null;
   function itemDown(e: PointerEvent, it: Placed, end = false) {
@@ -301,9 +309,9 @@
     const it = placed(drag.id);
     if (!it) return;
     if (!drag.moved) { app.checkpoint(); drag.moved = true; }
-    const t = sn(tAt(e.clientX) - drag.dx, e.altKey), crowdy = isCrowd(it), max = crowdy ? (it.do.do === 'cheer' ? CHEER_MAX : 60) : Infinity, least = crowdy && it.do.do !== 'cheer' ? 0 : 0.5;
-    if (drag.end) it.len = Math.max(least, Math.min(max, span.to - it.at, t - it.at));
-    else { it.at = inSpan(t); if (it.len !== undefined) it.len = Math.max(least, Math.min(it.len, span.to - it.at)); }
+    const t = sn(tAt(e.clientX) - drag.dx, e.altKey);
+    if (drag.end) it.len = lenFor(it, t - it.at);
+    else { it.at = inSpan(t); if (it.len !== undefined) it.len = lenFor(it, it.len); }
   }
   // The keyboard's way to move one (there was none): arrows, a beat (with Shift a bar; a bar each
   // when it snaps to bars; half a second with snap off or outside the song)
@@ -317,13 +325,12 @@
     const step = inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5;
     app.checkpoint();
     it.at = inSpan(Math.round((it.at + (e.key === 'ArrowRight' ? step : -step)) * 1000) / 1000);
-    if (it.len !== undefined) it.len = Math.max(0.5, Math.min(it.len, span.to - it.at));
-    if (tl.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at);
+    if (it.len !== undefined) it.len = lenFor(it, it.len);
+    sortCrowd();
     app.markDirty(0);
   }
   function itemUp() {
-    // (the crowd's track stays in time order)
-    if (drag?.moved) { if (tl?.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at); app.markDirty(0); }
+    if (drag?.moved) { sortCrowd(); app.markDirty(0); }
     drag = null;
   }
   function remove(id: string) {
@@ -886,7 +893,7 @@
                   {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{:else if mark === 'winch'}<span class="mark winch" aria-hidden="true">⇅</span>{/if}
                   <span class="t">{labelOf(it)}</span>
                   {#if it.len !== undefined}<!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span class="end" onpointerdown={(e) => itemDown(e, it, true)} onpointermove={itemMove} onpointerup={itemUp}></span>{/if}
+                    <span class="end" onpointerdown={(e) => itemDown(e, it, true)}></span>{/if}
                 </button>
               {/each}
             </div>

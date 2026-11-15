@@ -508,7 +508,7 @@
         <g class="fx" data-name={f.name} role="button" tabindex="-1" aria-label={f.name} aria-pressed={sel}
            class:dropping={dropFx === f.id} oncontextmenu={(e) => fxMenu(e, f.id)}
            ondragover={(e) => { if (isPreset(e)) { e.preventDefault(); dropFx = f.id; } }} ondragleave={() => { if (dropFx === f.id) dropFx = null; }} ondrop={(e) => presetDrop(e, f.id)}
-           onpointerdown={(e) => downFixture(e, f.id)} onpointermove={moveFixture} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
+           onpointerdown={(e) => downFixture(e, f.id)} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
           {#if machines.has(f.id)}
             <!-- a curtain or a drop: its cloth across the stage, solid where it hangs in view (a curtain
                  closed, a drop flown in), dashed where it's out of the way; a track's halves part -->
