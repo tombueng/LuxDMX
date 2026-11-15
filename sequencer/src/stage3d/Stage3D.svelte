@@ -240,7 +240,14 @@
     const at = ui.focus3d;
     if (!at || at === focusSeen || Date.now() - at > 5000) return;
     // (after the room is built: building it puts the camera at the front)
-    const go = () => { if (!controls || !fixtures.length || !holding || builtRoom !== (room.key ?? room.id)) return void setTimeout(go, 100); focusSeen = at; requestAnimationFrame(() => focusSel()); };
+    // (every built view's stage hears it, only the one on screen goes: the others give up when this one
+    // went away, a newer ask came, or after a while; they used to wait, and flew to whatever was
+    // picked when shown minutes later, or kept asking for good once gone)
+    const go = () => {
+      if (gone || ui.focus3d !== at || Date.now() - at > 15000) return;
+      if (!controls || !fixtures.length || !holding || builtRoom !== (room.key ?? room.id)) return void setTimeout(go, 100);
+      focusSeen = at; requestAnimationFrame(() => focusSel());
+    };
     untrack(go);
   });
   // the list of moves (opened from the keys: onto the one running, or the first)

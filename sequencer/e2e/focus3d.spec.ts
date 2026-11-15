@@ -43,6 +43,35 @@ test('the camera flies to the selected lights: "Selected" on the 3D stage, "Show
   await expect(cam.getByRole('button', { name: 'Selected', exact: true })).toBeDisabled();
 });
 
+// Every built view has a 3D stage, and all of them hear "Show it in 3D"; only the one on screen goes.
+// The others used to wait until shown, and flew off to whatever was picked then, minutes later.
+test('"Show it in 3D": a view opened later doesn\'t fly off to whatever is picked by then', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 6, 0, 'Head');
+  const tabs = page.locator('.top .modes');
+  // Live once (its stage is built), then back to Program
+  await tabs.getByRole('tab', { name: 'Live' }).click();
+  await expect(page.locator('div.live')).toBeVisible();
+  await tabs.getByRole('tab', { name: 'Program' }).click();
+  await page.locator('.fl li[data-fixture="Head 5"]').click();
+  await page.locator('.fl li[data-fixture="Head 5"]').click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Show it in 3D' }).click();
+  await expect.poll(() => page.evaluate(() => !!(window as any).__stage3d?.internals), { timeout: 45000 }).toBe(true);
+  await expect.poll(() => offCentre(page, 'Head 5'), { timeout: 20000 }).toBeLessThan(0.25);
+  // a while later another light is picked, and Live is opened: its stage takes over and stays put
+  await page.waitForTimeout(16000);
+  await page.locator('.fl li[data-fixture="Head 1"]').click();
+  await tabs.getByRole('tab', { name: 'Live' }).click();
+  await expect(page.locator('div.live')).toBeVisible();
+  const flew = await page.evaluate(() => new Promise<boolean>((done) => {
+    const t0 = performance.now(); let seen = false;
+    const look = () => { if ((window as any).__stage3d?.flying()) seen = true; if (performance.now() - t0 > 3000) done(seen); else requestAnimationFrame(look); };
+    look();
+  }));
+  expect(flew).toBe(false);
+});
+
 test('Measure on the 3D stage: two points and how far apart; one light: how high it hangs and where its beam lands; Esc clears', async ({ page }) => {
   test.setTimeout(120_000);
   await openConnected(page);
