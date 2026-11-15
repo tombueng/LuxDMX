@@ -124,31 +124,40 @@
   // Picked by name: a gobo, a second gobo, the light's built-in effects, its colour programs (from
   // the first selected light that has them; app.setSlot finds the same name on the others).
   const PICKS: ['gobo' | 'gobo2' | 'effectMacro' | 'colorMacro', string][] = [['gobo', 'Gobo'], ['gobo2', 'Gobo 2'], ['effectMacro', 'Built-in effect'], ['colorMacro', 'Colour program']];
-  const picks = $derived(PICKS.flatMap(([k, label]) => {
+  // What each pick offers (worked out when the selection or its lights change: the wheel's
+  // patterns and ranges are regexes over every slot's name, too much for every frame), then what
+  // it's on right now (from the look, every frame: a lookup)
+  const pickDefs = $derived(PICKS.flatMap(([k, label]) => {
     for (const f of sel) {
       const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine);
       const slots = c ? slotsOf(c) : [];
       if (slots.length) {
-        const v = look()[f.id]?.[k];
-        const cur = typeof v === 'number' ? Math.round(v * (slots.length - 1)) : -1;
-        return [{ k, label, slots: slots.map((r) => r.label), colors: slots.map((r) => r.color), cur, wheel: wheelExtras(f.id, k) }];
+        const names = slots.map((r) => r.label);
+        return [{ k, label, id: f.id, slots: names, colors: slots.map((r) => r.color), wheel: wheelRanges(f.id, k),
+          pats: k === 'gobo' || k === 'gobo2' ? wheelPatterns(names) : null }];
       }
     }
     return [];
   }));
+  const picks = $derived(pickDefs.map((p) => {
+    const l = look()[p.id] as Record<string, number | undefined> | undefined, v = l?.[p.k];
+    const cur = typeof v === 'number' ? Math.round(v * (p.slots.length - 1)) : -1;
+    return { ...p, cur, shaking: (l?.[`${p.k}Shake`] ?? 0) > 0, scroll: l?.[`${p.k}Scroll`] ?? 0 };
+  }));
   // A gobo wheel's own functions, as real heads have them on its channel's other ranges: the gobo
   // shaking ("Shake 3 slow..fast") and the whole wheel running round ("Wheel rotation CW / CCW").
   // Attributes like any other (goboShake, goboScroll: a cue keeps them, the next one lets them go).
-  function wheelExtras(id: string, k: string) {
+  // (`shakeAt[i]`: the range that shakes gobo i+1, if the wheel has one)
+  function wheelRanges(id: string, k: string) {
     if (k !== 'gobo' && k !== 'gobo2') return undefined;
     const c = app.modeOf(id)?.channels.find((x) => x.attr === k && !x.fine && x.cell === undefined);
     const others = c?.ranges?.filter((r) => r.kind === 'other') ?? [];
     const shakes = others.filter((r) => /shake|wackel|zitter/i.test(r.label ?? ''));
     const runs = others.filter((r) => /rotat|scroll|spin|dreh/i.test(r.label ?? '') && !/shake/i.test(r.label ?? ''));
     if (!shakes.length && !runs.length) return undefined;
-    const l = look()[id] as Record<string, number | undefined> | undefined;
-    return { shakes, cw: runs.some((r) => !CCW_WORDS.test(r.label ?? '')), ccw: runs.some((r) => CCW_WORDS.test(r.label ?? '')),
-      shaking: (l?.[`${k}Shake`] ?? 0) > 0, scroll: l?.[`${k}Scroll`] ?? 0 };
+    const n = slotsOf(c!).length;
+    const shakeAt = Array.from({ length: n }, (_, i) => shakes.find((r) => new RegExp(`(^|\\D)${i + 1}(\\D|$)`).test(r.label ?? '')));
+    return { shakeAt, cw: runs.some((r) => !CCW_WORDS.test(r.label ?? '')), ccw: runs.some((r) => CCW_WORDS.test(r.label ?? '')) };
   }
   // A slider's channel with named ranges (a prism's facets, a rotation's index / CW / stop / CCW): its
   // ranges, from the first selected light that has it (a plain channel: none)
@@ -315,19 +324,18 @@
       <section class="pick" aria-label={p.label}>
         <div class="lab"><span>{p.label}</span><span class="faint">{p.cur >= 0 ? p.slots[p.cur] : ''}</span></div>
         {#if p.slots.length <= 12}
-          {@const pats = p.k === 'gobo' || p.k === 'gobo2' ? wheelPatterns(p.slots) : null}
           <div class="quick wrap">
-            {#each p.slots as s, i (i)}<button class:on={i === p.cur && !p.wheel?.scroll} onclick={() => app.setSlot(p.k, s, i)} title={s}>{#if p.colors[i]}<span class="dot" style="background:{p.colors[i]}"></span>{/if}{#if pats}<GoboIcon pattern={pats[i]} />{/if}{s}</button>{/each}
+            {#each p.slots as s, i (i)}<button class:on={i === p.cur && !p.scroll} onclick={() => app.setSlot(p.k, s, i)} title={s}>{#if p.colors[i]}<span class="dot" style="background:{p.colors[i]}"></span>{/if}{#if p.pats}<GoboIcon pattern={p.pats[i]} />{/if}{s}</button>{/each}
           </div>
           {#if p.wheel}
             {@const w = p.wheel}
-            {@const shake = w.shakes.find((r) => new RegExp(`(^|\\D)${p.cur + 1}(\\D|$)`).test(r.label ?? ''))}
+            {@const shake = p.cur >= 0 ? w.shakeAt[p.cur] : undefined}
             {@const sk = `${p.k}Shake`}
             {@const sc = `${p.k}Scroll`}
             <div class="quick wrap wheelfx" role="group" aria-label="{p.label}: shake and wheel">
-              {#if shake}<button class:on={w.shaking} aria-pressed={w.shaking} onclick={() => app.set({ [sk]: w.shaking ? 0 : 0.5 } as Values)} title="{shake.label}: the gobo shakes back and forth (as the light does it)">Shake</button>{/if}
-              {#if w.cw}<button class:on={w.scroll > 0} aria-pressed={w.scroll > 0} onclick={() => app.set({ [sc]: w.scroll > 0 ? 0 : 0.5 } as Values)} title="The whole wheel runs round through its gobos, clockwise">Wheel ↻</button>{/if}
-              {#if w.ccw}<button class:on={w.scroll < 0} aria-pressed={w.scroll < 0} onclick={() => app.set({ [sc]: w.scroll < 0 ? 0 : -0.5 } as Values)} title="The whole wheel runs round through its gobos, counter-clockwise">Wheel ↺</button>{/if}
+              {#if shake}<button class:on={p.shaking} aria-pressed={p.shaking} onclick={() => app.set({ [sk]: p.shaking ? 0 : 0.5 } as Values)} title="{shake.label}: the gobo shakes back and forth (as the light does it)">Shake</button>{/if}
+              {#if w.cw}<button class:on={p.scroll > 0} aria-pressed={p.scroll > 0} onclick={() => app.set({ [sc]: p.scroll > 0 ? 0 : 0.5 } as Values)} title="The whole wheel runs round through its gobos, clockwise">Wheel ↻</button>{/if}
+              {#if w.ccw}<button class:on={p.scroll < 0} aria-pressed={p.scroll < 0} onclick={() => app.set({ [sc]: p.scroll < 0 ? 0 : -0.5 } as Values)} title="The whole wheel runs round through its gobos, counter-clockwise">Wheel ↺</button>{/if}
             </div>
           {/if}
         {:else}
