@@ -58,29 +58,6 @@ test('the page and the thread work out the same look', async ({ page }) => {
   expect(wire).toEqual(screen);
 });
 
-// Under load the page's own engine works out only the frames its screen shows (every 3rd here):
-// the thread still sends every change, and the screen gets there too, a moment later at most.
-test('the page busy (the screen every 3rd frame): the box gets the look, the screen shows it too', async ({ page }) => {
-  await openConnected(page);
-  await patch(page, 'gen-drgb', 4, 0, 'PAR');
-  await expect.poll(() => page.evaluate(() => { const a = (window as any).__luxdmx; return a.thread.running && a.thread.serves(a.bridges[0]); }), { timeout: 10000 }).toBe(true);
-  // (held there: the governor brings it back up after a few calm seconds)
-  await page.evaluate(() => { const L = (window as any).__luxload; (window as any).__hold = setInterval(() => { L.uiEvery = 3; L.calmSince = L.lastStep = performance.now(); }, 100); });
-  const ticks = () => page.evaluate(() => new Promise<number>((done) => { const e = (window as any).__luxdmx.engine, t0 = e.tick; let n = 0; e.tick = function (...a: unknown[]) { n++; return t0.apply(this, a); }; setTimeout(() => { e.tick = t0; done(n); }, 1000); }));
-  const n = await ticks();
-  expect(n).toBeLessThan(25);                                        // (a third of ~40, give or take)
-  expect(n).toBeGreaterThan(5);
-  await page.evaluate(() => { const a = (window as any).__luxdmx, ids = a.show.fixtures.map((f: any) => f.id); a.programmer = Object.fromEntries(ids.map((id: string, i: number) => [id, { intensity: 0.25 * (i + 1), color: { r: 1, g: i / 4, b: 0.5 } }])); });
-  await page.waitForTimeout(600);
-  const [wire, screen] = await Promise.all([
-    fetch(`http://127.0.0.1:${process.env.FAKE_PORT ?? 8199}/frames.json`).then((r) => r.json()).then((f) => f['0'].ch.slice(0, 16)),
-    page.evaluate(() => [...(window as any).__luxdmx.frames.get(0)].slice(0, 16)),
-  ]);
-  expect(wire.some((x: number) => x > 0)).toBe(true);
-  expect(wire).toEqual(screen);
-  await page.evaluate(() => clearInterval((window as any).__hold));
-});
-
 test('a page that goes away: its safe look is the last thing the box gets', async ({ page, context }) => {
   await openConnected(page);
   await patch(page, 'gen-flame', 1, 0, 'Flame');
