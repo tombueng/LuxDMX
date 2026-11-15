@@ -7,7 +7,7 @@
   export interface KeptWorld {
     renderer: T.WebGLRenderer; canvas: HTMLCanvasElement; scene: T.Scene; camera: T.PerspectiveCamera; wash: T.SpotLight[];
     venue: ReturnType<typeof import('./venue').buildVenue>; rig: import('./rig').Rig; particles: import('./particles').Particles;
-    builtRoom: string; shape: string | null; free: () => void;
+    builtRoom: string; builtAct: 'band' | 'none'; shape: string | null; free: () => void;
   }
   let kept: KeptWorld | null = null, keptTimer: ReturnType<typeof setTimeout> | undefined;
   // stages up now, and one that started while another was still up, waiting for its world (the
@@ -358,7 +358,7 @@
   }
   function start(k: KeptWorld | null) {
     if (gone || !active || holding) { if (k) park(k); return; }
-    if (k) ({ renderer, canvas, scene, camera, wash, venue, rig, particles, builtRoom, shape } = k);
+    if (k) ({ renderer, canvas, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape } = k);
     else build();
     cvHost!.appendChild(canvas!);
     hemi = scene.getObjectByName('ambient:sky') as THREE.HemisphereLight | undefined;
@@ -409,7 +409,7 @@
     if (custom) scene.remove(custom);
     const s = scene, r = renderer;
     const freeAll = () => { free(s); (s.environment as THREE.Texture | null)?.dispose(); r.dispose(); r.forceContextLoss(); };
-    if (keep) { canvas?.remove(); canvas?.classList.remove('take'); park({ renderer, canvas: canvas!, scene, camera, wash, venue, rig, particles, builtRoom, shape, free: freeAll }); }
+    if (keep) { canvas?.remove(); canvas?.classList.remove('take'); park({ renderer, canvas: canvas!, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape, free: freeAll }); }
     else freeAll();
   }
   // this stage's own parts, for good
@@ -977,11 +977,13 @@
     if (!holding) return;
     untrack(() => {
       if (!scene || !venue || ((r.key ?? r.id) === builtRoom && a === builtAct)) return;
+      // (the camera to the front only for another room: the band going or coming leaves it where it is)
+      const newRoom = (r.key ?? r.id) !== builtRoom;
       scene.remove(venue.group); free(venue.group);
       venue = buildVenue({ room: r.id, band: bandShown, act: a, custom: r });
       venue.group.visible = !app.show.settings.stage3d?.hideVenue;
       scene.add(venue.group); builtRoom = r.key ?? r.id; builtAct = a; showRoom(r);
-      view('front');
+      if (newRoom) view('front');
     });
   });
   $effect(() => { const n = bandShown; if (holding) untrack(() => venue?.setBand(n)); });

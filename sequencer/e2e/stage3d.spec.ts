@@ -324,3 +324,28 @@ test('the theatre\'s machinery: on its own universe it moves with the show, live
   const pics = await page.evaluate(() => (window as any).__stage3d.machinery().filter((m: any) => m.look === 'flybar').map((m: any) => m.picture));
   expect(pics).toEqual(['forest', 'castle', 'stars', 'city']);
 });
+
+// A show with nobody on stage (the Theatre, Church and Cinema templates): the world goes on from
+// view to view as it is. Each view's stage used to think the band was still there: it built the
+// room again on its first visit (half a second or more, the page stalled) and put the camera at
+// the front. (Review 5, R5-B1)
+test('nobody on stage: the next view takes the room as it is, the camera where it was', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 45000 }).toBe('theatre');
+  await page.locator('.s3').getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'FOH', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.flying()), { timeout: 10000 }).toBe(false);
+  await page.waitForTimeout(800);
+  const now = () => page.evaluate(() => { const s = (window as any).__stage3d; return s?.internals ? { group: s.venue().group, cam: s.internals.camera.position.toArray() as number[] } : null; });
+  const before = (await now())!;
+  for (const tab of ['Live', 'Timeline']) {
+    await page.locator('.top .modes').getByRole('tab', { name: tab }).click();
+    await expect.poll(async () => (await now())?.group, { timeout: 30000, message: tab }).toBeTruthy();
+    await page.waitForTimeout(1500);
+    const after = (await now())!;
+    expect(after.group, tab).toBe(before.group);
+    expect(Math.hypot(...after.cam.map((v, i) => v - before.cam[i])), tab).toBeLessThan(0.05);
+  }
+});
