@@ -24,8 +24,9 @@ export const CURVE_KNOBS = ['speed', 'size', 'spread', 'width', 'low', 'high', '
 export type CurveKnob = (typeof CURVE_KNOBS)[number];
 export interface Curve { knob: CurveKnob; pts: [number, number][] }
 // the knob's value at a point along the bar (0..1)
-export function curveAt(c: Curve, f: number): number {
-  const p = c.pts;
+export const curveAt = (c: Curve, f: number) => along(c.pts, f);
+// points in order ([where, value]): straight lines between them, before the first and after the last theirs
+function along(p: readonly (readonly [number, number])[], f: number): number {
   if (f <= p[0][0]) return p[0][1];
   for (let i = 1; i < p.length; i++) if (f <= p[i][0]) { const [a, va] = p[i - 1], [b, vb] = p[i]; return b > a ? va + ((f - a) / (b - a)) * (vb - va) : vb; }
   return p[p.length - 1][1];
@@ -39,6 +40,32 @@ export function curvesAt(items: readonly TimelineItem[], t: number): Record<stri
     for (const c of i.curves) o[c.knob] = curveAt(c, f);
   }
   return out;
+}
+// A list's level over the song (its track opened): points [seconds on the song's clock, 0..1] in
+// time order, straight lines between them, before the first and after the last theirs. While the
+// song plays it scales the list's master (the list's fader still pulls it down), as the effect bars'
+// curves change their knobs. One point: that level all song long.
+export type Levels = Record<string, [number, number][]>;
+export const levelAt = (pts: readonly [number, number][], t: number) => along(pts, t);
+// every list's level at `t` (the lists with points only)
+export function levelsAt(levels: Levels, t: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [list, pts] of Object.entries(levels)) if (pts.length) out[list] = levelAt(pts, t);
+  return out;
+}
+// The levels as a file has them: per list (`lists`: the show's, others go), the points that are
+// [a time, a level], the level brought inside 0..1, in time order, one per time. Nothing left: undefined.
+export function cleanLevels(v: unknown, lists?: ReadonlySet<string>): Levels | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out: Levels = {};
+  for (const [list, pts] of Object.entries(v)) {
+    if (lists && !lists.has(list) || !Array.isArray(pts)) continue;
+    const ok = pts.filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite))
+      .map(([t, l]) => [t, Math.max(0, Math.min(1, l))] as [number, number]).sort((a, b) => a[0] - b[0])
+      .filter((p, i, a) => !i || p[0] > a[i - 1][0]);
+    if (ok.length) out[list] = ok;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 // A curve as a file has it: a knob there is, two points or more along the bar in order, each a number
 // (else undefined: the bar goes on with its effect's own value)
@@ -74,6 +101,7 @@ export interface Timeline {
   lead?: number;           // seconds of show before the song starts (things there at -lead..0)
   tail?: number;           // seconds of show after it ends (up to duration + tail)
   crowd?: CrowdItem[];     // the crowd's sound, in time order
+  levels?: Levels;         // a list's level over the song (its id: the points)
 }
 // before and after the song: at most ten minutes each
 export const AROUND_MAX = 600;

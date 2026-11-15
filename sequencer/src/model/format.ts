@@ -8,7 +8,7 @@ import { MAX_NUM } from './numbers';
 import { validEntry } from './schedule';
 import { cleanLayout, MAX_PIXELS } from './pixelLayout';
 import { cleanCurve } from './ledCurve';
-import { AROUND_MAX, cleanCrowd, cleanSections, validItem, validTimeline } from './timeline';
+import { AROUND_MAX, cleanCrowd, cleanLevels, cleanSections, validItem, validTimeline } from './timeline';
 import type { Show } from './types';
 import { KNOBS, cleanColors, isColor } from '../engine/fxkit';
 
@@ -260,11 +260,13 @@ function mendSettings(st: Obj, note: Note) {
 // (the same for every song of a set list: the timeline is the song that's up, the others sit in
 // setlist.before and setlist.after)
 function mendTimeline(s: Obj, note: Note) {
-  if (s.timeline !== undefined && !mendSong(s.timeline, 'The timeline', note)) { delete s.timeline; note('The timeline couldn\'t be read and was left out'); }
-  mendSetlist(s, note);
+  // (the lists a song's levels can be for: the file's, read before the lists are mended)
+  const lists = new Set((Array.isArray(s.cueLists) ? s.cueLists : []).map((l: unknown) => (isObj(l) ? l.id : undefined)).filter((id): id is string => typeof id === 'string'));
+  if (s.timeline !== undefined && !mendSong(s.timeline, 'The timeline', note, lists)) { delete s.timeline; note('The timeline couldn\'t be read and was left out'); }
+  mendSetlist(s, note, lists);
 }
 // one song; false: it can't be used at all
-function mendSong(tl: unknown, where: string, note: Note): boolean {
+function mendSong(tl: unknown, where: string, note: Note, lists: ReadonlySet<string>): boolean {
   if (isObj(tl)) fixNum(tl, 'duration', 0, 86400, where, note);
   if (!validTimeline(tl)) return false;
   // the time before and after the song (things before the show's start can't be played: left out)
@@ -278,6 +280,7 @@ function mendSong(tl: unknown, where: string, note: Note): boolean {
     if ((c?.length ?? 0) < k) note(`${where}: ${plural(k - (c?.length ?? 0), 'crowd moment', 'crowd moments')} that couldn't be read left out`);
     if (c) tl.crowd = c; else delete tl.crowd;
   }
+  if (tl.levels !== undefined) { const l = cleanLevels(tl.levels, lists); if (l) tl.levels = l; else delete tl.levels; }
   fixNum(tl as Obj, 'bpm', 20, 300, where, note);
   fixNum(tl as Obj, 'offset', -60, 86400, where, note);
   if (tl.name !== undefined) { if (typeof tl.name !== 'string') delete tl.name; else if (tl.name.length > 80) tl.name = tl.name.slice(0, 80); }
@@ -294,7 +297,7 @@ function mendSong(tl: unknown, where: string, note: Note): boolean {
 }
 // The rest of the set: the songs that can be used, in order; without a timeline, one of them is up.
 // The look between songs names a cue; the count-in is 0 to 2 bars.
-function mendSetlist(s: Obj, note: Note) {
+function mendSetlist(s: Obj, note: Note, lists: ReadonlySet<string>) {
   const sl = s.setlist;
   if (sl === undefined) return;
   if (!isObj(sl)) { delete s.setlist; note('The set list couldn\'t be read and was left out'); return; }
@@ -302,7 +305,7 @@ function mendSetlist(s: Obj, note: Note) {
     if (sl[k] !== undefined && !Array.isArray(sl[k])) note(`The set list: its songs ${k} the one that's up couldn't be read`);
     const all: unknown[] = Array.isArray(sl[k]) ? sl[k] : [];
     // (said by its name, or its place in the set as the file has it)
-    const ok = all.filter((t, i) => mendSong(t, isObj(t) && typeof t.name === 'string' && t.name.trim() ? `The song "${t.name.trim().slice(0, 40)}"` : `The set list, song ${first + i}`, note));
+    const ok = all.filter((t, i) => mendSong(t, isObj(t) && typeof t.name === 'string' && t.name.trim() ? `The song "${t.name.trim().slice(0, 40)}"` : `The set list, song ${first + i}`, note, lists));
     if (ok.length < all.length) note(`The set list: ${plural(all.length - ok.length, 'song', 'songs')} that couldn't be read left out`);
     return ok;
   };

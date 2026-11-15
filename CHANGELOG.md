@@ -13,6 +13,11 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **More timeline tracks open**: a cue list's track opens into its level over the song (click in
+  the row for a point, drag it, double-click to take it away; while the song plays it scales the
+  list's fader, the output thread plays it too), and the Moments track into how long each moment
+  lasts, as a bar whose end you drag (or the arrow keys on it). Before, a moment's length could only
+  be changed by placing it again.
 - **Changing what a light's channels do is kept when you press Done.** Before, only the Save button
   under the table kept it, and Done threw it away without a word (swap red and green, Done, and
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and

@@ -477,6 +477,12 @@ are cut to 60 on load, an empty one is dropped.
   (`confetti`, `flame`, `sparks`, `co2`, `bubbles`), the fog machines (`fog`), or every light
   (`strobe`, `blinder`) for that long (30 s at most). `lane` says which track it's drawn on
   (`list:<id>`, `fx`, `special`).
+- `levels` (optional): a list's level over the song, `{ "<list id>": [[12, 1], [40, 0.3]] }`: each
+  point is a time on the song's clock (seconds) and a level (0..1), straight lines between them, the
+  first and last levels before and after (one point: that level all song long). While the song
+  plays it scales the list's master; paused, the master alone. A reader keeps the points that are
+  two numbers, the level brought inside 0..1, in time order, one per time, and only for lists the
+  show has.
 - A reader that plays the show from a point puts each list on the latest cue placed before it,
   runs the effects whose bars cover it, and keeps the blackout as the items before it left it.
 - `name` (optional, up to 80 characters): what the song is called in the set list. Without one

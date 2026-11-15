@@ -61,7 +61,7 @@ import { LINK, LinkOutput } from './output/link';
 import { RemoteHost } from './remote/host.svelte';
 import { TimelinePlayer } from './timeline/player.svelte';
 import type { BurstAttr, TimelineAction, TimelineItem } from './model/timeline';
-import { curvesAt, firstLook, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
+import { curvesAt, firstLook, levelsAt, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
 
 
 // per mode name: old cell -> new cell (null: gone); cells not in it stay where they are
@@ -88,6 +88,7 @@ const pingAfter = (() => {
 // (said when a box connects while blind; gone the moment you go on stage)
 const BLIND_TOAST = 'Connected. You are blind';
 const NO_OVER: Record<string, Record<string, number>> = {};
+const NO_LEVELS: Record<string, number> = {};
 // where the winches were last sent armed (held there over a reload): { "fixture:hoist": { v: byte,
 // at: ms } }, anything else isn't kept
 function keptHeld(): Record<string, { v: number; at: number }> {
@@ -1084,6 +1085,7 @@ class App {
     // object while nothing changes, so the output thread isn't told again)
     const song = this.show.timeline;
     this.engine.fxOver = this.timeline.playing && song?.items.some((i) => i.curves) ? curvesAt(song.items, this.timeline.position) : NO_OVER;
+    this.engine.levelOver = this.timeline.playing && song?.levels ? levelsAt(song.levels, this.timeline.position) : NO_LEVELS;
     // the output thread gets what changed (its own engine works out the frames that go out)
     // (blind with nothing frozen, a tab that started blind: the thread sends nothing either)
     const blindOut = this.output === 'live' ? null : this.blindFrames();

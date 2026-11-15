@@ -126,10 +126,10 @@ export class OutputThread {
     const t = performance.now();
     const v: Partial<Inputs> = {};
     for (const k of ['grandMaster', 'blackout', 'bpm', 'sound', 'armed'] as const) if (engine[k] !== this.prev[k]) { (v as Record<string, unknown>)[k] = engine[k]; this.prev[k] = engine[k]; }
-    for (const k of ['programmer', 'live', 'fxOver', 'overlay', 'groupMasters', 'heldSeed'] as const) {
+    for (const k of ['programmer', 'live', 'fxOver', 'levelOver', 'overlay', 'groupMasters', 'heldSeed'] as const) {
       // (these are only ever replaced whole: the same object, nothing to compare. The live layer and
-      // the curves' knobs are made anew every frame: compared as text)
-      if (k !== 'live' && k !== 'fxOver') { if (engine[k] === this.refs[k]) continue; this.refs[k] = engine[k]; }
+      // the curves' knobs and levels are made anew every frame: compared as text)
+      if (k !== 'live' && k !== 'fxOver' && k !== 'levelOver') { if (engine[k] === this.refs[k]) continue; this.refs[k] = engine[k]; }
       const s = JSON.stringify(engine[k] ?? null);
       if (s !== this.prev[k]) { this.prev[k] = s; (v as Record<string, unknown>)[k] = engine[k] ? JSON.parse(s) : engine[k]; }
     }

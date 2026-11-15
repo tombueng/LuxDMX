@@ -113,6 +113,8 @@ export class Engine {
   // effects' knobs as the timeline's curves have them right now (an effect's id: its knobs), over the
   // effects' own values; nothing in the show changes
   fxOver: Record<string, Record<string, number>> = {};
+  // lists' levels as the timeline has them right now (a list's id: 0..1), times their masters
+  levelOver: Record<string, number> = {};
   grandMaster = 1;
   // keep each list's tracked look from one GO to the next: only where the show is a new copy after
   // every edit (the output thread), so an edit can never leave an old look in it
@@ -411,10 +413,10 @@ export class Engine {
     for (const { p } of order) {
       const w = p.weightAt(now);
       if (w <= 0) continue;
-      const look = p.look(now), quiet = this.jumped.has(p.id);
+      const look = p.look(now), quiet = this.jumped.has(p.id), master = this.masterOf(p);
       for (const [fid, v] of Object.entries(look)) {
         if (!stage[fid]) continue;
-        htp[fid] = Math.max(htp[fid], (v.intensity ?? 0) * w * p.master);
+        htp[fid] = Math.max(htp[fid], (v.intensity ?? 0) * w * master);
         let setsLevel = v.intensity !== undefined;
         const n = v.cellVals ? capsOf(modes.get(fid)).cells : 0;
         if (n > 0) {
@@ -423,11 +425,11 @@ export class Engine {
           for (let k = 0; k < n; k++) {
             const own = v.cellVals![k]?.intensity, x = own ?? v.intensity ?? 0;
             if (own !== undefined) setsLevel = true;
-            c.lvl[k] = Math.max(c.lvl[k], x * w * p.master); c.rec[k] = Math.max(c.rec[k], x);
+            c.lvl[k] = Math.max(c.lvl[k], x * w * master); c.rec[k] = Math.max(c.rec[k], x);
           }
           if (Object.values(v.cellVals!).some((x) => x.color)) colored.add(fid);
         } else {
-          plain[fid] = Math.max(plain[fid] ?? 0, (v.intensity ?? 0) * w * p.master);
+          plain[fid] = Math.max(plain[fid] ?? 0, (v.intensity ?? 0) * w * master);
           plainRec[fid] = Math.max(plainRec[fid] ?? 0, v.intensity ?? 0);
         }
         if (setsLevel) held.set(fid, Math.max(held.get(fid) ?? 0, w * p.hold(fid, now)));
@@ -436,7 +438,7 @@ export class Engine {
         const { intensity: _i, fog, haze, confetti, bubbles, flame, sparks, co2, ...ltp } = v;
         // (most lights have none of these: one check, not seven)
         if (fog !== undefined || haze !== undefined || confetti !== undefined || bubbles !== undefined || flame !== undefined || sparks !== undefined || co2 !== undefined)
-          for (const k of SMOKE) if (v[k] !== undefined && !(quiet && isGated(k))) { const m = (smoke[fid] ??= {}); m[k] = Math.max(m[k] ?? 0, v[k]! * w * p.master); }
+          for (const k of SMOKE) if (v[k] !== undefined && !(quiet && isGated(k))) { const m = (smoke[fid] ??= {}); m[k] = Math.max(m[k] ?? 0, v[k]! * w * master); }
         // (quiet: a machine's channel set by number in "All channels" stays quiet too)
         if (quiet && ltp.raw) ltp.raw = withoutChannels(ltp.raw, gatedChannels(modes.get(fid)));
         // (and a winch: a jump never moves one, it stays where it is until the list is played on)
@@ -717,6 +719,9 @@ export class Engine {
     }
   }
 
+  // a list's master as it is now: its fader's, times its level on the timeline while the song plays
+  private masterOf(p: ListPlayer) { return p.master * (this.levelOver[p.id] ?? 1); }
+
   // Every effect that runs (from a cue, or by hand), mixed onto the stage.
   private runEffects(show: Show, players: ListPlayer[], stage: Record<string, Resolved>, modes: Map<string, FixtureMode | undefined>, now: number,
     held = new Map<string, number>(), colored = new Set<string>()) {
@@ -730,7 +735,7 @@ export class Engine {
     if (on !== this.mutedFor) { this.mutedFor = on; this.fxMuted.clear(); }
     const cueFx = new Set<string>();
     for (const p of players) {
-      const pw = p.weightAt(now) * p.master;
+      const pw = p.weightAt(now) * this.masterOf(p);
       for (const [id, v] of p.effects(now)) {
         if (v * pw > 0) cueFx.add(id);
         const m = this.fxMuted.get(id), mute = m ? rampAt(m, now) : 0;

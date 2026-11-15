@@ -744,7 +744,13 @@ Three more demos come with their own room on the 3D stage:
   The **Effects** track opens (its ▸): a row for each knob its effects have (speed, size, spread...)
   with a line over every bar at that knob's value. Drag the line up or down to change the effect's
   own value; double-click it (or Alt+click) for a point there, and the knob follows a **curve**
-  along that bar while the song plays: drag the points, double-click one to take it away. Play runs
+  along that bar while the song plays: drag the points, double-click one to take it away. A cue
+  list's track opens too, into its **level** over the song: a dashed line at full until you click in
+  the row, which puts a point there (one point: that level all song long; more: straight lines
+  between them, snapped to the beat, Alt: free). Drag the points, double-click one to take it away.
+  While the song plays it scales the list's fader (the fader still pulls it down; paused, the fader
+  alone). The **Moments** track opens into **how long** each moment lasts, a bar from it on: drag its
+  end, or the arrow keys on it (half a second, Shift a tenth; 30 s at most). Play runs
   the show on the song's clock, in Live and on the 3D stage
   too (Live has a play/pause chip with the time at the top). Going through the song is safe: grab
   the green playhead anywhere along its height (or drag on the ruler, click a part, Home, End, the

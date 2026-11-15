@@ -18,6 +18,8 @@
   import { isMachineList } from '../content/busking';
   import { cueMarkOf, listMarkOf, MARK_SHORT } from './risk';
   import TimelineCurves from './TimelineCurves.svelte';
+  import TimelineLengths from './TimelineLengths.svelte';
+  import TimelineLevel from './TimelineLevel.svelte';
   import { CURVE_KNOBS } from '../model/timeline';
   import { LIVE_KNOBS } from '../engine/knobs';
   import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
@@ -53,10 +55,19 @@
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
   const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   // one lane per list that's on the timeline or could be, then effects, then moments
-  // the Effects track opened: a row for each knob its effects have, their values over the bars
-  let fxOpen = $state(false);
+  // A track opened (the ▸ by its name) shows what's on it in more detail, a thinner row each: the
+  // Effects track a row for each knob its effects have (their values over the bars), a list's track
+  // its level over the song, the Moments track how long each one lasts
+  let opened = $state<Record<string, boolean>>({});
   const fxBars = $derived(items.filter((i) => i.lane === 'fx' && i.len !== undefined && i.do.do === 'effect' && i.do.on));
   const fxKnobs = $derived(CURVE_KNOBS.filter((k) => fxBars.some((i) => { const e = app.show.effects.find((x) => x.id === (i.do as { effect: string }).effect); return !!e && (LIVE_KNOBS[e.kind] ?? CURVE_KNOBS).includes(k as never); })));
+  const moments = $derived(items.filter((i) => i.lane === 'special' && i.do.do === 'burst'));
+  const rowsOf = (id: string): string[] => (id === 'fx' ? (fxBars.length ? fxKnobs : []) : id.startsWith('list:') ? ['level'] : id === 'special' && moments.length ? ['how long'] : []);
+  const OPENER: Record<string, { label: string; tip: string }> = {
+    fx: { label: "the effects' knobs", tip: "The effects' knobs over time: speed, size and the rest, as lines and curves under the bars" },
+    special: { label: "the moments' lengths", tip: 'How long each moment lasts: drag the end of its bar' },
+  };
+  const openerOf = (ln: { id: string; name: string }) => OPENER[ln.id] ?? { label: `${ln.name}'s level`, tip: `${ln.name}'s level over the song: put points on the line to bring it down and up (it scales the list's fader while the song plays)` };
   const lanes = $derived([...lists.map((l) => ({ id: `list:${l.id}`, name: l.name, color: l.color ?? '#45d85c' })),
     { id: 'fx', name: 'Effects', color: '#ffaa1c' }, { id: 'crowd', name: 'Crowd', color: '#7fc8ff' }, { id: 'special', name: 'Moments', color: '#f33abc' }]);
   // the crowd's moments: how it sounds from there on (got to over the bar's length), or a cheer
@@ -835,9 +846,12 @@
       <div class="names">
         <div class="nr" title={songs.length > 1 ? `Song ${cur + 1} of ${songs.length}: ${songName(tl, cur)}` : undefined}>{songs.length > 1 ? `${cur + 1}. ${songName(tl, cur)}` : 'Song'}</div>
         {#each lanes as ln (ln.id)}
-          {#if ln.id === 'fx' && fxBars.length}
-            <div class="nl" style="--c:{ln.color}" title={ln.name}><button class="ghost open" aria-expanded={fxOpen} onclick={() => (fxOpen = !fxOpen)} aria-label="{fxOpen ? 'Close' : 'Open'} the effects' knobs" title="The effects' knobs over time: speed, size and the rest, as lines and curves under the bars">{fxOpen ? '▾' : '▸'}</button>{ln.name}</div>
-            {#if fxOpen}{#each fxKnobs as k (k)}<div class="nl sub" style="--c:{ln.color}">{k}</div>{/each}{/if}
+          {@const rows = rowsOf(ln.id)}
+          {#if rows.length}
+            {@const o = openerOf(ln)}
+            {@const on = !!opened[ln.id]}
+            <div class="nl" style="--c:{ln.color}" title={ln.name}><button class="ghost open" aria-expanded={on} onclick={() => (opened[ln.id] = !on)} aria-label="{on ? 'Close' : 'Open'} {o.label}" title={o.tip}>{on ? '▾' : '▸'}</button>{ln.name}</div>
+            {#if on}{#each rows as k (k)}<div class="nl sub" style="--c:{ln.color}">{k}</div>{/each}{/if}
           {:else}<div class="nl" style="--c:{ln.color}" title={ln.name}>{ln.name}</div>{/if}
         {/each}
       </div>
@@ -876,8 +890,14 @@
                 </button>
               {/each}
             </div>
-            {#if ln.id === 'fx' && fxOpen && built}
-              {#each fxKnobs as k (k)}<div class="lane sub" style="--c:{ln.color}"><TimelineCurves knob={k} bars={fxBars} {x} {scale} /></div>{/each}
+            {#if opened[ln.id] && built && tl}
+              {#if ln.id === 'fx'}
+                {#each fxBars.length ? fxKnobs : [] as k (k)}<div class="lane sub" style="--c:{ln.color}"><TimelineCurves knob={k} bars={fxBars} {x} {scale} /></div>{/each}
+              {:else if ln.id === 'special'}
+                {#if moments.length}<div class="lane sub" style="--c:{ln.color}"><TimelineLengths items={moments} {x} {scale} {labelOf} /></div>{/if}
+              {:else if ln.id.startsWith('list:')}
+                <div class="lane sub" style="--c:{ln.color}"><TimelineLevel list={ln.id.slice(5)} name={ln.name} {x} {span} {sn} /></div>
+              {/if}
             {/if}
           {/each}
           {#if dropAt !== null}<span class="drop" style="left:{x(dropAt)}px"></span>{/if}
@@ -1016,7 +1036,7 @@
   .vol .snd:not(:has(svg)) { font-size: .78rem; }
   .wave path { fill: #6aa2ff55; stroke: #6aa2ff; stroke-width: .5; }
   .lane { height: 38px; position: relative; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(90deg, transparent 0 1px, transparent 1px 100%); }
-  /* (the Effects track opened: a thinner row per knob under it, named in small type) */
+  /* (a track opened: a thinner row each under it, named in small type) */
   .lane.sub { height: 34px; background: #ffffff05; }
   .nl.sub { height: 34px; line-height: 33px; padding-left: 1.6rem; font-size: .74rem; color: var(--muted); border-left-style: dotted; }
   .nl .open { padding: 0 .25rem; margin-right: .2rem; font-size: .8rem; min-height: 0; line-height: 1; }
