@@ -10,13 +10,13 @@
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import { lookColor } from '../engine/cuelook';
-  import { cellLookAt } from '../engine/resolve';
   import { fixtureActions, fixtureMenu } from './actions';
   import { EFFECT_MAP } from '../engine/effects';
   import type { Fixture, Resolved } from '../model/types';
   import { roomFor } from '../stage3d/geometry';
   import { machineryOf, type Machinery } from '../model/library';
   import { bestLabels, type At } from './stageLabels';
+  import StageSymbol from './StageSymbol.svelte';
 
   // compact: no toolbar. readonly: only to look at (the Live page): zoom and pan, no selecting or moving.
   // blindChip: says "Blind: only here" itself (the Live page has its own, one you can press)
@@ -301,9 +301,6 @@
   const css = (l: Resolved | undefined) => lookColor(l);
   // each light's colour on the plan, once a frame (the glows, the beams and the symbols all use it)
   const cssOf = $derived(new Map(app.show.fixtures.map((f) => [f.id, css(app.drawn[f.id])])));
-  const cells = (id: string) => app.caps(id).cells;
-  // the cells picked on a light (outlined on the plan)
-  const picks = (id: string) => new Set(app.cellsPicked(id));
   // one universe: addresses as plain numbers ("73", not "0.73", which reads like a decimal)
   const oneUni = $derived(new Set(app.show.fixtures.map((f) => f.universe)).size <= 1);
 
@@ -447,75 +444,7 @@
            class:dropping={dropFx === f.id} oncontextmenu={(e) => fxMenu(e, f.id)}
            ondragover={(e) => { if (isPreset(e)) { e.preventDefault(); dropFx = f.id; } }} ondragleave={() => { if (dropFx === f.id) dropFx = null; }} ondrop={(e) => presetDrop(e, f.id)}
            onpointerdown={(e) => downFixture(e, f.id)} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
-          {#if machines.has(f.id)}
-            <!-- a curtain or a drop: its cloth across the stage, solid where it hangs in view (a curtain
-                 closed, a drop flown in), dashed where it's out of the way; a track's halves part -->
-            {@const mc = machines.get(f.id)!}
-            {@const v = Math.max(0, Math.min(1, (l as { hoist?: number } | undefined)?.hoist ?? 0))}
-            {@const shown = mc.how === 'flybar' ? v : 1 - v}
-            {@const th = size * 0.36}
-            {@const fill = mc.how === 'flybar' ? '#4f6a4a' : '#7a1420'}
-            <rect class="cloth" x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill="none" stroke="#4a5463" stroke-width={1.2 * px} stroke-dasharray="{4 * px} {3 * px}" />
-            {#if mc.how === 'curtain'}
-              {@const part = mc.half * Math.max(0.08, 1 - v)}
-              <rect x={x - mc.half} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
-              <rect x={x + mc.half - part} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
-            {:else}
-              <rect x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill={fill} opacity={0.15 + 0.85 * shown} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
-            {/if}
-          {:else if kind === 'mover'}
-            <circle cx={x} cy={y} r={size * 1.25} fill={c.css} opacity={c.glow * 0.45} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-            <rect x={x - size * 0.9} y={y - size * 0.25} width={size * 1.8} height={size * 0.5} rx="3" fill="#2a313c" />
-            <circle cx={x} cy={y} r={size * 0.62} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-          {:else if kind === 'bar' && app.placesOf(f.id)}
-            {@const at = app.placesOf(f.id)!}
-            {@const R = size * 2}
-            {#if at.round}
-              <circle cx={x} cy={y} r={R * 1.05} fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-              <circle cx={x} cy={y} r={R * 1.04} fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            {:else}
-              {@const w = R * (at.gw - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1) + size * 0.2}
-              {@const h = R * (at.gh - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1) + size * 0.2}
-              <rect x={x - w} y={y - h} width={w * 2} height={h * 2} rx="3" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-              <rect x={x - w} y={y - h} width={w * 2} height={h * 2} rx="3" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            {/if}
-            <!-- its pixels, where they really are -->
-            {#each Array(at.n) as _, i (i)}
-              {@const cc = css(cellLookAt(l, i, at.n))}
-              <circle class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} cx={x + at.x[i] * R} cy={y - at.y[i] * R} r={Math.max(0.6, at.dot * R)} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
-            {/each}
-          {:else if kind === 'bar'}
-            {@const n = cells(f.id)}
-            {@const bw = barHalf.get(f.id) ?? size * 2.2}
-            <rect x={x - bw} y={y - size * 0.55} width={bw * 2} height={size * 1.1} rx="4" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-            <rect x={x - bw} y={y - size * 0.42} width={bw * 2} height={size * 0.84} rx="4" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            <!-- its cells (a long pixel strip: the pixels touch, no gaps) -->
-            {#each Array(n) as _, i (i)}
-              {@const cc = css(cellLookAt(l, i, n))}
-              <rect class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} x={x - bw * 0.93 + (i * bw * 1.86) / n} y={y - size * 0.28} width={Math.max(0.5, (bw * 1.86) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
-            {/each}
-          {:else if kind === 'sfx'}
-            <!-- an effect machine: what it is, lit while it runs -->
-            {@const at = (['confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const).find((a) => app.modeOf(f.id)?.channels.some((ch) => ch.attr === a)) ?? 'confetti'}
-            {@const on = ((l as Record<string, number> | undefined)?.[at] ?? 0) > 0.02}
-            <rect x={x - size * 0.8} y={y - size * 0.5} width={size * 1.6} height={size} rx="5" fill={on ? '#3a2a10' : '#1a2029'} stroke={sel ? 'var(--orange)' : on ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            <text x={x} y={y + size * 0.16} text-anchor="middle" class="glyph" font-size={size * 0.4}>{({ confetti: 'CONF', bubbles: 'BUBL', flame: 'FIRE', sparks: 'SPRK', co2: 'CO2' })[at]}</text>
-          {:else if kind === 'fog'}
-            {@const fog = l?.fog ?? l?.haze ?? 0}
-            {@const hazer = !!app.modeOf(f.id)?.channels.some((ch) => ch.attr === 'haze') && !app.modeOf(f.id)?.channels.some((ch) => ch.attr === 'fog')}
-            {#if fog > 0.02}
-              {#each [0, 1, 2] as k (k)}<circle pointer-events="none" class="puff" class:still={!moving} style="animation-delay:{k * 0.5}s" cx={x - size * 0.3} cy={y} r={size * (0.9 + k * 0.5)} fill="#cfd8e3" opacity={0.18 * fog} />{/each}
-            {/if}
-            <rect x={x - size * 0.8} y={y - size * 0.5} width={size * 1.6} height={size} rx="5" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            <text x={x} y={y + size * 0.18} text-anchor="middle" class="glyph" font-size={size * (hazer ? 0.45 : 0.55)}>{hazer ? 'HAZE' : 'FOG'}</text>
-          {:else}
-            {@const strobe = (l?.strobe ?? 0) > 0.02 && c.glow > 0.02}
-            <circle cx={x} cy={y} r={size * 1.5} fill={c.css} opacity={c.glow * 0.5} filter={blur ? 'url(#glow)' : undefined} class:flash={strobe && moving} pointer-events="none"
-                    style={strobe ? `animation-duration:${(0.5 - 0.42 * (l?.strobe ?? 0)).toFixed(2)}s` : ''} />
-            <circle cx={x} cy={y} r={size * 0.72} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            {#if kind === 'par'}<circle cx={x} cy={y} r={size * 0.38} fill="none" stroke="#00000055" stroke-width="1.5" />{/if}
-            {#if kind === 'strobe'}<text x={x} y={y + size * 0.22} text-anchor="middle" class="glyph" font-size={size * 0.7}>⚡</text>{/if}
-          {/if}
+          <StageSymbol {f} {l} {c} {kind} {sel} {x} {y} {size} {px} {blur} {moving} mc={machines.get(f.id)} barW={barHalf.get(f.id)} />
           <title>{f.num ? `${f.num} ` : ''}{f.name} · {oneUni ? `address ${f.address}` : `universe ${f.universe}, address ${f.address}`}</title>
         </g>
       {/each}
@@ -567,23 +496,16 @@
   @media (max-width: 760px) { .zoomin { display: none; } }
   svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
   .fx { cursor: grab; }
-  .px.picked { stroke: #ffaa1c; stroke-width: 1.5px; }   /* (picked: orange, as selection is everywhere) */
   .fx:focus { outline: none; }
   .fx.dropping { filter: drop-shadow(0 0 6px var(--orange)); }
   .fx:active { cursor: grabbing; }
   .lbl { fill: var(--muted); pointer-events: none; paint-order: stroke; stroke: #0b0e13; stroke-width: 3px; stroke-linejoin: round; }
   .lbl.sel { fill: var(--orange); font-weight: 600; }
   .adr { fill: var(--faint); font-family: ui-monospace, monospace; pointer-events: none; paint-order: stroke; stroke: #0b0e13; stroke-width: 3px; stroke-linejoin: round; }
-  .glyph { fill: var(--muted); font-weight: 700; pointer-events: none; }
   .edge { fill: var(--faint); letter-spacing: .25em; text-transform: uppercase; }
   .dims line { stroke: #ffffff2e; stroke-width: 1; vector-effect: non-scaling-stroke; }
   .dims text { fill: var(--faint); opacity: .8; }
   .beam { filter: blur(2px); }
-  .puff { animation: puff 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-  .puff.still { animation: none; }
-  @keyframes puff { 0%, 100% { transform: scale(.85); } 50% { transform: scale(1.12); } }
-  .flash { animation: flash .2s steps(2, jump-none) infinite; }
-  @keyframes flash { 50% { opacity: 0; } }
   /* over the 3D stage too (it sits at z-index 3) */
   .tplbtn { font-size: .85rem; color: var(--muted); padding: .2rem .45rem; }
   .empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; justify-content: center;
