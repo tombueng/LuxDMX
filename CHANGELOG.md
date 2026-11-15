@@ -18,6 +18,9 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   list's fader, the output thread plays it too), and the Moments track into how long each moment
   lasts, as a bar whose end you drag (or the arrow keys on it). Before, a moment's length could only
   be changed by placing it again.
+- **"Stop effects" stops them on stage, not just on the screen.** The effects your cues run kept
+  going on the wire after the button (the screen said they'd stopped), and tapping one of them
+  afterwards flipped the two around. The output now hears it like every other command.
 - **Moving a cue to another list keeps it whole.** "Move to" in a cue's menu was a cut and a
   paste: the cut took every Live button and timeline moment that played the cue with it, and the
   paste gave it a new id. Now the cue itself moves, what plays it follows, and one Undo takes it back.

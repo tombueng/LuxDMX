@@ -640,3 +640,23 @@ test('a page renamed from its menu and by a double-click on its tab', async ({ p
   await ask.getByLabel('Name').press('Enter');
   await expect(tabs.first()).toContainText('Encore');
 });
+
+test('"Stop effects" stops the effects the cues run on the wire too, not only on the screen', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 1, 0, 'D');
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, id = a.show.fixtures[0].id;
+    a.show.effects.push({ id: 'e-pulse', name: 'Pulse', kind: 'pulse', fixtures: [id], params: { speed: 1, tempo: false } });
+    a.show.cueLists.push({ id: 'L-fx', name: 'Pulsing', end: 'stop', cues: [{ id: 'c-fx', name: 'Pulse on', values: { [id]: { intensity: 1 } }, effects: ['e-pulse'], fade: 0, advance: { mode: 'manual' } }] });
+    a.show.pages = [];
+    a.checkpoint();
+    a.engine.go('L-fx');
+  });
+  // pulsing on the wire
+  const sample = async () => { const v: number[] = []; for (let i = 0; i < 8; i++) { v.push((await channels(0, 1))[0]); await page.waitForTimeout(120); } return v; };
+  await expect.poll(async () => { const v = await sample(); return Math.max(...v) - Math.min(...v); }, { timeout: 10000 }).toBeGreaterThan(20);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  await page.locator('.live').getByRole('button', { name: /Stop effects/ }).first().click();
+  // stopped on the wire (after its fade): steady
+  await expect.poll(async () => { const v = await sample(); return Math.max(...v) - Math.min(...v); }, { timeout: 10000 }).toBeLessThan(3);
+});
