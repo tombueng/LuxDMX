@@ -67,7 +67,7 @@
   import { Particles } from './particles';
   import { MirrorDots, type Ball } from './mirrorBall';
   import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type RoomId, type Rot, type V3, type ViewKey } from './geometry';
-  import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
+  import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, shotOfLights, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
   import type { Resolved, Show } from '../model/types';
@@ -189,65 +189,9 @@
     const fs = fixtures.filter((f) => ids.includes(f.id));
     if (!fs.length || !controls) return false;
     stopCam();
-    const pts = fs.map((f) => { const p = pivotOf(f.p, f.rot); return new THREE.Vector3(p.x, p.y, p.z); });
-    const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
-    // (a light up under the ceiling: looked at from a little below it, the camera can't go above it
-    // and the controls never put it under what it looks at)
-    if (c.y > room.ceiling - 0.9) c.y = room.ceiling - 0.9;
-    const r = Math.max(0.6, box.getSize(new THREE.Vector3()).length() / 2);
-    // (from in front and a little to the side: up at hung lights, as the audience sees them; down
-    // at ones on the floor)
-    const d = Math.max(4.5, (r / Math.sin((camera.fov * Math.PI) / 360)) * 1.15);
-    // (where the camera can be: inside the room, clear of its rows, tables and people. A light on
-    // the cinema's side wall seen from the front put it inside the raked seats: the first of a few
-    // ways round that's clear, else the nearest to it)
-    const W = room.walls, inside = (p: THREE.Vector3) => Math.abs(p.x) < W.x - 0.5 && p.z > W.z0 + 0.5 && p.z < W.z1 - 0.5 && p.y > 0.4 && p.y < room.ceiling - 0.8;
-    const sp = spaceOf(room, castOf(room.id)), into = Math.sign(-c.x) || 1;
-    // (hung lights, shining down: from the front and level with them; the rest from above. Not by
-    // their height: a washer on the cinema's top rows is high up and shines up its wall)
-    const hung = fs.every((f) => toWorld({ x: 0, y: 1, z: 0 }, f.rot).y < -0.3);
-    const dirs = hung ? [[0.35, -0.32, 1], [-0.35, -0.32, 1], [into * 0.8, -0.2, 0.6], [0, -0.8, 0.6], [into * 0.7, -0.7, 0.2], [0, -1, 0.08], [0, 0.4, 1]] : [[0.35, 0.45, 1], [-0.35, 0.45, 1], [into * 0.9, 0.5, 0.4], [into * 0.5, 1.1, 0.6], [0, 0.9, 1], [into * 0.15, 0.25, 1], [into * 0.15, 0.25, -1], [into * 0.3, 1.4, 0.2]];
-    // (and with nothing between it and the light: a boom in the wings seen through the proscenium's
-    // wall was a box drawn over a blank wall)
-    const seen = (q: THREE.Vector3) => {
-      const n = Math.ceil(q.distanceTo(c) / 0.3);
-      for (let i = 1; i < n - 1; i++) {
-        const m = q.clone().lerp(c, i / n), b = blocked(sp, { x: m.x, y: m.y, z: m.z });
-        // (only what's solid and big hides it: the proscenium, the balcony, the deck. Rows of seats,
-        // tables, the lights on a bar in between: one sees over and between them)
-        if (b === 'the proscenium' || b === 'the balcony' || b === 'the deck') return false;
-      }
-      return true;
-    };
-    let p1: THREE.Vector3 | undefined, clear: THREE.Vector3 | undefined;   // (clear but not seeing it: the next best)
-    // (clear with a little room above too: a spot right on the edge of a rail of lights ended up a
-    // hair inside it once the controls settled. Not the ceiling: `inside` keeps the camera off that,
-    // and a light under it is looked at from right at that limit; its 5 cm went a hair over it and
-    // no spot was left, the camera stuck a metre off with the light at the picture's edge)
-    const solid = (q: THREE.Vector3) => {
-      if (blocked(sp, { x: q.x, y: q.y, z: q.z })) return true;
-      const up = blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z });
-      return !!up && up !== 'the ceiling';
-    };
-    const ok = (q: THREE.Vector3) => { if (!inside(q) || solid(q)) return false; if (seen(q)) return true; clear ??= q; return false; };
-    for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
-      if (p1) break;
-      const q = c.clone().addScaledVector(new THREE.Vector3(x, y, z).normalize(), d * k);
-      // (the controls never let the camera under what it looks at: where they'd put it)
-      if (q.y < c.y + 0.05) q.y = c.y + 0.05;
-      if (ok(q)) p1 = q;
-    }
-    // (none of those: round it, nearer and nearer, level with it and a little above, the side
-    // towards the audience first; a low bar's rail of lights left little room)
-    // (and close in under a low ceiling: the bar's top shelf, a rail of lights in front of it)
-    if (!p1) for (const k of [0.8, 0.55, 0.35, 0.22]) for (const dy of [0.05, 0.3, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
-      const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = new THREE.Vector3(c.x + Math.sin(ang) * d * k, c.y + dy, c.z + Math.cos(ang) * d * k);
-      if (ok(q)) p1 = q;
-    }
-    p1 ??= clear;
-    p1 ??= c.clone().addScaledVector(new THREE.Vector3(into * 0.6, 0.8, 0.3).normalize(), Math.min(d, 3));
-    p1.set(Math.max(-W.x + 0.6, Math.min(W.x - 0.6, p1.x)), Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), Math.max(W.z0 + 0.6, Math.min(W.z1 - 0.6, p1.z)));
-    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1, t1: c, at: performance.now(), dur: 700 };
+    // (where it goes: director.ts, worked out from the room and the lights alone)
+    const { pos, at } = shotOfLights(room, fs, camera.fov);
+    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: new THREE.Vector3(pos.x, pos.y, pos.z), t1: new THREE.Vector3(at.x, at.y, at.z), at: performance.now(), dur: 700 };
     return true;
   }
   // asked from elsewhere (a light's menu): once the stage and its lights are there
