@@ -9,7 +9,7 @@ import { validEntry } from './schedule';
 import { cleanLayout, MAX_PIXELS } from './pixelLayout';
 import { cleanCurve } from './ledCurve';
 import { AROUND_MAX, cleanCrowd, cleanLevels, cleanSections, validItem, validTimeline } from './timeline';
-import type { Show } from './types';
+import type { Cue, Show } from './types';
 import { KNOBS, cleanColors, isColor } from '../engine/fxkit';
 
 export const FORMAT = 'luxdmx-show';
@@ -486,26 +486,36 @@ function mendList(l: Obj, note: Note) {
   if (l.play !== undefined && typeof l.play !== 'boolean') delete l.play;
   if (l.color !== undefined && typeof l.color !== 'string') delete l.color;
   l.cues = withIds(l.cues, `${where}, cues`, note);
-  for (const c of l.cues) {
-    const cw = `${where}, cue "${c.name}"`;
-    c.values = mendByFixture(c.values ?? {}, bad);
-    fixNum(c, 'fade', 0, 3600, cw, note, 0);
-    fixNum(c, 'fadeOut', 0, 3600, cw, note); fixNum(c, 'delay', 0, 3600, cw, note);
-    // (fades of its own for colour, position, beam: each a number of seconds, or not there)
-    if (c.times !== undefined) {
-      if (!isObj(c.times)) { delete c.times; note(`${cw}: its colour / position / beam times couldn't be read, it uses its fade`); }
-      else { for (const k of ['color', 'position', 'beam']) fixNum(c.times, k, 0, 3600, cw, note); if (!Object.keys(c.times).length) delete c.times; }
-    }
-    c.advance = mendAdvance(c.advance, cw, note);
-    if (c.effects !== undefined) { if (Array.isArray(c.effects)) c.effects = strings(c.effects); else delete c.effects; }
-    if (c.actions !== undefined) {
-      c.actions = objects(c.actions, `${cw}, actions`, note).filter((a) => typeof a.do === 'string');
-      for (const a of c.actions) if (a.do === 'master') fixNum(a, 'level', 0, 1, cw, note, 1);
-    }
-    if (c.num !== undefined && !Number.isFinite(c.num)) delete c.num;
-    if (c.note !== undefined && typeof c.note !== 'string') delete c.note;
-  }
+  for (const c of l.cues) mendCue(c, `${where}, cue "${c.name}"`, note, bad);
   if (bad.n) note(`${where}: ${plural(bad.n, 'value', 'values')} that couldn't be used left out or brought into range`);
+}
+// One cue, as a show file has it or as it's pasted (any tab or app can write the clipboard)
+function mendCue(c: Obj, cw: string, note: Note, bad: { n: number }) {
+  c.values = mendByFixture(c.values ?? {}, bad);
+  fixNum(c, 'fade', 0, 3600, cw, note, 0);
+  fixNum(c, 'fadeOut', 0, 3600, cw, note); fixNum(c, 'delay', 0, 3600, cw, note);
+  // (fades of its own for colour, position, beam: each a number of seconds, or not there)
+  if (c.times !== undefined) {
+    if (!isObj(c.times)) { delete c.times; note(`${cw}: its colour / position / beam times couldn't be read, it uses its fade`); }
+    else { for (const k of ['color', 'position', 'beam']) fixNum(c.times, k, 0, 3600, cw, note); if (!Object.keys(c.times).length) delete c.times; }
+  }
+  c.advance = mendAdvance(c.advance, cw, note);
+  if (c.effects !== undefined) { if (Array.isArray(c.effects)) c.effects = strings(c.effects); else delete c.effects; }
+  if (c.actions !== undefined) {
+    c.actions = objects(c.actions, `${cw}, actions`, note).filter((a) => typeof a.do === 'string');
+    for (const a of c.actions) if (a.do === 'master') fixNum(a, 'level', 0, 1, cw, note, 1);
+  }
+  if (c.num !== undefined && !Number.isFinite(c.num)) delete c.num;
+  if (c.note !== undefined && typeof c.note !== 'string') delete c.note;
+}
+// A cue from the clipboard, mended like one from a file (a cue without its `advance` threw on every
+// frame while it was on stage): undefined when it's no cue at all
+export function mendPastedCue(x: unknown): Cue | undefined {
+  if (!isObj(x)) return undefined;
+  const c = JSON.parse(JSON.stringify(x)) as Obj;
+  if (typeof c.name !== 'string') c.name = 'Cue';
+  mendCue(c, `The pasted cue "${c.name}"`, () => {}, { n: 0 });
+  return c as unknown as Cue;
 }
 // what comes after a cue: a wait, a follow or a count of beats needs its time (else: on GO)
 function mendAdvance(a: unknown, where: string, note: Note): Obj {

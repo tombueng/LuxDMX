@@ -4,7 +4,7 @@
 // track), another cue's "go to", a timetable entry, the look between songs. Nothing is pruned, the
 // clipboard isn't used, and one Undo takes it all back. (It was a cut and a paste: the cut deleted
 // every button and timeline moment for the cue, the paste gave it a new id.)
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { freshApp, smallShow } from './app.harness';
 
 describe('moving cues to another list', { timeout: 30000 }, () => {
@@ -51,5 +51,27 @@ describe('moving cues to another list', { timeout: 30000 }, () => {
     expect(app.moveCuesToList(['c1'], 'L')).toBe(0);
     expect(app.moveCuesToList([], 'L')).toBe(0);
     expect(app.show.cueLists[0].cues).toHaveLength(2);
+  });
+});
+
+// A cue pasted from the clipboard is mended like one from a file: any tab or app can write it, and
+// a cue without its `advance` threw on every frame while it was on stage
+describe('pasting cues', { timeout: 30000 }, () => {
+  it('a cue without what comes after it, with a level out of range: mended, and it plays', async () => {
+    // (what another tab or app put on the clipboard)
+    let show = '';
+    vi.doMock('./store/clipboard', () => ({ copyClip: async () => {}, readClip: async () => ({ luxdmxClipboard: 1, kind: 'cues', show,
+      items: [{ id: 'x1', name: 'From elsewhere', values: { p1: { intensity: 7 } }, fade: 0 }, 'not a cue'] }) }));
+    const { app, tick } = await freshApp();
+    smallShow(app);
+    show = app.showId;
+    expect(await app.pasteCues()).toBe(1);
+    // (into the list open in Program: none was, so a new one)
+    const l = app.list, k = l.cues.findIndex((x: any) => x.name === 'From elsewhere'), c = l.cues[k];
+    expect(c.advance).toEqual({ mode: 'manual' });
+    expect(c.values.p1.intensity).toBe(1);
+    app.jump(l.id, k);
+    expect(() => tick(3)).not.toThrow();
+    vi.doUnmock('./store/clipboard');
   });
 });

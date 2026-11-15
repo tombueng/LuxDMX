@@ -9,7 +9,7 @@ import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
 import { freezeGroupNumbers, nextGroupNumber } from './model/groupnum';
 import { cleanHost, hostProblem } from './model/host';
-import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
+import { emptyShow, mendPastedCue, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
 import { capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
 import { ledOfLight, ledShown, unservedPixels } from './app/leds';
@@ -2247,7 +2247,9 @@ class App {
     const fxIds = new Set(this.show.effects.map((e) => e.id)), listIds = new Set(this.show.cueLists.map((x) => x.id));
     const added: string[] = [], made: Cue[] = [];
     const lost = new Set<string>(); let lostFx = 0;
-    for (const c of clip.items as Cue[]) {
+    // (mended like a file's: any tab or app can write the clipboard, and a cue without what comes
+    // after it threw on every frame while it was on stage)
+    for (const c of (clip.items as unknown[]).map(mendPastedCue).filter((x): x is Cue => !!x)) {
       const values: Record<string, Values> = {};
       for (const [id, v] of Object.entries(c.values)) { const t = target(id); if (t) values[t] = rawCells(v); else lost.add(clip.names?.[id] ?? id); }
       const { num: _n, ...rest } = c;                                    // a number of its own, here
