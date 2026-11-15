@@ -474,8 +474,10 @@ export class Rig {
     out[6] = typeof v?.frost === 'number' ? Math.max(0, Math.min(1, v.frost)) : 0;
     out[7] = typeof v?.focus === 'number' ? Math.max(0, Math.min(1, v.focus)) : -1;
     this.goboTurn.set(f.id, turn);
-    this.goboNow.set(f.id, [out[0], out[1]]);
-    this.goboDrawn.set(f.id, [out[2], out[3]]);
+    // (for the tests, kept in place: two new pairs per head per frame otherwise; the getter copies)
+    const gn = this.goboNow.get(f.id), gd = this.goboDrawn.get(f.id);
+    if (gn) { gn[0] = out[0]; gn[1] = out[1]; } else this.goboNow.set(f.id, [out[0], out[1]]);
+    if (gd) { gd[0] = out[2]; gd[1] = out[3]; } else this.goboDrawn.set(f.id, [out[2], out[3]]);
     const fx = this.fxNow.get(f.id) ?? { prism: null, anim: 0, soft: 0, iris: 0, shake: [0, 0] as [number, number], scroll: [0, 0] as [number, number] };
     fx.anim = am; fx.shake = shake; fx.scroll = scroll;
     this.fxNow.set(f.id, fx);
