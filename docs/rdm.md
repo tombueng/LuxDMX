@@ -229,7 +229,9 @@ fresh discovery with nowhere to land. Only a reboot cleared it. Regression test:
 ### Testing it
 
 - `docs/tests/artnet_rdm_ctrl.py <gateway-ip> --pa 0 selftest` drives the whole thing as a controller
-  (ArtPoll, TOD, GET/SET, sensors) and prints pass/fail.
+  (ArtPoll, TOD, GET/SET, sensors) and prints pass/fail. It binds UDP 6454 on the network card that
+  leads to the gateway (never on all of them), so close anything else holding 6454 on that machine
+  first (a console, LuxDMX Link). With no route to the gateway it says so and stops.
 - `docs/tests/artnet-rdm.spec.mjs` is the Playwright e2e (read-only paths by default; the wire GET/SET
   + flush + DMX-not-disturbed checks and the `ArtAddress` merge / BackgroundQueuePolicy config checks
   gate behind `LUXDMX_WRITE=1`). The read-only pass also asserts `ArtPollReply` advertises RDM-capable
