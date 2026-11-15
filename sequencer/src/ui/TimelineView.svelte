@@ -10,6 +10,8 @@
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
   import TimelineSongPicker from './TimelineSongPicker.svelte';
+  import TimelinePalette from './TimelinePalette.svelte';
+  import { burstLabel, crowdLabel, DT, type Chip } from './timeline/chips';
   import { Songs } from './timeline/songs.svelte';
   import StageView from './StageView.svelte';
   import { app, newId } from '../app.svelte';
@@ -23,7 +25,7 @@
   import TimelineLevel from './TimelineLevel.svelte';
   import { CURVE_KNOBS } from '../model/timeline';
   import { LIVE_KNOBS } from '../engine/knobs';
-  import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
+  import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
   import { sectionStarts } from '../timeline/beat';
   import { CATALOG } from '../timeline/catalog';
   import { progressSaid } from '../timeline/songPicker';
@@ -74,32 +76,6 @@
   const openerOf = (ln: { id: string; name: string }) => OPENER[ln.id] ?? { label: `${ln.name}'s level`, tip: `${ln.name}'s level over the song: put points on the line to bring it down and up (it scales the list's fader while the song plays)` };
   const lanes = $derived([...lists.map((l) => ({ id: `list:${l.id}`, name: l.name, color: l.color ?? '#45d85c' })),
     { id: 'fx', name: 'Effects', color: '#ffaa1c' }, { id: 'crowd', name: 'Crowd', color: '#7fc8ff' }, { id: 'special', name: 'Moments', color: '#f33abc' }]);
-  // the crowd's moments: how it sounds from there on (got to over the bar's length), or a cheer
-  const CROWD: { label: string; a: CrowdAction; len: number; tip: string }[] = [
-    { label: 'Chatter', a: { do: 'crowd', mood: 'chatter', level: 0.5 }, len: 2, tip: 'People talking while they wait' },
-    { label: 'Cheering', a: { do: 'crowd', mood: 'cheer', level: 0.5 }, len: 2, tip: 'The crowd cheers from here on' },
-    { label: 'Roar', a: { do: 'crowd', mood: 'cheer', level: 1 }, len: 1, tip: 'As loud as they get' },
-    { label: 'Quiet', a: { do: 'crowd', mood: 'cheer', level: 0 }, len: 3, tip: 'The crowd goes quiet' },
-    { label: 'Cheer!', a: { do: 'cheer', level: 1 }, len: 4, tip: 'A cheer that swells up and dies away' },
-  ];
-  const crowdLabel = (a: CrowdAction) => {
-    const pc = `${Math.round(a.level * 100)} %`;
-    if (a.do === 'cheer') return `Cheer! ${pc}`;
-    if (a.level === 0) return 'Crowd quiet';
-    return `${a.mood === 'chatter' ? 'Chatter' : a.level >= 0.95 ? 'Roar' : 'Cheering'} ${pc}`;
-  };
-  const BURSTS: { attr: BurstAttr; label: string; s: number }[] = [
-    { attr: 'confetti', label: 'Confetti', s: 1 }, { attr: 'flame', label: 'Flames', s: 1.5 }, { attr: 'sparks', label: 'Sparks', s: 4 },
-    { attr: 'co2', label: 'CO2 jet', s: 2 }, { attr: 'bubbles', label: 'Bubbles', s: 8 }, { attr: 'fog', label: 'Fog', s: 5 },
-    { attr: 'strobe', label: 'Strobe hit', s: 2 }, { attr: 'blinder', label: 'Blinder hit', s: 1 }];
-  const ARMED_ONLY: string[] = ['confetti', 'flame', 'sparks', 'co2'];
-  // (the machine moments the rig can do: one for a confetti cannon it hasn't got did nothing. A strobe
-  // or blinder hit uses any light)
-  const bursts = $derived.by(() => {
-    const attrs = new Set(app.show.fixtures.flatMap((f) => app.modeOf(f.id)?.channels.map((c) => c.attr) ?? []));
-    const fog = app.show.fixtures.some((f) => app.caps(f.id).fog);
-    return BURSTS.filter((b) => b.attr === 'strobe' || b.attr === 'blinder' || (b.attr === 'fog' ? fog : attrs.has(b.attr)));
-  });
 
   // ---- scale and scrolling
   let tracks = $state<HTMLDivElement>();
@@ -222,7 +198,7 @@
     const a = i.do;
     if (a.do === 'goto') { const l = app.show.cueLists.find((x) => x.id === a.list), k = l?.cues.findIndex((c) => c.id === a.cue) ?? -1; return l && k >= 0 ? `${cueNumber(l, k)}. ${l.cues[k].name}` : '(gone)'; }
     if (a.do === 'effect') return app.show.effects.find((e) => e.id === a.effect)?.name ?? '(gone)';
-    if (a.do === 'burst') return BURSTS.find((b) => b.attr === a.attr)?.label ?? a.attr;
+    if (a.do === 'burst') return burstLabel(a.attr);
     if (a.do === 'blackout') return a.on ? 'Blackout' : 'Blackout off';
     if (a.do === 'off') return 'Everything off';
     if (a.do === 'release') return 'Fade out';
@@ -250,8 +226,7 @@
     sel = it.id;
     app.markDirty(0);
   }
-  // what a palette chip stands for
-  type Chip = { kind: 'cue'; list: string; cue: string } | { kind: 'fx'; effect: string } | { kind: 'burst'; attr: BurstAttr; s: number } | { kind: 'act'; a: TimelineAction } | { kind: 'crowd'; a: CrowdAction; len: number };
+  // a palette chip dropped or tapped onto the tracks (timeline/chips.ts says what each is)
   function chipAt(c: Chip, at: number) {
     const bar = barS;
     if (c.kind === 'cue') place({ do: 'goto', list: c.list, cue: c.cue }, at, `list:${c.list}`);
@@ -278,8 +253,6 @@
   type Placed = TimelineItem | (CrowdItem & { lane?: undefined });
   const placed = (id: string): Placed | undefined => tl?.items.find((i) => i.id === id) ?? tl?.crowd?.find((i) => i.id === id);
   const isCrowd = (it: Placed): it is CrowdItem => it.do.do === 'crowd' || it.do.do === 'cheer';
-  const DT = 'application/x-luxdmx-timeline';
-  function dragChip(e: DragEvent, c: Chip) { e.dataTransfer?.setData(DT, JSON.stringify(c)); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'; }
   let dropAt = $state<number | null>(null);
   function over(e: DragEvent) { if (e.dataTransfer?.types.includes(DT) || e.dataTransfer?.types.includes('Files')) { e.preventDefault(); dropAt = sn(tAt(e.clientX), e.altKey); } }
   async function drop(e: DragEvent) {
@@ -711,47 +684,7 @@
       <label>After it <input type="number" min="0" max={AROUND_MAX} step="1" value={tl?.tail ?? 0} aria-label="Seconds after the song"
         onchange={(e) => { const el = e.target as HTMLInputElement; el.value = String(setAround('tail', el.valueAsNumber)); }} /> s</label>
     </div>
-    {#each built ? lists : [] as l (l.id)}
-      <h3>{l.name}</h3>
-      <div class="chips">
-        {#each l.cues as c, i (c.id)}
-          {@const chip = { kind: 'cue', list: l.id, cue: c.id } as Chip}
-          {@const risk = cueMarkOf(app.show, c, app.showRev)}
-          <button class="chip" class:risky={!!risk} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)}
-                  title="{cueNumber(l, i)}. {c.name}: drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : risk === 'winch' ? '. Moves a winch (scenery) while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {:else if risk === 'winch'}⇅ {/if}<span class="t">{cueNumber(l, i)}. {c.name}</span></button>
-        {/each}
-        {#if !l.cues.length}<span class="faint">No cues yet</span>{/if}
-      </div>
-    {/each}
-    {#if app.show.effects.length}
-      <h3>Effects</h3>
-      <div class="chips">
-        {#each app.show.effects as e (e.id)}
-          {@const chip = { kind: 'fx', effect: e.id } as Chip}
-          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => tapChip(chip)} title="{e.name}: a bar that runs it from where it starts to where it ends. Drag onto the timeline, or tap: at the playhead">{e.name}</button>
-        {/each}
-      </div>
-    {/if}
-    <h3>Moments</h3>
-    <!-- (only the machines wait for Arm: a strobe, blinder, fog or bubble hit fires on Safe too; it said all of them did) -->
-    <p class="note">Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed.</p>
-    <div class="chips">
-      {#each bursts as b (b.attr)}
-        {@const chip = { kind: 'burst', attr: b.attr, s: b.s } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{b.label} for {b.s} s{ARMED_ONLY.includes(b.attr) ? ', only while armed' : ''}. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
-      {/each}
-      {#each [{ label: 'Blackout', a: { do: 'blackout', on: true } }, { label: 'Blackout off', a: { do: 'blackout', on: false } }, { label: 'Everything off', a: { do: 'off' } }] as m (m.label)}
-        {@const chip = { kind: 'act', a: m.a as TimelineAction } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{m.label} at that moment. Drag onto the timeline, or tap: at the playhead">{m.label}</button>
-      {/each}
-    </div>
-    <h3>Crowd</h3>
-    <div class="chips">
-      {#each CROWD as c (c.label)}
-        {@const chip = { kind: 'crowd', a: c.a, len: c.len } as Chip}
-        <button class="chip cr" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{c.tip}. Drag onto the timeline, or tap: at the playhead">{c.label}</button>
-      {/each}
-    </div>
+    <TimelinePalette {lists} {built} ontap={tapChip} />
   </aside>
 
   <section class="main">
@@ -876,18 +809,13 @@
   .set .opt select { flex: 1; min-width: 0; font-size: .8rem; }
   .snd.off { color: var(--faint); text-decoration: line-through; }
   .vol .snd { min-height: 0; padding: .15rem .3rem; }
-  .chips { display: flex; flex-wrap: wrap; gap: .25rem; }
-  /* (a long name stops at the panel's edge, the whole of it in the title) */
   .chip { cursor: grab; font-size: .8rem; padding: .15rem .5rem; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); min-height: 0;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .chip.fx { border-color: #ffaa1c66; } .chip.mo { border-color: #f33abc66; } .chip.cr { border-color: #7fc8ff66; }
   /* the time before and after the song: two small fields under the song */
   .around { display: flex; flex-wrap: wrap; gap: .2rem .6rem; font-size: .8rem; color: var(--muted); }
   .around label { display: inline-flex; align-items: center; gap: .3rem; }
   /* (600, the most, whole next to the spin arrows) */
   .around input { width: calc(3ch + 3em); font-size: .8rem; padding-inline: .3rem; }
-  .chip.risky { color: var(--orange); display: inline-flex; align-items: center; gap: .2rem; }
   .main { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(140px, 1fr) auto minmax(160px, auto) auto; gap: .45rem; }
   .preview { min-height: 0; display: flex; overflow: hidden; }      /* (never over the transport) */
   .preview :global(.stage-wrap) { flex: 1; }
@@ -957,7 +885,6 @@
   .mark { flex: none; display: inline-flex; align-items: center; margin-right: .25rem; pointer-events: none; }
   .mark.hazard, .mark.winch { color: var(--orange); }
   .mark.once { font-size: .64rem; font-weight: 700; padding: 0 .2rem; border-radius: 3px; background: #ffffff1c; }
-  .note { margin: 0; font-size: .74rem; color: var(--faint); }
   .armed.on { color: var(--pink); border-color: #f33abc88; background: #f33abc1a; }
   .drop { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; }
   .empty { margin: 0; }
