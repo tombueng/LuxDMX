@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { EFFECT_MAP, EFFECTS, paramsOf, runEffect, type Where } from './effects';
 import { MATRIX_EFFECTS } from './matrix';
-import { glyph } from './shapes';
+import { glyph } from './font';
 import { placesFor, type Places } from '../model/pixelLayout';
 import type { PixelLayout } from '../model/types';
 

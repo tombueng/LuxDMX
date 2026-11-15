@@ -12,7 +12,7 @@ import {
   PALETTES, TAU, WHITE, along, c, clamp01, frac, hash, noise, shine,
   type EffectDef, type EffectParams, type Elem, type FxOut,
 } from './fxkit';
-import { glyph, plainText } from './shapes';
+import { glyph, plainText } from './font';
 
 const { sin, cos, exp, floor, round, min, max, abs, hypot, PI } = Math;
 const ss = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
