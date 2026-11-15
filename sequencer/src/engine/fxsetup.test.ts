@@ -33,3 +33,26 @@ describe('an effect\'s setup kept per show copy', () => {
     expect(Math.min(...r.frames(0))).toBeLessThan(40);
   });
 });
+
+// "Stop effects" holds until a cue comes on (a GO, a list started): another list stopping is no new
+// cue, and it undid the stop
+describe('cue effects stopped by hand', () => {
+  it('stay stopped when another list stops; a GO brings them back', () => {
+    const s = show(['a']);
+    s.cueLists.push({ id: 'A', name: 'A', end: 'stop', cues: [
+      { id: 'a1', name: 'Pulse', values: { a: { intensity: 1 } }, effects: ['e'], fade: 0, advance: { mode: 'manual' } },
+      { id: 'a2', name: 'Pulse again', values: { a: { intensity: 1 } }, effects: ['e'], fade: 0, advance: { mode: 'manual' } }] } as never,
+      { id: 'B', name: 'B', end: 'stop', cues: [{ id: 'b1', name: 'Other', values: { b: { intensity: 0.5 } }, fade: 0, advance: { mode: 'manual' } }] } as never);
+    let now = 0;
+    const eng = new Engine(() => s, () => now);
+    const weight = () => { for (let k = 0; k < 30; k++) { now += 0.05; eng.tick(); } return eng.fxWeights.get('e') ?? 0; };
+    eng.go('A'); eng.go('B');
+    expect(weight()).toBeGreaterThan(0.9);
+    eng.muteCueEffects();
+    expect(weight()).toBe(0);
+    eng.stop('B');                                   // another list goes: still stopped
+    expect(weight()).toBe(0);
+    eng.go('A');                                     // a GO: the cue's own effects again
+    expect(weight()).toBeGreaterThan(0.9);
+  });
+});

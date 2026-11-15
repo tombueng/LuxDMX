@@ -160,9 +160,10 @@ export class Engine {
   private liveFx = new Map<string, Ramp>();   // effects started by hand
   private fxFlash = new Set<string>();
   // Effects a cue runs, stopped by hand (its button tapped): faded out until a tap brings them back,
-  // or a cue starts again (any list's cue changing: what's on stage is new then)
+  // or a cue comes on (a GO, a list started: what's on stage is new then). A list stopping or
+  // finishing its release isn't one: "Stop effects" came undone when an unrelated list ended.
   private fxMuted = new Map<string, Ramp>();
-  private mutedFor = '';
+  private mutedFor = new Map<string, string>();       // each running list's cue, when the mutes were set
   private cueFx = new Set<string>();          // effects running from a cue, last frame
   private fxSince = new Map<string, { beats: number; seconds: number }>();
   private beats = 0;
@@ -753,8 +754,13 @@ export class Engine {
       const v = rampAt(r, now);
       if (v <= 0 && r.to === 0 && now >= r.start + r.dur) this.liveFx.delete(id); else add(id, v);
     }
-    const on = players.map((p) => (p.running ? p.cueId : '')).join();
-    if (on !== this.mutedFor) { this.mutedFor = on; this.fxMuted.clear(); }
+    // (a cue that came on, in a list running now: on another cue than it was, or started since)
+    let cameOn = false;
+    for (const p of players) {
+      if (!p.running) { this.mutedFor.delete(p.id); continue; }
+      if (this.mutedFor.get(p.id) !== p.cueId) { cameOn ||= this.mutedFor.has(p.id) || this.fxMuted.size > 0; this.mutedFor.set(p.id, p.cueId); }
+    }
+    if (cameOn) this.fxMuted.clear();
     const cueFx = new Set<string>();
     for (const p of players) {
       const pw = p.weightAt(now) * this.masterOf(p);
