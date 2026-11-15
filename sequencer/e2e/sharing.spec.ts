@@ -20,7 +20,8 @@ test('new lights play along in every look like one that is there, and on the wir
   const dlg = page.getByRole('dialog', { name: 'Add fixtures' });
   await dlg.locator(`[data-type="${before.type}"]`).click();
   await dlg.getByLabel('How many').fill('2');
-  await dlg.getByLabel('In the looks').selectOption({ label: `like ${before.name}` });
+  // (by the light: the label says its universe too when the show has more than one, the bar's strips)
+  await dlg.getByLabel('In the looks').selectOption(before.id);
   await dlg.getByRole('button', { name: /^Add 2 × / }).click();
   await expect(page.locator('.toast')).toContainText(`they do what ${before.name} does`);
   const r = await page.evaluate((src) => {

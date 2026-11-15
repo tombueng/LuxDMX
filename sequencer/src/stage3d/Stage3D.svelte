@@ -210,7 +210,10 @@
       return true;
     };
     let p1: THREE.Vector3 | undefined, clear: THREE.Vector3 | undefined;   // (clear but not seeing it: the next best)
-    const ok = (q: THREE.Vector3) => { if (!inside(q) || blocked(sp, { x: q.x, y: q.y, z: q.z })) return false; if (seen(q)) return true; clear ??= q; return false; };
+    // (clear with a little room above too: a spot right on the edge of a rail of lights ended up a
+    // hair inside it once the controls settled)
+    const solid = (q: THREE.Vector3) => !!(blocked(sp, { x: q.x, y: q.y, z: q.z }) || blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z }));
+    const ok = (q: THREE.Vector3) => { if (!inside(q) || solid(q)) return false; if (seen(q)) return true; clear ??= q; return false; };
     for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
       if (p1) break;
       const q = c.clone().addScaledVector(new THREE.Vector3(x, y, z).normalize(), d * k);
@@ -220,7 +223,8 @@
     }
     // (none of those: round it, nearer and nearer, level with it and a little above, the side
     // towards the audience first; a low bar's rail of lights left little room)
-    if (!p1) for (const k of [0.8, 0.55, 0.35]) for (const dy of [0.05, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
+    // (and close in under a low ceiling: the bar's top shelf, a rail of lights in front of it)
+    if (!p1) for (const k of [0.8, 0.55, 0.35, 0.22]) for (const dy of [0.05, 0.3, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
       const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = new THREE.Vector3(c.x + Math.sin(ang) * d * k, c.y + dy, c.z + Math.cos(ang) * d * k);
       if (ok(q)) p1 = q;
     }
