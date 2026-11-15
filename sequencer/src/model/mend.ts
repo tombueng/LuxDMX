@@ -24,42 +24,6 @@ export function mendShow(s: any, notes: string[], d: Show): Show {
   s.settings = { ...d.settings, ...s.settings };
   if (!isObj(s.extensions)) s.extensions = {};
   mendSettings(s.settings, note);
-  // a timetable written by hand: the entries that can run (one bad line mustn't stop the clock)
-  if (s.settings.schedule !== undefined) s.settings.schedule = Array.isArray(s.settings.schedule) ? s.settings.schedule.filter(validEntry) : [];
-  // (a list's master set by a timetable entry: a level, else full: a word there went in as NaN and
-  // the list went dark, as cue actions are mended too)
-  for (const e of s.settings.schedule ?? []) if (isObj(e.do) && e.do.do === 'master') fixNum(e.do, 'level', 0, 1, 'The timetable', note, 1);
-  // your own 3D venue: numbers that are numbers, or it goes
-  const vm = s.settings.stage3d?.model;
-  if (vm && !(typeof vm.name === 'string' && typeof vm.store === 'string' && ['scale', 'x', 'y', 'z', 'yaw'].every((k) => Number.isFinite((vm as unknown as Record<string, number>)[k])))) delete s.settings.stage3d!.model;
-  if (s.settings.scheduleOff !== undefined && typeof s.settings.scheduleOff !== 'boolean') delete s.settings.scheduleOff;
-  if (s.settings.schedulePause !== undefined && !Number.isFinite(s.settings.schedulePause)) delete s.settings.schedulePause;
-  // the stage's marks: each with a name and a place, or left out
-  if (s.settings.marks !== undefined) {
-    const ok = (m: any) => m && typeof m.id === 'string' && typeof m.name === 'string' && m.p && ['x', 'y', 'z'].every((k) => Number.isFinite(m.p[k]));
-    const list = Array.isArray(s.settings.marks) ? s.settings.marks : [];
-    const good = list.filter(ok).map((m: any) => ({ id: m.id, name: m.name, p: { x: m.p.x, y: m.p.y, z: m.p.z } }));
-    if (good.length < list.length || !Array.isArray(s.settings.marks)) note(`${(Array.isArray(s.settings.marks) ? list.length : 1) - good.length} of the stage's marks couldn't be read, left out`);
-    if (good.length) s.settings.marks = good; else delete s.settings.marks;
-  }
-  if (s.settings.recordChanges !== undefined && typeof s.settings.recordChanges !== 'boolean') delete s.settings.recordChanges;
-  // the console's faders on MIDI controls: what they move and which control, each readable
-  if (s.settings.consoleMidi !== undefined) {
-    const ok = (b: any) => b && typeof b.to === 'string' && /^(grand|(list|group|light):.+)$/s.test(b.to) && b.midi && (b.midi.kind === 'cc' || b.midi.kind === 'note')
-      && Number.isInteger(b.midi.ch) && b.midi.ch >= 1 && b.midi.ch <= 16 && Number.isInteger(b.midi.num) && b.midi.num >= 0 && b.midi.num <= 127;
-    const list = Array.isArray(s.settings.consoleMidi) ? s.settings.consoleMidi : [];
-    // (one control moves one fader: of two for the same control or the same fader, the later stays)
-    const good: { to: string; midi: { kind: string; ch: number; num: number } }[] = [];
-    for (const b of list.filter(ok)) {
-      const m = { kind: b.midi.kind, ch: b.midi.ch, num: b.midi.num };
-      for (let i = good.length - 1; i >= 0; i--) if (good[i].to === b.to || (good[i].midi.kind === m.kind && good[i].midi.ch === m.ch && good[i].midi.num === m.num)) good.splice(i, 1);
-      good.push({ to: b.to, midi: m });
-    }
-    const unread = list.length - list.filter(ok).length;
-    if (unread > 0 || !Array.isArray(s.settings.consoleMidi)) note(`${Math.max(1, unread)} of the console's MIDI controls couldn't be read, left out`);
-    if (good.length) s.settings.consoleMidi = good; else delete s.settings.consoleMidi;
-  }
-  if (s.settings.place !== undefined) { const p = s.settings.place; if (!p || !(Math.abs(p.lat) <= 90) || !(Math.abs(p.lon) <= 180)) delete s.settings.place; }
   mendTimeline(s, note);
 
   s.fixtureTypes = withIds(s.fixtureTypes, 'Fixture types', note, false);
@@ -177,6 +141,42 @@ function mendSettings(st: Obj, note: Note) {
   for (const k of ['lockPin', 'lockPage']) if (st[k] !== undefined && typeof st[k] !== 'string') delete st[k];
   // the PIN kept as its hash (model/pin.ts): a show from before that kept the digits gets it now
   if (typeof st.lockPin === 'string') { if (!st.lockPin.trim()) delete st.lockPin; else if (!isPinHash(st.lockPin)) st.lockPin = pinHash(st.lockPin); }
+  // a timetable written by hand: the entries that can run (one bad line mustn't stop the clock)
+  if (st.schedule !== undefined) st.schedule = Array.isArray(st.schedule) ? st.schedule.filter(validEntry) : [];
+  // (a list's master set by a timetable entry: a level, else full: a word there went in as NaN and
+  // the list went dark, as cue actions are mended too)
+  for (const e of st.schedule ?? []) if (isObj(e.do) && e.do.do === 'master') fixNum(e.do, 'level', 0, 1, 'The timetable', note, 1);
+  // your own 3D venue: numbers that are numbers, or it goes
+  const vm = st.stage3d?.model;
+  if (vm && !(typeof vm.name === 'string' && typeof vm.store === 'string' && ['scale', 'x', 'y', 'z', 'yaw'].every((k) => Number.isFinite((vm as unknown as Record<string, number>)[k])))) delete st.stage3d!.model;
+  if (st.scheduleOff !== undefined && typeof st.scheduleOff !== 'boolean') delete st.scheduleOff;
+  if (st.schedulePause !== undefined && !Number.isFinite(st.schedulePause)) delete st.schedulePause;
+  // the stage's marks: each with a name and a place, or left out
+  if (st.marks !== undefined) {
+    const ok = (m: any) => m && typeof m.id === 'string' && typeof m.name === 'string' && m.p && ['x', 'y', 'z'].every((k) => Number.isFinite(m.p[k]));
+    const list = Array.isArray(st.marks) ? st.marks : [];
+    const good = list.filter(ok).map((m: any) => ({ id: m.id, name: m.name, p: { x: m.p.x, y: m.p.y, z: m.p.z } }));
+    if (good.length < list.length || !Array.isArray(st.marks)) note(`${(Array.isArray(st.marks) ? list.length : 1) - good.length} of the stage's marks couldn't be read, left out`);
+    if (good.length) st.marks = good; else delete st.marks;
+  }
+  if (st.recordChanges !== undefined && typeof st.recordChanges !== 'boolean') delete st.recordChanges;
+  // the console's faders on MIDI controls: what they move and which control, each readable
+  if (st.consoleMidi !== undefined) {
+    const ok = (b: any) => b && typeof b.to === 'string' && /^(grand|(list|group|light):.+)$/s.test(b.to) && b.midi && (b.midi.kind === 'cc' || b.midi.kind === 'note')
+      && Number.isInteger(b.midi.ch) && b.midi.ch >= 1 && b.midi.ch <= 16 && Number.isInteger(b.midi.num) && b.midi.num >= 0 && b.midi.num <= 127;
+    const list = Array.isArray(st.consoleMidi) ? st.consoleMidi : [];
+    // (one control moves one fader: of two for the same control or the same fader, the later stays)
+    const good: { to: string; midi: { kind: string; ch: number; num: number } }[] = [];
+    for (const b of list.filter(ok)) {
+      const m = { kind: b.midi.kind, ch: b.midi.ch, num: b.midi.num };
+      for (let i = good.length - 1; i >= 0; i--) if (good[i].to === b.to || (good[i].midi.kind === m.kind && good[i].midi.ch === m.ch && good[i].midi.num === m.num)) good.splice(i, 1);
+      good.push({ to: b.to, midi: m });
+    }
+    const unread = list.length - list.filter(ok).length;
+    if (unread > 0 || !Array.isArray(st.consoleMidi)) note(`${Math.max(1, unread)} of the console's MIDI controls couldn't be read, left out`);
+    if (good.length) st.consoleMidi = good; else delete st.consoleMidi;
+  }
+  if (st.place !== undefined) { const p = st.place; if (!p || !(Math.abs(p.lat) <= 90) || !(Math.abs(p.lon) <= 180)) delete st.place; }
 }
 
 // the timeline: well-formed or gone; items that aren't, dropped. Its tempo and length bounded (the
