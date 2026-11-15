@@ -3,6 +3,7 @@
   import { CCW_WORDS, wheelPatterns } from '../stage3d/gobos';
   import { levelOf } from '../engine/cuelook';
   import { tick } from 'svelte';
+  import { whileShown } from './shown.svelte';
   import ValueEdit from './ValueEdit.svelte';
   // The programmer: set the selected lights. Only controls the selection can use show up. What you
   // set here sits on top of everything until you Record it into a cue (or Clear it).
@@ -17,6 +18,9 @@
   import type { ChannelAttr, Color, NumAttr, Values } from '../model/types';
   import { EFFECT_MAP } from '../engine/effects';
   import { slotsOf } from '../engine/render';
+  // (the stage as it is, while Program is shown; hidden, the last of it: the programmer doesn't
+  // follow the stage frame by frame behind another view)
+  const look = whileShown(() => app.look), status = whileShown(() => app.status), stage = whileShown(() => app.stage);
 
   const sel = $derived(app.show.fixtures.filter((f) => app.selected.includes(f.id)));
   // Every attribute at least one selected light has.
@@ -82,12 +86,12 @@
     for (const h of hands) scroller.addEventListener(h, hand, { passive: true });
     return () => { scroller.removeEventListener('scroll', spy); for (const h of hands) scroller.removeEventListener(h, hand); };
   });
-  const playing = $derived(app.show.cueLists.filter((l) => app.status[l.id]?.running && !app.status[l.id]?.releasing));
+  const playing = $derived(app.show.cueLists.filter((l) => status()[l.id]?.running && !status()[l.id]?.releasing));
   // Effects running on the selection (what you see on stage may be them, not the values here).
   const running = $derived(app.effectsOn(sel.map((f) => f.id)));
   // (a pixel bar: its brightest cell, a pixel chase lights it at intensity 0)
   // (picked cells: the first one's)
-  const out = $derived.by(() => { if (!sel.length) return undefined; const s = app.stage[sel[0].id], k = app.cellsPicked(sel[0].id)[0]; return k === undefined ? levelOf(s) : cellLookAt(s, k, app.caps(sel[0].id).cells)?.intensity ?? 0; });
+  const out = $derived.by(() => { if (!sel.length) return undefined; const s = stage()[sel[0].id], k = app.cellsPicked(sel[0].id)[0]; return k === undefined ? levelOf(s) : cellLookAt(s, k, app.caps(sel[0].id).cells)?.intensity ?? 0; });
   // (what an effect works on, said after its name; 'pixel' was missing: "Bar twinkles (undefined)")
   const CAT: Record<string, string> = { move: 'position', color: 'colour', intensity: 'brightness', pixel: 'cells' };
   const fxSaid = (e: { name: string; kind: string }) => { const c = CAT[EFFECT_MAP.get(e.kind)?.category ?? '']; return c ? `${e.name} (${c})` : e.name; };
@@ -126,7 +130,7 @@
       const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine);
       const slots = c ? slotsOf(c) : [];
       if (slots.length) {
-        const v = app.look[f.id]?.[k];
+        const v = look()[f.id]?.[k];
         const cur = typeof v === 'number' ? Math.round(v * (slots.length - 1)) : -1;
         return [{ k, label, slots: slots.map((r) => r.label), colors: slots.map((r) => r.color), cur, wheel: wheelExtras(f.id, k) }];
       }
@@ -143,9 +147,9 @@
     const shakes = others.filter((r) => /shake|wackel|zitter/i.test(r.label ?? ''));
     const runs = others.filter((r) => /rotat|scroll|spin|dreh/i.test(r.label ?? '') && !/shake/i.test(r.label ?? ''));
     if (!shakes.length && !runs.length) return undefined;
-    const look = app.look[id] as Record<string, number | undefined> | undefined;
+    const l = look()[id] as Record<string, number | undefined> | undefined;
     return { shakes, cw: runs.some((r) => !CCW_WORDS.test(r.label ?? '')), ccw: runs.some((r) => CCW_WORDS.test(r.label ?? '')),
-      shaking: (look?.[`${k}Shake`] ?? 0) > 0, scroll: look?.[`${k}Scroll`] ?? 0 };
+      shaking: (l?.[`${k}Shake`] ?? 0) > 0, scroll: l?.[`${k}Scroll`] ?? 0 };
   }
   // A slider's channel with named ranges (a prism's facets, a rotation's index / CW / stop / CCW): its
   // ranges, from the first selected light that has it (a plain channel: none)
@@ -218,7 +222,7 @@
       <section class="now" aria-label="Playing now">
         <h3 class="faint">Playing now</h3>
         {#each playing as l (l.id)}
-          {@const st = app.status[l.id]}
+          {@const st = status()[l.id]}
           <div class="pl" style="--c:{l.color ?? 'var(--green)'}">
             <span class="dot"></span>
             <span class="nm"><b>{l.name}</b> <span class="faint">{l.cues[st.index]?.name ?? ''}</span></span>
@@ -359,7 +363,7 @@
         <div class="pad" bind:this={pad} role="slider" aria-label="Pan and tilt" aria-valuenow={pct(first?.pan ?? 0.5)} tabindex="0"
              onpointerdown={aim} onpointermove={aim} onkeydown={padKey}>
           {#each sel as f (f.id)}
-            {@const l = app.look[f.id]}
+            {@const l = look()[f.id]}
             {#if app.kinds[f.id] === 'mover'}<div class="cross" class:main={f.id === sel[0].id} style="left:{(l?.pan ?? 0.5) * 100}%;top:{(l?.tilt ?? 0.5) * 100}%"></div>{/if}
           {/each}
         </div>

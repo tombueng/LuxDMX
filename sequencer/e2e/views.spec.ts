@@ -197,3 +197,19 @@ test('a hidden view holds its lists still and catches up when it is shown: the f
   await to(page, 'Program');
   await expect(lvl).toHaveAttribute('style', /height: ?100%/);
 });
+
+test('the console hidden holds its faders still and catches up when it is shown', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await page.getByRole('tab', { name: 'Console' }).click();
+  const pct = page.locator('.strip[data-strip="D 1"] .pct');
+  await expect(pct).toHaveText('0');
+  await to(page, 'Live');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.programmer = { [a.show.fixtures[0].id]: { intensity: 1 } }; });
+  await expect.poll(() => page.evaluate(() => { const a = (window as any).__luxdmx; return a.stage[a.show.fixtures[0].id]?.intensity; })).toBe(1);
+  await page.waitForTimeout(400);
+  // (at full on stage, the hidden console still shows what it last showed)
+  await expect(pct).toHaveText('0');
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await expect(pct).toHaveText('100');
+});

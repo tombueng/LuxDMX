@@ -7,7 +7,7 @@
   // saturation, beam, effects), a fader with GO, Flash and Release for every cue list, and the
   // grand master. Everything goes through the programmer and the lists like anywhere else.
   import { app } from '../app.svelte';
-  import { setContext } from 'svelte';
+  import { setContext, untrack } from 'svelte';
   import { dialogOpen, isShortcut, spaceIsGo, ui } from './ui.svelte';
   import Knob from './Knob.svelte';
   import Help from './Help.svelte';
@@ -77,7 +77,7 @@
   const banks = $derived(Math.max(1, Math.ceil(strips.length / PER)));
   const shown = $derived(strips.slice(bank * PER, bank * PER + PER));
   $effect(() => { if (bank >= banks) bank = banks - 1; });
-  const levelOf = (ids: string[]) => (ids.length ? ids.reduce((a, id) => a + (app.look[id]?.intensity ?? 0), 0) / ids.length : 0);
+  const levelOf = (ids: string[]) => (ids.length ? ids.reduce((a, id) => a + (look[id]?.intensity ?? 0), 0) / ids.length : 0);
   const isSel = (ids: string[]) => ids.length > 0 && ids.every((id) => app.selected.includes(id));
   // ---- MIDI: with MIDI on, a fader's MIDI button waits for a control to be moved, and from then
   // on that control moves the fader (in every view). The button again: its control is let go.
@@ -152,7 +152,7 @@
       const slots = c ? slotsOf(c) : [];
       if (!slots.length) continue;
       // (what was just set, when it's a number; a palette's reference: what it shows)
-      const p = app.programmer[f.id]?.[k], v = (typeof p === 'number' ? p : typeof app.look[f.id]?.[k] === 'number' ? app.look[f.id]![k] : 0) as number;
+      const p = app.programmer[f.id]?.[k], v = (typeof p === 'number' ? p : typeof look[f.id]?.[k] === 'number' ? look[f.id]![k] : 0) as number;
       return { slots, at: Math.max(0, Math.min(slots.length - 1, Math.round(v * (slots.length - 1)))) };
     }
   }
@@ -198,7 +198,7 @@
   const pbanks = $derived(Math.max(1, Math.ceil(lists.length / PPER)));
   const pshown = $derived(lists.slice(pbank * PPER, pbank * PPER + PPER));
   $effect(() => { if (pbank >= pbanks) pbank = pbanks - 1; });
-  const st = (id: string) => app.status[id];
+  const st = (id: string) => status[id];
   // a list that fires machines (flames, sparks, CO2, confetti): marked, and said when it's safe
   const riskOf = (l: (typeof app.show.cueLists)[number]) => listRiskOf(app.show, l, app.showRev);
   function cuesOf(l: (typeof app.show.cueLists)[number], e: MouseEvent) {
@@ -216,6 +216,10 @@
   const onScreen = $derived(app.view === 'console');
   // (its 3D stage gives the world up while another view is shown, as the other views' stages do)
   setContext('view-shown', () => app.view === 'console');
+  // (what the faders, encoders and strips show follows the stage only while the console is shown:
+  // hidden, it holds still instead of working out every strip on every frame)
+  const look = $derived(onScreen ? app.look : untrack(() => app.look));
+  const status = $derived(onScreen ? app.status : untrack(() => app.status));
   $effect(() => { if (!onScreen) app.releaseConsoleHolds(); });
 
   // flash buttons: held with a pointer (any: mouse, finger) or Space/Enter on the button
