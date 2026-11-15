@@ -30,15 +30,21 @@ export function levelOf(l: Resolved | undefined): number {
   return l ? topLevel(l) : 0;
 }
 
+// the colour of a look's brightest cell (undefined: no cell has one)
+function brightestCell(l: Resolved): Color | undefined {
+  let cell: Color | undefined, best = -1;
+  if (l.cells) for (const c of l.cells) { if (c.color && (c.intensity ?? 0) > best) { best = c.intensity ?? 0; cell = c.color; } }
+  else for (const k in l.cellVals ?? {}) { const c = l.cellVals![k]; const x = l.cellLvl?.[+k] ?? c.intensity ?? 1; if (c.color && x > best) { best = x; cell = c.color; } }
+  return cell;
+}
+
 // A look as one light (a beam in 3D, a dot on a plan): lit by its cells more than by itself, at
 // its brightest cell's level and colour.
 export function wholeLook(l: Resolved | undefined): Resolved | undefined {
   if (!l || !(l.cellVals || l.cells || l.cellLvl)) return l;
   const d = topLevel(l);
   if (d <= (l.intensity ?? 0) + 1e-3) return l;
-  let cell: Color | undefined, best = -1;
-  if (l.cells) for (const c of l.cells) { if (c.color && (c.intensity ?? 0) > best) { best = c.intensity ?? 0; cell = c.color; } }
-  else for (const k in l.cellVals ?? {}) { const c = l.cellVals![k]; const x = l.cellLvl?.[+k] ?? c.intensity ?? 1; if (c.color && x > best) { best = x; cell = c.color; } }
+  const cell = brightestCell(l);
   return { ...l, intensity: d, ...(cell ? { color: cell } : {}) };
 }
 
@@ -47,12 +53,7 @@ export function lookColor(l: Resolved | undefined): { css: string; glow: number 
   if (!l) return { css: 'rgb(0,0,0)', glow: 0 };
   const d = levelOf(l), w = l.white ?? 0;
   // (a look lit by its cells more than by itself: the colour of its brightest cell)
-  let cell: Color | undefined;
-  if ((l.cellVals || l.cells) && d > (l.intensity ?? 0) + 1e-3) {
-    let best = -1;
-    if (l.cells) for (const c of l.cells) { if (c.color && (c.intensity ?? 0) > best) { best = c.intensity ?? 0; cell = c.color; } }
-    else for (const k in l.cellVals) { const c = l.cellVals[k]; const x = l.cellLvl?.[+k] ?? c.intensity ?? 1; if (c.color && x > best) { best = x; cell = c.color; } }
-  }
+  const cell = (l.cellVals || l.cells) && d > (l.intensity ?? 0) + 1e-3 ? brightestCell(l) : undefined;
   const { r, g, b } = l.draw ?? cell ?? l.color ?? { r: 1, g: 1, b: 1 };
   const c = (v: number) => Math.round(Math.min(1, (v + w) * d) * 255);
   return { css: `rgb(${c(r)},${c(g)},${c(b)})`, glow: d };
