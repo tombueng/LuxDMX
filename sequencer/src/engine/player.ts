@@ -25,6 +25,11 @@ interface Track { from: Resolved; to: Resolved; at: number; fade: number; fadeOu
 const LEVELS = ['intensity', 'white', 'amber', 'uv', 'fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 // what belongs to its cue (a look's fog, a confetti shot, a flame): the next look stops it
 export const FOGGY = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
+// A cue's longest fade: its fade, its fade out, its own colour / position / beam times. What a
+// follow waits for and what its progress counts (a follow after fade 1 with an 8 s pan cut the pan
+// off at 1 s).
+export const longestFade = (c: Pick<Cue, 'fade' | 'fadeOut' | 'times'>) =>
+  Math.max(c.fade, c.fadeOut ?? c.fade, ...Object.values(c.times ?? {}).filter((x): x is number => typeof x === 'number'));
 // a level at its highest: the light's own, or one of its cells' (a ring with only its rim lit is lit)
 const CELLY = new Set<string>(CELL_ATTRS);
 const lv = (r: Resolved | undefined, k: (typeof LEVELS)[number]) => (!r ? 0 : CELLY.has(k) ? topLevel(r, k as CellAttr) : (r[k] ?? 0));
@@ -131,7 +136,7 @@ export class ListPlayer {
     for (const id of this.fxFrom) if (!this.fxTo.includes(id) && t < 1) out.set(id, 1 - t);
     return out;
   }
-  progress(now: number) { return this.fadeT(now, Math.max(this.fade, this.fadeOut, ...Object.values(this.times ?? {}).filter((x): x is number => typeof x === 'number'))); }
+  progress(now: number) { return this.fadeT(now, longestFade({ fade: this.fade, fadeOut: this.fadeOut, times: this.times })); }
   // How firmly this list sets a light's level now, 0..1 (before the list's weight and master): a
   // light it only just took over is still fading in, so whatever lit it before (an effect) has to
   // fade out at the same pace, or it goes dark first.
@@ -353,7 +358,7 @@ export class ListPlayer {
     const cue = list.cues[this.index];
     if (!cue) return -1;
     const a = cue.advance;
-    const fadeEnd = this.cueAt + (cue.delay ?? 0) + Math.max(cue.fade, cue.fadeOut ?? cue.fade);
+    const fadeEnd = this.cueAt + (cue.delay ?? 0) + longestFade(cue);
     let due = Infinity;
     // Never faster than 20 steps a second, whatever the numbers say (a 0 typed by accident must not
     // turn a loop into a 40 Hz strobe).
