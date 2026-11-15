@@ -42,14 +42,15 @@ export function nearestSlot(c: Channel, want: Color): number | undefined {
 
 // The colour a fixture's emitters should show: white extraction for RGBW and friends. `cv`: a
 // cell's own values over the light's (no copy made: a disc has hundreds of cells).
-function emitters(hasWhite: boolean, v: Resolved, cv?: Resolved) {
+// (into `o` from `at`: red, green, blue, white, amber, uv)
+function emitters(o: Float64Array, at: number, hasWhite: boolean, v: Resolved, cv?: Resolved) {
   const c = cv?.color ?? v.color ?? WHITE;
   let { r, g, b } = c;
   let white = cv?.white ?? v.white;
   if (white === undefined && hasWhite) {   // nobody set white: move the common part of RGB onto it
     white = Math.min(r, g, b); r -= white; g -= white; b -= white;
   }
-  return { r, g, b, white: white ?? 0, amber: cv?.amber ?? v.amber ?? 0, uv: cv?.uv ?? v.uv ?? 0 };
+  o[at] = r; o[at + 1] = g; o[at + 2] = b; o[at + 3] = white ?? 0; o[at + 4] = cv?.amber ?? v.amber ?? 0; o[at + 5] = cv?.uv ?? v.uv ?? 0;
 }
 
 // What a fixture can actually show, so the stage draws the truth and the DMX follows the intent:
@@ -101,6 +102,7 @@ interface Plan {
   strobe: (ChannelRange | undefined)[];
   slots: (ChannelRange[] | undefined)[];   // gobo slots
   hasCells: boolean;                        // channels that belong to cells (a pixel light)
+  cellN: number;                            // its cells (the highest a channel names, + 1)
 }
 const plans = new WeakMap<FixtureMode, Plan>();
 function planOf(m: FixtureMode): Plan {
@@ -126,6 +128,7 @@ function planOf(m: FixtureMode): Plan {
     strobe: ch.map((c) => (c.attr === 'shutter' ? c.ranges?.find((r) => r.kind === 'strobe') : undefined)),
     slots: ch.map((c) => (SLOTTED.has(c.attr) ? slotsOf(c) : undefined)),
     hasCells: ch.some((c) => c.cell !== undefined),
+    cellN: ch.reduce((n, c) => (c.cell === undefined ? n : Math.max(n, c.cell + 1)), 0),
   };
   plans.set(m, p);
   return p;
@@ -138,7 +141,28 @@ export function level(c: Channel, hi: boolean, x: number): number {
   return c.fine ? word(x) & 0xff : hi ? word(x) >> 8 : byte(x);
 }
 
-type Emit = ReturnType<typeof emitters>;
+// A light's emitters, and each cell's look as it's worked out (once per cell, the first of its
+// channels): emitters, the share its emitters carry (k), its level under the master (ci); its
+// colour. Reused light after light, frame after frame: a pixel rig is thousands of cells a frame,
+// and an object or two for each was most of rendering. `CSTAMP[j] === stamp`: cell j done for this light.
+const E0 = new Float64Array(6);
+const SLOT = 8;
+let CE = new Float64Array(64 * SLOT), CSTAMP = new Uint32Array(64), CCOL: Color[] = new Array(64), stamp = 0;
+function cellRoom(n: number) {
+  if (++stamp >= 0xffffffff) { CSTAMP.fill(0); stamp = 1; }
+  if (n <= CSTAMP.length) return;
+  const m = Math.max(n, CSTAMP.length * 2);
+  CE = new Float64Array(m * SLOT); CSTAMP = new Uint32Array(m); CCOL = new Array(m);
+}
+// a head of its own among the cells (a moving bar): where it points (cv: that cell's own values),
+// its own else the light's, swapped and inverted as the light is
+// (a bar that pans or tilts as a whole as well: its heads' own motors at their middle unless set,
+// or the bar's angle would count twice)
+function headAxis(f: Fixture, P: Plan, v: Resolved, cv: Resolved | undefined, tiltAxis: boolean): number {
+  const pp = cv?.pan ?? (P.barPan ? 0.5 : v.pan), tt = cv?.tilt ?? (P.barTilt ? 0.5 : v.tilt);
+  const x = (tiltAxis !== !!f.swapPanTilt ? tt : pp) ?? 0.5;
+  return (tiltAxis ? f.invertTilt : f.invertPan) ? 1 - x : x;
+}
 // `out`: a universe, or a buffer of its own for a light too big for one (the engine splits that up).
 export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint8Array, base = f.address - 1) {
   const P = planOf(m), chs = m.channels;
@@ -158,8 +182,9 @@ export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint
   // carries a brighter cell, the light's own emitters (a pixel head's main beam) take their share.
   // (only when a cell is brighter than the light: a dark PAR keeps its colour, its dimmer is at 0)
   const k0 = hasMaster ? (M > own + 1e-9 ? own / M : 1) : dim;
-  const e0 = emitters(P.hasWhite, v), color0 = v.color ?? WHITE;
-  let cellLook: Map<number, { e: Emit; k: number; color: Color; ci: number }> | undefined;
+  emitters(E0, 0, P.hasWhite, v);
+  const color0 = v.color ?? WHITE;
+  if (P.hasCells) cellRoom(P.cellN);
   const cct = v.cct;
   // warm/cool pair: the middle is both at full (the brightest white it has), the ends one of them
   const ww = Math.min(1, 2 * (1 - (cct ?? 0.5))), cw = Math.min(1, 2 * (cct ?? 0.5));
@@ -169,15 +194,6 @@ export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint
   const tilt = f.invertTilt ? 1 - (t0 ?? 0.5) : (t0 ?? 0.5);
   const strobe = v.strobe ?? 0;
   const raws = v.raw;
-  // a head of its own among the cells (a moving bar): where it points, its own else the light's,
-  // swapped and inverted as the light is
-  // (a bar that pans or tilts as a whole as well: its heads' own motors at their middle unless set,
-  // or the bar's angle would count twice)
-  const headAt = (k: number) => {
-    const cv = cells?.[k] ?? cvs?.[k], pp = cv?.pan ?? (P.barPan ? 0.5 : v.pan), tt = cv?.tilt ?? (P.barTilt ? 0.5 : v.tilt);
-    const a = f.swapPanTilt ? tt : pp, b = f.swapPanTilt ? pp : tt;
-    return { pan: f.invertPan ? 1 - (a ?? 0.5) : (a ?? 0.5), tilt: f.invertTilt ? 1 - (b ?? 0.5) : (b ?? 0.5) };
-  };
 
   for (let i = 0; i < chs.length; i++) {
     const at = base + i;
@@ -188,30 +204,32 @@ export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint
     if (raw !== undefined && !isHeld(c.attr)) { out[at] = Math.max(0, Math.min(255, Math.round(raw))); continue; }
     if (P.fixed[i]) { out[at] = c.default ?? 0; continue; }
     const hi = P.hi[i];
-    let e = e0, k = k0, color = color0, ci = dim;
+    let e = E0, o = 0, k = k0, color = color0, ci = dim;
     if (c.cell !== undefined) {
-      let l = (cellLook ??= new Map()).get(c.cell);
-      if (!l) {
-        const cv = cells?.[c.cell] ?? cvs?.[c.cell];
+      const j = c.cell;
+      e = CE; o = j * SLOT;
+      if (CSTAMP[j] !== stamp) {
+        const cv = cells?.[j] ?? cvs?.[j];
         // its level: its own, else the light's
-        const lvl = cells ? (cv?.intensity ?? own) : lv ? lv[c.cell] ?? 0 : cv?.intensity ?? own;
-        const color = cv?.color ?? v.color ?? WHITE;
+        const lvl = cells ? (cv?.intensity ?? own) : lv ? lv[j] ?? 0 : cv?.intensity ?? own;
         // what's left for this cell under the master: on its own dimmer, else on its emitters
         const rel = M > 0 ? Math.min(1, lvl / M) : 0;
-        l = { e: cv ? emitters(P.hasWhite, v, cv) : e0, k: P.cellDim.has(c.cell) ? 1 : rel, color, ci: rel };
-        cellLook.set(c.cell, l);
+        if (cv) emitters(CE, o, P.hasWhite, v, cv); else CE.set(E0, o);
+        CE[o + 6] = P.cellDim.has(j) ? 1 : rel; CE[o + 7] = rel;
+        CCOL[j] = cv?.color ?? v.color ?? WHITE;
+        CSTAMP[j] = stamp;
       }
-      ({ e, k, color, ci } = l);
+      k = CE[o + 6]; ci = CE[o + 7]; color = CCOL[j];
     }
     let d: number | undefined;
     switch (c.attr) {
       case 'intensity': d = level(c, hi, c.cell !== undefined ? ci : dim); break;
-      case 'red': d = byte(e.r * k); break;
-      case 'green': d = byte(e.g * k); break;
-      case 'blue': d = byte(e.b * k); break;
-      case 'white': d = byte(e.white * k); break;
-      case 'amber': d = byte(e.amber * k); break;
-      case 'uv': d = byte(e.uv * k); break;
+      case 'red': d = byte(e[o] * k); break;
+      case 'green': d = byte(e[o + 1] * k); break;
+      case 'blue': d = byte(e[o + 2] * k); break;
+      case 'white': d = byte(e[o + 3] * k); break;
+      case 'amber': d = byte(e[o + 4] * k); break;
+      case 'uv': d = byte(e[o + 5] * k); break;
       case 'lime': d = 0; break;
       case 'cyan': d = byte((1 - color.r) * k); break;
       case 'magenta': d = byte((1 - color.g) * k); break;
@@ -220,8 +238,8 @@ export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint
       case 'warmWhite': d = byte(ww * k); break;
       case 'coolWhite': d = byte(cw * k); break;
       case 'colorWheel': d = nearestSlot(c, P.mixes ? WHITE : color); break;
-      case 'pan': d = level(c, hi, c.cell !== undefined ? headAt(c.cell).pan : pan); break;
-      case 'tilt': d = level(c, hi, c.cell !== undefined ? headAt(c.cell).tilt : tilt); break;
+      case 'pan': d = level(c, hi, c.cell !== undefined ? headAxis(f, P, v, cells?.[c.cell] ?? cvs?.[c.cell], false) : pan); break;
+      case 'tilt': d = level(c, hi, c.cell !== undefined ? headAxis(f, P, v, cells?.[c.cell] ?? cvs?.[c.cell], true) : tilt); break;
       case 'strobe': d = strobe > 0 ? level(c, hi, strobe) : (c.default ?? 0); break;   // 0 = the channel's 'no strobe' value
       case 'shutter': {
         const open = P.open[i], st = P.strobe[i];
@@ -234,7 +252,7 @@ export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint
         // a gobo wheel's own functions first, on its channel's other ranges: the whole wheel running
         // round, or the gobo it's on shaking
         if (c.attr === 'gobo' || c.attr === 'gobo2') {
-          const w = wheelByte(c, slots, x, v[`${c.attr}Scroll`], v[`${c.attr}Shake`]);
+          const w = c.attr === 'gobo' ? wheelByte(c, slots, x, v.goboScroll, v.goboShake) : wheelByte(c, slots, x, v.gobo2Scroll, v.gobo2Shake);
           if (w !== undefined) { d = w; break; }
         }
         if (x === undefined) break;
@@ -269,6 +287,7 @@ export function renderFixture(f: Fixture, m: FixtureMode, v: Resolved, out: Uint
 // channel has no such range (or nothing asked for): the slot as it is.
 const CCW = /ccw|counter|anti|gegen|left|links|reverse|\brev\b|backward|\bback\b|rückwärts|rueckwaerts|retour/i;
 function wheelByte(c: Channel, slots: ChannelRange[], x: number | undefined, scroll?: number, shake?: number): number | undefined {
+  if (!(scroll && Math.abs(scroll) > 1e-3) && !(shake && shake > 1e-3)) return undefined;   // (the usual case, every frame)
   const others = c.ranges?.filter((r) => r.kind === 'other' && r.label);
   if (!others?.length) return undefined;
   const at = (r: ChannelRange, speed: number) => {
