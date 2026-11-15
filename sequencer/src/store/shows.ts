@@ -44,20 +44,24 @@ function db(): Promise<IDBDatabase> {
   });
   return dbp;
 }
+// (settled when the transaction is, not its request: a write can still be thrown away at its commit,
+// a full disk (QuotaExceededError) aborting it, and then only `abort` fires. A promise waiting for
+// `complete` or `error` alone never settled, and the show said "saving..." for good)
+function settle(t: IDBTransaction, done: () => void, reject: (e: unknown) => void) {
+  t.oncomplete = done;
+  t.onerror = () => reject(t.error);
+  t.onabort = () => reject(t.error ?? new Error('The browser threw the change away'));
+}
 function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>, store = STORE): Promise<T> {
   return db().then((d) => new Promise<T>((resolve, reject) => {
-    const r = run(d.transaction(store, mode).objectStore(store));
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
+    const t = d.transaction(store, mode), r = run(t.objectStore(store));
+    settle(t, () => resolve(r.result), reject);
   }));
 }
 
 export async function listShows(): Promise<ShowMeta[]> {
   const all = await tx<ShowMeta[]>('readonly', (s) => s.getAll() as IDBRequest<ShowMeta[]>, META);
   return all.sort((a, b) => b.modified.localeCompare(a.modified));
-}
-export async function showModified(id: string): Promise<string | undefined> {
-  return (await tx<ShowMeta | undefined>('readonly', (s) => s.get(id) as IDBRequest<ShowMeta | undefined>, META))?.modified;
 }
 export async function readShow(id: string): Promise<string | undefined> {
   return (await tx<Rec | undefined>('readonly', (s) => s.get(id) as IDBRequest<Rec | undefined>))?.json;
@@ -68,8 +72,7 @@ export async function writeShow(meta: ShowMeta, json: string): Promise<void> {
     const t = d.transaction([STORE, META], 'readwrite');
     t.objectStore(STORE).put({ ...meta, json });
     t.objectStore(META).put(meta);
-    t.oncomplete = () => resolve();
-    t.onerror = () => reject(t.error);
+    settle(t, resolve, reject);
   });
 }
 export async function deleteShow(id: string): Promise<void> {
@@ -78,8 +81,7 @@ export async function deleteShow(id: string): Promise<void> {
     const t = d.transaction([STORE, META], 'readwrite');
     t.objectStore(STORE).delete(id);
     t.objectStore(META).delete(id);
-    t.oncomplete = () => resolve();
-    t.onerror = () => reject(t.error);
+    settle(t, resolve, reject);
   });
 }
 
