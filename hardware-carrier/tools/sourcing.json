@@ -7,10 +7,11 @@
       "source": "LCSC",
       "mpn": "1206W4F1200T5E",
       "vendor": "UNI-ROYAL",
-      "lcsc": null,
-      "note": "Same series as the verified 10k. The C number could not be confirmed by search, look up the manufacturer part number on LCSC.",
+      "lcsc": "C17909",
+      "url": "https://www.lcsc.com/product-detail/C17909.html",
+      "note": "Same series as the 10k. JLCPCB basic part, so no extended-part fee for assembly.",
       "price_eur": 0.004,
-      "stock": null
+      "stock": 158200
     },
     "10k dir": {
       "desc": "Resistor 10k 1206 1%",
@@ -177,15 +178,15 @@
       }
     },
     "74AHCT541 pixel buffer": {
-      "desc": "Octal buffer 74HCT541, SO-20 300 mil (SOIC-20W land)",
+      "desc": "Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land)",
       "source": "LCSC",
-      "mpn": "74HCT541D,653",
-      "vendor": "Nexperia",
-      "lcsc": "C547781",
-      "url": "https://www.lcsc.com/product-detail/Buffers-Drivers_Nexperia_C547781.html",
+      "mpn": "SN74AHCT541DWR",
+      "vendor": "TI",
+      "lcsc": "C2682058",
+      "url": "https://www.lcsc.com/product-detail/C2682058.html",
       "note": "Two things decide this part, and neither is the number 541.\n1) The T. HCT, AHCT and ACT have TTL input thresholds (VIH 2.0 V), so 3.3 V from the S3 switches them reliably on a 5 V supply. HC, AHC and AC do not: their threshold is 0.7 x VCC = 3.5 V.\n2) The package. The land is SOIC-20W: 1.27 mm pitch, rows 10.10 mm apart, copper from 3.63 to 6.47 mm off the axis, pads reaching 1.32 mm past the lead tip so an iron fits. Only the 1.27 mm parts land on it - TI calls that DW, Nexperia calls it D.\nSpeed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x bit.",
-      "price_eur": 0.42,
-      "stock": 16712,
+      "price_eur": 0.64,
+      "stock": 2778,
       "alternatives": {
         "Works": {
           "cols": [
@@ -199,7 +200,7 @@
               "74HCT541D,653 (Nexperia)",
               "HCT",
               "D = SO-20 300 mil",
-              "LCSC C547781, in stock, about 0.42 EUR. What this BOM names."
+              "LCSC C547781, about 0.42 EUR. Was the BOM part until JLCPCB had only 1 left (2026-11)."
             ],
             [
               "74AHCT541D,118 (Nexperia)",
@@ -211,7 +212,7 @@
               "SN74AHCT541DW / DWR (TI)",
               "AHCT",
               "DW = SOIC-20 300 mil",
-              "Same land. R is tape and reel, otherwise identical."
+              "Same land. R is tape and reel, otherwise identical. DWR is what the BOM names: LCSC C2682058, about 0.64 EUR, 2778 in stock 2026-11-16."
             ],
             [
               "SN74HCT541DW / DWR (TI)",

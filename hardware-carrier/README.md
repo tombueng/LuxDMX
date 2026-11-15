@@ -203,7 +203,8 @@ outputs.
 
 ### The buffer chip
 
-`74HCT541D,653` (Nexperia), LCSC C547781, about 0.42 EUR. VCC on `+5V`, both output enables tied to
+`SN74AHCT541DWR` (TI), LCSC C2682058, about 0.64 EUR. The Nexperia `74HCT541D,653` (C547781)
+fits the same land and was the BOM part until JLCPCB ran out of it. VCC on `+5V`, both output enables tied to
 GND, inputs A1 to A5 used, A6 to A8 (pins 7 to 9) tied to GND by a track to pin 10.
 
 Two things decide the part:
@@ -276,7 +277,7 @@ BOM, the lands take 0402 to 1206.
 | RS-485 module | MAX3485, with EN pin | | port used |
 | DMX header | 1x3 pin header, or 2.54 mm screw terminal | | port used |
 | `10k dir` | 10k, 1206W4F1002T5E | C17902 | port used |
-| `120R term` | 120 Ω, 1206W4F1200T5E | | port at the end of the bus, module has none |
+| `120R term` | 120 Ω, 1206W4F1200T5E | C17909 | port at the end of the bus, module has none |
 | `330R bias+`, `330R bias-` | 330 Ω, 1206W4J0331T5E | C25374 | port drives the bus, once per bus |
 | `TVS bidir` x2 | SMF12CA, or SMAJ12CA | C353317 | port leaves the enclosure |
 
@@ -284,7 +285,7 @@ BOM, the lands take 0402 to 1206.
 
 | Part | Value / part number | LCSC | Fit when |
 |---|---|---|---|
-| `74AHCT541 pixel buffer` | 74HCT541D,653, SO-20 300 mil | C547781 | at least one pixel port used |
+| `74AHCT541 pixel buffer` | SN74AHCT541DWR, SOIC-20 300 mil | C2682058 | at least one pixel port used |
 | `330R PIX1..5` | 330 Ω, 1206W4J0331T5E | C25374 | that port used |
 | `Pixel1..5` | KF128-5.08-3P screw terminal | C474953 | that port used |
 | `12-24V IN` | KF128-5.08-2P screw terminal, 24 A | C474952 | any pixel port used |
@@ -320,7 +321,7 @@ BOM, the lands take 0402 to 1206.
 | `Button 1`, `Button 2` | 6 x 6 mm tact switch, 30 mm plunger | you want the buttons |
 | `EXP` | 1x6 pin header | you need spare pins |
 
-LCSC small parts for a fully fitted board: about 2.80 EUR. Stock, prices, marketplace links and
+LCSC small parts for a fully fitted board: about 3.00 EUR. Stock, prices, marketplace links and
 search terms for every module: [`production/BOM.md`](production/BOM.md). Every position with its
 side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 
@@ -352,7 +353,6 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
     preview of the 1206 parts and the SOIC buffer;
   - rotations come straight from KiCad; JLCPCB's footprints sometimes differ by 90 or 180
     degrees, so check the TVS diodes, the electrolytic and pin 1 of the buffer;
-  - the 120R has no LCSC number yet, pick it in JLCPCB's part search (`1206W4F1200T5E`);
   - the modules, headers, fuse holder, buttons and encoder are not in the files: those are
     plugged or hand soldered.
 

@@ -14,16 +14,16 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 703670 | 0.06 | 0.06 |
 | 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 23.140 | 0.129 | 0.26 |
 | 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch | `KM108M035J20RR0VH2FP0` | [C10749](https://www.lcsc.com/product-detail/C10749.html) | 48.810 | 0.171 | 0.17 |
-| 1 | 74AHCT541 pixel buffer | Octal buffer 74HCT541, SO-20 300 mil (SOIC-20W land) | `74HCT541D,653` | [C547781](https://www.lcsc.com/product-detail/Buffers-Drivers_Nexperia_C547781.html) | 16712 | 0.42 | 0.42 |
+| 1 | 74AHCT541 pixel buffer | Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land) | `SN74AHCT541DWR` | [C2682058](https://www.lcsc.com/product-detail/C2682058.html) | 2778 | 0.64 | 0.64 |
 | 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 644 | 0.419 | 0.42 |
 | 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 204.500 | 0.018 | 0.09 |
-| 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | - | ? | 0.004 | 0.01 |
+| 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | [C17909](https://www.lcsc.com/product-detail/C17909.html) | 158200 | 0.004 | 0.01 |
 | 11 | 330R bias+ / 330R bias- / 330R pixel | Resistor 330R 1206 5% (fail-safe bias) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 79.100 | 0.012 | 0.13 |
 | 1 | 12-24V IN 24A | Screw terminal, 2 pole, 5.08 mm pitch, 24 A | `KF128-5.08-2P-AA` | [C474952](https://www.lcsc.com/product-detail/C474952.html) | 63.515 | 0.177 | 0.18 |
 | 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 16.545 | 0.175 | 0.88 |
 | 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
 
-**Small parts total: about 2.80 EUR**
+**Small parts total: about 3.02 EUR**
 
 Deliberately not listed:
 
@@ -41,7 +41,7 @@ Deliberately not listed:
 2) The package. The land is SOIC-20W: 1.27 mm pitch, rows 10.10 mm apart, copper from 3.63 to 6.47 mm off the axis, pads reaching 1.32 mm past the lead tip so an iron fits. Only the 1.27 mm parts land on it - TI calls that DW, Nexperia calls it D.
 Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x bit.
 - **MF-R 30V**: The largest that fits the current placement: body 17.4 x 3.0 mm, 3.8 mm clear of the 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series but its body is 24.2 mm and would come within 0.40 mm of the can; both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.  Two numbers decide a replacement and neither is the current: the voltage (30 V, not 16) and the lead pitch (5.08 or 10.2 mm, nothing else). The table below is what has been checked so far.
-- **120R term**: Same series as the verified 10k. The C number could not be confirmed by search, look up the manufacturer part number on LCSC.
+- **120R term**: Same series as the 10k. JLCPCB basic part, so no extended-part fee for assembly.
 - **330R bias+ / 330R bias- / 330R pixel**: Fail-safe bias on a 3.3 V bus needs more than 200 mV idle differential. With two terminators (60 R, the normal case once this board is the controller at one end) 330 R gives 275 mV, 470 R only 198 mV. Anything from 270 R to 430 R works, see the table. Bus loading 4.6 mA, which no RS-485 driver cares about, and 5 % tolerance is irrelevant for a bias resistor. The land takes anything from 0402 to 1206: copper runs 0.30 to 2.30 mm off centre, so every end cap lands on it, an 0402's at 0.25 to 0.50 as much as a 1206's at 1.10 to 1.60. The 390R that only exists in 0805 therefore goes in without any trickery.
   - lcsc: [390R exists only in 0805 (C17655) and fits the 1206 land by hand if needed](https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount-UniOhm_390R-3900-1_C17655.html) - 0.004 USD
 - **TVS bidir**: The land is universal: copper runs from 0.30 to 2.90 mm off centre, so SOD-123, SOD-123F, SOD-123FL, DO-214AC (SMA) and a plain 1206 all sit on it. SMF12CA in SOD-123FL is the cheap default. SMAJ12CA in SMA is the same diode at 400 W instead of 200 W, same 12 V standoff and the same breakdown window, and its feet reach 2.80 mm so it now lands properly rather than hanging off the end. VRWM 12 V, so it does not conduct at the +12 V common mode RS-485 allows, VBR 14.7 V, clamps at 19.9 V with 10 A. Two per port, A and B to GND. A varistor is no substitute, it would not clamp until about 40 V.
@@ -55,9 +55,9 @@ Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x
 
 | Type | Family | Package | Note |
 |---|---|---|---|
-| `74HCT541D,653 (Nexperia)` | HCT | D = SO-20 300 mil | LCSC C547781, in stock, about 0.42 EUR. What this BOM names. |
+| `74HCT541D,653 (Nexperia)` | HCT | D = SO-20 300 mil | LCSC C547781, about 0.42 EUR. Was the BOM part until JLCPCB had only 1 left (2026-11). |
 | `74AHCT541D,118 (Nexperia)` | AHCT | D = SO-20 300 mil | Same land, faster. LCSC C554678, out of stock when last checked. |
-| `SN74AHCT541DW / DWR (TI)` | AHCT | DW = SOIC-20 300 mil | Same land. R is tape and reel, otherwise identical. |
+| `SN74AHCT541DW / DWR (TI)` | AHCT | DW = SOIC-20 300 mil | Same land. R is tape and reel, otherwise identical. DWR is what the BOM names: LCSC C2682058, about 0.64 EUR, 2778 in stock 2026-11-16. |
 | `SN74HCT541DW / DWR (TI)` | HCT | DW = SOIC-20 300 mil | Same land. |
 | `CD74ACT541M (TI)` | ACT | M = SOIC-20 300 mil | ACT has TTL thresholds too. Stronger drive, noisier supply. |
 
