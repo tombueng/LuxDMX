@@ -184,8 +184,9 @@ http.createServer(async (req, res) => {
     if (!f) throw new Error(`no action ${name}: ${Object.keys(actions).join(' ')}`);
     out = { ok: true, ...(await f(b)) };
   } catch (e) {
-    // (the message only, never the stack: what failed and the call log, for whoever drives it)
-    const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : 'failed';
+    // (the message only, never the stack or the thrown thing itself: what failed and the call log,
+    // for whoever drives it)
+    const msg = e instanceof Error ? String(e.message) : 'failed';
     out = { ok: false, error: msg.split('\n').slice(0, 6).join('\n') };
   }
   // (let the page react, then say what it logged meanwhile)

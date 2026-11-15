@@ -22,6 +22,14 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
   paste: the cut took every Live button and timeline moment that played the cue with it, and the
   paste gave it a new id. Now the cue itself moves, what plays it follows, and one Undo takes it back.
 - **The console no longer leaves a second 3D stage running** when you switch to another view.
+- **Small things that were off:** the arrow keys on the pan/tilt pad lost presses when you tapped
+  fast and moved the whole bar instead of the heads you'd picked; on the Live and Timeline plans a
+  pinch or a middle-button pan that started on a light did nothing; moving an instant crowd change
+  with the arrow keys turned it into a half-second ramp.
+- **Live got lighter on a big rig:** the "Confetti at 2:41 · safe" and "Fog on" chips were worked
+  out on every frame (20 ms a go on the festival demo, which is time the timeline's cues waited for).
+  Now they're worked out when the show changes. A hidden console or programmer also stops following
+  the stage frame by frame.
 - **Changing what a light's channels do is kept when you press Done.** Before, only the Save button
   under the table kept it, and Done threw it away without a word (swap red and green, Done, and
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and

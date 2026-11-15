@@ -220,7 +220,12 @@
   // A page made your own doesn't follow the show by itself: what's new there (a look, a list, an
   // effect, a group made since) is offered, and goes on this page in one tap (keys already taken
   // elsewhere left off). Nothing for the generated page: it follows anyway.
-  const fresh = $derived(app.show.pages.length && !app.locked ? whatsNew(app.show, app.show.pages) : []);
+  // (what's new in the show for the pages: once per change of the show, from its plain copy, and
+  // only while Live is shown. On every edit, through the proxies, in every view, it was 11 ms)
+  const fresh = $derived.by(() => {
+    const s = shown ? app.plain : untrack(() => app.plain);
+    return s?.pages.length && !app.locked ? whatsNew(s, s.pages) : [];
+  });
   const nameOf = (w: Widget) => w.label || (w.type === 'cue' ? app.show.cueLists.find((l) => l.id === w.list)?.cues.find((c) => c.id === w.cue)?.name
     : w.type === 'list' || w.type === 'cuelist' ? app.show.cueLists.find((l) => l.id === w.list)?.name : w.type === 'effect' ? app.show.effects.find((e) => e.id === w.effect)?.name
     : w.type === 'group' ? app.show.groups.find((g) => g.id === w.group)?.name : w.type === 'song' ? SONG_NAME[w.do] : 'Fog') || '?';
