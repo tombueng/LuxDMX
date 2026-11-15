@@ -23,6 +23,8 @@ import sys
 
 import pcbnew
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 def _project_dir():
     """The project directory, whether this script sits in it or in tools/ beside it.
 
@@ -66,6 +68,99 @@ def generic(val, fpid):
     return v
 
 
+# JLCPCB matches BOM and CPL on the designator, and wants plain ones (R12, C3). The board's
+# references are labels for hand assembly ("330R bias+", three times "10k dir"), which their
+# uploader refuses with nothing but "failed to load" (issue #164). So the upload files get
+# designators of their own, numbered here, and JLC-designators.csv says which is which.
+JLC_PREFIX = {"Resistor": "R", "Capacitor": "C", "Electrolytic": "C", "TVS": "D",
+              "Octal": "U", "Screw": "J", "DC": "J", "Polyfuse": "F"}
+# what JLCPCB shows as the footprint; the board's own names say nothing to them
+JLC_FOOTPRINT = {"chip-universal": "1206", "chip-universal-tvs": "SOD-123FL"}
+
+
+def _jlc_fp(fpid):
+    name = fpid.split(":")[-1]
+    return JLC_FOOTPRINT.get(name, name)
+
+
+def write_jlc(board, placed, parts, boards):
+    """BOM-LCSC-upload.csv and luxdmx-carrier-cpl.csv in JLCPCB's format.
+
+    Only what comes from LCSC goes in: the modules and headers are bought elsewhere and
+    soldered by hand, so JLCPCB has nothing to place there. Coordinates are in the frame the
+    gerbers are plotted in (the drill/aux origin), the same numbers kicad-cli's pos export gives."""
+    taken = {f.GetReference() for f in board.GetFootprints()
+             if re.match(r"^[A-Z]+[0-9]+$", f.GetReference())}
+    org = board.GetDesignSettings().GetAuxOrigin()
+    items = []
+    for key, f in placed:
+        p = parts.get(key)
+        if not p or p.get("source", "LCSC") != "LCSC":
+            continue
+        word = p["desc"].split()[0]
+        if word not in JLC_PREFIX:
+            raise SystemExit(f"gen_bom: no JLC designator prefix for {key!r} ({p['desc']})")
+        pos = f.GetPosition()
+        x, y = pcbnew.ToMM(pos.x - org.x), -pcbnew.ToMM(pos.y - org.y)
+        items.append({"prefix": JLC_PREFIX[word], "key": key, "p": p, "label": f.GetReference(),
+                      "fp": _jlc_fp(f.GetFPIDAsString()), "x": x, "y": y,
+                      "rot": f.GetOrientationDegrees() % 360,
+                      "layer": "Bottom" if f.IsFlipped() else "Top"})
+    # numbered top to bottom, left to right within each letter, skipping numbers the board
+    # already uses (F1 is the blade fuse holder), so the same board always gives the same names
+    items.sort(key=lambda t: (t["prefix"], -round(t["y"], 2), round(t["x"], 2)))
+    nxt = {}
+    for it in items:
+        n = nxt.get(it["prefix"], 1)
+        while f"{it['prefix']}{n}" in taken:
+            n += 1
+        it["ref"] = f"{it['prefix']}{n}"
+        nxt[it["prefix"]] = n + 1
+
+    def natural(d):
+        return (re.match(r"[A-Z]+", d).group(), int(re.search(r"[0-9]+", d).group()))
+
+    lines = {}
+    for it in items:
+        p = it["p"]
+        mk = (p.get("lcsc") or "", p.get("mpn") or it["key"], it["fp"])
+        lines.setdefault(mk, []).append(it)
+    bom = []
+    for (lcsc, mpn, fp), its in lines.items():
+        refs = sorted((i["ref"] for i in its), key=natural)
+        # the value, not the position label: "10k dir" and "10k ETH_CS pu" are one 10k reel
+        word = its[0]["p"]["desc"].split()[0]
+        comment = its[0]["key"].split()[0] if word in ("Resistor", "Capacitor") else mpn
+        bom.append({"Comment": comment, "Designator": ",".join(refs), "Footprint": fp,
+                    "LCSC Part #": lcsc, "Quantity": len(refs) * boards,
+                    "Manufacturer Part Number": mpn, "Description": its[0]["p"]["desc"]})
+    bom.sort(key=lambda r: natural(r["Designator"].split(",")[0]))
+    # plain UTF-8, no BOM, LF: the safest thing for JLCPCB's parser and still opens in Excel
+    with open(os.path.join(OUT, "BOM-LCSC-upload.csv"), "w", newline="",
+              encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, lineterminator="\n", fieldnames=[
+            "Comment", "Designator", "Footprint", "LCSC Part #", "Quantity",
+            "Manufacturer Part Number", "Description"])
+        w.writeheader()
+        w.writerows(bom)
+    with open(os.path.join(OUT, "luxdmx-carrier-cpl.csv"), "w", newline="",
+              encoding="utf-8") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
+        for it in sorted(items, key=lambda t: natural(t["ref"])):
+            w.writerow([it["ref"], f"{it['x']:.4f}mm", f"{it['y']:.4f}mm", it["layer"],
+                        f"{it['rot']:g}"])
+    # the way back from JLCPCB's names to the labels printed on the board
+    with open(os.path.join(OUT, "JLC-designators.csv"), "w", newline="",
+              encoding="utf-8") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(["Designator", "Board label", "Layer", "Mid X", "Mid Y"])
+        for it in sorted(items, key=lambda t: natural(t["ref"])):
+            w.writerow([it["ref"], it["label"], it["layer"], f"{it['x']:.4f}mm",
+                        f"{it['y']:.4f}mm"])
+    return len(bom)
+
+
 def main():
     src = json.load(open(SRC, encoding="utf-8"))
     parts, modules = src["parts"], src["modules"]
@@ -76,7 +171,7 @@ def main():
             parts[k] = dict(parts[v["same_as"]])
 
     board = pcbnew.LoadBoard(BOARD)
-    counts, missing = {}, []
+    counts, missing, placed = {}, [], []
     for f in board.GetFootprints():
         val = f.GetValue()
         g = generic(val, f.GetFPIDAsString())
@@ -89,6 +184,7 @@ def main():
             missing.append(val)
             continue
         counts[key] = counts.get(key, 0) + 1
+        placed.append((key, f))
 
     # The OLED and the encoder are not footprints, they plug into headers. One each.
     # The OLED is the only part left that is not a footprint of its own; it plugs into a
@@ -239,27 +335,18 @@ def main():
         w.writeheader()
         w.writerows(csv_rows)
 
-    # ---- LCSC-Upload ---------------------------------------------------------------
-    # https://www.lcsc.com/bom nimmt Menge + (LCSC-Nummer | MPN | Beschreibung). Teile ohne
-    # bestaetigte C-Nummer gehen mit der MPN rein, die matcht LCSC selbst -- oder eben nicht,
-    # dann stehen sie danach rot in der Liste. Besser als eine geratene Nummer.
+    # ---- JLCPCB / LCSC upload: BOM + placement ----------------------------------
     boards = int(sys.argv[sys.argv.index("--boards") + 1]) if "--boards" in sys.argv else 1
-    up = []
-    for r in rows_l:
-        # only what LCSC can actually match; marketplace parts would just sit there red
-        if r["_source"] != "LCSC":
-            continue
-        up.append({"LCSC Part Number": r["LCSC"].split(" / ")[0],
-                   "Manufacturer Part Number": r["MPN"].split(" / ")[0],
-                   "Quantity": r["Stk"] * boards,
-                   "Designator": r["Bauteil"],
-                   "Description": r["Beschreibung"]})
-    with open(os.path.join(OUT, "BOM-LCSC-upload.csv"), "w", newline="",
-              encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=["LCSC Part Number", "Manufacturer Part Number",
-                                           "Quantity", "Designator", "Description"])
-        w.writeheader()
-        w.writerows(up)
+    n_up = write_jlc(board, placed, parts, boards)
+    import check_jlc_files
+    errors, warnings = check_jlc_files.check(OUT)
+    for w in warnings:
+        print("  warn: " + w)
+    for e in errors:
+        print("  FEHLER: " + e)
+    if errors:
+        print("JLC-Dateien kaputt, siehe oben")
+        return 1
 
     # ---- XLSX --------------------------------------------------------------------
     try:
@@ -302,7 +389,7 @@ def main():
 
     print(f"{len(rows_l)} LCSC-Positionen ({total_l:.2f} EUR), {len(rows_m)} Module")
     print(f"-> production/BOM.md, BOM.csv, {xl}, BOM-LCSC-upload.csv "
-          f"({len(up)} Zeilen fuer {boards} Board(s))")
+          f"({n_up} Zeilen fuer {boards} Board(s)), luxdmx-carrier-cpl.csv, JLC-designators.csv")
     return 0
 
 

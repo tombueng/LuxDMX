@@ -338,7 +338,27 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 - **PCB:** [`production/luxdmx-carrier-gerbers.zip`](production/), 2 layers, 1 oz, 1.6 mm, any fab
   (e.g. <https://cart.jlcpcb.com/quote>).
 - **Small parts:** [`production/BOM-LCSC-upload.csv`](production/) goes straight into
-  <https://www.lcsc.com/bom>. Also as `BOM.csv` / `BOM.xlsx`, and `BOM-TME.md` for TME.
+  <https://www.lcsc.com/bom> (map `LCSC Part #` and `Quantity`). Also as `BOM.csv` / `BOM.xlsx`,
+  and `BOM-TME.md` for TME.
+- **JLCPCB assembly (optional, untested):** usually not needed. Without pixels you can leave
+  the whole pixel section out, and the rest is a handful of 1206 parts and headers. If you want
+  JLCPCB to fit the LCSC parts anyway, upload `BOM-LCSC-upload.csv` as the BOM and
+  [`production/luxdmx-carrier-cpl.csv`](production/) as the CPL, next to the gerber zip. Both use
+  plain designators (`R12`, `C3`) because JLCPCB refuses the board's own labels;
+  [`production/JLC-designators.csv`](production/) maps them back (`R9` = `120R term`). Things to
+  check in JLCPCB's preview before you pay:
+  - nearly every SMD part sits on the **back**, so it is a bottom-side (or two-sided) job;
+  - the lands are sized for hand soldering, longer than the parts, so check the placement
+    preview of the 1206 parts and the SOIC buffer;
+  - rotations come straight from KiCad; JLCPCB's footprints sometimes differ by 90 or 180
+    degrees, so check the TVS diodes, the electrolytic and pin 1 of the buffer;
+  - the 120R has no LCSC number yet, pick it in JLCPCB's part search (`1206W4F1200T5E`);
+  - the modules, headers, fuse holder, buttons and encoder are not in the files: those are
+    plugged or hand soldered.
+
+  `tools/gen_bom.py` writes all three files and runs `tools/check_jlc_files.py`, which fails on
+  anything JLCPCB's uploader is known to refuse (header names, encoding, duplicate or
+  mismatched designators, layer values, units).
 - **Modules:** search terms and example links in [`production/BOM.md`](production/BOM.md). Links rot,
   search terms don't.
 
