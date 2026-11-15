@@ -265,12 +265,10 @@ Three more demos come with their own room on the 3D stage:
   the page as before). A page that closes stops the thread first and sends its safe look last
   (fog and machines off), so nothing from the thread can come after it. In a browser without
   workers the page sends itself, the frame going out before anything is drawn. With the thread the
-  page being slow can't make the output late, so the 3D stage keeps the quality you chose, as sharp
-  and with its glow. While the page is busy it still fires the timeline's cues, Auto GO and the
-  fog's timers, so the 3D draws less often first (at most 30, then 20 frames a second), then the
-  panels and the plan give way (updated every second or third frame, the plan without its blur and
-  moving bits); all of it comes back after a few calm seconds.
-  The 3D stage reads every frame's values itself, so moving heads move as smoothly as it draws.
+  page being slow can't make the output late, so the 3D stage keeps the quality you chose, and while
+  the page is busy only the panels and the plan give way (updated every second or third frame, the
+  plan without its blur and moving bits);
+  the 3D stage reads every frame's values itself, so moving heads move as smoothly as it draws.
   Without the thread, when drawing would slow the page (a slow laptop, a busy machine), the stage
   pictures give way at once: they update every other frame, then draw simpler (the 3D stage with
   fewer frames a second and no glow, never fewer pixels than the screen has; the plan without its

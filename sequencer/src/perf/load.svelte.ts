@@ -31,11 +31,6 @@ export class Load {
   // quality chosen; the panels' updates and the plan give way (the 3D stage reads every frame's
   // values itself)
   outputSafe = false;
-  // the 3D stage's frames, held back while it keeps the quality chosen (the output on its thread)
-  // but the page's own frames come late: 0 as the level says, 1 at most 30 a second, 2 at most 20.
-  // The page frame still fires the timeline's cues, Auto GO and the fog's timers, and the 3D's
-  // drawing is the most the page does: it draws less often first, as sharp and with its glow.
-  slow3d = $state<0 | 1 | 2>(0);
   // the output thread's late frames in its last few seconds (its own report): when it's late, the
   // drawing gives way to it all the same (both run on the same computer)
   threadLate = 0;
@@ -45,7 +40,7 @@ export class Load {
   rate = $state(0);                               // output frames a second
   worst = $state(0);                              // the longest gap between two output frames (ms)
   late = $state(0);                               // output frames late in the last WINDOW
-  get lowered() { return this.level < this.quality || this.level2d < this.quality || this.uiEvery > 1 || this.slow3d > 0; }
+  get lowered() { return this.level < this.quality || this.level2d < this.quality || this.uiEvery > 1; }
 
   private ticks: number[] = [];                   // when each output frame ran
   private work: [number, number][] = [];          // [when, ms] of the page's own work
@@ -91,13 +86,11 @@ export class Load {
     // (the 3D keeps the quality chosen while the wire is fine without the page)
     const pinned = this.outputSafe && this.threadLate === 0;
     if (pinned && this.level < this.quality) this.level = this.quality;
-    if (!pinned && this.slow3d) this.slow3d = 0;            // (the level steps the frames down then)
     if (late >= 2) {
       this.calmSince = now;
       if (now - this.lastStep < 500) return;
       this.lastStep = now;
       if (this.uiEvery < 2) this.uiEvery = 2;
-      else if (pinned && this.slow3d < 2) this.slow3d = (this.slow3d + 1) as 1 | 2;
       else if (this.level2d > 0) { this.level2d = (this.level2d - 1) as Level; if (!pinned) this.level = this.level2d; }
       else if (this.uiEvery < (pinned ? 3 : 6)) this.uiEvery++;
       return;
@@ -108,7 +101,6 @@ export class Load {
       this.lastStep = now; this.calmSince = now;
       if (this.uiEvery > 2) this.uiEvery--;
       else if (this.level2d < this.quality) { this.level2d = (this.level2d + 1) as Level; if (!pinned) this.level = this.level2d; }
-      else if (this.slow3d > 0) this.slow3d = (this.slow3d - 1) as 0 | 1;
       else if (this.uiEvery > 1) this.uiEvery = 1;
     }
   }
