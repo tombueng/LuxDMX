@@ -390,3 +390,22 @@ test('what the channels do, changed and the dialog closed with Done: kept (red a
   await d2.getByRole('button', { name: 'Done' }).click();
   await expect.poll(chans).toEqual([['Dimmer', 'intensity'], ['Green', 'green'], ['Red', 'red'], ['Blue', 'blue']]);
 });
+
+test('a number field: a click picks what is in it, but after a Tab into it a click puts the caret there', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  const dlg = await openSetup(page, 'Head');
+  const turn = dlg.getByLabel('Turn', { exact: true }), tip = dlg.getByLabel('Tip', { exact: true });
+  await tip.fill('30'); await tip.press('Enter');
+  // clicked into: all of it picked, typing replaces it
+  await turn.click();
+  await page.keyboard.type('15');
+  await expect(turn).toHaveValue('15');
+  // Tab into Tip (all picked), then a click in it: the caret goes there, typing adds to what's there
+  await turn.press('Tab');
+  await expect(tip).toBeFocused();
+  const b = (await tip.boundingBox())!;
+  await page.mouse.click(b.x + b.width * 0.55, b.y + b.height / 2);
+  await page.keyboard.type('5');
+  await expect(tip).toHaveValue('305');
+});

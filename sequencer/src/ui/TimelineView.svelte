@@ -885,12 +885,13 @@
             <div class="lane" style="--c:{ln.color}">
               {#each built ? (ln.id === 'crowd' ? crowd : items.filter((i) => i.lane === ln.id)) : [] as it (it.id)}
                 {@const mark = markOf(it)}
+                {@const label = labelOf(it)}
                 <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : `max-width:min(18rem, ${Math.max(28, Math.max(width, x(shownTo)) - x(it.at) - 2)}px)`}"
                   onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)} onkeydown={(e) => itemKey(e, it.id)}
-                  aria-label="{labelOf(it)} at {clockOf(it.at)}{mark ? `, ${MARK_SHORT[mark]}` : ''}"
-                  title="{labelOf(it)} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move, right-click for more">
+                  aria-label="{label} at {clockOf(it.at)}{mark ? `, ${MARK_SHORT[mark]}` : ''}"
+                  title="{label} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move, right-click for more">
                   {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{:else if mark === 'winch'}<span class="mark winch" aria-hidden="true">⇅</span>{/if}
-                  <span class="t">{labelOf(it)}</span>
+                  <span class="t">{label}</span>
                   {#if it.len !== undefined}<!-- svelte-ignore a11y_no_static_element_interactions -->
                     <span class="end" onpointerdown={(e) => itemDown(e, it, true)}></span>{/if}
                 </button>

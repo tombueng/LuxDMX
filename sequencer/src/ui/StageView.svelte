@@ -303,6 +303,8 @@
     return out;
   });
   const css = (l: Resolved | undefined) => lookColor(l);
+  // each light's colour on the plan, once a frame (the glows, the beams and the symbols all use it)
+  const cssOf = $derived(new Map(app.show.fixtures.map((f) => [f.id, css(app.drawn[f.id])])));
   const cells = (id: string) => app.caps(id).cells;
   // the cells picked on a light (outlined on the plan)
   const picks = (id: string) => new Set(app.cellsPicked(id));
@@ -476,7 +478,7 @@
         {#each app.show.fixtures as f (f.id)}
           {@const k = app.kinds[f.id]}
           {#if k === 'par' || k === 'bar' || k === 'dimmer'}
-            {@const c = css(app.drawn[f.id])}
+            {@const c = cssOf.get(f.id)!}
             {#if c.glow > 0.04}
               <ellipse cx={f.x * W} cy={f.y * H + size * 1.5} rx={size * (k === 'bar' ? 3.4 : 2.2)} ry={size * 0.9} fill={c.css} opacity={0.18 * Math.min(1, c.glow)} />
             {/if}
@@ -488,7 +490,7 @@
         {@const k = app.kinds[f.id]}
         {#if k === 'mover'}
           {@const l = app.drawn[f.id]}
-          {@const c = css(l)}
+          {@const c = cssOf.get(f.id)!}
           {#if c.glow > 0.02}
             {@const pan = ((l?.pan ?? 0.5) - 0.5) * 2.6}
             {@const len = 70 + 260 * (l?.tilt ?? 0.5)}
@@ -500,7 +502,7 @@
       {/each}
       {#each app.show.fixtures as f (f.id)}
         {@const l = app.drawn[f.id]}
-        {@const c = css(l)}
+        {@const c = cssOf.get(f.id)!}
         {@const kind = app.kinds[f.id] ?? 'other'}
         {@const sel = !readonly && app.selected.includes(f.id)}
         {@const x = f.x * W}
