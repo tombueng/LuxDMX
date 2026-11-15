@@ -169,6 +169,7 @@ export class Engine {
   private beats = 0;
   private seconds = 0;
   private last = -1;
+  private beatsSetAt = -1;     // (when a song last set the beat clock: the next frame counts on from there)
 
   constructor(private getShow: () => Show, readonly now: () => number = () => performance.now() / 1000) {}
 
@@ -238,6 +239,7 @@ export class Engine {
     if (!Number.isFinite(b)) return;
     if (Math.abs(b - this.beats) > 0.5) this.fxSince.clear();
     this.beats = b;
+    this.beatsSetAt = this.now();
   }
   get beatCount() { return this.beats; }
   releaseFlashes() { for (const p of this.players.values()) if (p.flashing) p.stop(); for (const id of this.fxFlash) this.liveFx.delete(id); this.fxFlash.clear(); }
@@ -366,9 +368,13 @@ export class Engine {
     // output thread's clock went on, and the stage and Auto GO ran half a beat off the effects on
     // the wire from then on)
     const dt = this.last < 0 ? 0 : Math.max(0, now - this.last);
+    // (the beat set from a song since the last frame: on from that moment, not by the whole frame. It
+    // ran a frame ahead of the song, and with uneven frames back and forth: tempo effects stepped
+    // two on, one back, on a busy page)
+    const beatDt = this.beatsSetAt > this.last ? Math.max(0, now - this.beatsSetAt) : dt;
     this.last = now;
     this.seconds += dt;
-    this.beats += dt * this.bpm / 60;
+    this.beats += beatDt * this.bpm / 60;
 
     // Auto-advance (wait / follow / beats) and finished releases.
     for (const [id, p] of this.players) {
