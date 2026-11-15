@@ -20,7 +20,7 @@
   import { listRiskOf } from './risk';
   import { isMachine, RISK_LABEL, RISK_SHORT } from '../model/safety';
   import type { ChannelAttr, Color, NumAttr } from '../model/types';
-  import { slotsOf } from '../engine/render';
+  import { selection } from './selection.svelte';
   import StageView from './StageView.svelte';
   import Icon from './Icon.svelte';
 
@@ -110,8 +110,7 @@
   }
 
   // ---- encoders: the attributes the selection has, a page at a time
-  const sel = $derived(app.show.fixtures.filter((f) => app.selected.includes(f.id)));
-  const attrs = $derived.by(() => { const a = new Set<ChannelAttr>(); for (const f of sel) for (const c of app.modeOf(f.id)?.channels ?? []) a.add(c.attr); return a; });
+  const sel = $derived(selection.fixtures), attrs = $derived(selection.attrs);
   type Enc = { k: NumAttr | 'hue' | 'sat'; label: string; need: ChannelAttr[] };
   const PAGES: { id: string; label: string; enc: Enc[] }[] = [
     { id: 'int', label: 'Intensity', enc: [{ k: 'intensity', label: 'Intensity', need: ['intensity', 'red', 'green', 'blue', 'white', 'cyan', 'colorWheel', 'cct', 'warmWhite'] }, { k: 'strobe', label: 'Strobe', need: ['strobe', 'shutter'] }] },
@@ -145,14 +144,11 @@
     { k: 'effectMacro', label: 'Built-in effect', page: 'fx' }, { k: 'colorMacro', label: 'Colour program', page: 'fx' },
   ];
   function slotInfo(k: SlotK) {
-    for (const f of sel) {
-      const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine);
-      const slots = c ? slotsOf(c) : [];
-      if (!slots.length) continue;
-      // (what was just set, when it's a number; a palette's reference: what it shows)
-      const p = app.programmer[f.id]?.[k], v = (typeof p === 'number' ? p : typeof look[f.id]?.[k] === 'number' ? look[f.id]![k] : 0) as number;
-      return { slots, at: Math.max(0, Math.min(slots.length - 1, Math.round(v * (slots.length - 1)))) };
-    }
+    const s = selection.slots(k);
+    if (!s) return undefined;
+    // (what was just set, when it's a number; a palette's reference: what it shows)
+    const p = app.programmer[s.id]?.[k], v = (typeof p === 'number' ? p : typeof look[s.id]?.[k] === 'number' ? look[s.id]![k] : 0) as number;
+    return { slots: s.slots, at: Math.max(0, Math.min(s.slots.length - 1, Math.round(v * (s.slots.length - 1)))) };
   }
   const slotEncs = $derived(cur ? SLOT_ENC.filter((e) => e.page === cur.id && attrs.has(e.k)) : []);
   function stepSlot(k: SlotK, d: number) {

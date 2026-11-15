@@ -4,6 +4,7 @@
   import { levelOf } from '../engine/cuelook';
   import { tick } from 'svelte';
   import { whileShown } from './shown.svelte';
+  import { selection } from './selection.svelte';
   import { clearProgrammer } from './clear.svelte';
   import ValueEdit from './ValueEdit.svelte';
   // The programmer: set the selected lights. Only controls the selection can use show up. What you
@@ -23,14 +24,9 @@
   // follow the stage frame by frame behind another view)
   const look = whileShown(() => app.look), status = whileShown(() => app.status), stage = whileShown(() => app.stage);
 
-  const sel = $derived(app.show.fixtures.filter((f) => app.selected.includes(f.id)));
-  // Every attribute at least one selected light has.
-  const attrs = $derived.by(() => {
-    const a = new Set<ChannelAttr>();
-    for (const f of sel) for (const c of app.modeOf(f.id)?.channels ?? []) a.add(c.attr);
-    return a;
-  });
-  const has = (...k: ChannelAttr[]) => k.some((x) => attrs.has(x));
+  // (the selection, every attribute at least one selected light has: shared with the console)
+  const sel = $derived(selection.fixtures);
+  const has = selection.has;
   const can = $derived({
     color: has('red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'colorWheel'),
     position: has('pan', 'tilt'),
@@ -129,16 +125,11 @@
   // patterns and ranges are regexes over every slot's name, too much for every frame), then what
   // it's on right now (from the look, every frame: a lookup)
   const pickDefs = $derived(PICKS.flatMap(([k, label]) => {
-    for (const f of sel) {
-      const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine);
-      const slots = c ? slotsOf(c) : [];
-      if (slots.length) {
-        const names = slots.map((r) => r.label);
-        return [{ k, label, id: f.id, slots: names, colors: slots.map((r) => r.color), wheel: wheelRanges(f.id, k),
-          pats: k === 'gobo' || k === 'gobo2' ? wheelPatterns(names) : null }];
-      }
-    }
-    return [];
+    const s = selection.slots(k);
+    if (!s) return [];
+    const names = s.slots.map((r) => r.label);
+    return [{ k, label, id: s.id, slots: names, colors: s.slots.map((r) => r.color), wheel: wheelRanges(s.id, k),
+      pats: k === 'gobo' || k === 'gobo2' ? wheelPatterns(names) : null }];
   }));
   const picks = $derived(pickDefs.map((p) => {
     const l = look()[p.id] as Record<string, number | undefined> | undefined, v = l?.[p.k];
