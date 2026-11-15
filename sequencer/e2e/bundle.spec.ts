@@ -3,7 +3,7 @@
 // browser context), the song plays there, nothing to find again. A plain "Save as file" says the
 // songs stay behind.
 import fs from 'node:fs';
-import { fresh, openConnected, resetFake, test, expect, startTemplate } from './helpers';
+import { fresh, openConnected, resetFake, startWhereTestsDo, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -39,6 +39,7 @@ test('"Save with its songs" takes the song along: opened in a browser that never
 
   // the second laptop: a browser that has never seen the song
   const ctx = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+  await startWhereTestsDo(ctx);
   const other = await ctx.newPage();
   await fresh(other);
   await other.locator('.top .show').click();

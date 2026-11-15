@@ -1,14 +1,19 @@
 // Shared e2e helpers: the fake LuxDMX (test/fake-luxdmx.mjs), the bridge handshake, and short
 // ways to drive the UI the way a person would.
-import { test as base, expect, type Locator, type Page } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
 
 // Every test fails on an uncaught error (or a Svelte warning) in the page, even if the
 // assertions happen to pass.
+// (a first visit opens the stage demo; tests start on the last show, an empty stage after fresh().
+// For a page of the test's own, or a browser context it makes itself: a second laptop)
+export async function startWhereTestsDo(on: Page | BrowserContext) {
+  await on.addInitScript(() => { try { if (!localStorage.getItem('luxdmx.seq.startwith')) localStorage.setItem('luxdmx.seq.startwith', JSON.stringify({ v: 1, data: 'last' })); } catch { /* storage blocked */ } });
+}
 export const test = base.extend<{ pageErrors: void }>({
   pageErrors: [async ({ page }, use) => {
     // (the tests start where they always did, on the last show: a visit otherwise opens the demo,
     // e2e/intro.spec.ts. A test's own init script can take this away again)
-    await page.addInitScript(() => { try { if (!localStorage.getItem('luxdmx.seq.startwith')) localStorage.setItem('luxdmx.seq.startwith', JSON.stringify({ v: 1, data: 'last' })); } catch { /* storage blocked */ } });
+    await startWhereTestsDo(page);
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.stack ?? e.message));
     // (the app never asks before leaving; a stray dialog is dismissed)
