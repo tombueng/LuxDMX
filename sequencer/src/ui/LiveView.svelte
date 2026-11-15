@@ -3,6 +3,7 @@
   import { pinMatches } from '../model/pin';
   import { looksPage } from '../content/busking';
   import { whatsNew } from '../content/whatsNew';
+  import { clearProgrammer } from './clear.svelte';
   import { clockOf } from '../model/timeline';
   import { actionRisk, isGated } from '../model/safety';
   import { machines } from './risk';
@@ -560,7 +561,7 @@
       <Icon name="edit" size={16} />
       <span><b>{progHeld} light{progHeld > 1 ? 's' : ''}</b> you changed in Program {progHeld > 1 ? 'override' : 'overrides'} the show here. Not recorded yet.</span>
       {#if !app.locked}<button onclick={() => { const l = app.liveList; ui.toast(app.record(l?.id) ? `Recorded into ${l?.name ?? app.list?.name ?? 'the cue list'}` : 'Nothing to record'); }}>Record</button>{/if}
-      <button onclick={() => { app.checkpoint(); const keep = $state.snapshot(app.programmer); app.clearProgrammer(); ui.toast('The show has its lights back', 4000, { label: 'Undo', run: () => (app.programmer = keep) }); }}>Clear</button>
+      <button onclick={() => clearProgrammer('The show has its lights back')}>Clear</button>
     </div>
   {/if}
 

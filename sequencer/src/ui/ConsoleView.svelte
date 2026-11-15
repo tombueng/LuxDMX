@@ -8,6 +8,7 @@
   // grand master. Everything goes through the programmer and the lists like anywhere else.
   import { app } from '../app.svelte';
   import { toHsv } from '../model/values';
+  import { clearProgrammer } from './clear.svelte';
   import { setContext, untrack } from 'svelte';
   import { dialogOpen, isShortcut, spaceIsGo, ui } from './ui.svelte';
   import Knob from './Knob.svelte';
@@ -231,7 +232,6 @@
   }
   const changed = $derived(Object.keys(app.programmer).length);
   // (Clear can be taken back for a moment, as on Live: a slip mustn't lose a half-built look)
-  function clearUndo() { const keep = $state.snapshot(app.programmer); app.clearProgrammer(); ui.toast('Cleared: the cues have their lights back', 4000, { label: 'Undo', run: () => (app.programmer = keep) }); }
   function step(d: 1 | -1) { const r = app.runCommand(d > 0 ? 'next' : 'prev'); said = r.said; bad = !r.ok; }
   function record() { const l = app.liveList, ok = app.record(l?.id); ui.toast(ok ? `Recorded as a new cue in ${l?.name ?? app.list?.name ?? 'a new list'}` : 'Nothing to record: set some lights first (5 @ full)'); }
   // (a laptop's short screen: the cue lists' faders shorter, their GO in view)
@@ -278,7 +278,7 @@
       <button onclick={() => { const r = app.updateOnStage(); ui.toast(r.said); }} disabled={!changed && !app.liveFx.length} title="Update the cue on stage in the list Live plays">Update</button>
       <button class:on={!!app.show.settings.recordChanges} aria-pressed={!!app.show.settings.recordChanges} onclick={() => { app.checkpoint(); if (app.show.settings.recordChanges) delete app.show.settings.recordChanges; else app.show.settings.recordChanges = true; app.markDirty(0); }}
               title="Record and Update keep only what you changed (as desks do: in a play, what earlier cues set carries on through). Off: each light you touched with its whole look.">Only changes</button>
-      <button onclick={clearUndo} disabled={!changed} title="Let go of your changes: the cues take over again">Clear</button>
+      <button onclick={() => clearProgrammer()} disabled={!changed} title="Let go of your changes: the cues take over again">Clear</button>
       <button class:on={app.highlight} aria-pressed={app.highlight} onclick={() => (app.highlight = !app.highlight)} disabled={!app.selected.length && !app.highlight}>Highlight</button>
     </div>
     <!-- one light of the selection at a time (Highlight on: each one lights up to focus it) -->

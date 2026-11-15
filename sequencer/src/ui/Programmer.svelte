@@ -4,6 +4,7 @@
   import { levelOf } from '../engine/cuelook';
   import { tick } from 'svelte';
   import { whileShown } from './shown.svelte';
+  import { clearProgrammer } from './clear.svelte';
   import ValueEdit from './ValueEdit.svelte';
   // The programmer: set the selected lights. Only controls the selection can use show up. What you
   // set here sits on top of everything until you Record it into a cue (or Clear it).
@@ -245,7 +246,7 @@
         {/each}
         {#if changed}
           <div class="pl prg"><Icon name="edit" size={14} /><span class="nm">{changed} light{changed > 1 ? 's' : ''} changed, not recorded</span>
-            <button class="sm" onclick={() => app.clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button></div>
+            <button class="sm" onclick={() => clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button></div>
         {/if}
       </section>
     {/if}
@@ -394,7 +395,7 @@
   {#if changed}
     <div class="foot row">
       <span class="faint">{changed} light{changed > 1 ? 's' : ''} changed</span><span class="grow"></span>
-      <button onclick={() => app.clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button>
+      <button onclick={() => clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button>
       <button class="rec" onclick={record} title="Record your changes as a new cue"><Icon name="record" />Record</button>
     </div>
   {/if}
