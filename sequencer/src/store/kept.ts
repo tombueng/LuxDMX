@@ -42,14 +42,16 @@ function write(key: string, e: Entry, data: unknown): boolean {
   try { const s = store(e.where); s?.setItem(key, JSON.stringify({ v: e.version, data })); return !!s; } catch { return false; }
 }
 function aside(key: string, e: Entry, raw: string) {
-  try { store(e.where)?.setItem(`${key}.unreadable`, raw); } catch { /* full: at least it isn't overwritten */ }
+  // (once: a value read again and again isn't written aside again and again)
+  try { const s = store(e.where); if (s && s.getItem(`${key}.unreadable`) !== raw) s.setItem(`${key}.unreadable`, raw); } catch { /* full: at least it isn't overwritten */ }
 }
 
 // the value under a key, brought up to date (and written back) when it was older
 function read(key: string, e: Entry): unknown {
   const r = readRaw(key, e.where);
   if (!r) return e.fallback;
-  if (r.v === e.version) return e.ok(r.data) ? r.data : e.fallback;
+  // (one of this version that isn't a good value: put aside too, before the next set overwrites it)
+  if (r.v === e.version) { if (e.ok(r.data)) return r.data; aside(key, e, r.raw); return e.fallback; }
   if (r.v > e.version) return e.fallback;                                    // (a newer app's: left alone)
   let data = r.data;
   try { for (let k = r.v + 1; k <= e.version; k++) data = e.steps[k] ? e.steps[k](data) : data; }
