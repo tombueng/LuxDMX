@@ -748,6 +748,8 @@ Three more demos come with their own room on the 3D stage:
   list's track opens too, into its **level** over the song: a dashed line at full until you click in
   the row, which puts a point there (one point: that level all song long; more: straight lines
   between them, snapped to the beat, Alt: free). Drag the points, double-click one to take it away.
+  From the keyboard: Enter on the row puts a point at the playhead; on a point the up and down arrows
+  change its level (5 %, Shift 1 %), left and right move it a beat (Shift a bar), Delete removes it.
   While the song plays it scales the list's fader (the fader still pulls it down; paused, the fader
   alone). The **Moments** track opens into **how long** each moment lasts, a bar from it on: drag its
   end, or the arrow keys on it (half a second, Shift a tenth; 30 s at most). Play runs

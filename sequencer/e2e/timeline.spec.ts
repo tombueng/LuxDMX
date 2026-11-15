@@ -460,6 +460,26 @@ test('a list\'s track opened: its level over the song, a point put and moved dim
   await row.locator('circle.pt').dblclick();
   await expect.poll(pts).toBeUndefined();
   await expect(row.locator('line.own')).toHaveCount(1);
+  // the keyboard: Enter on the row puts a point at the playhead (at full: there were none), the
+  // arrows change it (5 %, Shift 1 %; a beat along), Delete takes it away
+  const beat = await page.evaluate(() => { const a = (window as any).__luxdmx; return 60 / (a.show.timeline.bpm ?? a.show.settings.bpm); });
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(8));
+  await row.focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await pts())?.length).toBe(1);
+  const t0 = (await pts())[0][0];
+  expect(Math.abs(t0 - 8)).toBeLessThan(beat);
+  expect((await pts())[0][1]).toBe(1);
+  await expect(row.locator('circle.pt')).toBeFocused();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await pts())[0][1]).toBeCloseTo(0.84, 5);
+  expect((await pts())[0][0]).toBeCloseTo(t0 + beat, 3);
+  await expect(row.locator('circle.pt')).toHaveAttribute('aria-valuenow', '84');
+  await page.keyboard.press('Delete');
+  await expect.poll(pts).toBeUndefined();
+  await expect(row).toBeFocused();
 
   // a strobe hit at 0:04; the Moments track opened: a bar as long as it lasts (2 s)
   await page.evaluate(() => (window as any).__luxdmx.timeline.seek(4));

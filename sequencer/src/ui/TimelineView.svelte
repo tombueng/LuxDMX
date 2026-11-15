@@ -903,7 +903,7 @@
               {:else if ln.id === 'special'}
                 {#if moments.length}<div class="lane sub" style="--c:{ln.color}"><TimelineLengths items={moments} {x} {scale} {labelOf} /></div>{/if}
               {:else if ln.id.startsWith('list:')}
-                <div class="lane sub" style="--c:{ln.color}"><TimelineLevel list={ln.id.slice(5)} name={ln.name} {x} {span} {sn} /></div>
+                <div class="lane sub" style="--c:{ln.color}"><TimelineLevel list={ln.id.slice(5)} name={ln.name} {x} {span} {sn} beat={barS / 4} playhead={at} /></div>
               {/if}
             {/if}
           {/each}
