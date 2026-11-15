@@ -11,6 +11,8 @@
 
   const MIN = 0.2, MAX = 30;
   const secondsOf = (it: TimelineItem) => (it.do.do === 'burst' ? it.do.seconds : 0);
+  // (said to a tenth: a made show's 10.7466 s read as 10.7466 on its bar)
+  const said = (s: number) => `${Math.round(s * 10) / 10} s`;
   function set(it: TimelineItem, s: number) {
     if (it.do.do !== 'burst') return;
     it.do.seconds = Math.round(Math.max(MIN, Math.min(MAX, s)) * 10) / 10;
@@ -37,10 +39,11 @@
 
 {#each items as it (it.id)}
   {@const s = secondsOf(it)}
+  {@const t = said(s)}
   <div class="len" style="left:{x(it.at)}px;width:{Math.max(6, s * scale)}px;height:{h - 10}px" role="slider" tabindex="0"
-    aria-label="How long {labelOf(it)} at {clockOf(it.at)} lasts" aria-valuemin={MIN} aria-valuemax={MAX} aria-valuenow={s} aria-valuetext="{s} s"
-    title="{labelOf(it)}: {s} s. Drag the end (or the arrow keys, Shift: finer) to make it longer or shorter" onkeydown={(e) => key(e, it)}>
-    <span class="t">{s} s</span>
+    aria-label="How long {labelOf(it)} at {clockOf(it.at)} lasts" aria-valuemin={MIN} aria-valuemax={MAX} aria-valuenow={Math.round(s * 10) / 10} aria-valuetext={t}
+    title="{labelOf(it)}: {t}. Drag the end (or the arrow keys, Shift: finer) to make it longer or shorter" onkeydown={(e) => key(e, it)}>
+    <span class="t">{t}</span>
     <!-- svelte-ignore a11y_no_static_element_interactions (the arrow keys on the bar do the same) -->
     <span class="end" onpointerdown={(e) => endDown(e, it)} onpointermove={move} onpointerup={up} onpointercancel={up}></span>
   </div>

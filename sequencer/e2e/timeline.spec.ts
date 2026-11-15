@@ -421,7 +421,7 @@ test('a list\'s track opened: its level over the song, a point put and moved dim
   await expect.poll(lit).toBeGreaterThan(0.5);
   const full = await lit(), wireFull = await wire();
   // opened: a dashed line at full; a click low in the row puts a point there (that level all song long)
-  await page.locator('.tlv').getByRole('button', { name: `Open ${name}'s level` }).click();
+  await page.locator('.tlv').getByRole('button', { name: `Open the level of ${name}` }).click();
   const rows = page.locator('.tlv .lane.sub svg.level'), row = rows.first();
   await expect(rows).toHaveCount(1);
   await expect(row.locator('line.own')).toHaveCount(1);
@@ -437,17 +437,17 @@ test('a list\'s track opened: its level over the song, a point put and moved dim
   await expect.poll(async () => (await pts())?.length).toBe(1);
   // another list's row, while this one has a point: one plain click puts its first point too
   await page.evaluate(() => (window as any).__luxdmx.newList('Second'));
-  const levelOpeners = page.locator('.tlv .nl .open[aria-label$="\'s level"][aria-expanded="false"]');
+  const levelOpeners = page.locator('.tlv .nl .open[aria-label^="Open the level of "][aria-expanded="false"]');
   expect(await levelOpeners.count()).toBeGreaterThan(0);
   const label = (await levelOpeners.first().getAttribute('aria-label'))!;
-  const other = label.replace(/^Open /, '').replace(/'s level$/, '');
+  const other = label.replace(/^Open the level of /, '');
   await levelOpeners.first().click();
   await expect(rows).toHaveCount(2);
   const r2 = await page.locator(`.tlv svg.level[aria-label="The level of ${other} over the song"]`).boundingBox();
   await page.mouse.click(r2!.x + r2!.width * 0.6, r2!.y + r2!.height * 0.5);
   await expect.poll(() => page.evaluate((n) => { const a = (window as any).__luxdmx; const id = a.show.cueLists.find((x: any) => x.name === n).id; return a.show.timeline.levels?.[id]?.length; }, other)).toBe(1);
   await expect(page.locator(`.tlv svg.level[aria-label="The level of ${other} over the song"] circle.pt`)).toHaveCount(1);
-  await page.locator('.tlv').getByRole('button', { name: `Close ${other}'s level` }).click();
+  await page.locator('.tlv').getByRole('button', { name: `Close the level of ${other}` }).click();
   await expect(rows).toHaveCount(1);
   // the point dragged further down: lower still
   const pt = await row.locator('circle.pt').boundingBox();
@@ -515,6 +515,11 @@ test('a list\'s track opened: its level over the song, a point put and moved dim
   await expect.poll(hit).toBeCloseTo(dragged - 0.4, 5);
   await page.keyboard.press('Control+z');
   await expect.poll(hit).toBeCloseTo(dragged - 0.5, 5);
+  // a length a made show worked out (10.7466 s) is said to a tenth
+  await page.evaluate(() => { const i = (window as any).__luxdmx.show.timeline.items.find((x: any) => x.do.do === 'burst'); i.do.seconds = 10.7466; });
+  await expect(len).toHaveAttribute('aria-valuetext', '10.7 s');
+  await expect(len.locator('.t')).toHaveText('10.7 s');
+  await page.evaluate((v) => { const i = (window as any).__luxdmx.show.timeline.items.find((x: any) => x.do.do === 'burst'); i.do.seconds = v; }, dragged - 0.5);
   // a show file keeps it
   const saved = await page.evaluate(async () => { const f = await import('/src/model/format.ts'); return f.parseShow(JSON.stringify((window as any).__luxdmx.show)).timeline!.items.find((i: any) => i.do.do === 'burst')!.do; });
   expect((saved as any).seconds).toBeCloseTo(dragged - 0.5, 5);

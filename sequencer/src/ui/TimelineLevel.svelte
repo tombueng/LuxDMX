@@ -112,7 +112,7 @@
   {#if pts}
     <polyline class="line" points={line} />
     {#each pts as p, i (i)}
-      <circle class="pt" cx={x(p[0]) - x(span.from)} cy={toY(p[1])} r="4" role="slider" tabindex="0" aria-label="A point of {name}'s level"
+      <circle class="pt" cx={x(p[0]) - x(span.from)} cy={toY(p[1])} r="4" role="slider" tabindex="0" aria-label="A point of the level of {name}"
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p[1] * 100)} aria-valuetext="{said(p[1])} at {clockOf(p[0])}"
         onpointerdown={(e) => pointDown(e, i)} ondblclick={(e) => remove(e, i)} onkeydown={(e) => pointKey(e, i)}><title>{said(p[1])} at {clockOf(p[0])}: drag to move (or the arrow keys), double-click (or Delete) to take it away</title></circle>
     {/each}

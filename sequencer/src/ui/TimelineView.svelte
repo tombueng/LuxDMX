@@ -75,7 +75,7 @@
     fx: { label: "the effects' knobs", tip: "The effects' knobs over time: speed, size and the rest, as lines and curves under the bars" },
     special: { label: "the moments' lengths", tip: 'How long each moment lasts: drag the end of its bar' },
   };
-  const openerOf = (ln: { id: string; name: string }) => OPENER[ln.id] ?? { label: `${ln.name}'s level`, tip: `${ln.name}'s level over the song: put points on the line to bring it down and up (it scales the list's fader while the song plays)` };
+  const openerOf = (ln: { id: string; name: string }) => OPENER[ln.id] ?? { label: `the level of ${ln.name}`, tip: `The level of ${ln.name} over the song: put points on the line to bring it down and up (it scales the list's fader while the song plays)` };
   const lanes = $derived([...lists.map((l) => ({ id: `list:${l.id}`, name: l.name, color: l.color ?? '#45d85c' })),
     { id: 'fx', name: 'Effects', color: '#ffaa1c' }, { id: 'crowd', name: 'Crowd', color: '#7fc8ff' }, { id: 'special', name: 'Moments', color: '#f33abc' }]);
 
