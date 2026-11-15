@@ -413,7 +413,15 @@
     gizmo.detach(); controls.disconnect(); gizmo.disconnect();
     if (import.meta.env.DEV && (window as unknown as { __stage3d?: unknown }).__stage3d === devHook) delete (window as unknown as { __stage3d?: unknown }).__stage3d;
     feedFree();
+    freeTargets();
     handOn(true);
+  }
+  // its picture buffers back to the graphics card while it's hidden (two frames with depth and the
+  // glow's chain: about 190 MB for a big panel on a sharp screen, 25 for a small one, kept by every
+  // view that ever showed the 3D). Drawn into again, three makes them anew.
+  function freeTargets() {
+    composer?.renderTarget1.dispose(); composer?.renderTarget2.dispose();
+    if (bloom) { for (const r of [...bloom.renderTargetsHorizontal, ...bloom.renderTargetsVertical, bloom.renderTargetBright]) r.dispose(); }
   }
   // the world leaves this stage: on to the next one (3D still on), or back to the graphics chip
   function handOn(keep: boolean) {
