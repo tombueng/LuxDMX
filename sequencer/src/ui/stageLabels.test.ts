@@ -42,3 +42,21 @@ describe('names on the plan', () => {
     expect([16.8, 14.7, 10.5]).toContain(Math.round(r.fs * 10) / 10);
   });
 });
+
+// A curtain or a drop is drawn as a thin line across the stage: the names of the lights hung along
+// it still go under them (a name over the line reads, it has its dark outline, and isn't taken for
+// the cloth's), and the cloth's own name sits at one of its ends, inside the plan. Before, four fly
+// bars and a curtain across the theatre's stage left out a third of its names.
+describe('a cloth across the stage', () => {
+  const lights = Array.from({ length: 8 }, (_, i) => fx(`l${i}`, 0.15 + i * 0.1, 0.4));
+  const drop = { ...fx('drop', 0.5, 0.4 + 30 / H), name: 'Fly 1' };
+  const o: Labels = { ...opts([...lights, drop]), halfW: (id) => (id === 'drop' ? 480 : 8), cloth: (id) => id === 'drop' };
+  it('the lights along it keep their names; the cloth\'s is at its end', () => {
+    const at = placeLabels(o, 12);
+    for (const l of lights) expect(at.get(l.id), l.id).not.toBeNull();
+    const d = at.get('drop')!;
+    expect(d).not.toBeNull();
+    expect(Math.abs(d.x - 500)).toBeGreaterThan(300);               // (at an end, not in the middle)
+    expect(d.x).toBeGreaterThan(0); expect(d.x).toBeLessThan(W);
+  });
+});

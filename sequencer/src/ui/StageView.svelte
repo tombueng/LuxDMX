@@ -314,7 +314,7 @@
   const lpx = $derived(px * Math.max(1, ui.zoom));
   const halfW = (id: string) => { const k = app.kinds[id]; return machines.get(id)?.half ?? (k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72)); };
   const placed = $derived(labels || addrs
-    ? bestLabels({ fixtures: app.show.fixtures, selected: app.selected, text: labelText, halfW, size, px, W, H, edge: EDGE }, lpx)
+    ? bestLabels({ fixtures: app.show.fixtures, selected: app.selected, text: labelText, halfW, size, px, W, H, edge: EDGE, cloth: (id) => machines.has(id) }, lpx)
     : { at: new Map<string, At | null>(), fs: 12 * lpx });
   const labelAt = $derived(placed.at);
 </script>
