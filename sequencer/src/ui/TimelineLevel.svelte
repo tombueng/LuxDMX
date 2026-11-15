@@ -28,7 +28,11 @@
   // a point where it was clicked (snapped to the beat, Alt: not); its index
   function addPoint(e: PointerEvent): number {
     const { t: raw, v } = local(e), t = sn(raw, e.altKey);
-    const levels = (tl.levels ??= {}), p = (levels[list] ??= []);
+    // (assigned, then read back: `??=` hands back the plain object, not the state's proxy, and a
+    // point put into that never shows)
+    if (!tl.levels) tl.levels = {};
+    if (!tl.levels[list]) tl.levels[list] = [];
+    const p = tl.levels[list];
     const same = p.findIndex((q) => q[0] === t);
     if (same >= 0) { p[same] = [t, v]; return same; }
     const at = p.findIndex((q) => q[0] > t), i = at < 0 ? p.length : at;

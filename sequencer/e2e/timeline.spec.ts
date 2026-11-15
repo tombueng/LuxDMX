@@ -414,8 +414,8 @@ test('a list\'s track opened: its level over the song, a point put and moved dim
   const full = await lit(), wireFull = await wire();
   // opened: a dashed line at full; a click low in the row puts a point there (that level all song long)
   await page.locator('.tlv').getByRole('button', { name: `Open ${name}'s level` }).click();
-  const row = page.locator('.tlv .lane.sub svg.level');
-  await expect(row).toHaveCount(1);
+  const rows = page.locator('.tlv .lane.sub svg.level'), row = rows.first();
+  await expect(rows).toHaveCount(1);
   await expect(row.locator('line.own')).toHaveCount(1);
   const r = await row.boundingBox();
   await page.mouse.click(r!.x + r!.width * 0.4, r!.y + r!.height * 0.75);
@@ -427,6 +427,20 @@ test('a list\'s track opened: its level over the song, a point put and moved dim
   await expect.poll(pts).toBeUndefined();
   await page.keyboard.press('Control+Shift+z');
   await expect.poll(async () => (await pts())?.length).toBe(1);
+  // another list's row, while this one has a point: one plain click puts its first point too
+  await page.evaluate(() => (window as any).__luxdmx.newList('Second'));
+  const levelOpeners = page.locator('.tlv .nl .open[aria-label$="\'s level"][aria-expanded="false"]');
+  expect(await levelOpeners.count()).toBeGreaterThan(0);
+  const label = (await levelOpeners.first().getAttribute('aria-label'))!;
+  const other = label.replace(/^Open /, '').replace(/'s level$/, '');
+  await levelOpeners.first().click();
+  await expect(rows).toHaveCount(2);
+  const r2 = await page.locator(`.tlv svg.level[aria-label="The level of ${other} over the song"]`).boundingBox();
+  await page.mouse.click(r2!.x + r2!.width * 0.6, r2!.y + r2!.height * 0.5);
+  await expect.poll(() => page.evaluate((n) => { const a = (window as any).__luxdmx; const id = a.show.cueLists.find((x: any) => x.name === n).id; return a.show.timeline.levels?.[id]?.length; }, other)).toBe(1);
+  await expect(page.locator(`.tlv svg.level[aria-label="The level of ${other} over the song"] circle.pt`)).toHaveCount(1);
+  await page.locator('.tlv').getByRole('button', { name: `Close ${other}'s level` }).click();
+  await expect(rows).toHaveCount(1);
   // the point dragged further down: lower still
   const pt = await row.locator('circle.pt').boundingBox();
   await page.mouse.move(pt!.x + pt!.width / 2, pt!.y + pt!.height / 2); await page.mouse.down();
