@@ -13,6 +13,33 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **Tempo effects no longer step back while a song plays.** The beat clock ran a frame ahead of
+  the song, and when frames came unevenly (a busy page) it went back and forth: moving heads and
+  chases went two steps on, one back, in the 3D and on the wire. It counts from the song's beat now.
+- **The 3D stage, fixed in a few places:**
+  - pixel bars, rings and matrix heads light the room (the washes, the crowd light, the fog, the
+    mirror ball's dots) in their cells' colours: a red chase on a bar used to light it blue;
+  - the club's and the bar's own mirror balls and the ballroom's dancers move again (they turned
+    on paper and stood still on screen);
+  - with nobody on stage (Theatre, Church, Cinema) going to another view no longer builds the
+    whole room again and swings the camera to the front;
+  - after the 3D had been let go (Live with its stage hidden for a few minutes) and came back, it
+    broke on every frame. It sets itself up for the new one now;
+  - your own venue model is read once and freed when it's replaced or removed, not once per view;
+  - "Show it in 3D" no longer flies the camera off in a view you open minutes later;
+  - "Selected" on a light up under a high ceiling (the cinema's house lights) frames it again;
+  - hidden views give their picture buffers back to the graphics card, at Low the screens hold
+    still, and a view switch no longer waits for the exposure meter.
+- **The theatre's names are back on the plan.** Since the curtain and the drops are drawn as
+  cloths, a third of its names were gone. A cloth is a line now that other names may sit on, with
+  its own name at one end; two names no longer touch by a pixel; a crowded plan tries the smaller
+  size when fewer than three quarters of the names fit.
+- **Faster where it adds up:** the output thread's frame on the festival demo went from 4.5 to
+  2.6 ms, and working out every light's 3D look again (on any change, on every pointer move of a
+  drag) from 5 to 1 ms.
+- **Small things:** a follow waits for a cue's own colour, position and beam times; a light with
+  more than a universe per pixel no longer hangs the page; "saving..." can't get stuck when the
+  browser's storage is full; a pasted cue is checked like one from a file.
 - **More timeline tracks open**: a cue list's track opens into its level over the song (click in
   the row for a point, drag it, double-click to take it away; while the song plays it scales the
   list's fader, the output thread plays it too), and the Moments track into how long each moment
