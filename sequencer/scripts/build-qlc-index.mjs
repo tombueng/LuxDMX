@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { xmlText } from './xmlText.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = process.argv[2];
@@ -13,7 +14,7 @@ const xml = await (await fetch(`https://raw.githubusercontent.com/mcallegari/qlc
 const fixtures = [];
 for (const m of xml.matchAll(/<M n="([^"]+)">([\s\S]*?)<\/M>/g))
   for (const f of m[2].matchAll(/<F n="([^"]+)" m="([^"]*)"/g))
-    fixtures.push({ k: `${m[1]}/${f[1]}.qxf`, n: f[2].replaceAll('&amp;', '&').replaceAll('&quot;', '"'), m: m[1].replaceAll('_', ' ') });
+    fixtures.push({ k: `${m[1]}/${f[1]}.qxf`, n: xmlText(f[2]), m: xmlText(m[1]).replaceAll('_', ' ') });
 fixtures.sort((a, b) => (a.m + a.n).localeCompare(b.m + b.n));
 const out = path.join(root, 'public/qlc');
 fs.mkdirSync(out, { recursive: true });
