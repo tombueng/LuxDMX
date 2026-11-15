@@ -495,8 +495,17 @@ export class Engine {
     // what the lists and effects made, before the live layer (Highlight, flashes, the patch
     // check), the masters and the fitting to each fixture: new cues fade from this (without the
     // cells an effect drew; with the cells' own colours, and their levels to tell a lit light)
-    this.lastStage = Object.fromEntries(Object.entries(stage).map(([k, { cells: _c, cellLvl, cellVals, ...v }]) => [k, { ...v, color: v.color && { ...v.color },
-      ...(cellVals ? { cellVals } : {}), ...(cellLvl ? { cellLvl: Float64Array.from(cellLvl) } : {}) }]));
+    // (a plain loop: entries, a rest pattern and fromEntries for every light were a third more)
+    const last: Record<string, Resolved> = {};
+    for (const fid in stage) {
+      const v = stage[fid], c: Resolved = { ...v };
+      c.color = v.color && { ...v.color };
+      if ('cells' in c) delete c.cells;
+      if (v.cellLvl) c.cellLvl = Float64Array.from(v.cellLvl); else if ('cellLvl' in c) delete c.cellLvl;
+      if (!v.cellVals && 'cellVals' in c) delete c.cellVals;
+      last[fid] = c;
+    }
+    this.lastStage = last;
 
     // The live layer (held flash and fog buttons) wins, on pixel cells too.
     for (const [fid, v] of Object.entries(this.live)) {
