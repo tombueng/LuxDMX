@@ -105,6 +105,8 @@
   // every light as the 3D stage needs it (rebuilt when the lights, their types or places change)
   // (a light without a 3D place of its own goes where its plan position puts it in this room)
   const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => rigFixtureFull(f, app.modeOf(f.id), app.kinds[f.id] ?? 'other', app.types.get(f.typeId), room)));
+  // (what the winches hold on the wire is only asked for with winches in the rig: every light, every frame)
+  const hasWinch = $derived(fixtures.some((f) => !!f.winch));
 
   // The gobo patterns, drawn once for the page into one texture (gobos.ts), with the symbol fonts
   // that come with the app (until they're in, the beams have no gobos)
@@ -1144,7 +1146,7 @@
     haze = Math.min(1.5, hazeAmt * (0.9 + 0.5 * room) + 0.08 * Math.max(room, 0.5 * smokeIn));
     (scene.fog as THREE.FogExp2).density = 0.005 + 0.016 * haze;
     // (a winch live and not armed: where the wire holds it, not where the show would send it)
-    const held = src ? null : app.winchesHeld();
+    const held = src || !hasWinch ? null : app.winchesHeld();
     rig.winchWire = held ? (id) => held.get(id) : undefined;
     rig.update(src?.drawn ?? app.drawnNow, t, haze, sel);
     particles.light(rig.lit, FOG_LIT[load.level]);
