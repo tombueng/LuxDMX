@@ -61,13 +61,16 @@ export class ExposureMeter extends Pass {
     const was = renderer.getRenderTarget();
     renderer.setRenderTarget(this.rt); this.quad.render(renderer);
     // (into the pixel buffer: readPixels returns at once, the fence says when it's there)
-    if (!this.pbo) { this.pbo = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, this.bytes.byteLength, gl.STREAM_READ); }
+    if (!this.pbo) { this.pbo = gl.createBuffer(); this.bufGl = gl; gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, this.bytes.byteLength, gl.STREAM_READ); }
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     this.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     renderer.setRenderTarget(was);
     this.gl = gl;
   }
   private gl: WebGL2RenderingContext | null = null;
+  // (the context its pixel buffer was made on, once it has one: for the tests)
+  private bufGl: WebGL2RenderingContext | null = null;
+  get context() { return this.bufGl; }
   // the exposure for this scene: half way (in stops) from where it is to what would put its middle
   // brightness at `key`, like an eye or a camera that doesn't quite adapt all the way
   target(key: number, lo = 0.12, hi = 1.4) { return Math.min(hi, Math.max(lo, Math.sqrt(key / Math.exp(this.logAvg)))); }

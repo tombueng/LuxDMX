@@ -23,6 +23,8 @@
   function takeKept() { const w = kept; kept = null; clearTimeout(keptTimer); return w; }
   // (for the tests: whether a world is waiting)
   export const keptWorld = () => !!kept;
+  // (and one let go now, as after its 3 minutes)
+  export const freeKeptWorld = () => { clearTimeout(keptTimer); kept?.free(); kept = null; };
 </script>
 
 <script lang="ts">
@@ -140,7 +142,7 @@
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
   const overlay = new THREE.Scene();       // drawn after the glow: the gizmo, the Measure line
   // (about once a second: the eye's adapting is slow anyway, and each read costs the page a moment)
-  const meter = new ExposureMeter(45);
+  let meter: ExposureMeter | undefined;
   // the middle brightness the exposure aims for (a dark venue: low key; measured so the Front view
   // of the demo sits at about the exposure it always had)
   const EXPOSURE_KEY = 0.024;
@@ -373,7 +375,13 @@
     canvas!.addEventListener('pointerdown', pdown); canvas!.addEventListener('pointerup', pup);
     // (this stage's own parts: made once, woken up again when it's shown again; a world built
     // anew, after the last one went back to the graphics chip, gets new ones)
-    if (madeFor !== renderer) { if (madeFor) dropParts(); setup(); madeFor = renderer; } else wake();
+    if (madeFor !== renderer) {
+      // (a world built anew after this stage held an older one: what it looked up in that one, the
+      // crowd light, the mirror ball's dots, the GPU timer, is looked up again; the model goes in)
+      if (madeFor) { dropParts(); crowdLamp = undefined; mirrorDots = undefined; gpuExt = undefined; gpuQ = []; }
+      setup(); madeFor = renderer;
+      if (custom) scene.add(custom);
+    } else wake();
     // (the lights now: a world handed on has the last view's; a late start missed the first round)
     untrack(() => { const list = fixtures, sig = sigOf(list); rigFor = list; if (sig !== shape) { shape = sig; rig.build(list); } else rig.place(list); });
     holding = true;
@@ -422,7 +430,7 @@
   function dropParts() {
     gizmo?.detach(); gizmo?.dispose(); controls?.dispose();
     if (gizmo) overlay.remove(gizmo.getHelper());
-    composer?.dispose(); bloom?.dispose();
+    composer?.dispose(); bloom?.dispose(); meter?.dispose(); meter = undefined;
   }
   // the world, built (the first 3D stage, or the last one went back to the graphics chip)
   function build() {
@@ -452,7 +460,9 @@
     scene.add(new MirrorDots().group);
     venue = buildVenue({ room: room.id, band: bandShown, act, custom: room }); builtRoom = room.key ?? room.id; builtAct = act; showRoom(room);
     scene.add(venue.group);
-    rig = new Rig(); scene.add(rig.group);
+    // (a new rig: built for the lights, whatever this stage's last world had: with that one's
+    // signature still here it was only placed, never built, and threw on every frame)
+    rig = new Rig(); scene.add(rig.group); shape = null;
     { const r = rig; void makeGobos().then((a) => { if (rig === r) r.setGobos(a.tex); }); }
     particles = new Particles(); scene.add(particles.group);
   }
@@ -476,6 +486,7 @@
     scene.add(proxy);
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
+    meter = new ExposureMeter(45);
     composer.addPass(meter);
     bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), glow, 0.4, 0.62);
     composer.addPass(bloom);
@@ -542,6 +553,7 @@
       toolsFit: () => ({ tier, squeeze, over: toolsEl ? toolsEl.scrollWidth - toolsEl.clientWidth : 0, overWas: [...overWas] }),
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
       // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
+      parts: () => ({ lamp: !!crowdLamp && crowdLamp.parent === scene, dots: !!mirrorDots && mirrorDots.group.parent === scene, meter: !!meter && (!meter.context || meter.context === renderer.getContext()) }),
       mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ballsNow().map((b) => +b.obj.rotation.y.toFixed(3)), tilt: ballsNow().map((b) => +b.obj.rotation.x.toFixed(4)),
         // (where it's turned on screen: its matrix, which a frozen ball never updates whatever its rotation says)
         drawn: ballsNow().map((b) => +Math.atan2(b.obj.matrixWorld.elements[8], b.obj.matrixWorld.elements[10]).toFixed(3)) }),
@@ -573,7 +585,7 @@
     if (rendering) renderStop = true;
     if (holding && camera && controls) { camSaved = 0; keepCam(); }
     cancelAnimationFrame(raf);
-    dropParts(); meter.dispose();
+    dropParts();
     if (import.meta.env.DEV && (window as unknown as { __stage3d?: unknown }).__stage3d === devHook) delete (window as unknown as { __stage3d?: unknown }).__stage3d;
     if (holding) { feedFree(); handOn(ui.stage3dNow); }
     // (3D switched off with the world parked by a view's stage that went away first: given back)
@@ -1159,7 +1171,7 @@
     scene.environmentIntensity = 0.28 * amb;
     // exposure like a camera's: down when looking into the lights, up a little for a dark look (less
     // with less room light: lifting a dark room is what makes it look lit)
-    renderer.toneMappingExposure += (meter.target(EXPOSURE_KEY, 0.12, 1.05 + 0.35 * Math.min(1, amb)) - renderer.toneMappingExposure) * Math.min(1, dt * 1.2);
+    renderer.toneMappingExposure += (meter!.target(EXPOSURE_KEY, 0.12, 1.05 + 0.35 * Math.min(1, amb)) - renderer.toneMappingExposure) * Math.min(1, dt * 1.2);
     const q = gpuBegin();
     if (glow > 0.02 && (load.level > 0 || taking)) composer.render(); else renderer.render(scene, camera);
     // the gizmo on top, after the glow (inside it, a bright look washed it out)
