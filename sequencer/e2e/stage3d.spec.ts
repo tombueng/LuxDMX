@@ -217,6 +217,30 @@ test('your own venue: a .glb loads into the 3D stage, the built-in stage can go'
   expect(m).toMatchObject({ name: 'hall.glb', scale: 0.001, y: 0 });
   await page.locator('.s3 .venue').getByLabel('The built-in stage').uncheck();
   expect(await page.evaluate(() => (window as any).__luxdmx.show.settings.stage3d.hideVenue)).toBe(true);
+  // read once, and the world keeps it: Live and Program again show the same one, nothing read again
+  // (each view read and uploaded its own copy, never freed). Removed, it goes back to the graphics chip.
+  const model = () => page.evaluate(() => (window as any).__stage3d?.model?.());
+  await expect.poll(async () => (await model())?.inScene, { timeout: 10000 }).toBe(true);
+  const first = await model();
+  expect(first.reads).toBe(1);
+  const tabs = page.locator('.top .modes');
+  for (const tab of ['Live', 'Program']) {
+    await tabs.getByRole('tab', { name: tab }).click();
+    if (tab === 'Live') {
+      const eye = page.locator('.live').getByRole('button', { name: 'Show the stage' });
+      if ((await eye.getAttribute('aria-pressed')) !== 'true') await eye.click();
+    }
+    await expect.poll(async () => (await model())?.inScene, { timeout: 30000, message: tab }).toBe(true);
+    await page.waitForTimeout(500);
+    expect(await model(), tab).toMatchObject({ reads: 1, id: first.id, inScene: true });
+  }
+  const before = (await model()).geometries;
+  const s3 = page.locator('.s3:visible');
+  const venueBtn = s3.getByRole('button', { name: 'Venue', exact: true });
+  if ((await venueBtn.getAttribute('aria-expanded')) !== 'true') await venueBtn.click();
+  await s3.locator('.venue').getByRole('button', { name: 'Remove it' }).click();
+  await expect.poll(async () => (await model()).inScene, { timeout: 5000 }).toBe(false);
+  expect((await model()).geometries).toBeLessThan(before);
 });
 
 test('a reload keeps the 3D view where it was, and the song playing on from where it would be', async ({ page }) => {

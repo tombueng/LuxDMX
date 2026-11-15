@@ -8,6 +8,8 @@
     renderer: T.WebGLRenderer; canvas: HTMLCanvasElement; scene: T.Scene; camera: T.PerspectiveCamera; wash: T.SpotLight[];
     venue: ReturnType<typeof import('./venue').buildVenue>; rig: import('./rig').Rig; particles: import('./particles').Particles;
     builtRoom: string; builtAct: 'band' | 'none'; shape: string | null; free: () => void;
+    // your own venue model in its scene (and which stored file it is): read once per world
+    custom: T.Object3D | null; customFor: string;
   }
   let kept: KeptWorld | null = null, keptTimer: ReturnType<typeof setTimeout> | undefined;
   // stages up now, and one that started while another was still up, waiting for its world (the
@@ -23,6 +25,10 @@
   function takeKept() { const w = kept; kept = null; clearTimeout(keptTimer); return w; }
   // (for the tests: whether a world is waiting)
   export const keptWorld = () => !!kept;
+  // (and how many venue models were read from their files, all stages together)
+  let modelReads = 0;
+  export const countModelRead = () => ++modelReads;
+  export const modelReadCount = () => modelReads;
   // (and one let go now, as after its 3 minutes)
   export const freeKeptWorld = () => { clearTimeout(keptTimer); kept?.free(); kept = null; };
 </script>
@@ -366,7 +372,7 @@
   }
   function start(k: KeptWorld | null) {
     if (gone || !active || holding) { if (k) park(k); return; }
-    if (k) ({ renderer, canvas, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape } = k);
+    if (k) ({ renderer, canvas, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape, custom, customFor } = k);
     else build();
     cvHost!.appendChild(canvas!);
     hemi = scene.getObjectByName('ambient:sky') as THREE.HemisphereLight | undefined;
@@ -380,7 +386,6 @@
       // crowd light, the mirror ball's dots, the GPU timer, is looked up again; the model goes in)
       if (madeFor) { dropParts(); crowdLamp = undefined; mirrorDots = undefined; gpuExt = undefined; gpuQ = []; }
       setup(); madeFor = renderer;
-      if (custom) scene.add(custom);
     } else wake();
     // (the lights now: a world handed on has the last view's; a late start missed the first round)
     untrack(() => { const list = fixtures, sig = sigOf(list); rigFor = list; if (sig !== shape) { shape = sig; rig.build(list); } else rig.place(list); });
@@ -392,7 +397,6 @@
   function wake() {
     controls.connect(); gizmo.connect();
     scene.add(proxy);
-    if (custom) scene.add(custom);
     lensBase = 0; lensSet = 0;
     restoreCam();
     glow = GLOW_3D.get(); hazeAmt = HAZE_3D.get(); ambient = AMBIENT_3D.get(); spill = SPILL_3D.get();
@@ -428,10 +432,9 @@
     holding = false;
     canvas?.removeEventListener('pointerdown', pdown); canvas?.removeEventListener('pointerup', pup);
     scene.remove(proxy);
-    if (custom) scene.remove(custom);
     const s = scene, r = renderer;
     const freeAll = () => { free(s); (s.environment as THREE.Texture | null)?.dispose(); r.dispose(); r.forceContextLoss(); };
-    if (keep) { canvas?.remove(); canvas?.classList.remove('take'); park({ renderer, canvas: canvas!, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape, free: freeAll }); }
+    if (keep) { canvas?.remove(); canvas?.classList.remove('take'); park({ renderer, canvas: canvas!, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape, custom, customFor, free: freeAll }); }
     else freeAll();
   }
   // this stage's own parts, for good
@@ -471,6 +474,7 @@
     // (a new rig: built for the lights, whatever this stage's last world had: with that one's
     // signature still here it was only placed, never built, and threw on every frame)
     rig = new Rig(); scene.add(rig.group); shape = null;
+    custom = null; customFor = ''; customLoading = '';      // (a new world: no model in it yet)
     { const r = rig; void makeGobos().then((a) => { if (rig === r) r.setGobos(a.tex); }); }
     particles = new Particles(); scene.add(particles.group);
   }
@@ -562,6 +566,7 @@
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
       // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
       parts: () => ({ lamp: !!crowdLamp && crowdLamp.parent === scene, dots: !!mirrorDots && mirrorDots.group.parent === scene, meter: !!meter && (!meter.context || meter.context === renderer.getContext()) }),
+      model: () => ({ reads: modelReadCount(), inScene: !!custom && custom.parent === scene, id: custom?.uuid ?? null, geometries: renderer.info.memory.geometries }),
       mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ballsNow().map((b) => +b.obj.rotation.y.toFixed(3)), tilt: ballsNow().map((b) => +b.obj.rotation.x.toFixed(4)),
         // (where it's turned on screen: its matrix, which a frozen ball never updates whatever its rotation says)
         drawn: ballsNow().map((b) => +Math.atan2(b.obj.matrixWorld.elements[8], b.obj.matrixWorld.elements[10]).toFixed(3)) }),
@@ -923,18 +928,25 @@
   // browser; its size, height and turn by hand; the built-in stage can go
   let venuePanel = $state(false);
   let modelFile = $state<HTMLInputElement>();
-  let custom: THREE.Object3D | null = null, customFor = '';
+  // (the model in this stage's world, which stored file it is, and one being read now)
+  let custom: THREE.Object3D | null = null, customFor = '', customLoading = '';
+  let freshModel: { store: string; scene: THREE.Object3D } | null = null;
+  function dropModel() { if (custom) { scene.remove(custom); free(custom); } custom = null; customFor = ''; }
   const vm = $derived(app.show.settings.stage3d?.model);
   async function loadModel(f: File) {
     try {
       const buf = await f.arrayBuffer();
       const g = await new GLTFLoader().parseAsync(buf, '');
+      countModelRead();
       // fitted: standing on the floor, its middle at the stage's, metres (a model in millimetres
       // or centimetres comes in far too big: scaled down)
       const b = new THREE.Box3().setFromObject(g.scene), size = b.getSize(new THREE.Vector3()), big = Math.max(size.x, size.y, size.z);
       const scale = big > 2000 ? 0.001 : big > 300 ? 0.01 : 1;
       const key = `${app.showId}:${f.name}`;
       try { await putModel(key, f); } catch { /* shown now; another time it asks again */ }
+      // (the one just read goes in as it is: not read again from the store, and a file loaded again
+      // under the same name replaces the old one)
+      freshModel = { store: key, scene: g.scene };
       app.checkpoint();
       app.show.settings.stage3d = { ...app.show.settings.stage3d, model: { name: f.name, store: key, scale, x: r1(-(b.min.x + b.max.x) / 2 * scale), y: r1(-b.min.y * scale), z: r1(-(b.min.z + b.max.z) / 2 * scale), yaw: 0 } };
       app.markDirty(0);
@@ -1020,17 +1032,31 @@
     untrack(() => {
       if (venue) venue.group.visible = !hide;
       if (!scene) return;
-      if (!m) { if (custom) { scene.remove(custom); custom = null; customFor = ''; } return; }
+      // (removed or another file: the one there goes back to the graphics chip, it used to stay)
+      if (!m) { dropModel(); return; }
       const placeIt = () => { if (!custom) return; custom.scale.setScalar(m.scale); custom.position.set(m.x, m.y, m.z); custom.rotation.y = (m.yaw * Math.PI) / 180; };
+      if (freshModel?.store === m.store) {
+        const g = freshModel.scene;
+        freshModel = null; customLoading = '';
+        dropModel(); custom = g; customFor = m.store; scene.add(custom); placeIt();
+        return;
+      }
+      // (in this world already, read by whichever view had it: read once per world, not per view)
       if (customFor === m.store) { placeIt(); return; }
-      customFor = m.store;
+      if (customLoading === m.store) return;
+      customLoading = m.store;
+      const into = scene;
       void getModel(m.store).then(async (blob) => {
-        if (!blob) { ui.toast(`"${m.name}" isn't in this browser: load it again (3D, Venue)`, 5000); return; }
+        if (!blob) { customLoading = ''; ui.toast(`"${m.name}" isn't in this browser: load it again (3D, Venue)`, 5000); return; }
         const g = await new GLTFLoader().parseAsync(await blob.arrayBuffer(), '');
-        if (customFor !== m.store) return;
-        if (custom) scene.remove(custom);
-        custom = g.scene; if (holding) scene.add(custom); placeIt();      // (its view hidden meanwhile: added when it's shown)
-      }).catch(() => ui.toast(`"${m.name}" didn't open`));
+        countModelRead();
+        // (another file picked meanwhile, or the world went on to another view: not for this one,
+        // the view holding it reads it into its own world)
+        if (customLoading !== m.store || !holding || scene !== into) { free(g.scene); if (customLoading === m.store) customLoading = ''; return; }
+        customLoading = '';
+        dropModel();
+        custom = g.scene; customFor = m.store; scene.add(custom); placeIt();
+      }).catch(() => { customLoading = ''; ui.toast(`"${m.name}" didn't open`); });
     });
   });
 
