@@ -49,6 +49,8 @@ footer a:hover { color:var(--gh-text); }
 .app-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1080; align-items:center; justify-content:center; padding:1rem; }
 .app-modal.show { display:flex; }
 .app-modal .card { width:min(440px,96vw); }
+/* (the messages say their lists on lines of their own: \n in textContent was a space) */
+#app-modal-body { white-space:pre-line; }
 /* Pin picker (issue #12) */
 .pin-grp .pin-pick { flex:0 0 auto; padding:.15rem .45rem; display:flex; align-items:center; }
 .pin-grp .pin-pick svg { width:15px; height:15px; }
@@ -1695,15 +1697,27 @@ document.querySelector('form[action="/config"]').addEventListener('submit', func
   fetch('/config', { method: 'POST', body: new FormData(this) })
     .then(function(r){ return r.json(); })
     .then(function(j){
+      // A pixel port the box turned off (its pin belongs to something that's on): said, and
+      // unticked here too. It used to answer "Saved" and the port was simply off after a reload.
+      var off = (Array.isArray(j.pixOff) ? j.pixOff : []).map(function(o){
+        var card = document.querySelectorAll('.pix-card')[o.port], en = card && card.querySelector('.pix-en');
+        if (en && en.checked){ en.checked = false; en.dispatchEvent(new Event('change', { bubbles: true })); }
+        return 'Pixel port ' + (o.port + 1) + ': ' + o.why;
+      });
+      var offText = off.length ? 'Turned off, because the box can\'t drive ' + (off.length > 1 ? 'them' : 'it') + ' there:\n\n'
+          + off.join('\n') + '\n\nPick another pin, then turn it on again.' : '';
       if (j.reboot){
         showModal({
           title: 'Restarting to apply this',
           body: 'Saved. Most settings take effect immediately, but these need a restart because '
               + 'they are bound to a pin or a driver that is set up at boot:\n\n' + j.fields
               + '\n\nThe device is restarting now and will be back in a few seconds. '
-              + 'If its address changed you will have to reconnect.',
+              + 'If its address changed you will have to reconnect.' + (offText ? '\n\n' + offText : ''),
           okText: 'OK', cancel: false
         });
+      } else if (offText){
+        btn.textContent = was; btn.disabled = false;
+        showModal({ title: 'Saved, but a pixel port is off', body: offText, okText: 'OK', cancel: false });
       } else {
         btn.textContent = 'Saved';
         setTimeout(function(){ btn.textContent = was; btn.disabled = false; }, 1500);

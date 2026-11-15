@@ -33,6 +33,10 @@ g++ -std=c++17 -O1 -Wall -Wextra \
     test/native/pixel_map_test.cpp -o build/pixtest
 build/pixtest
 
+# Which GPIO a pixel port may not have: only what's on owns a pin (src/pixel_pins.h, issue #165).
+g++ -std=c++17 -O1 -Wall -Wextra -I src test/native/pixel_pins_test.cpp -o build/pixpintest
+build/pixpintest
+
 # Which saved WiFi network gets joined, and the form's reorder (src/wifi_pick.h, issue #120).
 g++ -std=c++17 -O1 -Wall -Wextra -I src test/native/wifi_pick_test.cpp -o build/wifitest
 build/wifitest

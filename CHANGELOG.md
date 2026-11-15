@@ -285,6 +285,11 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 
 **Firmware**
 
+- **A pixel port on a WT32-ETH01 stays on after saving** (issue #165). The box refused pins of
+  things that were switched off: the WT32 keeps the W5500's default pins although it runs its own
+  Ethernet, so a port on GPIO5 went off after every save while the page said "Saved". Only what's
+  on counts now, the same rule the settings page uses, and a port the box still turns off is
+  named in the save's answer with the reason.
 - **Channel labels and the box's name show as text.** The status page's change log and the bar at
   the top of every page put them in as HTML, so a label like `<b>Spot</b>` came out bold, and one
   with a script in it ran in every browser that opened the box. A quote in the name broke
