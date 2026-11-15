@@ -583,6 +583,14 @@ export class Rig {
       return level;
     };
     const lensCol = (level: number, isSel: boolean) => (level > 0.01 ? C2.copy(col).multiplyScalar(0.6 + level * 1.4) : isSel ? sel : off);
+    // What a pixel light gives the room (the washes, the crowd light, the fog, the mirror-ball dots):
+    // its cells' colours, each by how bright it is. (It was whatever colour the cell loop left
+    // behind: a red chase on a bar lit the room in the last cell's blue.)
+    const mean = new THREE.Color();
+    let meanW = 0;
+    const cellsFrom = () => { mean.setRGB(0, 0, 0); meanW = 0; };
+    const addCell = (cl: number) => { if (cl > 0) { mean.r += col.r * cl; mean.g += col.g * cl; mean.b += col.b * cl; meanW += cl; } };
+    const cellsMean = () => (meanW > 0 ? mean.multiplyScalar(1 / meanW) : mean);   // (none lit: black, it lights nothing)
 
     for (let fi = 0; fi < this.list.length; fi++) {
       const f = this.list[fi], v = stage[f.id];
@@ -763,10 +771,12 @@ export class Rig {
         } else put('panel', TMP.copy(base).multiply(TMP2.makeScale(pr.panel!.w, pr.panel!.d / 0.02, pr.panel!.h)));
         const fq = CQ.setFromRotationMatrix(face), dir = DIR.set(0, 1, 0).transformDirection(face), sq = this.parts.get('sqcell');
         this.beamNow.set(f.id, pr.beamDeg);
+        cellsFrom();
         for (let i = 0; i < n; i++) {
-          const cl = lightOf(cellLookAt(v, i, f.cells) ?? v, t);
+          const cv = cellLookAt(v, i, f.cells) ?? v, cl = lightOf(cv, t);
           // (a white fixture's channels are dimmers: its LEDs' own warm white)
-          if (white && !(cellLookAt(v, i, f.cells) ?? v)?.color) col.setRGB(white[0], white[1], white[2]);
+          if (white && !cv?.color) col.setRGB(white[0], white[1], white[2]);
+          addCell(cl);
           const [cx, cz] = cellAt(pr, i), cp = CP.set(cx, lift, cz).applyMatrix4(face);
           const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off, sz = pr.cells.size;
           m4.compose(cp, fq, sc.set(sz, pr.cells.square ? 0.008 : 0.012, sz));
@@ -775,35 +785,38 @@ export class Rig {
           // (25 beams side by side: each a share of the light, together as bright as one big one)
           if (cl > 0.01) beamAt(CP.addScaledVector(dir, 0.01), dir, pr.beamDeg, cl * 0.22, col, MAX_BEAM, i % 4 === 0);
         }
-        pushLit(fi, CP.set(0, lift, 0).applyMatrix4(face), dir, lightOf(v, t) > 0 ? col : C2.set(0, 0, 0), level, pr.beamDeg);
+        pushLit(fi, CP.set(0, lift, 0).applyMatrix4(face), dir, cellsMean(), level, pr.beamDeg);
       } else if (f.shape) {
         // a ring or a matrix: its board in the light's x-z plane, its pixels on it, facing its up
         const at = f.shape, S = f.size! / 2, dot = Math.max(0.006, 2 * at.dot * S);
         put(f.look, TMP.copy(base).multiply(TMP2.makeScale(2 * S * shapeW(at) + 0.04, 1, 2 * S * shapeH(at) + 0.04)));
         const dir = DIR.copy(UP).applyQuaternion(q);
+        cellsFrom();
         for (let i = 0; i < at.n; i++) {
           const cl = lightOf(cellLookAt(v, i, at.n) ?? v, t);
+          addCell(cl);
           const cp = CP.set(at.x[i] * S, 0.006, -at.y[i] * S).applyMatrix4(base);
           const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off;
           m4.compose(cp, q, sc.set(dot, 0.012, dot)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
         }
-        lightOf(v, t);
-        pushLit(fi, pos, dir, col, level * 0.4, 60);
+        pushLit(fi, pos, dir, cellsMean(), level * 0.4, 60);
       } else if (f.kind === 'bar') {
         // the bar lies along its x; its cells shine along its up
         const L = f.barLen ?? (f.cells > 24 ? f.cells / 30 : 1);
         put('bar', TMP.copy(base).multiply(TMP2.makeScale(L + 0.04, 1, 1)));
         const dir = DIR.copy(UP).applyQuaternion(q);
+        cellsFrom();
         for (let i = 0; i < f.cells; i++) {
           const cv = cellLookAt(v, i, f.cells) ?? v;
           const cl = lightOf(cv, t);
+          addCell(cl);
           const cp = CP.set(-L / 2 + (L * (i + 0.5)) / f.cells, 0.012, 0).applyMatrix4(base);
           const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off;
           const d = Math.min((L / f.cells) * 0.86, 0.07);
           m4.compose(cp, q, sc.set(d, 0.016, d)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
           if (f.cells <= 24) beamAt(cp, dir, 30, cl * 0.6, col, 5, false);
         }
-        pushLit(fi, pos, dir, col, level * 0.6, 40);
+        pushLit(fi, pos, dir, cellsMean(), level * 0.6, 40);
       } else if (f.fog || f.sfx) {
         put(f.look, base);
       } else {
