@@ -7,6 +7,7 @@
   // saturation, beam, effects), a fader with GO, Flash and Release for every cue list, and the
   // grand master. Everything goes through the programmer and the lists like anywhere else.
   import { app } from '../app.svelte';
+  import { toHsv } from '../model/values';
   import { setContext, untrack } from 'svelte';
   import { dialogOpen, isShortcut, spaceIsGo, ui } from './ui.svelte';
   import Knob from './Knob.svelte';
@@ -132,12 +133,8 @@
     const f = sel[0];
     return f ? app.lookFor(f.id) : undefined;
   });
-  function hsvOf(c: Color | undefined): [number, number] {
-    const x = c ?? { r: 1, g: 1, b: 1 }, mx = Math.max(x.r, x.g, x.b), mn = Math.min(x.r, x.g, x.b), d = mx - mn;
-    let h = 0;
-    if (d > 1e-9) h = mx === x.r ? ((x.g - x.b) / d + 6) % 6 : mx === x.g ? (x.b - x.r) / d + 2 : (x.r - x.g) / d + 4;
-    return [h / 6, mx > 0 ? d / mx : 0];
-  }
+  // (hue and saturation as app.nudge turns them: no colour yet is white)
+  const hsvOf = (c: Color | undefined) => toHsv(c ?? { r: 1, g: 1, b: 1 });
   // Encoders that click from slot to slot: a gobo wheel, a built-in effect, a colour program. The
   // first selected light that has it says where it is (what you just set, not the last frame); each
   // light gets the one by that name (app.setSlot).

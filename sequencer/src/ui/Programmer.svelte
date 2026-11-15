@@ -104,7 +104,6 @@
   const noColor = $derived(sel.filter((f) => { const c = app.caps(f.id); return !c.color && !c.fog && (c.intensity || c.cct || c.white); }));
   const posPresets = $derived(presets.filter((p) => p.kind === 'position'));
   // (picked cells: every one of them uses it)
-  const usesPreset = (id: string) => app.usesPreset(id);
 
   const css = (c: Color) => `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
   const pct = (v: number | undefined) => Math.round((v ?? 0) * 100);
@@ -279,7 +278,7 @@
         <div class="lab"><span>White</span></div>
         <div class="swatches">
           {#each whitePresets as p (p.id)}
-            <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+            <button class="sw" class:on={app.usesPreset(p.id)} aria-pressed={app.usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
           {/each}
         </div>
       </section>
@@ -291,7 +290,7 @@
           <div class="swatches">
             {#each colorPresets as p (p.id)}
               {@const c = p.values.color && !('preset' in p.values.color) ? p.values.color : { r: 1, g: 1, b: 1 }}
-              <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+              <button class="sw" class:on={app.usesPreset(p.id)} aria-pressed={app.usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
             {/each}
           </div>
         {/if}
@@ -368,7 +367,7 @@
           {/each}
         </div>
         <div class="quick wrap">
-          {#each posPresets as p (p.id)}<button class:on={usesPreset(p.id)} onclick={() => app.applyPreset(p.id)} title="Position preset">{p.name}</button>{/each}
+          {#each posPresets as p (p.id)}<button class:on={app.usesPreset(p.id)} onclick={() => app.applyPreset(p.id)} title="Position preset">{p.name}</button>{/each}
           <button onclick={() => app.set({ pan: 0.5, tilt: 0.5 })}>Centre</button>
         </div>
         {#if sel.filter((f) => app.kinds[f.id] === 'mover').length > 1}

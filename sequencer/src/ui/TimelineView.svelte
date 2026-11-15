@@ -6,7 +6,7 @@
   // The show can start before the song (an intro, the walk-on) and go on after it (the cheer, the
   // house lights): those spans sit left and right of the song on the ruler, shaded and named; the
   // song's parts and beat grid only over the song. The crowd's sound has a track of its own.
-  import { onDestroy, onMount, setContext, untrack } from 'svelte';
+  import { onDestroy, setContext, untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
   import Modal from './Modal.svelte';
@@ -24,7 +24,8 @@
   import { LIVE_KNOBS } from '../engine/knobs';
   import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
   import { BAR_S, DEMO_SECONDS, playDemo, sectionStarts } from '../timeline/beat';
-  import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
+  import { CATALOG, type CatalogSong } from '../timeline/catalog';
+  import { progressSaid, songsByGenre } from '../timeline/songPicker';
   import { SongError, creditOf, downloadSong } from '../timeline/download';
   import { ShowChanged } from '../timeline/player.svelte';
   import { SURE, type SongAnalysis } from '../timeline/analyze';
@@ -43,15 +44,18 @@
   // and what's on the tracks a moment later, in a task of their own once the frame is on screen
   let built = $state(false);
   $effect(() => { const id = requestAnimationFrame(() => setTimeout(() => (built = true))); return () => cancelAnimationFrame(id); });
-  onMount(() => { void P.prepare(); });
-  $effect(() => { void app.show.timeline?.audio?.store; void app.show.timeline?.demo; void P.prepare(); });
+  // (the song made ready when the view is built and when another one comes in; untracked: what
+  // prepare reads made it run again on every play, pause and edit of the time around the song)
+  $effect(() => { void app.show.timeline?.audio?.store; void app.show.timeline?.demo; untrack(() => void P.prepare()); });
 
   const tl = $derived(app.show.timeline);
+  const songLen = $derived(tl?.duration ?? 0);                                  // (what the player says too)
+  const barS = $derived((60 / (tl?.bpm ?? app.show.settings.bpm)) * 4);       // a bar, in seconds
   const items = $derived(tl?.items ?? []);
   const crowd = $derived(tl?.crowd ?? []);
   // the show's span on the song's clock: from the start of the time before the song to the end of
   // the time after it (the song itself is 0 to its length)
-  const span = $derived(spanOf(tl ? { duration: P.duration || tl.duration, lead: tl.lead, tail: tl.tail } : { duration: 240 }));
+  const span = $derived(spanOf(tl ? { duration: tl.duration, lead: tl.lead, tail: tl.tail } : { duration: 240 }));
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
   const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   // one lane per list that's on the timeline or could be, then effects, then moments
@@ -130,7 +134,7 @@
   const tAt = (clientX: number) => { const r = tracks!.getBoundingClientRect(); return inSpan((clientX - r.left + tracks!.scrollLeft) / scale + span.from); };
   let snapTo = $state<'bar' | 'beat' | 'off'>('beat');
   const sn = (t: number, free = false) => {
-    const song = P.duration || tl?.duration || 0;
+    const song = songLen;
     if (free || snapTo === 'off') return inSpan(Math.round(t * 20) / 20);
     // the song's start and end close by (8 px) win, then a part of the song: cues land right on
     // the chorus, the drop...
@@ -144,7 +148,7 @@
   const grid = $derived.by(() => {
     // (a tempo that isn't a sane number would loop for ever here: 120)
     const raw = tl?.bpm ?? app.show.settings.bpm, bpm = Number.isFinite(raw) && raw >= 20 && raw <= 300 ? raw : 120;
-    const beat = 60 / bpm, d = P.duration || tl?.duration || 240, out: { t: number; bar: boolean; n: number; label: boolean }[] = [];
+    const beat = 60 / bpm, d = songLen || 240, out: { t: number; bar: boolean; n: number; label: boolean }[] = [];
     const every = scale * beat < 6 ? (scale * beat * 4 < 14 ? 4 * Math.ceil(14 / (scale * beat * 4)) : 4) : 1;
     // (the bar numbers as far apart as they need: "121" is wider than "9", so past bar 99 only
     // every second or fourth bar is numbered where they'd run into each other)
@@ -162,7 +166,7 @@
   const sections = $derived.by((): { name: string; at: number; end: number; energy?: number }[] => {
     if (!tl) return [];
     if (tl.demo && !tl.audio && !tl.sections?.length) return sectionStarts();
-    const s = tl.sections ?? [], d = P.duration || tl.duration;
+    const s = tl.sections ?? [], d = songLen;
     return s.map((x, i) => ({ name: x.name, at: x.at, end: Math.max(x.at, s[i + 1]?.at ?? d), energy: x.energy }));
   });
   function zoom(f: number, at?: number) {
@@ -173,7 +177,7 @@
   // the time before and after the song (seconds): what's placed there can't be cut off by it.
   // Hands back what it is now (the field shows that).
   function setAround(k: 'lead' | 'tail', v: number): number {
-    const T = app.timeline.ensure(), song = P.duration || T.duration;
+    const T = app.timeline.ensure(), song = T.duration;
     let s = Math.round(Math.max(0, Math.min(AROUND_MAX, Number.isFinite(v) ? v : 0)));
     const at = [...T.items.map((i) => i.at + (k === 'tail' ? i.len ?? 0 : 0)), ...(T.crowd ?? []).map((i) => i.at + (k === 'tail' ? i.len ?? 0 : 0))];
     const need = k === 'lead' ? Math.ceil(Math.max(0, ...at.map((a) => -a))) : Math.ceil(Math.max(0, ...at.map((a) => a - song)));
@@ -205,7 +209,7 @@
   });
   // the time before and after the song, on the ruler and behind the tracks
   const around = $derived.by(() => {
-    const song = P.duration || tl?.duration || 0, out: { cls: string; name: string; from: number; to: number }[] = [];
+    const song = songLen, out: { cls: string; name: string; from: number; to: number }[] = [];
     if (span.from < 0) out.push({ cls: 'lead', name: 'Before the song', from: span.from, to: 0 });
     // (no song yet: there's no "after" it, the whole ruler said so)
     if (song > 0 && shownTo > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: shownTo });
@@ -249,7 +253,7 @@
   // what a palette chip stands for
   type Chip = { kind: 'cue'; list: string; cue: string } | { kind: 'fx'; effect: string } | { kind: 'burst'; attr: BurstAttr; s: number } | { kind: 'act'; a: TimelineAction } | { kind: 'crowd'; a: CrowdAction; len: number };
   function chipAt(c: Chip, at: number) {
-    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
+    const bar = barS;
     if (c.kind === 'cue') place({ do: 'goto', list: c.list, cue: c.cue }, at, `list:${c.list}`);
     // (an effect runs to the end of the part of the song it lands in, the chorus it's for, not a
     // fixed 8 bars that stopped short of it; a song without parts: 8 bars)
@@ -264,7 +268,7 @@
   // A tap on a chip: at the playhead, or, when its lane already has something there (the last tap),
   // a bar after it, so taps in a row go one after the other instead of on top of each other
   function tapChip(c: Chip) {
-    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4, lane = c.kind === 'cue' ? `list:${c.list}` : c.kind === 'fx' ? 'fx' : c.kind === 'crowd' ? null : 'special';
+    const bar = barS, lane = c.kind === 'cue' ? `list:${c.list}` : c.kind === 'fx' ? 'fx' : c.kind === 'crowd' ? null : 'special';
     const taken = (t: number) => (lane === null ? (tl?.crowd ?? []).some((i) => Math.abs(i.at - t) < 0.05) : (tl?.items ?? []).some((i) => i.lane === lane && Math.abs(i.at - t) < 0.05));
     let at = sn(P.position);
     for (let k = 0; k < 64 && taken(at); k++) at = sn(at + bar);
@@ -320,7 +324,7 @@
     const it = placed(id);
     if (!it) return;
     e.preventDefault(); e.stopPropagation();
-    const song = P.duration || tl.duration || 0, beat = 60 / (tl.bpm ?? app.show.settings.bpm);
+    const song = songLen, beat = barS / 4;
     const inSong = it.at >= 0 && it.at <= song && snapTo !== 'off';
     const step = inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5;
     app.checkpoint();
@@ -363,11 +367,10 @@
   // on or off, blackout) and NOTHING fires: no confetti, flames, sparks, CO2, fog, strobe or blinder
   // hits. Playing before, it plays on from where it's let go (what's placed right there doesn't fire).
   let scrubT = 0;
-  function scrubStart() { P.scrubStart(); }
   function scrubTo(t: number) { scrubT = inSpan(t); P.scrub(scrubT); }
   function scrubEnd() { P.scrubEnd(scrubT); }
   // a jump (a key, a click on a part of the song, Go to): a scrub that's over at once
-  function jump(t: number) { scrubStart(); scrubTo(t); scrubEnd(); }
+  function jump(t: number) { P.scrubStart(); scrubTo(t); scrubEnd(); }
   // A right-click on the playhead is for what's under it (a part's name, an item): it caught them
   function underPlayhead(e: MouseEvent) {
     const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => !el.classList.contains('playhead'));
@@ -388,7 +391,7 @@
       toldScrub = true;
       ui.toast('On stage: the real lights and heads follow the playhead as you drag (confetti, flames, sparks, CO2 and fog bursts never fire). Blind (top right) lets you look around without them.', 9000);
     }
-    scrubStart();
+    P.scrubStart();
     scrubTo(ruler ? sn(tAt(e.clientX), true) : tAt(e.clientX));
   }
   function scrubMove(e: PointerEvent) { if (scrubbing) scrubTo(tAt(e.clientX)); }
@@ -549,11 +552,7 @@
 
   // ---- demo songs: the demo beat (made here) and real songs, downloaded when picked
   let picking = $state(false);
-  const byGenre = (() => {
-    const m = new Map<string, CatalogSong[]>();
-    for (const s of CATALOG) { const g = GENRES[s.genre] ?? s.genre; m.set(g, [...(m.get(g) ?? []), s]); }
-    return [...m];
-  })();
+  const byGenre = songsByGenre();
   const missingSong = $derived(P.missing && tl?.audio?.catalog ? CATALOG.find((s) => s.id === tl.audio!.catalog) : undefined);
   // the credit the song's licence asks for, under the waveform while it's the song
   const credit = $derived.by(() => {
@@ -596,7 +595,7 @@
   // picking a song: it downloads (with progress), stays in this browser like a file you load, and
   // brings its tempo, first downbeat, parts and credit onto the timeline
   let dl = $state<{ id: string; title: string; got: number; total: number; ctl: AbortController } | null>(null);
-  const pct = (d: { got: number; total: number }) => (d.total ? `${Math.min(99, Math.round((d.got / d.total) * 100))} %` : `${(d.got / 1e6).toFixed(1)} MB`);
+  const pct = progressSaid;
   async function take(s: CatalogSong) {
     hush();
     dl?.ctl.abort();
@@ -704,7 +703,7 @@
     if (app.view !== 'timeline' || dialogOpen()) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
+    const bar = barS;
     // (Space on a button the mouse last pressed is the show's too: the welcome hands the focus back
     // to the show's name, and Space must pause the song, not open the shows. Tabbed to, the button's)
     if (e.code === 'Space') { if (spaceIsGo(e)) { e.preventDefault(); P.toggle(); } else if (e.repeat) e.preventDefault(); }
@@ -829,7 +828,7 @@
     <div class="transport" role="toolbar" aria-label="Transport">
       <button class="ghost" onclick={() => jump(P.start)} aria-label="Back to the start" title="Back to the start (Home)"><Icon name="back" /></button>
       <button class="primary play" onclick={() => P.toggle()} aria-label={P.playing ? 'Pause' : 'Play'} title="Play / pause (Space)"><Icon name={P.playing ? 'stop' : 'play'} />{P.playing ? 'Pause' : 'Play'}</button>
-      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(P.duration || tl?.duration || span.to, false)}</span></span>
+      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(songLen || span.to, false)}</span></span>
       <!-- (a found tempo has its tenth: shown whole, as the top bar shows it while the song plays) -->
       <label class="bpm">BPM <input type="number" min="40" max="240" step="0.1" value={Math.round((tl?.bpm ?? app.show.settings.bpm) * 10) / 10} aria-label="Timeline BPM"
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (v >= 40 && v <= 240) { app.timeline.ensure().bpm = v; app.markDirty(0); } }} /></label>

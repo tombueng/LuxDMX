@@ -21,7 +21,9 @@
   import { lightsOnly } from '../content/lightsOnly';
   import type { DemoInfo } from '../content/demos';
   import type { Show } from '../model/types';
-  import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
+  import { GENRES, type CatalogSong } from '../timeline/catalog';
+  import { progressSaid, songsByGenre } from '../timeline/songPicker';
+  import { clockOf } from '../model/timeline';
   import { DEMO_SONG, demoSong, startDemo } from './startDemo';
   import { TEMPLATE_SHOWS } from '../content/templateShows';
   import { onDestroy } from 'svelte';
@@ -58,16 +60,11 @@
   let songs = $state<Record<string, string>>(WELCOME_SONGS.get());
   const songOf = (d: Demo) => { const v = songs[d.id]; return v === 'beat' || demoSong(v) ? v! : d.song ?? DEMO_SONG; };
   function pickSong(d: Demo, v: string) { songs[d.id] = v; WELCOME_SONGS.set({ ...songs }); }
-  const byGenre = (() => {
-    const m = new Map<string, CatalogSong[]>();
-    for (const s of CATALOG) { const g = GENRES[s.genre] ?? s.genre; m.set(g, [...(m.get(g) ?? []), s]); }
-    return [...m];
-  })();
-  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+  const byGenre = songsByGenre();
 
   // a demo: the song comes down first (its progress on the tile); closing cancels it
   let dl = $state<{ id: string; got: number; total: number; ctl: AbortController } | null>(null);
-  const pct = (d: { got: number; total: number }) => (d.total ? `${Math.min(99, Math.round((d.got / d.total) * 100))} %` : `${(d.got / 1e6).toFixed(1)} MB`);
+  const pct = progressSaid;
   async function play(d: Demo) {
     if (dl) return;
     const ctl = new AbortController(), song = d.song ? songOf(d) : 'beat';
@@ -113,7 +110,7 @@
       {/each}
       <optgroup label="Made here"><option value="beat">The demo beat</option></optgroup>
     </select></label>
-  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clock(s.duration)} · {s.license}{:else}Made in the browser, nothing to download{/if}</p>
+  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clockOf(s.duration, false)} · {s.license}{:else}Made in the browser, nothing to download{/if}</p>
 {/snippet}
 {#snippet getting(s: CatalogSong | undefined)}
   <button class="primary" disabled aria-busy="true"><Icon name="play" />{s && dl ? `Getting the song… ${pct(dl)}` : 'Starting…'}</button>
