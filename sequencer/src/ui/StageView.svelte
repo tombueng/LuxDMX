@@ -59,8 +59,9 @@
     return { x: q.x / W, y: q.y / H };
   };
   function downFixture(e: PointerEvent, id: string) {
+    if (readonly) return;                          // (Live only looks: a pinch or a pan starting on a light is the plan's)
     e.stopPropagation();
-    if (e.button !== 0 || readonly) return;        // right-click: the menu, the selection stays; Live only looks
+    if (e.button !== 0) return;                    // right-click: the menu, the selection stays
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     const multi = ui.adding(e);
     if (multi) app.select(id, true);

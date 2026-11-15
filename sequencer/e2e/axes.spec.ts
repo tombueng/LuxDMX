@@ -84,3 +84,21 @@ test('a moving bar: picked heads tilt on their own (on the wire and in 3D, each 
   await expect.poll(async () => (await channels(0, 1))[0]).toBe(191);
   await expect.poll(async () => (await bar3d())!.pan, { timeout: 15000 }).toBeCloseTo(135, 0);   // (a quarter of its 540 off the middle)
 });
+
+test('the arrow keys on the position pad: every press counts, and on a bar only the heads picked move', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-headbar4', 1, 0, 'Bar');
+  await selectAll(page); await full(page);
+  const TILT = (k: number) => 2 + k * 6;
+  await expect.poll(async () => { const c = await channels(0, 26); return [0, 1, 2, 3].map((k) => c[TILT(k)]); }).toEqual([128, 128, 128, 128]);
+  const picker = page.locator('.prog #pg-cells');
+  await picker.getByLabel('Cells to pick').fill('2-3'); await picker.getByLabel('Cells to pick').press('Enter');
+  const pad = page.locator('.prog [role=slider][aria-label="Pan and tilt"]');
+  await pad.focus();
+  // four presses at once (no frame between them): four steps of half a percent
+  await pad.evaluate((el) => { for (let i = 0; i < 4; i++) el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })); });
+  await expect.poll(async () => { const c = await channels(0, 26); return [0, 1, 2, 3].map((k) => c[TILT(k)]); }).toEqual([128, 133, 133, 128]);
+  // Shift: five percent
+  await pad.press('Shift+ArrowDown');
+  await expect.poll(async () => { const c = await channels(0, 26); return [0, 1, 2, 3].map((k) => c[TILT(k)]); }).toEqual([128, 145, 145, 128]);
+});

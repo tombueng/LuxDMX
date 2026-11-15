@@ -176,10 +176,11 @@
     const d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
     if (!d[e.key]) return;
     e.preventDefault();
-    for (const f of sel) {
-      const l = app.look[f.id];
-      app.programmer[f.id] = { ...app.programmer[f.id], pan: Math.max(0, Math.min(1, (l?.pan ?? 0.5) + d[e.key][0])), tilt: Math.max(0, Math.min(1, (l?.tilt ?? 0.5) + d[e.key][1])) };
-    }
+    // (as an encoder turns: from the programmer, so presses between two frames all count, and the
+    // heads picked on a bar move, not the whole bar)
+    const [dp, dt] = d[e.key];
+    if (dp) app.nudge('pan', dp);
+    if (dt) app.nudge('tilt', dt);
   }
   function record() { ui.toast(app.record() ? 'Recorded as a new cue' : 'Nothing to record yet'); }
 </script>

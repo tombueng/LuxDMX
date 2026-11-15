@@ -350,3 +350,25 @@ test('a cue moved to another list from its menu stays itself: its Live button an
   await page.locator('body').press('Control+z');
   await expect.poll(() => page.evaluate((x) => (window as any).__luxdmx.show.cueLists.map((l: any) => (l.id === x.list || l.id === x.other ? l.cues.length : -1)).filter((n: number) => n >= 0), ids)).toEqual([2, 0]);
 });
+
+test('the read-only plans (Timeline, Live) pan with the middle button even when it starts on a light', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 4, 0, 'P');
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  const svg = page.locator('.tlv svg[aria-label="Stage"]');
+  await expect(svg).toBeVisible();
+  const b = (await svg.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.wheel(0, -400);                      // (zoomed in: there's somewhere to pan to)
+  await expect.poll(() => svg.getAttribute('viewBox')).not.toBe('0.0 0.0 1000.0 560.0');
+  const before = await svg.getAttribute('viewBox');
+  const picked = await page.evaluate(() => [...(window as any).__luxdmx.selected]);
+  const light = (await page.locator('.tlv .fx[data-name="P 2"]').boundingBox())!;
+  await page.mouse.move(light.x + light.width / 2, light.y + light.height / 2);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(light.x + light.width / 2 + 120, light.y + light.height / 2 + 40, { steps: 6 });
+  await page.mouse.up({ button: 'middle' });
+  await expect.poll(() => svg.getAttribute('viewBox')).not.toBe(before);
+  // and the selection isn't changed from here
+  expect(await page.evaluate(() => [...(window as any).__luxdmx.selected])).toEqual(picked);
+});
