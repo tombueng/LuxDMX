@@ -75,6 +75,12 @@ def generic(val, fpid):
 # designators of their own, numbered here, and JLC-designators.csv says which is which.
 JLC_PREFIX = {"Resistor": "R", "Capacitor": "C", "Electrolytic": "C", "TVS": "D",
               "Octal": "U", "Screw": "J", "DC": "J", "Polyfuse": "F"}
+# Turns on top of KiCad's rotation, per footprint. The DMX land is a pin header footprint
+# (pins along Y at 0 degrees), turned 90 on the board; JLCPCB's terminal blocks have their pins
+# along X at 0 like the pixel terminals. Another 90 lines the pins up, and the rest of the half
+# turn puts the wire entry on the board edge the XLR tails come from, the opposite edge from the
+# pixel terminals.
+JLC_ROT_EXTRA = {"header-1x03-P2.54-terminal": 90}
 # what JLCPCB shows as the footprint; the board's own names say nothing to them
 JLC_FOOTPRINT = {"chip-universal": "1206", "chip-universal-tvs": "SOD-123FL"}
 
@@ -94,8 +100,9 @@ def _jlc_place(f):
 
     The polyfuse land has three holes for two lead pitches. The MF-R500 takes the outer
     two, which are 1.2 mm apart in height, so the part is turned to lie along them."""
-    rot = f.GetOrientationDegrees()
-    holes = [p.GetPosition() for p in f.Pads() if p.GetDrillSize().x > 0]
+    rot = f.GetOrientationDegrees() + JLC_ROT_EXTRA.get(f.GetFPIDAsString().split(":")[-1], 0)
+    # the leads only: the DMX land also has unplated holes for the Phoenix terminal's pegs
+    holes = [p.GetPosition() for p in f.Pads() if p.GetDrillSize().x > 0 and p.GetNumber()]
     if not holes:
         pos = f.GetPosition()
         return pcbnew.ToMM(pos.x), -pcbnew.ToMM(pos.y), rot

@@ -184,7 +184,7 @@ TVS: SMF12CA (SOD-123FL, 200 W), or SMAJ12CA (SMA, 400 W). 12 V standoff so it s
 substitute, it clamps around 40 V.
 
 Header: 2.54 mm pitch, 1.20 mm holes. Takes a pin header or a 2.54 mm screw terminal (Phoenix
-MPT 0,5/3-2,54, TE 282834-3, Xinya XY308-2.54-3P).
+MPT 0,5/3-2,54, TE 282834-3, Xinya XY308-2.54-3P). The BOM names the Xinya, LCSC C557686.
 
 **Not isolated.** DMX GND is board GND. Fine for a desk or a small rig. Use an isolated RS-485
 module on a separate build if you need it.
@@ -275,7 +275,7 @@ BOM, the lands take 0402 to 1206.
 | Part | Value / part number | LCSC | Fit when |
 |---|---|---|---|
 | RS-485 module | MAX3485, with EN pin | | port used |
-| DMX header | 1x3 pin header, or 2.54 mm screw terminal | | port used |
+| DMX header | XY308-2.54-3P screw terminal, or 1x3 pin header | C557686 | port used |
 | `10k dir` | 10k, 1206W4F1002T5E | C17902 | port used |
 | `120R term` | 120 Ω, 1206W4F1200T5E | C17909 | port at the end of the bus, module has none |
 | `330R bias+`, `330R bias-` | 330 Ω, 1206W4J0331T5E | C25374 | port drives the bus, once per bus |
@@ -321,7 +321,7 @@ BOM, the lands take 0402 to 1206.
 | `Button 1`, `Button 2` | 6 x 6 mm tact switch, 30 mm plunger | you want the buttons |
 | `EXP` | 1x6 pin header | you need spare pins |
 
-LCSC small parts for a fully fitted board: about 3.00 EUR. Stock, prices, marketplace links and
+LCSC small parts for a fully fitted board: about 4.05 EUR. Stock, prices, marketplace links and
 search terms for every module: [`production/BOM.md`](production/BOM.md). Every position with its
 side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 
@@ -352,9 +352,11 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
   - the lands are sized for hand soldering, longer than the parts, so check the placement
     preview of the 1206 parts and the SOIC buffer;
   - rotations come straight from KiCad; JLCPCB's footprints sometimes differ by 90 or 180
-    degrees, so check the TVS diodes, the electrolytic and pin 1 of the buffer;
-  - the modules, headers, fuse holder, buttons and encoder are not in the files: those are
-    plugged or hand soldered.
+    degrees, so check the TVS diodes, the electrolytic and pin 1 of the buffer, and that the
+    screw terminals open towards the board edge (DMX J1-J3 at the top, pixels and inlet J4-J9
+    at the bottom);
+  - the modules, pin headers, fuse holder, buttons and encoder are not in the files: those
+    are plugged or hand soldered.
 
   `tools/gen_bom.py` writes all three files and runs `tools/check_jlc_files.py`, which fails on
   anything JLCPCB's uploader is known to refuse (header names, encoding, duplicate or

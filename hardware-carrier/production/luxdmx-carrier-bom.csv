@@ -5,8 +5,9 @@ Comment,Designator,Footprint,LCSC Part #,Quantity,Manufacturer Part Number,Descr
 KM108M035J20RR0VH2FP0,C6,CP_Radial_D13.0mm_P5.00mm,C10749,1,KM108M035J20RR0VH2FP0,"Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch"
 SMF12CA,"D1,D2,D3,D4,D5,D6",SOD-123FL,C353317,6,SMF12CA,"TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W"
 MF-R500,F2,polyfuse-dual-pitch,C208489,1,MF-R500,"Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch"
-KF128-5.08-3P-AA,"J1,J2,J3,J4,J5",terminal-1x03-P5.08-bigpad,C474953,5,KF128-5.08-3P-AA,"Screw terminal, 3 pole, 5.08 mm pitch"
-KF128-5.08-2P-AA,J6,terminal-1x02-P5.08-bigpad,C474952,1,KF128-5.08-2P-AA,"Screw terminal, 2 pole, 5.08 mm pitch, 24 A"
+XY308-2.54-3P,"J1,J2,J3",header-1x03-P2.54-terminal,C557686,3,XY308-2.54-3P,"Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows"
+KF128-5.08-3P-AA,"J4,J5,J6,J7,J8",terminal-1x03-P5.08-bigpad,C474953,5,KF128-5.08-3P-AA,"Screw terminal, 3 pole, 5.08 mm pitch"
+KF128-5.08-2P-AA,J9,terminal-1x02-P5.08-bigpad,C474952,1,KF128-5.08-2P-AA,"Screw terminal, 2 pole, 5.08 mm pitch, 24 A"
 10k,"R1,R2,R3,R4,R8",1206,C17902,5,1206W4F1002T5E,Resistor 10k 1206 1%
 330R,"R5,R6,R7,R12,R13,R14,R15,R16,R17,R18,R19",1206,C25374,11,1206W4J0331T5E,Resistor 330R 1206 5% (fail-safe bias)
 120R,"R9,R10,R11",1206,C17909,3,1206W4F1200T5E,Resistor 120R 1206 1%

@@ -298,6 +298,17 @@
       "price_eur": 0.175,
       "stock": "16.545"
     },
+    "header-1x03-P2.54-terminal": {
+      "desc": "Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows",
+      "source": "LCSC",
+      "mpn": "XY308-2.54-3P",
+      "vendor": "Xinlaiya",
+      "lcsc": "C557686",
+      "url": "https://www.lcsc.com/product-detail/C557686.html",
+      "note": "Screws the XLR tails down. One of the three terminals the 1.20 mm DMX land was drawn for (with Phoenix MPT 0,5/3-2,54 and TE 282834-3). A 3-pin piece off the header strip fits the same holes if you would rather plug the tails on.",
+      "price_eur": 0.35,
+      "stock": 5930
+    },
     "DC jack": {
       "desc": "DC barrel jack, Kycon KLDX-0202 land, 3.5 A",
       "source": "LCSC",
@@ -655,7 +666,6 @@
   },
   "ignore": {
     "PinHeader": "2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below.",
-    "header-1x03-P2.54-terminal": "The three DMX rows: a 3-pin piece off the same header strip, or a 2.54 mm screw terminal if you would rather screw the XLR tails down. Both fit the 1.20 mm holes.",
     "Display socket": "The display sits on a 1x04 FEMALE socket, not a piece of header strip. PinSocket 1x04 P2.54, 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board."
   },
   "_price_basis": "Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume price. Converted at about 0.92 EUR/USD. Where a page could not be checked the value is an estimate and the stock column says ?."
