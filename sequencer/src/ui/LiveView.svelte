@@ -379,26 +379,34 @@
   // safe: said a minute and a half before it comes, so it isn't a surprise that nothing fires (or
   // there's time to arm them)
   const MACHINE_WORD: Record<string, string> = { confetti: 'Confetti', flame: 'Flames', sparks: 'Sparks', co2: 'CO2' };
-  const shotAhead = $derived.by(() => {
-    const tl = app.show.timeline, now = songAt;
-    if (!tl || !app.timeline.playing || app.sfxArmed || app.output !== 'live') return undefined;
-    let best: { at: number; what: string } | undefined;
-    const machineRisk = machines(app.show);              // (a machine's own programs fire it too)
+  // (the machine moments on the timeline, in time order: worked out once per change of the show,
+  // from its plain copy. Done on every tick of the song's clock it was 20 ms, 40 times a second on
+  // the festival demo, and the page's frame is what fires the timeline's cues)
+  const machineMoments = $derived.by(() => {
+    const s = app.plain, tl = s?.timeline;
+    if (!tl) return [];
+    const out: { at: number; what: string }[] = [];
+    const machineRisk = machines(s);              // (a machine's own programs fire it too)
     for (const i of tl.items) {
-      if (i.at <= now || i.at - now > 90 || (best && i.at >= best.at)) continue;
       const d = i.do;
-      if (d.do === 'burst') { if (isGated(d.attr)) best = { at: i.at, what: MACHINE_WORD[d.attr] ?? d.attr }; continue; }
-      if (d.do === 'effect') continue;
-      if (!('list' in d)) continue;
-      const r = actionRisk(app.show, d, undefined, machineRisk);
+      if (d.do === 'burst') { if (isGated(d.attr)) out.push({ at: i.at, what: MACHINE_WORD[d.attr] ?? d.attr }); continue; }
+      if (d.do === 'effect' || !('list' in d)) continue;
+      const r = actionRisk(s, d, undefined, machineRisk);
       if (r === 'once' || r === 'hazard') {
-        const l = app.show.cueLists.find((x) => x.id === d.list), c = d.do === 'goto' ? l?.cues.find((x) => x.id === d.cue) : undefined;
-        best = { at: i.at, what: c?.name ?? l?.name ?? 'A machine' };
+        const l = s.cueLists.find((x) => x.id === d.list), c = d.do === 'goto' ? l?.cues.find((x) => x.id === d.cue) : undefined;
+        out.push({ at: i.at, what: c?.name ?? l?.name ?? 'A machine' });
       }
     }
-    return best;
+    return out.sort((a, b) => a.at - b.at);
   });
-  const hazeOnly = $derived(app.hazing.every((id) => app.modeOf(id)?.channels.some((c) => c.attr === 'haze')));   // hazers: say haze
+  const shotAhead = $derived.by(() => {
+    if (!app.timeline.playing || app.sfxArmed || app.output !== 'live') return undefined;
+    const next = machineMoments.find((m) => m.at > songAt);
+    return next && next.at - songAt <= 90 ? next : undefined;
+  });
+  // (fog machines on: read while the view is shown)
+  const hazing = $derived(shown ? app.hazing : untrack(() => app.hazing));
+  const hazeOnly = $derived(hazing.every((id) => app.modeOf(id)?.channels.some((c) => c.attr === 'haze')));   // hazers: say haze
   // the timetable's next change, looked at twice a minute
   let nowMs = $state(Date.now());
   $effect(() => { const t = setInterval(() => (nowMs = Date.now()), 5000); return () => clearInterval(t); });
@@ -493,9 +501,9 @@
       <button class="chip nextup" onclick={() => (ui.modal = 'schedule')} oncontextmenu={(e) => { e.preventDefault(); if (!app.locked) ui.openMenu(e, pauseItems()); }} title="The timetable, next: {upAt}{upcoming.entry.sun ? ` (${upcoming.entry.sun === 'set' ? 'sunset' : 'sunrise'})` : ''} {actionText(app.show, upcoming.entry.do)} (right-click to pause it)">
         <Icon name="clock" size={14} />{#if narrow}{upAt}{:else}{actionShort(app.show, upcoming.entry.do)} · {inWords(upcoming.when, new Date(nowMs)).replace(/^at /, '')}{/if}</button>
     {/if}
-    {#if app.hazing.length}
+    {#if hazing.length}
       <span class="chip haze" title="A fog or haze machine is running from a cue">
-        <Icon name="fog" size={14} />{#if !narrow}<span>{app.hazing.length > 1 ? `${app.hazing.length} fog machines on` : hazeOnly ? 'Haze on' : 'Fog on'}</span>{/if}
+        <Icon name="fog" size={14} />{#if !narrow}<span>{hazing.length > 1 ? `${hazing.length} fog machines on` : hazeOnly ? 'Haze on' : 'Fog on'}</span>{/if}
         <button class="stop" onclick={() => { app.stopHaze(); ui.toast(`${hazeOnly ? 'Haze' : 'Fog'} stopped until the next cue that fogs.`, 4000); }}
           aria-label={hazeOnly ? 'Stop the haze' : 'Stop the fog'}>Stop</button></span>
     {/if}

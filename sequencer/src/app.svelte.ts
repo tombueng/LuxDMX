@@ -1829,9 +1829,11 @@ class App {
   // Fog and haze machines making fog right now that no held fog button is behind (a cue left them
   // on): Live says so, with a way to stop them.
   get hazing(): string[] {
-    return this.show.fixtures.filter((f) => this.caps(f.id).fog && !this.live[f.id]
-      && ((this.stage[f.id]?.fog ?? 0) > 0.01 || (this.stage[f.id]?.haze ?? 0) > 0.01)).map((f) => f.id);
+    return this.fogIds.filter((id) => !this.live[id] && ((this.stage[id]?.fog ?? 0) > 0.01 || (this.stage[id]?.haze ?? 0) > 0.01));
   }
+  // (the fog and haze machines: worked out when the lights change, not on every frame: going
+  // through all of the festival's 233 lights for them was 13 ms a read)
+  private fogIds = $derived(this.show.fixtures.filter((f) => this.caps(f.id).fog).map((f) => f.id));
   // Held off on the live layer until a cue that fogs one of them comes on (not in the programmer: a
   // later haze cue still hazes, and a Record doesn't write "hazer off" into whatever cue it makes).
   stopHaze() {
