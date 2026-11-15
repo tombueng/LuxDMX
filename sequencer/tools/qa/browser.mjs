@@ -160,6 +160,25 @@ const actions = {
       return out.slice(0, 60);
     }) };
   },
+  // a CPU profile of the page's main thread for `ms` (default 5 s): written to the out folder, the
+  // functions it spent the most time in themselves back as a list (url:line, ms, %)
+  async profile(b) {
+    const cdp = await page().context().newCDPSession(page());
+    await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: b.interval ?? 200 }); await cdp.send('Profiler.start');
+    await new Promise((r) => setTimeout(r, b.ms ?? 5000));
+    const { profile } = await cdp.send('Profiler.stop'); await cdp.detach();
+    const file = path.join(OUT, (b.name || `profile-${Date.now()}`).replace(/[^\w.-]+/g, '_') + '.cpuprofile');
+    fs.writeFileSync(file, JSON.stringify(profile));
+    const byId = new Map(profile.nodes.map((n) => [n.id, n])), self = new Map();
+    let all = 0;
+    profile.samples.forEach((id, i) => {
+      const d = profile.timeDeltas[i] ?? 0, cf = byId.get(id).callFrame;
+      const k = `${cf.functionName || '(anon)'} ${cf.url.split('/').pop().split('?')[0]}:${cf.lineNumber + 1}`;
+      self.set(k, (self.get(k) ?? 0) + d); all += d;
+    });
+    const top = [...self].sort((x, y) => y[1] - x[1]).slice(0, b.top ?? 20).map(([k, us]) => `${(us / 1000).toFixed(0).padStart(6)} ms ${((100 * us) / all).toFixed(1).padStart(5)} %  ${k}`);
+    return { file, ms: Math.round(all / 1000), top };
+  },
   async logs(b) { const since = b.since ?? 0; return { seq, list: logs.filter((e) => e.seq > since && (!b.errors || e.level === 'error' || e.type === 'pageerror')) }; },
   async pages() { return { cur, list: pages.map((p, i) => ({ i, url: p.url() })) }; },
   async page(b) { cur = Math.max(0, Math.min(pages.length - 1, b.i)); await pages[cur].bringToFront(); return { cur, url: pages[cur].url() }; },
