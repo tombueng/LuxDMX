@@ -21,6 +21,7 @@ export class ExposureMeter extends Pass {
   private quad: FullScreenQuad;
   private mat: THREE.ShaderMaterial;
   private frame = 0;
+  private still = 0;
   logAvg = Math.log(0.2);            // the scene's log-average brightness (linear light)
   constructor(private every = 8) {
     super();
@@ -45,7 +46,11 @@ export class ExposureMeter extends Pass {
     });
     this.quad = new FullScreenQuad(this.mat);
   }
+  // Not for the next n frames, the read waiting meanwhile: right after a view switch or a new size
+  // the card is busy with that, and the read waited for it (26 ms of a switch's stall)
+  hold(n = 30) { this.still = Math.max(this.still, n); }
   render(renderer: THREE.WebGLRenderer, _write: THREE.WebGLRenderTarget, read: THREE.WebGLRenderTarget) {
+    if (this.still > 0) { this.still--; return; }
     const gl = renderer.getContext() as WebGL2RenderingContext;
     // the last read, when the card has finished it (asked without waiting)
     if (this.sync) {

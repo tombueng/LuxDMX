@@ -349,6 +349,7 @@
     glow = GLOW_3D.get(); hazeAmt = HAZE_3D.get(); ambient = AMBIENT_3D.get(); spill = SPILL_3D.get();
     liveScreens = SCREENS_LIVE.get();
     composer.setPixelRatio(renderer.getPixelRatio());
+    meter?.hold();
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook;
   }
   // its view hidden: the world goes on to the view shown now (or waits for it)
@@ -582,7 +583,7 @@
     // (the same size again, e.g. the observer's first call: the canvas isn't made anew)
     const pr = renderer.getPixelRatio();
     renderer.getSize(sizeNow);
-    if (sizeNow.x !== w || sizeNow.y !== h || canvas!.width !== Math.floor(w * pr) || canvas!.height !== Math.floor(h * pr)) renderer.setSize(w, h, false);
+    if (sizeNow.x !== w || sizeNow.y !== h || canvas!.width !== Math.floor(w * pr) || canvas!.height !== Math.floor(h * pr)) { renderer.setSize(w, h, false); meter?.hold(); }
     composer.setSize(w, h); camera.aspect = w / Math.max(1, h);
     // (a tall screen sees as much of the stage across as a wide one: the views are made for 16:9)
     // (only a really tall one: a panel a bit narrower than wide keeps the normal lens and its zoom)
