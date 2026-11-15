@@ -63,10 +63,14 @@ function find(root, sel) {
   // (exact: "Command" must not find "Command line"; label~=... for a part of it)
   return m[1] === 'label' ? root.getByLabel(v, { exact: true }) : m[1] === 'placeholder' ? root.getByPlaceholder(v) : root.getByTitle(v);
 }
+// (only what's on screen: the views not shown stay in the page, hidden and inert, and the first
+// "GO" or "Gobos" found was often one of theirs: a click waited for it and timed out. `any:` in front
+// for hidden ones too.)
 const loc = (sel, nth) => {
-  const parts = String(sel).split(/\s+>>>\s+/);
+  const all = String(sel).startsWith('any:'), parts = String(sel).replace(/^any:/, '').split(/\s+>>>\s+/);
   let l = find(page(), parts[0]);
   for (const p of parts.slice(1)) l = find(l.first(), p);
+  if (!all) l = l.filter({ visible: true });
   return nth === undefined ? l.first() : nth === 'last' ? l.last() : l.nth(nth);
 };
 
