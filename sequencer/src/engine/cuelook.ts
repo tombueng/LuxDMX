@@ -3,8 +3,7 @@
 // as playback does (player.ts trackedLook): fog, haze and the machines only in the cue that sets
 // them, never carried on (an exported scene after a flame cue fired the flame again, and QLC+ has
 // no Arm). In a list of looks (`own`) a look is what it names, so that's its picture.
-import type { Color, CueList, Preset, Resolved } from '../model/types';
-import { FOGGY } from './player';
+import { FOGGY, type Color, type CueList, type Preset, type Resolved } from '../model/types';
 import { overlay, resolveValues, topLevel } from './resolve';
 
 export function cueLooks(list: CueList, presets: Map<string, Preset>, own = false): Record<string, Resolved>[] {

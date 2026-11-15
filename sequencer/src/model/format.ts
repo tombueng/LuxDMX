@@ -9,7 +9,7 @@ import { validEntry } from './schedule';
 import { cleanLayout, MAX_PIXELS } from './pixelLayout';
 import { cleanCurve } from './ledCurve';
 import { AROUND_MAX, cleanCrowd, cleanLevels, cleanSections, validItem, validTimeline } from './timeline';
-import type { Cue, Show } from './types';
+import { NUM_ATTRS, type Cue, type Show } from './types';
 import { KNOBS, cleanColors, isColor } from '../engine/fxkit';
 
 export const FORMAT = 'luxdmx-show';
@@ -416,10 +416,7 @@ function beamDegOf(x: unknown): [number, number] | undefined {
 }
 // Values (a cue's, a preset's): levels in 0..1, colours with r, g, b in 0..1, raw channels 0..255,
 // or a preset reference. What isn't is left out (the light keeps what it had). Counts the changes.
-const NUM_ATTRS = new Set(['intensity', 'white', 'amber', 'uv', 'cct', 'pan', 'tilt', 'strobe', 'zoom', 'focus', 'iris', 'frost', 'prism',
-  'goboRotation', 'gobo', 'fog', 'haze', 'fan', 'speed', 'confetti', 'bubbles', 'flame', 'sparks', 'co2',
-  'gobo2', 'gobo2Rotation', 'prismRotation', 'animation', 'animationRotation', 'effectMacro', 'effectSpeed', 'colorMacro',
-  'goboShake', 'goboScroll', 'gobo2Shake', 'gobo2Scroll', 'panRotation', 'tiltRotation', 'roll', 'rollRotation', 'hoist']);
+const NUM_SET = new Set<string>(NUM_ATTRS);
 // (a wheel running round goes either way: -1..1)
 const SIGNED_ATTRS = new Set(['goboScroll', 'gobo2Scroll']);
 function mendValues(v: Obj, bad: { n: number }) {
@@ -452,7 +449,7 @@ function mendValues(v: Obj, bad: { n: number }) {
         if (!Object.keys(c).length) delete x[ci];
       }
       if (!Object.keys(x).length) delete v.cells;
-    } else if (NUM_ATTRS.has(k) && !isRef(x)) {
+    } else if (NUM_SET.has(k) && !isRef(x)) {
       const n = numIn(x, SIGNED_ATTRS.has(k) ? -1 : 0, 1);
       if (n === x) continue;
       if (Number.isFinite(n)) v[k] = n; else delete v[k];

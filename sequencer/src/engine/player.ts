@@ -7,11 +7,11 @@
 // names and leaves the rest as it is ("Hall" lights the hall, the church stays as it was).
 // On top sits a weight (0..1): it's how releasing fades the whole list back to what's underneath,
 // and how a flash snaps it in and out. The mixer (engine.ts) combines all lists.
-import { CELL_ATTRS, type CellAttr, type Cue, type CueList, type CueTimes, type Preset, type Resolved } from '../model/types';
+import { CELL_ATTRS, FOGGY, type CellAttr, type Cue, type CueList, type CueTimes, type Preset, type Resolved } from '../model/types';
 import { isLooks } from '../model/library';
 import { lerpResolved, overlay, resolveValues, topLevel } from './resolve';
 
-interface Ramp { from: number; to: number; start: number; dur: number }
+export interface Ramp { from: number; to: number; start: number; dur: number }
 // One light's fade: each light has its own, so a GO only re-times the lights whose target changed
 // (the others carry on with their own fade, even when the new cue is faster or delayed).
 // `blend`: a light going out of a list that was fading out when a look was tapped: its colour and
@@ -24,7 +24,6 @@ interface Track { from: Resolved; to: Resolved; at: number; fade: number; fadeOu
 // doesn't set goes to 0 (back to cue 9 switches off what cue 10 switched on).
 const LEVELS = ['intensity', 'white', 'amber', 'uv', 'fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 // what belongs to its cue (a look's fog, a confetti shot, a flame): the next look stops it
-export const FOGGY = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
 // A cue's longest fade: its fade, its fade out, its own colour / position / beam times. What a
 // follow waits for and what its progress counts (a follow after fade 1 with an 8 s pan cut the pan
 // off at 1 s).
@@ -43,7 +42,7 @@ function zeroCells(r: Resolved) {
 }
 const t01 = (now: number, at: number, dur: number) => (dur <= 0 ? (now >= at ? 1 : 0) : Math.max(0, Math.min(1, (now - at) / dur)));
 const same = (a: Resolved, b: Resolved) => JSON.stringify(a) === JSON.stringify(b);
-const rampAt = (r: Ramp, now: number) => (r.dur <= 0 || now >= r.start + r.dur ? r.to : now <= r.start ? r.from : r.from + (r.to - r.from) * (now - r.start) / r.dur);
+export const rampAt = (r: Ramp, now: number) => (r.dur <= 0 || now >= r.start + r.dur ? r.to : now <= r.start ? r.from : r.from + (r.to - r.from) * (now - r.start) / r.dur);
 
 export interface PlayerStatus {
   running: boolean;

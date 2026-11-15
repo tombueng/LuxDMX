@@ -10,17 +10,17 @@
 //   - then the effects (from cues, or started by hand), then the live layer (fog buttons), then
 //     the grand master and blackout
 import { isHeld, enableValue, isGated, isMachine, MACHINE_PROGRAMS, MAX_ON, KINETIC_CTL, kineticOff } from '../model/safety';
-import type { CueAction, CueList, Effect, FixtureMode, Preset, Resolved, Show, Values, Fixture } from '../model/types';
+import { FOGGY, type CueAction, type CueList, type Effect, type FixtureMode, type Preset, type Resolved, type Show, type Values, type Fixture } from '../model/types';
 import { headCellsOf, capsOf, modeOf, typeMap } from '../model/library';
 import { isWide, placesOfLight, spansOf } from '../model/pixelLayout';
-import { ListPlayer, type PlayerStatus } from './player';
+import { ListPlayer, rampAt, type PlayerStatus, type Ramp } from './player';
 import { lerpResolved, resolveValues, spreadCells, stripCells } from './resolve';
 import { DARK, fitLook, renderFixture, level } from './render';
 import { EFFECT_MAP, applyFx, hash, paramsOf, runEffect, type EffectDef, type EffectParams, type Target } from './effects';
 
-// fog, haze and the effect machines: highest wins across lists, like a level (a haze list runs all
-// night whatever the moods say; two lists firing confetti fire it)
-const SMOKE = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const;
+// fog, haze and the effect machines (FOGGY): highest wins across lists, like a level (a haze list
+// runs all night whatever the moods say; two lists firing confetti fire it)
+const SMOKE = FOGGY;
 
 const PRIO = { low: 0, normal: 1, high: 2 } as const;
 const FX_FADE = 0.4;            // seconds an effect started or stopped by hand takes to fade
@@ -29,8 +29,6 @@ export const LIGHT = new Set(['intensity', 'red', 'green', 'blue', 'white', 'war
 const wide = new WeakMap<FixtureMode, Uint8Array>();   // a light too big for one universe, drawn whole
 const FX_ORDER = { move: 0, color: 1, pixel: 1, intensity: 2 } as const;   // intensity effects get the last word
 
-interface Ramp { from: number; to: number; start: number; dur: number }
-const rampAt = (r: Ramp, now: number) => (r.dur <= 0 || now >= r.start + r.dur ? r.to : now <= r.start ? r.from : r.from + (r.to - r.from) * (now - r.start) / r.dur);
 
 export interface Frame {
   frames: Map<number, Uint8Array>;

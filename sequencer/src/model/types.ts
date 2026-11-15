@@ -124,6 +124,15 @@ export type CellAttr = 'intensity' | 'white' | 'amber' | 'uv';
 export type CellMove = 'pan' | 'tilt' | 'hoist';
 export type CellValues = { [K in CellAttr | CellMove]?: number | PresetRef } & { color?: Color | PresetRef };
 export const CELL_ATTRS: CellAttr[] = ['intensity', 'white', 'amber', 'uv'];
+// Every number attribute a light's values can have: what fades (engine/resolve.ts) and what a file's
+// values are mended as (model/format.ts). One list: a new one added in one place reaches both.
+export const NUM_ATTRS = ['intensity', 'white', 'amber', 'uv', 'cct', 'pan', 'tilt', 'strobe', 'zoom', 'focus', 'iris',
+  'frost', 'prism', 'goboRotation', 'gobo', 'fog', 'haze', 'fan', 'speed', 'confetti', 'bubbles', 'flame', 'sparks', 'co2',
+  'gobo2', 'gobo2Rotation', 'prismRotation', 'animation', 'animationRotation', 'effectMacro', 'effectSpeed', 'colorMacro',
+  'goboShake', 'goboScroll', 'gobo2Shake', 'gobo2Scroll', 'panRotation', 'tiltRotation', 'roll', 'rollRotation', 'hoist'] as const satisfies readonly NumAttr[];
+// Fog, haze and the effect machines: highest wins across lists like a level, and they run only in
+// the cue that sets them, never carried on to the next
+export const FOGGY = ['fog', 'haze', 'confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const satisfies readonly NumAttr[];
 export const CELL_MOVES: CellMove[] = ['pan', 'tilt', 'hoist'];
 
 // Values with every preset looked up: what the engine works with.
