@@ -1,0 +1,502 @@
+// Mending what a show file holds (format.ts reads it, upgrades it, then hands it here): anything
+// missing filled in without touching what's there, what can't be used mended or left out, and
+// notes in plain words on what was. Also for a cue pasted from the clipboard (mendPastedCue).
+import { isPinHash, pinHash } from './pin';
+import { MAX_NUM } from './numbers';
+import { validEntry } from './schedule';
+import { cleanLayout, MAX_PIXELS } from './pixelLayout';
+import { cleanCurve } from './ledCurve';
+import { AROUND_MAX, cleanCrowd, cleanLevels, cleanSections, validItem, validTimeline } from './timeline';
+import { NUM_ATTRS, type Cue, type Show } from './types';
+import { KNOBS, cleanColors, isColor } from '../engine/fxkit';
+
+// Fill in anything missing (a hand-written or partial file), without touching what's there, and
+// mend what can't be used.
+export function mendShow(s: any, notes: string[], d: Show): Show {
+  const note = noteTo(notes);
+  for (const k of Object.keys(d) as (keyof Show)[]) if (s[k] === undefined) s[k] = d[k];
+  if (!isObj(s.meta)) s.meta = {};
+  for (const k of ['name', 'created', 'modified', 'app']) if (s.meta[k] !== undefined && typeof s.meta[k] !== 'string') delete s.meta[k];
+  s.meta = { ...d.meta, ...s.meta };
+  s.outputs = { devices: [], ...(isObj(s.outputs) ? s.outputs : {}) };
+  s.outputs.devices = objects(s.outputs.devices, 'Devices', note).filter((x) => typeof x.host === 'string');
+  if (!isObj(s.settings)) { note('The show settings couldn\'t be read: the defaults are used'); s.settings = {}; }
+  s.settings = { ...d.settings, ...s.settings };
+  if (!isObj(s.extensions)) s.extensions = {};
+  mendSettings(s.settings, note);
+  // a timetable written by hand: the entries that can run (one bad line mustn't stop the clock)
+  if (s.settings.schedule !== undefined) s.settings.schedule = Array.isArray(s.settings.schedule) ? s.settings.schedule.filter(validEntry) : [];
+  // (a list's master set by a timetable entry: a level, else full: a word there went in as NaN and
+  // the list went dark, as cue actions are mended too)
+  for (const e of s.settings.schedule ?? []) if (isObj(e.do) && e.do.do === 'master') fixNum(e.do, 'level', 0, 1, 'The timetable', note, 1);
+  // your own 3D venue: numbers that are numbers, or it goes
+  const vm = s.settings.stage3d?.model;
+  if (vm && !(typeof vm.name === 'string' && typeof vm.store === 'string' && ['scale', 'x', 'y', 'z', 'yaw'].every((k) => Number.isFinite((vm as unknown as Record<string, number>)[k])))) delete s.settings.stage3d!.model;
+  if (s.settings.scheduleOff !== undefined && typeof s.settings.scheduleOff !== 'boolean') delete s.settings.scheduleOff;
+  if (s.settings.schedulePause !== undefined && !Number.isFinite(s.settings.schedulePause)) delete s.settings.schedulePause;
+  // the stage's marks: each with a name and a place, or left out
+  if (s.settings.marks !== undefined) {
+    const ok = (m: any) => m && typeof m.id === 'string' && typeof m.name === 'string' && m.p && ['x', 'y', 'z'].every((k) => Number.isFinite(m.p[k]));
+    const list = Array.isArray(s.settings.marks) ? s.settings.marks : [];
+    const good = list.filter(ok).map((m: any) => ({ id: m.id, name: m.name, p: { x: m.p.x, y: m.p.y, z: m.p.z } }));
+    if (good.length < list.length || !Array.isArray(s.settings.marks)) note(`${(Array.isArray(s.settings.marks) ? list.length : 1) - good.length} of the stage's marks couldn't be read, left out`);
+    if (good.length) s.settings.marks = good; else delete s.settings.marks;
+  }
+  if (s.settings.recordChanges !== undefined && typeof s.settings.recordChanges !== 'boolean') delete s.settings.recordChanges;
+  // the console's faders on MIDI controls: what they move and which control, each readable
+  if (s.settings.consoleMidi !== undefined) {
+    const ok = (b: any) => b && typeof b.to === 'string' && /^(grand|(list|group|light):.+)$/s.test(b.to) && b.midi && (b.midi.kind === 'cc' || b.midi.kind === 'note')
+      && Number.isInteger(b.midi.ch) && b.midi.ch >= 1 && b.midi.ch <= 16 && Number.isInteger(b.midi.num) && b.midi.num >= 0 && b.midi.num <= 127;
+    const list = Array.isArray(s.settings.consoleMidi) ? s.settings.consoleMidi : [];
+    // (one control moves one fader: of two for the same control or the same fader, the later stays)
+    const good: { to: string; midi: { kind: string; ch: number; num: number } }[] = [];
+    for (const b of list.filter(ok)) {
+      const m = { kind: b.midi.kind, ch: b.midi.ch, num: b.midi.num };
+      for (let i = good.length - 1; i >= 0; i--) if (good[i].to === b.to || (good[i].midi.kind === m.kind && good[i].midi.ch === m.ch && good[i].midi.num === m.num)) good.splice(i, 1);
+      good.push({ to: b.to, midi: m });
+    }
+    const unread = list.length - list.filter(ok).length;
+    if (unread > 0 || !Array.isArray(s.settings.consoleMidi)) note(`${Math.max(1, unread)} of the console's MIDI controls couldn't be read, left out`);
+    if (good.length) s.settings.consoleMidi = good; else delete s.settings.consoleMidi;
+  }
+  if (s.settings.place !== undefined) { const p = s.settings.place; if (!p || !(Math.abs(p.lat) <= 90) || !(Math.abs(p.lon) <= 180)) delete s.settings.place; }
+  mendTimeline(s, note);
+
+  s.fixtureTypes = withIds(s.fixtureTypes, 'Fixture types', note, false);
+  for (const t of s.fixtureTypes) mendType(t, note);
+  s.fixtures = withIds(s.fixtures, 'Fixtures', note).filter((f) => mendFixture(f, note));
+  s.groups = withIds(s.groups, 'Groups', note);
+  // (numbers: whole, from 1; the app gives out missing and doubled ones when it opens the show)
+  for (const f of s.fixtures) if (f.num !== undefined && !(Number.isInteger(f.num) && f.num >= 1 && f.num <= MAX_NUM)) { note(`${f.name}: its number "${String(f.num)}" isn't one, it gets a new one`); delete f.num; }
+  const groupNums = new Set<number>();
+  for (const g of s.groups) {
+    g.fixtures = strings(g.fixtures);
+    // (its console number: whole, from 1, its own; else it counts by its place)
+    if (g.num !== undefined) {
+      if (!(Number.isInteger(g.num) && g.num >= 1 && g.num <= MAX_NUM) || groupNums.has(g.num)) { note(`Group ${String(g.name)}: its number "${String(g.num)}" ${groupNums.has(g.num) ? 'is another group\'s' : "isn't one"}, it counts by its place`); delete g.num; }
+      else groupNums.add(g.num);
+    }
+    // (a group of cells: whole numbers from 0; none that can be read: the whole lights)
+    if (g.cells !== undefined) {
+      const was = Array.isArray(g.cells) ? g.cells.length : 1;
+      const ok = Array.isArray(g.cells) ? g.cells.filter((x: unknown) => Number.isInteger(x) && (x as number) >= 0 && (x as number) < MAX_PIXELS) : [];
+      if (ok.length < was) note(`Group ${String(g.name)}: ${was - ok.length} of its cells couldn't be read${ok.length ? ', left out' : ': a group of whole lights now'}`);
+      if (ok.length) g.cells = ok; else delete g.cells;
+    }
+  }
+  s.presets = withIds(s.presets, 'Presets', note);
+  for (const p of s.presets) mendPreset(p, note);
+  s.cueLists = withIds(s.cueLists, 'Cue lists', note);
+  for (const l of s.cueLists) mendList(l, note);
+  s.effects = withIds(s.effects, 'Effects', note).filter((e) => mendEffect(e, note));
+  s.pages = withIds(s.pages, 'Live pages', note);
+  for (const pg of s.pages) mendPage(pg, note);
+  return s as Show;
+}
+
+// ---------------------------------------------------------------- mending what a file holds
+//
+// A show file can hold anything: written by hand or by a script, damaged on the way. Nothing in it
+// may stop the frames going out (a null in a list, a word where a number goes, a palette colour
+// that isn't one) or hang the page (a tempo of 0 or less, an endless number). What can't be used
+// is mended or left out here, and the notes say what, in plain words. Unknown fields stay.
+
+type Obj = Record<string, any>;
+type Note = (msg: string) => void;
+export const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
+const isRef = (v: unknown) => isObj(v) && typeof v.preset === 'string';
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+const shown = (v: unknown) => (typeof v === 'string' ? `"${v.slice(0, 24)}"` : typeof v === 'number' ? String(v) : String(JSON.stringify(v) ?? v).slice(0, 24));
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const MAX_NOTES = 40;
+const noteTo = (notes: string[]): Note => (m) => {
+  if (notes.length < MAX_NOTES) notes.push(m); else if (notes.length === MAX_NOTES) notes.push('...and more like these');
+};
+
+// A number from what the file has (a number written as text, "0", counts), brought into lo..hi;
+// NaN when it isn't one.
+function numIn(v: unknown, lo: number, hi: number): number {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : NaN;
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : NaN;
+}
+// Field k of o as a number in lo..hi: brought into the range, or (not a number at all) set to
+// `or`, or left out when there's no `or`. Missing: `or`, if there is one. Notes what it changed.
+function fixNum(o: Obj, k: string, lo: number, hi: number, where: string, note: Note, or?: number, whole = false) {
+  const v = o[k];
+  if (v === undefined) { if (or !== undefined) o[k] = or; return; }
+  let n = numIn(v, lo, hi);
+  if (whole) n = Math.round(n);
+  if (n === v) return;
+  if (Number.isFinite(n)) { o[k] = n; note(`${where}: ${k} ${shown(v)} is now ${n}`); }
+  else if (or !== undefined) { o[k] = or; note(`${where}: ${k} ${shown(v)} isn't a usable number, now ${or}`); }
+  else { delete o[k]; note(`${where}: ${k} ${shown(v)} isn't a usable number, left out`); }
+}
+// Only the objects of a list (a null, a number or a word where an entry goes is left out); not a
+// list at all: an empty one.
+function objects(v: unknown, what: string, note: Note): Obj[] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) { note(`${what}: not a list, left empty`); return []; }
+  const out = v.filter(isObj);
+  if (out.length < v.length) note(`${what}: ${plural(v.length - out.length, 'empty or broken entry', 'empty or broken entries')} left out`);
+  return out;
+}
+// ...and of those, the ones with an id of their own (what everything else refers to them by; a
+// second one with the same id would be a different thing under the same name). `named`: a name to
+// show (the id, when it has none).
+function withIds(v: unknown, what: string, note: Note, named = true): Obj[] {
+  const all = objects(v, what, note), seen = new Set<string>();
+  const out = all.filter((o) => typeof o.id === 'string' && o.id !== '' && !seen.has(o.id) && !!seen.add(o.id));
+  if (out.length < all.length) note(`${what}: ${plural(all.length - out.length, 'entry', 'entries')} without an id of its own left out`);
+  if (named) for (const o of out) if (typeof o.name !== 'string') o.name = o.id;
+  return out;
+}
+
+function mendSettings(st: Obj, note: Note) {
+  fixNum(st, 'bpm', 20, 300, 'The show\'s tempo', note, 120);
+  if (st.stage !== undefined) {
+    if (!isObj(st.stage)) delete st.stage;
+    else { if (st.stage.image !== undefined && typeof st.stage.image !== 'string') delete st.stage.image; fixNum(st.stage, 'opacity', 0, 1, 'The stage picture', note); }
+  }
+  if (st.stage3d !== undefined && !isObj(st.stage3d)) delete st.stage3d;
+  // the 3D stage's room: one it knows, or the big stage (a room from a newer version: that one)
+  if (isObj(st.stage3d) && st.stage3d.room !== undefined && !['hall', 'pub', 'club', 'party', 'truss', 'custom', 'cinema', 'bar', 'theatre', 'church', 'ballroom'].includes(st.stage3d.room as string)) delete st.stage3d.room;
+  // your own stage's size: numbers in metres, brought into range (geometry.ts stageSize); not an
+  // object: none (8 x 5 m)
+  if (isObj(st.stage3d) && st.stage3d.size !== undefined) {
+    const z = st.stage3d.size;
+    if (!isObj(z)) delete st.stage3d.size;
+    else {
+      const num = (k: string, lo: number, hi: number, d: number) => { const v = z[k]; z[k] = typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
+      num('w', 2, 40, 8); num('d', 1.5, 25, 5); num('trussY', 2.5, 15, 5); num('trusses', 0, 4, 2); z.trusses = Math.round(z.trusses as number);
+      if (typeof z.riser !== 'boolean') z.riser = true;
+    }
+  }
+  if (isObj(st.stage3d) && st.stage3d.act !== undefined && !['band', 'none'].includes(st.stage3d.act as string)) delete st.stage3d.act;
+  // the band's name: words, at most 60 characters, or none (their picture)
+  if (st.bandName !== undefined) { if (typeof st.bandName === 'string' && st.bandName.trim()) st.bandName = st.bandName.trim().slice(0, 60); else delete st.bandName; }
+  for (const k of ['lockPin', 'lockPage']) if (st[k] !== undefined && typeof st[k] !== 'string') delete st[k];
+  // the PIN kept as its hash (model/pin.ts): a show from before that kept the digits gets it now
+  if (typeof st.lockPin === 'string') { if (!st.lockPin.trim()) delete st.lockPin; else if (!isPinHash(st.lockPin)) st.lockPin = pinHash(st.lockPin); }
+}
+
+// the timeline: well-formed or gone; items that aren't, dropped. Its tempo and length bounded (the
+// ruler draws a line per beat or bar: a tempo of 0 or less never ends)
+// (the same for every song of a set list: the timeline is the song that's up, the others sit in
+// setlist.before and setlist.after)
+function mendTimeline(s: Obj, note: Note) {
+  // (the lists a song's levels can be for: the file's, read before the lists are mended)
+  const lists = new Set((Array.isArray(s.cueLists) ? s.cueLists : []).map((l: unknown) => (isObj(l) ? l.id : undefined)).filter((id): id is string => typeof id === 'string'));
+  if (s.timeline !== undefined && !mendSong(s.timeline, 'The timeline', note, lists)) { delete s.timeline; note('The timeline couldn\'t be read and was left out'); }
+  mendSetlist(s, note, lists);
+}
+// one song; false: it can't be used at all
+function mendSong(tl: unknown, where: string, note: Note, lists: ReadonlySet<string>): boolean {
+  if (isObj(tl)) fixNum(tl, 'duration', 0, 86400, where, note);
+  if (!validTimeline(tl)) return false;
+  // the time before and after the song (things before the show's start can't be played: left out)
+  fixNum(tl as Obj, 'lead', 0, AROUND_MAX, where, note);
+  fixNum(tl as Obj, 'tail', 0, AROUND_MAX, where, note);
+  const seen = new Set<string>(), n = tl.items.length, from = -(tl.lead ?? 0);
+  tl.items = tl.items.filter((i) => validItem(i) && i.at >= from && !seen.has(i.id) && !!seen.add(i.id));
+  for (const i of tl.items) if (i.do.do === 'master') fixNum(i.do as unknown as Obj, 'level', 0, 1, where, note, 1);
+  if (tl.items.length < n) note(`${where}: ${plural(n - tl.items.length, 'thing', 'things')} on it that couldn't be read left out`);
+  if (tl.crowd !== undefined) {
+    const k = Array.isArray(tl.crowd) ? tl.crowd.length : 0, c = cleanCrowd(tl.crowd, from);
+    if ((c?.length ?? 0) < k) note(`${where}: ${plural(k - (c?.length ?? 0), 'crowd moment', 'crowd moments')} that couldn't be read left out`);
+    if (c) tl.crowd = c; else delete tl.crowd;
+  }
+  if (tl.levels !== undefined) { const l = cleanLevels(tl.levels, lists); if (l) tl.levels = l; else delete tl.levels; }
+  fixNum(tl as Obj, 'bpm', 20, 300, where, note);
+  fixNum(tl as Obj, 'offset', -60, 86400, where, note);
+  if (tl.name !== undefined) { if (typeof tl.name !== 'string') delete tl.name; else if (tl.name.length > 80) tl.name = tl.name.slice(0, 80); }
+  if (tl.sections !== undefined) { const c = cleanSections(tl.sections); if (c?.length) tl.sections = c; else delete tl.sections; }
+  if (tl.demo !== undefined && typeof tl.demo !== 'boolean' && typeof tl.demo !== 'string') delete tl.demo;
+  const a = tl.audio as Obj | undefined;
+  if (a !== undefined) {
+    if (!isObj(a)) { delete tl.audio; return true; }
+    if (typeof a.name !== 'string') a.name = '';
+    fixNum(a, 'duration', 0, 86400, 'The song', note, tl.duration);
+    for (const k of ['store', 'catalog', 'credit']) if (a[k] !== undefined && typeof a[k] !== 'string') delete a[k];
+  }
+  return true;
+}
+// The rest of the set: the songs that can be used, in order; without a timeline, one of them is up.
+// The look between songs names a cue; the count-in is 0 to 2 bars.
+function mendSetlist(s: Obj, note: Note, lists: ReadonlySet<string>) {
+  const sl = s.setlist;
+  if (sl === undefined) return;
+  if (!isObj(sl)) { delete s.setlist; note('The set list couldn\'t be read and was left out'); return; }
+  const songs = (k: 'before' | 'after', first: number) => {
+    if (sl[k] !== undefined && !Array.isArray(sl[k])) note(`The set list: its songs ${k} the one that's up couldn't be read`);
+    const all: unknown[] = Array.isArray(sl[k]) ? sl[k] : [];
+    // (said by its name, or its place in the set as the file has it)
+    const ok = all.filter((t, i) => mendSong(t, isObj(t) && typeof t.name === 'string' && t.name.trim() ? `The song "${t.name.trim().slice(0, 40)}"` : `The set list, song ${first + i}`, note, lists));
+    if (ok.length < all.length) note(`The set list: ${plural(all.length - ok.length, 'song', 'songs')} that couldn't be read left out`);
+    return ok;
+  };
+  sl.before = songs('before', 1);
+  sl.after = songs('after', sl.before.length + 2);
+  if (s.timeline === undefined) { const t = sl.after.shift() ?? sl.before.pop(); if (t) s.timeline = t; }
+  if (sl.between !== undefined && !(isObj(sl.between) && typeof sl.between.list === 'string' && typeof sl.between.cue === 'string')) delete sl.between;
+  fixNum(sl, 'countIn', 0, 2, 'The set list', note, undefined, true);
+}
+
+function mendType(t: Obj, note: Note) {
+  const where = `Fixture type "${t.model ?? t.id}"`;
+  for (const k of ['manufacturer', 'model']) if (typeof t[k] !== 'string') t[k] = k === 'model' ? t.id : '';
+  t.modes = objects(t.modes, `${where}, modes`, note);
+  t.modes.forEach((m: Obj, i: number) => {
+    if (typeof m.name !== 'string') m.name = `Mode ${i + 1}`;
+    m.channels = objects(m.channels, `${where}, mode "${m.name}"`, note);
+    for (const c of m.channels) {
+      if (typeof c.attr !== 'string') c.attr = 'raw';
+      if (typeof c.name !== 'string') c.name = '';
+      if (c.fine !== undefined && typeof c.fine !== 'boolean') delete c.fine;
+      fixNum(c, 'default', 0, 255, where, note, undefined, true);
+      // which pixel: one of this mode's channels at most (a huge one would make endless pixels)
+      fixNum(c, 'cell', 0, Math.max(0, m.channels.length - 1), where, note, undefined, true);
+      if (c.span !== undefined && !(Array.isArray(c.span) && c.span.length === 2 && c.span.every((x: unknown) => typeof x === 'number' && x >= 0 && x <= 255))) {
+        delete c.span; note(`${where}: a channel's span couldn't be read, it uses the whole channel`);
+      }
+      if (c.ranges !== undefined) {
+        const rs = objects(c.ranges, `${where}, channel "${c.name}"`, note);
+        for (const r of rs) {
+          fixNum(r, 'from', 0, 255, where, note); fixNum(r, 'to', 0, 255, where, note);
+          if (typeof r.label !== 'string') r.label = '';
+          if (r.color !== undefined && typeof r.color !== 'string') delete r.color;
+        }
+        c.ranges = rs.filter((r) => r.from !== undefined && r.to !== undefined);
+      }
+    }
+    // (after its channels: a cell written "3", or one brought into range, counts as it ends up)
+    if (m.layout !== undefined) {
+      // (its shape has to fit its pixels; without one it's still a strip)
+      const cells = m.channels.reduce((n: number, c: Obj) => Math.max(n, typeof c.cell === 'number' ? c.cell + 1 : 0), 0);
+      const shape = cleanLayout(m.layout, cells);
+      if (shape) m.layout = shape;
+      else { delete m.layout; note(`${where}: its ring or matrix layout doesn't fit its ${cells} pixels, it runs as a strip`); }
+    }
+  });
+  if (t.physical !== undefined) {
+    if (!isObj(t.physical)) delete t.physical;
+    else {
+      for (const k of ['panDeg', 'tiltDeg', 'rollDeg']) fixNum(t.physical, k, 1, 1080, where, note);
+      fixNum(t.physical, 'travel', 0.1, 100, where, note); fixNum(t.physical, 'hoistSpeed', 0.01, 10, where, note);
+      if (t.physical.beamDeg !== undefined) { const b = beamDegOf(t.physical.beamDeg); if (b) t.physical.beamDeg = b; else { note(`${where}: beam angle ${shown(t.physical.beamDeg)} can't be right, left out`); delete t.physical.beamDeg; } }
+      if (t.physical.dims !== undefined) { const d = dimsOf(t.physical.dims); if (d) t.physical.dims = d; else { note(`${where}: size ${shown(t.physical.dims)} can't be right, left out`); delete t.physical.dims; } }
+    }
+  }
+}
+
+// A fixture is left out when it can't say where it is: a universe (0..32767) and an address
+// (1..512) that are whole numbers. "0" (text) is 0; as text it would get a universe of its own.
+function mendFixture(f: Obj, note: Note): boolean {
+  const where = `Fixture "${f.name}"`;
+  if (typeof f.typeId !== 'string') { note(`${where}: no fixture type, left out`); return false; }
+  if (f.universe === undefined) { f.universe = 0; note(`${where}: no universe, now 0`); }
+  for (const [k, lo, hi] of [['universe', 0, 32767], ['address', 1, 512]] as const) {
+    const v = f[k], n = Math.round(numIn(v, -Infinity, Infinity));
+    if (!(n >= lo && n <= hi)) { note(`${where}: ${k} ${shown(v)} can't be right, the fixture is left out`); return false; }
+    if (n !== v) { f[k] = n; note(`${where}: ${k} ${shown(v)} is now ${n}`); }
+  }
+  if (typeof f.mode !== 'string') f.mode = 'default';
+  fixNum(f, 'x', 0, 1, where, note, 0.5); fixNum(f, 'y', 0, 1, where, note, 0.5);
+  for (const k of ['invertPan', 'invertTilt', 'swapPanTilt', 'panReversed', 'tiltReversed']) if (f[k] !== undefined && typeof f[k] !== 'boolean') delete f[k];
+  // its own pan / tilt range (degrees): a number a head can have, or gone (the type's, or 540 / 270)
+  for (const k of ['panDeg', 'tiltDeg']) if (f[k] !== undefined && !(typeof f[k] === 'number' && f[k] >= 1 && f[k] <= 1080)) { note(`${where}: ${k} ${shown(f[k])} can't be right, left out`); delete f[k]; }
+  if (f.beamDeg !== undefined) { const b = beamDegOf(f.beamDeg); if (b) f.beamDeg = b; else { note(`${where}: beam angle ${shown(f.beamDeg)} can't be right, left out`); delete f.beamDeg; } }
+  if (f.dims !== undefined) { const d = dimsOf(f.dims); if (d) f.dims = d; else { note(`${where}: size ${shown(f.dims)} can't be right, left out`); delete f.dims; } }
+  // (a winch's soft limits: two parts of its travel, the top one first; anything else isn't kept, and
+  // the winch has its whole travel)
+  if (f.hoistLimits !== undefined) {
+    const h = f.hoistLimits;
+    if (Array.isArray(h) && h.length === 2 && h.every((x: unknown) => typeof x === 'number' && x >= 0 && x <= 1)) f.hoistLimits = [Math.min(h[0], h[1]), Math.max(h[0], h[1])];
+    else { note(`${where}: winch limits ${shown(h)} can't be right, left out`); delete f.hoistLimits; }
+  }
+  // the 3D place and turn: well-formed or gone (a hand-edited file mustn't break the 3D stage)
+  const ok = (o: unknown, k: string[]) => !!o && typeof o === 'object' && k.every((x) => Number.isFinite((o as Record<string, number>)[x]));
+  if (f.p3 !== undefined && !ok(f.p3, ['x', 'y', 'z'])) delete f.p3;
+  if (f.rot !== undefined && !ok(f.rot, ['yaw', 'pitch', 'roll'])) delete f.rot;
+  for (const k of ['panOffset', 'tiltOffset'] as const) if (f[k] !== undefined && !Number.isFinite(f[k])) delete f[k];
+  // its own ring or matrix layout: well-formed or gone (whether it fits the type's pixels is
+  // checked where it's used: one that doesn't is ignored, the type's counts)
+  if (f.layout !== undefined) { const l = cleanLayout(f.layout); if (l) f.layout = l; else { delete f.layout; note(`${where}: its own LED layout can't be used, it has its type's`); } }
+  // how its LEDs light, set by hand: in range or gone (the box's or the usual then)
+  if (f.led !== undefined) { const c = cleanCurve(f.led); if (c) f.led = c; else delete f.led; }
+  // the real light it is (RDM): a well-formed UID or none
+  if (f.uid !== undefined) { if (typeof f.uid === 'string' && /^[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}$/.test(f.uid)) f.uid = f.uid.toUpperCase(); else delete f.uid; }
+  return true;
+}
+
+// a light's size: w, h, d in metres, each from 2 cm to 100 m (one that isn't: left out); none: no size
+function dimsOf(x: unknown): { w?: number; h?: number; d?: number } | undefined {
+  if (!isObj(x)) return undefined;
+  const out: { w?: number; h?: number; d?: number } = {};
+  for (const k of ['w', 'h', 'd'] as const) { const v = (x as Record<string, unknown>)[k]; if (typeof v === 'number' && v >= 0.02 && v <= 100) out[k] = v; }
+  return Object.keys(out).length ? out : undefined;
+}
+// a beam's opening angle, narrowest and widest: two numbers from half a degree to 180, the narrow one first
+function beamDegOf(x: unknown): [number, number] | undefined {
+  if (!Array.isArray(x) || x.length !== 2 || !x.every((v) => typeof v === 'number' && v >= 0.5 && v <= 180)) return undefined;
+  return [Math.min(x[0], x[1]), Math.max(x[0], x[1])];
+}
+// Values (a cue's, a preset's): levels in 0..1, colours with r, g, b in 0..1, raw channels 0..255,
+// or a preset reference. What isn't is left out (the light keeps what it had). Counts the changes.
+const NUM_SET = new Set<string>(NUM_ATTRS);
+// (a wheel running round goes either way: -1..1)
+const SIGNED_ATTRS = new Set(['goboScroll', 'gobo2Scroll']);
+function mendValues(v: Obj, bad: { n: number }) {
+  // (a level a hair outside its range, from rounding, is put right without counting as a change)
+  const off = (was: unknown, now: number) => !(typeof was === 'number' && Math.abs(was - now) < 1e-6);
+  for (const [k, x] of Object.entries(v)) {
+    if (k === 'color') {
+      if (isRef(x) || isColor(x)) continue;
+      const [c] = cleanColors([x]);
+      if (c) v.color = c; else delete v.color;
+      if (!c || off(x.r, c.r) || off(x.g, c.g) || off(x.b, c.b)) bad.n++;
+    } else if (k === 'raw') {
+      if (!isObj(x)) { delete v.raw; bad.n++; continue; }
+      for (const [ch, d] of Object.entries(x)) {
+        const n = numIn(d, 0, 255);
+        if (n === d) continue;
+        if (Number.isFinite(n)) x[ch] = Math.round(n); else delete x[ch];
+        if (off(d, n)) bad.n++;
+      }
+    } else if (k === 'cells') {
+      // single cells by number (0, 1, 2 ...: "01" is no cell number), each mended like a light's
+      // values; what a cell doesn't use yet is kept (a newer app may)
+      if (!isObj(x)) { delete v.cells; bad.n++; continue; }
+      for (const [ci, c] of Object.entries(x)) {
+        if (!/^(0|[1-9]\d*)$/.test(ci) || +ci >= MAX_PIXELS || !isObj(c)) { delete x[ci]; bad.n++; continue; }
+        // (a cell has no cells or channels of its own)
+        if ('cells' in c) { delete c.cells; bad.n++; }
+        if ('raw' in c) { delete c.raw; bad.n++; }
+        mendValues(c, bad);
+        if (!Object.keys(c).length) delete x[ci];
+      }
+      if (!Object.keys(x).length) delete v.cells;
+    } else if (NUM_SET.has(k) && !isRef(x)) {
+      const n = numIn(x, SIGNED_ATTRS.has(k) ? -1 : 0, 1);
+      if (n === x) continue;
+      if (Number.isFinite(n)) v[k] = n; else delete v[k];
+      if (off(x, n)) bad.n++;
+    }
+  }
+}
+// the values of each fixture (by id) in a cue or a preset's perFixture
+function mendByFixture(o: unknown, bad: { n: number }): Obj {
+  if (!isObj(o)) { bad.n++; return {}; }
+  for (const [fid, v] of Object.entries(o)) { if (isObj(v)) mendValues(v, bad); else { delete o[fid]; bad.n++; } }
+  return o;
+}
+
+function mendPreset(p: Obj, note: Note) {
+  const bad = { n: 0 };
+  if (typeof p.kind !== 'string') p.kind = 'color';
+  if (!isObj(p.values)) { p.values = {}; bad.n++; } else mendValues(p.values, bad);
+  if (p.perFixture !== undefined) p.perFixture = mendByFixture(p.perFixture, bad);
+  if (bad.n) note(`Preset "${p.name}": ${plural(bad.n, 'value', 'values')} that couldn't be used left out or brought into range`);
+}
+
+const PRIOS = ['low', 'normal', 'high'], RESTARTS = ['first', 'resume'];
+function mendList(l: Obj, note: Note) {
+  const where = `Cue list "${l.name}"`, bad = { n: 0 };
+  if (typeof l.end !== 'string') l.end = 'stop';
+  if (l.priority !== undefined && !PRIOS.includes(l.priority)) delete l.priority;
+  if (l.restart !== undefined && !RESTARTS.includes(l.restart)) delete l.restart;
+  fixNum(l, 'releaseTime', 0, 3600, where, note);
+  fixNum(l, 'bpm', 20, 300, where, note);
+  if (l.play !== undefined && typeof l.play !== 'boolean') delete l.play;
+  if (l.color !== undefined && typeof l.color !== 'string') delete l.color;
+  l.cues = withIds(l.cues, `${where}, cues`, note);
+  for (const c of l.cues) mendCue(c, `${where}, cue "${c.name}"`, note, bad);
+  if (bad.n) note(`${where}: ${plural(bad.n, 'value', 'values')} that couldn't be used left out or brought into range`);
+}
+// One cue, as a show file has it or as it's pasted (any tab or app can write the clipboard)
+function mendCue(c: Obj, cw: string, note: Note, bad: { n: number }) {
+  c.values = mendByFixture(c.values ?? {}, bad);
+  fixNum(c, 'fade', 0, 3600, cw, note, 0);
+  fixNum(c, 'fadeOut', 0, 3600, cw, note); fixNum(c, 'delay', 0, 3600, cw, note);
+  // (fades of its own for colour, position, beam: each a number of seconds, or not there)
+  if (c.times !== undefined) {
+    if (!isObj(c.times)) { delete c.times; note(`${cw}: its colour / position / beam times couldn't be read, it uses its fade`); }
+    else { for (const k of ['color', 'position', 'beam']) fixNum(c.times, k, 0, 3600, cw, note); if (!Object.keys(c.times).length) delete c.times; }
+  }
+  c.advance = mendAdvance(c.advance, cw, note);
+  if (c.effects !== undefined) { if (Array.isArray(c.effects)) c.effects = strings(c.effects); else delete c.effects; }
+  if (c.actions !== undefined) {
+    c.actions = objects(c.actions, `${cw}, actions`, note).filter((a) => typeof a.do === 'string');
+    for (const a of c.actions) if (a.do === 'master') fixNum(a, 'level', 0, 1, cw, note, 1);
+  }
+  if (c.num !== undefined && !Number.isFinite(c.num)) delete c.num;
+  if (c.note !== undefined && typeof c.note !== 'string') delete c.note;
+}
+// A cue from the clipboard, mended like one from a file (a cue without its `advance` threw on every
+// frame while it was on stage): undefined when it's no cue at all
+export function mendPastedCue(x: unknown): Cue | undefined {
+  if (!isObj(x)) return undefined;
+  const c = JSON.parse(JSON.stringify(x)) as Obj;
+  if (typeof c.name !== 'string') c.name = 'Cue';
+  mendCue(c, `The pasted cue "${c.name}"`, () => {}, { n: 0 });
+  return c as unknown as Cue;
+}
+// what comes after a cue: a wait, a follow or a count of beats needs its time (else: on GO)
+function mendAdvance(a: unknown, where: string, note: Note): Obj {
+  if (!isObj(a) || typeof a.mode !== 'string') { if (a !== undefined) note(`${where}: what comes next couldn't be read, it waits for GO`); return { mode: 'manual' }; }
+  const k = a.mode === 'wait' || a.mode === 'follow' ? 'time' : a.mode === 'beats' ? 'beats' : undefined;
+  if (!k) return a;
+  const n = numIn(a[k], 0, k === 'time' ? 86400 : 10000);
+  if (Number.isFinite(n)) { if (n !== a[k]) { note(`${where}: ${k} ${shown(a[k])} is now ${n}`); a[k] = n; } return a; }
+  note(`${where}: ${k} ${shown(a[k])} isn't a usable number, it waits for GO`);
+  return { mode: 'manual' };
+}
+
+// An effect: its knobs in range (FORMAT.md), its palette only colours. A knob that isn't a number
+// is left out, so the effect's own default plays.
+function mendEffect(e: Obj, note: Note): boolean {
+  const where = `Effect "${e.name}"`;
+  if (typeof e.kind !== 'string') { note(`${where}: no kind of effect, left out`); return false; }
+  if (e.group !== undefined && typeof e.group !== 'string') delete e.group;
+  if (e.fixtures !== undefined) { if (Array.isArray(e.fixtures)) e.fixtures = strings(e.fixtures); else { delete e.fixtures; note(`${where}: its lights couldn't be read`); } }
+  // (cells: whole numbers from 0; what isn't one is left out, none left: the whole lights)
+  if (e.cells !== undefined) {
+    const ok = Array.isArray(e.cells) ? e.cells.filter((x: unknown) => Number.isInteger(x) && (x as number) >= 0 && (x as number) < MAX_PIXELS) : [];
+    if (!Array.isArray(e.cells) || ok.length !== e.cells.length) note(`${where}: cells that couldn't be read left out`);
+    if (ok.length) e.cells = ok; else delete e.cells;
+  }
+  if (!isObj(e.params)) { if (e.params !== undefined) note(`${where}: its settings couldn't be read, it plays its defaults`); e.params = {}; }
+  const p = e.params;
+  for (const [k, r] of Object.entries(KNOBS)) fixNum(p, k, r.lo, r.hi, where, note, undefined, k === 'blocks');
+  if (p.colors !== undefined) {
+    const cs = cleanColors(p.colors);
+    if (!cs.length) { delete p.colors; note(`${where}: its colours couldn't be read, it plays its own`); }
+    else if (cs.length !== p.colors.length || cs.some((c, i) => c !== p.colors[i])) { p.colors = cs; note(`${where}: colours that couldn't be read left out`); }
+  }
+  return true;
+}
+
+function mendPage(pg: Obj, note: Note) {
+  const where = `Live page "${pg.name}"`;
+  if (pg.locked !== undefined && typeof pg.locked !== 'boolean') delete pg.locked;
+  pg.widgets = withIds(pg.widgets, `${where}, buttons`, note, false).filter((w) => typeof w.type === 'string');
+  // a song button does one of three things; one that says something else is left out
+  const songs = pg.widgets.length;
+  pg.widgets = pg.widgets.filter((w: Obj) => w.type !== 'song' || ['play', 'next', 'part'].includes(w.do));
+  if (pg.widgets.length < songs) note(`${where}: ${plural(songs - pg.widgets.length, 'song button', 'song buttons')} that couldn't be read left out`);
+  for (const w of pg.widgets) {
+    const ww = `${where}, button "${w.label ?? w.id}"`;
+    for (const k of ['label', 'color', 'key']) if (w[k] !== undefined && typeof w[k] !== 'string') delete w[k];
+    if (w.size !== undefined && w.size !== 1 && w.size !== 2) delete w.size;
+    const m = w.midi;
+    if (m !== undefined && !(isObj(m) && (m.kind === 'note' || m.kind === 'cc') && Number.isInteger(m.ch) && m.ch >= 1 && m.ch <= 16 && Number.isInteger(m.num) && m.num >= 0 && m.num <= 127)) delete w.midi;
+    if (w.type === 'fog') {
+      // a fog button always stops by itself: without a usable maximum it gets one
+      if (!(numIn(w.max, 1, 60) >= 1)) { w.max = 10; note(`${ww}: no usable time limit, now 10 s`); }
+      w.fixtures = strings(w.fixtures);
+      fixNum(w, 'level', 0, 1, ww, note, 1); fixNum(w, 'burst', 0, 60, ww, note, 3); fixNum(w, 'max', 1, 60, ww, note, 10);
+    } else if (w.type === 'group') {
+      fixNum(w, 'level', 0, 1, ww, note, 1); fixNum(w, 'strobe', 0, 1, ww, note);
+      if (w.white !== undefined && typeof w.white !== 'boolean') delete w.white;
+    } else if (w.type === 'special') fixNum(w, 'seconds', 0.5, 60, ww, note);
+  }
+}
