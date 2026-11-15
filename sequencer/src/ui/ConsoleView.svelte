@@ -7,6 +7,7 @@
   // saturation, beam, effects), a fader with GO, Flash and Release for every cue list, and the
   // grand master. Everything goes through the programmer and the lists like anywhere else.
   import { app } from '../app.svelte';
+  import { setContext } from 'svelte';
   import { dialogOpen, isShortcut, spaceIsGo, ui } from './ui.svelte';
   import Knob from './Knob.svelte';
   import Help from './Help.svelte';
@@ -213,6 +214,8 @@
   }
   // leaving the console lets go of anything still held here (a flash held while the view changed)
   const onScreen = $derived(app.view === 'console');
+  // (its 3D stage gives the world up while another view is shown, as the other views' stages do)
+  setContext('view-shown', () => app.view === 'console');
   $effect(() => { if (!onScreen) app.releaseConsoleHolds(); });
 
   // flash buttons: held with a pointer (any: mouse, finger) or Space/Enter on the button

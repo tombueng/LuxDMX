@@ -111,6 +111,20 @@ test('hidden views are out of the way: one 3D stage, in the view shown; nothing 
   await expect(page.locator('.prog svg[aria-label="Stage"]')).toBeVisible();
 });
 
+test('the console gives its 3D stage up when another view is shown: still one 3D stage on the page', async ({ page }) => {
+  await bigDemo(page);
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await expect(page.locator('main')).toHaveAttribute('aria-label', 'Console');
+  await expect(page.locator('.pane:not([hidden]) .s3 canvas')).toBeVisible({ timeout: 15000 });
+  await to(page, 'Live');
+  await expect(page.locator('main')).toHaveAttribute('aria-label', 'Live');
+  // (a second world would be built 400 ms after the view changed)
+  await page.waitForTimeout(1500);
+  await expect(page.locator('.three canvas')).toHaveCount(1);
+  await expect(page.locator('.s3')).toHaveCount(1);
+  await expect(page.locator('.pane:not([hidden]) .s3 canvas')).toBeVisible();
+});
+
 test('keys act on the view shown only: Delete, Space, P and the arrows in Program leave the timeline and the live page alone', async ({ page }) => {
   await bigDemo(page);
   const tl = () => page.evaluate(() => { const t = (window as any).__luxdmx.show.timeline; return { items: t.items.length, parts: (t.sections ?? []).length, playing: (window as any).__luxdmx.timeline.playing, at: (window as any).__luxdmx.timeline.position }; });
