@@ -35,14 +35,31 @@ describe('the drawing gives way to the DMX output', () => {
     t = run(l, t, t + 30_000, 25);
     expect([l.level, l.uiEvery]).toEqual([1, 1]);   // the chosen Medium, not High
   });
-  it('with the DMX on its own thread: late page frames keep the 3D at the quality chosen; the panels (to every 3rd) and the plan give way, and come back', () => {
+  it('with the DMX on its own thread: late page frames keep the 3D at the quality chosen but draw it less often first; the panels (to every 3rd) and the plan give way, and all come back', () => {
     const l = new Load(); l.setQuality(2); l.outputSafe = true;
-    let t = run(l, 0, 6000, 60);
+    const plan = l.level2d;
+    let t = run(l, 0, 700, 60);
+    expect([l.uiEvery, l.slow3d]).toEqual([2, 0]);
+    t = run(l, t, t + 600, 60);
+    // (the 3D's frames before the plan: it's the most the page does)
+    expect([l.slow3d, l.level2d]).toEqual([1, plan]);
+    t = run(l, t, t + 6000, 60);
     expect(l.level).toBe(2);
+    expect(l.slow3d).toBe(2);
     expect(l.level2d).toBe(0);
     expect(l.uiEvery).toBe(3);
+    expect(l.lowered).toBe(true);
     t = run(l, t, t + 40_000, 25);
-    expect([l.level, l.level2d, l.uiEvery]).toEqual([2, 2, 1]);
+    expect([l.level, l.level2d, l.uiEvery, l.slow3d]).toEqual([2, 2, 1, 0]);
+    expect(l.lowered).toBe(false);
+  });
+  it('the 3D held back, then the thread itself late: the level steps down instead, not both', () => {
+    const l = new Load(); l.setQuality(2); l.outputSafe = true;
+    let t = run(l, 0, 3000, 60);
+    expect(l.slow3d).toBeGreaterThan(0);
+    l.threadLate = 6;
+    t = run(l, t, t + 600, 60);
+    expect(l.slow3d).toBe(0);
   });
   it('the thread itself late (the same computer, busy): the 3D gives way to it too, and comes back when it\'s on time', () => {
     const l = new Load(); l.setQuality(2); l.outputSafe = true; l.threadLate = 6;

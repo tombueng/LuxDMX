@@ -498,7 +498,7 @@
     controls.addEventListener('change', grabbed);
     // for the tests (dev only): what can't be read off the pixels (the shown stage's)
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook = {
-      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog, drawn: drawnFrames, crowdLight: crowdLevel }),
+      stats: () => ({ fixtures: fixtures.length, beams: rig.beamCount, particles: particles.count, fog: particles.fog, drawn: drawnFrames, crowdLight: crowdLevel, gap: frameGap() }),
       // a band member's right hand (the band stands still without music)
       band: () => (venue as { band?: { handAt: (s: 'L' | 'R') => THREE.Vector3 }[] }).band?.[1]?.handAt('R').toArray() ?? null,
       // the screens: the live camera's picture on them (and how many it has drawn, its last shot)
@@ -1033,6 +1033,9 @@
   // second; Low: no glow, 20 a second. Never fewer pixels than the screen has: a blurred stage was
   // the first thing anyone noticed, frames and glow are what can go. A take keeps every frame.
   const RATIO = [1, 1.5, 2], EVERY = [1000 / 21, 1000 / 31, 0];
+  // (held back while the page's own frames come late: load.slow3d)
+  const SLOW = [0, 1000 / 31, 1000 / 21];
+  const frameGap = () => Math.max(EVERY[load.level], SLOW[load.slow3d]);   // (ms at least between two frames)
   let drawnAt = 0, drawnFrames = 0;
   function quality() {
     if (taking) return;
@@ -1073,7 +1076,7 @@
     // (folded away to nothing, e.g. the timeline's picture on a phone: nothing to draw)
     if (!canvas || (!taking && !visible)) { last = now; return; }
     // (fewer frames a second at a lower quality, when the governor says the output needs the time)
-    if (!taking && now - drawnAt < EVERY[load.level]) return;
+    if (!taking && now - drawnAt < frameGap()) return;
     drawnAt = now; drawnFrames++;
     const work0 = performance.now();
     quality();

@@ -115,6 +115,28 @@ test('the drawing quality starts at High (glow on), and stays there while the DM
   expect(await page.evaluate(() => (window as any).__luxload.level)).toBe(2);
 });
 
+// The page's own frames late (it still fires the timeline's cues and Auto GO) while the DMX is fine on
+// its thread: the 3D keeps its quality but draws less often, at most 20 frames a second at the
+// second step (load.slow3d). (Review 5, R5-P1)
+test('held back for a late page, the 3D draws at most 20 frames a second, as sharp as before', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-mover8', 1, 0, 'Head');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.stats?.().drawn ?? 0), { timeout: 30000 }).toBeGreaterThan(2);
+  // (the least time between two 3D frames, set and read in one go: the governor itself is in the
+  // unit tests, and headless draws the 3D in software at a frame or two a second, so the rate itself
+  // can't be told apart here)
+  const gap = (level: number, slow: number) => page.evaluate(([level, slow]) => {
+    const L = (window as any).__luxload; L.level = level; L.slow3d = slow;
+    return Math.round((window as any).__stage3d.stats().gap);
+  }, [level, slow] as const);
+  expect(await gap(2, 0)).toBe(0);
+  expect(await gap(2, 1)).toBe(32);
+  expect(await gap(2, 2)).toBe(48);
+  // (a lower level's own gap counts when it's the longer one)
+  expect(await gap(0, 1)).toBe(48);
+});
+
 test('a pixel bar lit by an effect reads its real level; a Release says the effect goes on, and stops it', async ({ page }) => {
   await openConnected(page);
   await patch(page, 'gen-bar12', 1, 0, 'Bar');
