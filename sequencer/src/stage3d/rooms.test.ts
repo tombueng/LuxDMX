@@ -180,3 +180,29 @@ describe('the theatre from above', () => {
     }
   });
 });
+
+// What a room turns itself (the club's and the bar's mirror ball, the ballroom's dancers) moves on
+// screen: its matrix, not just its rotation. (Everything was frozen after baking but the DJ: they
+// turned on paper and stood still, and the ball's dots didn't sweep. Review 5, R5-B3.)
+describe('the rooms\' own moving parts', () => {
+  const white = new THREE.Color(1, 1, 1);
+  for (const id of ['club', 'bar'] as const) it(`${id}: its mirror ball goes round`, () => {
+    const v = room(id), ball = v.mirrorBalls![0].obj;
+    const at = (t: number) => { v.animate(t, t * 2, 0.5, white, true); v.group.updateMatrixWorld(true); return ball.matrixWorld.elements.slice(0, 11); };
+    const a = at(1), b = at(4);
+    expect(a.some((x, i) => Math.abs(x - b[i]) > 1e-4)).toBe(true);
+  });
+  it('ballroom: its dancers move', () => {
+    const v = room('ballroom');
+    const snap = () => { v.group.updateMatrixWorld(true); const out: number[] = []; v.group.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.name !== 'baked') out.push(...o.matrixWorld.elements.slice(0, 15)); }); return out; };
+    v.animate(1, 2, 0.5, white, true); const m1 = snap();
+    v.animate(3, 6, 0.5, white, true); const m2 = snap();
+    expect(m1.filter((x, i) => Math.abs(x - m2[i]) > 1e-6).length).toBeGreaterThan(10);
+  });
+  it('the rest stays frozen: in the bar only the ball and what it hangs from work their matrices out every frame', () => {
+    let live = 0, all = 0;
+    room('bar').group.traverse((o) => { all++; if (o.matrixAutoUpdate) live++; });
+    expect(all).toBeGreaterThan(200);
+    expect(live).toBeLessThan(6);
+  });
+});

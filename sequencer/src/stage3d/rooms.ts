@@ -277,7 +277,15 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
   const keep = new Set<THREE.Object3D>(dj ? [dj.p.group] : []);
   const inKept = (x: THREE.Object3D) => { for (let p: THREE.Object3D | null = x; p; p = p.parent) if (keep.has(p)) return true; return false; };
   const baked = bake(group, (x) => live.has(x) || inKept(x) || (!!crowd && x === crowd.group));
-  const freeze = (x: THREE.Object3D) => { if (dj && x === dj.p.group) return; x.updateMatrix(); x.matrixAutoUpdate = false; x.children.forEach(freeze); };
+  // (what moves keeps its matrix live, and so does everything it hangs from: the mirror ball and the
+  // dancers turn a group above their meshes. Frozen, they turned on paper and stood still on screen.)
+  const moving = new Set<THREE.Object3D>();
+  for (const m of live) for (let x: THREE.Object3D | null = m; x && x !== group; x = x.parent) moving.add(x);
+  const freeze = (x: THREE.Object3D) => {
+    if (dj && x === dj.p.group) return;
+    if (!moving.has(x)) { x.updateMatrix(); x.matrixAutoUpdate = false; }
+    x.children.forEach(freeze);
+  };
   group.children.forEach(freeze);
   if (crowd) crowd.group.visible = false;
 
