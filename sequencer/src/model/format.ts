@@ -327,13 +327,6 @@ function mendType(t: Obj, note: Note) {
   t.modes.forEach((m: Obj, i: number) => {
     if (typeof m.name !== 'string') m.name = `Mode ${i + 1}`;
     m.channels = objects(m.channels, `${where}, mode "${m.name}"`, note);
-    if (m.layout !== undefined) {
-      // (its shape has to fit its pixels; without one it's still a strip)
-      const cells = m.channels.reduce((n: number, c: Obj) => Math.max(n, typeof c.cell === 'number' ? c.cell + 1 : 0), 0);
-      const shape = cleanLayout(m.layout, cells);
-      if (shape) m.layout = shape;
-      else { delete m.layout; note(`${where}: its ring or matrix layout doesn't fit its ${cells} pixels, it runs as a strip`); }
-    }
     for (const c of m.channels) {
       if (typeof c.attr !== 'string') c.attr = 'raw';
       if (typeof c.name !== 'string') c.name = '';
@@ -353,6 +346,14 @@ function mendType(t: Obj, note: Note) {
         }
         c.ranges = rs.filter((r) => r.from !== undefined && r.to !== undefined);
       }
+    }
+    // (after its channels: a cell written "3", or one brought into range, counts as it ends up)
+    if (m.layout !== undefined) {
+      // (its shape has to fit its pixels; without one it's still a strip)
+      const cells = m.channels.reduce((n: number, c: Obj) => Math.max(n, typeof c.cell === 'number' ? c.cell + 1 : 0), 0);
+      const shape = cleanLayout(m.layout, cells);
+      if (shape) m.layout = shape;
+      else { delete m.layout; note(`${where}: its ring or matrix layout doesn't fit its ${cells} pixels, it runs as a strip`); }
     }
   });
   if (t.physical !== undefined) {

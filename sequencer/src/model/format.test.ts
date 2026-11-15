@@ -270,6 +270,14 @@ describe('a ring or matrix in a file', () => {
     expect(load({ kind: 'blob' }).fixtureTypes[0].modes[0].layout).toBeUndefined();
     expect(load('square').fixtureTypes[0].modes[0].channels).toHaveLength(12);
   });
+  it('cells written as words ("3"): the shape counts them as they end up, and stays', () => {
+    const s: any = emptyShow('t'), t = type({ kind: 'matrix', cols: 2, rows: 2 });
+    for (const c of t.modes[0].channels) (c as any).cell = String(c.cell);
+    s.fixtureTypes.push(t);
+    const m = parseShow(JSON.stringify(s)).fixtureTypes[0].modes[0];
+    expect(m.channels[11].cell).toBe(3);
+    expect(m.layout).toEqual({ kind: 'matrix', cols: 2, rows: 2 });
+  });
   it("a light's own wiring: kept and saved again when it's well-formed, dropped with a note when it isn't", () => {
     const s: any = emptyShow('t');
     s.fixtureTypes.push(type({ kind: 'matrix', cols: 2, rows: 2 }));
