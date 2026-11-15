@@ -337,12 +337,12 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 
 - **PCB:** [`production/luxdmx-carrier-gerbers.zip`](production/), 2 layers, 1 oz, 1.6 mm, any fab
   (e.g. <https://cart.jlcpcb.com/quote>).
-- **Small parts:** [`production/BOM-LCSC-upload.csv`](production/) goes straight into
+- **Small parts:** [`production/luxdmx-carrier-bom.csv`](production/) goes straight into
   <https://www.lcsc.com/bom> (map `LCSC Part #` and `Quantity`). Also as `BOM.csv` / `BOM.xlsx`,
   and `BOM-TME.md` for TME.
 - **JLCPCB assembly (optional, untested):** usually not needed. Without pixels you can leave
   the whole pixel section out, and the rest is a handful of 1206 parts and headers. If you want
-  JLCPCB to fit the LCSC parts anyway, upload `BOM-LCSC-upload.csv` as the BOM and
+  JLCPCB to fit the LCSC parts anyway, upload `luxdmx-carrier-bom.csv` as the BOM and
   [`production/luxdmx-carrier-cpl.csv`](production/) as the CPL, next to the gerber zip. Both use
   plain designators (`R12`, `C3`) because JLCPCB refuses the board's own labels;
   [`production/JLC-designators.csv`](production/) maps them back (`R9` = `120R term`). Things to

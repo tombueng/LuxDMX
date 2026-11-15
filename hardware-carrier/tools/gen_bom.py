@@ -84,7 +84,7 @@ def _jlc_fp(fpid):
 
 
 def write_jlc(board, placed, parts, boards):
-    """BOM-LCSC-upload.csv and luxdmx-carrier-cpl.csv in JLCPCB's format.
+    """luxdmx-carrier-bom.csv and luxdmx-carrier-cpl.csv in JLCPCB's format.
 
     Only what comes from LCSC goes in: the modules and headers are bought elsewhere and
     soldered by hand, so JLCPCB has nothing to place there. Coordinates are in the frame the
@@ -136,7 +136,7 @@ def write_jlc(board, placed, parts, boards):
                     "Manufacturer Part Number": mpn, "Description": its[0]["p"]["desc"]})
     bom.sort(key=lambda r: natural(r["Designator"].split(",")[0]))
     # plain UTF-8, no BOM, LF: the safest thing for JLCPCB's parser and still opens in Excel
-    with open(os.path.join(OUT, "BOM-LCSC-upload.csv"), "w", newline="",
+    with open(os.path.join(OUT, "luxdmx-carrier-bom.csv"), "w", newline="",
               encoding="utf-8") as fh:
         w = csv.DictWriter(fh, lineterminator="\n", fieldnames=[
             "Comment", "Designator", "Footprint", "LCSC Part #", "Quantity",
@@ -388,7 +388,7 @@ def main():
         xl = "(openpyxl fehlt)"
 
     print(f"{len(rows_l)} LCSC-Positionen ({total_l:.2f} EUR), {len(rows_m)} Module")
-    print(f"-> production/BOM.md, BOM.csv, {xl}, BOM-LCSC-upload.csv "
+    print(f"-> production/BOM.md, BOM.csv, {xl}, luxdmx-carrier-bom.csv "
           f"({n_up} Zeilen fuer {boards} Board(s)), luxdmx-carrier-cpl.csv, JLC-designators.csv")
     return 0
 

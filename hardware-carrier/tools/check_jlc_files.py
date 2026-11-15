@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the JLCPCB assembly files against the format their uploader takes.
 
-    production/BOM-LCSC-upload.csv   Comment, Designator, Footprint, LCSC Part #, ...
+    production/luxdmx-carrier-bom.csv Comment, Designator, Footprint, LCSC Part #, ...
     production/luxdmx-carrier-cpl.csv Designator, Mid X, Mid Y, Layer, Rotation
 
 JLCPCB's uploader says nothing but "failed to load" when it doesn't like a file (issue #164),
@@ -21,7 +21,7 @@ import os
 import re
 import sys
 
-BOM_NAME = "BOM-LCSC-upload.csv"
+BOM_NAME = "luxdmx-carrier-bom.csv"
 CPL_NAME = "luxdmx-carrier-cpl.csv"
 BOM_HEAD = ["Comment", "Designator", "Footprint", "LCSC Part #"]
 CPL_HEAD = ["Designator", "Mid X", "Mid Y", "Layer", "Rotation"]
