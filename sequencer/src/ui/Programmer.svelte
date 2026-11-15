@@ -367,7 +367,7 @@
       <section id="pg-pos">
         <div class="lab"><span>Position</span><span class="faint">pan <ValueEdit text={String(pct(first?.pan ?? 0.5))} value={pct(first?.pan ?? 0.5)} label="Pan" onset={(v) => app.set({ pan: v / 100 })} />
           · tilt <ValueEdit text={String(pct(first?.tilt ?? 0.5))} value={pct(first?.tilt ?? 0.5)} label="Tilt" onset={(v) => app.set({ tilt: v / 100 })} /></span></div>
-        <div class="pad" bind:this={pad} role="slider" aria-label="Pan and tilt" aria-valuenow={pct(first?.pan ?? 0.5)} tabindex="0"
+        <div class="pad" bind:this={pad} role="slider" aria-label="Pan and tilt" aria-valuenow={pct(first?.pan ?? 0.5)} aria-valuetext="pan {pct(first?.pan ?? 0.5)} %, tilt {pct(first?.tilt ?? 0.5)} %" tabindex="0"
              onpointerdown={aim} onpointermove={aim} onkeydown={padKey}>
           {#each sel as f (f.id)}
             {@const l = look()[f.id]}

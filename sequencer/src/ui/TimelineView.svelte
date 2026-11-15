@@ -319,16 +319,18 @@
   }
   // The keyboard's way to move one (there was none): arrows, a beat (with Shift a bar; a bar each
   // when it snaps to bars; half a second with snap off or outside the song)
+  // (with Alt, a bar's (or a crowd change's) end instead: longer or shorter by the same step)
   function itemKey(e: KeyboardEvent, id: string) {
-    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || !tl) return;
+    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.ctrlKey || e.metaKey || !tl) return;
     const it = placed(id);
-    if (!it) return;
+    if (!it || (e.altKey && it.len === undefined)) return;
     e.preventDefault(); e.stopPropagation();
     const song = songLen, beat = barS / 4;
     const inSong = it.at >= 0 && it.at <= song && snapTo !== 'off';
-    const step = inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5;
+    const step = (inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5) * (e.key === 'ArrowRight' ? 1 : -1);
     app.checkpoint();
-    it.at = inSpan(Math.round((it.at + (e.key === 'ArrowRight' ? step : -step)) * 1000) / 1000);
+    if (e.altKey) it.len = lenFor(it, Math.round((it.len! + step) * 1000) / 1000);
+    else it.at = inSpan(Math.round((it.at + step) * 1000) / 1000);
     if (it.len !== undefined) it.len = lenFor(it, it.len);
     sortCrowd();
     app.markDirty(0);
@@ -889,7 +891,7 @@
                 <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : `max-width:min(18rem, ${Math.max(28, Math.max(width, x(shownTo)) - x(it.at) - 2)}px)`}"
                   onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)} onkeydown={(e) => itemKey(e, it.id)}
                   aria-label="{label} at {clockOf(it.at)}{mark ? `, ${MARK_SHORT[mark]}` : ''}"
-                  title="{label} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move, right-click for more">
+                  title="{label} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move{it.len !== undefined ? ', its end (or Alt+arrows) for its length' : ''}, right-click for more">
                   {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{:else if mark === 'winch'}<span class="mark winch" aria-hidden="true">⇅</span>{/if}
                   <span class="t">{label}</span>
                   {#if it.len !== undefined}<!-- svelte-ignore a11y_no_static_element_interactions -->

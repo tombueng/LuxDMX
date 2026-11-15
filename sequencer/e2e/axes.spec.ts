@@ -101,4 +101,6 @@ test('the arrow keys on the position pad: every press counts, and on a bar only 
   // Shift: five percent
   await pad.press('Shift+ArrowDown');
   await expect.poll(async () => { const c = await channels(0, 26); return [0, 1, 2, 3].map((k) => c[TILT(k)]); }).toEqual([128, 145, 145, 128]);
+  // (a screen reader hears both)
+  await expect(pad).toHaveAttribute('aria-valuetext', /^pan \d+ %, tilt \d+ %$/);
 });

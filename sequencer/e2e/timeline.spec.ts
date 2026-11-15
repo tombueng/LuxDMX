@@ -108,6 +108,14 @@ test('an effect dragged on runs as a bar; Del removes what is selected and Undo 
   await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.liveFx.includes(e), id)).toBe(true);
   await page.evaluate((t) => (window as any).__luxdmx.timeline.seek(t), it.at + it.len + 1);
   await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.liveFx.includes(e), id)).toBe(false);
+  // its length from the keyboard: Alt+arrows, a beat each
+  const beat = await page.evaluate(() => { const a = (window as any).__luxdmx; return 60 / (a.show.timeline.bpm ?? a.show.settings.bpm); });
+  await page.locator('.tlv .it').first().focus();
+  await page.keyboard.press('Alt+ArrowRight');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].len)).toBeCloseTo(it.len + beat, 3);
+  await page.keyboard.press('Alt+ArrowLeft'); await page.keyboard.press('Alt+ArrowLeft');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].len)).toBeCloseTo(it.len - beat, 3);
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].at)).toBe(it.at);
   await page.locator('.tlv .it').first().click();
   await page.keyboard.press('Delete');
   await expect(page.locator('.tlv .it')).toHaveCount(0);

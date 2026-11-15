@@ -739,7 +739,7 @@ Three more demos come with their own room on the 3D stage:
   **Snap** (in the transport) says what a drag lands on: the beat, the bar, or nothing. Besides the
   machines the moments have **Blackout**, **Blackout off** and **Everything off**.
   What's placed drags along the beat grid and onto the song's parts (Alt: free), or moves with the
-  arrow keys once it has the focus (a beat, Shift a bar); an effect bar's end makes it longer,
+  arrow keys once it has the focus (a beat, Shift a bar); an effect bar's end (or Alt+arrows) makes it longer,
   right-click or Del removes. The **wheel zooms** round the pointer (Shift+wheel scrolls sideways).
   The **Effects** track opens (its ▸): a row for each knob its effects have (speed, size, spread...)
   with a line over every bar at that knob's value. Drag the line up or down to change the effect's
