@@ -9,7 +9,8 @@
   import { onDestroy, setContext, untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
-  import Modal from './Modal.svelte';
+  import TimelineSongPicker from './TimelineSongPicker.svelte';
+  import { Songs } from './timeline/songs.svelte';
   import StageView from './StageView.svelte';
   import { app, newId } from '../app.svelte';
   import { ui, dialogOpen, asPercent, spaceIsGo } from './ui.svelte';
@@ -23,11 +24,10 @@
   import { CURVE_KNOBS } from '../model/timeline';
   import { LIVE_KNOBS } from '../engine/knobs';
   import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
-  import { BAR_S, DEMO_SECONDS, playDemo, sectionStarts } from '../timeline/beat';
-  import { CATALOG, type CatalogSong } from '../timeline/catalog';
-  import { progressSaid, songsByGenre } from '../timeline/songPicker';
-  import { SongError, creditOf, downloadSong } from '../timeline/download';
-  import { ShowChanged } from '../timeline/player.svelte';
+  import { sectionStarts } from '../timeline/beat';
+  import { CATALOG } from '../timeline/catalog';
+  import { progressSaid } from '../timeline/songPicker';
+  import { creditOf } from '../timeline/download';
   import { SURE, type SongAnalysis } from '../timeline/analyze';
   import { analyzeAudio } from '../timeline/songAnalysis';
 
@@ -552,9 +552,12 @@
     ui.openMenu(e, [{ label: 'Add a part here', icon: 'plus', keys: 'P', run: () => addPart(t) }]);
   }
 
-  // ---- demo songs: the demo beat (made here) and real songs, downloaded when picked
+  // ---- demo songs: the demo beat (made here) and real songs, downloaded when picked (the picker
+  // and the downloads: TimelineSongPicker, timeline/songs.svelte.ts)
   let picking = $state(false);
-  const byGenre = songsByGenre();
+  const songsDl = new Songs();
+  onDestroy(() => songsDl.dispose());
+  const dl = $derived(songsDl.dl);
   const missingSong = $derived(P.missing && tl?.audio?.catalog ? CATALOG.find((s) => s.id === tl.audio!.catalog) : undefined);
   // the credit the song's licence asks for, under the waveform while it's the song
   const credit = $derived.by(() => {
@@ -564,81 +567,7 @@
     return { text: a.credit ?? (s ? creditOf(s) : ''), s };
   });
 
-  // a short listen: the demo beat from just before its first drop, a song from its chorus (or a third in)
-  let listening = $state('');
-  let pv: { ctx?: AudioContext; stop?: () => void; timer?: ReturnType<typeof setTimeout> } = {};
-  function listen(s: CatalogSong | null) {
-    const id = s?.id ?? 'demo', again = listening === id;
-    hush();
-    if (again) return;
-    if (P.playing) P.pause();
-    listening = id;
-    pv.timer = setTimeout(hush, 15000);
-    if (!s) {
-      try { pv.ctx ??= new AudioContext(); } catch { hush(); ui.toast("This browser can't play sound here", 3500); return; }
-      const ctx = pv.ctx, g = ctx.createGain();
-      g.gain.value = P.volume; g.connect(ctx.destination); void ctx.resume();
-      const stop = playDemo(ctx, g, sectionStarts().find((x) => x.name === 'Drop')!.at - 2 * BAR_S);
-      pv.stop = () => { stop(); setTimeout(() => g.disconnect(), 500); };
-      return;
-    }
-    const from = s.sections.find((x) => /chorus|drop|hook/i.test(x.name))?.at ?? s.duration / 3;
-    const a = new Audio(), srcs = [s.url, s.mirror].filter((u): u is string => !!u);
-    let n = 0;
-    a.preload = 'auto'; a.volume = P.volume;
-    a.onerror = () => { if (listening !== s.id) return; if (++n < srcs.length) a.src = srcs[n]; else { hush(); ui.toast(`"${s.title}" can't be played right now (offline, or its site is blocked here)`, 4500); } };
-    a.onloadedmetadata = () => { if (Number.isFinite(a.duration)) a.currentTime = Math.max(0, Math.min(from, a.duration - 16)); void a.play().catch(() => {}); };
-    a.src = srcs[0];
-    pv.stop = () => { a.onerror = null; a.pause(); a.removeAttribute('src'); };
-  }
-  function hush() { clearTimeout(pv.timer); pv.stop?.(); pv.stop = undefined; listening = ''; }
-  onDestroy(() => { hush(); void pv.ctx?.close().catch(() => {}); });
-
-  // picking a song: it downloads (with progress), stays in this browser like a file you load, and
-  // brings its tempo, first downbeat, parts and credit onto the timeline
-  let dl = $state<{ id: string; title: string; got: number; total: number; ctl: AbortController } | null>(null);
-  const pct = progressSaid;
-  async function take(s: CatalogSong) {
-    hush();
-    dl?.ctl.abort();
-    const ctl = new AbortController();
-    dl = { id: s.id, title: s.title, got: 0, total: 0, ctl };
-    const forShow = app.showId;                        // (the show it's for, whatever is open when it's done)
-    let file: File;
-    try { file = await downloadSong(s, (got, total) => { if (dl?.ctl === ctl) { dl.got = got; dl.total = total; } }, ctl.signal); }
-    catch (e) {
-      if (dl?.ctl !== ctl) return;
-      dl = null;
-      if (!ctl.signal.aborted) ui.toast(e instanceof SongError ? e.message : `"${s.title}" can't be downloaded right now. Try again later.`, 6000);
-      return;
-    }
-    if (dl?.ctl !== ctl) return;                       // cancelled, or another one picked meanwhile
-    try { await P.loadFile(file, forShow); }
-    catch (e) {
-      dl = null;
-      ui.toast(e instanceof ShowChanged ? `"${s.title}" came down after another show was opened, so it isn't on this one. Pick it again in the show it was for.`
-        : `"${s.title}" came down, but it doesn't play in this browser`, 7000);
-      return;
-    }
-    dl = null;
-    const t = app.timeline.ensure();
-    t.bpm = s.bpm; t.offset = s.offset;
-    t.sections = s.sections.map((x) => ({ name: x.name, at: x.at, ...(Number.isFinite(x.energy) ? { energy: x.energy } : {}) }));
-    if (t.audio) { t.audio.catalog = s.id; t.audio.credit = creditOf(s); }
-    t.name = s.title;                // (the set list said the file's name: the artist first, cut off)
-    app.markDirty(0);
-    picking = false; pps = 0;
-    ui.toast(`"${s.title}" by ${s.artist} is the song now (${s.bpm} BPM, ${clockOf(P.duration, false)}). Its parts are on the ruler.`, 4000);
-  }
-  function cancel() { dl?.ctl.abort(); dl = null; }
-  function takeDemo() {
-    hush(); cancel();
-    P.useDemo();
-    if (app.show.timeline?.sections) { delete app.show.timeline.sections; app.markDirty(0); }
-    picking = false; pps = 0;
-    ui.toast('The demo beat: ten minutes, 126 BPM, with builds and drops');
-  }
-  function closePicker() { hush(); picking = false; }
+  function closePicker() { songsDl.hush(); picking = false; }
   // another view shown: a short listen stops, the song picker closes (as when this view went away)
   $effect(() => { if (!shown) untrack(closePicker); });
 
@@ -647,9 +576,9 @@
   const songs = $derived(songsOf(app.show));
   const cur = $derived(songIndex(app.show));
   // picking one: stopped at its start, its first look on the stage (never dark, see app.pickSong)
-  function pickSong(i: number) { if (i === cur) return; hush(); cancel(); app.pickSong(i); pps = 0; sel = null; }
+  function pickSong(i: number) { if (i === cur) return; songsDl.stop(); app.pickSong(i); pps = 0; sel = null; }
   function newSong() {
-    hush(); cancel();
+    songsDl.stop();
     app.checkpoint();
     addSong(app.show, { duration: 240, bpm: app.show.settings.bpm, items: [] });
     app.pickSong(songsOf(app.show).length - 1);
@@ -772,9 +701,9 @@
       <button onclick={() => fileIn?.click()}><Icon name="music" />{tl?.audio ? 'Another song…' : 'Load a song…'}</button>
       <button class="ghost" class:on={(tl?.demo && !tl.audio) || !!tl?.audio?.catalog} onclick={() => (picking = true)} title="Real songs with vocals (free to use), or the demo beat">Demo songs…</button>
       <input type="file" accept="audio/*" hidden bind:this={fileIn} onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; (e.target as HTMLInputElement).value = ''; if (f) void loadSong(f); }} />
-      {#if dl}<p class="dl" role="status"><progress max={dl.total || undefined} value={dl.total ? dl.got : undefined} aria-label="Downloading {dl.title}"></progress><span>{dl.title} {pct(dl)}</span><button class="ghost" onclick={cancel}>Cancel</button></p>{/if}
+      {#if dl}<p class="dl" role="status"><progress max={dl.total || undefined} value={dl.total ? dl.got : undefined} aria-label="Downloading {dl.title}"></progress><span>{dl.title} {progressSaid(dl)}</span><button class="ghost" onclick={() => songsDl.cancel()}>Cancel</button></p>{/if}
       {#if finding}<p class="dl" role="status"><progress aria-label="Finding the tempo of {finding}"></progress><span>Finding the tempo and parts…</span></p>{/if}
-      {#if P.missing}<p class="err">"{P.missing}" isn't in this browser: {#if missingSong}<button class="ghost again" onclick={() => take(missingSong)}>download it again</button>{:else}load the file again.{/if}</p>{/if}
+      {#if P.missing}<p class="err">"{P.missing}" isn't in this browser: {#if missingSong}<button class="ghost again" onclick={() => songsDl.take(missingSong)}>download it again</button>{:else}load the file again.{/if}</p>{/if}
     </div>
     <div class="around" title="Time for the show before the song starts (an intro, the walk-on) and after it ends (the cheer, the house lights)">
       <label>Before the song <input type="number" min="0" max={AROUND_MAX} step="1" value={tl?.lead ?? 0} aria-label="Seconds before the song"
@@ -923,43 +852,7 @@
   </section>
 </div>
 
-{#snippet listenButton(s: CatalogSong | null, name: string)}
-  {@const on = listening === (s?.id ?? 'demo')}
-  <button class="ghost listen" class:on aria-pressed={on} onclick={() => listen(s)} aria-label="{on ? 'Stop' : 'Listen to'} {name}" title="A short listen (15 s)"><Icon name={on ? 'stop' : 'play'} />{on ? 'Stop' : 'Listen'}</button>
-{/snippet}
-
-{#if picking}
-  <Modal title="Demo songs" onclose={closePicker} wide>
-    <p class="hint">Real songs with vocals, free to use under their Creative Commons licences (the credit stays with your show). Picking one downloads it into this browser; its tempo and its parts come with it, and cues snap to the parts.</p>
-    <h3 class="genre">Made in the app</h3>
-    <ul class="songs">
-      <li class:cur={!!tl?.demo && !tl.audio}>
-        {@render listenButton(null, 'Demo beat')}
-        <div class="info"><b>Demo beat</b> <span class="meta">Club · 126 BPM · {clockOf(DEMO_SECONDS, false)}</span><span class="blurb">Ten minutes with builds and drops, made in the app: nothing to download. The big demo show runs on it.</span></div>
-        {#if tl?.demo && !tl.audio}<span class="chip green">On the timeline</span>{:else}<button class="primary" onclick={takeDemo} aria-label="Use Demo beat">Use</button>{/if}
-      </li>
-    </ul>
-    {#each byGenre as [genre, songs] (genre)}
-      <h3 class="genre">{genre}</h3>
-      <ul class="songs">
-        {#each songs as s (s.id)}
-          {@const cur = tl?.audio?.catalog === s.id && !P.missing}
-          <li class:cur>
-            {@render listenButton(s, s.title)}
-            <div class="info">
-              <b>{s.title}</b> <span>{s.artist}</span> <span class="meta">{s.bpm} BPM · {clockOf(s.duration, false)}</span>
-              <span class="blurb"><a href={s.licenseUrl} target="_blank" rel="noopener noreferrer">{s.license}</a> · <a href={s.page} target="_blank" rel="noopener noreferrer">where it's from</a></span>
-              {#if dl?.id === s.id}<span class="dl"><progress max={dl.total || undefined} value={dl.total ? dl.got : undefined} aria-label="Downloading {s.title}"></progress>{pct(dl)}</span>{/if}
-            </div>
-            {#if cur}<span class="chip green">On the timeline</span>
-            {:else if dl?.id === s.id}<button onclick={cancel} aria-label="Stop downloading {s.title}">Cancel</button>
-            {:else}<button class="primary" onclick={() => take(s)} aria-label="Use {s.title}">Use</button>{/if}
-          </li>
-        {/each}
-      </ul>
-    {/each}
-  </Modal>
-{/if}
+{#if picking}<TimelineSongPicker songs={songsDl} onclose={closePicker} onpicked={() => { picking = false; pps = 0; }} />{/if}
 
 <style>
   .tlv { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr); gap: .55rem; padding: .55rem; }
@@ -1069,15 +962,6 @@
   .drop { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; }
   .empty { margin: 0; }
   .err { color: var(--pink); font-size: .82rem; margin: .2rem 0 0; }
-  .songs { list-style: none; margin: .4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
-  .songs li { display: flex; align-items: center; gap: .6rem; padding: .4rem .5rem; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--panel2); }
-  .songs li.cur { border-color: #45d85c66; }
-  .songs .info { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .5rem; }
-  .songs .meta { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
-  .songs .blurb { flex-basis: 100%; color: var(--faint); font-size: .8rem; }
-  .songs .listen { min-width: 5.6rem; justify-content: flex-start; }
-  .songs .blurb a { color: var(--muted); }
-  .genre { margin: .8rem 0 0; font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
   .dl { display: flex; align-items: center; gap: .4rem; margin: .2rem 0 0; font-size: .8rem; color: var(--muted); flex-basis: 100%; }
   .dl progress { flex: 1; max-width: 12rem; accent-color: var(--accent); }
   .song .dl span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
