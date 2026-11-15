@@ -74,6 +74,10 @@ describe('over several universes', () => {
     const m = { name: 'x', channels: Array.from({ length: 800 }, (_, i) => ({ name: '', attr: 'red' as const, cell: Math.floor(i / 4) })) };
     expect(spansOf({ universe: 0, address: 1 }, m).map((s) => s.count)).toEqual([512, 288]);
   });
+  it('a "pixel" wider than a universe (600 channels, one of them a cell) is split channel by channel, not looped on for ever', () => {
+    const m = { name: 'x', channels: Array.from({ length: 600 }, (_, i) => ({ name: '', attr: 'red' as const, ...(i === 0 ? { cell: 0 } : {}) })) };
+    expect(spansOf({ universe: 0, address: 1 }, m).map((s) => [s.universe, s.count])).toEqual([[0, 512], [1, 88]]);
+  });
   it('starting further up: whole pixels on the first universe too', () => {
     const m = type('gen-disc241')!;
     expect(spansOf({ universe: 0, address: 101 }, m)[0]).toEqual({ universe: 0, at: 100, from: 0, count: 411 });

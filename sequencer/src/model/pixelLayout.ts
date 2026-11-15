@@ -293,7 +293,10 @@ export function spansOf(f: { universe: number; address: number }, m: FixtureMode
   const n = m?.channels.length ?? 1;
   if (!isWide(m)) return [{ universe: f.universe, at: f.address - 1, from: 0, count: n }];
   const cells = m!.channels.reduce((a, c) => Math.max(a, (c.cell ?? -1) + 1), 0);
-  const per = cells > 0 ? Math.max(1, Math.round(n / cells)) : 1;
+  // (a pixel that couldn't fit in a universe, a mode with a few cells over 600 channels, is no
+  // pixel to keep whole: channel by channel then. Else this looped for ever, the page and the
+  // output thread with it)
+  const p0 = cells > 0 ? Math.max(1, Math.round(n / cells)) : 1, per = p0 > 512 ? 1 : p0;
   const whole = (room: number) => Math.floor(room / per) * per;
   const out: Span[] = [];
   let from = 0, u = f.universe, at = f.address - 1;
