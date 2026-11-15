@@ -112,3 +112,26 @@ describe('gobo wheels and prism per mode', () => {
     expect(goboWheelsOf(undefined)).toBeUndefined();
   });
 });
+
+// A rotation or prism channel's answer for a byte, read from its range names once (the 3D stage asks
+// every frame): the same one again for the same list and byte; a byte no range covers still turns
+// as fast as the value says, to the fraction. (Review 5, R5-P4)
+describe('rotation and prism answers, read once per range list and byte', () => {
+  const ranges = [{ from: 0, to: 9, label: 'Stop' }, { from: 10, to: 127, label: 'CW fast..slow' }, { from: 128, to: 245, label: 'CCW slow..fast' }];
+  it('the same answer, the same object, for the same byte; a fresh list reads its own', () => {
+    const a = rotationOf(ranges, 0.3);
+    expect(rotationOf(ranges, 0.3)).toBe(a);
+    expect(rotationOf([...ranges], 0.3)).toEqual(a);
+    expect(rotationOf(ranges, 0.8)).toEqual({ speed: expect.any(Number) });
+    expect((rotationOf(ranges, 0.8) as { speed: number }).speed).toBeLessThan(0);
+    const prism = [{ from: 0, to: 127, label: 'Open' }, { from: 128, to: 255, label: '5-facet linear' }];
+    expect(prismOf(prism, 0.9)).toBe(prismOf(prism, 0.9));
+    expect(prismOf(prism, 0.9)).toEqual({ facets: 5, linear: true });
+    expect(prismOf(prism, 0.1)).toBeNull();
+  });
+  it('a byte no range covers: by the value itself, not the byte', () => {
+    const x1 = 250.6 / 255, x2 = 250.9 / 255;        // (both byte 251, past the last range)
+    expect((rotationOf(ranges, x1) as { speed: number }).speed).toBeCloseTo(x1 * 4 * Math.PI, 12);
+    expect((rotationOf(ranges, x2) as { speed: number }).speed).toBeCloseTo(x2 * 4 * Math.PI, 12);
+  });
+});
