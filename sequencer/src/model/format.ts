@@ -105,6 +105,9 @@ function withDefaults(s: any, notes: string[]): Show {
   mendSettings(s.settings, note);
   // a timetable written by hand: the entries that can run (one bad line mustn't stop the clock)
   if (s.settings.schedule !== undefined) s.settings.schedule = Array.isArray(s.settings.schedule) ? s.settings.schedule.filter(validEntry) : [];
+  // (a list's master set by a timetable entry: a level, else full: a word there went in as NaN and
+  // the list went dark, as cue actions are mended too)
+  for (const e of s.settings.schedule ?? []) if (isObj(e.do) && e.do.do === 'master') fixNum(e.do, 'level', 0, 1, 'The timetable', note, 1);
   // your own 3D venue: numbers that are numbers, or it goes
   const vm = s.settings.stage3d?.model;
   if (vm && !(typeof vm.name === 'string' && typeof vm.store === 'string' && ['scale', 'x', 'y', 'z', 'yaw'].every((k) => Number.isFinite((vm as unknown as Record<string, number>)[k])))) delete s.settings.stage3d!.model;
@@ -274,6 +277,7 @@ function mendSong(tl: unknown, where: string, note: Note, lists: ReadonlySet<str
   fixNum(tl as Obj, 'tail', 0, AROUND_MAX, where, note);
   const seen = new Set<string>(), n = tl.items.length, from = -(tl.lead ?? 0);
   tl.items = tl.items.filter((i) => validItem(i) && i.at >= from && !seen.has(i.id) && !!seen.add(i.id));
+  for (const i of tl.items) if (i.do.do === 'master') fixNum(i.do as unknown as Obj, 'level', 0, 1, where, note, 1);
   if (tl.items.length < n) note(`${where}: ${plural(n - tl.items.length, 'thing', 'things')} on it that couldn't be read left out`);
   if (tl.crowd !== undefined) {
     const k = Array.isArray(tl.crowd) ? tl.crowd.length : 0, c = cleanCrowd(tl.crowd, from);
