@@ -10,7 +10,8 @@
 //   node tools/qa/q.mjs logs 0 errors            (console, page errors, failed requests)
 //   node tools/qa/q.mjs <action> '{"sel":"...","nth":2}'   (any action with its full options)
 //   Selectors find what's on screen only (the hidden views stay in the page); 'any:' in front for
-//   hidden ones too. Role names match a part, any case: name="GO" also finds "Gobos", "GO" s is exact.
+//   hidden ones too (a file input always is: files 'any:[role=dialog] input[type=file]' a.json).
+//   Role names match a part, any case: name="GO" also finds "Gobos", "GO" s is exact.
 // Several steps in one go: separate them with ' -- ' as one argument list.
 const PORT = Number(process.env.QA_PORT ?? 9333);
 const POS = {
