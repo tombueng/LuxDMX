@@ -189,6 +189,8 @@ test('the stage zooms with the wheel and fits again', async ({ page }) => {
   await expect(fit).toHaveText(/^\d+%$/);
   await expect(fit).not.toHaveText('100%');
   expect(await svg.getAttribute('viewBox')).not.toBe('0.0 0.0 1000.0 560.0');
+  // (the wheel is the plan's: not passed on to scroll the page)
+  expect(await svg.evaluate((el) => { const r = el.getBoundingClientRect(), e = new WheelEvent('wheel', { deltaY: 50, bubbles: true, cancelable: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 }); el.dispatchEvent(e); return e.defaultPrevented; })).toBe(true);
   // selecting by clicking still hits the right light when zoomed
   await page.locator('.stage-wrap .fx[data-name="P 2"]').click();
   await expect(page.locator('.fl li.oitem.sel .nm')).toHaveText(['P 2']);

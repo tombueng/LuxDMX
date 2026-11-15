@@ -140,18 +140,13 @@
     const x = px - (px - view.x) * view.k / k, y = py - (py - view.y) * view.k / k;
     view = { k, x: Math.max(0, Math.min(W - W / k, x)), y: Math.max(0, Math.min(H - H / k, y)) };
   }
+  // (onwheel isn't passive in Svelte 5 (only touchstart and touchmove are): preventDefault keeps
+  // the page from scrolling while the plan zooms)
   function wheel(e: WheelEvent) {
     e.preventDefault();
     const p = pt(e as unknown as PointerEvent);
     zoomAt(p.x * W, p.y * H, view.k * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0018)));
   }
-  // Not onwheel: Svelte makes that listener passive, and the page would scroll while zooming.
-  $effect(() => {
-    const el = svg;
-    if (!el) return;
-    el.addEventListener('wheel', wheel, { passive: false });
-    return () => el.removeEventListener('wheel', wheel);
-  });
   const touches = new Map<number, { x: number; y: number }>();
   let pinch: { d: number; k: number; cx: number; cy: number } | null = null;
   let pan: { x: number; y: number; vx: number; vy: number } | null = null;
@@ -449,7 +444,7 @@
     {#if !ui.stage3d}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (an application region: the stage handles its own keys) -->
     <svg bind:this={svg} viewBox={vb} preserveAspectRatio="none" role="application" aria-label="Stage" aria-describedby="stage-keys" tabindex="0" onkeydown={stageKey}
-         onpointerdown={downBg} onpointermove={(e) => { moveBg(e); moveFixture(e); }} onpointerup={upBg} onpointercancel={upBg} oncontextmenu={bgMenu}>
+         onwheel={wheel} onpointerdown={downBg} onpointermove={(e) => { moveBg(e); moveFixture(e); }} onpointerup={upBg} onpointercancel={upBg} oncontextmenu={bgMenu}>
       <desc id="stage-keys">Arrow keys move the selected lights (Shift: bigger steps). Ctrl+A selects every light, Escape none, Delete removes the selected. Drag on the floor to select with a box.</desc>
       <defs>
         <radialGradient id="floor" cx="50%" cy="0%" r="90%"><stop offset="0" stop-color="#1c2533" /><stop offset="1" stop-color="#090c11" /></radialGradient>
