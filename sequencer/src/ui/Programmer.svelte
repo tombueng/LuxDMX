@@ -3,6 +3,9 @@
   import { CCW_WORDS, wheelPatterns } from '../stage3d/gobos';
   import { levelOf } from '../engine/cuelook';
   import { tick } from 'svelte';
+  import { whileShown } from './shown.svelte';
+  import { selection } from './selection.svelte';
+  import { clearProgrammer } from './clear.svelte';
   import ValueEdit from './ValueEdit.svelte';
   // The programmer: set the selected lights. Only controls the selection can use show up. What you
   // set here sits on top of everything until you Record it into a cue (or Clear it).
@@ -17,15 +20,13 @@
   import type { ChannelAttr, Color, NumAttr, Values } from '../model/types';
   import { EFFECT_MAP } from '../engine/effects';
   import { slotsOf } from '../engine/render';
+  // (the stage as it is, while Program is shown; hidden, the last of it: the programmer doesn't
+  // follow the stage frame by frame behind another view)
+  const look = whileShown(() => app.look), status = whileShown(() => app.status), stage = whileShown(() => app.stage);
 
-  const sel = $derived(app.show.fixtures.filter((f) => app.selected.includes(f.id)));
-  // Every attribute at least one selected light has.
-  const attrs = $derived.by(() => {
-    const a = new Set<ChannelAttr>();
-    for (const f of sel) for (const c of app.modeOf(f.id)?.channels ?? []) a.add(c.attr);
-    return a;
-  });
-  const has = (...k: ChannelAttr[]) => k.some((x) => attrs.has(x));
+  // (the selection, every attribute at least one selected light has: shared with the console)
+  const sel = $derived(selection.fixtures);
+  const has = selection.has;
   const can = $derived({
     color: has('red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'colorWheel'),
     position: has('pan', 'tilt'),
@@ -82,12 +83,12 @@
     for (const h of hands) scroller.addEventListener(h, hand, { passive: true });
     return () => { scroller.removeEventListener('scroll', spy); for (const h of hands) scroller.removeEventListener(h, hand); };
   });
-  const playing = $derived(app.show.cueLists.filter((l) => app.status[l.id]?.running && !app.status[l.id]?.releasing));
+  const playing = $derived(app.show.cueLists.filter((l) => status()[l.id]?.running && !status()[l.id]?.releasing));
   // Effects running on the selection (what you see on stage may be them, not the values here).
   const running = $derived(app.effectsOn(sel.map((f) => f.id)));
   // (a pixel bar: its brightest cell, a pixel chase lights it at intensity 0)
   // (picked cells: the first one's)
-  const out = $derived.by(() => { if (!sel.length) return undefined; const s = app.stage[sel[0].id], k = app.cellsPicked(sel[0].id)[0]; return k === undefined ? levelOf(s) : cellLookAt(s, k, app.caps(sel[0].id).cells)?.intensity ?? 0; });
+  const out = $derived.by(() => { if (!sel.length) return undefined; const s = stage()[sel[0].id], k = app.cellsPicked(sel[0].id)[0]; return k === undefined ? levelOf(s) : cellLookAt(s, k, app.caps(sel[0].id).cells)?.intensity ?? 0; });
   // (what an effect works on, said after its name; 'pixel' was missing: "Bar twinkles (undefined)")
   const CAT: Record<string, string> = { move: 'position', color: 'colour', intensity: 'brightness', pixel: 'cells' };
   const fxSaid = (e: { name: string; kind: string }) => { const c = CAT[EFFECT_MAP.get(e.kind)?.category ?? '']; return c ? `${e.name} (${c})` : e.name; };
@@ -100,7 +101,6 @@
   const noColor = $derived(sel.filter((f) => { const c = app.caps(f.id); return !c.color && !c.fog && (c.intensity || c.cct || c.white); }));
   const posPresets = $derived(presets.filter((p) => p.kind === 'position'));
   // (picked cells: every one of them uses it)
-  const usesPreset = (id: string) => app.usesPreset(id);
 
   const css = (c: Color) => `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
   const pct = (v: number | undefined) => Math.round((v ?? 0) * 100);
@@ -121,31 +121,35 @@
   // Picked by name: a gobo, a second gobo, the light's built-in effects, its colour programs (from
   // the first selected light that has them; app.setSlot finds the same name on the others).
   const PICKS: ['gobo' | 'gobo2' | 'effectMacro' | 'colorMacro', string][] = [['gobo', 'Gobo'], ['gobo2', 'Gobo 2'], ['effectMacro', 'Built-in effect'], ['colorMacro', 'Colour program']];
-  const picks = $derived(PICKS.flatMap(([k, label]) => {
-    for (const f of sel) {
-      const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine);
-      const slots = c ? slotsOf(c) : [];
-      if (slots.length) {
-        const v = app.look[f.id]?.[k];
-        const cur = typeof v === 'number' ? Math.round(v * (slots.length - 1)) : -1;
-        return [{ k, label, slots: slots.map((r) => r.label), colors: slots.map((r) => r.color), cur, wheel: wheelExtras(f.id, k) }];
-      }
-    }
-    return [];
+  // What each pick offers (worked out when the selection or its lights change: the wheel's
+  // patterns and ranges are regexes over every slot's name, too much for every frame), then what
+  // it's on right now (from the look, every frame: a lookup)
+  const pickDefs = $derived(PICKS.flatMap(([k, label]) => {
+    const s = selection.slots(k);
+    if (!s) return [];
+    const names = s.slots.map((r) => r.label);
+    return [{ k, label, id: s.id, slots: names, colors: s.slots.map((r) => r.color), wheel: wheelRanges(s.id, k),
+      pats: k === 'gobo' || k === 'gobo2' ? wheelPatterns(names) : null }];
+  }));
+  const picks = $derived(pickDefs.map((p) => {
+    const l = look()[p.id] as Record<string, number | undefined> | undefined, v = l?.[p.k];
+    const cur = typeof v === 'number' ? Math.round(v * (p.slots.length - 1)) : -1;
+    return { ...p, cur, shaking: (l?.[`${p.k}Shake`] ?? 0) > 0, scroll: l?.[`${p.k}Scroll`] ?? 0 };
   }));
   // A gobo wheel's own functions, as real heads have them on its channel's other ranges: the gobo
   // shaking ("Shake 3 slow..fast") and the whole wheel running round ("Wheel rotation CW / CCW").
   // Attributes like any other (goboShake, goboScroll: a cue keeps them, the next one lets them go).
-  function wheelExtras(id: string, k: string) {
+  // (`shakeAt[i]`: the range that shakes gobo i+1, if the wheel has one)
+  function wheelRanges(id: string, k: string) {
     if (k !== 'gobo' && k !== 'gobo2') return undefined;
     const c = app.modeOf(id)?.channels.find((x) => x.attr === k && !x.fine && x.cell === undefined);
     const others = c?.ranges?.filter((r) => r.kind === 'other') ?? [];
     const shakes = others.filter((r) => /shake|wackel|zitter/i.test(r.label ?? ''));
     const runs = others.filter((r) => /rotat|scroll|spin|dreh/i.test(r.label ?? '') && !/shake/i.test(r.label ?? ''));
     if (!shakes.length && !runs.length) return undefined;
-    const look = app.look[id] as Record<string, number | undefined> | undefined;
-    return { shakes, cw: runs.some((r) => !CCW_WORDS.test(r.label ?? '')), ccw: runs.some((r) => CCW_WORDS.test(r.label ?? '')),
-      shaking: (look?.[`${k}Shake`] ?? 0) > 0, scroll: look?.[`${k}Scroll`] ?? 0 };
+    const n = slotsOf(c!).length;
+    const shakeAt = Array.from({ length: n }, (_, i) => shakes.find((r) => new RegExp(`(^|\\D)${i + 1}(\\D|$)`).test(r.label ?? '')));
+    return { shakeAt, cw: runs.some((r) => !CCW_WORDS.test(r.label ?? '')), ccw: runs.some((r) => CCW_WORDS.test(r.label ?? '')) };
   }
   // A slider's channel with named ranges (a prism's facets, a rotation's index / CW / stop / CCW): its
   // ranges, from the first selected light that has it (a plain channel: none)
@@ -176,10 +180,11 @@
     const d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
     if (!d[e.key]) return;
     e.preventDefault();
-    for (const f of sel) {
-      const l = app.look[f.id];
-      app.programmer[f.id] = { ...app.programmer[f.id], pan: Math.max(0, Math.min(1, (l?.pan ?? 0.5) + d[e.key][0])), tilt: Math.max(0, Math.min(1, (l?.tilt ?? 0.5) + d[e.key][1])) };
-    }
+    // (as an encoder turns: from the programmer, so presses between two frames all count, and the
+    // heads picked on a bar move, not the whole bar)
+    const [dp, dt] = d[e.key];
+    if (dp) app.nudge('pan', dp);
+    if (dt) app.nudge('tilt', dt);
   }
   function record() { ui.toast(app.record() ? 'Recorded as a new cue' : 'Nothing to record yet'); }
 </script>
@@ -217,7 +222,7 @@
       <section class="now" aria-label="Playing now">
         <h3 class="faint">Playing now</h3>
         {#each playing as l (l.id)}
-          {@const st = app.status[l.id]}
+          {@const st = status()[l.id]}
           <div class="pl" style="--c:{l.color ?? 'var(--green)'}">
             <span class="dot"></span>
             <span class="nm"><b>{l.name}</b> <span class="faint">{l.cues[st.index]?.name ?? ''}</span></span>
@@ -232,7 +237,7 @@
         {/each}
         {#if changed}
           <div class="pl prg"><Icon name="edit" size={14} /><span class="nm">{changed} light{changed > 1 ? 's' : ''} changed, not recorded</span>
-            <button class="sm" onclick={() => app.clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button></div>
+            <button class="sm" onclick={() => clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button></div>
         {/if}
       </section>
     {/if}
@@ -274,7 +279,7 @@
         <div class="lab"><span>White</span></div>
         <div class="swatches">
           {#each whitePresets as p (p.id)}
-            <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+            <button class="sw" class:on={app.usesPreset(p.id)} aria-pressed={app.usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(p.values.color as Color)}" onclick={() => app.applyPreset(p.id)}></button>
           {/each}
         </div>
       </section>
@@ -286,7 +291,7 @@
           <div class="swatches">
             {#each colorPresets as p (p.id)}
               {@const c = p.values.color && !('preset' in p.values.color) ? p.values.color : { r: 1, g: 1, b: 1 }}
-              <button class="sw" class:on={usesPreset(p.id)} aria-pressed={usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
+              <button class="sw" class:on={app.usesPreset(p.id)} aria-pressed={app.usesPreset(p.id)} title="{p.name} (preset)" aria-label={p.name} style="background:{css(c as Color)}" onclick={() => app.applyPreset(p.id)}></button>
             {/each}
           </div>
         {/if}
@@ -311,19 +316,18 @@
       <section class="pick" aria-label={p.label}>
         <div class="lab"><span>{p.label}</span><span class="faint">{p.cur >= 0 ? p.slots[p.cur] : ''}</span></div>
         {#if p.slots.length <= 12}
-          {@const pats = p.k === 'gobo' || p.k === 'gobo2' ? wheelPatterns(p.slots) : null}
           <div class="quick wrap">
-            {#each p.slots as s, i (i)}<button class:on={i === p.cur && !p.wheel?.scroll} onclick={() => app.setSlot(p.k, s, i)} title={s}>{#if p.colors[i]}<span class="dot" style="background:{p.colors[i]}"></span>{/if}{#if pats}<GoboIcon pattern={pats[i]} />{/if}{s}</button>{/each}
+            {#each p.slots as s, i (i)}<button class:on={i === p.cur && !p.scroll} onclick={() => app.setSlot(p.k, s, i)} title={s}>{#if p.colors[i]}<span class="dot" style="background:{p.colors[i]}"></span>{/if}{#if p.pats}<GoboIcon pattern={p.pats[i]} />{/if}{s}</button>{/each}
           </div>
           {#if p.wheel}
             {@const w = p.wheel}
-            {@const shake = w.shakes.find((r) => new RegExp(`(^|\\D)${p.cur + 1}(\\D|$)`).test(r.label ?? ''))}
+            {@const shake = p.cur >= 0 ? w.shakeAt[p.cur] : undefined}
             {@const sk = `${p.k}Shake`}
             {@const sc = `${p.k}Scroll`}
             <div class="quick wrap wheelfx" role="group" aria-label="{p.label}: shake and wheel">
-              {#if shake}<button class:on={w.shaking} aria-pressed={w.shaking} onclick={() => app.set({ [sk]: w.shaking ? 0 : 0.5 } as Values)} title="{shake.label}: the gobo shakes back and forth (as the light does it)">Shake</button>{/if}
-              {#if w.cw}<button class:on={w.scroll > 0} aria-pressed={w.scroll > 0} onclick={() => app.set({ [sc]: w.scroll > 0 ? 0 : 0.5 } as Values)} title="The whole wheel runs round through its gobos, clockwise">Wheel ↻</button>{/if}
-              {#if w.ccw}<button class:on={w.scroll < 0} aria-pressed={w.scroll < 0} onclick={() => app.set({ [sc]: w.scroll < 0 ? 0 : -0.5 } as Values)} title="The whole wheel runs round through its gobos, counter-clockwise">Wheel ↺</button>{/if}
+              {#if shake}<button class:on={p.shaking} aria-pressed={p.shaking} onclick={() => app.set({ [sk]: p.shaking ? 0 : 0.5 } as Values)} title="{shake.label}: the gobo shakes back and forth (as the light does it)">Shake</button>{/if}
+              {#if w.cw}<button class:on={p.scroll > 0} aria-pressed={p.scroll > 0} onclick={() => app.set({ [sc]: p.scroll > 0 ? 0 : 0.5 } as Values)} title="The whole wheel runs round through its gobos, clockwise">Wheel ↻</button>{/if}
+              {#if w.ccw}<button class:on={p.scroll < 0} aria-pressed={p.scroll < 0} onclick={() => app.set({ [sc]: p.scroll < 0 ? 0 : -0.5 } as Values)} title="The whole wheel runs round through its gobos, counter-clockwise">Wheel ↺</button>{/if}
             </div>
           {/if}
         {:else}
@@ -355,15 +359,15 @@
       <section id="pg-pos">
         <div class="lab"><span>Position</span><span class="faint">pan <ValueEdit text={String(pct(first?.pan ?? 0.5))} value={pct(first?.pan ?? 0.5)} label="Pan" onset={(v) => app.set({ pan: v / 100 })} />
           · tilt <ValueEdit text={String(pct(first?.tilt ?? 0.5))} value={pct(first?.tilt ?? 0.5)} label="Tilt" onset={(v) => app.set({ tilt: v / 100 })} /></span></div>
-        <div class="pad" bind:this={pad} role="slider" aria-label="Pan and tilt" aria-valuenow={pct(first?.pan ?? 0.5)} tabindex="0"
+        <div class="pad" bind:this={pad} role="slider" aria-label="Pan and tilt" aria-valuenow={pct(first?.pan ?? 0.5)} aria-valuetext="pan {pct(first?.pan ?? 0.5)} %, tilt {pct(first?.tilt ?? 0.5)} %" tabindex="0"
              onpointerdown={aim} onpointermove={aim} onkeydown={padKey}>
           {#each sel as f (f.id)}
-            {@const l = app.look[f.id]}
+            {@const l = look()[f.id]}
             {#if app.kinds[f.id] === 'mover'}<div class="cross" class:main={f.id === sel[0].id} style="left:{(l?.pan ?? 0.5) * 100}%;top:{(l?.tilt ?? 0.5) * 100}%"></div>{/if}
           {/each}
         </div>
         <div class="quick wrap">
-          {#each posPresets as p (p.id)}<button class:on={usesPreset(p.id)} onclick={() => app.applyPreset(p.id)} title="Position preset">{p.name}</button>{/each}
+          {#each posPresets as p (p.id)}<button class:on={app.usesPreset(p.id)} onclick={() => app.applyPreset(p.id)} title="Position preset">{p.name}</button>{/each}
           <button onclick={() => app.set({ pan: 0.5, tilt: 0.5 })}>Centre</button>
         </div>
         {#if sel.filter((f) => app.kinds[f.id] === 'mover').length > 1}
@@ -382,7 +386,7 @@
   {#if changed}
     <div class="foot row">
       <span class="faint">{changed} light{changed > 1 ? 's' : ''} changed</span><span class="grow"></span>
-      <button onclick={() => app.clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button>
+      <button onclick={() => clearProgrammer()} title="Let go of your changes: the cues take over again">Clear</button>
       <button class="rec" onclick={record} title="Record your changes as a new cue"><Icon name="record" />Record</button>
     </div>
   {/if}

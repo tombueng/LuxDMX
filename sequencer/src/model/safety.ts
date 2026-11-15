@@ -106,8 +106,6 @@ export const MARK_TITLE: Record<Exclude<Mark, ''>, string> = {
   winch: 'Moves scenery on a winch (a curtain, a drop, a hoist): only while armed',
 };
 export const MARK_SHORT: Record<Exclude<Mark, ''>, string> = { hazard: 'fires a machine', once: 'fires once', winch: 'moves a winch' };
-// a short mark for it ('' for plain light and atmosphere): a warning sign, or 1× for confetti
-export const MARK_HINT: Record<Risk, string> = { light: '', atmosphere: '', once: 'fires once (confetti)', hazard: 'fires a machine (flames, sparks or CO2)' };
 
 export const RISK_LABEL: Record<Risk, string> = {
   light: 'Light',

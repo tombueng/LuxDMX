@@ -5,7 +5,6 @@ import * as THREE from 'three';
 
 export const DROP_PICTURES = ['forest', 'city', 'stars', 'castle', 'sea', 'clouds'] as const;
 export type DropPicture = (typeof DROP_PICTURES)[number];
-export const DROP_NAMES: Record<DropPicture, string> = { forest: 'A forest', city: 'A city by night', stars: 'A starry sky', castle: 'A castle at sunset', sea: 'The sea', clouds: 'A sky of clouds' };
 export const isDropPicture = (p: unknown): p is DropPicture => (DROP_PICTURES as readonly string[]).includes(p as string);
 
 const made = new Map<string, THREE.Texture>();

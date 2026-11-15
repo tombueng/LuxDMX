@@ -43,3 +43,23 @@ it('LuxDMX Link is the thread\'s to send to only once the thread\'s own socket t
   expect(host.serves(link)).toBe(true);
   vi.unstubAllGlobals();
 });
+
+// Live's "Stop effects" stops the effects the cues on stage run as well: that has to reach the
+// thread, or the screen shows them stopped while the wire keeps sending them
+it('"Stop effects" muting the cues\' effects goes to the thread too', async () => {
+  const posted: { t: string; m?: string }[] = [];
+  (globalThis as unknown as { Worker: unknown }).Worker = class { onmessage: unknown; onerror: unknown; postMessage(m: { t: string; m?: string }) { posted.push(m); } terminate() {} };
+  const { OutputThread } = await import('./host.svelte');
+  const s: Show = emptyShow();
+  s.fixtures.push({ id: 'p', name: 'P', typeId: 'gen-drgb', mode: '', universe: 0, address: 1, x: 0.5, y: 0.5 } as never);
+  s.effects.push({ id: 'e1', name: 'Pulse', kind: 'pulse', fixtures: ['p'], params: { speed: 1 } } as never);
+  s.cueLists.push({ id: 'L', name: 'L', cues: [{ id: 'c1', name: 'One', values: { p: { intensity: 1 } }, effects: ['e1'], fade: 0, advance: { mode: 'manual' } }] } as never);
+  let now = 0;
+  const eng = new Engine(() => s, () => now), host = new OutputThread();
+  expect(host.start(eng, () => s)).toBe(true);
+  eng.go('L');
+  for (now = 0; now < 1; now += 0.025) eng.tick();
+  eng.stopAllEffects(); eng.muteCueEffects();
+  expect(posted.filter((m) => m.t === 'call').map((m) => m.m)).toEqual(['go', 'stopAllEffects', 'muteCueEffects']);
+  vi.unstubAllGlobals();
+});

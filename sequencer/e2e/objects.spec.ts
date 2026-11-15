@@ -189,6 +189,8 @@ test('the stage zooms with the wheel and fits again', async ({ page }) => {
   await expect(fit).toHaveText(/^\d+%$/);
   await expect(fit).not.toHaveText('100%');
   expect(await svg.getAttribute('viewBox')).not.toBe('0.0 0.0 1000.0 560.0');
+  // (the wheel is the plan's: not passed on to scroll the page)
+  expect(await svg.evaluate((el) => { const r = el.getBoundingClientRect(), e = new WheelEvent('wheel', { deltaY: 50, bubbles: true, cancelable: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 }); el.dispatchEvent(e); return e.defaultPrevented; })).toBe(true);
   // selecting by clicking still hits the right light when zoomed
   await page.locator('.stage-wrap .fx[data-name="P 2"]').click();
   await expect(page.locator('.fl li.oitem.sel .nm')).toHaveText(['P 2']);
@@ -318,4 +320,57 @@ test('a cue pasted into another show says which of its lights this show doesn\'t
   const names = await page.evaluate(() => { const a = (window as any).__luxdmx; const c = a.list.cues.at(-1); return Object.keys(c.values).map((id) => a.show.fixtures.find((f: any) => f.id === id)?.name); });
   expect(names).toContain('Front 1');
   expect(names.every((n: string | undefined) => !!n)).toBe(true);
+});
+
+test('a cue moved to another list from its menu stays itself: its Live button and its moment on the timeline go along', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  for (const n of ['D 1', 'D 2']) { await selectFixtures(page, [n]); await intensity(page, 1); await record(page); }
+  const ids = await page.evaluate(() => {
+    const a = (window as any).__luxdmx, l = a.list, c = l.cues[1], other = a.newList('Other');
+    a.currentList = l.id;
+    a.show.pages.push({ id: 'pg-e2e', name: 'Mine', widgets: [{ id: 'w-e2e', type: 'cue', list: l.id, cue: c.id }] });
+    a.show.timeline = { duration: 60, items: [{ id: 't-e2e', at: 4, lane: `list:${l.id}`, do: { do: 'goto', list: l.id, cue: c.id } }] };
+    a.checkpoint();
+    return { list: l.id, cue: c.id, other: other.id };
+  });
+  await expect(cues(page)).toHaveCount(2);
+  await cues(page).nth(1).click({ button: 'right' });
+  await menuItem(page, 'Move to "Other"').click();
+  const after = await page.evaluate((x) => {
+    const a = (window as any).__luxdmx;
+    return { from: a.show.cueLists.find((l: any) => l.id === x.list).cues.map((c: any) => c.id), to: a.show.cueLists.find((l: any) => l.id === x.other).cues.map((c: any) => c.id),
+      button: a.show.pages.find((p: any) => p.id === 'pg-e2e')?.widgets[0], moment: a.show.timeline.items[0] };
+  }, ids);
+  expect(after.from).not.toContain(ids.cue);
+  expect(after.to).toEqual([ids.cue]);
+  expect(after.button).toMatchObject({ list: ids.other, cue: ids.cue });
+  expect(after.moment).toMatchObject({ lane: `list:${ids.other}`, do: { list: ids.other, cue: ids.cue } });
+  // the deck shows the list it went to, the cue picked there
+  await expect(cues(page)).toHaveCount(1);
+  // one Undo takes it back (the deck stays on the list it was showing)
+  await page.locator('body').press('Control+z');
+  await expect.poll(() => page.evaluate((x) => (window as any).__luxdmx.show.cueLists.map((l: any) => (l.id === x.list || l.id === x.other ? l.cues.length : -1)).filter((n: number) => n >= 0), ids)).toEqual([2, 0]);
+});
+
+test('the read-only plans (Timeline, Live) pan with the middle button even when it starts on a light', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-rgb', 4, 0, 'P');
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  const svg = page.locator('.tlv svg[aria-label="Stage"]');
+  await expect(svg).toBeVisible();
+  const b = (await svg.boundingBox())!;
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.wheel(0, -400);                      // (zoomed in: there's somewhere to pan to)
+  await expect.poll(() => svg.getAttribute('viewBox')).not.toBe('0.0 0.0 1000.0 560.0');
+  const before = await svg.getAttribute('viewBox');
+  const picked = await page.evaluate(() => [...(window as any).__luxdmx.selected]);
+  const light = (await page.locator('.tlv .fx[data-name="P 2"]').boundingBox())!;
+  await page.mouse.move(light.x + light.width / 2, light.y + light.height / 2);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(light.x + light.width / 2 + 120, light.y + light.height / 2 + 40, { steps: 6 });
+  await page.mouse.up({ button: 'middle' });
+  await expect.poll(() => svg.getAttribute('viewBox')).not.toBe(before);
+  // and the selection isn't changed from here
+  expect(await page.evaluate(() => [...(window as any).__luxdmx.selected])).toEqual(picked);
 });

@@ -1,6 +1,6 @@
 // Values -> Resolved: look up every preset reference for one fixture. A preset can carry a value
 // for all fixtures and overrides per fixture (each mover's own "on the singer" position).
-import { CELL_ATTRS, CELL_MOVES, type Color, type NumAttr, type Preset, type PresetRef, type Resolved, type Values } from '../model/types';
+import { CELL_ATTRS, CELL_MOVES, NUM_ATTRS, type Color, type NumAttr, type Preset, type PresetRef, type Resolved, type Values } from '../model/types';
 // what a cell can have of its own: its light, and on a moving bar where its head points
 const CELL_KEYS = [...CELL_ATTRS, ...CELL_MOVES];
 
@@ -123,14 +123,13 @@ export function spreadCells(l: Resolved, n: number): Resolved[] {
 // what cell k shows (the light itself when it has no cells of its own)
 export const cellLookAt = (l: Resolved | undefined, k: number, n: number): Resolved | undefined => cellsOf(l, n)?.[k] ?? l;
 
-const NUM: NumAttr[] = ['intensity', 'white', 'amber', 'uv', 'cct', 'pan', 'tilt', 'strobe', 'zoom', 'focus', 'iris',
-  'frost', 'prism', 'goboRotation', 'gobo', 'fog', 'haze', 'fan', 'speed', 'confetti', 'bubbles', 'flame', 'sparks', 'co2',
-  'gobo2', 'gobo2Rotation', 'prismRotation', 'animation', 'animationRotation', 'effectMacro', 'effectSpeed', 'colorMacro',
-  'goboShake', 'goboScroll', 'gobo2Shake', 'gobo2Scroll', 'panRotation', 'tiltRotation', 'roll', 'rollRotation', 'hoist'];
 // Attributes that jump instead of fading (a gobo halfway between two slots is a different gobo,
 // a macro halfway between two is another macro).
 const SNAP_AT_START: NumAttr[] = ['gobo', 'prism', 'gobo2', 'effectMacro', 'colorMacro', 'goboShake', 'goboScroll', 'gobo2Shake', 'gobo2Scroll'];
 const SNAP_AT_END: NumAttr[] = ['strobe'];
+// (each number attribute's way of going from a to b, looked up once: the mix asks it for every
+// attribute of every light of every list, every frame)
+const HOW = new Map<string, 'fade' | 'start' | 'end'>(NUM_ATTRS.map((k) => [k, SNAP_AT_START.includes(k) ? 'start' : SNAP_AT_END.includes(k) ? 'end' : 'fade']));
 
 // Blend b over a by t (0 = a, 1 = b). Attributes only one side has are taken as they are.
 // tIntensity: the light's level's own clock; tDown: the clock for a cell's level going down (the
@@ -147,13 +146,16 @@ export const TIME_FAMILY: Partial<Record<string, 'color' | 'position' | 'beam'>>
 export function lerpResolved(a: Resolved, b: Resolved, t: number, tIntensity = t, tDown?: number, tBy?: { color: number; position: number; beam: number }): Resolved {
   const out: Resolved = { ...a };
   const tColor = tBy ? tBy.color : t;
-  for (const k of NUM) {
-    const x = a[k], y = b[k];
+  // (only what b sets: a cue names a few of the 41, not all of them)
+  for (const key in b) {
+    const how = HOW.get(key);
+    if (!how) continue;
+    const k = key as NumAttr, x = a[k], y = b[k];
     if (y === undefined) continue;
     if (x === undefined) { out[k] = y; continue; }
     const fam = tBy ? TIME_FAMILY[k] : undefined;
     const tt = k === 'intensity' ? tIntensity : fam ? tBy![fam] : t;
-    out[k] = SNAP_AT_START.includes(k) ? (tt > 0 ? y : x) : SNAP_AT_END.includes(k) ? (tt >= 1 ? y : x) : x + (y - x) * tt;
+    out[k] = how === 'start' ? (tt > 0 ? y : x) : how === 'end' ? (tt >= 1 ? y : x) : x + (y - x) * tt;
   }
   if (b.color) {
     const c = a.color ?? b.color;

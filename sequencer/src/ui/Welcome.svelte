@@ -16,11 +16,14 @@
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import { ALL_TEMPLATES as TEMPLATES } from '../content/ringMatrix';
+  import { sizeSaid } from '../content/sizes';
   import type { Template } from '../content/templates';
   import { lightsOnly } from '../content/lightsOnly';
   import type { DemoInfo } from '../content/demos';
   import type { Show } from '../model/types';
-  import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
+  import { GENRES, type CatalogSong } from '../timeline/catalog';
+  import { progressSaid, songsByGenre } from '../timeline/songPicker';
+  import { clockOf } from '../model/timeline';
   import { DEMO_SONG, demoSong, startDemo } from './startDemo';
   import { TEMPLATE_SHOWS } from '../content/templateShows';
   import { onDestroy } from 'svelte';
@@ -35,7 +38,7 @@
   let demos = $state<Demo[]>([
     { id: 'festival', name: 'Festival stage', icon: 'mover', song: DEMO_SONG, blurb: 'A band on a big stage in a hall: over a hundred moving heads hitting the beat, every effect machine, a crowd of hundreds.' },
   ]);
-  import('../content/demos').then((m) => { demos = m.DEMOS.map((d) => ({ ...d })); count(); }).catch(() => {});
+  import('../content/demos').then((m) => { demos = m.DEMOS.map((d) => ({ ...d })); }).catch(() => {});
   const HUE: Record<string, string> = { festival: 'var(--orange)', club: 'var(--violet)', party: 'var(--pink)', truss: 'var(--cyan)' };
   const TPL_HUES = ['var(--blue)', 'var(--green)', 'var(--violet)', 'var(--orange)', 'var(--cyan)', 'var(--pink)'];
   // a template as a show to play (its own song; `t:` and its name, as startDemo takes it)
@@ -57,39 +60,11 @@
   let songs = $state<Record<string, string>>(WELCOME_SONGS.get());
   const songOf = (d: Demo) => { const v = songs[d.id]; return v === 'beat' || demoSong(v) ? v! : d.song ?? DEMO_SONG; };
   function pickSong(d: Demo, v: string) { songs[d.id] = v; WELCOME_SONGS.set({ ...songs }); }
-  const byGenre = (() => {
-    const m = new Map<string, CatalogSong[]>();
-    for (const s of CATALOG) { const g = GENRES[s.genre] ?? s.genre; m.set(g, [...(m.get(g) ?? []), s]); }
-    return [...m];
-  })();
-  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
-
-  // what's in each (lights, cues), worked out once the dialog is up, one at a time
-  let counts = $state<Record<string, { lights: number; cues: number }>>({});
-  const tally = (s: Show) => ({ lights: s.fixtures.length, cues: s.cueLists.reduce((n, l) => n + l.cues.length, 0) });
-  let counting = false;
-  function count() {
-    if (counting) return;
-    counting = true;
-    // (the list again each time: the demos come in while the templates are being counted)
-    const todo = (): [string, () => Show][] => [
-      ...TEMPLATES.map((t) => [`t:${t.name}`, t.build] as [string, () => Show]),
-      ...demos.filter((d) => d.build).map((d) => [`d:${d.id}`, () => d.build!()] as [string, () => Show]),
-    ];
-    const next = () => {
-      const job = todo().find(([k]) => !counts[k]);
-      if (!job || gone) { counting = false; return; }
-      try { counts[job[0]] = tally(job[1]()); } catch { counts[job[0]] = { lights: 0, cues: 0 }; }
-      setTimeout(next, 0);
-    };
-    setTimeout(next, 30);
-  }
-  count();
-  const said = (k: string) => { const c = counts[k]; return c ? `${c.lights} light${c.lights === 1 ? '' : 's'} · ${c.cues} cue${c.cues === 1 ? '' : 's'}` : ' '; };
+  const byGenre = songsByGenre();
 
   // a demo: the song comes down first (its progress on the tile); closing cancels it
   let dl = $state<{ id: string; got: number; total: number; ctl: AbortController } | null>(null);
-  const pct = (d: { got: number; total: number }) => (d.total ? `${Math.min(99, Math.round((d.got / d.total) * 100))} %` : `${(d.got / 1e6).toFixed(1)} MB`);
+  const pct = progressSaid;
   async function play(d: Demo) {
     if (dl) return;
     const ctl = new AbortController(), song = d.song ? songOf(d) : 'beat';
@@ -113,9 +88,8 @@
   }
   function template(t: Template) { void app.startShow(t.build()); onclose(); }
 
-  let gone = false;
   function close() { dl?.ctl.abort(); dl = null; onclose(); }
-  onDestroy(() => { gone = true; dl?.ctl.abort(); });
+  onDestroy(() => { dl?.ctl.abort(); });
 
   let showFile = $state<HTMLInputElement>();
   async function open(f: File) {
@@ -136,7 +110,7 @@
       {/each}
       <optgroup label="Made here"><option value="beat">The demo beat</option></optgroup>
     </select></label>
-  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clock(s.duration)} · {s.license}{:else}Made in the browser, nothing to download{/if}</p>
+  <p class="credit">{#if s}{GENRES[s.genre]}, {Math.round(s.bpm)} BPM, {clockOf(s.duration, false)} · {s.license}{:else}Made in the browser, nothing to download{/if}</p>
 {/snippet}
 {#snippet getting(s: CatalogSong | undefined)}
   <button class="primary" disabled aria-busy="true"><Icon name="play" />{s && dl ? `Getting the song… ${pct(dl)}` : 'Starting…'}</button>
@@ -161,7 +135,7 @@
             <div class="tile" role="group" aria-label={d.name} style:--hue={HUE[d.id] ?? 'var(--orange)'}>
               <div class="th"><span class="ic"><Icon name={d.icon} size={22} /></span><b>{d.name}</b></div>
               <p class="blurb">{d.blurb}</p>
-              <p class="meta">{said(`d:${d.id}`)}</p>
+              <p class="meta">{sizeSaid(`d:${d.id}`) || ' '}</p>
               {#if d.song}
                 {@render music(d, song, s)}
               {:else}
@@ -214,7 +188,7 @@
           <div class="tile" role="group" aria-label={t.name} style:--hue={TPL_HUES[i % TPL_HUES.length]}>
             <div class="th"><span class="ic"><Icon name={t.icon} size={22} /></span><b>{t.name}</b></div>
             <p class="blurb">{t.blurb}</p>
-            <p class="meta">{said(`t:${t.name}`)}</p>
+            <p class="meta">{sizeSaid(`t:${t.name}`) || ' '}</p>
             {#if d}{@render music(d, song, s)}{/if}
             <div class="acts">
               {#if d && dl?.id === d.id}

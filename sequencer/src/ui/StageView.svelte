@@ -10,12 +10,13 @@
   import { app } from '../app.svelte';
   import { ui } from './ui.svelte';
   import { lookColor } from '../engine/cuelook';
-  import { cellLookAt } from '../engine/resolve';
   import { fixtureActions, fixtureMenu } from './actions';
   import { EFFECT_MAP } from '../engine/effects';
   import type { Fixture, Resolved } from '../model/types';
   import { roomFor } from '../stage3d/geometry';
   import { machineryOf, type Machinery } from '../model/library';
+  import { bestLabels, type At } from './stageLabels';
+  import StageSymbol from './StageSymbol.svelte';
 
   // compact: no toolbar. readonly: only to look at (the Live page): zoom and pan, no selecting or moving.
   // blindChip: says "Blind: only here" itself (the Live page has its own, one you can press)
@@ -59,8 +60,9 @@
     return { x: q.x / W, y: q.y / H };
   };
   function downFixture(e: PointerEvent, id: string) {
+    if (readonly) return;                          // (Live only looks: a pinch or a pan starting on a light is the plan's)
     e.stopPropagation();
-    if (e.button !== 0 || readonly) return;        // right-click: the menu, the selection stays; Live only looks
+    if (e.button !== 0) return;                    // right-click: the menu, the selection stays
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     const multi = ui.adding(e);
     if (multi) app.select(id, true);
@@ -139,18 +141,13 @@
     const x = px - (px - view.x) * view.k / k, y = py - (py - view.y) * view.k / k;
     view = { k, x: Math.max(0, Math.min(W - W / k, x)), y: Math.max(0, Math.min(H - H / k, y)) };
   }
+  // (onwheel isn't passive in Svelte 5 (only touchstart and touchmove are): preventDefault keeps
+  // the page from scrolling while the plan zooms)
   function wheel(e: WheelEvent) {
     e.preventDefault();
     const p = pt(e as unknown as PointerEvent);
     zoomAt(p.x * W, p.y * H, view.k * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0018)));
   }
-  // Not onwheel: Svelte makes that listener passive, and the page would scroll while zooming.
-  $effect(() => {
-    const el = svg;
-    if (!el) return;
-    el.addEventListener('wheel', wheel, { passive: false });
-    return () => el.removeEventListener('wheel', wheel);
-  });
   const touches = new Map<number, { x: number; y: number }>();
   let pinch: { d: number; k: number; cx: number; cy: number } | null = null;
   let pan: { x: number; y: number; vx: number; vy: number } | null = null;
@@ -302,85 +299,24 @@
     return out;
   });
   const css = (l: Resolved | undefined) => lookColor(l);
-  const cells = (id: string) => app.caps(id).cells;
-  // the cells picked on a light (outlined on the plan)
-  const picks = (id: string) => new Set(app.cellsPicked(id));
+  // each light's colour on the plan, once a frame (the glows, the beams and the symbols all use it)
+  const cssOf = $derived(new Map(app.show.fixtures.map((f) => [f.id, css(app.drawn[f.id])])));
   // one universe: addresses as plain numbers ("73", not "0.73", which reads like a decimal)
   const oneUni = $derived(new Set(app.show.fixtures.map((f) => f.universe)).size <= 1);
 
-  // Names that don't run into each other: each label goes under its light, or above when that's
-  // in the way (another name, another light), else beside it on the right or the left. One that
-  // fits nowhere is left out (hover shows it; a selected light always gets its name). Like the
-  // labels on a map.
-  type At = { x: number; y: number; anchor: 'middle' | 'start' | 'end' };
+  // Names that don't run into each other (ui/stageLabels.ts places them).
   // (its number and address with the name when # is on, in the same label: placed as one, so they
   // don't land on each other's or on the names, as they did drawn on their own)
   const addrOf = (f: Fixture) => `${f.num ? `#${f.num} ` : ''}${oneUni ? f.address : `${f.universe}.${f.address}`}`;
   const labelText = (f: Fixture) => [labels ? f.name : '', addrs ? addrOf(f) : ''].filter(Boolean).join('  ');
-  // (a crowded plan, a short screen: when not even 70 % of the names fit, they're tried a size
-  // smaller, and the size that fits more wins)
   // (the names grow with the interface size like every other text: at 140 % for weak eyes they
   // stayed 11 px; a size that doesn't fit falls back as below)
   const lpx = $derived(px * Math.max(1, ui.zoom));
-  const placed = $derived.by(() => {
-    if (!labels && !addrs) return { at: new Map<string, At | null>(), fs: 12 * lpx };
-    const a = placeAt(12 * lpx), n = app.show.fixtures.length, shown = (m: Map<string, At | null>) => [...m.values()].filter(Boolean).length;
-    if (shown(a) >= n * 0.7) return { at: a, fs: 12 * lpx };
-    const b = placeAt(10.5 * lpx);
-    if (shown(b) >= n * 0.7 || lpx === px) return shown(b) > shown(a) ? { at: b, fs: 10.5 * lpx } : { at: a, fs: 12 * lpx };
-    // (bigger than they fit: the normal sizes then)
-    const c = placeAt(10.5 * px);
-    return [{ at: a, fs: 12 * lpx }, { at: b, fs: 10.5 * lpx }, { at: c, fs: 10.5 * px }].reduce((x, y) => (shown(y.at) > shown(x.at) ? y : x));
-  });
+  const halfW = (id: string) => { const k = app.kinds[id]; return machines.get(id)?.half ?? (k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72)); };
+  const placed = $derived(labels || addrs
+    ? bestLabels({ fixtures: app.show.fixtures, selected: app.selected, text: labelText, halfW, size, px, W, H, edge: EDGE, cloth: (id) => machines.has(id) }, lpx)
+    : { at: new Map<string, At | null>(), fs: 12 * lpx });
   const labelAt = $derived(placed.at);
-  function placeAt(fs: number) {
-    const out = new Map<string, At | null>();
-    const halfW = (id: string) => { const k = app.kinds[id]; return machines.get(id)?.half ?? (k === 'bar' ? barHalf.get(id) ?? size * 2.2 : size * (k === 'mover' ? 0.9 : k === 'fog' || k === 'sfx' ? 0.8 : 0.72)); };
-    // Boxes (the lights' bodies, then each placed name) go into columns of the stage, so a name
-    // only checks what's near it: a big rig stays quick while a light is dragged around.
-    type Box = { x0: number; x1: number; y0: number; y1: number; id?: string };
-    const G = 160 * px, grid = new Map<number, Box[]>();
-    const cols = (b: Box) => { const out: number[] = []; for (let c = Math.floor(b.x0 / G); c <= Math.floor(b.x1 / G); c++) out.push(c); return out; };
-    const put = (b: Box) => { for (const c of cols(b)) { const l = grid.get(c); if (l) l.push(b); else grid.set(c, [b]); } };
-    const hits = (b: Box, self: string) => cols(b).some((c) => grid.get(c)?.some((o) => o.id !== self && o.x0 < b.x1 && b.x0 < o.x1 && o.y0 < b.y1 && b.y0 < o.y1));
-    for (const f of app.show.fixtures) { const w = halfW(f.id), x = f.x * W, y = f.y * H; put({ id: f.id, x0: x - w, x1: x + w, y0: y - size * 0.7, y1: y + size * 0.7 }); }
-    // the word "audience" at the front edge is in the way too
-    put({ id: 'audience', x0: W / 2 - 34 * px, x1: W / 2 + 34 * px, y0: H - 30, y1: H - 12 });
-    // and so are the stage's measurements, "14 m wide" at the top and "9 m deep" at the side
-    put({ id: 'wide', x0: W / 2 - 32 * px, x1: W / 2 + 32 * px, y0: 2 * px, y1: 24 * px });
-    put({ id: 'deep', x0: 8 * px, x1: 22 * px, y0: H / 2 - 28 * px, y1: H / 2 + 28 * px });
-    // (a name reads as the light nearest to it: every other light clearly further from the label
-    // than its own, else it's left out rather than mistaken for that one's)
-    // (above it, the last resort, it has to be clearly its own: that's where a name read as the
-    // light in the row before)
-    // (distances to the edge of a light's symbol: a long bar's name at its end is next to it)
-    const gapTo = (o: Fixture, cx: number, cy: number) => { const w = halfW(o.id), h = size * 0.7, x = o.x * W, y = o.y * H; return Math.hypot(Math.max(x - w - cx, 0, cx - x - w), Math.max(y - h - cy, 0, cy - y - h)); };
-    const ownest = (f: Fixture, b: Box, k: number) => {
-      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, own = gapTo(f, cx, cy);
-      for (const o of app.show.fixtures) if (o !== f && Math.abs(cx - o.x * W) < own * k + halfW(o.id) && gapTo(o, cx, cy) < own * k) return false;
-      return true;
-    };
-    const sel = new Set(app.selected);
-    const order = [...app.show.fixtures].sort((a, b) => Number(sel.has(b.id)) - Number(sel.has(a.id)));
-    for (const f of order) {
-      const x = f.x * W, y = f.y * H, half = labelText(f).length * fs * 0.3 + 2 * px, side = halfW(f.id) + 4 * px;
-      const below = y + size * 1.15 + 13 * px, above = y - size * 1.1 - 4 * px, mid = y + fs * 0.35;
-      // under it, else beside it (level with it: it can't be read as another's), above only last
-      // (a name above sat right under the light in the row before and read as that one's); the
-      // front row the other way round, clear of the audience's edge
-      const [first, last] = y > H * 0.86 ? [above, below] : [below, above];
-      const tries: At[] = [{ x, y: first, anchor: 'middle' }, { x: x + side, y: mid, anchor: 'start' }, { x: x - side, y: mid, anchor: 'end' }, { x, y: last, anchor: 'middle' }];
-      let at: At | null = null;
-      for (const [n, t] of tries.entries()) {
-        const x0 = t.anchor === 'middle' ? t.x - half : t.anchor === 'start' ? t.x : t.x - 2 * half, x1 = x0 + 2 * half;
-        const b: Box = { x0, x1, y0: t.y - fs * 0.9, y1: t.y + fs * 0.3, id: `label:${f.id}` };
-        // (inside the plan both ways: a name over a light in the back row stuck out of the top)
-        if (x0 >= 0 && x1 <= W && b.y0 >= -H * EDGE && b.y1 <= H * (1 + EDGE) && !hits(b, f.id) && (n < 3 || ownest(f, b, 1.15))) { at = t; put(b); break; }
-      }
-      out.set(f.id, at ?? (sel.has(f.id) ? tries[0] : null));
-    }
-    return out;
-  }
 </script>
 
 <div class="panel stage-wrap" data-marks="show">
@@ -446,7 +382,7 @@
     {#if !ui.stage3d}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (an application region: the stage handles its own keys) -->
     <svg bind:this={svg} viewBox={vb} preserveAspectRatio="none" role="application" aria-label="Stage" aria-describedby="stage-keys" tabindex="0" onkeydown={stageKey}
-         onpointerdown={downBg} onpointermove={(e) => { moveBg(e); moveFixture(e); }} onpointerup={upBg} onpointercancel={upBg} oncontextmenu={bgMenu}>
+         onwheel={wheel} onpointerdown={downBg} onpointermove={(e) => { moveBg(e); moveFixture(e); }} onpointerup={upBg} onpointercancel={upBg} oncontextmenu={bgMenu}>
       <desc id="stage-keys">Arrow keys move the selected lights (Shift: bigger steps). Ctrl+A selects every light, Escape none, Delete removes the selected. Drag on the floor to select with a box.</desc>
       <defs>
         <radialGradient id="floor" cx="50%" cy="0%" r="90%"><stop offset="0" stop-color="#1c2533" /><stop offset="1" stop-color="#090c11" /></radialGradient>
@@ -475,7 +411,7 @@
         {#each app.show.fixtures as f (f.id)}
           {@const k = app.kinds[f.id]}
           {#if k === 'par' || k === 'bar' || k === 'dimmer'}
-            {@const c = css(app.drawn[f.id])}
+            {@const c = cssOf.get(f.id)!}
             {#if c.glow > 0.04}
               <ellipse cx={f.x * W} cy={f.y * H + size * 1.5} rx={size * (k === 'bar' ? 3.4 : 2.2)} ry={size * 0.9} fill={c.css} opacity={0.18 * Math.min(1, c.glow)} />
             {/if}
@@ -487,7 +423,7 @@
         {@const k = app.kinds[f.id]}
         {#if k === 'mover'}
           {@const l = app.drawn[f.id]}
-          {@const c = css(l)}
+          {@const c = cssOf.get(f.id)!}
           {#if c.glow > 0.02}
             {@const pan = ((l?.pan ?? 0.5) - 0.5) * 2.6}
             {@const len = 70 + 260 * (l?.tilt ?? 0.5)}
@@ -499,7 +435,7 @@
       {/each}
       {#each app.show.fixtures as f (f.id)}
         {@const l = app.drawn[f.id]}
-        {@const c = css(l)}
+        {@const c = cssOf.get(f.id)!}
         {@const kind = app.kinds[f.id] ?? 'other'}
         {@const sel = !readonly && app.selected.includes(f.id)}
         {@const x = f.x * W}
@@ -507,76 +443,8 @@
         <g class="fx" data-name={f.name} role="button" tabindex="-1" aria-label={f.name} aria-pressed={sel}
            class:dropping={dropFx === f.id} oncontextmenu={(e) => fxMenu(e, f.id)}
            ondragover={(e) => { if (isPreset(e)) { e.preventDefault(); dropFx = f.id; } }} ondragleave={() => { if (dropFx === f.id) dropFx = null; }} ondrop={(e) => presetDrop(e, f.id)}
-           onpointerdown={(e) => downFixture(e, f.id)} onpointermove={moveFixture} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
-          {#if machines.has(f.id)}
-            <!-- a curtain or a drop: its cloth across the stage, solid where it hangs in view (a curtain
-                 closed, a drop flown in), dashed where it's out of the way; a track's halves part -->
-            {@const mc = machines.get(f.id)!}
-            {@const v = Math.max(0, Math.min(1, (l as { hoist?: number } | undefined)?.hoist ?? 0))}
-            {@const shown = mc.how === 'flybar' ? v : 1 - v}
-            {@const th = size * 0.36}
-            {@const fill = mc.how === 'flybar' ? '#4f6a4a' : '#7a1420'}
-            <rect class="cloth" x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill="none" stroke="#4a5463" stroke-width={1.2 * px} stroke-dasharray="{4 * px} {3 * px}" />
-            {#if mc.how === 'curtain'}
-              {@const part = mc.half * Math.max(0.08, 1 - v)}
-              <rect x={x - mc.half} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
-              <rect x={x + mc.half - part} y={y - th} width={part} height={th * 2} rx="2" fill={fill} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
-            {:else}
-              <rect x={x - mc.half} y={y - th} width={mc.half * 2} height={th * 2} rx="2" fill={fill} opacity={0.15 + 0.85 * shown} stroke={sel ? 'var(--orange)' : 'none'} stroke-width={2.5 * px} />
-            {/if}
-          {:else if kind === 'mover'}
-            <circle cx={x} cy={y} r={size * 1.25} fill={c.css} opacity={c.glow * 0.45} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-            <rect x={x - size * 0.9} y={y - size * 0.25} width={size * 1.8} height={size * 0.5} rx="3" fill="#2a313c" />
-            <circle cx={x} cy={y} r={size * 0.62} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-          {:else if kind === 'bar' && app.placesOf(f.id)}
-            {@const at = app.placesOf(f.id)!}
-            {@const R = size * 2}
-            {#if at.round}
-              <circle cx={x} cy={y} r={R * 1.05} fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-              <circle cx={x} cy={y} r={R * 1.04} fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            {:else}
-              {@const w = R * (at.gw - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1) + size * 0.2}
-              {@const h = R * (at.gh - 1) / Math.max(1, Math.max(at.gw, at.gh) - 1) + size * 0.2}
-              <rect x={x - w} y={y - h} width={w * 2} height={h * 2} rx="3" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-              <rect x={x - w} y={y - h} width={w * 2} height={h * 2} rx="3" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            {/if}
-            <!-- its pixels, where they really are -->
-            {#each Array(at.n) as _, i (i)}
-              {@const cc = css(cellLookAt(l, i, at.n))}
-              <circle class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} cx={x + at.x[i] * R} cy={y - at.y[i] * R} r={Math.max(0.6, at.dot * R)} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
-            {/each}
-          {:else if kind === 'bar'}
-            {@const n = cells(f.id)}
-            {@const bw = barHalf.get(f.id) ?? size * 2.2}
-            <rect x={x - bw} y={y - size * 0.55} width={bw * 2} height={size * 1.1} rx="4" fill={c.css} opacity={c.glow * 0.4} filter={blur ? 'url(#glow)' : undefined} pointer-events="none" />
-            <rect x={x - bw} y={y - size * 0.42} width={bw * 2} height={size * 0.84} rx="4" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            <!-- its cells (a long pixel strip: the pixels touch, no gaps) -->
-            {#each Array(n) as _, i (i)}
-              {@const cc = css(cellLookAt(l, i, n))}
-              <rect class="px" class:picked={sel && picks(f.id).has(i)} data-cell={i} x={x - bw * 0.93 + (i * bw * 1.86) / n} y={y - size * 0.28} width={Math.max(0.5, (bw * 1.86) / n - (n > 24 ? 0 : 2))} height={size * 0.56} rx={n > 24 ? 0 : 2} fill={cc.glow > 0.02 ? cc.css : '#232a35'} />
-            {/each}
-          {:else if kind === 'sfx'}
-            <!-- an effect machine: what it is, lit while it runs -->
-            {@const at = (['confetti', 'bubbles', 'flame', 'sparks', 'co2'] as const).find((a) => app.modeOf(f.id)?.channels.some((ch) => ch.attr === a)) ?? 'confetti'}
-            {@const on = ((l as Record<string, number> | undefined)?.[at] ?? 0) > 0.02}
-            <rect x={x - size * 0.8} y={y - size * 0.5} width={size * 1.6} height={size} rx="5" fill={on ? '#3a2a10' : '#1a2029'} stroke={sel ? 'var(--orange)' : on ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            <text x={x} y={y + size * 0.16} text-anchor="middle" class="glyph" font-size={size * 0.4}>{({ confetti: 'CONF', bubbles: 'BUBL', flame: 'FIRE', sparks: 'SPRK', co2: 'CO2' })[at]}</text>
-          {:else if kind === 'fog'}
-            {@const fog = l?.fog ?? l?.haze ?? 0}
-            {@const hazer = !!app.modeOf(f.id)?.channels.some((ch) => ch.attr === 'haze') && !app.modeOf(f.id)?.channels.some((ch) => ch.attr === 'fog')}
-            {#if fog > 0.02}
-              {#each [0, 1, 2] as k (k)}<circle pointer-events="none" class="puff" class:still={!moving} style="animation-delay:{k * 0.5}s" cx={x - size * 0.3} cy={y} r={size * (0.9 + k * 0.5)} fill="#cfd8e3" opacity={0.18 * fog} />{/each}
-            {/if}
-            <rect x={x - size * 0.8} y={y - size * 0.5} width={size * 1.6} height={size} rx="5" fill="#1a2029" stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            <text x={x} y={y + size * 0.18} text-anchor="middle" class="glyph" font-size={size * (hazer ? 0.45 : 0.55)}>{hazer ? 'HAZE' : 'FOG'}</text>
-          {:else}
-            {@const strobe = (l?.strobe ?? 0) > 0.02 && c.glow > 0.02}
-            <circle cx={x} cy={y} r={size * 1.5} fill={c.css} opacity={c.glow * 0.5} filter={blur ? 'url(#glow)' : undefined} class:flash={strobe && moving} pointer-events="none"
-                    style={strobe ? `animation-duration:${(0.5 - 0.42 * (l?.strobe ?? 0)).toFixed(2)}s` : ''} />
-            <circle cx={x} cy={y} r={size * 0.72} fill={c.glow > 0.02 ? c.css : '#1a2029'} stroke={sel ? 'var(--orange)' : '#4a5463'} stroke-width={(sel ? 2.5 : 1.2) * px} />
-            {#if kind === 'par'}<circle cx={x} cy={y} r={size * 0.38} fill="none" stroke="#00000055" stroke-width="1.5" />{/if}
-            {#if kind === 'strobe'}<text x={x} y={y + size * 0.22} text-anchor="middle" class="glyph" font-size={size * 0.7}>⚡</text>{/if}
-          {/if}
+           onpointerdown={(e) => downFixture(e, f.id)} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
+          <StageSymbol {f} {l} {c} {kind} {sel} {x} {y} {size} {px} {blur} {moving} mc={machines.get(f.id)} barW={barHalf.get(f.id)} />
           <title>{f.num ? `${f.num} ` : ''}{f.name} · {oneUni ? `address ${f.address}` : `universe ${f.universe}, address ${f.address}`}</title>
         </g>
       {/each}
@@ -628,23 +496,16 @@
   @media (max-width: 760px) { .zoomin { display: none; } }
   svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
   .fx { cursor: grab; }
-  .px.picked { stroke: #ffaa1c; stroke-width: 1.5px; }   /* (picked: orange, as selection is everywhere) */
   .fx:focus { outline: none; }
   .fx.dropping { filter: drop-shadow(0 0 6px var(--orange)); }
   .fx:active { cursor: grabbing; }
   .lbl { fill: var(--muted); pointer-events: none; paint-order: stroke; stroke: #0b0e13; stroke-width: 3px; stroke-linejoin: round; }
   .lbl.sel { fill: var(--orange); font-weight: 600; }
   .adr { fill: var(--faint); font-family: ui-monospace, monospace; pointer-events: none; paint-order: stroke; stroke: #0b0e13; stroke-width: 3px; stroke-linejoin: round; }
-  .glyph { fill: var(--muted); font-weight: 700; pointer-events: none; }
   .edge { fill: var(--faint); letter-spacing: .25em; text-transform: uppercase; }
   .dims line { stroke: #ffffff2e; stroke-width: 1; vector-effect: non-scaling-stroke; }
   .dims text { fill: var(--faint); opacity: .8; }
   .beam { filter: blur(2px); }
-  .puff { animation: puff 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-  .puff.still { animation: none; }
-  @keyframes puff { 0%, 100% { transform: scale(.85); } 50% { transform: scale(1.12); } }
-  .flash { animation: flash .2s steps(2, jump-none) infinite; }
-  @keyframes flash { 50% { opacity: 0; } }
   /* over the 3D stage too (it sits at z-index 3) */
   .tplbtn { font-size: .85rem; color: var(--muted); padding: .2rem .45rem; }
   .empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; justify-content: center;

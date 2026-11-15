@@ -1,18 +1,24 @@
-// What every cue of a list looks like on its own, without playing it: for cue thumbnails and the
-// show manager. In a play a cue keeps what the cues before it set for fixtures it doesn't mention,
-// exactly like playback does, so each picture shows the real look at that point in the list. In a
-// list of looks (`own`) a look is what it names, so that's its picture ("Hall": the hall).
-import type { Color, CueList, Preset, Resolved } from '../model/types';
+// What every cue of a list looks like on its own, without playing it: for the cue cards and the
+// QLC+ export. In a play a cue keeps what the cues before it set for fixtures it doesn't mention,
+// as playback does (player.ts trackedLook): fog, haze and the machines only in the cue that sets
+// them, never carried on (an exported scene after a flame cue fired the flame again, and QLC+ has
+// no Arm). In a list of looks (`own`) a look is what it names, so that's its picture.
+import { FOGGY, type Color, type CueList, type Preset, type Resolved } from '../model/types';
 import { overlay, resolveValues, topLevel } from './resolve';
 
 export function cueLooks(list: CueList, presets: Map<string, Preset>, own = false): Record<string, Resolved>[] {
   const out: Record<string, Resolved>[] = [];
-  let cur: Record<string, Resolved> = {};
+  let left: Record<string, Resolved> = {};          // what the cues so far leave for the next ones
   for (const c of list.cues) {
-    const next = own ? {} : { ...cur };
-    for (const [id, v] of Object.entries(c.values)) next[id] = own ? resolveValues(v, id, presets) : overlay(cur[id], resolveValues(v, id, presets));
-    out.push(next);
-    cur = next;
+    if (own) { out.push(Object.fromEntries(Object.entries(c.values).map(([id, v]) => [id, resolveValues(v, id, presets)]))); continue; }
+    const look = { ...left }, next = { ...left };
+    for (const [id, v] of Object.entries(c.values)) {
+      const r = overlay(left[id], resolveValues(v, id, presets)), kept = { ...r };
+      for (const f of FOGGY) delete kept[f];
+      look[id] = r; next[id] = kept;
+    }
+    out.push(look);
+    left = next;
   }
   return out;
 }
@@ -24,15 +30,21 @@ export function levelOf(l: Resolved | undefined): number {
   return l ? topLevel(l) : 0;
 }
 
+// the colour of a look's brightest cell (undefined: no cell has one)
+function brightestCell(l: Resolved): Color | undefined {
+  let cell: Color | undefined, best = -1;
+  if (l.cells) for (const c of l.cells) { if (c.color && (c.intensity ?? 0) > best) { best = c.intensity ?? 0; cell = c.color; } }
+  else for (const k in l.cellVals ?? {}) { const c = l.cellVals![k]; const x = l.cellLvl?.[+k] ?? c.intensity ?? 1; if (c.color && x > best) { best = x; cell = c.color; } }
+  return cell;
+}
+
 // A look as one light (a beam in 3D, a dot on a plan): lit by its cells more than by itself, at
 // its brightest cell's level and colour.
 export function wholeLook(l: Resolved | undefined): Resolved | undefined {
   if (!l || !(l.cellVals || l.cells || l.cellLvl)) return l;
   const d = topLevel(l);
   if (d <= (l.intensity ?? 0) + 1e-3) return l;
-  let cell: Color | undefined, best = -1;
-  if (l.cells) for (const c of l.cells) { if (c.color && (c.intensity ?? 0) > best) { best = c.intensity ?? 0; cell = c.color; } }
-  else for (const k in l.cellVals ?? {}) { const c = l.cellVals![k]; const x = l.cellLvl?.[+k] ?? c.intensity ?? 1; if (c.color && x > best) { best = x; cell = c.color; } }
+  const cell = brightestCell(l);
   return { ...l, intensity: d, ...(cell ? { color: cell } : {}) };
 }
 
@@ -41,12 +53,7 @@ export function lookColor(l: Resolved | undefined): { css: string; glow: number 
   if (!l) return { css: 'rgb(0,0,0)', glow: 0 };
   const d = levelOf(l), w = l.white ?? 0;
   // (a look lit by its cells more than by itself: the colour of its brightest cell)
-  let cell: Color | undefined;
-  if ((l.cellVals || l.cells) && d > (l.intensity ?? 0) + 1e-3) {
-    let best = -1;
-    if (l.cells) for (const c of l.cells) { if (c.color && (c.intensity ?? 0) > best) { best = c.intensity ?? 0; cell = c.color; } }
-    else for (const k in l.cellVals) { const c = l.cellVals[k]; const x = l.cellLvl?.[+k] ?? c.intensity ?? 1; if (c.color && x > best) { best = x; cell = c.color; } }
-  }
+  const cell = (l.cellVals || l.cells) && d > (l.intensity ?? 0) + 1e-3 ? brightestCell(l) : undefined;
   const { r, g, b } = l.draw ?? cell ?? l.color ?? { r: 1, g: 1, b: 1 };
   const c = (v: number) => Math.round(Math.min(1, (v + w) * d) * 255);
   return { css: `rgb(${c(r)},${c(g)},${c(b)})`, glow: d };

@@ -5,7 +5,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Page } from '@playwright/test';
-import { openConnected, resetFake, channels, history, patch, test, expect, startTemplate } from './helpers';
+import { openConnected, resetFake, channels, frames, history, patch, test, expect, startTemplate } from './helpers';
 
 test.beforeEach(async () => { await resetFake(); });
 
@@ -108,6 +108,14 @@ test('an effect dragged on runs as a bar; Del removes what is selected and Undo 
   await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.liveFx.includes(e), id)).toBe(true);
   await page.evaluate((t) => (window as any).__luxdmx.timeline.seek(t), it.at + it.len + 1);
   await expect.poll(() => page.evaluate((e) => (window as any).__luxdmx.liveFx.includes(e), id)).toBe(false);
+  // its length from the keyboard: Alt+arrows, a beat each
+  const beat = await page.evaluate(() => { const a = (window as any).__luxdmx; return 60 / (a.show.timeline.bpm ?? a.show.settings.bpm); });
+  await page.locator('.tlv .it').first().focus();
+  await page.keyboard.press('Alt+ArrowRight');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].len)).toBeCloseTo(it.len + beat, 3);
+  await page.keyboard.press('Alt+ArrowLeft'); await page.keyboard.press('Alt+ArrowLeft');
+  await expect.poll(() => page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].len)).toBeCloseTo(it.len - beat, 3);
+  expect(await page.evaluate(() => (window as any).__luxdmx.show.timeline.items[0].at)).toBe(it.at);
   await page.locator('.tlv .it').first().click();
   await page.keyboard.press('Delete');
   await expect(page.locator('.tlv .it')).toHaveCount(0);
@@ -401,4 +409,118 @@ test('the Effects track opened: a row per knob; the line drags the effect\'s own
   const tr = await page.locator('.tlv .tracks').boundingBox();
   await page.mouse.move(tr!.x + 200, tr!.y + 60); await page.mouse.wheel(0, -300);
   await expect.poll(async () => (await page.locator('.tlv .it').first().boundingBox())!.width).toBeGreaterThan(w0!.width * 1.3);
+});
+
+test('a list\'s track opened: its level over the song, a point put and moved dims the list while the song plays (on the wire too); the Moments track opened: how long each lasts, dragged and keyed', async ({ page }) => {
+  await bar(page);
+  await page.locator('.tlv .pal .chip').first().click();                   // the list's first cue at 0:00
+  const { list, name } = await page.evaluate(() => { const a = (window as any).__luxdmx, id = a.show.timeline.items[0].lane.slice(5); return { list: id, name: a.show.cueLists.find((l: any) => l.id === id).name }; });
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(0));
+  const lit = () => page.evaluate(() => Object.values((window as any).__luxdmx.stage as Record<string, any>).reduce((s, v) => s + (v.intensity ?? 0), 0));
+  const wire = async () => Object.values(await frames()).reduce((s, f) => s + f.ch.reduce((a, b) => a + b, 0), 0);
+  await expect.poll(lit).toBeGreaterThan(0.5);
+  const full = await lit(), wireFull = await wire();
+  // opened: a dashed line at full; a click low in the row puts a point there (that level all song long)
+  await page.locator('.tlv').getByRole('button', { name: `Open the level of ${name}` }).click();
+  const rows = page.locator('.tlv .lane.sub svg.level'), row = rows.first();
+  await expect(rows).toHaveCount(1);
+  await expect(row.locator('line.own')).toHaveCount(1);
+  const r = await row.boundingBox();
+  await page.mouse.click(r!.x + r!.width * 0.4, r!.y + r!.height * 0.75);
+  const pts = () => page.evaluate((l) => (window as any).__luxdmx.show.timeline.levels?.[l], list);
+  await expect.poll(async () => (await pts())?.length).toBe(1);
+  expect((await pts())[0][1]).toBeGreaterThan(0.1); expect((await pts())[0][1]).toBeLessThan(0.35);
+  // Undo takes it away, Redo puts it back
+  await page.keyboard.press('Control+z');
+  await expect.poll(pts).toBeUndefined();
+  await page.keyboard.press('Control+Shift+z');
+  await expect.poll(async () => (await pts())?.length).toBe(1);
+  // another list's row, while this one has a point: one plain click puts its first point too
+  await page.evaluate(() => (window as any).__luxdmx.newList('Second'));
+  const levelOpeners = page.locator('.tlv .nl .open[aria-label^="Open the level of "][aria-expanded="false"]');
+  expect(await levelOpeners.count()).toBeGreaterThan(0);
+  const label = (await levelOpeners.first().getAttribute('aria-label'))!;
+  const other = label.replace(/^Open the level of /, '');
+  await levelOpeners.first().click();
+  await expect(rows).toHaveCount(2);
+  const r2 = await page.locator(`.tlv svg.level[aria-label="The level of ${other} over the song"]`).boundingBox();
+  await page.mouse.click(r2!.x + r2!.width * 0.6, r2!.y + r2!.height * 0.5);
+  await expect.poll(() => page.evaluate((n) => { const a = (window as any).__luxdmx; const id = a.show.cueLists.find((x: any) => x.name === n).id; return a.show.timeline.levels?.[id]?.length; }, other)).toBe(1);
+  await expect(page.locator(`.tlv svg.level[aria-label="The level of ${other} over the song"] circle.pt`)).toHaveCount(1);
+  await page.locator('.tlv').getByRole('button', { name: `Close the level of ${other}` }).click();
+  await expect(rows).toHaveCount(1);
+  // the point dragged further down: lower still
+  const pt = await row.locator('circle.pt').boundingBox();
+  await page.mouse.move(pt!.x + pt!.width / 2, pt!.y + pt!.height / 2); await page.mouse.down();
+  await page.mouse.move(pt!.x + pt!.width / 2, r!.y + r!.height * 0.9, { steps: 4 }); await page.mouse.up();
+  await expect.poll(async () => (await pts())[0][1]).toBeLessThan(0.15);
+  const level = (await pts())[0][1];
+  // paused nothing changes; playing, the list is at that level: the stage and the wire dimmer
+  expect(await page.evaluate((l) => (window as any).__luxdmx.engine.levelOver[l], list)).toBeUndefined();
+  await page.locator('.transport').getByRole('button', { name: 'Play' }).click();
+  await expect.poll(() => page.evaluate((l) => (window as any).__luxdmx.engine.levelOver[l], list)).toBeCloseTo(level, 2);
+  await expect.poll(lit).toBeLessThan(full * 0.5);
+  await expect.poll(wire).toBeLessThan(wireFull);
+  await page.locator('.transport').getByRole('button', { name: 'Pause' }).click();
+  await expect.poll(() => page.evaluate((l) => (window as any).__luxdmx.engine.levelOver[l], list)).toBeUndefined();
+  await expect.poll(lit).toBeGreaterThan(full * 0.9);
+  // a double-click on the point takes it away: the dashed line at full again
+  await row.locator('circle.pt').dblclick();
+  await expect.poll(pts).toBeUndefined();
+  await expect(row.locator('line.own')).toHaveCount(1);
+  // the keyboard: Enter on the row puts a point at the playhead (at full: there were none), the
+  // arrows change it (5 %, Shift 1 %; a beat along), Delete takes it away
+  const beat = await page.evaluate(() => { const a = (window as any).__luxdmx; return 60 / (a.show.timeline.bpm ?? a.show.settings.bpm); });
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(8));
+  await row.focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await pts())?.length).toBe(1);
+  const t0 = (await pts())[0][0];
+  expect(Math.abs(t0 - 8)).toBeLessThan(beat);
+  expect((await pts())[0][1]).toBe(1);
+  await expect(row.locator('circle.pt')).toBeFocused();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await pts())[0][1]).toBeCloseTo(0.84, 5);
+  expect((await pts())[0][0]).toBeCloseTo(t0 + beat, 3);
+  await expect(row.locator('circle.pt')).toHaveAttribute('aria-valuenow', '84');
+  await page.keyboard.press('Delete');
+  await expect.poll(pts).toBeUndefined();
+  await expect(row).toBeFocused();
+
+  // a strobe hit at 0:04; the Moments track opened: a bar as long as it lasts (2 s)
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(4));
+  await page.locator('.tlv .pal .chip.mo').filter({ hasText: 'Strobe hit' }).click();
+  const hit = () => page.evaluate(() => (window as any).__luxdmx.show.timeline.items.find((i: any) => i.do.do === 'burst').do.seconds);
+  expect(await hit()).toBe(2);
+  await page.locator('.tlv').getByRole('button', { name: "Open the moments' lengths" }).click();
+  const len = page.locator('.tlv .lane.sub [role=slider]');
+  await expect(len).toHaveCount(1);
+  await expect(len).toHaveAttribute('aria-valuenow', '2');
+  // its end dragged to the right: longer (zoomed in, the playhead off it)
+  await page.evaluate(() => (window as any).__luxdmx.timeline.seek(0));
+  for (let i = 0; i < 4; i++) await page.locator('.tlv').getByRole('button', { name: 'Zoom in' }).click();
+  await len.scrollIntoViewIfNeeded();
+  const e = await len.locator('.end').boundingBox(), b = await len.boundingBox();
+  await page.mouse.move(e!.x + e!.width / 2, e!.y + e!.height / 2); await page.mouse.down();
+  await page.mouse.move(e!.x + e!.width / 2 + b!.width, e!.y + e!.height / 2, { steps: 4 }); await page.mouse.up();
+  await expect.poll(hit).toBeGreaterThan(3);
+  const dragged = await hit();
+  // the arrow keys on it: half a second each, Shift a tenth; Undo takes a step back
+  await len.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(hit).toBeCloseTo(dragged - 0.5, 5);
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect.poll(hit).toBeCloseTo(dragged - 0.4, 5);
+  await page.keyboard.press('Control+z');
+  await expect.poll(hit).toBeCloseTo(dragged - 0.5, 5);
+  // a length a made show worked out (10.7466 s) is said to a tenth
+  await page.evaluate(() => { const i = (window as any).__luxdmx.show.timeline.items.find((x: any) => x.do.do === 'burst'); i.do.seconds = 10.7466; });
+  await expect(len).toHaveAttribute('aria-valuetext', '10.7 s');
+  await expect(len.locator('.t')).toHaveText('10.7 s');
+  await page.evaluate((v) => { const i = (window as any).__luxdmx.show.timeline.items.find((x: any) => x.do.do === 'burst'); i.do.seconds = v; }, dragged - 0.5);
+  // a show file keeps it
+  const saved = await page.evaluate(async () => { const f = await import('/src/model/format.ts'); return f.parseShow(JSON.stringify((window as any).__luxdmx.show)).timeline!.items.find((i: any) => i.do.do === 'burst')!.do; });
+  expect((saved as any).seconds).toBeCloseTo(dragged - 0.5, 5);
 });

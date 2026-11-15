@@ -3,7 +3,7 @@
 // gone", no moment on the timeline plays a list that isn't there, no effect runs on no lights, no
 // confetti moment waits for a cannon that went. Run after every delete (app.prune).
 import type { CueAction, Show, Widget } from './types';
-import { songsOf } from './timeline';
+import { songsOf, type SetList } from './timeline';
 
 export interface Pruned { effects: number; buttons: number; moments: number; actions: number; entries: number }
 
@@ -61,6 +61,22 @@ export function prune(s: Show, can: (attr: string) => boolean = () => true): Pru
     n.entries += sch.length - k.length;
     if (k.length !== sch.length) { if (k.length) s.settings.schedule = k; else delete s.settings.schedule; }
   }
+  return n;
+}
+
+// Cues moved from one list to another: everything that plays them follows (a cue's "go to", a Live
+// button, a moment on the timeline and its track, a timetable entry, the look between songs), the
+// same things prune looks at. How many followed.
+export function moveCueRefs(s: Show, cues: ReadonlySet<string>, from: string, to: string): number {
+  let n = 0;
+  const follow = (r: { list: string; cue: string }) => (r.list === from && cues.has(r.cue) ? ((r.list = to), ++n) : 0);
+  const action = (a: CueAction) => (a.do === 'goto' ? follow(a) : 0);
+  for (const l of s.cueLists) for (const c of l.cues) for (const a of c.actions ?? []) action(a);
+  for (const p of s.pages) for (const w of p.widgets) if (w.type === 'cue') follow(w);
+  for (const tl of songsOf(s)) for (const i of tl.items) if (i.do.do === 'goto' && follow(i.do)) i.lane = `list:${to}`;
+  for (const e of s.settings.schedule ?? []) action(e.do);
+  const between = (s as Show & { setlist?: SetList }).setlist?.between;
+  if (between) follow(between);
   return n;
 }
 

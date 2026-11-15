@@ -32,7 +32,8 @@ export interface Stage {
   crowd?: Crowd;
   // the LED screens' (and TVs') material, where the room has them: its picture is the painted one
   // (`painted`) unless the 3D view puts the live camera on it
-  screens?: { mat: THREE.MeshBasicMaterial; painted: THREE.Texture };
+  // (`still`: the 3D view at its lowest quality: the painted picture only painted again for a new name)
+  screens?: { mat: THREE.MeshBasicMaterial; painted: THREE.Texture; still?: boolean };
   // the DJ (for the tests): the person, how far the left hand is up, the booth (the person's parent)
   dj?: { p: Person; raised: () => number; booth: THREE.Object3D };
   // its mirror balls (turning: the scene spins them), for what they throw round the room
@@ -43,7 +44,10 @@ export const isDemoRoom = (r: unknown): r is DemoRoom => r === 'club' || r === '
 
 // Is WebGL drawn in software here (no graphics chip: SwiftShader, llvmpipe)? Hundreds of people cost
 // a second a frame there.
-export function softwareGL() {
+// (asked once a page: it made a WebGL2 context every time a room was built, up to three a build)
+let soft: boolean | undefined;
+export function softwareGL() { return (soft ??= askGL()); }
+function askGL() {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
     if (!gl) return false;
@@ -277,7 +281,15 @@ export function buildRoom(id: DemoRoom, o: { crowd?: number; band?: string; cust
   const keep = new Set<THREE.Object3D>(dj ? [dj.p.group] : []);
   const inKept = (x: THREE.Object3D) => { for (let p: THREE.Object3D | null = x; p; p = p.parent) if (keep.has(p)) return true; return false; };
   const baked = bake(group, (x) => live.has(x) || inKept(x) || (!!crowd && x === crowd.group));
-  const freeze = (x: THREE.Object3D) => { if (dj && x === dj.p.group) return; x.updateMatrix(); x.matrixAutoUpdate = false; x.children.forEach(freeze); };
+  // (what moves keeps its matrix live, and so does everything it hangs from: the mirror ball and the
+  // dancers turn a group above their meshes. Frozen, they turned on paper and stood still on screen.)
+  const moving = new Set<THREE.Object3D>();
+  for (const m of live) for (let x: THREE.Object3D | null = m; x && x !== group; x = x.parent) moving.add(x);
+  const freeze = (x: THREE.Object3D) => {
+    if (dj && x === dj.p.group) return;
+    if (!moving.has(x)) { x.updateMatrix(); x.matrixAutoUpdate = false; }
+    x.children.forEach(freeze);
+  };
   group.children.forEach(freeze);
   if (crowd) crowd.group.visible = false;
 

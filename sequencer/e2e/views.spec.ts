@@ -111,6 +111,20 @@ test('hidden views are out of the way: one 3D stage, in the view shown; nothing 
   await expect(page.locator('.prog svg[aria-label="Stage"]')).toBeVisible();
 });
 
+test('the console gives its 3D stage up when another view is shown: still one 3D stage on the page', async ({ page }) => {
+  await bigDemo(page);
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await expect(page.locator('main')).toHaveAttribute('aria-label', 'Console');
+  await expect(page.locator('.pane:not([hidden]) .s3 canvas')).toBeVisible({ timeout: 15000 });
+  await to(page, 'Live');
+  await expect(page.locator('main')).toHaveAttribute('aria-label', 'Live');
+  // (a second world would be built 400 ms after the view changed)
+  await page.waitForTimeout(1500);
+  await expect(page.locator('.three canvas')).toHaveCount(1);
+  await expect(page.locator('.s3')).toHaveCount(1);
+  await expect(page.locator('.pane:not([hidden]) .s3 canvas')).toBeVisible();
+});
+
 test('keys act on the view shown only: Delete, Space, P and the arrows in Program leave the timeline and the live page alone', async ({ page }) => {
   await bigDemo(page);
   const tl = () => page.evaluate(() => { const t = (window as any).__luxdmx.show.timeline; return { items: t.items.length, parts: (t.sections ?? []).length, playing: (window as any).__luxdmx.timeline.playing, at: (window as any).__luxdmx.timeline.position }; });
@@ -182,4 +196,20 @@ test('a hidden view holds its lists still and catches up when it is shown: the f
   await expect(lvl).toHaveAttribute('style', /height: ?0%/);
   await to(page, 'Program');
   await expect(lvl).toHaveAttribute('style', /height: ?100%/);
+});
+
+test('the console hidden holds its faders still and catches up when it is shown', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await page.getByRole('tab', { name: 'Console' }).click();
+  const pct = page.locator('.strip[data-strip="D 1"] .pct');
+  await expect(pct).toHaveText('0');
+  await to(page, 'Live');
+  await page.evaluate(() => { const a = (window as any).__luxdmx; a.programmer = { [a.show.fixtures[0].id]: { intensity: 1 } }; });
+  await expect.poll(() => page.evaluate(() => { const a = (window as any).__luxdmx; return a.stage[a.show.fixtures[0].id]?.intensity; })).toBe(1);
+  await page.waitForTimeout(400);
+  // (at full on stage, the hidden console still shows what it last showed)
+  await expect(pct).toHaveText('0');
+  await page.getByRole('tab', { name: 'Console' }).click();
+  await expect(pct).toHaveText('100');
 });

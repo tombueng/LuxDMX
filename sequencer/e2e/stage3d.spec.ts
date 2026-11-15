@@ -217,6 +217,30 @@ test('your own venue: a .glb loads into the 3D stage, the built-in stage can go'
   expect(m).toMatchObject({ name: 'hall.glb', scale: 0.001, y: 0 });
   await page.locator('.s3 .venue').getByLabel('The built-in stage').uncheck();
   expect(await page.evaluate(() => (window as any).__luxdmx.show.settings.stage3d.hideVenue)).toBe(true);
+  // read once, and the world keeps it: Live and Program again show the same one, nothing read again
+  // (each view read and uploaded its own copy, never freed). Removed, it goes back to the graphics chip.
+  const model = () => page.evaluate(() => (window as any).__stage3d?.model?.());
+  await expect.poll(async () => (await model())?.inScene, { timeout: 10000 }).toBe(true);
+  const first = await model();
+  expect(first.reads).toBe(1);
+  const tabs = page.locator('.top .modes');
+  for (const tab of ['Live', 'Program']) {
+    await tabs.getByRole('tab', { name: tab }).click();
+    if (tab === 'Live') {
+      const eye = page.locator('.live').getByRole('button', { name: 'Show the stage' });
+      if ((await eye.getAttribute('aria-pressed')) !== 'true') await eye.click();
+    }
+    await expect.poll(async () => (await model())?.inScene, { timeout: 30000, message: tab }).toBe(true);
+    await page.waitForTimeout(500);
+    expect(await model(), tab).toMatchObject({ reads: 1, id: first.id, inScene: true });
+  }
+  const before = (await model()).geometries;
+  const s3 = page.locator('.s3:visible');
+  const venueBtn = s3.getByRole('button', { name: 'Venue', exact: true });
+  if ((await venueBtn.getAttribute('aria-expanded')) !== 'true') await venueBtn.click();
+  await s3.locator('.venue').getByRole('button', { name: 'Remove it' }).click();
+  await expect.poll(async () => (await model()).inScene, { timeout: 5000 }).toBe(false);
+  expect((await model()).geometries).toBeLessThan(before);
 });
 
 test('a reload keeps the 3D view where it was, and the song playing on from where it would be', async ({ page }) => {
@@ -323,4 +347,29 @@ test('the theatre\'s machinery: on its own universe it moves with the show, live
   await expect.poll(async () => { const m = await mach(); return [m['Fly 1'], m['Fly 3']]; }, { timeout: 25000 }).toEqual([0, 1]);
   const pics = await page.evaluate(() => (window as any).__stage3d.machinery().filter((m: any) => m.look === 'flybar').map((m: any) => m.picture));
   expect(pics).toEqual(['forest', 'castle', 'stars', 'city']);
+});
+
+// A show with nobody on stage (the Theatre, Church and Cinema templates): the world goes on from
+// view to view as it is. Each view's stage used to think the band was still there: it built the
+// room again on its first visit (half a second or more, the page stalled) and put the camera at
+// the front. (Review 5, R5-B1)
+test('nobody on stage: the next view takes the room as it is, the camera where it was', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openConnected(page);
+  await startTemplate(page, 'Theatre');
+  await open3d(page);
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d?.venue?.()?.room), { timeout: 45000 }).toBe('theatre');
+  await page.locator('.s3').getByRole('group', { name: 'Camera' }).getByRole('button', { name: 'FOH', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__stage3d.flying()), { timeout: 10000 }).toBe(false);
+  await page.waitForTimeout(800);
+  const now = () => page.evaluate(() => { const s = (window as any).__stage3d; return s?.internals ? { group: s.venue().group, cam: s.internals.camera.position.toArray() as number[] } : null; });
+  const before = (await now())!;
+  for (const tab of ['Live', 'Timeline']) {
+    await page.locator('.top .modes').getByRole('tab', { name: tab }).click();
+    await expect.poll(async () => (await now())?.group, { timeout: 30000, message: tab }).toBeTruthy();
+    await page.waitForTimeout(1500);
+    const after = (await now())!;
+    expect(after.group, tab).toBe(before.group);
+    expect(Math.hypot(...after.cam.map((v, i) => v - before.cam[i])), tab).toBeLessThan(0.05);
+  }
 });

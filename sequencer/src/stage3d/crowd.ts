@@ -594,6 +594,6 @@ export function buildCrowd(n: number, area: CrowdArea, seed = 777): Crowd {
   };
 }
 // (for the tests)
-export const CROWD_RIDER = RIDER, CROWD_POLE = POLE, CROWD_LEG = LEG;
+export const CROWD_RIDER = RIDER, CROWD_POLE = POLE;
 // how long a beat is now (seconds), as measured from the beat count (the band plays on it too)
 export const crowdBeatLen = () => U.uBeatLen.value;

@@ -275,10 +275,26 @@ export const CCW_WORDS = /ccw|counter|anti|gegen|left|links|reverse|\brev\b|back
 // or the other, slow to fast as its range says ("Rotation fast CW..slow CW", "CCW slow > fast",
 // "Index 0..360", "Stop"). Without ranges: 0 is still, up to two turns a second clockwise.
 // speed in radians a second (clockwise positive), angle in radians.
-export function rotationOf(ranges: { from: number; to: number; label?: string }[] | undefined, x: number): { speed: number } | { angle: number } {
+// (both read a channel's range names: a handful of word lists per channel, per frame, in the 3D stage.
+// The answer for a range list and a byte is always the same: worked out once, kept with the list.
+// What comes back is shared, only ever read.)
+type Rot = { speed: number } | { angle: number };
+type Ranges = { from: number; to: number; label?: string }[];
+const rotMemo = new WeakMap<Ranges, (Rot | null)[]>(), prismMemo = new WeakMap<Ranges, ({ facets: number; linear: boolean } | null)[]>();
+export function rotationOf(ranges: Ranges | undefined, x: number): Rot {
   const v = x > 0 ? (x < 1 ? x : 1) : 0, b = Math.round(v * 255);
-  const r = ranges?.find((q) => b >= q.from && b <= q.to);
-  if (!r) return { speed: v * 2 * TAU };
+  if (ranges) {
+    let m = rotMemo.get(ranges);
+    if (!m) rotMemo.set(ranges, (m = []));
+    const r = m[b] !== undefined ? m[b] : (m[b] = rotationAt(ranges, b));
+    if (r) return r;
+  }
+  // (no range for it: as fast as the value says, not by the byte)
+  return { speed: v * 2 * TAU };
+}
+function rotationAt(ranges: Ranges, b: number): Rot | null {
+  const r = ranges.find((q) => b >= q.from && b <= q.to);
+  if (!r) return null;
   const l = (r.label ?? '').toLowerCase(), k = r.to > r.from ? (b - r.from) / (r.to - r.from) : 0;
   const turning = /\bc?cw\b|clockwise|counter|anti|gegen|uhrzeiger|rotat|spin|dreh|speed|reverse|backward|forward|rückwärts|rueckwaerts|vorwärts|vorwaerts/.test(l);
   if (/index|angle|position|deg|°|winkel|grad/.test(l) && !/\bc?cw\b|speed|fast|slow|schnell|langsam/.test(l)) return { angle: k * TAU };
@@ -295,9 +311,14 @@ export function rotationOf(ranges: { from: number; to: number; label?: string }[
 // A prism channel as the head does it: out (null), or in with so many facets, round or in a line.
 // From the range it's in ("3-facet prism", "5 facet linear", "8-fach", "Prism 2"); a plain level
 // (no ranges): in from a little up, three facets round.
-export function prismOf(ranges: { from: number; to: number; label?: string }[] | undefined, x: number): { facets: number; linear: boolean } | null {
+export function prismOf(ranges: Ranges | undefined, x: number): { facets: number; linear: boolean } | null {
   const v = x > 0 ? (x < 1 ? x : 1) : 0, b = Math.round(v * 255);
   if (!ranges?.length) return v > 0.02 ? { facets: 3, linear: false } : null;
+  let m = prismMemo.get(ranges);
+  if (!m) prismMemo.set(ranges, (m = []));
+  return m[b] !== undefined ? m[b] : (m[b] = prismAt(ranges, b));
+}
+function prismAt(ranges: Ranges, b: number): { facets: number; linear: boolean } | null {
   const r = ranges.find((q) => b >= q.from && b <= q.to);
   const l = (r?.label ?? '').toLowerCase();
   if (!r || /(^|[^a-z])(open|out|off|no prism|kein|aus|none)($|[^a-z])/.test(l) || (!/prism|facet|fach|\d/.test(l))) return null;

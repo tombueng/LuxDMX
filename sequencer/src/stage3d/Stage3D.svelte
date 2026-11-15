@@ -7,7 +7,9 @@
   export interface KeptWorld {
     renderer: T.WebGLRenderer; canvas: HTMLCanvasElement; scene: T.Scene; camera: T.PerspectiveCamera; wash: T.SpotLight[];
     venue: ReturnType<typeof import('./venue').buildVenue>; rig: import('./rig').Rig; particles: import('./particles').Particles;
-    builtRoom: string; shape: string | null; free: () => void;
+    builtRoom: string; builtAct: 'band' | 'none'; shape: string | null; free: () => void;
+    // your own venue model in its scene (and which stored file it is): read once per world
+    custom: T.Object3D | null; customFor: string;
   }
   let kept: KeptWorld | null = null, keptTimer: ReturnType<typeof setTimeout> | undefined;
   // stages up now, and one that started while another was still up, waiting for its world (the
@@ -23,6 +25,12 @@
   function takeKept() { const w = kept; kept = null; clearTimeout(keptTimer); return w; }
   // (for the tests: whether a world is waiting)
   export const keptWorld = () => !!kept;
+  // (and how many venue models were read from their files, all stages together)
+  let modelReads = 0;
+  export const countModelRead = () => ++modelReads;
+  export const modelReadCount = () => modelReads;
+  // (and one let go now, as after its 3 minutes)
+  export const freeKeptWorld = () => { clearTimeout(keptTimer); kept?.free(); kept = null; };
 </script>
 
 <script lang="ts">
@@ -59,7 +67,7 @@
   import { Particles } from './particles';
   import { MirrorDots, type Ball } from './mirrorBall';
   import { aimAt, aimRot, beamDir, calibrate, faceBand, groundAt, pivotOf, toWorld, DECK, D, nearestTruss, onDeck, roomFor, showRoom, showWalls, hitRoom, stageSize, STAGE_SIZE, TRUSS_HANG, W, worldToPlan, type Room, type RoomId, type Rot, type V3, type ViewKey } from './geometry';
-  import { blocked, CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, spaceOf, type CamMode, type Cast, type Part } from './director';
+  import { CAM_MODES, castOf, direct, isCamMode, LENS, newMemory, partAt, shotOfLights, type CamMode, type Cast, type Part } from './director';
   import { sectionStarts } from '../timeline/beat';
   import { spanOf, type Timeline } from '../model/timeline';
   import type { Resolved, Show } from '../model/types';
@@ -97,6 +105,8 @@
   // every light as the 3D stage needs it (rebuilt when the lights, their types or places change)
   // (a light without a 3D place of its own goes where its plan position puts it in this room)
   const fixtures = $derived.by((): RigFixture[] => app.show.fixtures.map((f) => rigFixtureFull(f, app.modeOf(f.id), app.kinds[f.id] ?? 'other', app.types.get(f.typeId), room)));
+  // (what the winches hold on the wire is only asked for with winches in the rig: every light, every frame)
+  const hasWinch = $derived(fixtures.some((f) => !!f.winch));
 
   // The gobo patterns, drawn once for the page into one texture (gobos.ts), with the symbol fonts
   // that come with the app (until they're in, the beams have no gobos)
@@ -140,7 +150,7 @@
   const DARK = new THREE.Color(0x07090d), fogCol = new THREE.Color();
   const overlay = new THREE.Scene();       // drawn after the glow: the gizmo, the Measure line
   // (about once a second: the eye's adapting is slow anyway, and each read costs the page a moment)
-  const meter = new ExposureMeter(45);
+  let meter: ExposureMeter | undefined;
   // the middle brightness the exposure aims for (a dark venue: low key; measured so the Front view
   // of the demo sits at about the exposure it always had)
   const EXPOSURE_KEY = 0.024;
@@ -179,59 +189,9 @@
     const fs = fixtures.filter((f) => ids.includes(f.id));
     if (!fs.length || !controls) return false;
     stopCam();
-    const pts = fs.map((f) => { const p = pivotOf(f.p, f.rot); return new THREE.Vector3(p.x, p.y, p.z); });
-    const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
-    // (a light up under the ceiling: looked at from a little below it, the camera can't go above it
-    // and the controls never put it under what it looks at)
-    if (c.y > room.ceiling - 0.9) c.y = room.ceiling - 0.9;
-    const r = Math.max(0.6, box.getSize(new THREE.Vector3()).length() / 2);
-    // (from in front and a little to the side: up at hung lights, as the audience sees them; down
-    // at ones on the floor)
-    const d = Math.max(4.5, (r / Math.sin((camera.fov * Math.PI) / 360)) * 1.15);
-    // (where the camera can be: inside the room, clear of its rows, tables and people. A light on
-    // the cinema's side wall seen from the front put it inside the raked seats: the first of a few
-    // ways round that's clear, else the nearest to it)
-    const W = room.walls, inside = (p: THREE.Vector3) => Math.abs(p.x) < W.x - 0.5 && p.z > W.z0 + 0.5 && p.z < W.z1 - 0.5 && p.y > 0.4 && p.y < room.ceiling - 0.8;
-    const sp = spaceOf(room, castOf(room.id)), into = Math.sign(-c.x) || 1;
-    // (hung lights, shining down: from the front and level with them; the rest from above. Not by
-    // their height: a washer on the cinema's top rows is high up and shines up its wall)
-    const hung = fs.every((f) => toWorld({ x: 0, y: 1, z: 0 }, f.rot).y < -0.3);
-    const dirs = hung ? [[0.35, -0.32, 1], [-0.35, -0.32, 1], [into * 0.8, -0.2, 0.6], [0, -0.8, 0.6], [into * 0.7, -0.7, 0.2], [0, -1, 0.08], [0, 0.4, 1]] : [[0.35, 0.45, 1], [-0.35, 0.45, 1], [into * 0.9, 0.5, 0.4], [into * 0.5, 1.1, 0.6], [0, 0.9, 1], [into * 0.15, 0.25, 1], [into * 0.15, 0.25, -1], [into * 0.3, 1.4, 0.2]];
-    // (and with nothing between it and the light: a boom in the wings seen through the proscenium's
-    // wall was a box drawn over a blank wall)
-    const seen = (q: THREE.Vector3) => {
-      const n = Math.ceil(q.distanceTo(c) / 0.3);
-      for (let i = 1; i < n - 1; i++) {
-        const m = q.clone().lerp(c, i / n), b = blocked(sp, { x: m.x, y: m.y, z: m.z });
-        // (only what's solid and big hides it: the proscenium, the balcony, the deck. Rows of seats,
-        // tables, the lights on a bar in between: one sees over and between them)
-        if (b === 'the proscenium' || b === 'the balcony' || b === 'the deck') return false;
-      }
-      return true;
-    };
-    let p1: THREE.Vector3 | undefined, clear: THREE.Vector3 | undefined;   // (clear but not seeing it: the next best)
-    // (clear with a little room above too: a spot right on the edge of a rail of lights ended up a
-    // hair inside it once the controls settled)
-    const solid = (q: THREE.Vector3) => !!(blocked(sp, { x: q.x, y: q.y, z: q.z }) || blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z }));
-    const ok = (q: THREE.Vector3) => { if (!inside(q) || solid(q)) return false; if (seen(q)) return true; clear ??= q; return false; };
-    for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
-      if (p1) break;
-      const q = c.clone().addScaledVector(new THREE.Vector3(x, y, z).normalize(), d * k);
-      // (the controls never let the camera under what it looks at: where they'd put it)
-      if (q.y < c.y + 0.05) q.y = c.y + 0.05;
-      if (ok(q)) p1 = q;
-    }
-    // (none of those: round it, nearer and nearer, level with it and a little above, the side
-    // towards the audience first; a low bar's rail of lights left little room)
-    // (and close in under a low ceiling: the bar's top shelf, a rail of lights in front of it)
-    if (!p1) for (const k of [0.8, 0.55, 0.35, 0.22]) for (const dy of [0.05, 0.3, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
-      const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = new THREE.Vector3(c.x + Math.sin(ang) * d * k, c.y + dy, c.z + Math.cos(ang) * d * k);
-      if (ok(q)) p1 = q;
-    }
-    p1 ??= clear;
-    p1 ??= c.clone().addScaledVector(new THREE.Vector3(into * 0.6, 0.8, 0.3).normalize(), Math.min(d, 3));
-    p1.set(Math.max(-W.x + 0.6, Math.min(W.x - 0.6, p1.x)), Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), Math.max(W.z0 + 0.6, Math.min(W.z1 - 0.6, p1.z)));
-    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1, t1: c, at: performance.now(), dur: 700 };
+    // (where it goes: director.ts, worked out from the room and the lights alone)
+    const { pos, at } = shotOfLights(room, fs, camera.fov);
+    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: new THREE.Vector3(pos.x, pos.y, pos.z), t1: new THREE.Vector3(at.x, at.y, at.z), at: performance.now(), dur: 700 };
     return true;
   }
   // asked from elsewhere (a light's menu): once the stage and its lights are there
@@ -240,7 +200,14 @@
     const at = ui.focus3d;
     if (!at || at === focusSeen || Date.now() - at > 5000) return;
     // (after the room is built: building it puts the camera at the front)
-    const go = () => { if (!controls || !fixtures.length || !holding || builtRoom !== (room.key ?? room.id)) return void setTimeout(go, 100); focusSeen = at; requestAnimationFrame(() => focusSel()); };
+    // (every built view's stage hears it, only the one on screen goes: the others give up when this one
+    // went away, a newer ask came, or after a while; they used to wait, and flew to whatever was
+    // picked when shown minutes later, or kept asking for good once gone)
+    const go = () => {
+      if (gone || ui.focus3d !== at || Date.now() - at > 15000) return;
+      if (!controls || !fixtures.length || !holding || builtRoom !== (room.key ?? room.id)) return void setTimeout(go, 100);
+      focusSeen = at; requestAnimationFrame(() => focusSel());
+    };
     untrack(go);
   });
   // the list of moves (opened from the keys: onto the one running, or the first)
@@ -291,6 +258,7 @@
   function feedFrame(t: number, energy: number, frameDt = 1 / 60) {
     const scr = venue.screens;
     if (!scr) return;
+    scr.still = load.level < 1;
     if (!liveScreens || load.level < 1) { if (scr.mat.map !== scr.painted) scr.mat.map = scr.painted; return; }
     if (!feed) {
       const mk = () => new THREE.WebGLRenderTarget(512, 288, { type: THREE.HalfFloatType });
@@ -351,7 +319,7 @@
   }
   function start(k: KeptWorld | null) {
     if (gone || !active || holding) { if (k) park(k); return; }
-    if (k) ({ renderer, canvas, scene, camera, wash, venue, rig, particles, builtRoom, shape } = k);
+    if (k) ({ renderer, canvas, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape, custom, customFor } = k);
     else build();
     cvHost!.appendChild(canvas!);
     hemi = scene.getObjectByName('ambient:sky') as THREE.HemisphereLight | undefined;
@@ -360,7 +328,12 @@
     canvas!.addEventListener('pointerdown', pdown); canvas!.addEventListener('pointerup', pup);
     // (this stage's own parts: made once, woken up again when it's shown again; a world built
     // anew, after the last one went back to the graphics chip, gets new ones)
-    if (madeFor !== renderer) { if (madeFor) dropParts(); setup(); madeFor = renderer; } else wake();
+    if (madeFor !== renderer) {
+      // (a world built anew after this stage held an older one: what it looked up in that one, the
+      // crowd light, the mirror ball's dots, the GPU timer, is looked up again; the model goes in)
+      if (madeFor) { dropParts(); crowdLamp = undefined; mirrorDots = undefined; gpuExt = undefined; gpuQ = []; }
+      setup(); madeFor = renderer;
+    } else wake();
     // (the lights now: a world handed on has the last view's; a late start missed the first round)
     untrack(() => { const list = fixtures, sig = sigOf(list); rigFor = list; if (sig !== shape) { shape = sig; rig.build(list); } else rig.place(list); });
     holding = true;
@@ -371,12 +344,12 @@
   function wake() {
     controls.connect(); gizmo.connect();
     scene.add(proxy);
-    if (custom) scene.add(custom);
     lensBase = 0; lensSet = 0;
     restoreCam();
     glow = GLOW_3D.get(); hazeAmt = HAZE_3D.get(); ambient = AMBIENT_3D.get(); spill = SPILL_3D.get();
     liveScreens = SCREENS_LIVE.get();
     composer.setPixelRatio(renderer.getPixelRatio());
+    meter?.hold();
     if (import.meta.env.DEV) (window as unknown as { __stage3d: unknown }).__stage3d = devHook;
   }
   // its view hidden: the world goes on to the view shown now (or waits for it)
@@ -392,24 +365,31 @@
     gizmo.detach(); controls.disconnect(); gizmo.disconnect();
     if (import.meta.env.DEV && (window as unknown as { __stage3d?: unknown }).__stage3d === devHook) delete (window as unknown as { __stage3d?: unknown }).__stage3d;
     feedFree();
+    freeTargets();
     handOn(true);
+  }
+  // its picture buffers back to the graphics card while it's hidden (two frames with depth and the
+  // glow's chain: about 190 MB for a big panel on a sharp screen, 25 for a small one, kept by every
+  // view that ever showed the 3D). Drawn into again, three makes them anew.
+  function freeTargets() {
+    composer?.renderTarget1.dispose(); composer?.renderTarget2.dispose();
+    if (bloom) { for (const r of [...bloom.renderTargetsHorizontal, ...bloom.renderTargetsVertical, bloom.renderTargetBright]) r.dispose(); }
   }
   // the world leaves this stage: on to the next one (3D still on), or back to the graphics chip
   function handOn(keep: boolean) {
     holding = false;
     canvas?.removeEventListener('pointerdown', pdown); canvas?.removeEventListener('pointerup', pup);
     scene.remove(proxy);
-    if (custom) scene.remove(custom);
     const s = scene, r = renderer;
     const freeAll = () => { free(s); (s.environment as THREE.Texture | null)?.dispose(); r.dispose(); r.forceContextLoss(); };
-    if (keep) { canvas?.remove(); canvas?.classList.remove('take'); park({ renderer, canvas: canvas!, scene, camera, wash, venue, rig, particles, builtRoom, shape, free: freeAll }); }
+    if (keep) { canvas?.remove(); canvas?.classList.remove('take'); park({ renderer, canvas: canvas!, scene, camera, wash, venue, rig, particles, builtRoom, builtAct, shape, custom, customFor, free: freeAll }); }
     else freeAll();
   }
   // this stage's own parts, for good
   function dropParts() {
     gizmo?.detach(); gizmo?.dispose(); controls?.dispose();
     if (gizmo) overlay.remove(gizmo.getHelper());
-    composer?.dispose(); bloom?.dispose();
+    composer?.dispose(); bloom?.dispose(); meter?.dispose(); meter = undefined;
   }
   // the world, built (the first 3D stage, or the last one went back to the graphics chip)
   function build() {
@@ -439,7 +419,10 @@
     scene.add(new MirrorDots().group);
     venue = buildVenue({ room: room.id, band: bandShown, act, custom: room }); builtRoom = room.key ?? room.id; builtAct = act; showRoom(room);
     scene.add(venue.group);
-    rig = new Rig(); scene.add(rig.group);
+    // (a new rig: built for the lights, whatever this stage's last world had: with that one's
+    // signature still here it was only placed, never built, and threw on every frame)
+    rig = new Rig(); scene.add(rig.group); shape = null;
+    custom = null; customFor = ''; customLoading = '';      // (a new world: no model in it yet)
     { const r = rig; void makeGobos().then((a) => { if (rig === r) r.setGobos(a.tex); }); }
     particles = new Particles(); scene.add(particles.group);
   }
@@ -463,6 +446,7 @@
     scene.add(proxy);
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
+    meter = new ExposureMeter(45);
     composer.addPass(meter);
     bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), glow, 0.4, 0.62);
     composer.addPass(bloom);
@@ -529,7 +513,11 @@
       toolsFit: () => ({ tier, squeeze, over: toolsEl ? toolsEl.scrollWidth - toolsEl.clientWidth : 0, overWas: [...overWas] }),
       // (the lit lights of the last frame: where each shines from and to, how wide and bright)
       // the stage machinery: each curtain's and fly bar's motor, how far it has got (m) of its travel
-      mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ballsNow().map((b) => +b.obj.rotation.y.toFixed(3)), tilt: ballsNow().map((b) => +b.obj.rotation.x.toFixed(4)) }),
+      parts: () => ({ lamp: !!crowdLamp && crowdLamp.parent === scene, dots: !!mirrorDots && mirrorDots.group.parent === scene, meter: !!meter && (!meter.context || meter.context === renderer.getContext()) }),
+      model: () => ({ reads: modelReadCount(), inScene: !!custom && custom.parent === scene, id: custom?.uuid ?? null, geometries: renderer.info.memory.geometries }),
+      mirror: () => ({ dots: mirrorDots?.lastDots ?? 0, hit: mirrorDots?.lastHit ?? [], spin: ballsNow().map((b) => +b.obj.rotation.y.toFixed(3)), tilt: ballsNow().map((b) => +b.obj.rotation.x.toFixed(4)),
+        // (where it's turned on screen: its matrix, which a frozen ball never updates whatever its rotation says)
+        drawn: ballsNow().map((b) => +Math.atan2(b.obj.matrixWorld.elements[8], b.obj.matrixWorld.elements[10]).toFixed(3)) }),
       machinery: () => fixtures.filter((f) => f.cloth).map((f) => ({ name: f.name, look: f.look, at: rig.winchOf(f.id) ?? 0, travel: f.winch?.travel ?? 0, picture: f.cloth?.picture })),
       looks: () => fixtures.map((f) => ({ name: f.name, look: f.look, profile: f.profile?.name ?? null })),
       lit: () => (rig?.lit ?? []).map((l) => ({ key: l.key, p: l.p.toArray().map((v) => +v.toFixed(2)), d: l.d.toArray().map((v) => +v.toFixed(2)), deg: Math.round(l.deg), level: +l.level.toFixed(2) })),
@@ -558,7 +546,7 @@
     if (rendering) renderStop = true;
     if (holding && camera && controls) { camSaved = 0; keepCam(); }
     cancelAnimationFrame(raf);
-    dropParts(); meter.dispose();
+    dropParts();
     if (import.meta.env.DEV && (window as unknown as { __stage3d?: unknown }).__stage3d === devHook) delete (window as unknown as { __stage3d?: unknown }).__stage3d;
     if (holding) { feedFree(); handOn(ui.stage3dNow); }
     // (3D switched off with the world parked by a view's stage that went away first: given back)
@@ -595,7 +583,7 @@
     // (the same size again, e.g. the observer's first call: the canvas isn't made anew)
     const pr = renderer.getPixelRatio();
     renderer.getSize(sizeNow);
-    if (sizeNow.x !== w || sizeNow.y !== h || canvas!.width !== Math.floor(w * pr) || canvas!.height !== Math.floor(h * pr)) renderer.setSize(w, h, false);
+    if (sizeNow.x !== w || sizeNow.y !== h || canvas!.width !== Math.floor(w * pr) || canvas!.height !== Math.floor(h * pr)) { renderer.setSize(w, h, false); meter?.hold(); }
     composer.setSize(w, h); camera.aspect = w / Math.max(1, h);
     // (a tall screen sees as much of the stage across as a wide one: the views are made for 16:9)
     // (only a really tall one: a panel a bit narrower than wide keeps the normal lens and its zoom)
@@ -888,18 +876,25 @@
   // browser; its size, height and turn by hand; the built-in stage can go
   let venuePanel = $state(false);
   let modelFile = $state<HTMLInputElement>();
-  let custom: THREE.Object3D | null = null, customFor = '';
+  // (the model in this stage's world, which stored file it is, and one being read now)
+  let custom: THREE.Object3D | null = null, customFor = '', customLoading = '';
+  let freshModel: { store: string; scene: THREE.Object3D } | null = null;
+  function dropModel() { if (custom) { scene.remove(custom); free(custom); } custom = null; customFor = ''; }
   const vm = $derived(app.show.settings.stage3d?.model);
   async function loadModel(f: File) {
     try {
       const buf = await f.arrayBuffer();
       const g = await new GLTFLoader().parseAsync(buf, '');
+      countModelRead();
       // fitted: standing on the floor, its middle at the stage's, metres (a model in millimetres
       // or centimetres comes in far too big: scaled down)
       const b = new THREE.Box3().setFromObject(g.scene), size = b.getSize(new THREE.Vector3()), big = Math.max(size.x, size.y, size.z);
       const scale = big > 2000 ? 0.001 : big > 300 ? 0.01 : 1;
       const key = `${app.showId}:${f.name}`;
       try { await putModel(key, f); } catch { /* shown now; another time it asks again */ }
+      // (the one just read goes in as it is: not read again from the store, and a file loaded again
+      // under the same name replaces the old one)
+      freshModel = { store: key, scene: g.scene };
       app.checkpoint();
       app.show.settings.stage3d = { ...app.show.settings.stage3d, model: { name: f.name, store: key, scale, x: r1(-(b.min.x + b.max.x) / 2 * scale), y: r1(-b.min.y * scale), z: r1(-(b.min.z + b.max.z) / 2 * scale), yaw: 0 } };
       app.markDirty(0);
@@ -914,6 +909,21 @@
   function removeModel() { app.checkpoint(); if (app.show.settings.stage3d) delete app.show.settings.stage3d.model; app.markDirty(0); }
   // what the "built-in" box hides, said for the room shown (in the church that's the whole church,
   // not a band and a truss)
+  type RoomPick = 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom';
+  // the rooms in the Venue panel, in its order: the button, what it is (its tooltip)
+  const ROOMS_PICKED: { id: RoomPick; label: string; title: string }[] = [
+    { id: 'hall', label: 'Big stage', title: 'A big stage in a hall: truss, LED walls, a few hundred people' },
+    { id: 'club', label: 'Club', title: 'A club: a DJ booth on a stage, LED strips round it, a dance floor with a bar and a mirror ball' },
+    { id: 'party', label: 'Party', title: 'No stage: a square of truss over the crowd on four legs, speakers in the corners, the DJ on the floor' },
+    { id: 'pub', label: 'Small club / pub', title: 'A small club or pub: a small stage under a low ceiling, a bar at the back, a few dozen people. Lights you placed by hand stay where you put them; Reset puts them on its rig.' },
+    { id: 'bar', label: 'Bar', title: 'A bar: a long counter with a back bar of bottles and a mirror, stools with people, tables, a little dance floor with a mirror ball' },
+    { id: 'theatre', label: 'Theatre', title: 'A theatre: a proscenium stage with its house curtain and a cyclorama, lighting bars over it, stalls and a balcony with an audience' },
+    { id: 'cinema', label: 'Cinema', title: 'A big cinema: the screen between red curtains, a stage in front of it, raked rows of seats with an audience' },
+    { id: 'church', label: 'Church', title: 'A church: the chancel with the altar, the cross and the choir, pews down the nave with the congregation, stained glass' },
+    { id: 'ballroom', label: 'Ballroom', title: 'A ballroom for a wedding: draped walls for the uplights, round tables with the guests, a parquet dance floor, the head table, the cake, chandeliers' },
+    { id: 'truss', label: 'Test truss', title: 'An empty room with one truss on two towers: for trying lights out' },
+    { id: 'custom', label: 'Your stage', title: 'Your own stage at its real size: its width and depth, a riser or not, how many trusses and how high' },
+  ];
   const BUILT: Partial<Record<RoomId, string>> = {
     hall: 'The built-in stage (band, truss, crowd)', pub: 'The built-in club (stage, band, people)', club: 'The club itself (DJ, booth, crowd)',
     party: 'The party room itself (DJ, crowd)', truss: 'The test truss\'s room', custom: 'The built-in stage (riser, trusses, crowd)',
@@ -922,7 +932,7 @@
   };
   function setHideVenue(h: boolean) { app.checkpoint(); app.show.settings.stage3d = { ...app.show.settings.stage3d, hideVenue: h || undefined }; app.markDirty(0); }
   // the built-in room: the big stage, or a small club / pub (kept with the show)
-  function setRoom(id: 'hall' | 'pub' | 'club' | 'party' | 'truss' | 'custom' | 'cinema' | 'bar' | 'theatre' | 'church' | 'ballroom') {
+  function setRoom(id: RoomPick) {
     if (room.id === id) return;
     const s3 = app.show.settings.stage3d;
     app.checkpoint(); app.show.settings.stage3d = { ...s3, room: id === 'hall' ? undefined : id, ...(id === 'custom' && !s3?.size ? { size: { ...STAGE_SIZE } } : {}) }; app.markDirty(0);
@@ -968,11 +978,13 @@
     if (!holding) return;
     untrack(() => {
       if (!scene || !venue || ((r.key ?? r.id) === builtRoom && a === builtAct)) return;
+      // (the camera to the front only for another room: the band going or coming leaves it where it is)
+      const newRoom = (r.key ?? r.id) !== builtRoom;
       scene.remove(venue.group); free(venue.group);
       venue = buildVenue({ room: r.id, band: bandShown, act: a, custom: r });
       venue.group.visible = !app.show.settings.stage3d?.hideVenue;
       scene.add(venue.group); builtRoom = r.key ?? r.id; builtAct = a; showRoom(r);
-      view('front');
+      if (newRoom) view('front');
     });
   });
   $effect(() => { const n = bandShown; if (holding) untrack(() => venue?.setBand(n)); });
@@ -983,17 +995,31 @@
     untrack(() => {
       if (venue) venue.group.visible = !hide;
       if (!scene) return;
-      if (!m) { if (custom) { scene.remove(custom); custom = null; customFor = ''; } return; }
+      // (removed or another file: the one there goes back to the graphics chip, it used to stay)
+      if (!m) { dropModel(); return; }
       const placeIt = () => { if (!custom) return; custom.scale.setScalar(m.scale); custom.position.set(m.x, m.y, m.z); custom.rotation.y = (m.yaw * Math.PI) / 180; };
+      if (freshModel?.store === m.store) {
+        const g = freshModel.scene;
+        freshModel = null; customLoading = '';
+        dropModel(); custom = g; customFor = m.store; scene.add(custom); placeIt();
+        return;
+      }
+      // (in this world already, read by whichever view had it: read once per world, not per view)
       if (customFor === m.store) { placeIt(); return; }
-      customFor = m.store;
+      if (customLoading === m.store) return;
+      customLoading = m.store;
+      const into = scene;
       void getModel(m.store).then(async (blob) => {
-        if (!blob) { ui.toast(`"${m.name}" isn't in this browser: load it again (3D, Venue)`, 5000); return; }
+        if (!blob) { customLoading = ''; ui.toast(`"${m.name}" isn't in this browser: load it again (3D, Venue)`, 5000); return; }
         const g = await new GLTFLoader().parseAsync(await blob.arrayBuffer(), '');
-        if (customFor !== m.store) return;
-        if (custom) scene.remove(custom);
-        custom = g.scene; if (holding) scene.add(custom); placeIt();      // (its view hidden meanwhile: added when it's shown)
-      }).catch(() => ui.toast(`"${m.name}" didn't open`));
+        countModelRead();
+        // (another file picked meanwhile, or the world went on to another view: not for this one,
+        // the view holding it reads it into its own world)
+        if (customLoading !== m.store || !holding || scene !== into) { free(g.scene); if (customLoading === m.store) customLoading = ''; return; }
+        customLoading = '';
+        dropModel();
+        custom = g.scene; customFor = m.store; scene.add(custom); placeIt();
+      }).catch(() => { customLoading = ''; ui.toast(`"${m.name}" didn't open`); });
     });
   });
 
@@ -1004,6 +1030,8 @@
   // second; Low: no glow, 20 a second. Never fewer pixels than the screen has: a blurred stage was
   // the first thing anyone noticed, frames and glow are what can go. A take keeps every frame.
   const RATIO = [1, 1.5, 2], EVERY = [1000 / 21, 1000 / 31, 0];
+  // (puffs of fog that look again which beams they're in, a frame: Low, Medium, High)
+  const FOG_LIT = [250, 500, 800];
   let drawnAt = 0, drawnFrames = 0;
   function quality() {
     if (taking) return;
@@ -1075,10 +1103,10 @@
     haze = Math.min(1.5, hazeAmt * (0.9 + 0.5 * room) + 0.08 * Math.max(room, 0.5 * smokeIn));
     (scene.fog as THREE.FogExp2).density = 0.005 + 0.016 * haze;
     // (a winch live and not armed: where the wire holds it, not where the show would send it)
-    const held = src ? null : app.winchesHeld();
+    const held = src || !hasWinch ? null : app.winchesHeld();
     rig.winchWire = held ? (id) => held.get(id) : undefined;
     rig.update(src?.drawn ?? app.drawnNow, t, haze, sel);
-    particles.light(rig.lit);
+    particles.light(rig.lit, FOG_LIT[load.level]);
     // (the machines' output follows the clock, not the frame rate: a slow computer gets the same fog
     // and confetti, in steps of at most 0.1 s)
     for (let left = real; left > 1e-4; left -= 0.1) particles.step(Math.min(0.1, left), machines);
@@ -1142,7 +1170,7 @@
     scene.environmentIntensity = 0.28 * amb;
     // exposure like a camera's: down when looking into the lights, up a little for a dark look (less
     // with less room light: lifting a dark room is what makes it look lit)
-    renderer.toneMappingExposure += (meter.target(EXPOSURE_KEY, 0.12, 1.05 + 0.35 * Math.min(1, amb)) - renderer.toneMappingExposure) * Math.min(1, dt * 1.2);
+    renderer.toneMappingExposure += (meter!.target(EXPOSURE_KEY, 0.12, 1.05 + 0.35 * Math.min(1, amb)) - renderer.toneMappingExposure) * Math.min(1, dt * 1.2);
     const q = gpuBegin();
     if (glow > 0.02 && (load.level > 0 || taking)) composer.render(); else renderer.render(scene, camera);
     // the gizmo on top, after the glow (inside it, a bright look washed it out)
@@ -1573,17 +1601,7 @@
         <div class="vhead"><b>Venue</b><button class="ghost x" onclick={closeVenue} aria-label="Close the venue panel" title="Close (Esc)"><Icon name="close" size={14} /></button></div>
         <div class="seg rooms" role="group" aria-label="Room">
           <!-- (concerts and parties, then the rooms people sit in, then the test truss and your own) -->
-          <button class="ghost" class:on={room.id === 'hall'} aria-pressed={room.id === 'hall'} onclick={() => setRoom('hall')} title="A big stage in a hall: truss, LED walls, a few hundred people">Big stage</button>
-          <button class="ghost" class:on={room.id === 'club'} aria-pressed={room.id === 'club'} onclick={() => setRoom('club')} title="A club: a DJ booth on a stage, LED strips round it, a dance floor with a bar and a mirror ball">Club</button>
-          <button class="ghost" class:on={room.id === 'party'} aria-pressed={room.id === 'party'} onclick={() => setRoom('party')} title="No stage: a square of truss over the crowd on four legs, speakers in the corners, the DJ on the floor">Party</button>
-          <button class="ghost" class:on={room.id === 'pub'} aria-pressed={room.id === 'pub'} onclick={() => setRoom('pub')} title="A small club or pub: a small stage under a low ceiling, a bar at the back, a few dozen people. Lights you placed by hand stay where you put them; Reset puts them on its rig.">Small club / pub</button>
-          <button class="ghost" class:on={room.id === 'bar'} aria-pressed={room.id === 'bar'} onclick={() => setRoom('bar')} title="A bar: a long counter with a back bar of bottles and a mirror, stools with people, tables, a little dance floor with a mirror ball">Bar</button>
-          <button class="ghost" class:on={room.id === 'theatre'} aria-pressed={room.id === 'theatre'} onclick={() => setRoom('theatre')} title="A theatre: a proscenium stage with its house curtain and a cyclorama, lighting bars over it, stalls and a balcony with an audience">Theatre</button>
-          <button class="ghost" class:on={room.id === 'cinema'} aria-pressed={room.id === 'cinema'} onclick={() => setRoom('cinema')} title="A big cinema: the screen between red curtains, a stage in front of it, raked rows of seats with an audience">Cinema</button>
-          <button class="ghost" class:on={room.id === 'church'} aria-pressed={room.id === 'church'} onclick={() => setRoom('church')} title="A church: the chancel with the altar, the cross and the choir, pews down the nave with the congregation, stained glass">Church</button>
-          <button class="ghost" class:on={room.id === 'ballroom'} aria-pressed={room.id === 'ballroom'} onclick={() => setRoom('ballroom')} title="A ballroom for a wedding: draped walls for the uplights, round tables with the guests, a parquet dance floor, the head table, the cake, chandeliers">Ballroom</button>
-          <button class="ghost" class:on={room.id === 'truss'} aria-pressed={room.id === 'truss'} onclick={() => setRoom('truss')} title="An empty room with one truss on two towers: for trying lights out">Test truss</button>
-          <button class="ghost" class:on={room.id === 'custom'} aria-pressed={room.id === 'custom'} onclick={() => setRoom('custom')} title="Your own stage at its real size: its width and depth, a riser or not, how many trusses and how high">Your stage</button>
+          {#each ROOMS_PICKED as r (r.id)}<button class="ghost" class:on={room.id === r.id} aria-pressed={room.id === r.id} onclick={() => setRoom(r.id)} title={r.title}>{r.label}</button>{/each}
         </div>
         {#if room.id === 'custom'}
           <!-- (each as it's set: the room is built again; the plan's width and depth are these too) -->

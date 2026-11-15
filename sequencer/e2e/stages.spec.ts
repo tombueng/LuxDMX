@@ -35,6 +35,13 @@ for (const [id, people] of [['club', true], ['party', true], ['truss', false]] a
       await page.evaluate(() => { (window as any).__luxdmx.show.settings.bandName = 'Night Owl'; });
       await expect.poll(async () => (await venue(page)).band.surfaces[0].shows).toBe('NIGHT OWL');
     } else expect(v.crowd).toBe(0);
+    if (id === 'club') {
+      // the club's own mirror ball (the demo has none on DMX) goes round on screen, not just on paper
+      const drawn = async () => (await page.evaluate(() => (window as any).__stage3d.mirror())).drawn[0];
+      const a0 = await drawn();
+      expect(typeof a0).toBe('number');
+      await expect.poll(drawn, { timeout: 5000 }).not.toBe(a0);
+    }
     const n = await page.evaluate(() => (window as any).__luxdmx.show.fixtures.length);
     await expect.poll(() => page.evaluate(() => (window as any).__stage3d.stats().fixtures), { timeout: 20000 }).toBe(n);
     // the show plays (the demo beat): light on the wire, beams on the stage

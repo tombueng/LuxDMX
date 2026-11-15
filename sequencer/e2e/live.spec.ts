@@ -1,7 +1,7 @@
 // Live: the busking page built from a show, every kind of control, keys, hold-to-fog with its hard
 // maximum, flash, and editing the page (add, change, move, remove, lock).
 import type { Page } from '@playwright/test';
-import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, test, expect, startTemplate } from './helpers';
+import { lockPage, openConnected, resetFake, channels, patch, selectFixtures, selectAll, full, record, test, expect, startTemplate } from './helpers';
 
 const tile = (page: Page, id: string) => page.locator(`.live [data-widget="${id}"]`);
 const tileByText = (page: Page, text: string) => page.locator('.live .tile', { hasText: text }).first();
@@ -621,4 +621,42 @@ test('the GO bar holds still: Release and Auto GO stay where they are whatever t
   expect(new Set(ax).size, ax.join(',')).toBe(1);
   // (the long name cut short, all of it in the tooltip, while it was up or next)
   expect(titles.some((t) => /thunder and the rain$/.test(t))).toBe(true);
+});
+
+test('a page renamed from its menu and by a double-click on its tab', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await selectAll(page); await full(page); await record(page);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  const tabs = page.locator('.live .pages [role=tab]');
+  await tabs.first().click({ button: 'right' });
+  await page.locator('.ctx').getByRole('menuitem', { name: 'Rename' }).click();
+  const ask = page.getByRole('dialog', { name: 'Rename the page' });
+  await ask.getByLabel('Name').fill('Main show');
+  await ask.getByLabel('Name').press('Enter');
+  await expect(tabs.first()).toContainText('Main show');
+  await tabs.first().dblclick();
+  await ask.getByLabel('Name').fill('Encore');
+  await ask.getByLabel('Name').press('Enter');
+  await expect(tabs.first()).toContainText('Encore');
+});
+
+test('"Stop effects" stops the effects the cues run on the wire too, not only on the screen', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 1, 0, 'D');
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx, id = a.show.fixtures[0].id;
+    a.show.effects.push({ id: 'e-pulse', name: 'Pulse', kind: 'pulse', fixtures: [id], params: { speed: 1, tempo: false } });
+    a.show.cueLists.push({ id: 'L-fx', name: 'Pulsing', end: 'stop', cues: [{ id: 'c-fx', name: 'Pulse on', values: { [id]: { intensity: 1 } }, effects: ['e-pulse'], fade: 0, advance: { mode: 'manual' } }] });
+    a.show.pages = [];
+    a.checkpoint();
+    a.engine.go('L-fx');
+  });
+  // pulsing on the wire
+  const sample = async () => { const v: number[] = []; for (let i = 0; i < 8; i++) { v.push((await channels(0, 1))[0]); await page.waitForTimeout(120); } return v; };
+  await expect.poll(async () => { const v = await sample(); return Math.max(...v) - Math.min(...v); }, { timeout: 10000 }).toBeGreaterThan(20);
+  await page.locator('.top .modes').getByRole('tab', { name: 'Live' }).click();
+  await page.locator('.live').getByRole('button', { name: /Stop effects/ }).first().click();
+  // stopped on the wire (after its fade): steady
+  await expect.poll(async () => { const v = await sample(); return Math.max(...v) - Math.min(...v); }, { timeout: 10000 }).toBeLessThan(3);
 });

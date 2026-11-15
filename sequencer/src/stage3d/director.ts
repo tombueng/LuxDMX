@@ -12,7 +12,8 @@
 // place a camera goes is checked against the room (`Space`: the walls, the ceiling, the deck, the
 // truss and the lights under it, the band, the DJ, the crowd, the big gear): the tests walk every
 // mode through every room, and every frame `clear` keeps it out of anything as a last resort.
-import { DECK, DJ_BOOTH, tourAt, TRUSS, W, type Room, type RoomId, type Seg, type V3 } from './geometry';
+import { DECK, DJ_BOOTH, pivotOf, toWorld, tourAt, TRUSS, W, type Room, type RoomId, type Rot, type Seg, type V3 } from './geometry';
+import { BALLROOM, CHURCH, CINEMA, LAYOUT, THEATRE } from './sceneSizes';
 
 export type CamMode = 'tour' | 'broadcast' | 'crane' | 'steadicam' | 'drone' | 'bandcam';
 // the modes as the toolbar offers them: a short name, a line under it, the longer title
@@ -71,10 +72,11 @@ export type Who = 'singer' | 'guitar' | 'bass' | 'keys' | 'drums' | 'dj';
 // `at`: between the feet (the drums: the kit's middle on the riser)
 export interface Light3 { p: V3; kind: string }
 export interface Cast { people: { who: Who; at: V3 }[]; booth?: V3; lights: Light3[] }
-const BAND: Record<'hall' | 'pub', Record<Exclude<Who, 'dj'>, P3>> = {
-  hall: { singer: [0, DECK, 2.0], guitar: [-3.6, DECK, 1.2], bass: [3.6, DECK, 1.2], keys: [-4.6, DECK, -1.6], drums: [0, DECK + 0.4, -2.4] },
-  pub: { singer: [0, DECK, 2.7], guitar: [-2.5, DECK, 2.1], bass: [2.5, DECK, 2.1], keys: [-3.15, DECK, -0.8], drums: [0, DECK + 0.4, -0.15] },
-};
+// (where venue.ts puts them: sceneSizes LAYOUT; the drums on their riser)
+const onDeck = ([x, z]: [number, number], up = 0): P3 => [x, DECK + up, z];
+const bandOf = (l: (typeof LAYOUT)['hall']): Record<Exclude<Who, 'dj'>, P3> =>
+  ({ singer: onDeck(l.mic), guitar: onDeck(l.guitar), bass: onDeck(l.bass), keys: onDeck(l.keys), drums: onDeck(l.kit, 0.4) });
+const BAND: Record<'hall' | 'pub', Record<Exclude<Who, 'dj'>, P3>> = { hall: bandOf(LAYOUT.hall), pub: bandOf(LAYOUT.pub) };
 export function castOf(id: RoomId, lights: Light3[] = []): Cast {
   if (id === 'hall' || id === 'pub') return { people: (Object.entries(BAND[id]) as [Who, P3][]).map(([who, p]) => ({ who, at: P(p) })), lights };
   const dj = DJ_BOOTH[id];
@@ -134,19 +136,22 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
   ],
   truss: [bx(6.2, 7.0, 0, 1.0, 6.2, 7.8, 'the table'), bx(-7.4, -6.6, 0, 1.7, 7.4, 9.9, 'road cases')],
   // the cinema's rows, three at a time, up to the heads of the audience in them (scenes.ts CINEMA)
-  cinema: [0, 1, 2, 3, 4, 5, 6, 7].map((k) => bx(-15.6, 15.6, 0, (3 * k + 3) * 0.34 + 1.3, 5.8 + 3 * k * 1.1, 5.8 + (3 * k + 3) * 1.1, 'the rows')),
+  cinema: Array.from({ length: Math.ceil(CINEMA.rows / 3) }, (_, k) =>
+    bx(-(CINEMA.wallX - 0.4), CINEMA.wallX - 0.4, 0, (3 * k + 3) * CINEMA.rowRise + 1.3, CINEMA.rowZ0 + 3 * k * CINEMA.rowD, CINEMA.rowZ0 + (3 * k + 3) * CINEMA.rowD, 'the rows')),
   // the theatre: its stalls four rows at a time, the balcony, the proscenium's walls round the opening
-  theatre: [...[0, 1, 2, 3].map((k) => bx(-21, 21, 0, (4.5 * k + 4.5) * 0.16 + 1.3, 5 + 4.5 * k, 9.5 + 4.5 * k, 'the stalls')), bx(-21, 21, 5.2, 10.6, 17.5, 28.5, 'the balcony'),
+  theatre: [...Array.from({ length: Math.ceil((THEATRE.stalls.rows * THEATRE.stalls.d) / 4.5) }, (_, k) =>
+    bx(-THEATRE.wallX, THEATRE.wallX, 0, (4.5 * k + 4.5) * THEATRE.stalls.rise + 1.3, THEATRE.stalls.z0 + 4.5 * k, THEATRE.stalls.z0 + 4.5 + 4.5 * k, 'the stalls')), bx(-21, 21, 5.2, 10.6, 17.5, 28.5, 'the balcony'),
     bx(-21, -13, 0, 32, 1.8, 2.6, 'the proscenium'), bx(13, 21, 0, 32, 1.8, 2.6, 'the proscenium'), bx(-13, 13, 15.5, 32, 1.8, 2.6, 'the proscenium')],
   // the church: its pews six rows at a time, the altar, the choir benches, the lectern
-  church: [...[0, 1, 2].map((k) => bx(-7.6, 7.6, 0, 1.75, 1.0 + 6.3 * k, 7.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
+  church: [...Array.from({ length: Math.ceil(CHURCH.pews.rows / 6) }, (_, k) =>
+    bx(-7.6, 7.6, 0, 1.75, CHURCH.pews.z0 + 6.3 * k, CHURCH.pews.z0 + 6.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
     bx(-5.2, -3.6, 0, 2.2, -6.5, -2.7, 'the choir'), bx(3.6, 5.2, 0, 2.2, -6.5, -2.7, 'the choir'), bx(-4.6, -3.8, 0, 2.6, -2.8, -2.0, 'the lectern')],
   // the ballroom: its round tables (chairs and guests round them), the head table, the cake, the
   // DJ's table, the chandeliers, the couples dancing
   ballroom: [
-    ...([[-7.8, 0.5], [-7.8, 4.5], [-7.8, 8.5], [-7.8, 12.5], [7.8, 0.5], [7.8, 4.5], [7.8, 8.5], [7.8, 12.5], [-4, 14], [0, 14], [4, 14], [-2, 17.5], [2, 17.5]] as const).map(([x, z]) => bx(x - 1.7, x + 1.7, 0, 1.5, z - 1.7, z + 1.7, 'a table')),
+    ...BALLROOM.tables.map(([x, z]) => bx(x - 1.7, x + 1.7, 0, 1.5, z - 1.7, z + 1.7, 'a table')),
     bx(-4.3, 4.3, 0, 1.6, -4.7, -2.9, 'the head table'), bx(6.7, 8.1, 0, 1.9, -4.1, -2.7, 'the cake'), bx(-9.6, -5.3, 0, 1.3, -4.2, -3.0, 'the DJ'),
-    ...([[-5, 6.5], [5, 6.5], [0, 12.6]] as const).map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
+    ...BALLROOM.chandeliers.map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
     ...([[-1.6, 5.2], [1.6, 6.2], [-0.2, 8.2]] as const).map(([x, z]) => bx(x - 0.6, x + 0.6, 0, 1.9, z - 0.6, z + 0.6, 'the dancers')),
   ],
   // the bar: its counter, the stools and the people on them, the back counter, the tables at the
@@ -234,6 +239,75 @@ export function blocked(s: Space, p: V3): string {
   for (const c of s.caps) if (capNear(c, p)) return c.what;
   if (p.y < crowdTop(s.crowd, p.x, p.z)) return 'the crowd';
   return '';
+}
+
+// ---- the camera to some lights ("Selected", a light's menu: Show it in 3D): where it goes and what
+// it looks at, far enough back to see them all. (The arithmetic is three.js's own, step by step:
+// it was worked out with its vectors in the 3D stage, and lands on the same spots.)
+const len3 = (x: number, y: number, z: number) => Math.sqrt(x * x + y * y + z * z);
+const unit = (x: number, y: number, z: number): V3 => { const k = 1 / (len3(x, y, z) || 1); return { x: x * k, y: y * k, z: z * k }; };
+export function shotOfLights(room: Room, lights: { p: V3; rot: Rot }[], fov: number): { pos: V3; at: V3 } {
+  const pts = lights.map((f) => pivotOf(f.p, f.rot));
+  const lo = { x: Infinity, y: Infinity, z: Infinity }, hi = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (const p of pts) { lo.x = Math.min(lo.x, p.x); lo.y = Math.min(lo.y, p.y); lo.z = Math.min(lo.z, p.z); hi.x = Math.max(hi.x, p.x); hi.y = Math.max(hi.y, p.y); hi.z = Math.max(hi.z, p.z); }
+  const c = { x: (lo.x + hi.x) * 0.5, y: (lo.y + hi.y) * 0.5, z: (lo.z + hi.z) * 0.5 };
+  // (a light up under the ceiling: looked at from a little below it, the camera can't go above it
+  // and the controls never put it under what it looks at)
+  if (c.y > room.ceiling - 0.9) c.y = room.ceiling - 0.9;
+  const r = Math.max(0.6, len3(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z) / 2);
+  // (from in front and a little to the side: up at hung lights, as the audience sees them; down
+  // at ones on the floor)
+  const d = Math.max(4.5, (r / Math.sin((fov * Math.PI) / 360)) * 1.15);
+  // (where the camera can be: inside the room, clear of its rows, tables and people. A light on
+  // the cinema's side wall seen from the front put it inside the raked seats: the first of a few
+  // ways round that's clear, else the nearest to it)
+  const Wl = room.walls, inside = (p: V3) => Math.abs(p.x) < Wl.x - 0.5 && p.z > Wl.z0 + 0.5 && p.z < Wl.z1 - 0.5 && p.y > 0.4 && p.y < room.ceiling - 0.8;
+  const sp = spaceOf(room, castOf(room.id)), into = Math.sign(-c.x) || 1;
+  // (hung lights, shining down: from the front and level with them; the rest from above. Not by
+  // their height: a washer on the cinema's top rows is high up and shines up its wall)
+  const hung = lights.every((f) => toWorld({ x: 0, y: 1, z: 0 }, f.rot).y < -0.3);
+  const dirs = hung ? [[0.35, -0.32, 1], [-0.35, -0.32, 1], [into * 0.8, -0.2, 0.6], [0, -0.8, 0.6], [into * 0.7, -0.7, 0.2], [0, -1, 0.08], [0, 0.4, 1]] : [[0.35, 0.45, 1], [-0.35, 0.45, 1], [into * 0.9, 0.5, 0.4], [into * 0.5, 1.1, 0.6], [0, 0.9, 1], [into * 0.15, 0.25, 1], [into * 0.15, 0.25, -1], [into * 0.3, 1.4, 0.2]];
+  // (and with nothing between it and the light: a boom in the wings seen through the proscenium's
+  // wall was a box drawn over a blank wall)
+  const seen = (q: V3) => {
+    const n = Math.ceil(len3(q.x - c.x, q.y - c.y, q.z - c.z) / 0.3);
+    for (let i = 1; i < n - 1; i++) {
+      const t = i / n, b = blocked(sp, { x: q.x + (c.x - q.x) * t, y: q.y + (c.y - q.y) * t, z: q.z + (c.z - q.z) * t });
+      // (only what's solid and big hides it: the proscenium, the balcony, the deck. Rows of seats,
+      // tables, the lights on a bar in between: one sees over and between them)
+      if (b === 'the proscenium' || b === 'the balcony' || b === 'the deck') return false;
+    }
+    return true;
+  };
+  let p1: V3 | undefined, clear: V3 | undefined;   // (clear but not seeing it: the next best)
+  // (clear with a little room above too: a spot right on the edge of a rail of lights ended up a
+  // hair inside it once the controls settled. Not the ceiling: `inside` keeps the camera off that,
+  // and a light under it is looked at from right at that limit; its 5 cm went a hair over it and
+  // no spot was left, the camera stuck a metre off with the light at the picture's edge)
+  const solid = (q: V3) => {
+    if (blocked(sp, q)) return true;
+    const up = blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z });
+    return !!up && up !== 'the ceiling';
+  };
+  const ok = (q: V3) => { if (!inside(q) || solid(q)) return false; if (seen(q)) return true; clear ??= q; return false; };
+  for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) {
+    if (p1) break;
+    const u = unit(x, y, z), s = d * k, q = { x: c.x + u.x * s, y: c.y + u.y * s, z: c.z + u.z * s };
+    // (the controls never let the camera under what it looks at: where they'd put it)
+    if (q.y < c.y + 0.05) q.y = c.y + 0.05;
+    if (ok(q)) p1 = q;
+  }
+  // (none of those: round it, nearer and nearer, level with it and a little above, the side
+  // towards the audience first; a low bar's rail of lights left little room)
+  // (and close in under a low ceiling: the bar's top shelf, a rail of lights in front of it)
+  if (!p1) for (const k of [0.8, 0.55, 0.35, 0.22]) for (const dy of [0.05, 0.3, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) {
+    const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = { x: c.x + Math.sin(ang) * d * k, y: c.y + dy, z: c.z + Math.cos(ang) * d * k };
+    if (ok(q)) p1 = q;
+  }
+  p1 ??= clear;
+  if (!p1) { const u = unit(into * 0.6, 0.8, 0.3), s = Math.min(d, 3); p1 = { x: c.x + u.x * s, y: c.y + u.y * s, z: c.z + u.z * s }; }
+  const pos = { x: Math.max(-Wl.x + 0.6, Math.min(Wl.x - 0.6, p1.x)), y: Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), z: Math.max(Wl.z0 + 0.6, Math.min(Wl.z1 - 0.6, p1.z)) };
+  return { pos, at: c };
 }
 // The camera moved out of anything it's in (the shortest way out), and inside the room: the last
 // resort for a room or a light placed where no crew expects it. `n` counts the frames it acted.

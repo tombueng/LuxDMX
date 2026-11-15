@@ -22,7 +22,7 @@ export function headParts(look: 'spot' | 'wash') {
   const head = look === 'spot'
     ? merge([new THREE.CylinderGeometry(0.1, 0.13, 0.42, 12).translate(0, 0.0, 0), new THREE.CylinderGeometry(0.115, 0.115, 0.05, 12).translate(0, 0.22, 0), new THREE.BoxGeometry(0.3, 0.06, 0.06).translate(0, 0, 0)])
     : merge([new THREE.SphereGeometry(0.17, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62).translate(0, 0.02, 0), new THREE.CylinderGeometry(0.15, 0.16, 0.08, 14).translate(0, 0.1, 0), new THREE.BoxGeometry(0.3, 0.06, 0.06)]);
-  return { base, yoke, head, lens: look === 'spot' ? 0.25 : 0.145, lensR: look === 'spot' ? 0.09 : 0.14 };
+  return { base, yoke, head };
 }
 
 // where the light comes out (no geometry made: the renderer asks every frame)
@@ -78,27 +78,27 @@ export function lookWidth(look: Look): number {
   }
   return w;
 }
-export function body(look: Look): { geo: THREE.BufferGeometry; lensR: number; lenses?: [number, number][] } {
+export function body(look: Look): { geo: THREE.BufferGeometry } {
   switch (look) {
-    case 'par': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.3, 12).translate(0, -0.15, 0), new THREE.TorusGeometry(0.17, 0.012, 4, 12, Math.PI).rotateY(Math.PI / 2).translate(0, -0.15, 0)]), lensR: 0.11 };
-    case 'fresnel': return { geo: merge([new THREE.BoxGeometry(0.22, 0.32, 0.22).translate(0, -0.17, 0), new THREE.CylinderGeometry(0.1, 0.1, 0.04, 12).translate(0, -0.01, 0)]), lensR: 0.1 };
+    case 'par': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.3, 12).translate(0, -0.15, 0), new THREE.TorusGeometry(0.17, 0.012, 4, 12, Math.PI).rotateY(Math.PI / 2).translate(0, -0.15, 0)]) };
+    case 'fresnel': return { geo: merge([new THREE.BoxGeometry(0.22, 0.32, 0.22).translate(0, -0.17, 0), new THREE.CylinderGeometry(0.1, 0.1, 0.04, 12).translate(0, -0.01, 0)]) };
     case 'blinder': {
       // a 2-lite: two lamps in a frame, side by side
-      return { geo: merge([new THREE.BoxGeometry(0.62, 0.12, 0.3).translate(0, -0.06, 0), new THREE.TorusGeometry(0.33, 0.012, 4, 12, Math.PI).rotateY(Math.PI / 2).translate(0, -0.06, 0)]), lensR: 0.12, lenses: [[-0.15, 0], [0.15, 0]] };
+      return { geo: merge([new THREE.BoxGeometry(0.62, 0.12, 0.3).translate(0, -0.06, 0), new THREE.TorusGeometry(0.33, 0.012, 4, 12, Math.PI).rotateY(Math.PI / 2).translate(0, -0.06, 0)]) };
     }
-    case 'strobe': return { geo: merge([new THREE.BoxGeometry(0.55, 0.1, 0.24).translate(0, -0.05, 0), new THREE.BoxGeometry(0.6, 0.02, 0.05).translate(0, -0.1, -0.13)]), lensR: 0.2 };
-    case 'bar': return { geo: new THREE.BoxGeometry(1, 0.08, 0.1).translate(0, -0.04, 0), lensR: 0 };
+    case 'strobe': return { geo: merge([new THREE.BoxGeometry(0.55, 0.1, 0.24).translate(0, -0.05, 0), new THREE.BoxGeometry(0.6, 0.02, 0.05).translate(0, -0.1, -0.13)]) };
+    case 'bar': return { geo: new THREE.BoxGeometry(1, 0.08, 0.1).translate(0, -0.04, 0) };
     // the board behind a LED ring or a matrix (scaled to its size)
-    case 'disc': return { geo: new THREE.CylinderGeometry(0.5, 0.5, 0.02, 48).translate(0, -0.01, 0), lensR: 0 };
-    case 'panel': return { geo: new THREE.BoxGeometry(1, 0.02, 1).translate(0, -0.01, 0), lensR: 0 };
-    case 'fog': return { geo: merge([new THREE.BoxGeometry(0.5, 0.3, 0.62).translate(0, 0.15, 0), new THREE.CylinderGeometry(0.05, 0.06, 0.12, 8).rotateX(Math.PI / 2).translate(0, 0.17, 0.36)]), lensR: 0 };
-    case 'confetti': return { geo: merge([new THREE.BoxGeometry(0.4, 0.12, 0.4).translate(0, 0.06, 0), new THREE.CylinderGeometry(0.09, 0.11, 0.7, 10).translate(0, 0.45, 0)]), lensR: 0 };
-    case 'bubbles': return { geo: merge([new THREE.BoxGeometry(0.42, 0.26, 0.32).translate(0, 0.13, 0), new THREE.TorusGeometry(0.12, 0.015, 4, 14).translate(0, 0.32, 0.17)]), lensR: 0 };
-    case 'flame': return { geo: merge([new THREE.BoxGeometry(0.42, 0.34, 0.42).translate(0, 0.17, 0), new THREE.CylinderGeometry(0.04, 0.06, 0.18, 8).translate(0, 0.43, 0)]), lensR: 0 };
-    case 'sparks': return { geo: merge([new THREE.BoxGeometry(0.4, 0.22, 0.4).translate(0, 0.11, 0), new THREE.CylinderGeometry(0.1, 0.05, 0.12, 10).translate(0, 0.28, 0)]), lensR: 0 };
-    case 'co2': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.2, 10).translate(0, 0.1, 0), new THREE.CylinderGeometry(0.035, 0.05, 0.6, 8).translate(0, 0.5, 0)]), lensR: 0 };
+    case 'disc': return { geo: new THREE.CylinderGeometry(0.5, 0.5, 0.02, 48).translate(0, -0.01, 0) };
+    case 'panel': return { geo: new THREE.BoxGeometry(1, 0.02, 1).translate(0, -0.01, 0) };
+    case 'fog': return { geo: merge([new THREE.BoxGeometry(0.5, 0.3, 0.62).translate(0, 0.15, 0), new THREE.CylinderGeometry(0.05, 0.06, 0.12, 8).rotateX(Math.PI / 2).translate(0, 0.17, 0.36)]) };
+    case 'confetti': return { geo: merge([new THREE.BoxGeometry(0.4, 0.12, 0.4).translate(0, 0.06, 0), new THREE.CylinderGeometry(0.09, 0.11, 0.7, 10).translate(0, 0.45, 0)]) };
+    case 'bubbles': return { geo: merge([new THREE.BoxGeometry(0.42, 0.26, 0.32).translate(0, 0.13, 0), new THREE.TorusGeometry(0.12, 0.015, 4, 14).translate(0, 0.32, 0.17)]) };
+    case 'flame': return { geo: merge([new THREE.BoxGeometry(0.42, 0.34, 0.42).translate(0, 0.17, 0), new THREE.CylinderGeometry(0.04, 0.06, 0.18, 8).translate(0, 0.43, 0)]) };
+    case 'sparks': return { geo: merge([new THREE.BoxGeometry(0.4, 0.22, 0.4).translate(0, 0.11, 0), new THREE.CylinderGeometry(0.1, 0.05, 0.12, 10).translate(0, 0.28, 0)]) };
+    case 'co2': return { geo: merge([new THREE.CylinderGeometry(0.12, 0.14, 0.2, 10).translate(0, 0.1, 0), new THREE.CylinderGeometry(0.035, 0.05, 0.6, 8).translate(0, 0.5, 0)]) };
     // a mirror ball's motor: a small box at the top of its chain (the ball is the rig's own, rig.ts)
-    case 'mirrorball': return { geo: new THREE.BoxGeometry(0.12, 0.1, 0.12).translate(0, -0.05, 0), lensR: 0.01 };
-    default: return { geo: new THREE.BoxGeometry(0.3, 0.3, 0.3).translate(0, -0.15, 0), lensR: 0.1 };
+    case 'mirrorball': return { geo: new THREE.BoxGeometry(0.12, 0.1, 0.12).translate(0, -0.05, 0) };
+    default: return { geo: new THREE.BoxGeometry(0.3, 0.3, 0.3).translate(0, -0.15, 0) };
   }
 }

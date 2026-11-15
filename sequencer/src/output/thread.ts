@@ -29,7 +29,7 @@ export type FromThread =
   | { t: 'held'; held: Record<string, number> }
   | { t: 'stats'; rate: number; worst: number; late: number; quiet: boolean; link: boolean }
   | { t: 'broken'; why: string };
-export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; fxOver: Engine['fxOver']; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
+export interface Inputs { programmer: Record<string, Values>; live: Record<string, Values>; fxOver: Engine['fxOver']; levelOver: Engine['levelOver']; grandMaster: number; blackout: boolean; bpm: number; sound: number; overlay: Engine['overlay']; armed: boolean; groupMasters: Record<string, number>; heldSeed: Record<string, number> }
 
 const PERIOD = 25, LATE = 10;
 // The page says something at least once a second (the beat's sync). Not heard from for this long

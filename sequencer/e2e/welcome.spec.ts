@@ -206,7 +206,10 @@ test('the demos fold away and stay folded; every start stays there; Lights only 
   await fresh(page, true);
   let w = welcomeDialog(page);
   await expect(w.getByRole('button', { name: /^Play the show: Festival stage/ })).toBeFocused();
-  await expect(w.getByRole('group', { name: 'Band' })).toContainText(/\d+ lights · \d+ cues/);      // (what's in it)
+  // (what's in it: written down per template, there at once, not worked out by building each show)
+  const band = await page.evaluate(async () => (await import('/src/content/sizes.ts')).sizeSaid('t:Band'));
+  expect(band).toMatch(/^\d+ lights · \d+ cues$/);
+  await expect(w.getByRole('group', { name: 'Band' })).toContainText(band);
   await w.getByRole('button', { name: 'Hide the demos' }).click();
   await expect(demoTile(w)).toHaveCount(0);
   await w.getByRole('button', { name: 'Start with an empty stage' }).click();

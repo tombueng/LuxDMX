@@ -306,6 +306,20 @@ describe('cue lists', () => {
     expect(r.e.status('L').running).toBe(false);
   });
 
+  it('a follow waits for the cue\'s longest fade, its own position time too (an 8 s pan isn\'t cut off at 1 s)', () => {
+    const r = rig([fx('m', 'gen-mover8', 1)], [list('L', [
+      cue({ m: { intensity: 1, pan: 0 } }, 0),
+      cue({ m: { intensity: 1, pan: 1 } }, 1, { times: { position: 8 }, advance: { mode: 'follow', time: 0 } }),
+      cue({ m: { intensity: 0.5 } }, 0),
+    ])]);
+    r.e.jumpTo('L', 0); out(r, 0, 1);
+    r.e.go('L'); out(r, 0.01, 1);
+    const pan = out(r, 2, 1)[0];
+    expect(r.e.status('L').index).toBe(1);                  // still the pan's cue at 2 s
+    expect(pan).toBeGreaterThan(40); expect(pan).toBeLessThan(110);   // about a quarter of the way
+    out(r, 8.5, 1); expect(r.e.status('L').index).toBe(2);  // on after the 8 s
+  });
+
   it('a loop of 1-beat cues keeps the tempo: each step counts from when it was due, not the frame that noticed', () => {
     const r = rig([fx('a', 'gen-dimmer', 1)], [list('L', [0.2, 0.4, 0.6, 0.8].map((v) => cue({ a: { intensity: v } }, 0, { advance: { mode: 'beats', beats: 1 } })), { end: 'loop' })]);
     r.e.bpm = 120;                                  // a step every 0.5 s

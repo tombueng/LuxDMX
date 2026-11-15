@@ -739,12 +739,20 @@ Three more demos come with their own room on the 3D stage:
   **Snap** (in the transport) says what a drag lands on: the beat, the bar, or nothing. Besides the
   machines the moments have **Blackout**, **Blackout off** and **Everything off**.
   What's placed drags along the beat grid and onto the song's parts (Alt: free), or moves with the
-  arrow keys once it has the focus (a beat, Shift a bar); an effect bar's end makes it longer,
+  arrow keys once it has the focus (a beat, Shift a bar); an effect bar's end (or Alt+arrows) makes it longer,
   right-click or Del removes. The **wheel zooms** round the pointer (Shift+wheel scrolls sideways).
   The **Effects** track opens (its ▸): a row for each knob its effects have (speed, size, spread...)
   with a line over every bar at that knob's value. Drag the line up or down to change the effect's
   own value; double-click it (or Alt+click) for a point there, and the knob follows a **curve**
-  along that bar while the song plays: drag the points, double-click one to take it away. Play runs
+  along that bar while the song plays: drag the points, double-click one to take it away. A cue
+  list's track opens too, into its **level** over the song: a dashed line at full until you click in
+  the row, which puts a point there (one point: that level all song long; more: straight lines
+  between them, snapped to the beat, Alt: free). Drag the points, double-click one to take it away.
+  From the keyboard: Enter on the row puts a point at the playhead; on a point the up and down arrows
+  change its level (5 %, Shift 1 %), left and right move it a beat (Shift a bar), Delete removes it.
+  While the song plays it scales the list's fader (the fader still pulls it down; paused, the fader
+  alone). The **Moments** track opens into **how long** each moment lasts, a bar from it on: drag its
+  end, or the arrow keys on it (half a second, Shift a tenth; 30 s at most). Play runs
   the show on the song's clock, in Live and on the 3D stage
   too (Live has a play/pause chip with the time at the top). Going through the song is safe: grab
   the green playhead anywhere along its height (or drag on the ruler, click a part, Home, End, the
@@ -932,7 +940,8 @@ Three more demos come with their own room on the 3D stage:
   pole, swinging round at each turn, drooping when it slows and rippling when it's fast.
   The LED screens beside the stage show the show the way a TV director films it (the **Broadcast**
   camera move, its own cuts, live; in the pub the TVs show it too). Off in the Venue panel (**The
-  live camera on the screens**) they show the band's name; at the lowest drawing quality too.
+  live camera on the screens**) they show the band's name; at the lowest drawing quality too, held still there
+  (painted again only for a new name: the page is busiest then).
   **Venue**: the room, **Big stage** (the hall) or **Small club / pub**: the same band on a smaller
   stage across the end of a room with brick walls and a low ceiling, two little trusses hung from
   it, a PA on poles, TVs on the walls, a bar at the back with its bartender, a few dozen people.
@@ -1035,7 +1044,9 @@ Three more demos come with their own room on the 3D stage:
   every box, Connect and **The rig (RDM)…**. On a tablet held upright (up to 900 px) Undo and
   Redo are in the ⋯ menu, as on a phone. On the stage plan the names never run into each other
   and stay inside the plan: each goes under its light, above it, or beside it; one with no room
-  left is shown on hover (a selected light always shows its name). On a narrow plan the symbols
+  left is shown on hover (a selected light always shows its name). A curtain or a drop is a line
+  across the stage with its name at one end; names of the lights along it may sit on the line. A
+  crowded plan writes its names a size smaller when that fits more of them. On a narrow plan the symbols
   get smaller so neighbours keep apart. Zoom with the wheel or a pinch (on a laptop also +); the
   zoom figure next to it fits the whole stage again. New lights land clear of the ones there: a
   row of their own where the stage has room, else each on the freest spot.

@@ -29,6 +29,10 @@ describe('a setting', () => {
     expect(VOLUME.get()).toBe(0.8);
     localStorage.setItem('luxdmx.seq.volume', JSON.stringify({ v: 1, data: 'loud' }));
     expect(VOLUME.get()).toBe(0.8);
+    // (one of this version too: put aside before the next set writes over it)
+    expect(raw('luxdmx.seq.volume.unreadable')).toBe(JSON.stringify({ v: 1, data: 'loud' }));
+    VOLUME.set(0.5);
+    expect(raw('luxdmx.seq.volume.unreadable')).toBe(JSON.stringify({ v: 1, data: 'loud' }));
     localStorage.setItem('luxdmx.seq.volume', JSON.stringify({ v: 0, data: 'x' }));
     // (a step that can't make a number of it: the default, and the old text put aside)
     const k = kept('test.broken', 1, 5, { 1: () => { throw new Error('no'); } }, isNum);

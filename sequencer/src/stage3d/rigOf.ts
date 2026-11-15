@@ -19,7 +19,18 @@ const SFX: Sfx[] = ['confetti', 'bubbles', 'flame', 'sparks', 'co2'];
 type Mode = FixtureMode | undefined;
 const chOf = (m: Mode, attr: string) => m?.channels.find((ch) => ch.attr === attr && !ch.fine && ch.cell === undefined);
 
+// (worked out once per mode: a type is never changed in place, saving one makes a new object. Every
+// light's 3D look is made again on any change to any light, a gizmo drag on every pointer move, and
+// reading the gobo names was most of that. What's made here is shared and only ever read.)
+const wheelsMemo = new WeakMap<FixtureMode, GoboWheel[] | undefined>(), prismMemo = new WeakMap<FixtureMode, RigFixture['prism']>();
 export function goboWheelsOf(m: Mode): GoboWheel[] | undefined {
+  if (!m) return undefined;
+  if (wheelsMemo.has(m)) return wheelsMemo.get(m);
+  const w = wheelsFrom(m);
+  wheelsMemo.set(m, w);
+  return w;
+}
+function wheelsFrom(m: Mode): GoboWheel[] | undefined {
   const out: GoboWheel[] = [];
   for (const [attr, rotAttr] of [['gobo', 'goboRotation'], ['gobo2', 'gobo2Rotation']] as const) {
     const c = chOf(m, attr);
@@ -30,8 +41,11 @@ export function goboWheelsOf(m: Mode): GoboWheel[] | undefined {
   return out.length ? out : undefined;
 }
 export function prismOfMode(m: Mode): RigFixture['prism'] {
-  const c = chOf(m, 'prism');
-  return c ? { ranges: c.ranges, rot: chOf(m, 'prismRotation')?.ranges } : undefined;
+  if (!m) return undefined;
+  if (prismMemo.has(m)) return prismMemo.get(m);
+  const c = chOf(m, 'prism'), p = c ? { ranges: c.ranges, rot: chOf(m, 'prismRotation')?.ranges } : undefined;
+  prismMemo.set(m, p);
+  return p;
 }
 
 // every light as the 3D stage needs it (a light without a 3D place of its own goes where its plan

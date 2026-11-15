@@ -527,8 +527,6 @@ export const rug = () => make('rug', 512, 512, (g, w, h) => {
   for (let i = 0; i < 160; i++) { g.fillStyle = ['#d8c79a', '#1f2a4a', '#8a2a2a'][i % 3]; g.fillRect(70 + r() * (w - 140), 70 + r() * (h - 140), 4, 4); }
   speckle(g, w, h, 9000, (rr) => `rgba(${rr() < 0.5 ? '255,255,255' : '0,0,0'},${0.04 + rr() * 0.06})`, 2, 73);
 });
-// a kick drum's front head with the band's logo (paintKick)
-export const kickHead = () => make('kickhead', 256, 256, (g, w, h) => paintKick(g, w, h, 'WANTB'));
 // a mixing desk's or a lighting desk's top: strips of knobs, buttons, little screens, fader slots
 export const consoleTop = (kind: 'sound' | 'light') => make(`console:${kind}`, 1024, 512, (g, w, h) => {
   g.fillStyle = '#26292e'; g.fillRect(0, 0, w, h);

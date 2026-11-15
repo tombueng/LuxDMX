@@ -6,10 +6,14 @@
   // The show can start before the song (an intro, the walk-on) and go on after it (the cheer, the
   // house lights): those spans sit left and right of the song on the ruler, shaded and named; the
   // song's parts and beat grid only over the song. The crowd's sound has a track of its own.
-  import { onDestroy, onMount, setContext, untrack } from 'svelte';
+  import { onDestroy, setContext, untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
-  import Modal from './Modal.svelte';
+  import TimelineSongPicker from './TimelineSongPicker.svelte';
+  import TimelinePalette from './TimelinePalette.svelte';
+  import TimelineSetList from './TimelineSetList.svelte';
+  import { burstLabel, crowdLabel, DT, type Chip } from './timeline/chips';
+  import { Songs } from './timeline/songs.svelte';
   import StageView from './StageView.svelte';
   import { app, newId } from '../app.svelte';
   import { ui, dialogOpen, asPercent, spaceIsGo } from './ui.svelte';
@@ -18,13 +22,16 @@
   import { isMachineList } from '../content/busking';
   import { cueMarkOf, listMarkOf, MARK_SHORT } from './risk';
   import TimelineCurves from './TimelineCurves.svelte';
+  import TimelineLengths from './TimelineLengths.svelte';
+  import TimelineLevel from './TimelineLevel.svelte';
   import { CURVE_KNOBS } from '../model/timeline';
   import { LIVE_KNOBS } from '../engine/knobs';
-  import { AROUND_MAX, CHEER_MAX, addSong, clockOf, moveSong, removeSong, setOptions, snap, songIndex, songName, songsOf, spanOf, type BurstAttr, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
-  import { BAR_S, DEMO_SECONDS, playDemo, sectionStarts } from '../timeline/beat';
-  import { CATALOG, GENRES, type CatalogSong } from '../timeline/catalog';
-  import { SongError, creditOf, downloadSong } from '../timeline/download';
-  import { ShowChanged } from '../timeline/player.svelte';
+  import { AROUND_MAX, CHEER_MAX, clockOf, snap, songIndex, songName, songsOf, spanOf, type CrowdAction, type CrowdItem, type TimelineAction, type TimelineItem, type TimelineSection } from '../model/timeline';
+  import { sectionStarts } from '../timeline/beat';
+  import { CATALOG } from '../timeline/catalog';
+  import { progressSaid } from '../timeline/songPicker';
+  import { gridOf, peaksPath as wavePath } from '../timeline/ruler';
+  import { creditOf } from '../timeline/download';
   import { SURE, type SongAnalysis } from '../timeline/analyze';
   import { analyzeAudio } from '../timeline/songAnalysis';
 
@@ -41,50 +48,36 @@
   // and what's on the tracks a moment later, in a task of their own once the frame is on screen
   let built = $state(false);
   $effect(() => { const id = requestAnimationFrame(() => setTimeout(() => (built = true))); return () => cancelAnimationFrame(id); });
-  onMount(() => { void P.prepare(); });
-  $effect(() => { void app.show.timeline?.audio?.store; void app.show.timeline?.demo; void P.prepare(); });
+  // (the song made ready when the view is built and when another one comes in; untracked: what
+  // prepare reads made it run again on every play, pause and edit of the time around the song)
+  $effect(() => { void app.show.timeline?.audio?.store; void app.show.timeline?.demo; untrack(() => void P.prepare()); });
 
   const tl = $derived(app.show.timeline);
+  const songLen = $derived(tl?.duration ?? 0);                                  // (what the player says too)
+  const barS = $derived((60 / (tl?.bpm ?? app.show.settings.bpm)) * 4);       // a bar, in seconds
   const items = $derived(tl?.items ?? []);
   const crowd = $derived(tl?.crowd ?? []);
   // the show's span on the song's clock: from the start of the time before the song to the end of
   // the time after it (the song itself is 0 to its length)
-  const span = $derived(spanOf(tl ? { duration: P.duration || tl.duration, lead: tl.lead, tail: tl.tail } : { duration: 240 }));
+  const span = $derived(spanOf(tl ? { duration: tl.duration, lead: tl.lead, tail: tl.tail } : { duration: 240 }));
   // (not the fog timers, nor the machines' own shot lists: those are buttons, not looks)
   const lists = $derived(app.show.cueLists.filter((l) => !isFogTimer(l) && !isMachineList(l, app.isMachineFx)));
   // one lane per list that's on the timeline or could be, then effects, then moments
-  // the Effects track opened: a row for each knob its effects have, their values over the bars
-  let fxOpen = $state(false);
+  // A track opened (the ▸ by its name) shows what's on it in more detail, a thinner row each: the
+  // Effects track a row for each knob its effects have (their values over the bars), a list's track
+  // its level over the song, the Moments track how long each one lasts
+  let opened = $state<Record<string, boolean>>({});
   const fxBars = $derived(items.filter((i) => i.lane === 'fx' && i.len !== undefined && i.do.do === 'effect' && i.do.on));
   const fxKnobs = $derived(CURVE_KNOBS.filter((k) => fxBars.some((i) => { const e = app.show.effects.find((x) => x.id === (i.do as { effect: string }).effect); return !!e && (LIVE_KNOBS[e.kind] ?? CURVE_KNOBS).includes(k as never); })));
+  const moments = $derived(items.filter((i) => i.lane === 'special' && i.do.do === 'burst'));
+  const rowsOf = (id: string): string[] => (id === 'fx' ? (fxBars.length ? fxKnobs : []) : id.startsWith('list:') ? ['level'] : id === 'special' && moments.length ? ['how long'] : []);
+  const OPENER: Record<string, { label: string; tip: string }> = {
+    fx: { label: "the effects' knobs", tip: "The effects' knobs over time: speed, size and the rest, as lines and curves under the bars" },
+    special: { label: "the moments' lengths", tip: 'How long each moment lasts: drag the end of its bar' },
+  };
+  const openerOf = (ln: { id: string; name: string }) => OPENER[ln.id] ?? { label: `the level of ${ln.name}`, tip: `The level of ${ln.name} over the song: put points on the line to bring it down and up (it scales the list's fader while the song plays)` };
   const lanes = $derived([...lists.map((l) => ({ id: `list:${l.id}`, name: l.name, color: l.color ?? '#45d85c' })),
     { id: 'fx', name: 'Effects', color: '#ffaa1c' }, { id: 'crowd', name: 'Crowd', color: '#7fc8ff' }, { id: 'special', name: 'Moments', color: '#f33abc' }]);
-  // the crowd's moments: how it sounds from there on (got to over the bar's length), or a cheer
-  const CROWD: { label: string; a: CrowdAction; len: number; tip: string }[] = [
-    { label: 'Chatter', a: { do: 'crowd', mood: 'chatter', level: 0.5 }, len: 2, tip: 'People talking while they wait' },
-    { label: 'Cheering', a: { do: 'crowd', mood: 'cheer', level: 0.5 }, len: 2, tip: 'The crowd cheers from here on' },
-    { label: 'Roar', a: { do: 'crowd', mood: 'cheer', level: 1 }, len: 1, tip: 'As loud as they get' },
-    { label: 'Quiet', a: { do: 'crowd', mood: 'cheer', level: 0 }, len: 3, tip: 'The crowd goes quiet' },
-    { label: 'Cheer!', a: { do: 'cheer', level: 1 }, len: 4, tip: 'A cheer that swells up and dies away' },
-  ];
-  const crowdLabel = (a: CrowdAction) => {
-    const pc = `${Math.round(a.level * 100)} %`;
-    if (a.do === 'cheer') return `Cheer! ${pc}`;
-    if (a.level === 0) return 'Crowd quiet';
-    return `${a.mood === 'chatter' ? 'Chatter' : a.level >= 0.95 ? 'Roar' : 'Cheering'} ${pc}`;
-  };
-  const BURSTS: { attr: BurstAttr; label: string; s: number }[] = [
-    { attr: 'confetti', label: 'Confetti', s: 1 }, { attr: 'flame', label: 'Flames', s: 1.5 }, { attr: 'sparks', label: 'Sparks', s: 4 },
-    { attr: 'co2', label: 'CO2 jet', s: 2 }, { attr: 'bubbles', label: 'Bubbles', s: 8 }, { attr: 'fog', label: 'Fog', s: 5 },
-    { attr: 'strobe', label: 'Strobe hit', s: 2 }, { attr: 'blinder', label: 'Blinder hit', s: 1 }];
-  const ARMED_ONLY: string[] = ['confetti', 'flame', 'sparks', 'co2'];
-  // (the machine moments the rig can do: one for a confetti cannon it hasn't got did nothing. A strobe
-  // or blinder hit uses any light)
-  const bursts = $derived.by(() => {
-    const attrs = new Set(app.show.fixtures.flatMap((f) => app.modeOf(f.id)?.channels.map((c) => c.attr) ?? []));
-    const fog = app.show.fixtures.some((f) => app.caps(f.id).fog);
-    return BURSTS.filter((b) => b.attr === 'strobe' || b.attr === 'blinder' || (b.attr === 'fog' ? fog : attrs.has(b.attr)));
-  });
 
   // ---- scale and scrolling
   let tracks = $state<HTMLDivElement>();
@@ -119,7 +112,7 @@
   const tAt = (clientX: number) => { const r = tracks!.getBoundingClientRect(); return inSpan((clientX - r.left + tracks!.scrollLeft) / scale + span.from); };
   let snapTo = $state<'bar' | 'beat' | 'off'>('beat');
   const sn = (t: number, free = false) => {
-    const song = P.duration || tl?.duration || 0;
+    const song = songLen;
     if (free || snapTo === 'off') return inSpan(Math.round(t * 20) / 20);
     // the song's start and end close by (8 px) win, then a part of the song: cues land right on
     // the chorus, the drop...
@@ -130,28 +123,13 @@
     return near ? near.at : Math.min(song, snap(t, tl?.bpm ?? app.show.settings.bpm, snapTo === 'bar' ? 4 : 1, tl?.offset ?? 0));
   };
   // the grid: bars (and beats when there's room)
-  const grid = $derived.by(() => {
-    // (a tempo that isn't a sane number would loop for ever here: 120)
-    const raw = tl?.bpm ?? app.show.settings.bpm, bpm = Number.isFinite(raw) && raw >= 20 && raw <= 300 ? raw : 120;
-    const beat = 60 / bpm, d = P.duration || tl?.duration || 240, out: { t: number; bar: boolean; n: number; label: boolean }[] = [];
-    const every = scale * beat < 6 ? (scale * beat * 4 < 14 ? 4 * Math.ceil(14 / (scale * beat * 4)) : 4) : 1;
-    // (the bar numbers as far apart as they need: "121" is wider than "9", so past bar 99 only
-    // every second or fourth bar is numbered where they'd run into each other)
-    const barStep = Math.max(1, every / 4), barPx = scale * beat * 4 * barStep;
-    const need = String(Math.max(1, Math.ceil(d / (beat * 4)))).length * 6.6 + 6;
-    const lab = barStep * ([1, 2, 4, 8, 16, 32].find((k) => barPx * k >= need) ?? 64);
-    for (let i = 0, t = tl?.offset ?? 0; t <= d; i += every, t = (tl?.offset ?? 0) + i * beat) {
-      const n = i / 4 + 1;
-      out.push({ t, bar: i % 4 === 0, n, label: i % 4 === 0 && (n - 1) % lab === 0 });
-    }
-    return out;
-  });
+  const grid = $derived(gridOf(tl?.bpm ?? app.show.settings.bpm, songLen, scale, tl?.offset ?? 0));
   // the song's parts: the demo beat's own, the ones a demo song came with, the ones found in a song
   // file of your own, or set by hand
   const sections = $derived.by((): { name: string; at: number; end: number; energy?: number }[] => {
     if (!tl) return [];
     if (tl.demo && !tl.audio && !tl.sections?.length) return sectionStarts();
-    const s = tl.sections ?? [], d = P.duration || tl.duration;
+    const s = tl.sections ?? [], d = songLen;
     return s.map((x, i) => ({ name: x.name, at: x.at, end: Math.max(x.at, s[i + 1]?.at ?? d), energy: x.energy }));
   });
   function zoom(f: number, at?: number) {
@@ -162,7 +140,7 @@
   // the time before and after the song (seconds): what's placed there can't be cut off by it.
   // Hands back what it is now (the field shows that).
   function setAround(k: 'lead' | 'tail', v: number): number {
-    const T = app.timeline.ensure(), song = P.duration || T.duration;
+    const T = app.timeline.ensure(), song = T.duration;
     let s = Math.round(Math.max(0, Math.min(AROUND_MAX, Number.isFinite(v) ? v : 0)));
     const at = [...T.items.map((i) => i.at + (k === 'tail' ? i.len ?? 0 : 0)), ...(T.crowd ?? []).map((i) => i.at + (k === 'tail' ? i.len ?? 0 : 0))];
     const need = k === 'lead' ? Math.ceil(Math.max(0, ...at.map((a) => -a))) : Math.ceil(Math.max(0, ...at.map((a) => a - song)));
@@ -194,7 +172,7 @@
   });
   // the time before and after the song, on the ruler and behind the tracks
   const around = $derived.by(() => {
-    const song = P.duration || tl?.duration || 0, out: { cls: string; name: string; from: number; to: number }[] = [];
+    const song = songLen, out: { cls: string; name: string; from: number; to: number }[] = [];
     if (span.from < 0) out.push({ cls: 'lead', name: 'Before the song', from: span.from, to: 0 });
     // (no song yet: there's no "after" it, the whole ruler said so)
     if (song > 0 && shownTo > song) out.push({ cls: 'tail', name: 'After the song', from: song, to: shownTo });
@@ -207,7 +185,7 @@
     const a = i.do;
     if (a.do === 'goto') { const l = app.show.cueLists.find((x) => x.id === a.list), k = l?.cues.findIndex((c) => c.id === a.cue) ?? -1; return l && k >= 0 ? `${cueNumber(l, k)}. ${l.cues[k].name}` : '(gone)'; }
     if (a.do === 'effect') return app.show.effects.find((e) => e.id === a.effect)?.name ?? '(gone)';
-    if (a.do === 'burst') return BURSTS.find((b) => b.attr === a.attr)?.label ?? a.attr;
+    if (a.do === 'burst') return burstLabel(a.attr);
     if (a.do === 'blackout') return a.on ? 'Blackout' : 'Blackout off';
     if (a.do === 'off') return 'Everything off';
     if (a.do === 'release') return 'Fade out';
@@ -235,10 +213,9 @@
     sel = it.id;
     app.markDirty(0);
   }
-  // what a palette chip stands for
-  type Chip = { kind: 'cue'; list: string; cue: string } | { kind: 'fx'; effect: string } | { kind: 'burst'; attr: BurstAttr; s: number } | { kind: 'act'; a: TimelineAction } | { kind: 'crowd'; a: CrowdAction; len: number };
+  // a palette chip dropped or tapped onto the tracks (timeline/chips.ts says what each is)
   function chipAt(c: Chip, at: number) {
-    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
+    const bar = barS;
     if (c.kind === 'cue') place({ do: 'goto', list: c.list, cue: c.cue }, at, `list:${c.list}`);
     // (an effect runs to the end of the part of the song it lands in, the chorus it's for, not a
     // fixed 8 bars that stopped short of it; a song without parts: 8 bars)
@@ -253,7 +230,7 @@
   // A tap on a chip: at the playhead, or, when its lane already has something there (the last tap),
   // a bar after it, so taps in a row go one after the other instead of on top of each other
   function tapChip(c: Chip) {
-    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4, lane = c.kind === 'cue' ? `list:${c.list}` : c.kind === 'fx' ? 'fx' : c.kind === 'crowd' ? null : 'special';
+    const bar = barS, lane = c.kind === 'cue' ? `list:${c.list}` : c.kind === 'fx' ? 'fx' : c.kind === 'crowd' ? null : 'special';
     const taken = (t: number) => (lane === null ? (tl?.crowd ?? []).some((i) => Math.abs(i.at - t) < 0.05) : (tl?.items ?? []).some((i) => i.lane === lane && Math.abs(i.at - t) < 0.05));
     let at = sn(P.position);
     for (let k = 0; k < 64 && taken(at); k++) at = sn(at + bar);
@@ -263,8 +240,6 @@
   type Placed = TimelineItem | (CrowdItem & { lane?: undefined });
   const placed = (id: string): Placed | undefined => tl?.items.find((i) => i.id === id) ?? tl?.crowd?.find((i) => i.id === id);
   const isCrowd = (it: Placed): it is CrowdItem => it.do.do === 'crowd' || it.do.do === 'cheer';
-  const DT = 'application/x-luxdmx-timeline';
-  function dragChip(e: DragEvent, c: Chip) { e.dataTransfer?.setData(DT, JSON.stringify(c)); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'; }
   let dropAt = $state<number | null>(null);
   function over(e: DragEvent) { if (e.dataTransfer?.types.includes(DT) || e.dataTransfer?.types.includes('Files')) { e.preventDefault(); dropAt = sn(tAt(e.clientX), e.altKey); } }
   async function drop(e: DragEvent) {
@@ -276,6 +251,14 @@
     if (raw) chipAt(JSON.parse(raw) as Chip, at);
   }
 
+  // how long a placed thing can be: a crowd change from an instant to a minute, a cheer up to
+  // CHEER_MAX, anything else half a second or more; never past the end of the show
+  function lenFor(it: Placed, len: number) {
+    const crowdy = isCrowd(it), max = crowdy ? (it.do.do === 'cheer' ? CHEER_MAX : 60) : Infinity, least = crowdy && it.do.do !== 'cheer' ? 0 : 0.5;
+    return Math.max(least, Math.min(max, span.to - it.at, len));
+  }
+  // (the crowd's track stays in time order)
+  function sortCrowd() { if (tl?.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at); }
   // dragging what's placed (and the end of an effect bar, a crowd change or a cheer)
   let drag: { id: string; dx: number; end: boolean; moved: boolean } | null = null;
   function itemDown(e: PointerEvent, it: Placed, end = false) {
@@ -290,29 +273,30 @@
     const it = placed(drag.id);
     if (!it) return;
     if (!drag.moved) { app.checkpoint(); drag.moved = true; }
-    const t = sn(tAt(e.clientX) - drag.dx, e.altKey), crowdy = isCrowd(it), max = crowdy ? (it.do.do === 'cheer' ? CHEER_MAX : 60) : Infinity, least = crowdy && it.do.do !== 'cheer' ? 0 : 0.5;
-    if (drag.end) it.len = Math.max(least, Math.min(max, span.to - it.at, t - it.at));
-    else { it.at = inSpan(t); if (it.len !== undefined) it.len = Math.max(least, Math.min(it.len, span.to - it.at)); }
+    const t = sn(tAt(e.clientX) - drag.dx, e.altKey);
+    if (drag.end) it.len = lenFor(it, t - it.at);
+    else { it.at = inSpan(t); if (it.len !== undefined) it.len = lenFor(it, it.len); }
   }
   // The keyboard's way to move one (there was none): arrows, a beat (with Shift a bar; a bar each
   // when it snaps to bars; half a second with snap off or outside the song)
+  // (with Alt, a bar's (or a crowd change's) end instead: longer or shorter by the same step)
   function itemKey(e: KeyboardEvent, id: string) {
-    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || !tl) return;
+    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.ctrlKey || e.metaKey || !tl) return;
     const it = placed(id);
-    if (!it) return;
+    if (!it || (e.altKey && it.len === undefined)) return;
     e.preventDefault(); e.stopPropagation();
-    const song = P.duration || tl.duration || 0, beat = 60 / (tl.bpm ?? app.show.settings.bpm);
+    const song = songLen, beat = barS / 4;
     const inSong = it.at >= 0 && it.at <= song && snapTo !== 'off';
-    const step = inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5;
+    const step = (inSong ? beat * (snapTo === 'bar' || e.shiftKey ? 4 : 1) : 0.5) * (e.key === 'ArrowRight' ? 1 : -1);
     app.checkpoint();
-    it.at = inSpan(Math.round((it.at + (e.key === 'ArrowRight' ? step : -step)) * 1000) / 1000);
-    if (it.len !== undefined) it.len = Math.max(0.5, Math.min(it.len, span.to - it.at));
-    if (tl.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at);
+    if (e.altKey) it.len = lenFor(it, Math.round((it.len! + step) * 1000) / 1000);
+    else it.at = inSpan(Math.round((it.at + step) * 1000) / 1000);
+    if (it.len !== undefined) it.len = lenFor(it, it.len);
+    sortCrowd();
     app.markDirty(0);
   }
   function itemUp() {
-    // (the crowd's track stays in time order)
-    if (drag?.moved) { if (tl?.crowd?.some((x, i, a) => i && x.at < a[i - 1].at)) tl.crowd = [...tl.crowd].sort((a, b) => a.at - b.at); app.markDirty(0); }
+    if (drag?.moved) { sortCrowd(); app.markDirty(0); }
     drag = null;
   }
   function remove(id: string) {
@@ -345,11 +329,10 @@
   // on or off, blackout) and NOTHING fires: no confetti, flames, sparks, CO2, fog, strobe or blinder
   // hits. Playing before, it plays on from where it's let go (what's placed right there doesn't fire).
   let scrubT = 0;
-  function scrubStart() { P.scrubStart(); }
   function scrubTo(t: number) { scrubT = inSpan(t); P.scrub(scrubT); }
   function scrubEnd() { P.scrubEnd(scrubT); }
   // a jump (a key, a click on a part of the song, Go to): a scrub that's over at once
-  function jump(t: number) { scrubStart(); scrubTo(t); scrubEnd(); }
+  function jump(t: number) { P.scrubStart(); scrubTo(t); scrubEnd(); }
   // A right-click on the playhead is for what's under it (a part's name, an item): it caught them
   function underPlayhead(e: MouseEvent) {
     const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => !el.classList.contains('playhead'));
@@ -370,7 +353,7 @@
       toldScrub = true;
       ui.toast('On stage: the real lights and heads follow the playhead as you drag (confetti, flames, sparks, CO2 and fog bursts never fire). Blind (top right) lets you look around without them.', 9000);
     }
-    scrubStart();
+    P.scrubStart();
     scrubTo(ruler ? sn(tAt(e.clientX), true) : tAt(e.clientX));
   }
   function scrubMove(e: PointerEvent) { if (scrubbing) scrubTo(tAt(e.clientX)); }
@@ -529,13 +512,12 @@
     ui.openMenu(e, [{ label: 'Add a part here', icon: 'plus', keys: 'P', run: () => addPart(t) }]);
   }
 
-  // ---- demo songs: the demo beat (made here) and real songs, downloaded when picked
+  // ---- demo songs: the demo beat (made here) and real songs, downloaded when picked (the picker
+  // and the downloads: TimelineSongPicker, timeline/songs.svelte.ts)
   let picking = $state(false);
-  const byGenre = (() => {
-    const m = new Map<string, CatalogSong[]>();
-    for (const s of CATALOG) { const g = GENRES[s.genre] ?? s.genre; m.set(g, [...(m.get(g) ?? []), s]); }
-    return [...m];
-  })();
+  const songsDl = new Songs();
+  onDestroy(() => songsDl.dispose());
+  const dl = $derived(songsDl.dl);
   const missingSong = $derived(P.missing && tl?.audio?.catalog ? CATALOG.find((s) => s.id === tl.audio!.catalog) : undefined);
   // the credit the song's licence asks for, under the waveform while it's the song
   const credit = $derived.by(() => {
@@ -545,148 +527,20 @@
     return { text: a.credit ?? (s ? creditOf(s) : ''), s };
   });
 
-  // a short listen: the demo beat from just before its first drop, a song from its chorus (or a third in)
-  let listening = $state('');
-  let pv: { ctx?: AudioContext; stop?: () => void; timer?: ReturnType<typeof setTimeout> } = {};
-  function listen(s: CatalogSong | null) {
-    const id = s?.id ?? 'demo', again = listening === id;
-    hush();
-    if (again) return;
-    if (P.playing) P.pause();
-    listening = id;
-    pv.timer = setTimeout(hush, 15000);
-    if (!s) {
-      try { pv.ctx ??= new AudioContext(); } catch { hush(); ui.toast("This browser can't play sound here", 3500); return; }
-      const ctx = pv.ctx, g = ctx.createGain();
-      g.gain.value = P.volume; g.connect(ctx.destination); void ctx.resume();
-      const stop = playDemo(ctx, g, sectionStarts().find((x) => x.name === 'Drop')!.at - 2 * BAR_S);
-      pv.stop = () => { stop(); setTimeout(() => g.disconnect(), 500); };
-      return;
-    }
-    const from = s.sections.find((x) => /chorus|drop|hook/i.test(x.name))?.at ?? s.duration / 3;
-    const a = new Audio(), srcs = [s.url, s.mirror].filter((u): u is string => !!u);
-    let n = 0;
-    a.preload = 'auto'; a.volume = P.volume;
-    a.onerror = () => { if (listening !== s.id) return; if (++n < srcs.length) a.src = srcs[n]; else { hush(); ui.toast(`"${s.title}" can't be played right now (offline, or its site is blocked here)`, 4500); } };
-    a.onloadedmetadata = () => { if (Number.isFinite(a.duration)) a.currentTime = Math.max(0, Math.min(from, a.duration - 16)); void a.play().catch(() => {}); };
-    a.src = srcs[0];
-    pv.stop = () => { a.onerror = null; a.pause(); a.removeAttribute('src'); };
-  }
-  function hush() { clearTimeout(pv.timer); pv.stop?.(); pv.stop = undefined; listening = ''; }
-  onDestroy(() => { hush(); void pv.ctx?.close().catch(() => {}); });
-
-  // picking a song: it downloads (with progress), stays in this browser like a file you load, and
-  // brings its tempo, first downbeat, parts and credit onto the timeline
-  let dl = $state<{ id: string; title: string; got: number; total: number; ctl: AbortController } | null>(null);
-  const pct = (d: { got: number; total: number }) => (d.total ? `${Math.min(99, Math.round((d.got / d.total) * 100))} %` : `${(d.got / 1e6).toFixed(1)} MB`);
-  async function take(s: CatalogSong) {
-    hush();
-    dl?.ctl.abort();
-    const ctl = new AbortController();
-    dl = { id: s.id, title: s.title, got: 0, total: 0, ctl };
-    const forShow = app.showId;                        // (the show it's for, whatever is open when it's done)
-    let file: File;
-    try { file = await downloadSong(s, (got, total) => { if (dl?.ctl === ctl) { dl.got = got; dl.total = total; } }, ctl.signal); }
-    catch (e) {
-      if (dl?.ctl !== ctl) return;
-      dl = null;
-      if (!ctl.signal.aborted) ui.toast(e instanceof SongError ? e.message : `"${s.title}" can't be downloaded right now. Try again later.`, 6000);
-      return;
-    }
-    if (dl?.ctl !== ctl) return;                       // cancelled, or another one picked meanwhile
-    try { await P.loadFile(file, forShow); }
-    catch (e) {
-      dl = null;
-      ui.toast(e instanceof ShowChanged ? `"${s.title}" came down after another show was opened, so it isn't on this one. Pick it again in the show it was for.`
-        : `"${s.title}" came down, but it doesn't play in this browser`, 7000);
-      return;
-    }
-    dl = null;
-    const t = app.timeline.ensure();
-    t.bpm = s.bpm; t.offset = s.offset;
-    t.sections = s.sections.map((x) => ({ name: x.name, at: x.at, ...(Number.isFinite(x.energy) ? { energy: x.energy } : {}) }));
-    if (t.audio) { t.audio.catalog = s.id; t.audio.credit = creditOf(s); }
-    t.name = s.title;                // (the set list said the file's name: the artist first, cut off)
-    app.markDirty(0);
-    picking = false; pps = 0;
-    ui.toast(`"${s.title}" by ${s.artist} is the song now (${s.bpm} BPM, ${clockOf(P.duration, false)}). Its parts are on the ruler.`, 4000);
-  }
-  function cancel() { dl?.ctl.abort(); dl = null; }
-  function takeDemo() {
-    hush(); cancel();
-    P.useDemo();
-    if (app.show.timeline?.sections) { delete app.show.timeline.sections; app.markDirty(0); }
-    picking = false; pps = 0;
-    ui.toast('The demo beat: ten minutes, 126 BPM, with builds and drops');
-  }
-  function closePicker() { hush(); picking = false; }
+  function closePicker() { songsDl.hush(); picking = false; }
   // another view shown: a short listen stops, the song picker closes (as when this view went away)
   $effect(() => { if (!shown) untrack(closePicker); });
 
-  // ---- the set list: the songs of the gig in one show, in order. The one picked is on the tracks
-  // (and up next in Live); the patch, the cues, the effects and the pages are the whole set's.
+  // ---- the set list (TimelineSetList): which song of it is on the tracks, said above the lanes
   const songs = $derived(songsOf(app.show));
   const cur = $derived(songIndex(app.show));
-  // picking one: stopped at its start, its first look on the stage (never dark, see app.pickSong)
-  function pickSong(i: number) { if (i === cur) return; hush(); cancel(); app.pickSong(i); pps = 0; sel = null; }
-  function newSong() {
-    hush(); cancel();
-    app.checkpoint();
-    addSong(app.show, { duration: 240, bpm: app.show.settings.bpm, items: [] });
-    app.pickSong(songsOf(app.show).length - 1);
-    app.markDirty(0); pps = 0; sel = null;
-    ui.toast('A new song at the end of the set: load its file or pick a demo song, then put cues on it', 4500);
-  }
-  function moveTo(from: number, to: number) {
-    if (to < 0 || to >= songs.length) return;
-    app.checkpoint(); moveSong(app.show, from, to); app.markDirty(0);
-    queueMicrotask(() => document.querySelectorAll<HTMLElement>('.tlv .setlist .pick')[to]?.focus());
-  }
-  async function renameSong(i: number) {
-    const n = await ui.ask('Rename the song', songName(songs[i], i));
-    if (n === null) return;
-    const t = songsOf(app.show)[i];
-    if (!t) return;
-    app.checkpoint();
-    if (n.trim()) t.name = n.trim().slice(0, 80); else delete t.name;
-    app.markDirty(0);
-  }
-  async function dropSong(i: number) {
-    const t = songs[i], name = songName(t, i);
-    if (!t || songs.length < 2) return;
-    if (t.items.length && !(await ui.confirm(`Remove "${name}" from the set?`, `Its ${t.items.length === 1 ? 'one cue or moment goes' : `${t.items.length} cues and moments go`} with it. Undo brings it back.`, 'Remove'))) return;
-    const up = i === songIndex(app.show);
-    app.checkpoint();
-    removeSong(app.show, i);
-    app.markDirty(0);
-    if (up) { app.pickSong(songIndex(app.show)); pps = 0; sel = null; }
-    app.toastUndo(`"${name}" is out of the set`);
-  }
-  function songMenu(e: MouseEvent, i: number) {
-    ui.openMenu(e, [
-      { label: 'Rename…', icon: 'edit', run: () => renameSong(i) },
-      { label: 'Earlier in the set', icon: 'up', keys: 'Alt+↑', disabled: i === 0, run: () => moveTo(i, i - 1) },
-      { label: 'Later in the set', icon: 'down', keys: 'Alt+↓', disabled: i >= songs.length - 1, run: () => moveTo(i, i + 1) },
-      { sep: true },
-      { label: 'Remove from the set', icon: 'trash', danger: true, disabled: songs.length < 2, run: () => dropSong(i) },
-    ]);
-  }
-  // the set's own settings: a count-in, the look between songs
-  const between = $derived(app.show.setlist?.between ? JSON.stringify([app.show.setlist.between.list, app.show.setlist.between.cue]) : '');
-  function setBetween(v: string) {
-    app.checkpoint();
-    const [list, cue] = v ? (JSON.parse(v) as [string, string]) : ['', ''];
-    setOptions(app.show, { between: v ? { list, cue } : null });
-    app.markDirty(0);
-  }
-  function setCountIn(v: number) { app.checkpoint(); setOptions(app.show, { countIn: v || null }); app.markDirty(0); }
 
   // ---- keys: Space plays and pauses, Home to the start, Del removes, arrows step a bar, P a part
   function keys(e: KeyboardEvent) {
     if (app.view !== 'timeline' || dialogOpen()) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    const bar = (60 / (tl?.bpm ?? app.show.settings.bpm)) * 4;
+    const bar = barS;
     // (Space on a button the mouse last pressed is the show's too: the welcome hands the focus back
     // to the show's name, and Space must pause the song, not open the shows. Tabbed to, the button's)
     if (e.code === 'Space') { if (spaceIsGo(e)) { e.preventDefault(); P.toggle(); } else if (e.repeat) e.preventDefault(); }
@@ -698,14 +552,7 @@
     else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); addPart(); }
     else if (e.key.toLowerCase() === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) { e.preventDefault(); loopHere(); }
   }
-  const peaksPath = $derived.by(() => {
-    const p = P.peaks, d = P.duration || 1, w = d * scale;
-    if (!p.length) return '';
-    let s = 'M0 22';
-    p.forEach((v, i) => { s += `L${((i + 0.5) / p.length * w).toFixed(1)} ${(22 - v * 20).toFixed(1)}`; });
-    for (let i = p.length - 1; i >= 0; i--) s += `L${((i + 0.5) / p.length * w).toFixed(1)} ${(22 + p[i] * 20).toFixed(1)}`;
-    return s + 'Z';
-  });
+  const peaksPath = $derived(wavePath(P.peaks, (P.duration || 1) * scale));
 </script>
 
 <svelte:window onkeydown={keys} />
@@ -724,38 +571,14 @@
         <p>A gig: put every song in the set list, in order, each with its own file and cues (the lights, cues and effects are the whole set's). On Live, Next song gets the next one ready without the lights going dark, and Play from the start comes in on the first downbeat.</p>
       </Help>
     </div>
-    <section class="set" aria-label="Set list">
-      <h3>Set list</h3>
-      {#if songs.length}
-        <ol class="setlist">
-          {#each songs as s, i (s)}
-            <li class:cur={i === cur}>
-              <button class="pick" aria-current={i === cur ? 'true' : undefined} onclick={() => pickSong(i)} oncontextmenu={(e) => songMenu(e, i)} ondblclick={() => renameSong(i)}
-                onkeydown={(e) => { if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); moveTo(i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}
-                title={i === cur ? 'On the tracks now. Double-click to rename, right-click for more' : 'Show this one (it is up next in Live). Double-click to rename, right-click for more'}>
-                <span class="n">{i + 1}</span><span class="nm">{songName(s, i)}</span>{#if s.duration}<span class="faint len">{clockOf(s.duration, false)}</span>{/if}</button>
-              <button class="ghost more" onclick={(e) => songMenu(e, i)} aria-label="More for {songName(s, i)}" title="Rename, move, remove"><Icon name="more" size={14} /></button>
-            </li>
-          {/each}
-        </ol>
-      {/if}
-      <button class="ghost add" onclick={newSong} title="A song at the end of the set, with its own file and cues"><Icon name="plus" size={14} />Add a song</button>
-      {#if songs.length}
-        <label class="opt">Count-in <select value={app.show.setlist?.countIn ?? 0} aria-label="Count-in" onchange={(e) => setCountIn(+(e.target as HTMLSelectElement).value)}>
-          <option value={0}>none</option><option value={1}>1 bar of clicks</option></select></label>
-        <label class="opt">Between songs <select value={between} aria-label="Between songs" onchange={(e) => setBetween((e.target as HTMLSelectElement).value)}>
-          <option value="">the last look stays</option>
-          {#each lists as l (l.id)}<optgroup label={l.name}>{#each l.cues as c, k (c.id)}<option value={JSON.stringify([l.id, c.id])}>{cueNumber(l, k)}. {c.name}</option>{/each}</optgroup>{/each}
-        </select></label>
-      {/if}
-    </section>
+    <TimelineSetList {lists} onswitch={() => { pps = 0; sel = null; }} onstop={() => songsDl.stop()} />
     <div class="song">
       <button onclick={() => fileIn?.click()}><Icon name="music" />{tl?.audio ? 'Another song…' : 'Load a song…'}</button>
       <button class="ghost" class:on={(tl?.demo && !tl.audio) || !!tl?.audio?.catalog} onclick={() => (picking = true)} title="Real songs with vocals (free to use), or the demo beat">Demo songs…</button>
       <input type="file" accept="audio/*" hidden bind:this={fileIn} onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; (e.target as HTMLInputElement).value = ''; if (f) void loadSong(f); }} />
-      {#if dl}<p class="dl" role="status"><progress max={dl.total || undefined} value={dl.total ? dl.got : undefined} aria-label="Downloading {dl.title}"></progress><span>{dl.title} {pct(dl)}</span><button class="ghost" onclick={cancel}>Cancel</button></p>{/if}
+      {#if dl}<p class="dl" role="status"><progress max={dl.total || undefined} value={dl.total ? dl.got : undefined} aria-label="Downloading {dl.title}"></progress><span>{dl.title} {progressSaid(dl)}</span><button class="ghost" onclick={() => songsDl.cancel()}>Cancel</button></p>{/if}
       {#if finding}<p class="dl" role="status"><progress aria-label="Finding the tempo of {finding}"></progress><span>Finding the tempo and parts…</span></p>{/if}
-      {#if P.missing}<p class="err">"{P.missing}" isn't in this browser: {#if missingSong}<button class="ghost again" onclick={() => take(missingSong)}>download it again</button>{:else}load the file again.{/if}</p>{/if}
+      {#if P.missing}<p class="err">"{P.missing}" isn't in this browser: {#if missingSong}<button class="ghost again" onclick={() => songsDl.take(missingSong)}>download it again</button>{:else}load the file again.{/if}</p>{/if}
     </div>
     <div class="around" title="Time for the show before the song starts (an intro, the walk-on) and after it ends (the cheer, the house lights)">
       <label>Before the song <input type="number" min="0" max={AROUND_MAX} step="1" value={tl?.lead ?? 0} aria-label="Seconds before the song"
@@ -763,47 +586,7 @@
       <label>After it <input type="number" min="0" max={AROUND_MAX} step="1" value={tl?.tail ?? 0} aria-label="Seconds after the song"
         onchange={(e) => { const el = e.target as HTMLInputElement; el.value = String(setAround('tail', el.valueAsNumber)); }} /> s</label>
     </div>
-    {#each built ? lists : [] as l (l.id)}
-      <h3>{l.name}</h3>
-      <div class="chips">
-        {#each l.cues as c, i (c.id)}
-          {@const chip = { kind: 'cue', list: l.id, cue: c.id } as Chip}
-          {@const risk = cueMarkOf(app.show, c, app.showRev)}
-          <button class="chip" class:risky={!!risk} draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)}
-                  title="{cueNumber(l, i)}. {c.name}: drag onto the timeline, or tap: at the playhead{risk === 'hazard' ? '. Fires a machine (flames, sparks or CO2) while armed' : risk === 'once' ? '. Fires confetti while armed' : risk === 'winch' ? '. Moves a winch (scenery) while armed' : ''}">{#if risk === 'hazard'}<Icon name="warn" size={11} />{:else if risk === 'once'}1× {:else if risk === 'winch'}⇅ {/if}<span class="t">{cueNumber(l, i)}. {c.name}</span></button>
-        {/each}
-        {#if !l.cues.length}<span class="faint">No cues yet</span>{/if}
-      </div>
-    {/each}
-    {#if app.show.effects.length}
-      <h3>Effects</h3>
-      <div class="chips">
-        {#each app.show.effects as e (e.id)}
-          {@const chip = { kind: 'fx', effect: e.id } as Chip}
-          <button class="chip fx" draggable="true" ondragstart={(ev) => dragChip(ev, chip)} onclick={() => tapChip(chip)} title="{e.name}: a bar that runs it from where it starts to where it ends. Drag onto the timeline, or tap: at the playhead">{e.name}</button>
-        {/each}
-      </div>
-    {/if}
-    <h3>Moments</h3>
-    <!-- (only the machines wait for Arm: a strobe, blinder, fog or bubble hit fires on Safe too; it said all of them did) -->
-    <p class="note">Moments only fire while playing forward; confetti, flames, sparks and CO2 only with the machines armed.</p>
-    <div class="chips">
-      {#each bursts as b (b.attr)}
-        {@const chip = { kind: 'burst', attr: b.attr, s: b.s } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{b.label} for {b.s} s{ARMED_ONLY.includes(b.attr) ? ', only while armed' : ''}. Drag onto the timeline, or tap: at the playhead">{b.label}</button>
-      {/each}
-      {#each [{ label: 'Blackout', a: { do: 'blackout', on: true } }, { label: 'Blackout off', a: { do: 'blackout', on: false } }, { label: 'Everything off', a: { do: 'off' } }] as m (m.label)}
-        {@const chip = { kind: 'act', a: m.a as TimelineAction } as Chip}
-        <button class="chip mo" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{m.label} at that moment. Drag onto the timeline, or tap: at the playhead">{m.label}</button>
-      {/each}
-    </div>
-    <h3>Crowd</h3>
-    <div class="chips">
-      {#each CROWD as c (c.label)}
-        {@const chip = { kind: 'crowd', a: c.a, len: c.len } as Chip}
-        <button class="chip cr" draggable="true" ondragstart={(e) => dragChip(e, chip)} onclick={() => tapChip(chip)} title="{c.tip}. Drag onto the timeline, or tap: at the playhead">{c.label}</button>
-      {/each}
-    </div>
+    <TimelinePalette {lists} {built} ontap={tapChip} />
   </aside>
 
   <section class="main">
@@ -811,7 +594,7 @@
     <div class="transport" role="toolbar" aria-label="Transport">
       <button class="ghost" onclick={() => jump(P.start)} aria-label="Back to the start" title="Back to the start (Home)"><Icon name="back" /></button>
       <button class="primary play" onclick={() => P.toggle()} aria-label={P.playing ? 'Pause' : 'Play'} title="Play / pause (Space)"><Icon name={P.playing ? 'stop' : 'play'} />{P.playing ? 'Pause' : 'Play'}</button>
-      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(P.duration || tl?.duration || span.to, false)}</span></span>
+      <span class="clock" role="timer" aria-label="Position">{clockOf(at)} <span class="faint">/ {clockOf(songLen || span.to, false)}</span></span>
       <!-- (a found tempo has its tenth: shown whole, as the top bar shows it while the song plays) -->
       <label class="bpm">BPM <input type="number" min="40" max="240" step="0.1" value={Math.round((tl?.bpm ?? app.show.settings.bpm) * 10) / 10} aria-label="Timeline BPM"
         onchange={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; if (v >= 40 && v <= 240) { app.timeline.ensure().bpm = v; app.markDirty(0); } }} /></label>
@@ -835,9 +618,12 @@
       <div class="names">
         <div class="nr" title={songs.length > 1 ? `Song ${cur + 1} of ${songs.length}: ${songName(tl, cur)}` : undefined}>{songs.length > 1 ? `${cur + 1}. ${songName(tl, cur)}` : 'Song'}</div>
         {#each lanes as ln (ln.id)}
-          {#if ln.id === 'fx' && fxBars.length}
-            <div class="nl" style="--c:{ln.color}" title={ln.name}><button class="ghost open" aria-expanded={fxOpen} onclick={() => (fxOpen = !fxOpen)} aria-label="{fxOpen ? 'Close' : 'Open'} the effects' knobs" title="The effects' knobs over time: speed, size and the rest, as lines and curves under the bars">{fxOpen ? '▾' : '▸'}</button>{ln.name}</div>
-            {#if fxOpen}{#each fxKnobs as k (k)}<div class="nl sub" style="--c:{ln.color}">{k}</div>{/each}{/if}
+          {@const rows = rowsOf(ln.id)}
+          {#if rows.length}
+            {@const o = openerOf(ln)}
+            {@const on = !!opened[ln.id]}
+            <div class="nl" style="--c:{ln.color}" title={ln.name}><button class="ghost open" aria-expanded={on} onclick={() => (opened[ln.id] = !on)} aria-label="{on ? 'Close' : 'Open'} {o.label}" title={o.tip}>{on ? '▾' : '▸'}</button>{ln.name}</div>
+            {#if on}{#each rows as k (k)}<div class="nl sub" style="--c:{ln.color}">{k}</div>{/each}{/if}
           {:else}<div class="nl" style="--c:{ln.color}" title={ln.name}>{ln.name}</div>{/if}
         {/each}
       </div>
@@ -865,19 +651,26 @@
             <div class="lane" style="--c:{ln.color}">
               {#each built ? (ln.id === 'crowd' ? crowd : items.filter((i) => i.lane === ln.id)) : [] as it (it.id)}
                 {@const mark = markOf(it)}
+                {@const label = labelOf(it)}
                 <button class="it" class:bar={it.len !== undefined} class:sel={sel === it.id} style="left:{x(it.at)}px;{it.len !== undefined ? `width:${Math.max(10, it.len * scale)}px` : `max-width:min(18rem, ${Math.max(28, Math.max(width, x(shownTo)) - x(it.at) - 2)}px)`}"
                   onpointerdown={(e) => itemDown(e, it)} onpointermove={itemMove} onpointerup={itemUp} oncontextmenu={(e) => itemMenu(e, it)} onkeydown={(e) => itemKey(e, it.id)}
-                  aria-label="{labelOf(it)} at {clockOf(it.at)}{mark ? `, ${MARK_SHORT[mark]}` : ''}"
-                  title="{labelOf(it)} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move, right-click for more">
+                  aria-label="{label} at {clockOf(it.at)}{mark ? `, ${MARK_SHORT[mark]}` : ''}"
+                  title="{label} at {clockOf(it.at)}{mark ? ` (${MARK_SHORT[mark]})` : ''}: drag (or the arrow keys) to move{it.len !== undefined ? ', its end (or Alt+arrows) for its length' : ''}, right-click for more">
                   {#if mark === 'hazard'}<span class="mark hazard" aria-hidden="true"><Icon name="warn" size={12} /></span>{:else if mark === 'once'}<span class="mark once" aria-hidden="true">1×</span>{:else if mark === 'winch'}<span class="mark winch" aria-hidden="true">⇅</span>{/if}
-                  <span class="t">{labelOf(it)}</span>
+                  <span class="t">{label}</span>
                   {#if it.len !== undefined}<!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span class="end" onpointerdown={(e) => itemDown(e, it, true)} onpointermove={itemMove} onpointerup={itemUp}></span>{/if}
+                    <span class="end" onpointerdown={(e) => itemDown(e, it, true)}></span>{/if}
                 </button>
               {/each}
             </div>
-            {#if ln.id === 'fx' && fxOpen && built}
-              {#each fxKnobs as k (k)}<div class="lane sub" style="--c:{ln.color}"><TimelineCurves knob={k} bars={fxBars} {x} {scale} /></div>{/each}
+            {#if opened[ln.id] && built && tl}
+              {#if ln.id === 'fx'}
+                {#each fxBars.length ? fxKnobs : [] as k (k)}<div class="lane sub" style="--c:{ln.color}"><TimelineCurves knob={k} bars={fxBars} {x} {scale} /></div>{/each}
+              {:else if ln.id === 'special'}
+                {#if moments.length}<div class="lane sub" style="--c:{ln.color}"><TimelineLengths items={moments} {x} {scale} {labelOf} /></div>{/if}
+              {:else if ln.id.startsWith('list:')}
+                <div class="lane sub" style="--c:{ln.color}"><TimelineLevel list={ln.id.slice(5)} name={ln.name} {x} {span} {sn} beat={barS / 4} playhead={at} /></div>
+              {/if}
             {/if}
           {/each}
           {#if dropAt !== null}<span class="drop" style="left:{x(dropAt)}px"></span>{/if}
@@ -894,78 +687,22 @@
   </section>
 </div>
 
-{#snippet listenButton(s: CatalogSong | null, name: string)}
-  {@const on = listening === (s?.id ?? 'demo')}
-  <button class="ghost listen" class:on aria-pressed={on} onclick={() => listen(s)} aria-label="{on ? 'Stop' : 'Listen to'} {name}" title="A short listen (15 s)"><Icon name={on ? 'stop' : 'play'} />{on ? 'Stop' : 'Listen'}</button>
-{/snippet}
-
-{#if picking}
-  <Modal title="Demo songs" onclose={closePicker} wide>
-    <p class="hint">Real songs with vocals, free to use under their Creative Commons licences (the credit stays with your show). Picking one downloads it into this browser; its tempo and its parts come with it, and cues snap to the parts.</p>
-    <h3 class="genre">Made in the app</h3>
-    <ul class="songs">
-      <li class:cur={!!tl?.demo && !tl.audio}>
-        {@render listenButton(null, 'Demo beat')}
-        <div class="info"><b>Demo beat</b> <span class="meta">Club · 126 BPM · {clockOf(DEMO_SECONDS, false)}</span><span class="blurb">Ten minutes with builds and drops, made in the app: nothing to download. The big demo show runs on it.</span></div>
-        {#if tl?.demo && !tl.audio}<span class="chip green">On the timeline</span>{:else}<button class="primary" onclick={takeDemo} aria-label="Use Demo beat">Use</button>{/if}
-      </li>
-    </ul>
-    {#each byGenre as [genre, songs] (genre)}
-      <h3 class="genre">{genre}</h3>
-      <ul class="songs">
-        {#each songs as s (s.id)}
-          {@const cur = tl?.audio?.catalog === s.id && !P.missing}
-          <li class:cur>
-            {@render listenButton(s, s.title)}
-            <div class="info">
-              <b>{s.title}</b> <span>{s.artist}</span> <span class="meta">{s.bpm} BPM · {clockOf(s.duration, false)}</span>
-              <span class="blurb"><a href={s.licenseUrl} target="_blank" rel="noopener noreferrer">{s.license}</a> · <a href={s.page} target="_blank" rel="noopener noreferrer">where it's from</a></span>
-              {#if dl?.id === s.id}<span class="dl"><progress max={dl.total || undefined} value={dl.total ? dl.got : undefined} aria-label="Downloading {s.title}"></progress>{pct(dl)}</span>{/if}
-            </div>
-            {#if cur}<span class="chip green">On the timeline</span>
-            {:else if dl?.id === s.id}<button onclick={cancel} aria-label="Stop downloading {s.title}">Cancel</button>
-            {:else}<button class="primary" onclick={() => take(s)} aria-label="Use {s.title}">Use</button>{/if}
-          </li>
-        {/each}
-      </ul>
-    {/each}
-  </Modal>
-{/if}
+{#if picking}<TimelineSongPicker songs={songsDl} onclose={closePicker} onpicked={() => { picking = false; pps = 0; }} />{/if}
 
 <style>
   .tlv { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr); gap: .55rem; padding: .55rem; }
   .pal { overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: .55rem; display: flex; flex-direction: column; gap: .35rem; }
-  .pal h3 { margin: .5rem 0 0; font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
   .song { display: flex; gap: .35rem; flex-wrap: wrap; }
   /* the set list: one row a song, the one on the tracks marked */
-  .set { display: flex; flex-direction: column; gap: .25rem; }
-  .set h3 { margin-top: .2rem; }
-  .setlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; }
-  .setlist li { display: flex; align-items: stretch; gap: .15rem; }
-  .setlist .pick { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: .4rem; justify-content: flex-start; padding: .25rem .45rem; border-radius: var(--radius-s);
-    border: 1px solid var(--line); background: var(--panel2); color: var(--text); text-align: left; font-size: .84rem; }
-  .setlist .cur .pick { border-color: var(--green); background: #45d85c14; }
-  .setlist .n { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 1.1em; }
-  .setlist .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .setlist .len { font-size: .74rem; font-variant-numeric: tabular-nums; }
-  .setlist .more { padding: 0 .3rem; min-height: 0; }
-  .set .add { align-self: flex-start; font-size: .82rem; }
-  .set .opt { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--muted); }
-  .set .opt select { flex: 1; min-width: 0; font-size: .8rem; }
   .snd.off { color: var(--faint); text-decoration: line-through; }
   .vol .snd { min-height: 0; padding: .15rem .3rem; }
-  .chips { display: flex; flex-wrap: wrap; gap: .25rem; }
-  /* (a long name stops at the panel's edge, the whole of it in the title) */
   .chip { cursor: grab; font-size: .8rem; padding: .15rem .5rem; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); min-height: 0;
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .chip.fx { border-color: #ffaa1c66; } .chip.mo { border-color: #f33abc66; } .chip.cr { border-color: #7fc8ff66; }
   /* the time before and after the song: two small fields under the song */
   .around { display: flex; flex-wrap: wrap; gap: .2rem .6rem; font-size: .8rem; color: var(--muted); }
   .around label { display: inline-flex; align-items: center; gap: .3rem; }
   /* (600, the most, whole next to the spin arrows) */
   .around input { width: calc(3ch + 3em); font-size: .8rem; padding-inline: .3rem; }
-  .chip.risky { color: var(--orange); display: inline-flex; align-items: center; gap: .2rem; }
   .main { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(140px, 1fr) auto minmax(160px, auto) auto; gap: .45rem; }
   .preview { min-height: 0; display: flex; overflow: hidden; }      /* (never over the transport) */
   .preview :global(.stage-wrap) { flex: 1; }
@@ -1016,7 +753,7 @@
   .vol .snd:not(:has(svg)) { font-size: .78rem; }
   .wave path { fill: #6aa2ff55; stroke: #6aa2ff; stroke-width: .5; }
   .lane { height: 38px; position: relative; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(90deg, transparent 0 1px, transparent 1px 100%); }
-  /* (the Effects track opened: a thinner row per knob under it, named in small type) */
+  /* (a track opened: a thinner row each under it, named in small type) */
   .lane.sub { height: 34px; background: #ffffff05; }
   .nl.sub { height: 34px; line-height: 33px; padding-left: 1.6rem; font-size: .74rem; color: var(--muted); border-left-style: dotted; }
   .nl .open { padding: 0 .25rem; margin-right: .2rem; font-size: .8rem; min-height: 0; line-height: 1; }
@@ -1035,20 +772,10 @@
   .mark { flex: none; display: inline-flex; align-items: center; margin-right: .25rem; pointer-events: none; }
   .mark.hazard, .mark.winch { color: var(--orange); }
   .mark.once { font-size: .64rem; font-weight: 700; padding: 0 .2rem; border-radius: 3px; background: #ffffff1c; }
-  .note { margin: 0; font-size: .74rem; color: var(--faint); }
   .armed.on { color: var(--pink); border-color: #f33abc88; background: #f33abc1a; }
   .drop { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; }
   .empty { margin: 0; }
   .err { color: var(--pink); font-size: .82rem; margin: .2rem 0 0; }
-  .songs { list-style: none; margin: .4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
-  .songs li { display: flex; align-items: center; gap: .6rem; padding: .4rem .5rem; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--panel2); }
-  .songs li.cur { border-color: #45d85c66; }
-  .songs .info { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .5rem; }
-  .songs .meta { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
-  .songs .blurb { flex-basis: 100%; color: var(--faint); font-size: .8rem; }
-  .songs .listen { min-width: 5.6rem; justify-content: flex-start; }
-  .songs .blurb a { color: var(--muted); }
-  .genre { margin: .8rem 0 0; font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
   .dl { display: flex; align-items: center; gap: .4rem; margin: .2rem 0 0; font-size: .8rem; color: var(--muted); flex-basis: 100%; }
   .dl progress { flex: 1; max-width: 12rem; accent-color: var(--accent); }
   .song .dl span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

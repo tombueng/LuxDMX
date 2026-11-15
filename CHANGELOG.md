@@ -13,6 +13,56 @@ get the newest one.
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
+- **Tempo effects no longer step back while a song plays.** The beat clock ran a frame ahead of
+  the song, and when frames came unevenly (a busy page) it went back and forth: moving heads and
+  chases went two steps on, one back, in the 3D and on the wire. It counts from the song's beat now.
+- **The 3D stage, fixed in a few places:**
+  - pixel bars, rings and matrix heads light the room (the washes, the crowd light, the fog, the
+    mirror ball's dots) in their cells' colours: a red chase on a bar used to light it blue;
+  - the club's and the bar's own mirror balls and the ballroom's dancers move again (they turned
+    on paper and stood still on screen);
+  - with nobody on stage (Theatre, Church, Cinema) going to another view no longer builds the
+    whole room again and swings the camera to the front;
+  - after the 3D had been let go (Live with its stage hidden for a few minutes) and came back, it
+    broke on every frame. It sets itself up for the new one now;
+  - your own venue model is read once and freed when it's replaced or removed, not once per view;
+  - "Show it in 3D" no longer flies the camera off in a view you open minutes later;
+  - "Selected" on a light up under a high ceiling (the cinema's house lights) frames it again;
+  - hidden views give their picture buffers back to the graphics card, at Low the screens hold
+    still, and a view switch no longer waits for the exposure meter.
+- **The theatre's names are back on the plan.** Since the curtain and the drops are drawn as
+  cloths, a third of its names were gone. A cloth is a line now that other names may sit on, with
+  its own name at one end; two names no longer touch by a pixel; a crowded plan tries the smaller
+  size when fewer than three quarters of the names fit.
+- **Faster where it adds up:** the output thread's frame on the festival demo went from 4.5 to
+  2.6 ms, and working out every light's 3D look again (on any change, on every pointer move of a
+  drag) from 5 to 1 ms.
+- **Small things:** a follow waits for a cue's own colour, position and beam times; a light with
+  more than a universe per pixel no longer hangs the page; "saving..." can't get stuck when the
+  browser's storage is full; a pasted cue is checked like one from a file.
+- **More timeline tracks open**: a cue list's track opens into its level over the song (click in
+  the row for a point, drag it, double-click to take it away; while the song plays it scales the
+  list's fader, the output thread plays it too), and the Moments track into how long each moment
+  lasts, as a bar whose end you drag (or the arrow keys on it). Before, a moment's length could only
+  be changed by placing it again.
+- **"Stop effects" stops them on stage, not just on the screen.** The effects your cues run kept
+  going on the wire after the button (the screen said they'd stopped), and tapping one of them
+  afterwards flipped the two around. The output now hears it like every other command.
+- **The QLC+ export no longer fires a machine again in every scene after it.** In a play, the
+  cue cards and the export carried flames, CO2, confetti and haze on into every later cue (playback
+  never did). An exported workspace opened those channels again, and QLC+ has no Arm.
+- **Moving a cue to another list keeps it whole.** "Move to" in a cue's menu was a cut and a
+  paste: the cut took every Live button and timeline moment that played the cue with it, and the
+  paste gave it a new id. Now the cue itself moves, what plays it follows, and one Undo takes it back.
+- **The console no longer leaves a second 3D stage running** when you switch to another view.
+- **Small things that were off:** the arrow keys on the pan/tilt pad lost presses when you tapped
+  fast and moved the whole bar instead of the heads you'd picked; on the Live and Timeline plans a
+  pinch or a middle-button pan that started on a light did nothing; moving an instant crowd change
+  with the arrow keys turned it into a half-second ramp.
+- **Live got lighter on a big rig:** the "Confetti at 2:41 · safe" and "Fog on" chips were worked
+  out on every frame (20 ms a go on the festival demo, which is time the timeline's cues waited for).
+  Now they're worked out when the show changes. A hidden console or programmer also stops following
+  the stage frame by frame.
 - **Changing what a light's channels do is kept when you press Done.** Before, only the Save button
   under the table kept it, and Done threw it away without a word (swap red and green, Done, and
   they were back). Now leaving the editor saves for all lights of the type, Undo takes it back, and

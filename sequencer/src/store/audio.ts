@@ -11,16 +11,25 @@ function open(): Promise<IDBDatabase> {
     r.onblocked = () => fail(new Error('another tab holds an older version of the song store'));
   });
 }
+// (a song is megabytes: a full disk throws its write away at the commit, and then only `abort`
+// fires; waiting for `complete` or `error` alone never ended)
 async function put(store: string, key: string, blob: Blob) {
   const db = await open();
-  await new Promise<void>((ok, fail) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(blob, key); tx.oncomplete = () => ok(); tx.onerror = () => fail(tx.error); });
-  db.close();
+  try {
+    await new Promise<void>((ok, fail) => {
+      const tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).put(blob, key);
+      tx.oncomplete = () => ok();
+      tx.onerror = () => fail(tx.error);
+      tx.onabort = () => fail(tx.error ?? new Error('The browser threw it away (is the disk full?)'));
+    });
+  } finally { db.close(); }
 }
 async function get(store: string, key: string): Promise<Blob | undefined> {
   const db = await open();
-  const b = await new Promise<Blob | undefined>((ok, fail) => { const r = db.transaction(store).objectStore(store).get(key); r.onsuccess = () => ok(r.result as Blob | undefined); r.onerror = () => fail(r.error); });
-  db.close();
-  return b;
+  try {
+    return await new Promise<Blob | undefined>((ok, fail) => { const r = db.transaction(store).objectStore(store).get(key); r.onsuccess = () => ok(r.result as Blob | undefined); r.onerror = () => fail(r.error); });
+  } finally { db.close(); }
 }
 export const putSong = (key: string, blob: Blob) => put(STORE, key, blob);
 export const getSong = (key: string) => get(STORE, key);

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ATLAS_CELLS, GOBOS, PLAIN_WHEEL, wheelPatterns } from './gobos';
+import { goboWheelsOf, prismOfMode } from './rigOf';
+import type { FixtureMode } from '../model/types';
 
 const id = (labels: string[]) => wheelPatterns(labels).map((i) => (i === null ? 'open' : GOBOS[i].id));
 
@@ -88,5 +90,48 @@ describe('turning backwards, as fixture files say it', () => {
     const speed = (label: string) => (rotationOf([{ from: 0, to: 255, label }], 0.5) as { speed: number }).speed;
     for (const l of ['Rotation reverse slow..fast', 'Backward rotation', 'Rückwärts drehen', 'Rotation CCW', 'counter-clockwise']) expect(speed(l), l).toBeLessThan(0);
     for (const l of ['Rotation forward slow..fast', 'Vorwärts drehen', 'Rotation CW', 'clockwise']) expect(speed(l), l).toBeGreaterThan(0);
+  });
+});
+
+// A mode's gobo wheels and prism, read once per mode (every light's 3D look is made again on any
+// change, on every pointer move of a gizmo drag): the same answer for the same mode, its own for
+// another one, even with the same name (a type saved again is a new object). (Review 5, R5-P3)
+describe('gobo wheels and prism per mode', () => {
+  const mode = (labels: string[]): FixtureMode => ({ name: 'm', channels: [
+    { name: 'Gobo', attr: 'gobo', ranges: labels.map((label, i) => ({ from: i * 10, to: i * 10 + 9, label, kind: 'slot' as const })) },
+    { name: 'Prism', attr: 'prism', ranges: [{ from: 0, to: 127, label: 'Out', kind: 'other' as const }, { from: 128, to: 255, label: '3-facet', kind: 'other' as const }] },
+  ] });
+  it('once per mode, and a new mode object reads its own', () => {
+    const a = mode(['Open', 'Stars', 'Flower']), b = mode(['Open', 'Heart', 'Dots']);
+    const wa = goboWheelsOf(a);
+    expect(goboWheelsOf(a)).toBe(wa);
+    expect(prismOfMode(a)).toBe(prismOfMode(a));
+    expect(wa![0].slots.map((i) => (i === null ? 'open' : GOBOS[i].id))).toEqual(['open', 'stars', 'flower']);
+    expect(goboWheelsOf(b)![0].slots.map((i) => (i === null ? 'open' : GOBOS[i].id))).toEqual(['open', 'heart', 'dots']);
+    expect(goboWheelsOf({ name: 'plain', channels: [{ name: 'Dimmer', attr: 'intensity' }] })).toBeUndefined();
+    expect(goboWheelsOf(undefined)).toBeUndefined();
+  });
+});
+
+// A rotation or prism channel's answer for a byte, read from its range names once (the 3D stage asks
+// every frame): the same one again for the same list and byte; a byte no range covers still turns
+// as fast as the value says, to the fraction. (Review 5, R5-P4)
+describe('rotation and prism answers, read once per range list and byte', () => {
+  const ranges = [{ from: 0, to: 9, label: 'Stop' }, { from: 10, to: 127, label: 'CW fast..slow' }, { from: 128, to: 245, label: 'CCW slow..fast' }];
+  it('the same answer, the same object, for the same byte; a fresh list reads its own', () => {
+    const a = rotationOf(ranges, 0.3);
+    expect(rotationOf(ranges, 0.3)).toBe(a);
+    expect(rotationOf([...ranges], 0.3)).toEqual(a);
+    expect(rotationOf(ranges, 0.8)).toEqual({ speed: expect.any(Number) });
+    expect((rotationOf(ranges, 0.8) as { speed: number }).speed).toBeLessThan(0);
+    const prism = [{ from: 0, to: 127, label: 'Open' }, { from: 128, to: 255, label: '5-facet linear' }];
+    expect(prismOf(prism, 0.9)).toBe(prismOf(prism, 0.9));
+    expect(prismOf(prism, 0.9)).toEqual({ facets: 5, linear: true });
+    expect(prismOf(prism, 0.1)).toBeNull();
+  });
+  it('a byte no range covers: by the value itself, not the byte', () => {
+    const x1 = 250.6 / 255, x2 = 250.9 / 255;        // (both byte 251, past the last range)
+    expect((rotationOf(ranges, x1) as { speed: number }).speed).toBeCloseTo(x1 * 4 * Math.PI, 12);
+    expect((rotationOf(ranges, x2) as { speed: number }).speed).toBeCloseTo(x2 * 4 * Math.PI, 12);
   });
 });

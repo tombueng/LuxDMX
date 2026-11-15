@@ -3,11 +3,8 @@
   import { pinMatches } from '../model/pin';
   import { looksPage } from '../content/busking';
   import { whatsNew } from '../content/whatsNew';
-  import { clockOf } from '../model/timeline';
-  import { actionRisk, isGated } from '../model/safety';
-  import { machines } from './risk';
-  import { inWords, nextUp } from '../model/schedule';
-  import { actionShort, actionText } from '../model/actions';
+  import { newWidget, nothingFor, songWidgets, type NewKind } from '../content/newWidget';
+  import { clearProgrammer } from './clear.svelte';
   // Live: play the show with big buttons. Starts with a page built from the show; Edit makes it
   // yours (add, move, change, remove controls; more pages). Keys on the buttons work as shortcuts,
   // Space is GO on the first cue list.
@@ -17,12 +14,12 @@
   import WidgetEditor from './WidgetEditor.svelte';
   import StageView from './StageView.svelte';
   import GoStrip from './GoStrip.svelte';
+  import LiveChips from './LiveChips.svelte';
   import { fogTimer as makeFogTimer } from './actions';
   import { app, newId } from '../app.svelte';
   import { dialogOpen, isShortcut, spaceIsGo, tablist, typesText, ui } from './ui.svelte';
   import type { Widget } from '../model/types';
   import { enableMidi, midiReady, midiSupported, onMidiInputs } from '../input/midi';
-  import { hhmm, pauseItems } from './schedulePause';
   import { SONG_NAME } from './widgetFace';
   import { setContext, untrack } from 'svelte';
 
@@ -146,32 +143,20 @@
     app.editPage = !app.editPage;
     selW = null;
   }
-  function add(kind: Widget['type'] | 'drop') {
+  // a new control (content/newWidget.ts makes it from what the show has), after the one picked
+  function add(kind: NewKind) {
     const p = app.ownPages().find((x) => x.id === (app.page || app.show.pages[0].id)) ?? app.show.pages[0];
-    // the set list's three: Play / pause and Next song big, Next part next to them
+    const at = selW ? p.widgets.findIndex((x) => x.id === selW) + 1 : p.widgets.length;
+    const id = () => newId('w');
     if (kind === 'song') {
-      const at = selW ? p.widgets.findIndex((x) => x.id === selW) + 1 : p.widgets.length;
-      const three: Widget[] = [{ id: newId('w'), type: 'song', do: 'play', size: 2 }, { id: newId('w'), type: 'song', do: 'next', size: 2 }, { id: newId('w'), type: 'song', do: 'part' }];
+      const three = songWidgets(id);
       p.widgets.splice(at, 0, ...three);
       selW = three[0].id;
       if (!app.show.timeline) ui.toast('Put a song on the Timeline (or a few: the set list) for these to play', 5000);
       return;
     }
-    const l = app.liveList, fx = app.show.effects[0];
-    const base = { id: newId('w') };
-    const w: Widget | undefined =
-      kind === 'list' ? (l ? { ...base, type: 'list', list: l.id, action: 'go' } : undefined)
-      : kind === 'cue' ? (l?.cues[0] ? { ...base, type: 'cue', list: l.id, cue: l.cues[0].id } : undefined)
-      : kind === 'effect' ? (fx ? { ...base, type: 'effect', effect: fx.id, action: 'toggle' } : undefined)
-      : kind === 'fader' ? { ...base, type: 'fader', target: 'grand' }
-      : kind === 'group' ? (app.show.groups[0] ? { ...base, type: 'group', group: app.show.groups[0].id, level: 1 } : undefined)
-      : kind === 'fog' ? { ...base, type: 'fog', fixtures: app.show.fixtures.filter((f) => app.caps(f.id).fog).map((f) => f.id), level: 1, burst: 3, max: 10, label: 'Fog' }
-      : kind === 'special' ? { ...base, type: 'special', do: 'blackout' }      // no label: it follows what it does
-      : kind === 'cuelist' ? (l ? { ...base, type: 'cuelist', list: l.id } : undefined)
-      : kind === 'drop' ? { ...base, type: 'special', do: 'drop', label: 'Drop' }
-      : { ...base, type: 'label', label: 'New section' };
-    if (!w) return ui.toast(kind === 'effect' ? 'Make an effect first (Program, Effects)' : kind === 'group' ? 'Make a group first (Program, Groups)' : 'Record some cues first');
-    const at = selW ? p.widgets.findIndex((x) => x.id === selW) + 1 : p.widgets.length;
+    const w = newWidget(app.show, kind, { list: app.liveList, fog: app.show.fixtures.filter((f) => app.caps(f.id).fog).map((f) => f.id), id });
+    if (!w) return ui.toast(nothingFor(kind));
     p.widgets.splice(at, 0, w);
     selW = w.id;
   }
@@ -220,7 +205,12 @@
   // A page made your own doesn't follow the show by itself: what's new there (a look, a list, an
   // effect, a group made since) is offered, and goes on this page in one tap (keys already taken
   // elsewhere left off). Nothing for the generated page: it follows anyway.
-  const fresh = $derived(app.show.pages.length && !app.locked ? whatsNew(app.show, app.show.pages) : []);
+  // (what's new in the show for the pages: once per change of the show, from its plain copy, and
+  // only while Live is shown. On every edit, through the proxies, in every view, it was 11 ms)
+  const fresh = $derived.by(() => {
+    const s = shown ? app.plain : untrack(() => app.plain);
+    return s?.pages.length && !app.locked ? whatsNew(s, s.pages) : [];
+  });
   const nameOf = (w: Widget) => w.label || (w.type === 'cue' ? app.show.cueLists.find((l) => l.id === w.list)?.cues.find((c) => c.id === w.cue)?.name
     : w.type === 'list' || w.type === 'cuelist' ? app.show.cueLists.find((l) => l.id === w.list)?.name : w.type === 'effect' ? app.show.effects.find((e) => e.id === w.effect)?.name
     : w.type === 'group' ? app.show.groups.find((g) => g.id === w.group)?.name : w.type === 'song' ? SONG_NAME[w.do] : 'Fog') || '?';
@@ -260,10 +250,20 @@
     own.splice(j, 0, p);
     app.markDirty(0);
   }
+  // (the page's menu and a double-click on its tab: one step to undo; a page made from the show
+  // becomes your own first)
+  async function renamePage(id: string, was: string) {
+    const n = await ui.ask('Rename the page', was);
+    if (!n || n === was) return;
+    app.checkpoint(); app.ownPages();
+    const q = app.show.pages.find((x) => x.id === id);
+    if (q) q.name = n;
+    app.markDirty(0);
+  }
   function pageMenu(e: MouseEvent, id: string) {
     const p = pages.find((x) => x.id === id)!;
     ui.openMenu(e, [
-      { label: 'Rename', icon: 'edit', run: async () => { const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === id); if (q) q.name = n; app.markDirty(0); } } },
+      { label: 'Rename', icon: 'edit', run: () => renamePage(id, p.name) },
       { label: 'Duplicate', icon: 'duplicate', run: () => { app.ownPages(); const q = app.show.pages.find((x) => x.id === id)!; const c = { ...JSON.parse(JSON.stringify(q)), id: newId('pg'), name: `${q.name} (copy)`, locked: false }; c.widgets.forEach((w: Widget) => (w.id = newId('w'))); app.show.pages.push(c); app.page = c.id; } },
       // (the pages in another order: there was no way to)
       { label: 'Move left', icon: 'left', disabled: pages.findIndex((x) => x.id === id) < 1, run: () => movePage(id, -1) },
@@ -375,38 +375,11 @@
   }
   let winW = $state(typeof window === 'undefined' ? 1200 : window.innerWidth);
   const narrow = $derived(winW <= 560);
-  // The timeline is playing towards a machine moment (confetti, flames, sparks, CO2) while they're
-  // safe: said a minute and a half before it comes, so it isn't a surprise that nothing fires (or
-  // there's time to arm them)
-  const MACHINE_WORD: Record<string, string> = { confetti: 'Confetti', flame: 'Flames', sparks: 'Sparks', co2: 'CO2' };
-  const shotAhead = $derived.by(() => {
-    const tl = app.show.timeline, now = songAt;
-    if (!tl || !app.timeline.playing || app.sfxArmed || app.output !== 'live') return undefined;
-    let best: { at: number; what: string } | undefined;
-    const machineRisk = machines(app.show);              // (a machine's own programs fire it too)
-    for (const i of tl.items) {
-      if (i.at <= now || i.at - now > 90 || (best && i.at >= best.at)) continue;
-      const d = i.do;
-      if (d.do === 'burst') { if (isGated(d.attr)) best = { at: i.at, what: MACHINE_WORD[d.attr] ?? d.attr }; continue; }
-      if (d.do === 'effect') continue;
-      if (!('list' in d)) continue;
-      const r = actionRisk(app.show, d, undefined, machineRisk);
-      if (r === 'once' || r === 'hazard') {
-        const l = app.show.cueLists.find((x) => x.id === d.list), c = d.do === 'goto' ? l?.cues.find((x) => x.id === d.cue) : undefined;
-        best = { at: i.at, what: c?.name ?? l?.name ?? 'A machine' };
-      }
-    }
-    return best;
-  });
-  const hazeOnly = $derived(app.hazing.every((id) => app.modeOf(id)?.channels.some((c) => c.attr === 'haze')));   // hazers: say haze
-  // the timetable's next change, looked at twice a minute
-  let nowMs = $state(Date.now());
-  $effect(() => { const t = setInterval(() => (nowMs = Date.now()), 5000); return () => clearInterval(t); });
-  // (paused: the first after the pause; off: none, the chip says it's off)
-  const schedOff = $derived(!!app.show.settings.scheduleOff && !!app.show.settings.schedule?.length);
-  const pausedTill = $derived((void nowMs, app.schedulePausedUntil));
-  const upcoming = $derived(app.show.settings.schedule?.length && !schedOff ? nextUp(app.show.settings.schedule, new Date(Math.max(nowMs, pausedTill)), app.place) : undefined);
-  const upAt = $derived(upcoming ? `${String(upcoming.when.getHours()).padStart(2, '0')}:${String(upcoming.when.getMinutes()).padStart(2, '0')}` : '');
+  function soundHere() {
+    const on = !app.timeline.soundHere;
+    app.timeline.setSoundHere(on);
+    ui.toast(on ? 'Sound here: the song plays out of this device again' : "No sound here: the song's clock runs on silently, the lights follow it (a video of the 3D stage still gets the song). This browser remembers it.", 5000);
+  }
   const touchy = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   function pageExtras(e: MouseEvent) {
     ui.openMenu(e, [
@@ -425,11 +398,6 @@
     if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {});
   }
   // the song out of this device's speakers, or not (kept in this browser)
-  function soundHere() {
-    const on = !app.timeline.soundHere;
-    app.timeline.setSoundHere(on);
-    ui.toast(on ? 'Sound here: the song plays out of this device again' : "No sound here: the song's clock runs on silently, the lights follow it (a video of the 3D stage still gets the song). This browser remembers it.", 5000);
-  }
   // Del removes the selected control while editing.
   function editKeys(e: KeyboardEvent) {
     if (app.view !== 'live' || !app.editPage || !selW || dialogOpen()) return;
@@ -446,7 +414,7 @@
     <div class="pages" role="tablist" aria-label="Pages" use:tablist>
       {#each tabs as p (p.id)}
         <button role="tab" aria-selected={p.id === page?.id} class:cur={p.id === page?.id} onclick={() => { app.page = p.id; selW = null; }} oncontextmenu={(e) => { if (app.locked) e.preventDefault(); else pageMenu(e, p.id); }}
-                ondblclick={async () => { if (app.locked) return; const n = await ui.ask('Rename the page', p.name); if (n) { app.ownPages(); const q = app.show.pages.find((x) => x.id === p.id); if (q) q.name = n; app.markDirty(0); } }} title="{p.name}: double-click to rename, right-click for more (move it, duplicate...)">
+                ondblclick={() => { if (!app.locked) void renamePage(p.id, p.name); }} title="{p.name}: double-click to rename, right-click for more (move it, duplicate...)">
           {#if p.locked}<Icon name="lock" size={12} />{/if}{p.name}</button>
       {/each}
     </div>
@@ -456,49 +424,7 @@
          pushed them all down as Edit was pressed, floating over them it covered some; on a phone,
          where the bar has no room, above the controls) -->
     <span class="grow">{#if app.editPage && !narrow}<button onclick={addMenu} aria-label="Add"><Icon name="plus" />Add</button>{/if}{#if app.editPage && !selected && !narrow}<span class="ehint">{#if touchy}Tap a control to change it, drag its <Icon name="grip" size={12} /> to move it{:else}Click a control to change it, drag to move it (or Alt+arrows){/if}, <b>Add</b> for new ones.</span>{#if fresh.length}<button class="chip" onclick={addNew} title="New in the show, not on a page yet: {freshNames}">Add the {fresh.length} new here</button>{/if}{/if}</span>
-    {#if app.output === 'blind' && app.bridges.length}
-      <!-- blind: said here too (on a phone the top bar only has a dot), one tap asks to go on stage -->
-      <button class="chip nextup blind" onclick={() => void app.askOnStage()} title="Blind: you see it here, the lights don't get it. Click to send it to the stage.">
-        <span class="bdot"></span>Blind{#if !narrow}: only here{/if}</button>
-    {/if}
-    {#if shotAhead}
-      <!-- a machine moment coming while they're safe -->
-      <span class="chip nextup shot" title="It won't fire: the machines are safe. Hold Arm (top right) if it should.">
-        <Icon name="warn" size={14} />{shotAhead.what} at {clockOf(shotAhead.at, false)} · safe</span>
-    {/if}
-    {#if app.show.timeline?.items.length}
-      <!-- the song show (Timeline): play and pause it from here too -->
-      <button class="chip nextup song" class:on={app.timeline.playing} onclick={() => app.timeline.toggle()} aria-label={app.timeline.playing ? 'Pause the timeline' : 'Play the timeline'}
-        title="The timeline: {app.timeline.playing ? 'pause' : 'play'} the song and what's on it">
-        <Icon name={app.timeline.playing ? 'stop' : 'play'} size={14} />{clockOf(songAt, false)}{#if !narrow}<span class="faint">&nbsp;/ {clockOf(app.timeline.duration, false)}</span>{/if}</button>
-    {/if}
-    {#if app.show.timeline}
-      <!-- the band plays live: no sound out of this device (the song's clock runs on) -->
-      <button class="chip nextup sound" class:off={!app.timeline.soundHere} aria-pressed={app.timeline.soundHere} onclick={soundHere}
-        title={app.timeline.soundHere ? "The song plays out of this device. Click for no sound here (the band plays live): the song's clock runs on" : 'No sound here: the song runs silently (a video of the 3D stage still gets it). Click for sound here'}>
-        <Icon name="music" size={14} /><span class:sr-only={narrow}>Sound here</span></button>
-    {/if}
-    {#if fresh.length && !app.editPage}
-      <!-- the page is behind the show (a look or an effect made since): said, one tap adds them -->
-      <button class="chip nextup fresh" onclick={addNew} title="New in the show since this page was made: {freshNames}. Click to add them here (Undo takes them back)">
-        <Icon name="plus" size={14} />{narrow ? fresh.length : `${fresh.length} new in the show`}</button>
-    {/if}
-    {#if schedOff || pausedTill}
-      <!-- the timetable switched off or paused (a party tonight): said, so nobody wonders why 18:00 didn't come -->
-      <button class="chip nextup paused" onclick={() => (ui.modal = 'schedule')} oncontextmenu={(e) => { e.preventDefault(); if (!app.locked) ui.openMenu(e, pauseItems()); }}
-        title={schedOff ? 'The timetable is off (right-click to switch it on)' : `The timetable is paused until ${hhmm(pausedTill)} (right-click to play it again)`}>
-        <Icon name="clock" size={14} />{schedOff ? 'Timetable off' : `Paused till ${hhmm(pausedTill)}`}</button>
-    {:else if upcoming}
-      <!-- the timetable's next change, said in clock time (a bar's 21:00, not "14400 s") -->
-      <button class="chip nextup" onclick={() => (ui.modal = 'schedule')} oncontextmenu={(e) => { e.preventDefault(); if (!app.locked) ui.openMenu(e, pauseItems()); }} title="The timetable, next: {upAt}{upcoming.entry.sun ? ` (${upcoming.entry.sun === 'set' ? 'sunset' : 'sunrise'})` : ''} {actionText(app.show, upcoming.entry.do)} (right-click to pause it)">
-        <Icon name="clock" size={14} />{#if narrow}{upAt}{:else}{actionShort(app.show, upcoming.entry.do)} · {inWords(upcoming.when, new Date(nowMs)).replace(/^at /, '')}{/if}</button>
-    {/if}
-    {#if app.hazing.length}
-      <span class="chip haze" title="A fog or haze machine is running from a cue">
-        <Icon name="fog" size={14} />{#if !narrow}<span>{app.hazing.length > 1 ? `${app.hazing.length} fog machines on` : hazeOnly ? 'Haze on' : 'Fog on'}</span>{/if}
-        <button class="stop" onclick={() => { app.stopHaze(); ui.toast(`${hazeOnly ? 'Haze' : 'Fog'} stopped until the next cue that fogs.`, 4000); }}
-          aria-label={hazeOnly ? 'Stop the haze' : 'Stop the fog'}>Stop</button></span>
-    {/if}
+    <LiveChips {narrow} {shown} {songAt} {fresh} {freshNames} onaddnew={addNew} onsound={soundHere} />
     {#if narrow}
       {#if app.remote.on}<span class="chip" class:green={app.remote.phones > 0} title={app.remote.phones ? 'Phones playing this show' : 'The phone remote is on; no phone is connected yet'}>{app.remote.phones} <Icon name="phone" size={14} /><span class="sr-only">phone{app.remote.phones === 1 ? '' : 's'} connected</span></span>{/if}
       <!-- a phone: the extras in one menu, so the padlock and Edit / Done always fit -->
@@ -547,7 +473,7 @@
       <Icon name="edit" size={16} />
       <span><b>{progHeld} light{progHeld > 1 ? 's' : ''}</b> you changed in Program {progHeld > 1 ? 'override' : 'overrides'} the show here. Not recorded yet.</span>
       {#if !app.locked}<button onclick={() => { const l = app.liveList; ui.toast(app.record(l?.id) ? `Recorded into ${l?.name ?? app.list?.name ?? 'the cue list'}` : 'Nothing to record'); }}>Record</button>{/if}
-      <button onclick={() => { app.checkpoint(); const keep = $state.snapshot(app.programmer); app.clearProgrammer(); ui.toast('The show has its lights back', 4000, { label: 'Undo', run: () => (app.programmer = keep) }); }}>Clear</button>
+      <button onclick={() => clearProgrammer('The show has its lights back')}>Clear</button>
     </div>
   {/if}
 
@@ -655,18 +581,5 @@
   .held { display: flex; align-items: center; gap: .6rem; padding: .45rem .7rem; border-radius: var(--radius); border: 1px solid #ffaa1c66; background: #ffaa1c14; color: var(--text); font-size: .9rem; }
   .held span { flex: 1; min-width: 0; }
   /* sized like the buttons next to them */
-  .chip.haze, .chip.nextup { font-size: .85rem; min-height: 29px; padding: .2rem .7rem; border-radius: 999px; display: inline-flex; gap: .35rem; align-items: center; background: none; }
-  .chip.haze { border: 1px solid var(--orange); color: var(--orange); padding-right: .25rem; }
-  .chip.haze .stop { min-height: 0; padding: .1rem .55rem; border-radius: 999px; border: 0; border-left: 1px solid #ffaa1c66; background: #ffaa1c1f; color: var(--orange); font-weight: 650; font-size: .8rem; }
-  .chip.nextup { border: 1px solid var(--line2); color: var(--muted); }
-  .chip.nextup.paused { border-style: dashed; }
-  .chip.nextup.song { font-variant-numeric: tabular-nums; } .chip.nextup.song.on { color: var(--green); border-color: #45d85c66; }
-  .chip.nextup.sound[aria-pressed='true'] { color: var(--text); }
-  .chip.nextup.sound.off { border-style: dashed; text-decoration: line-through; }
-  .chip.nextup.fresh { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-  .chip.nextup.blind { color: #9fc0ff; border-color: #6aa2ff66; }
-  .chip.nextup.shot { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
-  .bdot { width: .55rem; height: .55rem; border-radius: 50%; background: #5b6676; box-shadow: inset 0 0 0 1px #0006; }
   /* fingers: the Stop and the next-up chip as big as the buttons next to them */
-  @media (pointer: coarse) { .chip.haze, .chip.nextup { min-height: 38px; } .chip.haze { padding-top: 0; padding-bottom: 0; } .chip.haze .stop { min-height: 38px; padding: .2rem .9rem; } }
 </style>

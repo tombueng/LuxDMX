@@ -253,10 +253,12 @@ export interface Target { fixture: string; cell?: number; barPan?: boolean }
 export function applyFx(stage: Record<string, Resolved>, targets: Target[], outs: FxOut[], def: EffectDef, p: EffectParams, f: number, cellsOf: (id: string) => number,
   held?: Map<string, number>, base?: Map<string, number>) {
   if (f <= 0) return;
-  targets.forEach((t, i) => {
-    const s = stage[t.fixture];
-    const o = outs[i];
-    if (!s || !o) return;
+  // (a plain loop, the mixing a function of its own: closures made per element were most of the time,
+  // 1900 elements a frame on the festival demo)
+  const mx: Mixing = { def, p, f, held, base };
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i], s = stage[t.fixture], o = outs[i];
+    if (!s || !o) continue;
     // a light with cells of its own (an effect on its pixels, or cells a cue or the programmer set):
     // a look per cell from here on, and an effect on the whole light reaches every cell
     if (!s.cells && (t.cell !== undefined || s.cellVals || s.cellLvl)) { const n = cellsOf(t.fixture); if (n > 0) s.cells = spreadCells(s, n); }
@@ -270,27 +272,28 @@ export function applyFx(stage: Record<string, Resolved>, targets: Target[], outs
       else if (o.pan !== undefined && t.barPan) s.pan = clamp01((s.pan ?? 0.5) + o.pan * f);
       if (o.tilt !== undefined) c.tilt = clamp01((c.tilt ?? s.tilt ?? 0.5) + o.tilt * f);
     }
-    // how firmly something else sets it: the light, or that one cell (the programmer set it)
-    const holdOf = (k?: number) => Math.max(held?.get(t.fixture) ?? 0, k === undefined ? 0 : held?.get(`${t.fixture}#${k}`) ?? 0);
-    const apply = (dst: Resolved, k?: number) => {
-      if (o.color) {
-        // a dark light's colour doesn't matter: start from the effect's own (no pastel while it comes up)
-        dst.color = (dst.intensity ?? 0) < 0.004 ? { ...o.color } : lerpColor(dst.color ?? o.color, o.color, f);
-        if (dst.white !== undefined) dst.white = mix(dst.white, 0, f);
-      }
-      if (o.strike !== undefined) {
-        const v = o.strike * f;
-        if (v > 0) { dst.intensity = Math.max(dst.intensity ?? 0, v); dst.color = lerpColor(dst.color ?? WHITE, WHITE, v); if (dst.white !== undefined) dst.white = Math.max(dst.white, v); }
-      } else if (o.intensity !== undefined) dst.intensity = mix(dst.intensity ?? 0, o.intensity, f);
-      // Lights nothing else holds come up with the effect; one a cue or the programmer sets keeps that
-      // level. In between it's a crossfade, what holds it plus the effect for the rest: a list fading
-      // out hands the light to the effect, a cue fading in takes it over, and neither dips to black.
-      else if (p.lightUp && def.category !== 'intensity') {
-        const lift = Math.min(1, (base?.get(t.fixture) ?? 0) + f * (1 - holdOf(k)));
-        dst.intensity = Math.max(dst.intensity ?? 0, lift);
-      }
-    };
-    if (t.cell !== undefined) apply(s.cells?.[t.cell] ?? s, t.cell);
-    else { apply(s); if (s.cells) s.cells.forEach((c, k) => apply(c, k)); }
-  });
+    if (t.cell !== undefined) mixInto(s.cells?.[t.cell] ?? s, o, mx, t.fixture, t.cell);
+    else { mixInto(s, o, mx, t.fixture); if (s.cells) for (let k = 0; k < s.cells.length; k++) mixInto(s.cells[k], o, mx, t.fixture, k); }
+  }
+}
+interface Mixing { def: EffectDef; p: EffectParams; f: number; held?: Map<string, number>; base?: Map<string, number> }
+// One effect element's output onto a light (or one of its cells, `k`)
+function mixInto(dst: Resolved, o: FxOut, { def, p, f, held, base }: Mixing, fixture: string, k?: number) {
+  if (o.color) {
+    // a dark light's colour doesn't matter: start from the effect's own (no pastel while it comes up)
+    dst.color = (dst.intensity ?? 0) < 0.004 ? { ...o.color } : lerpColor(dst.color ?? o.color, o.color, f);
+    if (dst.white !== undefined) dst.white = mix(dst.white, 0, f);
+  }
+  if (o.strike !== undefined) {
+    const v = o.strike * f;
+    if (v > 0) { dst.intensity = Math.max(dst.intensity ?? 0, v); dst.color = lerpColor(dst.color ?? WHITE, WHITE, v); if (dst.white !== undefined) dst.white = Math.max(dst.white, v); }
+  } else if (o.intensity !== undefined) dst.intensity = mix(dst.intensity ?? 0, o.intensity, f);
+  // Lights nothing else holds come up with the effect; one a cue or the programmer sets keeps that
+  // level. In between it's a crossfade, what holds it plus the effect for the rest: a list fading
+  // out hands the light to the effect, a cue fading in takes it over, and neither dips to black.
+  else if (p.lightUp && def.category !== 'intensity') {
+    // (how firmly something else sets it: the light, or that one cell (the programmer set it))
+    const hold = Math.max(held?.get(fixture) ?? 0, k === undefined ? 0 : held?.get(`${fixture}#${k}`) ?? 0);
+    dst.intensity = Math.max(dst.intensity ?? 0, Math.min(1, (base?.get(fixture) ?? 0) + f * (1 - hold)));
+  }
 }

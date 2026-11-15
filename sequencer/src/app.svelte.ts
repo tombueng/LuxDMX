@@ -9,7 +9,7 @@ import { pinHash } from './model/pin';
 import { placeNew } from './model/place';
 import { freezeGroupNumbers, nextGroupNumber } from './model/groupnum';
 import { cleanHost, hostProblem } from './model/host';
-import { emptyShow, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
+import { emptyShow, mendPastedCue, parseShow, serializeShow, FormatError, FORMAT_VERSION } from './model/format';
 import { capsOf, headCellsOf, isFogTimer, isLooks, isPlay, kindOf, modeOf, typeMap, type FixtureKind } from './model/library';
 import { isWide, layoutOfLight, placesOfLight, spansOf } from './model/pixelLayout';
 import { ledOfLight, ledShown, unservedPixels } from './app/leds';
@@ -44,7 +44,7 @@ import { copyClip, readClip } from './store/clipboard';
 import { bundle, isZip, storedOf, unbundle } from './store/bundle';
 import { CURRENT_SHOW, HELD, LAST_PLAYED, OUTPUT_LOCKED_LIVE, OUTPUT_TAB, PLAYING_TAB, SCHEDULE_LOOKED, UNDO_TAB, WAS_ARMED } from './store/kept';
 import { getModel, getSong, putModel, putSong } from './store/audio';
-import { prune, prunedText } from './model/prune';
+import { moveCueRefs, prune, prunedText } from './model/prune';
 import { stageSvg } from './ui/thumb';
 import { cueLooks } from './engine/cuelook';
 import { cellLookAt, resolveValues } from './engine/resolve';
@@ -61,7 +61,7 @@ import { LINK, LinkOutput } from './output/link';
 import { RemoteHost } from './remote/host.svelte';
 import { TimelinePlayer } from './timeline/player.svelte';
 import type { BurstAttr, TimelineAction, TimelineItem } from './model/timeline';
-import { curvesAt, firstLook, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
+import { curvesAt, firstLook, levelsAt, pickSong, songIndex, songName, songsOf, stateAt } from './model/timeline';
 
 
 // per mode name: old cell -> new cell (null: gone); cells not in it stay where they are
@@ -88,6 +88,7 @@ const pingAfter = (() => {
 // (said when a box connects while blind; gone the moment you go on stage)
 const BLIND_TOAST = 'Connected. You are blind';
 const NO_OVER: Record<string, Record<string, number>> = {};
+const NO_LEVELS: Record<string, number> = {};
 // where the winches were last sent armed (held there over a reload): { "fixture:hoist": { v: byte,
 // at: ms } }, anything else isn't kept
 function keptHeld(): Record<string, { v: number; at: number }> {
@@ -1084,6 +1085,7 @@ class App {
     // object while nothing changes, so the output thread isn't told again)
     const song = this.show.timeline;
     this.engine.fxOver = this.timeline.playing && song?.items.some((i) => i.curves) ? curvesAt(song.items, this.timeline.position) : NO_OVER;
+    this.engine.levelOver = this.timeline.playing && song?.levels ? levelsAt(song.levels, this.timeline.position) : NO_LEVELS;
     // the output thread gets what changed (its own engine works out the frames that go out)
     // (blind with nothing frozen, a tab that started blind: the thread sends nothing either)
     const blindOut = this.output === 'live' ? null : this.blindFrames();
@@ -1827,9 +1829,11 @@ class App {
   // Fog and haze machines making fog right now that no held fog button is behind (a cue left them
   // on): Live says so, with a way to stop them.
   get hazing(): string[] {
-    return this.show.fixtures.filter((f) => this.caps(f.id).fog && !this.live[f.id]
-      && ((this.stage[f.id]?.fog ?? 0) > 0.01 || (this.stage[f.id]?.haze ?? 0) > 0.01)).map((f) => f.id);
+    return this.fogIds.filter((id) => !this.live[id] && ((this.stage[id]?.fog ?? 0) > 0.01 || (this.stage[id]?.haze ?? 0) > 0.01));
   }
+  // (the fog and haze machines: worked out when the lights change, not on every frame: going
+  // through all of the festival's 233 lights for them was 13 ms a read)
+  private fogIds = $derived(this.show.fixtures.filter((f) => this.caps(f.id).fog).map((f) => f.id));
   // Held off on the live layer until a cue that fogs one of them comes on (not in the programmer: a
   // later haze cue still hazes, and a Record doesn't write "hazer off" into whatever cue it makes).
   stopHaze() {
@@ -2199,6 +2203,25 @@ class App {
     const at = Math.max(0, Math.min(rest.length, to - l.cues.slice(0, to).filter((c) => ids.includes(c.id)).length));
     l.cues = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
   }
+  // Cues to another list, at its end: the same cues (their ids, everything in them, a number of
+  // their own there), and what played them follows (a Live button, a moment on the timeline...).
+  // One step to undo; the clipboard isn't touched.
+  moveCuesToList(ids: string[], to: string): number {
+    const from = this.show.cueLists.find((l) => l.cues.some((c) => ids.includes(c.id)));
+    const dest = this.show.cueLists.find((l) => l.id === to);
+    if (!from || !dest || from === dest) return 0;
+    this.checkpoint();
+    const moving = from.cues.filter((c) => ids.includes(c.id));
+    from.cues = from.cues.filter((c) => !ids.includes(c.id));
+    for (const c of moving) delete c.num;
+    numbersFor(dest, dest.cues.length, moving);
+    dest.cues = [...dest.cues, ...moving];
+    moveCueRefs(this.show, new Set(moving.map((c) => c.id)), from.id, dest.id);
+    this.currentList = dest.id;
+    this.cueSel = moving.map((c) => c.id);
+    this.markDirty(0);
+    return moving.length;
+  }
   async copyCues(ids = this.cueSel) {
     const items = this.list?.cues.filter((c) => ids.includes(c.id)) ?? [];
     const names = Object.fromEntries(this.show.fixtures.map((f) => [f.id, f.name]));
@@ -2224,7 +2247,9 @@ class App {
     const fxIds = new Set(this.show.effects.map((e) => e.id)), listIds = new Set(this.show.cueLists.map((x) => x.id));
     const added: string[] = [], made: Cue[] = [];
     const lost = new Set<string>(); let lostFx = 0;
-    for (const c of clip.items as Cue[]) {
+    // (mended like a file's: any tab or app can write the clipboard, and a cue without what comes
+    // after it threw on every frame while it was on stage)
+    for (const c of (clip.items as unknown[]).map(mendPastedCue).filter((x): x is Cue => !!x)) {
       const values: Record<string, Values> = {};
       for (const [id, v] of Object.entries(c.values)) { const t = target(id); if (t) values[t] = rawCells(v); else lost.add(clip.names?.[id] ?? id); }
       const { num: _n, ...rest } = c;                                    // a number of its own, here

@@ -7,6 +7,9 @@
   // saturation, beam, effects), a fader with GO, Flash and Release for every cue list, and the
   // grand master. Everything goes through the programmer and the lists like anywhere else.
   import { app } from '../app.svelte';
+  import { toHsv } from '../model/values';
+  import { clearProgrammer } from './clear.svelte';
+  import { setContext, untrack } from 'svelte';
   import { dialogOpen, isShortcut, spaceIsGo, ui } from './ui.svelte';
   import Knob from './Knob.svelte';
   import Help from './Help.svelte';
@@ -17,7 +20,7 @@
   import { listRiskOf } from './risk';
   import { isMachine, RISK_LABEL, RISK_SHORT } from '../model/safety';
   import type { ChannelAttr, Color, NumAttr } from '../model/types';
-  import { slotsOf } from '../engine/render';
+  import { selection } from './selection.svelte';
   import StageView from './StageView.svelte';
   import Icon from './Icon.svelte';
 
@@ -72,11 +75,11 @@
     // (in the order of their numbers, as a desk's fixture faders: fader 7 is light 7 after a sort too)
     // (no machines: fog, flames, sparks, CO2, confetti have their buttons on Live, not a level here)
     ? app.show.fixtures.flatMap((f, i) => { const c = app.caps(f.id); return c.fog || isMachine(app.modeOf(f.id)) || !(c.intensity || c.color || c.white || c.cct) ? [] : [{ key: f.id, num: f.num ?? i + 1, name: f.name, ids: [f.id] }]; }).sort((a, b) => a.num - b.num)
-    : app.show.groups.map((g, i) => ({ key: g.id, num: groupNumbers(app.show.groups)[i], name: g.name, ids: g.fixtures })));
+    : ((nums) => app.show.groups.map((g, i) => ({ key: g.id, num: nums[i], name: g.name, ids: g.fixtures })))(groupNumbers(app.show.groups)));
   const banks = $derived(Math.max(1, Math.ceil(strips.length / PER)));
   const shown = $derived(strips.slice(bank * PER, bank * PER + PER));
   $effect(() => { if (bank >= banks) bank = banks - 1; });
-  const levelOf = (ids: string[]) => (ids.length ? ids.reduce((a, id) => a + (app.look[id]?.intensity ?? 0), 0) / ids.length : 0);
+  const levelOf = (ids: string[]) => (ids.length ? ids.reduce((a, id) => a + (look[id]?.intensity ?? 0), 0) / ids.length : 0);
   const isSel = (ids: string[]) => ids.length > 0 && ids.every((id) => app.selected.includes(id));
   // ---- MIDI: with MIDI on, a fader's MIDI button waits for a control to be moved, and from then
   // on that control moves the fader (in every view). The button again: its control is let go.
@@ -107,8 +110,7 @@
   }
 
   // ---- encoders: the attributes the selection has, a page at a time
-  const sel = $derived(app.show.fixtures.filter((f) => app.selected.includes(f.id)));
-  const attrs = $derived.by(() => { const a = new Set<ChannelAttr>(); for (const f of sel) for (const c of app.modeOf(f.id)?.channels ?? []) a.add(c.attr); return a; });
+  const sel = $derived(selection.fixtures), attrs = $derived(selection.attrs);
   type Enc = { k: NumAttr | 'hue' | 'sat'; label: string; need: ChannelAttr[] };
   const PAGES: { id: string; label: string; enc: Enc[] }[] = [
     { id: 'int', label: 'Intensity', enc: [{ k: 'intensity', label: 'Intensity', need: ['intensity', 'red', 'green', 'blue', 'white', 'cyan', 'colorWheel', 'cct', 'warmWhite'] }, { k: 'strobe', label: 'Strobe', need: ['strobe', 'shutter'] }] },
@@ -131,12 +133,8 @@
     const f = sel[0];
     return f ? app.lookFor(f.id) : undefined;
   });
-  function hsvOf(c: Color | undefined): [number, number] {
-    const x = c ?? { r: 1, g: 1, b: 1 }, mx = Math.max(x.r, x.g, x.b), mn = Math.min(x.r, x.g, x.b), d = mx - mn;
-    let h = 0;
-    if (d > 1e-9) h = mx === x.r ? ((x.g - x.b) / d + 6) % 6 : mx === x.g ? (x.b - x.r) / d + 2 : (x.r - x.g) / d + 4;
-    return [h / 6, mx > 0 ? d / mx : 0];
-  }
+  // (hue and saturation as app.nudge turns them: no colour yet is white)
+  const hsvOf = (c: Color | undefined) => toHsv(c ?? { r: 1, g: 1, b: 1 });
   // Encoders that click from slot to slot: a gobo wheel, a built-in effect, a colour program. The
   // first selected light that has it says where it is (what you just set, not the last frame); each
   // light gets the one by that name (app.setSlot).
@@ -146,14 +144,11 @@
     { k: 'effectMacro', label: 'Built-in effect', page: 'fx' }, { k: 'colorMacro', label: 'Colour program', page: 'fx' },
   ];
   function slotInfo(k: SlotK) {
-    for (const f of sel) {
-      const c = app.modeOf(f.id)?.channels.find((x) => x.attr === k && !x.fine);
-      const slots = c ? slotsOf(c) : [];
-      if (!slots.length) continue;
-      // (what was just set, when it's a number; a palette's reference: what it shows)
-      const p = app.programmer[f.id]?.[k], v = (typeof p === 'number' ? p : typeof app.look[f.id]?.[k] === 'number' ? app.look[f.id]![k] : 0) as number;
-      return { slots, at: Math.max(0, Math.min(slots.length - 1, Math.round(v * (slots.length - 1)))) };
-    }
+    const s = selection.slots(k);
+    if (!s) return undefined;
+    // (what was just set, when it's a number; a palette's reference: what it shows)
+    const p = app.programmer[s.id]?.[k], v = (typeof p === 'number' ? p : typeof look[s.id]?.[k] === 'number' ? look[s.id]![k] : 0) as number;
+    return { slots: s.slots, at: Math.max(0, Math.min(s.slots.length - 1, Math.round(v * (s.slots.length - 1)))) };
   }
   const slotEncs = $derived(cur ? SLOT_ENC.filter((e) => e.page === cur.id && attrs.has(e.k)) : []);
   function stepSlot(k: SlotK, d: number) {
@@ -197,7 +192,7 @@
   const pbanks = $derived(Math.max(1, Math.ceil(lists.length / PPER)));
   const pshown = $derived(lists.slice(pbank * PPER, pbank * PPER + PPER));
   $effect(() => { if (pbank >= pbanks) pbank = pbanks - 1; });
-  const st = (id: string) => app.status[id];
+  const st = (id: string) => status[id];
   // a list that fires machines (flames, sparks, CO2, confetti): marked, and said when it's safe
   const riskOf = (l: (typeof app.show.cueLists)[number]) => listRiskOf(app.show, l, app.showRev);
   function cuesOf(l: (typeof app.show.cueLists)[number], e: MouseEvent) {
@@ -213,6 +208,12 @@
   }
   // leaving the console lets go of anything still held here (a flash held while the view changed)
   const onScreen = $derived(app.view === 'console');
+  // (its 3D stage gives the world up while another view is shown, as the other views' stages do)
+  setContext('view-shown', () => app.view === 'console');
+  // (what the faders, encoders and strips show follows the stage only while the console is shown:
+  // hidden, it holds still instead of working out every strip on every frame)
+  const look = $derived(onScreen ? app.look : untrack(() => app.look));
+  const status = $derived(onScreen ? app.status : untrack(() => app.status));
   $effect(() => { if (!onScreen) app.releaseConsoleHolds(); });
 
   // flash buttons: held with a pointer (any: mouse, finger) or Space/Enter on the button
@@ -227,7 +228,6 @@
   }
   const changed = $derived(Object.keys(app.programmer).length);
   // (Clear can be taken back for a moment, as on Live: a slip mustn't lose a half-built look)
-  function clearUndo() { const keep = $state.snapshot(app.programmer); app.clearProgrammer(); ui.toast('Cleared: the cues have their lights back', 4000, { label: 'Undo', run: () => (app.programmer = keep) }); }
   function step(d: 1 | -1) { const r = app.runCommand(d > 0 ? 'next' : 'prev'); said = r.said; bad = !r.ok; }
   function record() { const l = app.liveList, ok = app.record(l?.id); ui.toast(ok ? `Recorded as a new cue in ${l?.name ?? app.list?.name ?? 'a new list'}` : 'Nothing to record: set some lights first (5 @ full)'); }
   // (a laptop's short screen: the cue lists' faders shorter, their GO in view)
@@ -274,7 +274,7 @@
       <button onclick={() => { const r = app.updateOnStage(); ui.toast(r.said); }} disabled={!changed && !app.liveFx.length} title="Update the cue on stage in the list Live plays">Update</button>
       <button class:on={!!app.show.settings.recordChanges} aria-pressed={!!app.show.settings.recordChanges} onclick={() => { app.checkpoint(); if (app.show.settings.recordChanges) delete app.show.settings.recordChanges; else app.show.settings.recordChanges = true; app.markDirty(0); }}
               title="Record and Update keep only what you changed (as desks do: in a play, what earlier cues set carries on through). Off: each light you touched with its whole look.">Only changes</button>
-      <button onclick={clearUndo} disabled={!changed} title="Let go of your changes: the cues take over again">Clear</button>
+      <button onclick={() => clearProgrammer()} disabled={!changed} title="Let go of your changes: the cues take over again">Clear</button>
       <button class:on={app.highlight} aria-pressed={app.highlight} onclick={() => (app.highlight = !app.highlight)} disabled={!app.selected.length && !app.highlight}>Highlight</button>
     </div>
     <!-- one light of the selection at a time (Highlight on: each one lights up to focus it) -->

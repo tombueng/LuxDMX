@@ -270,6 +270,14 @@ describe('a ring or matrix in a file', () => {
     expect(load({ kind: 'blob' }).fixtureTypes[0].modes[0].layout).toBeUndefined();
     expect(load('square').fixtureTypes[0].modes[0].channels).toHaveLength(12);
   });
+  it('cells written as words ("3"): the shape counts them as they end up, and stays', () => {
+    const s: any = emptyShow('t'), t = type({ kind: 'matrix', cols: 2, rows: 2 });
+    for (const c of t.modes[0].channels) (c as any).cell = String(c.cell);
+    s.fixtureTypes.push(t);
+    const m = parseShow(JSON.stringify(s)).fixtureTypes[0].modes[0];
+    expect(m.channels[11].cell).toBe(3);
+    expect(m.layout).toEqual({ kind: 'matrix', cols: 2, rows: 2 });
+  });
   it("a light's own wiring: kept and saved again when it's well-formed, dropped with a note when it isn't", () => {
     const s: any = emptyShow('t');
     s.fixtureTypes.push(type({ kind: 'matrix', cols: 2, rows: 2 }));
@@ -386,5 +394,28 @@ describe('a beam angle in a file', () => {
     expect(back.fixtureTypes.find((t: any) => t.id === 'user:b').physical.beamDeg).toBeUndefined();
     expect(back.fixtures.map((f: any) => f.beamDeg)).toEqual([[12, 12], undefined]);
     expect(notes.join(' ')).toMatch(/beam angle/);
+  });
+});
+
+// A list's master from the timeline or the timetable, with a word for its level: full, as a cue
+// action's is mended (it went in as NaN, and that list went dark)
+describe('a master level the timeline or the timetable sets', () => {
+  it('a word for a level: full, said', () => {
+    const s = emptyShow() as any;
+    s.cueLists.push({ id: 'L', name: 'L', end: 'stop', cues: [] });
+    s.timeline = { duration: 60, items: [{ id: 't', at: 2, lane: 'list:L', do: { do: 'master', list: 'L', level: 'loud' } }] };
+    s.settings.schedule = [{ id: 'e', at: '20:00', do: { do: 'master', list: 'L', level: 'half' } }];
+    const notes: string[] = [];
+    const back = parseShow(JSON.stringify(s), notes) as any;
+    expect(back.timeline.items[0].do.level).toBe(1);
+    expect(back.settings.schedule[0].do.level).toBe(1);
+    expect(notes.join(' ')).toMatch(/level/);
+  });
+  it('a level a hair over full: full; one in range kept', () => {
+    const s = emptyShow() as any;
+    s.cueLists.push({ id: 'L', name: 'L', end: 'stop', cues: [] });
+    s.timeline = { duration: 60, items: [{ id: 't', at: 2, lane: 'list:L', do: { do: 'master', list: 'L', level: 1.5 } }, { id: 'u', at: 3, lane: 'list:L', do: { do: 'master', list: 'L', level: 0.4 } }] };
+    const back = parseShow(JSON.stringify(s)) as any;
+    expect(back.timeline.items.map((i: any) => i.do.level)).toEqual([1, 0.4]);
   });
 });

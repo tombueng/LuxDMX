@@ -441,14 +441,16 @@ export class Particles {
     this.group.add(this.smoke.body!, this.smoke.points);
   }
   get count() { return Object.values(this.clouds).reduce((n, c) => n + c.count, 0) + this.smoke.count; }
-  // fog lit by the beams going through it (some of it each frame: plenty for slow fog)
-  light(beams: Beam[]) {
+  // fog lit by the beams going through it (some of it each frame: plenty for slow fog). `budget`: how
+  // many puffs look again which beams they're in this frame (fewer while the drawing has given way:
+  // the fog follows a moving beam a little later, its levels and colours still every frame)
+  light(beams: Beam[], budget = 800) {
     const fog = this.smoke;
     // every beam's level and colour by its key, this frame
     const top = beams.reduce((m, b, i) => Math.max(m, b.key ?? i), 0), L = fog.levels.length >= (top + 1) * 4 ? fog.levels : (fog.levels = new Float32Array((top + 1) * 4 + 64));
     L.fill(0);
     beams.forEach((b, i) => { const o = (b.key ?? i) * 4; L[o] = b.level; L[o + 1] = b.c.r; L[o + 2] = b.c.g; L[o + 3] = b.c.b; });
-    if (fog.count) fog.light(beams, 800);
+    if (fog.count) fog.light(beams, budget);
   }
   // the fog's own grey: lit a little by the stage (`c`, about the average light on it)
   ambient(r: number, g: number, b: number) { this.smoke.setBody(0.055 + r * 0.22, 0.06 + g * 0.22, 0.07 + b * 0.22, 0.5); }

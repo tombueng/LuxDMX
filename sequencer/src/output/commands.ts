@@ -4,5 +4,5 @@ import type { Engine } from '../engine/engine';
 
 export const COMMANDS = ['go', 'back', 'jumpTo', 'start', 'refresh', 'toggle', 'release', 'stop', 'releaseAll', 'flash', 'alignBeat', 'syncBeats', 'releaseFlashes',
   'setMaster', 'wake', 'faderReleased', 'jumpQuiet', 'actQuiet', 'backdate', 'forget', 'startEffect', 'stopEffect', 'toggleEffect', 'flashEffect', 'takeLiveEffects',
-  'giveBackEffects', 'stopAllEffects', 'act'] as const satisfies readonly (keyof Engine)[];
+  'giveBackEffects', 'stopAllEffects', 'muteCueEffects', 'act'] as const satisfies readonly (keyof Engine)[];
 export type Command = (typeof COMMANDS)[number];

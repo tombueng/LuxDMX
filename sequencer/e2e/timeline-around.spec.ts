@@ -209,3 +209,20 @@ test('the before and after fields show their most (600) whole', async ({ page })
     expect(await f.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
   }
 });
+
+test('a crowd change made instant stays instant when the arrow keys move it', async ({ page }) => {
+  await openConnected(page);
+  await page.evaluate(() => {
+    const a = (window as any).__luxdmx;
+    a.show.timeline = { duration: 120, bpm: 120, items: [], crowd: [{ id: 'cr1', at: 10, len: 0, do: { do: 'crowd', mood: 'chatter', level: 0.5 } }] };
+    a.checkpoint();
+  });
+  await page.locator('.top .modes').getByRole('tab', { name: 'Timeline' }).click();
+  const it = page.locator('.tlv .lane .it').first();
+  await expect(it).toBeVisible();
+  await it.focus();
+  await page.keyboard.press('ArrowRight');
+  const c = await page.evaluate(() => (window as any).__luxdmx.show.timeline.crowd[0]);
+  expect(c.at).toBeCloseTo(10.5, 3);                     // (a beat at 120 BPM)
+  expect(c.len).toBe(0);
+});

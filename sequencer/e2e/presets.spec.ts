@@ -118,3 +118,16 @@ test('the Beam presets are tiles like the others: their names inside them, nothi
     expect(await t.locator('.name').evaluate((n) => { const r = n.getBoundingClientRect(), p = n.parentElement!.getBoundingClientRect(); return r.bottom <= p.bottom + 1; })).toBe(true);
   }
 });
+
+test('Clear lets go of what was set by hand, and its toast brings it back (Program, like the console and Live)', async ({ page }) => {
+  await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await selectAll(page); await full(page);
+  await expect.poll(() => channels(0, 2)).toEqual([255, 255]);
+  await page.locator('.prog').getByRole('button', { name: 'Clear', exact: true }).first().click();
+  await expect.poll(() => channels(0, 2)).toEqual([0, 0]);
+  const toast = page.locator('.toast', { hasText: 'Cleared' });
+  await expect(toast).toBeVisible();
+  await toast.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(() => channels(0, 2)).toEqual([255, 255]);
+});

@@ -245,10 +245,14 @@
   const num = (e: Event) => (e.target as HTMLInputElement).valueAsNumber;
   // (a short number field: what's in it is picked when you click in, so typing replaces it; after a
   // change it shows what was kept, also when what was typed couldn't be: 4010 degrees isn't a beam)
-  // (a click that brought the focus: its own mouseup would put the caret back, so that one is let go)
+  // (a click that brought the focus: its own mouseup would put the caret back, so that one is let go.
+  // Only that one, a press on this very field: after a Tab into it, the next click is to put the
+  // caret somewhere, however soon the Tab came after a click in the field before)
+  let pressedOn: EventTarget | null = null;
   const pickAll = (e: FocusEvent) => {
     const el = e.currentTarget as HTMLInputElement;
     el.select();
+    if (pressedOn !== el) return;
     const up = (m: MouseEvent) => { m.preventDefault(); el.select(); };
     el.addEventListener('mouseup', up, { once: true });
     el.addEventListener('blur', () => el.removeEventListener('mouseup', up), { once: true });
@@ -256,6 +260,8 @@
   const shown = (e: Event, v: number | undefined) => { (e.target as HTMLInputElement).value = v === undefined ? '' : String(v); };
   const pct = (v: number) => `${r1(v * 100)} %`;
 </script>
+
+<svelte:window onpointerdowncapture={(e) => (pressedOn = e.target)} onkeydowncapture={() => (pressedOn = null)} />
 
 {#if f && place}
 <div class="setup">

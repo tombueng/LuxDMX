@@ -17,7 +17,7 @@ import { rigFixtureFull } from './rigOf';
 import { microShow, type MicroShow } from './microShow';
 import { drawAtlas } from './gobos';
 import { loadGoboFonts } from './goboFonts';
-import { aimRot, HALL, pivotOf, ROOMS, showRoom, shownRoom, type Room, type V3, showWalls, wallsShown } from './geometry';
+import { aimRot, HALL, pivotOf, ROOMS, showRoom, shownRoom, type Room, showWalls, wallsShown } from './geometry';
 import { Particles } from './particles';
 import type { Focus } from './microShow';
 import { kindOf } from '../model/library';
@@ -314,5 +314,4 @@ export async function frames(light: PreviewLight, o: { w: number; h: number; n: 
 
 // (for the tests and the QA tools: how many previews there are and how often each was drawn)
 export const previewStats = () => ({ slots: slots.size, live: !!renderer, lost, drawn: [...slots.values()].map((s) => s.drawn) });
-export const _place = (light: PreviewLight): { look: string; p: V3 }[] => placed(light).list.map((rf) => ({ look: rf.look, p: rf.p }));
 if (import.meta.env.DEV) Object.assign(globalThis, { __previews: previewStats, __previewFrames: frames });

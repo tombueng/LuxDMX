@@ -77,6 +77,7 @@ export interface Room {
   // the floor's height at (x, z) where it isn't flat (raked seats: the theatre's stalls, the cinema's
   // rows): light lands on the seats there, not on the floor under them
   floor?: (x: number, z: number) => number;
+  floorTop?: number;      // (the highest it gets: a beam above that can't land on it yet)
 }
 // a 0.3 m box truss whose bottom chord is at y: its middle line is 0.15 m higher
 const mid = (y: number) => y + 0.15;
@@ -127,7 +128,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     // all over it, on the walls, in the ceiling, on the steps)
     id: 'cinema', W: 32, D: 41.2, zc: 15.7, truss: [{ z: CINEMA.stageTruss.z, y: CINEMA.stageTruss.y }, { z: CINEMA.foh.z, y: CINEMA.foh.y }], deck: { ...CINEMA.deck }, ceiling: CINEMA.ceiling,
     band: { ...CINEMA.deck }, walls: { x: CINEMA.wallX, z0: CINEMA.screenZ - 0.4, z1: CINEMA.backZ }, screens: [{ z: CINEMA.screenZ, x: CINEMA.screenW / 2, y0: CINEMA.screenY, y1: CINEMA.screenY + CINEMA.screenH }], inset: 0.14,
-    floor: (_x, z) => cinemaFloor(z),
+    floor: (_x, z) => cinemaFloor(z), floorTop: CINEMA.rows * CINEMA.rowRise,
     frame: [span(11, CINEMA.stageTruss.y, CINEMA.stageTruss.z), span(12.5, CINEMA.foh.y, CINEMA.foh.z)],
     views: { front: { pos: [0, 12, 34], at: [0, 6, -2] }, foh: { pos: [4.5, 6.4, 16], at: [0, 6, -3] }, side: { pos: [-14.5, 11, 14], at: [0, 5.5, 0] }, top: { pos: [0, 66, 15.01], at: [0, 0, 15] }, band: { pos: [0, 3.2, -3.4], at: [0, 6, 30] } },
     tour: { rx: 12, rz: 15, z0: 14, y: 10, dy: 2, at: [0, 5.5, -1] },
@@ -148,7 +149,7 @@ export const ROOMS: Record<Exclude<RoomId, 'custom'>, Room> = {
     id: 'theatre', W: 42, D: 38, zc: -2.5,
     truss: [...THEATRE.electrics.map((e) => ({ z: e.z, y: e.y })), { z: THEATRE.foh2.z, y: THEATRE.foh2.y }, { z: THEATRE.foh.z, y: THEATRE.foh.y }], deck: { x: THEATRE.stage.x, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, ceiling: THEATRE.ceiling,
     band: { x: THEATRE.arch.w / 2, z0: THEATRE.stage.z0, z1: THEATRE.stage.z1 }, walls: { x: THEATRE.wallX, z0: THEATRE.stage.z0 - 0.4, z1: THEATRE.backZ }, screens: [{ z: THEATRE.cycZ, x: THEATRE.cyc.w / 2, y0: DECK, y1: DECK + THEATRE.cyc.h }],
-    floor: (_x, z) => theatreFloor(z),
+    floor: (_x, z) => theatreFloor(z), floorTop: THEATRE.stalls.rows * THEATRE.stalls.rise,
     frame: [...THEATRE.electrics.map((e) => span(THEATRE.arch.w / 2 + 3, e.y, e.z)), span(THEATRE.arch.w / 2 + 2, THEATRE.foh2.y, THEATRE.foh2.z), span(THEATRE.arch.w / 2 + 2, THEATRE.foh.y, THEATRE.foh.z)],
     views: { front: { pos: [0, 14, 27.5], at: [0, 7, -6] }, foh: { pos: [6, 5.5, 19], at: [0, 7, -6] }, side: { pos: [-20, 15, 21], at: [0, 6.5, -6] }, top: { pos: [0, 64, -6.01], at: [0, 0, -6] }, band: { pos: [0, 4.6, -12], at: [0, 6, 26] } },
     tour: { rx: 16, rz: 12, z0: 9, y: 6.5, dy: 0.5, at: [0, 6.5, -6] },
@@ -337,18 +338,26 @@ export function hitFloor(p: V3, d: V3, r: Room = shown): V3 | undefined {
     if (!inside(x, z)) continue;
     // (a raked floor: along the ray to where it first goes under it, then closer in; the floor is
     // never above the light, so the flat hit is the furthest it can be)
-    if (r.floor && y === 0) return rakedHit(p, d, k, r.floor) ?? { x, y, z };
+    if (r.floor && y === 0) return rakedHit(p, d, k, r.floor, r.floorTop) ?? { x, y, z };
     return { x, y, z };
   }
   return undefined;
 }
-function rakedHit(p: V3, d: V3, kMax: number, floor: (x: number, z: number) => number): V3 | undefined {
-  const at = (k: number) => ({ x: p.x + d.x * k, y: p.y + d.y * k, z: p.z + d.z * k }), under = (k: number) => { const q = at(k); return q.y <= floor(q.x, q.z); };
+function rakedHit(p: V3, d: V3, kMax: number, floor: (x: number, z: number) => number, top = Infinity): V3 | undefined {
+  // (no object per step: a few hundred beams over raked seats was five times the flat floor's time)
+  const under = (k: number) => p.y + d.y * k <= floor(p.x + d.x * k, p.z + d.z * k);
   const step = 0.2;
-  let lo = 0;
-  for (let k = step; k < kMax + step; k += step) {
+  // (from where the beam has come down to the floor's top: nothing to hit above it. On the same
+  // 0.2 m steps as from the light, so it lands where it did)
+  let lo = top < p.y && d.y < 0 ? Math.floor((p.y - top) / -d.y / step) * step : 0;
+  for (let k = lo + step; k < kMax + step; k += step) {
     const kk = Math.min(k, kMax);
-    if (under(kk)) { let hi = kk; for (let i = 0; i < 8; i++) { const m = (lo + hi) / 2; if (under(m)) hi = m; else lo = m; } const q = at(hi); return { x: q.x, y: floor(q.x, q.z), z: q.z }; }
+    if (under(kk)) {
+      let hi = kk;
+      for (let i = 0; i < 8; i++) { const m = (lo + hi) / 2; if (under(m)) hi = m; else lo = m; }
+      const x = p.x + d.x * hi, z = p.z + d.z * hi;
+      return { x, y: floor(x, z), z };
+    }
     lo = kk;
   }
   return undefined;

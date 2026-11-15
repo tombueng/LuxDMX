@@ -2,7 +2,7 @@
 // move, the stories start and end dark, and the words come out letter by letter.
 import { describe, expect, it } from 'vitest';
 import { EFFECTS, EFFECT_MAP, paramsOf, runEffect, type Where } from './effects';
-import { textColumns } from './shapes';
+import { textColumns } from './font';
 import { Engine } from './engine';
 import { emptyShow } from '../model/format';
 import { placesFor, type Places } from '../model/pixelLayout';

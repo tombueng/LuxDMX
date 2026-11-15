@@ -9,8 +9,8 @@
 // a frame costs well under a tenth of a millisecond.
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { blocked, castOf, CAM_MODES, CROWDS, direct, holdFor, LENS, newMemory, partAt, spaceOf, WALK, type CamMode, type Cast, type Light3, type Music, type Part, type Shot, crewOf } from './director';
-import { DECK, ROOMS, defaultPlace, type Room, type RoomId, type V3 } from './geometry';
+import { blocked, castOf, CAM_MODES, CROWDS, direct, holdFor, LENS, newMemory, partAt, shotOfLights, spaceOf, WALK, type CamMode, type Cast, type Light3, type Music, type Part, type Shot, crewOf } from './director';
+import { DECK, ROOMS, defaultPlace, pivotOf, toWorld, type Room, type RoomId, type Rot, type V3 } from './geometry';
 import { buildVenue, type Venue } from './venue';
 import type { Stage } from './rooms';
 import { DEMOS } from '../content/demos';
@@ -274,3 +274,61 @@ it('costs well under a tenth of a millisecond a frame (the hall and the pub)', (
     expect(ms, `${mode} in the ${id}: ${(ms * 1000).toFixed(1)} µs`).toBeLessThan(0.05);
   }
 });
+
+
+// The camera to some lights ("Selected", Show it in 3D): worked out in director.ts from the room and
+// the lights alone (it was inside the 3D stage, with three.js vectors). The same spots as that code,
+// for lights all over seven rooms; and the cinema's house light under its ceiling in the middle of the
+// picture (a float a hair over the ceiling's margin once left no spot: it sat at the edge).
+// (Review 5, R5-S8)
+describe('the camera to the selected lights', () => {
+  // (the 3D stage's own code before, with three.js, as the yardstick)
+  function before(room: Room, fs: { p: V3; rot: Rot }[], fov: number) {
+    const pts = fs.map((f) => { const p = pivotOf(f.p, f.rot); return new THREE.Vector3(p.x, p.y, p.z); });
+    const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
+    if (c.y > room.ceiling - 0.9) c.y = room.ceiling - 0.9;
+    const r = Math.max(0.6, box.getSize(new THREE.Vector3()).length() / 2);
+    const d = Math.max(4.5, (r / Math.sin((fov * Math.PI) / 360)) * 1.15);
+    const W = room.walls, inside = (p: THREE.Vector3) => Math.abs(p.x) < W.x - 0.5 && p.z > W.z0 + 0.5 && p.z < W.z1 - 0.5 && p.y > 0.4 && p.y < room.ceiling - 0.8;
+    const sp = spaceOf(room, castOf(room.id)), into = Math.sign(-c.x) || 1;
+    const hung = fs.every((f) => toWorld({ x: 0, y: 1, z: 0 }, f.rot).y < -0.3);
+    const dirs = hung ? [[0.35, -0.32, 1], [-0.35, -0.32, 1], [into * 0.8, -0.2, 0.6], [0, -0.8, 0.6], [into * 0.7, -0.7, 0.2], [0, -1, 0.08], [0, 0.4, 1]] : [[0.35, 0.45, 1], [-0.35, 0.45, 1], [into * 0.9, 0.5, 0.4], [into * 0.5, 1.1, 0.6], [0, 0.9, 1], [into * 0.15, 0.25, 1], [into * 0.15, 0.25, -1], [into * 0.3, 1.4, 0.2]];
+    const seen = (q: THREE.Vector3) => { const n = Math.ceil(q.distanceTo(c) / 0.3); for (let i = 1; i < n - 1; i++) { const m = q.clone().lerp(c, i / n), b = blocked(sp, { x: m.x, y: m.y, z: m.z }); if (b === 'the proscenium' || b === 'the balcony' || b === 'the deck') return false; } return true; };
+    let p1: THREE.Vector3 | undefined, clear: THREE.Vector3 | undefined;
+    const solid = (q: THREE.Vector3) => { if (blocked(sp, { x: q.x, y: q.y, z: q.z })) return true; const up = blocked(sp, { x: q.x, y: q.y + 0.05, z: q.z }); return !!up && up !== 'the ceiling'; };
+    const ok = (q: THREE.Vector3) => { if (!inside(q) || solid(q)) return false; if (seen(q)) return true; clear ??= q; return false; };
+    for (const k of [1, 0.7, 0.5]) for (const [x, y, z] of dirs) { if (p1) break; const q = c.clone().addScaledVector(new THREE.Vector3(x, y, z).normalize(), d * k); if (q.y < c.y + 0.05) q.y = c.y + 0.05; if (ok(q)) p1 = q; }
+    if (!p1) for (const k of [0.8, 0.55, 0.35, 0.22]) for (const dy of [0.05, 0.3, 0.6, 1.2]) for (let i = 0; i < 12 && !p1; i++) { const ang = ((i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI) / 6, q = new THREE.Vector3(c.x + Math.sin(ang) * d * k, c.y + dy, c.z + Math.cos(ang) * d * k); if (ok(q)) p1 = q; }
+    p1 ??= clear;
+    p1 ??= c.clone().addScaledVector(new THREE.Vector3(into * 0.6, 0.8, 0.3).normalize(), Math.min(d, 3));
+    p1.set(Math.max(-W.x + 0.6, Math.min(W.x - 0.6, p1.x)), Math.max(0.5, Math.min(room.ceiling - 0.9, p1.y)), Math.max(W.z0 + 0.6, Math.min(W.z1 - 0.6, p1.z)));
+    return { pos: { x: p1.x, y: p1.y, z: p1.z }, at: { x: c.x, y: c.y, z: c.z } };
+  }
+  it('lands on the same spots as the 3D stage\'s own code did, all over seven rooms', () => {
+    let s = 11; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    let worst = 0, n = 0;
+    for (const id of ['hall', 'club', 'bar', 'cinema', 'theatre', 'church', 'ballroom'] as const) {
+      const r = ROOMS[id];
+      for (let i = 0; i < 300; i++) {
+        const k = 1 + Math.floor(rnd() * 3), fs = Array.from({ length: k }, () => ({
+          p: { x: (rnd() - 0.5) * r.walls.x * 1.8, y: 0.3 + rnd() * (r.ceiling - 0.4), z: r.walls.z0 + rnd() * (r.walls.z1 - r.walls.z0) },
+          rot: { yaw: rnd() * 360 - 180, pitch: rnd() < 0.5 ? 180 - rnd() * 40 : rnd() * 60, roll: 0 } }));
+        const a = shotOfLights(r, fs, 42), b = before(r, fs, 42);
+        for (const [u, v] of [[a.pos, b.pos], [a.at, b.at]]) worst = Math.max(worst, Math.abs(u.x - v.x), Math.abs(u.y - v.y), Math.abs(u.z - v.z));
+        n++;
+      }
+    }
+    expect(n).toBe(2100);
+    expect(worst).toBeLessThan(1e-9);
+  });
+  it('the cinema\'s house light under its ceiling: the camera somewhere clear, the light near the picture\'s middle', () => {
+    const r = ROOMS.cinema, light = { p: { x: -3.8, y: 15.75, z: 18 }, rot: { yaw: 0, pitch: 179, roll: 0 } };
+    const { pos, at } = shotOfLights(r, [light], 42);
+    expect(blocked(spaceOf(r, castOf('cinema')), pos)).toBe('');
+    const piv = pivotOf(light.p, light.rot), u = unitV(at.x - pos.x, at.y - pos.y, at.z - pos.z), w = unitV(piv.x - pos.x, piv.y - pos.y, piv.z - pos.z);
+    const off = Math.acos(Math.min(1, u.x * w.x + u.y * w.y + u.z * w.z)) * 180 / Math.PI;
+    expect(Math.hypot(pos.x - at.x, pos.z - at.z)).toBeGreaterThan(3.5);   // (not a metre off, under it)
+    expect(off).toBeLessThan(0.4 * 21);                                    // (within 40 % of the half picture)
+  });
+});
+const unitV = (x: number, y: number, z: number) => { const l = Math.hypot(x, y, z) || 1; return { x: x / l, y: y / l, z: z / l }; };
