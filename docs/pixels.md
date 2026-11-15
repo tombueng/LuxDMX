@@ -343,6 +343,16 @@ WS2812 sits on IO48, which is pixel port 5. Two drivers on one pin is the one co
 genuinely breaks, so the firmware refuses it and the carrier template ships with the status LED
 off. With port 5 unused you can turn the LED back on at `ledpin=48`, `ledtype=2`.
 
+**A pin something else uses turns the port off.** A pixel port drives its pin hard, so the
+firmware won't put it on a pin another part of the box is using: the status LED (or the 5-LED
+panel's pins), the W5500's SPI pins while the W5500 is your wired Ethernet, the display's pins
+while a display is set up, the encoder and buttons, and the pins of an enabled DMX output. Only
+what's switched on counts. The settings page blocks those pins before you save, and if the box
+still turns a port off (say a script posted `/config` directly) the save's answer says which port
+and why, and the page shows it. Up to v1.0.302 the box also counted pins of things that were
+off, so on a WT32-ETH01 a port on GPIO5 (the unused W5500's default CS) went off after every save
+with only "Saved" on screen (issue #165).
+
 **5 V strip on a 12/24 V board.** The carrier's pixel rail is a fused pass-through and does not
 care about voltage, but 5 V strip draws roughly 3.5× the current of 12 V strip for the same
 pixel count, and the board's limit is amps. The 5 V goes into `12-24V IN`, because USB and `5V IN`

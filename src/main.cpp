@@ -120,6 +120,7 @@ static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64
 #include "rdm_rmt.h"                    // RDM controller on RMT-TX + UART-RX
 #include "pixel.h"                      // WS281x pixel engine (framebuffers, latch, power)
 #include "wifi_pick.h"                  // which saved WiFi network to join (issue #120, host-tested)
+#include "pixel_pins.h"                 // who owns a GPIO, for a pixel port (issue #165, host-tested)
 
 // Auto-generated asset headers (produced by extra_scripts.py before each build)
 #include "generated/version.h"
@@ -773,52 +774,54 @@ static void sanitizeOutputs() {
             cfg.outputs[i].enabled = false;
 }
 
-// The same rule for pixel ports: enabled with no data pin, or no pixels, can't drive
-// anything, and an enabled-but-impossible port would just allocate a buffer nothing reads.
-// Also refuse a data pin that the status LED already owns -- on the carrier the module's
-// own WS2812 sits on IO48, which is pixel port 5, and two drivers on one pin is the one
-// combination that genuinely breaks (the LED's writes land inside the pixel stream).
-static void sanitizePixels() {
+// The same rule for pixel ports: enabled with no data pin, or no pixels, can't drive anything,
+// and an enabled-but-impossible port would just allocate a buffer nothing reads. A data pin
+// another subsystem owns is refused too: a pixel port drives its pin hard, so landing it on (say)
+// the W5500's MISO takes Ethernet off the bus and the board looks bricked, and on the carrier's
+// IO48 (the module's own WS2812, pixel port 5) the LED's writes land inside the pixel stream.
+// Only what is ON owns a pin (src/pixel_pins.h, the same rule as the /config page): the WT32-ETH01
+// keeps the W5500's default pins although it runs RMII, and GPIO5 (the W5500 CS there) turned a
+// port off on every save while the page said "Saved" (issue #165).
+// `off`, when given, gets what was turned off and why, as a JSON array for the save's answer.
+static String jsonEsc(const String& s);   // (below, with the other JSON helpers)
+static void sanitizePixels(String* off = nullptr) {
+    PixPinUse u;
+    u.ledType = cfg.ledType; u.ledPin = cfg.ledPin;
+    const int panel[5] = { cfg.ledR, cfg.ledG, cfg.ledY, cfg.ledB, cfg.ledW };
+    for (int i = 0; i < 5; i++) u.ledPanel[i] = panel[i];
+    u.spiEth = cfg.wiredPhy == WIRED_PHY_SPI && cfg.ethW5500;
+    const int eth[6] = { cfg.ethCs, cfg.ethSck, cfg.ethMosi, cfg.ethMiso, cfg.ethInt, cfg.ethRst };
+    for (int i = 0; i < 6; i++) u.eth[i] = eth[i];
+    u.dispType = cfg.dispType; u.dispI2c[0] = cfg.dispSda; u.dispI2c[1] = cfg.dispScl;
+    const int dspi[5] = { cfg.dispCs, cfg.dispDc, cfg.dispRst, cfg.dispSck, cfg.dispMosi };
+    for (int i = 0; i < 5; i++) u.dispSpi[i] = dspi[i];
+    u.enc[0] = cfg.encA; u.enc[1] = cfg.encB; u.enc[2] = cfg.encSw;
+    u.btn[0] = cfg.btn1Pin; u.btn[1] = cfg.btn2Pin; u.btn[2] = cfg.btn3Pin; u.btn[3] = cfg.btn4Pin;
+    u.nOut = MAX_OUTPUTS < PixPinUse::MAX_OUT ? MAX_OUTPUTS : PixPinUse::MAX_OUT;
+    for (int o = 0; o < u.nOut; o++)
+        u.out[o] = { cfg.outputs[o].enabled, cfg.outputs[o].txPin, cfg.outputs[o].rxPin, cfg.outputs[o].rtsPin };
+
+    bool any = false;
+    auto turnOff = [&](int i, const String& why) {
+        cfg.pixels[i].enabled = false;
+        Serial.printf("[PIX] port %d disabled: %s\n", i + 1, why.c_str());
+        if (!off) return;
+        *off += any ? "," : "[";
+        *off += "{\"port\":"; *off += i; *off += ",\"why\":\""; *off += jsonEsc(why); *off += "\"}";
+        any = true;
+    };
     for (int i = 0; i < MAX_PIXEL_PORTS; i++) {
         PixelPort& p = cfg.pixels[i];
         if (!p.enabled) continue;
-        if (p.pin < 0 || p.count <= 0) { p.enabled = false; continue; }
-        if (cfg.ledType != 0 && cfg.ledPin == p.pin) {
-            Serial.printf("[PIX] port %d disabled: pin %d is the status LED\n", i + 1, p.pin);
-            p.enabled = false; continue;
-        }
-        for (int j = 0; j < i; j++)
-            if (cfg.pixels[j].enabled && cfg.pixels[j].pin == p.pin) { p.enabled = false; break; }
-        if (!p.enabled) continue;
-        // Refuse a pin another subsystem owns. A pixel port drives its pin hard from an RMT
-        // channel, so landing it on (say) the W5500's MISO takes Ethernet off the bus
-        // entirely and the board looks bricked -- the chip ID just reads back 0x00 and the
-        // driver refuses to install, with nothing on screen to say why.
-        struct { int pin; const char* what; } claimed[] = {
-            { cfg.ethCs,   "W5500 CS"   }, { cfg.ethSck,  "W5500 SCK"  },
-            { cfg.ethMosi, "W5500 MOSI" }, { cfg.ethMiso, "W5500 MISO" },
-            { cfg.ethInt,  "W5500 INT"  }, { cfg.ethRst,  "W5500 RST"  },
-            { cfg.dispSda, "display SDA" }, { cfg.dispScl, "display SCL" },
-            { cfg.encA,    "encoder A"  }, { cfg.encB,    "encoder B"  },
-            { cfg.encSw,   "encoder SW" },
-        };
-        for (auto& c : claimed)
-            if (c.pin >= 0 && c.pin == p.pin) {
-                Serial.printf("[PIX] port %d disabled: pin %d is the %s\n", i + 1, p.pin, c.what);
-                p.enabled = false; break;
-            }
-        if (!p.enabled) continue;
-        for (int o = 0; o < MAX_OUTPUTS && p.enabled; o++) {
-            if (!cfg.outputs[o].enabled) continue;
-            const int dmx[3] = { cfg.outputs[o].txPin, cfg.outputs[o].rxPin, cfg.outputs[o].rtsPin };
-            for (int k = 0; k < 3; k++)
-                if (dmx[k] >= 0 && dmx[k] == p.pin) {
-                    Serial.printf("[PIX] port %d disabled: pin %d belongs to DMX output %c\n",
-                                  i + 1, p.pin, (char)('A' + o));
-                    p.enabled = false; break;
-                }
-        }
+        if (p.pin < 0) { turnOff(i, "no data pin"); continue; }
+        if (p.count <= 0) { turnOff(i, "no pixels"); continue; }
+        int twin = -1;
+        for (int j = 0; j < i; j++) if (cfg.pixels[j].enabled && cfg.pixels[j].pin == p.pin) { twin = j; break; }
+        if (twin >= 0) { turnOff(i, String("GPIO") + p.pin + " is pixel port " + (twin + 1) + "'s"); continue; }
+        char what[48];
+        if (pixPinOwned(u, p.pin, what, sizeof(what))) turnOff(i, String("GPIO") + p.pin + " is " + what);
     }
+    if (off && any) *off += "]";
 }
 
 // Config load/save are now driven by the schema engine (src/config/). The engine
@@ -3774,7 +3777,8 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
         }
     cfg.apFallback = (cfg.linkLossMode == WIRED_FB_AP);   // keep the legacy mirror in sync
     sanitizeOutputs();   // never persist an enabled output with no TX pin
-    sanitizePixels();    // and never an enabled pixel port with no data pin
+    String pixOff;       // (a port turned off here is said in the answer: the page said "Saved")
+    sanitizePixels(&pixOff);    // and never an enabled pixel port it can't drive
 
     // Which REBOOT-flagged fields actually changed? Only those force a restart. Collect their
     // human labels so the UI can tell the user *why* instead of just rebooting on them.
@@ -3817,7 +3821,9 @@ static void handleConfigPost(AsyncWebServerRequest* req) {
 
     String j = "{\"saved\":true,\"reboot\":";
     j += nReboot > 0 ? "true" : "false";
-    j += ",\"fields\":\"" + jsonEsc(needReboot) + "\"}";
+    j += ",\"fields\":\"" + jsonEsc(needReboot) + "\"";
+    if (pixOff.length()) { j += ",\"pixOff\":"; j += pixOff; }
+    j += "}";
     req->send(200, "application/json", j);
 
     if (nReboot > 0) {
