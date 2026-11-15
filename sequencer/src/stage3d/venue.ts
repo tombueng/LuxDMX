@@ -28,20 +28,14 @@ import { ARM, HIP, Person, SOLE, twoBone, type Look } from './people';
 import { bandSurface, type BandSurface } from './bandArt';
 import { buildCrowd, crowdBeatLen, type Crowd } from './crowd';
 import { buildRoom, isDemoRoom, softwareGL, type Stage } from './rooms';
+import { LAYOUT } from './sceneSizes';
 import {
   aimMic, ampHead, bake, cab, cameraTripod, clipMic, crewMember, desk, diBox, floorCable, followSpot, gearMats, guitarOnStand, hall, HALL,
   iemRack, ledWall, movingMeshes, pedalboard, rampRun, roadCase, rod, scaffold, sideFill, stageBox, tube, waterCrate, house,
 } from './gear';
 
 export const BAND = 'WE ARE NOT THE BAND';
-// Where the band and what's theirs stand, by room: on the big stage as they always did; in the pub
-// closer together on the smaller deck (the same people and instruments, real sizes). x, z on the
-// deck; the riser [x, z, width, depth]; the players' cables run past `cableZ` to `cableEnd`.
 type XZ = [number, number];
-const LAYOUT: Record<'hall' | 'pub', { riser: [number, number, number, number]; kit: XZ; mic: XZ; guitar: XZ; bass: XZ; keys: XZ; cableZ: number; cableEnd: XZ }> = {
-  hall: { riser: [0, -2.6, 3.4, 2.6], kit: [0, -2.4], mic: [0, 2.0], guitar: [-3.6, 1.2], bass: [3.6, 1.2], keys: [-4.6, -1.6], cableZ: -1.4, cableEnd: [0.8, -1.9] },
-  pub: { riser: [0, -0.35, 2.8, 2.2], kit: [0, -0.15], mic: [0, 2.7], guitar: [-2.5, 2.1], bass: [2.5, 2.1], keys: [-3.15, -0.8], cableZ: 0.9, cableEnd: [1.7, -0.6] },
-};
 // The drum kit in its own space (on the riser, the kick drum's back head at z = -0.12): the throne
 // (where the drummer sits), the snare; the hi-hat (its bottom cymbal's height and size); the two
 // pedals (where each footboard's heel end is, the kick pedal's axle height and where its beater

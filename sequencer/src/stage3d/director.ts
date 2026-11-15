@@ -13,6 +13,7 @@
 // truss and the lights under it, the band, the DJ, the crowd, the big gear): the tests walk every
 // mode through every room, and every frame `clear` keeps it out of anything as a last resort.
 import { DECK, DJ_BOOTH, pivotOf, toWorld, tourAt, TRUSS, W, type Room, type RoomId, type Rot, type Seg, type V3 } from './geometry';
+import { BALLROOM, CHURCH, CINEMA, LAYOUT, THEATRE } from './sceneSizes';
 
 export type CamMode = 'tour' | 'broadcast' | 'crane' | 'steadicam' | 'drone' | 'bandcam';
 // the modes as the toolbar offers them: a short name, a line under it, the longer title
@@ -71,10 +72,11 @@ export type Who = 'singer' | 'guitar' | 'bass' | 'keys' | 'drums' | 'dj';
 // `at`: between the feet (the drums: the kit's middle on the riser)
 export interface Light3 { p: V3; kind: string }
 export interface Cast { people: { who: Who; at: V3 }[]; booth?: V3; lights: Light3[] }
-const BAND: Record<'hall' | 'pub', Record<Exclude<Who, 'dj'>, P3>> = {
-  hall: { singer: [0, DECK, 2.0], guitar: [-3.6, DECK, 1.2], bass: [3.6, DECK, 1.2], keys: [-4.6, DECK, -1.6], drums: [0, DECK + 0.4, -2.4] },
-  pub: { singer: [0, DECK, 2.7], guitar: [-2.5, DECK, 2.1], bass: [2.5, DECK, 2.1], keys: [-3.15, DECK, -0.8], drums: [0, DECK + 0.4, -0.15] },
-};
+// (where venue.ts puts them: sceneSizes LAYOUT; the drums on their riser)
+const onDeck = ([x, z]: [number, number], up = 0): P3 => [x, DECK + up, z];
+const bandOf = (l: (typeof LAYOUT)['hall']): Record<Exclude<Who, 'dj'>, P3> =>
+  ({ singer: onDeck(l.mic), guitar: onDeck(l.guitar), bass: onDeck(l.bass), keys: onDeck(l.keys), drums: onDeck(l.kit, 0.4) });
+const BAND: Record<'hall' | 'pub', Record<Exclude<Who, 'dj'>, P3>> = { hall: bandOf(LAYOUT.hall), pub: bandOf(LAYOUT.pub) };
 export function castOf(id: RoomId, lights: Light3[] = []): Cast {
   if (id === 'hall' || id === 'pub') return { people: (Object.entries(BAND[id]) as [Who, P3][]).map(([who, p]) => ({ who, at: P(p) })), lights };
   const dj = DJ_BOOTH[id];
@@ -134,19 +136,22 @@ const GEAR: Partial<Record<RoomId, Box[]>> = {
   ],
   truss: [bx(6.2, 7.0, 0, 1.0, 6.2, 7.8, 'the table'), bx(-7.4, -6.6, 0, 1.7, 7.4, 9.9, 'road cases')],
   // the cinema's rows, three at a time, up to the heads of the audience in them (scenes.ts CINEMA)
-  cinema: [0, 1, 2, 3, 4, 5, 6, 7].map((k) => bx(-15.6, 15.6, 0, (3 * k + 3) * 0.34 + 1.3, 5.8 + 3 * k * 1.1, 5.8 + (3 * k + 3) * 1.1, 'the rows')),
+  cinema: Array.from({ length: Math.ceil(CINEMA.rows / 3) }, (_, k) =>
+    bx(-(CINEMA.wallX - 0.4), CINEMA.wallX - 0.4, 0, (3 * k + 3) * CINEMA.rowRise + 1.3, CINEMA.rowZ0 + 3 * k * CINEMA.rowD, CINEMA.rowZ0 + (3 * k + 3) * CINEMA.rowD, 'the rows')),
   // the theatre: its stalls four rows at a time, the balcony, the proscenium's walls round the opening
-  theatre: [...[0, 1, 2, 3].map((k) => bx(-21, 21, 0, (4.5 * k + 4.5) * 0.16 + 1.3, 5 + 4.5 * k, 9.5 + 4.5 * k, 'the stalls')), bx(-21, 21, 5.2, 10.6, 17.5, 28.5, 'the balcony'),
+  theatre: [...Array.from({ length: Math.ceil((THEATRE.stalls.rows * THEATRE.stalls.d) / 4.5) }, (_, k) =>
+    bx(-THEATRE.wallX, THEATRE.wallX, 0, (4.5 * k + 4.5) * THEATRE.stalls.rise + 1.3, THEATRE.stalls.z0 + 4.5 * k, THEATRE.stalls.z0 + 4.5 + 4.5 * k, 'the stalls')), bx(-21, 21, 5.2, 10.6, 17.5, 28.5, 'the balcony'),
     bx(-21, -13, 0, 32, 1.8, 2.6, 'the proscenium'), bx(13, 21, 0, 32, 1.8, 2.6, 'the proscenium'), bx(-13, 13, 15.5, 32, 1.8, 2.6, 'the proscenium')],
   // the church: its pews six rows at a time, the altar, the choir benches, the lectern
-  church: [...[0, 1, 2].map((k) => bx(-7.6, 7.6, 0, 1.75, 1.0 + 6.3 * k, 7.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
+  church: [...Array.from({ length: Math.ceil(CHURCH.pews.rows / 6) }, (_, k) =>
+    bx(-7.6, 7.6, 0, 1.75, CHURCH.pews.z0 + 6.3 * k, CHURCH.pews.z0 + 6.3 + 6.3 * k, 'the pews')), bx(-1.5, 1.5, 0, 2.8, -6.2, -5.0, 'the altar'),
     bx(-5.2, -3.6, 0, 2.2, -6.5, -2.7, 'the choir'), bx(3.6, 5.2, 0, 2.2, -6.5, -2.7, 'the choir'), bx(-4.6, -3.8, 0, 2.6, -2.8, -2.0, 'the lectern')],
   // the ballroom: its round tables (chairs and guests round them), the head table, the cake, the
   // DJ's table, the chandeliers, the couples dancing
   ballroom: [
-    ...([[-7.8, 0.5], [-7.8, 4.5], [-7.8, 8.5], [-7.8, 12.5], [7.8, 0.5], [7.8, 4.5], [7.8, 8.5], [7.8, 12.5], [-4, 14], [0, 14], [4, 14], [-2, 17.5], [2, 17.5]] as const).map(([x, z]) => bx(x - 1.7, x + 1.7, 0, 1.5, z - 1.7, z + 1.7, 'a table')),
+    ...BALLROOM.tables.map(([x, z]) => bx(x - 1.7, x + 1.7, 0, 1.5, z - 1.7, z + 1.7, 'a table')),
     bx(-4.3, 4.3, 0, 1.6, -4.7, -2.9, 'the head table'), bx(6.7, 8.1, 0, 1.9, -4.1, -2.7, 'the cake'), bx(-9.6, -5.3, 0, 1.3, -4.2, -3.0, 'the DJ'),
-    ...([[-5, 6.5], [5, 6.5], [0, 12.6]] as const).map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
+    ...BALLROOM.chandeliers.map(([x, z]) => bx(x - 0.85, x + 0.85, 4.6, 6.5, z - 0.85, z + 0.85, 'a chandelier')),
     ...([[-1.6, 5.2], [1.6, 6.2], [-0.2, 8.2]] as const).map(([x, z]) => bx(x - 0.6, x + 0.6, 0, 1.9, z - 0.6, z + 0.6, 'the dancers')),
   ],
   // the bar: its counter, the stools and the people on them, the back counter, the tables at the
