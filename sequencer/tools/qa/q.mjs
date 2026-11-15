@@ -4,6 +4,7 @@
 //   node tools/qa/q.mjs eval 'return window.__luxdmx.show.fixtures.length'
 //   node tools/qa/q.mjs shot after-go            (PNG in the out folder)
 //   node tools/qa/q.mjs profile 8000 busy         (CPU profile of the page for 8 s: file + top functions)
+//   node tools/qa/q.mjs trace 1500 sw 'js...'     (Chrome trace: style, layout, paint too; the js runs after 150 ms)
 //   node tools/qa/q.mjs snap '.prog'             (the accessibility tree as text)
 //   node tools/qa/q.mjs controls '.top'          (what can be clicked, with names)
 //   node tools/qa/q.mjs logs 0 errors            (console, page errors, failed requests)
@@ -16,7 +17,7 @@ const POS = {
   click: ['sel'], dblclick: ['sel'], hover: ['sel'], fill: ['sel', 'value'], type: ['text'], press: ['key', 'sel'],
   select: ['sel', 'value'], check: ['sel', 'on'], goto: ['url'], reset: ['url'], eval: ['js'], shot: ['name', 'sel'],
   snap: ['sel'], text: ['sel'], count: ['sel'], controls: ['sel'], logs: ['since', 'errors'], page: ['i'], wait: ['ms'],
-  viewport: ['w', 'h'], drag: ['from', 'to'], files: ['sel', 'paths'], download: ['sel'], profile: ['ms', 'name'],
+  viewport: ['w', 'h'], drag: ['from', 'to'], files: ['sel', 'paths'], download: ['sel'], profile: ['ms', 'name'], trace: ['ms', 'name', 'at'],
 };
 const steps = [];
 let cur = [];

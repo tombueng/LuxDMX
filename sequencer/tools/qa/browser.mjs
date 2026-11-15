@@ -179,6 +179,25 @@ const actions = {
     const top = [...self].sort((x, y) => y[1] - x[1]).slice(0, b.top ?? 20).map(([k, us]) => `${(us / 1000).toFixed(0).padStart(6)} ms ${((100 * us) / all).toFixed(1).padStart(5)} %  ${k}`);
     return { file, ms: Math.round(all / 1000), top };
   },
+  // a Chrome trace of the page for `ms` (what the browser itself does: style, layout, paint, GPU),
+  // `at`: a JS snippet run after 150 ms (a click to look at). The file in the out folder, the main
+  // thread's longest events back as a list (name, ms)
+  async trace(b) {
+    const file = path.join(OUT, (b.name || `trace-${Date.now()}`).replace(/[^\w.-]+/g, '_') + '.json');
+    await browser.startTracing(page(), { path: file, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink', 'v8', 'gpu'] });
+    if (b.at) setTimeout(() => { page().evaluate(b.at).catch(() => {}); }, 150);
+    await new Promise((r) => setTimeout(r, b.ms ?? 1500));
+    await browser.stopTracing();
+    const ev = (JSON.parse(fs.readFileSync(file, 'utf8')).traceEvents ?? []).filter((e) => e.ph === 'X' && e.dur > 0);
+    const main = new Map();
+    for (const e of ev) if (e.tid && e.name === 'RunTask') main.set(e.tid, (main.get(e.tid) ?? 0) + e.dur);
+    const tid = [...main].sort((x, y) => y[1] - x[1])[0]?.[0];
+    const byName = new Map();
+    for (const e of ev) if (e.tid === tid && e.name !== 'RunTask' && e.name !== 'ThreadControllerImpl::RunTask') byName.set(e.name, (byName.get(e.name) ?? 0) + e.dur);
+    const longest = ev.filter((e) => e.tid === tid && e.name === 'RunTask').sort((x, y) => y.dur - x.dur).slice(0, 5).map((e) => Math.round(e.dur / 1000));
+    const top = [...byName].sort((x, y) => y[1] - x[1]).slice(0, b.top ?? 18).map(([k, us]) => `${(us / 1000).toFixed(0).padStart(6)} ms  ${k}`);
+    return { file, longestTasksMs: longest, top };
+  },
   async logs(b) { const since = b.since ?? 0; return { seq, list: logs.filter((e) => e.seq > since && (!b.errors || e.level === 'error' || e.type === 'pageerror')) }; },
   async pages() { return { cur, list: pages.map((p, i) => ({ i, url: p.url() })) }; },
   async page(b) { cur = Math.max(0, Math.min(pages.length - 1, b.i)); await pages[cur].bringToFront(); return { cur, url: pages[cur].url() }; },
