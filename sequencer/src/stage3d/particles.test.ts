@@ -175,6 +175,22 @@ describe('fog', () => {
   });
 });
 
+// How many puffs look again which beams they're in, a frame: 800 at High, fewer while the drawing has
+// given way (the 3D stage passes 250 at Low); the beams' levels every frame either way. (Review 5, R5-P6)
+describe('fog lit by the beams, a budget a frame', () => {
+  it('only that many puffs are checked a frame, in turn', () => {
+    const { Ps } = run(DEMO.map((e) => ({ e, v: 1 })), 6, [6]);
+    const smoke = (Ps as unknown as { smoke: { count: number; cursor: number } }).smoke, n = smoke.count;
+    expect(n).toBeGreaterThan(300);
+    const beam = { key: 0, p: { x: 0, y: 8, z: 0 }, d: { x: 0, y: -1, z: 0 }, c: { r: 1, g: 0, b: 0 }, level: 1, deg: 30 } as never;
+    const c0 = smoke.cursor;
+    Ps.light([beam], 250);
+    expect((smoke.cursor - c0 + n) % n).toBe(250 % n);
+    Ps.light([beam]);
+    expect((smoke.cursor - c0 + n) % n).toBe((250 + Math.min(n, 800)) % n);
+  });
+});
+
 describe('the air that carries the fog', () => {
   it('pushes a pile at the backdrop away from it (never into it), and spreads a blob evenly both ways', () => {
     const A = new Air();

@@ -1070,6 +1070,8 @@
   const RATIO = [1, 1.5, 2], EVERY = [1000 / 21, 1000 / 31, 0];
   // (held back while the page's own frames come late: load.slow3d)
   const SLOW = [0, 1000 / 31, 1000 / 21];
+  // (puffs of fog that look again which beams they're in, a frame: Low, Medium, High)
+  const FOG_LIT = [250, 500, 800];
   const frameGap = () => Math.max(EVERY[load.level], SLOW[load.slow3d]);   // (ms at least between two frames)
   let drawnAt = 0, drawnFrames = 0;
   function quality() {
@@ -1145,7 +1147,7 @@
     const held = src ? null : app.winchesHeld();
     rig.winchWire = held ? (id) => held.get(id) : undefined;
     rig.update(src?.drawn ?? app.drawnNow, t, haze, sel);
-    particles.light(rig.lit);
+    particles.light(rig.lit, FOG_LIT[load.level]);
     // (the machines' output follows the clock, not the frame rate: a slow computer gets the same fog
     // and confetti, in steps of at most 0.1 s)
     for (let left = real; left > 1e-4; left -= 0.1) particles.step(Math.min(0.1, left), machines);
