@@ -183,7 +183,11 @@ http.createServer(async (req, res) => {
     const f = actions[name];
     if (!f) throw new Error(`no action ${name}: ${Object.keys(actions).join(' ')}`);
     out = { ok: true, ...(await f(b)) };
-  } catch (e) { out = { ok: false, error: String(e.message || e).split('\n').slice(0, 6).join('\n') }; }
+  } catch (e) {
+    // (the message only, never the stack: what failed and the call log, for whoever drives it)
+    const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : 'failed';
+    out = { ok: false, error: msg.split('\n').slice(0, 6).join('\n') };
+  }
   // (let the page react, then say what it logged meanwhile)
   if (!['logs', 'quit'].includes(name)) { await new Promise((r) => setTimeout(r, b.settle ?? 150)); const said = logs.filter((e) => e.seq > before && e.type !== 'http'); if (said.length) out.said = said.slice(-30); }
   res.setHeader('content-type', 'application/json');
