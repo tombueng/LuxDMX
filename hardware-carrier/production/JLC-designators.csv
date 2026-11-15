@@ -4,20 +4,20 @@ C2,1uF W5500,Bottom,100.2000mm,-68.5000mm
 C3,22uF W5500,Bottom,100.2000mm,-73.5000mm
 C4,100nF,Bottom,138.2425mm,-89.4000mm
 C5,22uF 3V3 bulk,Bottom,138.2425mm,-94.9000mm
-C6,1000uF 35V,Top,124.0000mm,-119.0000mm
+C6,1000uF 35V,Top,124.0000mm,-116.5000mm
 D1,TVS bidir,Bottom,120.0000mm,-60.0000mm
 D2,TVS bidir,Bottom,136.9875mm,-60.0000mm
 D3,TVS bidir,Bottom,143.5000mm,-60.0000mm
 D4,TVS bidir,Bottom,160.4875mm,-60.0000mm
 D5,TVS bidir,Bottom,167.0000mm,-60.0000mm
 D6,TVS bidir,Bottom,183.9875mm,-60.0000mm
-F2,Polyfuse MF-R 5.1(4A)/10.2(9A),Top,98.6300mm,-112.2300mm
-J1,Pixel1:Vcc/Data/GND,Top,105.5772mm,-130.9700mm
-J2,Pixel2:Vcc/Data/GND,Top,121.8414mm,-130.9700mm
-J3,Pixel3:Vcc/Data/GND,Top,138.1057mm,-130.9700mm
-J4,Pixel4:Vcc/Data/GND,Top,154.3700mm,-130.9700mm
-J5,Pixel5:Vcc/Data/GND,Top,170.6342mm,-130.9700mm
-J6,12-24V IN,Top,94.2400mm,-131.0500mm
+F2,Polyfuse MF-R 5.1(4A)/10.2(9A),Top,103.7300mm,-112.8300mm
+J1,Pixel1:Vcc/Data/GND,Top,110.6572mm,-130.9700mm
+J2,Pixel2:Vcc/Data/GND,Top,126.9214mm,-130.9700mm
+J3,Pixel3:Vcc/Data/GND,Top,143.1857mm,-130.9700mm
+J4,Pixel4:Vcc/Data/GND,Top,159.4500mm,-130.9700mm
+J5,Pixel5:Vcc/Data/GND,Top,175.7142mm,-130.9700mm
+J6,12-24V IN,Top,96.7800mm,-131.0500mm
 R1,10k dir,Bottom,128.5500mm,-65.5000mm
 R2,10k dir,Bottom,152.0500mm,-65.5000mm
 R3,10k dir,Bottom,175.5500mm,-65.5000mm

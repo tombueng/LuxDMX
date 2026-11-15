@@ -17,6 +17,7 @@ Run:  python hardware-carrier/gen_bom.py
 """
 import csv
 import json
+import math
 import os
 import re
 import sys
@@ -83,6 +84,31 @@ def _jlc_fp(fpid):
     return JLC_FOOTPRINT.get(name, name)
 
 
+def _jlc_place(f):
+    """Where JLCPCB has to put the part: x, y (mm, Y up like the gerbers) and rotation.
+
+    JLCPCB places on the middle of the part. KiCad's through-hole footprints sit on pin 1
+    (the 1000 uF can, the polyfuse, the screw terminals), which put them 2.5 to 5 mm off in
+    JLCPCB's viewer. So a through-hole part goes to the middle of its holes; SMD footprints
+    are drawn around their middle already.
+
+    The polyfuse land has three holes for two lead pitches. The MF-R500 takes the outer
+    two, which are 1.2 mm apart in height, so the part is turned to lie along them."""
+    rot = f.GetOrientationDegrees()
+    holes = [p.GetPosition() for p in f.Pads() if p.GetDrillSize().x > 0]
+    if not holes:
+        pos = f.GetPosition()
+        return pcbnew.ToMM(pos.x), -pcbnew.ToMM(pos.y), rot
+    xs, ys = [h.x for h in holes], [h.y for h in holes]
+    x, y = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    if "polyfuse-dual-pitch" in f.GetFPIDAsString():
+        a, c = min(holes, key=lambda h: h.x), max(holes, key=lambda h: h.x)
+        x, y = (a.x + c.x) / 2, (a.y + c.y) / 2
+        # board Y points down, so a hole lower on the board turns the part clockwise
+        rot = math.degrees(math.atan2(-(c.y - a.y), c.x - a.x))
+    return pcbnew.ToMM(x), -pcbnew.ToMM(y), rot
+
+
 def write_jlc(board, placed, parts, boards):
     """luxdmx-carrier-bom.csv and luxdmx-carrier-cpl.csv in JLCPCB's format.
 
@@ -100,11 +126,11 @@ def write_jlc(board, placed, parts, boards):
         word = p["desc"].split()[0]
         if word not in JLC_PREFIX:
             raise SystemExit(f"gen_bom: no JLC designator prefix for {key!r} ({p['desc']})")
-        pos = f.GetPosition()
-        x, y = pcbnew.ToMM(pos.x - org.x), -pcbnew.ToMM(pos.y - org.y)
+        x, y, rot = _jlc_place(f)
+        x, y = x - pcbnew.ToMM(org.x), y + pcbnew.ToMM(org.y)
         items.append({"prefix": JLC_PREFIX[word], "key": key, "p": p, "label": f.GetReference(),
                       "fp": _jlc_fp(f.GetFPIDAsString()), "x": x, "y": y,
-                      "rot": f.GetOrientationDegrees() % 360,
+                      "rot": round(rot, 1) % 360,
                       "layer": "Bottom" if f.IsFlipped() else "Top"})
     # numbered top to bottom, left to right within each letter, skipping numbers the board
     # already uses (F1 is the blade fuse holder), so the same board always gives the same names
