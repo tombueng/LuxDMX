@@ -351,10 +351,10 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
   - nearly every SMD part sits on the **back**, so it is a bottom-side (or two-sided) job;
   - the lands are sized for hand soldering, longer than the parts, so check the placement
     preview of the 1206 parts and the SOIC buffer;
-  - rotations come straight from KiCad; JLCPCB's footprints sometimes differ by 90 or 180
-    degrees, so check the TVS diodes, the electrolytic and pin 1 of the buffer, and that the
-    screw terminals open towards the board edge (DMX J1-J3 at the top, pixels and inlet J5-J10
-    at the bottom);
+  - positions and rotations are fitted onto JLCPCB's own footprint of each part
+    (`tools/jlc_fit.py`), so they should match their viewer; still look at pin 1 of the buffer,
+    the polarity of the electrolytic and that the screw terminals open towards the board edge
+    (DMX J1-J3 at the top, pixels and inlet J5-J10 at the bottom);
   - the encoder (`SW1`) is the Alps EC11E15244B2: set Steps per detent to 2 in `/config`;
   - the buttons (`SW2`, `SW3`) are 5 mm switches and the display socket (`J4`) is 8.5 mm tall;
   - the modules, the male pin headers and the fuse holder are not in the files: those are
@@ -362,7 +362,10 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 
   `tools/gen_bom.py` writes all three files and runs `tools/check_jlc_files.py`, which fails on
   anything JLCPCB's uploader is known to refuse (header names, encoding, duplicate or
-  mismatched designators, layer values, units).
+  mismatched designators, layer values, units). For the placement it fetches JLCPCB's
+  footprint of every part once (cached in `tools/jlc-footprints/`, not in git) and fits it onto
+  the board's pads; a part it can't fetch falls back to its middle and KiCad's rotation, with a
+  warning.
 - **Modules:** search terms and example links in [`production/BOM.md`](production/BOM.md). Links rot,
   search terms don't.
 

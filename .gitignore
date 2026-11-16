@@ -46,3 +46,6 @@ build/
 
 # local build logs
 .buildlogs/
+
+# JLCPCB/EasyEDA footprint cache for the CPL fit (their data, fetched on demand)
+hardware-carrier/tools/jlc-footprints/

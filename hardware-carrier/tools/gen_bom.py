@@ -17,7 +17,6 @@ Run:  python hardware-carrier/gen_bom.py
 """
 import csv
 import json
-import math
 import os
 import re
 import sys
@@ -25,6 +24,7 @@ import sys
 import pcbnew
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import jlc_fit  # noqa: E402
 
 def _project_dir():
     """The project directory, whether this script sits in it or in tools/ beside it.
@@ -77,18 +77,12 @@ def generic(val, fpid):
 JLC_PREFIX = {"Resistor": "R", "Capacitor": "C", "Electrolytic": "C", "TVS": "D",
               "Octal": "U", "Screw": "J", "DC": "J", "Polyfuse": "F", "Rotary": "SW",
               "Tactile": "SW", "Female": "J"}
-# Turns on top of KiCad's rotation, per footprint. The DMX land is a pin header footprint
-# (pins along Y at 0 degrees), turned 90 on the board; JLCPCB's terminal blocks have their pins
-# along X at 0 like the pixel terminals. Another 90 lines the pins up, and the rest of the half
-# turn puts the wire entry on the board edge the XLR tails come from, the opposite edge from the
-# pixel terminals.
-# KiCad draws an SOIC with its pin rows running up and down and pin 1 top left; JLCPCB with
-# the rows running across and pin 1 bottom left, a quarter turn the other way (-90 on top).
-# On the back the part is seen mirrored, so the same correction turns the other way there.
-JLC_ROT_EXTRA = {"header-1x03-P2.54-terminal": 90,
-                 "SOIC-20W_7.5x12.8mm_P1.27mm": -90,
-                 # the display socket: a header footprint, pins along Y like the DMX land
-                 "PinHeader_1x04_P2.54mm_Vertical": -90}
+# Rotation and position come from fitting JLCPCB's own footprint onto ours (jlc_fit.py).
+# On top of that, per footprint: the DMX terminals open towards the top edge, where the XLR
+# tails come from, a half turn from how their footprint pairs pin 1 with ours. Their pins sit
+# evenly about the middle, so the half turn lands in the same holes (checked in JLCPCB's
+# viewer, 2026-11-16).
+JLC_TURN = {"header-1x03-P2.54-terminal": 180}
 # what JLCPCB shows as the footprint; the board's own names say nothing to them
 JLC_FOOTPRINT = {"chip-universal": "1206", "chip-universal-tvs": "SOD-123FL"}
 
@@ -98,18 +92,30 @@ def _jlc_fp(fpid):
     return JLC_FOOTPRINT.get(name, name)
 
 
+def _jlc_fitted(f, lcsc):
+    """x, y, rotation from JLCPCB's footprint of the part, or None (then _jlc_place)."""
+    theirs = jlc_fit.jlc_pads(lcsc) if lcsc else None
+    if not theirs:
+        return None
+    ours = [(p.GetNumber(), pcbnew.ToMM(p.GetPosition().x), -pcbnew.ToMM(p.GetPosition().y),
+             p.GetDrillSize().x > 0) for p in f.Pads() if p.GetNumber()]
+    r = jlc_fit.fit(theirs, ours, f.IsFlipped())
+    # a fit worse than half a millimetre means the pads don't really match: don't trust it
+    if not r or r[3] > 0.5:
+        return None
+    turn = JLC_TURN.get(f.GetFPIDAsString().split(":")[-1], 0)
+    return r[0], r[1], (r[2] + turn) % 360
+
+
 def _jlc_place(f):
     """Where JLCPCB has to put the part: x, y (mm, Y up like the gerbers) and rotation.
 
     JLCPCB places on the middle of the part. KiCad's through-hole footprints sit on pin 1
     (the 1000 uF can, the polyfuse, the screw terminals), which put them 2.5 to 5 mm off in
     JLCPCB's viewer. So a through-hole part goes to the middle of its holes; SMD footprints
-    are drawn around their middle already.
-
-    The polyfuse land has three holes for two lead pitches. The MF-R500 takes the outer
-    two, which are 1.2 mm apart in height, so the part is turned to lie along them."""
-    extra = JLC_ROT_EXTRA.get(f.GetFPIDAsString().split(":")[-1], 0)
-    rot = f.GetOrientationDegrees() + (-extra if f.IsFlipped() else extra)
+    are drawn around their middle already. Only used where JLCPCB's own footprint can't
+    be fetched; _jlc_fitted is the real thing."""
+    rot = f.GetOrientationDegrees()
     # the leads only: the DMX land also has unplated holes for the Phoenix terminal's pegs
     holes = [p.GetPosition() for p in f.Pads() if p.GetDrillSize().x > 0 and p.GetNumber()]
     if not holes:
@@ -119,11 +125,6 @@ def _jlc_place(f):
     posts = [p.GetPosition() for p in f.Pads() if p.GetNumber() == "MP"]
     xs, ys = [h.x for h in posts or holes], [h.y for h in posts or holes]
     x, y = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
-    if "polyfuse-dual-pitch" in f.GetFPIDAsString():
-        a, c = min(holes, key=lambda h: h.x), max(holes, key=lambda h: h.x)
-        x, y = (a.x + c.x) / 2, (a.y + c.y) / 2
-        # board Y points down, so a hole lower on the board turns the part clockwise
-        rot = math.degrees(math.atan2(-(c.y - a.y), c.x - a.x))
     return pcbnew.ToMM(x), -pcbnew.ToMM(y), rot
 
 
@@ -136,7 +137,7 @@ def write_jlc(board, placed, parts, boards):
     taken = {f.GetReference() for f in board.GetFootprints()
              if re.match(r"^[A-Z]+[0-9]+$", f.GetReference())}
     org = board.GetDesignSettings().GetAuxOrigin()
-    items = []
+    items, unfitted = [], []
     for key, f in placed:
         p = parts.get(key)
         if not p or p.get("source", "LCSC") != "LCSC":
@@ -144,7 +145,10 @@ def write_jlc(board, placed, parts, boards):
         word = p["desc"].split()[0]
         if word not in JLC_PREFIX:
             raise SystemExit(f"gen_bom: no JLC designator prefix for {key!r} ({p['desc']})")
-        x, y, rot = _jlc_place(f)
+        fitted = _jlc_fitted(f, p.get("lcsc"))
+        if fitted is None:
+            unfitted.append(f.GetReference())
+        x, y, rot = fitted or _jlc_place(f)
         x, y = x - pcbnew.ToMM(org.x), y + pcbnew.ToMM(org.y)
         items.append({"prefix": JLC_PREFIX[word], "key": key, "p": p, "label": f.GetReference(),
                       "fp": _jlc_fp(f.GetFPIDAsString()), "x": x, "y": y,
@@ -202,6 +206,9 @@ def write_jlc(board, placed, parts, boards):
         for it in sorted(items, key=lambda t: natural(t["ref"])):
             w.writerow([it["ref"], it["label"], it["layer"], f"{it['x']:.4f}mm",
                         f"{it['y']:.4f}mm"])
+    if unfitted:
+        print("  warn: no JLCPCB footprint to fit for " + ", ".join(sorted(set(unfitted))) +
+              "; placed on their middle with KiCad's rotation, check those in the viewer")
     return len(bom)
 
 
