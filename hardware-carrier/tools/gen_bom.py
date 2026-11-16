@@ -55,7 +55,8 @@ def generic(val, fpid):
     the modules themselves: what you solder is a pin header, what you plug in is the module,
     and both have to be bought."""
     if "PinHeader" in fpid:
-        return "PinHeader"
+        # the display row is a female socket, its own line; every other header is strip
+        return "Display socket" if "SDA/SCL" in val else "PinHeader"
     if "header-1x03-P2.54-terminal" in fpid:
         # the DMX rows are drilled 1.20 so they take a screw terminal too, so they are their
         # own line, not just another piece off the header strip
@@ -75,7 +76,7 @@ def generic(val, fpid):
 # designators of their own, numbered here, and JLC-designators.csv says which is which.
 JLC_PREFIX = {"Resistor": "R", "Capacitor": "C", "Electrolytic": "C", "TVS": "D",
               "Octal": "U", "Screw": "J", "DC": "J", "Polyfuse": "F", "Rotary": "SW",
-              "Tact": "SW"}
+              "Tactile": "SW", "Female": "J"}
 # Turns on top of KiCad's rotation, per footprint. The DMX land is a pin header footprint
 # (pins along Y at 0 degrees), turned 90 on the board; JLCPCB's terminal blocks have their pins
 # along X at 0 like the pixel terminals. Another 90 lines the pins up, and the rest of the half
@@ -85,7 +86,9 @@ JLC_PREFIX = {"Resistor": "R", "Capacitor": "C", "Electrolytic": "C", "TVS": "D"
 # the rows running across and pin 1 bottom left, a quarter turn the other way (-90 on top).
 # On the back the part is seen mirrored, so the same correction turns the other way there.
 JLC_ROT_EXTRA = {"header-1x03-P2.54-terminal": 90,
-                 "SOIC-20W_7.5x12.8mm_P1.27mm": -90}
+                 "SOIC-20W_7.5x12.8mm_P1.27mm": -90,
+                 # the display socket: a header footprint, pins along Y like the DMX land
+                 "PinHeader_1x04_P2.54mm_Vertical": -90}
 # what JLCPCB shows as the footprint; the board's own names say nothing to them
 JLC_FOOTPRINT = {"chip-universal": "1206", "chip-universal-tvs": "SOD-123FL"}
 

@@ -36,7 +36,7 @@ size match, check both before buying.
 | Ethernet | USR-ES1 (W5500). Search `USR-ES1 W5500` | 2 x 6, rows 20.32 mm | 3.3 V only, no LDO on the module. About 132 mA typical. The single-row 8-pin W5500 boards are a different module |
 | Display | 1.3" OLED, SH1106, 128 x 64, I2C. Search `1.3 inch OLED I2C SH1106` | board pads 1-4: GND / 3V3 / SCL / SDA | Sits on a 1x4 female socket, 8.5 mm tall, which lifts the glass 10.9 mm clear of the modules. Sold with VCC and GND in either order, read the module's silk |
 | Encoder | EC11 with push switch, 20 mm D-shaft: Alps EC11E15244B2 (LCSC C470754) or any clone (the part inside a KY-040) | soldered to the board | GPIO pull-ups are internal, the KY-040's three 10k aren't needed. The Alps clicks every half step: set **Steps per detent = 2** in `/config` (clones: 4) |
-| Buttons, x2 | 6 x 6 mm tact switch | soldered to the board | Plunger 5 to 30 mm on the same land. The encoder shaft stands 20 mm, so 30 mm reaches the same front panel |
+| Buttons, x2 | 6 x 6 mm tact switch, K2-1102DP-C4SW-04 (5 mm, LCSC C110153) in the BOM | soldered to the board | Plunger 5 to 30 mm on the same land. The encoder shaft stands 20 mm, so behind a front panel take 30 mm switches (marketplace) or long caps; LCSC stops at 19 mm |
 
 ## Pin map
 
@@ -316,12 +316,12 @@ BOM, the lands take 0402 to 1206.
 
 | Part | Value / part number | Fit when |
 |---|---|---|
-| `Display` | 1.3" SH1106 I2C OLED on a 1x4 female socket, 8.5 mm | you want the display |
+| `Display` | 1.3" SH1106 I2C OLED on a 1x4 female socket, 8.5 mm (C22373890) | you want the display |
 | `Encoder` | EC11 with push switch, 20 mm D-shaft, Alps EC11E15244B2 (C470754) or a clone | you want the on-unit menu |
-| `Button 1`, `Button 2` | 6 x 6 mm tact switch, 30 mm plunger | you want the buttons |
+| `Button 1`, `Button 2` | 6 x 6 mm tact switch, 5 mm (C110153), or 30 mm for a front panel | you want the buttons |
 | `EXP` | 1x6 pin header | you need spare pins |
 
-LCSC small parts for a fully fitted board: about 6.30 EUR. Stock, prices, marketplace links and
+LCSC small parts for a fully fitted board: about 6.40 EUR. Stock, prices, marketplace links and
 search terms for every module: [`production/BOM.md`](production/BOM.md). Every position with its
 side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 
@@ -353,11 +353,12 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
     preview of the 1206 parts and the SOIC buffer;
   - rotations come straight from KiCad; JLCPCB's footprints sometimes differ by 90 or 180
     degrees, so check the TVS diodes, the electrolytic and pin 1 of the buffer, and that the
-    screw terminals open towards the board edge (DMX J1-J3 at the top, pixels and inlet J4-J9
+    screw terminals open towards the board edge (DMX J1-J3 at the top, pixels and inlet J5-J10
     at the bottom);
   - the encoder (`SW1`) is the Alps EC11E15244B2: set Steps per detent to 2 in `/config`;
-  - the modules, pin headers, fuse holder and buttons are not in the files: those are plugged
-    or hand soldered.
+  - the buttons (`SW2`, `SW3`) are 5 mm switches and the display socket (`J4`) is 8.5 mm tall;
+  - the modules, the male pin headers and the fuse holder are not in the files: those are
+    plugged or hand soldered.
 
   `tools/gen_bom.py` writes all three files and runs `tools/check_jlc_files.py`, which fails on
   anything JLCPCB's uploader is known to refuse (header names, encoding, duplicate or

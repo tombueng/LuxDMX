@@ -320,6 +320,28 @@
       "price_eur": 2.22,
       "stock": 3172
     },
+    "Display socket": {
+      "desc": "Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED",
+      "source": "LCSC",
+      "mpn": "HC-PM254-8.5H-1x4PZ-02A",
+      "vendor": "Hong Cheng",
+      "lcsc": "C22373890",
+      "url": "https://www.lcsc.com/product-detail/C22373890.html",
+      "note": "The display sits on a 1x04 FEMALE socket, not a piece of header strip. 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.",
+      "price_eur": 0.06,
+      "stock": 14940
+    },
+    "Tact 6x6 H30": {
+      "desc": "Tactile switch 6 x 6 mm, through hole, 5 mm tall",
+      "source": "LCSC",
+      "mpn": "K2-1102DP-C4SW-04",
+      "vendor": "Korean Hroparts",
+      "lcsc": "C110153",
+      "url": "https://www.lcsc.com/product-detail/C110153.html",
+      "note": "Short plunger, for buttons reached through a cap or used on the open board. The land takes every 6 x 6 mm through-hole switch, plungers from 5 to 30 mm. The 20 mm encoder shaft needs about 30 mm to reach the same front panel; LCSC/JLCPCB stock stops at 19 mm (K2-1102DP-Z4SW-04, C194449), so a panel build takes 30 mm switches from a marketplace or long caps. Goes straight to GND, IO3 and IO46 pull up internally.",
+      "price_eur": 0.03,
+      "stock": 61190
+    },
     "DC jack": {
       "desc": "DC barrel jack, Kycon KLDX-0202 land, 3.5 A",
       "source": "LCSC",
@@ -633,19 +655,6 @@
       ],
       "note": "These ship in two pin orders that differ by VCC and GND. Read the module's own silk, not the product page."
     },
-    "Tact 6x6 H30": {
-      "desc": "Tact switch 6 x 6 mm, through hole, 30 mm plunger",
-      "source": "marketplace",
-      "search": {
-        "amazon": "tact switch 6x6x30mm through hole long plunger",
-        "ebay": "6x6x30 tactile push button switch THT",
-        "aliexpress": "6*6*30mm tact switch 4 pin long stem"
-      },
-      "note": "The plunger length is the only thing that varies on this land - 5, 7, 9, 13, 17, 25 and 30 mm all use the same 6 x 6 footprint. 30 mm because the encoder shaft already stands 20 mm off the board, so anything shorter disappears behind the same front panel. Goes straight to GND, IO3 and IO46 pull up internally.",
-      "price_eur": 0.15,
-      "qty": 2,
-      "links": []
-    },
     "Blade fuse holder, alternative to the polyfuse": {
       "desc": "Fuse holder, MINI blade (ATM), PCB vertical, Keystone 3568",
       "source": "marketplace",
@@ -663,8 +672,7 @@
     }
   },
   "ignore": {
-    "PinHeader": "2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below.",
-    "Display socket": "The display sits on a 1x04 FEMALE socket, not a piece of header strip. PinSocket 1x04 P2.54, 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board."
+    "PinHeader": "2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below."
   },
   "_price_basis": "Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume price. Converted at about 0.92 EUR/USD. Where a page could not be checked the value is an estimate and the stock column says ?."
 }

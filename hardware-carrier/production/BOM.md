@@ -1,6 +1,6 @@
 # Bill of materials
 
-Everything fitted: 53 positions. Quantities come from the board.
+Everything fitted: 54 positions. Quantities come from the board.
 
 LCSC stock checked **2026-08-16**. Look again before ordering, it changes daily.
 
@@ -14,6 +14,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 703670 | 0.06 | 0.06 |
 | 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 23.140 | 0.129 | 0.26 |
 | 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch | `KM108M035J20RR0VH2FP0` | [C10749](https://www.lcsc.com/product-detail/C10749.html) | 48.810 | 0.171 | 0.17 |
+| 1 | Display socket | Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED | `HC-PM254-8.5H-1x4PZ-02A` | [C22373890](https://www.lcsc.com/product-detail/C22373890.html) | 14940 | 0.06 | 0.06 |
 | 1 | 74AHCT541 pixel buffer | Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land) | `SN74AHCT541DWR` | [C2682058](https://www.lcsc.com/product-detail/C2682058.html) | 2778 | 0.64 | 0.64 |
 | 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 644 | 0.419 | 0.42 |
 | 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 204.500 | 0.018 | 0.09 |
@@ -24,19 +25,20 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 3 | header-1x03-P2.54-terminal | Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows | `XY308-2.54-3P` | [C557686](https://www.lcsc.com/product-detail/C557686.html) | 5930 | 0.35 | 1.05 |
 | 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 16.545 | 0.175 | 0.88 |
 | 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
+| 2 | Tact 6x6 H30 | Tactile switch 6 x 6 mm, through hole, 5 mm tall | `K2-1102DP-C4SW-04` | [C110153](https://www.lcsc.com/product-detail/C110153.html) | 61190 | 0.03 | 0.06 |
 
-**Small parts total: about 6.29 EUR**
+**Small parts total: about 6.41 EUR**
 
 Deliberately not listed:
 
 - **PinHeader**: 2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below.
-- **Display socket**: The display sits on a 1x04 FEMALE socket, not a piece of header strip. PinSocket 1x04 P2.54, 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.
 
 ### Notes
 
 - **100nF**: 1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR. Over a million in stock.
 - **1uF**: The middle rung of the W5500's decoupling. Same Samsung series and package as the 100nF, so one reel family covers both. It closes a factor-220 gap: the rail had 100nF and 22uF and nothing between them.
 - **22uF 3V3 bulk / 22uF W5500**: Half the price of the 25 V part (C12891, 0.24 EUR) for the same job. 6.3 V on a 3.3 V rail is roughly a factor of two margin, normal for X5R. Worth knowing: ceramics lose capacitance under DC bias, a 6.3 V part at 3.3 V keeps about half, so 11 to 13 uF rather than 22. Ample for holding up the rail when three transceivers key at once. For the full 22 uF take C12891 (25 V, keeps about 85 %) and pay 12 cents more.
+- **Display socket**: The display sits on a 1x04 FEMALE socket, not a piece of header strip. 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.
 - **74AHCT541 pixel buffer**: Two things decide this part, and neither is the number 541.
 1) The T. HCT, AHCT and ACT have TTL input thresholds (VIH 2.0 V), so 3.3 V from the S3 switches them reliably on a 5 V supply. HC, AHC and AC do not: their threshold is 0.7 x VCC = 3.5 V.
 2) The package. The land is SOIC-20W: 1.27 mm pitch, rows 10.10 mm apart, copper from 3.63 to 6.47 mm off the axis, pads reaching 1.32 mm past the lead tip so an iron fits. Only the 1.27 mm parts land on it - TI calls that DW, Nexperia calls it D.
@@ -51,6 +53,7 @@ Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x
   - amazon: [50 x SMF12CA, bidirectional, SOD-123FL](https://www.amazon.com/Pcs-TVS-Diode-Bidirectional-Vrwm/dp/B0CNK4R5SC) - approx. 8-10 EUR / 50 pcs
   - amazon: [SMF 200W SOD-123 TVS kit, 20 values x 10 pcs, bidirectional](https://www.amazon.com/Values-SOD-123-Bi-Directional-Surface-Protection/dp/B0C5SLJQBB) - approx. 15-20 EUR
   - lcsc: [Littelfuse SMF12CA, brand part, 1265 pcs](https://www.lcsc.com/product-detail/C1851360.html) - approx. 0.19 EUR ea
+- **Tact 6x6 H30**: Short plunger, for buttons reached through a cap or used on the open board. The land takes every 6 x 6 mm through-hole switch, plungers from 5 to 30 mm. The 20 mm encoder shaft needs about 30 mm to reach the same front panel; LCSC/JLCPCB stock stops at 19 mm (K2-1102DP-Z4SW-04, C194449), so a panel build takes 30 mm switches from a marketplace or long caps. Goes straight to GND, IO3 and IO46 pull up internally.
 
 ### What may go in the 74AHCT541 pixel buffer position, and what may not
 
@@ -213,21 +216,6 @@ MAX3485 TTL to RS-485 module, 3.3 V, with enable pin
 | ebay | [1.3 inch OLED SH1106 I2C](https://www.ebay.de/sch/i.html?_nkw=1.3+OLED+SH1106+I2C) | approx. 4-7 EUR |
 
 > These ship in two pin orders that differ by VCC and GND. Read the module's own silk, not the product page.
-
-### 2 x Tact 6x6 H30
-
-Tact switch 6 x 6 mm, through hole, 30 mm plunger
-
-| Platform | Search term |
-|---|---|
-| amazon | `tact switch 6x6x30mm through hole long plunger` |
-| ebay | `6x6x30 tactile push button switch THT` |
-| aliexpress | `6*6*30mm tact switch 4 pin long stem` |
-
-| Platform | Offer | Price |
-|---|---|---|
-
-> The plunger length is the only thing that varies on this land - 5, 7, 9, 13, 17, 25 and 30 mm all use the same 6 x 6 footprint. 30 mm because the encoder shaft already stands 20 mm off the board, so anything shorter disappears behind the same front panel. Goes straight to GND, IO3 and IO46 pull up internally.
 
 ### 1 x USR-ES1 W5500
 
