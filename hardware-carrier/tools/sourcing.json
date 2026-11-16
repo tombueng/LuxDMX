@@ -309,6 +309,17 @@
       "price_eur": 0.35,
       "stock": 5930
     },
+    "EC11": {
+      "desc": "Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch",
+      "source": "LCSC",
+      "mpn": "EC11E15244B2",
+      "vendor": "Alps Alpine",
+      "lcsc": "C470754",
+      "url": "https://www.lcsc.com/product-detail/C470754.html",
+      "note": "The EC11 land is the standard 11 mm footprint, so the Alps original and every EC11 clone fit. This one: vertical, 20 mm flat shaft, 30 detents and 15 pulses, push switch with 1.5 mm travel (Alps' own series table, 2026-11-16). 30/15 means two quadrature edges per click, so set Steps per detent to 2 (half-step) in /config; the cheap 20/20 clones want the default 4. ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups. Add a knob for a 6 mm D-shaft.",
+      "price_eur": 2.22,
+      "stock": 3172
+    },
     "DC jack": {
       "desc": "DC barrel jack, Kycon KLDX-0202 land, 3.5 A",
       "source": "LCSC",
@@ -621,19 +632,6 @@
         ]
       ],
       "note": "These ship in two pin orders that differ by VCC and GND. Read the module's own silk, not the product page."
-    },
-    "EC11": {
-      "desc": "Rotary encoder EC11, 20 mm D-shaft, with push switch",
-      "source": "marketplace",
-      "search": {
-        "amazon": "EC11 rotary encoder 20mm shaft push switch",
-        "ebay": "EC11 rotary encoder switch 20mm D shaft",
-        "aliexpress": "EC11 encoder 20mm handle with switch 5 pin"
-      },
-      "note": "The part inside every KY-040 module, without the little board and its three 10k pullups: ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups, so the resistors buy nothing. 12.4 mm can, 2.5 mm pin pitch, two mounting posts. Sold in tens for small money; any EC11 clone fits, the case and pin positions are the same across the family. Add a knob for a 6 mm D-shaft.",
-      "price_eur": 0.4,
-      "qty": 1,
-      "links": []
     },
     "Tact 6x6 H30": {
       "desc": "Tact switch 6 x 6 mm, through hole, 30 mm plunger",

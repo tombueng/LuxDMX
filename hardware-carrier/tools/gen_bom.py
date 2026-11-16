@@ -74,7 +74,8 @@ def generic(val, fpid):
 # uploader refuses with nothing but "failed to load" (issue #164). So the upload files get
 # designators of their own, numbered here, and JLC-designators.csv says which is which.
 JLC_PREFIX = {"Resistor": "R", "Capacitor": "C", "Electrolytic": "C", "TVS": "D",
-              "Octal": "U", "Screw": "J", "DC": "J", "Polyfuse": "F"}
+              "Octal": "U", "Screw": "J", "DC": "J", "Polyfuse": "F", "Rotary": "SW",
+              "Tact": "SW"}
 # Turns on top of KiCad's rotation, per footprint. The DMX land is a pin header footprint
 # (pins along Y at 0 degrees), turned 90 on the board; JLCPCB's terminal blocks have their pins
 # along X at 0 like the pixel terminals. Another 90 lines the pins up, and the rest of the half
@@ -111,7 +112,9 @@ def _jlc_place(f):
     if not holes:
         pos = f.GetPosition()
         return pcbnew.ToMM(pos.x), -pcbnew.ToMM(pos.y), rot
-    xs, ys = [h.x for h in holes], [h.y for h in holes]
+    # an encoder's mounting posts sit either side of the shaft, which is where it is placed
+    posts = [p.GetPosition() for p in f.Pads() if p.GetNumber() == "MP"]
+    xs, ys = [h.x for h in posts or holes], [h.y for h in posts or holes]
     x, y = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
     if "polyfuse-dual-pitch" in f.GetFPIDAsString():
         a, c = min(holes, key=lambda h: h.x), max(holes, key=lambda h: h.x)

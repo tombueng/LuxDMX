@@ -19,12 +19,13 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 204.500 | 0.018 | 0.09 |
 | 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | [C17909](https://www.lcsc.com/product-detail/C17909.html) | 158200 | 0.004 | 0.01 |
 | 11 | 330R bias+ / 330R bias- / 330R pixel | Resistor 330R 1206 5% (fail-safe bias) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 79.100 | 0.012 | 0.13 |
+| 1 | EC11 | Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch | `EC11E15244B2` | [C470754](https://www.lcsc.com/product-detail/C470754.html) | 3172 | 2.22 | 2.22 |
 | 1 | 12-24V IN 24A | Screw terminal, 2 pole, 5.08 mm pitch, 24 A | `KF128-5.08-2P-AA` | [C474952](https://www.lcsc.com/product-detail/C474952.html) | 63.515 | 0.177 | 0.18 |
 | 3 | header-1x03-P2.54-terminal | Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows | `XY308-2.54-3P` | [C557686](https://www.lcsc.com/product-detail/C557686.html) | 5930 | 0.35 | 1.05 |
 | 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 16.545 | 0.175 | 0.88 |
 | 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
 
-**Small parts total: about 4.07 EUR**
+**Small parts total: about 6.29 EUR**
 
 Deliberately not listed:
 
@@ -44,6 +45,7 @@ Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x
 - **120R term**: Same series as the 10k. JLCPCB basic part, so no extended-part fee for assembly.
 - **330R bias+ / 330R bias- / 330R pixel**: Fail-safe bias on a 3.3 V bus needs more than 200 mV idle differential. With two terminators (60 R, the normal case once this board is the controller at one end) 330 R gives 275 mV, 470 R only 198 mV. Anything from 270 R to 430 R works, see the table. Bus loading 4.6 mA, which no RS-485 driver cares about, and 5 % tolerance is irrelevant for a bias resistor. The land takes anything from 0402 to 1206: copper runs 0.30 to 2.30 mm off centre, so every end cap lands on it, an 0402's at 0.25 to 0.50 as much as a 1206's at 1.10 to 1.60. The 390R that only exists in 0805 therefore goes in without any trickery.
   - lcsc: [390R exists only in 0805 (C17655) and fits the 1206 land by hand if needed](https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount-UniOhm_390R-3900-1_C17655.html) - 0.004 USD
+- **EC11**: The EC11 land is the standard 11 mm footprint, so the Alps original and every EC11 clone fit. This one: vertical, 20 mm flat shaft, 30 detents and 15 pulses, push switch with 1.5 mm travel (Alps' own series table, 2026-11-16). 30/15 means two quadrature edges per click, so set Steps per detent to 2 (half-step) in /config; the cheap 20/20 clones want the default 4. ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups. Add a knob for a 6 mm D-shaft.
 - **header-1x03-P2.54-terminal**: Screws the XLR tails down. One of the three terminals the 1.20 mm DMX land was drawn for (with Phoenix MPT 0,5/3-2,54 and TE 282834-3). A 3-pin piece off the header strip fits the same holes if you would rather plug the tails on.
 - **TVS bidir**: The land is universal: copper runs from 0.30 to 2.90 mm off centre, so SOD-123, SOD-123F, SOD-123FL, DO-214AC (SMA) and a plain 1206 all sit on it. SMF12CA in SOD-123FL is the cheap default. SMAJ12CA in SMA is the same diode at 400 W instead of 200 W, same 12 V standoff and the same breakdown window, and its feet reach 2.80 mm so it now lands properly rather than hanging off the end. VRWM 12 V, so it does not conduct at the +12 V common mode RS-485 allows, VBR 14.7 V, clamps at 19.9 V with 10 A. Two per port, A and B to GND. A varistor is no substitute, it would not clamp until about 40 V.
   - amazon: [50 x SMF12CA, bidirectional, SOD-123FL](https://www.amazon.com/Pcs-TVS-Diode-Bidirectional-Vrwm/dp/B0CNK4R5SC) - approx. 8-10 EUR / 50 pcs
@@ -152,21 +154,6 @@ Fuse holder, MINI blade (ATM), PCB vertical, Keystone 3568
 |---|---|---|
 
 > The land is KiCad's Fuseholder_Blade_Mini_Keystone_3568: four 1.78 mm holes, pairs 3.40 mm apart and 9.92 mm between the pairs. It takes MINI blade fuses - Bussmann ATM, Littelfuse 297/997, APM - and NOT the regular ATO/ATC size, which is nearly twice as wide. This entry used to say 'ATO/ATC mini, 10.2 mm pitch' and was wrong on both counts. The holder itself is rated 30 A, far above anything this board can carry; the fuse you put in it is what matters, and the copper gives out at 9.8 A. Alternative to the polyfuse, never fitted alongside it: a blade fuse blows once and is replaced, the polyfuse resets itself but runs warm and drops voltage while it holds.
-
-### 1 x EC11
-
-Rotary encoder EC11, 20 mm D-shaft, with push switch
-
-| Platform | Search term |
-|---|---|
-| amazon | `EC11 rotary encoder 20mm shaft push switch` |
-| ebay | `EC11 rotary encoder switch 20mm D shaft` |
-| aliexpress | `EC11 encoder 20mm handle with switch 5 pin` |
-
-| Platform | Offer | Price |
-|---|---|---|
-
-> The part inside every KY-040 module, without the little board and its three 10k pullups: ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups, so the resistors buy nothing. 12.4 mm can, 2.5 mm pin pitch, two mounting posts. Sold in tens for small money; any EC11 clone fits, the case and pin positions are the same across the family. Add a knob for a 6 mm D-shaft.
 
 ### 1 x ESP32-S3 N16R8
 
