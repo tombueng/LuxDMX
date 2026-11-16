@@ -13,7 +13,7 @@ The board is built and runs on the bench; most firmware testing happens on it.
 | Board | 100 x 80 mm, 2 layers, 1 oz copper, no mounting holes |
 | DMX / RDM | up to 3 ports, one MAX3485 module each, direction pin driven, **not isolated** |
 | Pixels | up to 5 WS281x ports, buffered to 5 V by a 74HCT541 |
-| Network | WiFi, or wired with a W5500 module |
+| Network | wired with a W5500 module (recommended), or WiFi with an external antenna, see [Network](#network-w5500-or-an-external-antenna) |
 | Logic supply | USB-C on the ESP module, external 5 V, or a buck module off the pixel rail |
 | Pixel supply | 12 or 24 V screw terminal, fused on the board, 9.8 A max |
 | UI | 1.3" SH1106 OLED, EC11 encoder with push switch, two buttons |
@@ -31,12 +31,24 @@ size match, check both before buying.
 
 | Slot | Module | Pins | Notes |
 |---|---|---|---|
-| MCU | ESP32-S3-DevKitC-1 clone, **WROOM-1-N16R8**, dual USB-C (Binghe, Amazon.de B0D6B2CYNW). Search `ESP32-S3-DevKitC-1 N16R8` | 2 x 22, official DevKitC-1 pin order | 57.5 x 27.9 mm, rows **25.40 mm** apart. Espressif's own DevKitC-1 has 22.86 mm rows and does **not** fit. Compare the seller's drawing against the footprint before buying |
+| MCU | ESP32-S3-DevKitC-1 clone, **WROOM-1-N16R8**, dual USB-C (Binghe, Amazon.de B0D6B2CYNW). Search `ESP32-S3-DevKitC-1 N16R8` | 2 x 22, official DevKitC-1 pin order | 57.5 x 27.9 mm, rows **25.40 mm** apart. Espressif's own DevKitC-1 has 22.86 mm rows and does **not** fit. Compare the seller's drawing against the footprint before buying. For WiFi take the **WROOM-1U** version with an external antenna, see below |
 | RS-485, x3 | MAX3485 module, silk `RS485 V2.01` (RAKSTORE, Amazon.de B0C2HRQ393). Search `MAX3485 TTL to RS485 module 3.3V` | left: GND / A / B<br>right: EN / VCC / RXD / TXD / GND | 3.3 V, not isolated. EN is DE and RE tied together, one GPIO per port, which is what RDM needs. A module without EN can't do RDM. RXD is the module's input (DI), TXD its output (RO); the board crosses them |
 | Ethernet | USR-ES1 (W5500). Search `USR-ES1 W5500` | 2 x 6, rows 20.32 mm | 3.3 V only, no LDO on the module. About 132 mA typical. The single-row 8-pin W5500 boards are a different module |
 | Display | 1.3" OLED, SH1106, 128 x 64, I2C. Search `1.3 inch OLED I2C SH1106` | board pads 1-4: GND / 3V3 / SCL / SDA | Sits on a 1x4 female socket, 8.5 mm tall, which lifts the glass 10.9 mm clear of the modules. Sold with VCC and GND in either order, read the module's silk |
 | Encoder | EC11 with push switch, 20 mm D-shaft: Alps EC11E15244B2 (LCSC C470754) or any clone (the part inside a KY-040) | soldered to the board | GPIO pull-ups are internal, the KY-040's three 10k aren't needed. The Alps clicks every half step: set **Steps per detent = 2** in `/config` (clones: 4) |
 | Buttons, x2 | 6 x 6 mm tact switch, K2-1102DP-C4SW-04 (5 mm, LCSC C110153) in the BOM | soldered to the board | Plunger 5 to 30 mm on the same land. The encoder shaft stands 20 mm, so behind a front panel take 30 mm switches (marketplace) or long caps; LCSC stops at 19 mm |
+
+### Network: W5500, or an external antenna
+
+The S3's antenna end sits in the middle of the board, over the ground copper and between the
+RS-485 modules and the display. A module with the usual PCB antenna (WROOM-1) loses a lot of
+range there, and modules, cables and an enclosure make it worse.
+
+- **Recommended: the W5500 module.** Wired Ethernet, no radio questions.
+- **WiFi only:** use a DevKitC-1 clone with the **ESP32-S3-WROOM-1U** (U.FL connector, e.g.
+  `N16R8U`) and an external 2.4 GHz antenna led out of the enclosure. Same 25.40 mm rows as
+  above, check the seller's drawing.
+- A WROOM-1 board on the bench, without a case, is fine for trying things out.
 
 ## Pin map
 
@@ -289,7 +301,7 @@ BOM, the lands take 0402 to 1206.
 | `330R PIX1..5` | 330 Ω, 1206W4J0331T5E | C25374 | that port used |
 | `Pixel1..5` | KF128-5.08-3P screw terminal | C474953 | that port used |
 | `12-24V IN` | KF128-5.08-2P screw terminal, 24 A | C474952 | any pixel port used |
-| `1000uF 35V` | Rubycon 35YXJ1000M12.5X20, D12.5 x 20 mm (any can up to 13 mm, 5 mm pitch) | C88743 | any pixel port used |
+| `1000uF 35V` | Panasonic EEU-FR1V102, D12.5 x 20 mm (any can up to 13 mm, 5 mm pitch) | C128518 | any pixel port used |
 | Fuse | MF-R500 polyfuse **or** Keystone 3568 blade holder **or** solder bridge | C208489 (MF-R500) | any pixel port used, see [Fuse](#fuse) |
 
 ### Supply
@@ -321,7 +333,8 @@ BOM, the lands take 0402 to 1206.
 | `Button 1`, `Button 2` | 6 x 6 mm tact switch, 5 mm (C110153), or 30 mm for a front panel | you want the buttons |
 | `EXP` | 1x6 pin header | you need spare pins |
 
-LCSC small parts for a fully fitted board: about 6.50 EUR. Stock, prices, marketplace links and
+LCSC small parts for a fully fitted board: about 13.60 USD as an actual LCSC order, see
+[What the LCSC parts cost](#what-the-lcsc-parts-cost). Stock, prices, marketplace links and
 search terms for every module: [`production/BOM.md`](production/BOM.md). Every position with its
 side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 
@@ -329,21 +342,65 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 
 | Build | DMX | Pixels | Network | Fit |
 |---|---|---|---|---|
-| DMX only, USB powered | 1-3 | - | WiFi | ESP, RS-485 module + header + 10k per port, bias / termination / TVS as needed |
+| DMX only, USB powered | 1-3 | - | WiFi, external antenna | ESP, RS-485 module + header + 10k per port, bias / termination / TVS as needed |
 | DMX + LAN | 1-3 | - | W5500 | above + W5500, its two 10k and 100 nF / 1 µF / 22 µF |
-| Pixels only | - | 1-5 | WiFi | ESP, buffer, 330 Ω + terminal per port, 1000 µF, inlet, fuse, buck or USB |
+| Pixels only | - | 1-5 | WiFi, external antenna | ESP, buffer, 330 Ω + terminal per port, 1000 µF, inlet, fuse, buck or USB |
 | Everything | 3 | 5 | W5500 | all of it, plus display, encoder, buttons |
 
 ## Ordering
+
+**Most builds only need the bare PCB.** Order the gerbers, solder on the ESP32-S3 and one RS-485
+module per DMX port, and add what your build needs from [Build levels](#build-levels). Everything
+else is optional: without pixels you can leave out the whole pixel section, and the display,
+encoder and buttons are only for the on-unit menu; setup runs over the web UI. The W5500 is the
+one extra worth having. Machine assembly at JLCPCB works with the files below, but it isn't the
+intended route: the board is laid out for a soldering iron.
+
+### What the BOM holds
+
+`production/luxdmx-carrier-bom.csv` is everything LCSC sells for this board, with part numbers,
+for LCSC's BOM tool and for JLCPCB assembly alike.
+
+| In the BOM (LCSC) | Not in the BOM, buy elsewhere |
+|---|---|
+| 1206 resistors and capacitors, TVS diodes | ESP32-S3-DevKitC-1 clone, 25.40 mm rows (LCSC's Espressif original doesn't fit) |
+| 74AHCT541 pixel buffer | MAX3485 modules with EN pin, one per DMX port |
+| 1000 µF electrolytic, MF-R500 polyfuse | USR-ES1 W5500 module |
+| screw terminals: DMX (2.54 mm), pixels and inlet (5.08 mm) | MP1584EN buck module |
+| EC11 encoder, two 6 x 6 mm buttons | 1.3" SH1106 I2C OLED |
+| 8.5 mm female socket for the display | male pin headers for the module rows, `5V IN`, `EXP` |
+| | blade fuse holder (alternative to the polyfuse), encoder knob |
+
+Search terms and example links for everything in the right column:
+[`production/BOM.md`](production/BOM.md).
+
+### What the LCSC parts cost
+
+LCSC BOM quote of 2026-11-16, one board, in USD, at LCSC's minimum order quantities (so the
+resistors come as 100, the terminals as 5). Shipping not included.
+
+| Group | Parts | USD | Needed? |
+|---|---|---:|---|
+| Pixel section | buffer 0.70, 1000 µF 0.63, polyfuse 0.52, 5 pixel terminals 1.60, inlet terminal 0.97 | 4.42 | only with pixels |
+| On-unit menu | encoder 2.42, display socket 0.65, buttons 0.55 | 3.62 | no, setup runs over the web UI |
+| DMX terminals | 3 x 2.54 mm screw terminal | 1.90 | no, a piece of pin header does |
+| Everything else | 10k 0.79, 330R 0.46, 120R 0.47, TVS 0.48, 100 nF / 1 µF / 22 µF 1.50 | 3.70 | partly, see below |
+| **Total** | | **13.64** | |
+
+Screw terminals are the biggest single item, a third of the total. For a DMX + Ethernet build
+the LCSC part is the 10k per port, the W5500's two 10k and its three capacitors: about
+2.30 USD, most of it reel minimums you won't use up. Bias, termination and TVS add 1.40 USD
+when your bus wants them.
+
+### Files
 
 - **PCB:** [`production/luxdmx-carrier-gerbers.zip`](production/), 2 layers, 1 oz, 1.6 mm, any fab
   (e.g. <https://cart.jlcpcb.com/quote>).
 - **Small parts:** [`production/luxdmx-carrier-bom.csv`](production/) goes straight into
   <https://www.lcsc.com/bom> (map `LCSC Part #` and `Quantity`). Also as `BOM.csv` / `BOM.xlsx`,
   and `BOM-TME.md` for TME.
-- **JLCPCB assembly (optional, untested):** usually not needed. Without pixels you can leave
-  the whole pixel section out, and the rest is a handful of 1206 parts and headers. If you want
-  JLCPCB to fit the LCSC parts anyway, upload `luxdmx-carrier-bom.csv` as the BOM and
+- **JLCPCB assembly (optional):** usually not needed, see above. If you want JLCPCB to fit the
+  LCSC parts anyway, upload `luxdmx-carrier-bom.csv` as the BOM and
   [`production/luxdmx-carrier-cpl.csv`](production/) as the CPL, next to the gerber zip. Both use
   plain designators (`R12`, `C3`) because JLCPCB refuses the board's own labels;
   [`production/JLC-designators.csv`](production/) maps them back (`R9` = `120R term`). Things to
