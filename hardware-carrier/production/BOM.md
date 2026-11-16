@@ -13,7 +13,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 2 | 100nF | Capacitor 100nF 50V X7R 1206 | `CL31B104KBCNNNC` | [C24497](https://www.lcsc.com/product-detail/C24497.html) | hoch | 0.023 | 0.05 |
 | 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 703670 | 0.06 | 0.06 |
 | 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 23.140 | 0.129 | 0.26 |
-| 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch | `KM108M035J20RR0VH2FP0` | [C10749](https://www.lcsc.com/product-detail/C10749.html) | 48.810 | 0.171 | 0.17 |
+| 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C | `35YXJ1000M12.5X20` | [C88743](https://www.lcsc.com/product-detail/C88743.html) | 194270 | 0.25 | 0.25 |
 | 1 | Display socket | Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED | `HC-PM254-8.5H-1x4PZ-02A` | [C22373890](https://www.lcsc.com/product-detail/C22373890.html) | 14940 | 0.06 | 0.06 |
 | 1 | 74AHCT541 pixel buffer | Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land) | `SN74AHCT541DWR` | [C2682058](https://www.lcsc.com/product-detail/C2682058.html) | 2778 | 0.64 | 0.64 |
 | 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 644 | 0.419 | 0.42 |
@@ -27,7 +27,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
 | 2 | Tact 6x6 H30 | Tactile switch 6 x 6 mm, through hole, 5 mm tall | `K2-1102DP-C4SW-04` | [C110153](https://www.lcsc.com/product-detail/C110153.html) | 61190 | 0.03 | 0.06 |
 
-**Small parts total: about 6.41 EUR**
+**Small parts total: about 6.49 EUR**
 
 Deliberately not listed:
 
@@ -38,6 +38,7 @@ Deliberately not listed:
 - **100nF**: 1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR. Over a million in stock.
 - **1uF**: The middle rung of the W5500's decoupling. Same Samsung series and package as the 100nF, so one reel family covers both. It closes a factor-220 gap: the rail had 100nF and 22uF and nothing between them.
 - **22uF 3V3 bulk / 22uF W5500**: Half the price of the 25 V part (C12891, 0.24 EUR) for the same job. 6.3 V on a 3.3 V rail is roughly a factor of two margin, normal for X5R. Worth knowing: ceramics lose capacitance under DC bias, a 6.3 V part at 3.3 V keeps about half, so 11 to 13 uF rather than 22. Ample for holding up the rail when three transceivers key at once. For the full 22 uF take C12891 (25 V, keeps about 85 %) and pay 12 cents more.
+- **1000uF 35V**: The land takes any radial can up to 13 mm across with 5.00 mm lead spacing. The Chengx KM108M035J20RR0VH2FP0 (C10749) that used to be here is discontinued at JLCPCB (2026-11); this Rubycon is 0.5 mm narrower, just as tall, and rated 10,000 h at 105 C instead of 2,000 h.
 - **Display socket**: The display sits on a 1x04 FEMALE socket, not a piece of header strip. 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.
 - **74AHCT541 pixel buffer**: Two things decide this part, and neither is the number 541.
 1) The T. HCT, AHCT and ACT have TTL input thresholds (VIH 2.0 V), so 3.3 V from the S3 switches them reliably on a 5 V supply. HC, AHC and AC do not: their threshold is 0.7 x VCC = 3.5 V.

@@ -289,7 +289,7 @@ BOM, the lands take 0402 to 1206.
 | `330R PIX1..5` | 330 Ω, 1206W4J0331T5E | C25374 | that port used |
 | `Pixel1..5` | KF128-5.08-3P screw terminal | C474953 | that port used |
 | `12-24V IN` | KF128-5.08-2P screw terminal, 24 A | C474952 | any pixel port used |
-| `1000uF 35V` | KM108M035J20RR0VH2FP0, D13 x 20 mm | C10749 | any pixel port used |
+| `1000uF 35V` | Rubycon 35YXJ1000M12.5X20, D12.5 x 20 mm (any can up to 13 mm, 5 mm pitch) | C88743 | any pixel port used |
 | Fuse | MF-R500 polyfuse **or** Keystone 3568 blade holder **or** solder bridge | C208489 (MF-R500) | any pixel port used, see [Fuse](#fuse) |
 
 ### Supply
@@ -321,7 +321,7 @@ BOM, the lands take 0402 to 1206.
 | `Button 1`, `Button 2` | 6 x 6 mm tact switch, 5 mm (C110153), or 30 mm for a front panel | you want the buttons |
 | `EXP` | 1x6 pin header | you need spare pins |
 
-LCSC small parts for a fully fitted board: about 6.40 EUR. Stock, prices, marketplace links and
+LCSC small parts for a fully fitted board: about 6.50 EUR. Stock, prices, marketplace links and
 search terms for every module: [`production/BOM.md`](production/BOM.md). Every position with its
 side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 

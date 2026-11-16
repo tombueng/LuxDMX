@@ -83,14 +83,15 @@
       "stock": "184.100"
     },
     "1000uF 35V": {
-      "desc": "Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch",
+      "desc": "Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C",
       "source": "LCSC",
-      "mpn": "KM108M035J20RR0VH2FP0",
-      "vendor": "Chengx",
-      "lcsc": "C10749",
-      "url": "https://www.lcsc.com/product-detail/C10749.html",
-      "price_eur": 0.171,
-      "stock": "48.810"
+      "mpn": "35YXJ1000M12.5X20",
+      "vendor": "Rubycon",
+      "lcsc": "C88743",
+      "url": "https://www.lcsc.com/product-detail/C88743.html",
+      "note": "The land takes any radial can up to 13 mm across with 5.00 mm lead spacing. The Chengx KM108M035J20RR0VH2FP0 (C10749) that used to be here is discontinued at JLCPCB (2026-11); this Rubycon is 0.5 mm narrower, just as tall, and rated 10,000 h at 105 C instead of 2,000 h.",
+      "price_eur": 0.25,
+      "stock": 194270
     },
     "MF-R 30V": {
       "desc": "Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch",

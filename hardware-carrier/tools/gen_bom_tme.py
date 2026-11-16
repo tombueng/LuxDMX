@@ -32,7 +32,7 @@ TME = {
  "CL31A226MQHNNNE": ("22uF 1206 X5R, 6.3 V or more", "search: 22uF 1206 X5R",
                      "6.3 V is the minimum; 10 V or 16 V is fine and often cheaper. Sits on "
                      "a 3.3 V rail."),
- "KM108M035J20RR0VH2FP0": ("1000uF 35 V radial, 13 mm can, 5 mm lead pitch",
+ "35YXJ1000M12.5X20": ("1000uF 35 V radial, 13 mm can at most, 5 mm lead pitch",
                      "search: 1000uF 35V 105C radial",
                      "The can must not exceed 13 mm diameter and the leads must be 5 mm "
                      "apart - the land is drawn for exactly that."),

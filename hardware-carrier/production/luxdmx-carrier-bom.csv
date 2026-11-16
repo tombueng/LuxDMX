@@ -2,7 +2,7 @@ Comment,Designator,Footprint,LCSC Part #,Quantity,Manufacturer Part Number,Descr
 100nF,"C1,C4",1206,C24497,2,CL31B104KBCNNNC,Capacitor 100nF 50V X7R 1206
 1uF,C2,1206,C1848,1,CL31B105KBHNNNE,Capacitor 1uF 50V X7R 1206
 22uF,"C3,C5",1206,C159757,2,CL31A226MQHNNNE,Capacitor 22uF 6.3V X5R 1206
-KM108M035J20RR0VH2FP0,C6,CP_Radial_D13.0mm_P5.00mm,C10749,1,KM108M035J20RR0VH2FP0,"Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch"
+35YXJ1000M12.5X20,C6,CP_Radial_D13.0mm_P5.00mm,C88743,1,35YXJ1000M12.5X20,"Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C"
 SMF12CA,"D1,D2,D3,D4,D5,D6",SOD-123FL,C353317,6,SMF12CA,"TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W"
 MF-R500,F2,polyfuse-dual-pitch,C208489,1,MF-R500,"Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch"
 XY308-2.54-3P,"J1,J2,J3",header-1x03-P2.54-terminal,C557686,3,XY308-2.54-3P,"Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows"
