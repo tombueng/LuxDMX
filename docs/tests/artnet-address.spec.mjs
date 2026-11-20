@@ -16,7 +16,7 @@
 // reboot, then restore. afterAll re-POSTs the whole /config form rebuilt from the opening snapshot,
 // so a run leaves the device exactly as it found it.
 import { test, expect } from '@playwright/test';
-import { deviceHost, sleep, e131Packet, streamFor, prepInput, UdpSender, SACN_PORT } from './lib/net.mjs';
+import { deviceHost, sleep, e131Packet, artDmxPacket, streamFor, prepInput, UdpSender, SACN_PORT, ART_PORT } from './lib/net.mjs';
 import { ArtRdmClient, uniParts, AC_CANCEL_MERGE } from './lib/artrdm.mjs';
 import { info, dmx, configForm, pollFor, waitForState, configSnapshot } from './lib/device.mjs';
 
@@ -111,6 +111,30 @@ test.describe('ArtAddress programming', () => {
     const after = await info(request);
     expect(after.artShort, 'a universe-only ArtAddress must not wipe the label').toBe(before.artShort);
     expect(after.artLong).toBe(before.artLong);
+  });
+
+  // Issue #160: MagicQ's Network Manager moved the port, /info.json and the page showed the new
+  // universe, but DMX on it only came out after a Save on the web page. The routing table was only
+  // rebuilt by a /config save (and by a reboot, which is why the test below, that reboots before
+  // it sends anything, never saw it). So: move it, then send on the new universe straight away.
+  test('a universe moved over the wire takes DMX at once, without a save or a reboot', async ({ request }) => {
+    const before = await info(request);
+    const taken = new Set(before.outputs.map((o) => o.uni));
+    let target = 0x147;
+    while (taken.has(target)) target++;
+
+    await c.addressAll(1, AC_NONE, uniParts(target));
+    await pollFor(() => info(request), (x) => x.outputs[0].uni === target, { ms: 10000 });
+
+    await prepInput(host);
+    const sender = new UdpSender(host);
+    const data = Buffer.alloc(512, 0); data[0] = 160; data[1] = 77;
+    try {
+      await streamFor(sender, ART_PORT, (seq) => artDmxPacket(target, data, seq), { ms: 1200, hz: 40 });
+    } finally { sender.close(); }
+    const got = await pollFor(() => dmx(request), (x) => x.ch[0] === 160, { ms: 5000 });
+    expect(got.ch[0], `Art-Net universe ${target} reaches the output it was just moved to`).toBe(160);
+    expect(got.ch[1]).toBe(77);
   });
 
   test('a console moves an output to another universe, live, and it sticks', async ({ request }) => {
