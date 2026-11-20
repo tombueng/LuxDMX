@@ -1557,6 +1557,12 @@ static void rdmSavePoll() {
 // multicast group and only netRxTask may touch the sockets, so both paths raise this and let
 // that task re-join. Declared here because artnet_rdm.h below sets it too.
 static volatile bool     g_sacnRejoin  = false;
+// Same two paths, the input side: routeFrame() does NOT read cfg.outputs[].universe, it walks the
+// sink table built from it (rebuildSinks()). Until that is rebuilt the output keeps listening on
+// its OLD universe, and the console sending on the new one gets nothing out (issue #160: MagicQ's
+// Network Manager moved the port, the page showed it, but DMX only came back after a web Save,
+// which rebuilds the table). netRxTask drains this: rebuild, then re-join sACN from the new table.
+static volatile bool     g_sinksRebuild = false;
 
 // Art-Net 4 RDM bridge (ArtPoll/ArtTod*/ArtRdm). Uses rdm_rmt.h's raw relay + discovery
 // primitives and the RdmDevice table / rdmDevices[] declared above. See docs/rdm.md.
@@ -5266,16 +5272,16 @@ static void ctlFlash(const char* msg, uint32_t ms) {
     ctlFlashUntil = millis() + ms;
 }
 
-// Persist one output's universe live. Art-Net re-routes by the packet's own
-// universe on the next frame, so it needs nothing; sACN listens on a per-universe
-// multicast group that must be re-joined, and only the socket-owning netRxTask may
-// touch the sockets — so raise a flag and let it re-join.
+// Persist one output's universe live. Both inputs route through the sink table, which is
+// built from cfg.outputs[].universe and has to be rebuilt; sACN also listens on a
+// per-universe multicast group that must be re-joined. Only netRxTask may touch the
+// sockets, so raise the flag and let it do both, in that order (issue #160).
 static void ctlApplyUniverse(int out, int uni) {
     if (out < 0 || out >= MAX_OUTPUTS) return;
     if (cfg.outputs[out].universe == uni) return;      // no real change (rolled back to start)
     cfg.outputs[out].universe = uni;
     saveConfig();
-    if (cfg.protocol != 0) g_sacnRejoin = true;
+    g_sinksRebuild = true;
     Serial.printf("[CTL] out%d universe -> %d (saved)\n", out, uni);
 }
 
@@ -6058,9 +6064,15 @@ void setup() {
 // priority-inverting the high-priority DMX task).
 static void netRxTask(void*) {
     for (;;) {
-        // The on-unit controls menu changed a universe -> re-join the sACN multicast
-        // groups here, where this task owns the sockets (issue #24). Art-Net needs
-        // nothing: routeFrame() already dispatches by each packet's own universe.
+        // A universe moved outside a /config save (the on-unit menu or ArtAddress): rebuild the
+        // routing table first, since the sACN groups below are joined from it (issue #160).
+        if (g_sinksRebuild) {
+            g_sinksRebuild = false;
+            rebuildSinks();
+            if (cfg.protocol != 0) g_sacnRejoin = true;
+        }
+        // ...and re-join the sACN multicast groups here, where this task owns the sockets
+        // (issue #24).
         if (g_sacnRejoin) { g_sacnRejoin = false; if (cfg.protocol != 0) startSacn(); }
         // Routing table + pixel buffers + multicast joins, off the web task. Order matters:
         // the groups we join are derived from the sink table, so that has to be rebuilt first.

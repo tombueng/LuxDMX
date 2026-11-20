@@ -459,10 +459,11 @@ static void artHandlePacket(const uint8_t* p, int n, uint32_t ip) {
             if (uni != was) {
                 cfg.outputs[out].universe = (int)uni;
                 dirty = true;
-                // Art-Net needs nothing (routeFrame dispatches on each packet's own universe), but
-                // sACN listens on a per-universe multicast group. Only netRxTask may touch the
-                // sockets, so raise the flag it drains rather than re-joining from here.
-                if (cfg.protocol != 0) g_sacnRejoin = true;
+                // routeFrame() walks the sink table, not cfg, so until that is rebuilt the port
+                // keeps listening on its old universe (issue #160). netRxTask rebuilds it on its
+                // next pass (we are inside that task's receive drain here) and then re-joins the
+                // sACN multicast groups from the new table.
+                g_sinksRebuild = true;
                 Serial.printf("[ART-ADDR] out%d universe %u -> %u (bind %u)\n", out, was, uni, bindIndex);
             }
         }

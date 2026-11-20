@@ -285,6 +285,10 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 
 **Firmware**
 
+- **A universe changed from the console or on the box takes DMX at once** (issue #160). When
+  MagicQ's Network Manager (or any ArtAddress) or the box's own menu moved an output to another
+  universe, the page showed the new number but the output kept listening on the old one: nothing
+  came out until a Save on the settings page. It follows the new universe straight away now.
 - **A pixel port on a WT32-ETH01 stays on after saving** (issue #165). The box refused pins of
   things that were switched off: the WT32 keeps the W5500's default pins although it runs its own
   Ethernet, so a port on GPIO5 went off after every save while the page said "Saved". Only what's
