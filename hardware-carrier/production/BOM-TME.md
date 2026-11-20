@@ -9,8 +9,8 @@ The same board, sourced at <https://www.tme.eu/>. Quantities are for one board a
 | 2 | 100nF 1206 X7R, 50 V | search: 100nF 1206 X7R 50V | Any maker. X7R matters, X5R or Y5V do not belong on a decoupling line. |
 | 1 | 1uF 1206 X7R, 50 V | search: 1uF 1206 X7R 50V | X7R again. A 1uF Y5V loses most of its value at voltage. |
 | 2 | 22uF 1206 X5R, 6.3 V or more | search: 22uF 1206 X5R | 6.3 V is the minimum; 10 V or 16 V is fine and often cheaper. Sits on a 3.3 V rail. |
-| 1 | 1000uF 35 V radial, 13 mm can, 5 mm lead pitch | search: 1000uF 35V 105C radial | The can must not exceed 13 mm diameter and the leads must be 5 mm apart - the land is drawn for exactly that. |
-| 1 | 74HCT541 in SO-20 300 mil | TME lists 74HCT541D,653 (confirmed) | WARNING, two ways to get this wrong. The suffix PW is TSSOP at 0.65 mm and does NOT fit this board; only D (SO-20 300 mil) or TI's DW does. And TME appeared to hold it on reel only, in poor supply - worth checking before you count on it. AHCT is the better part if you find it in the same package. |
+| 1 | 1000uF 35 V radial, 13 mm can at most, 5 mm lead pitch | search: 1000uF 35V 105C radial | The can must not exceed 13 mm diameter and the leads must be 5 mm apart - the land is drawn for exactly that. |
+| 1 | 74AHCT541 or 74HCT541 in SO-20 300 mil | TME lists 74HCT541D,653 (confirmed), which fits the same land | WARNING, two ways to get this wrong. The suffix PW is TSSOP at 0.65 mm and does NOT fit this board; only D (SO-20 300 mil) or TI's DW does. And TME appeared to hold it on reel only, in poor supply - worth checking before you count on it. AHCT is the better part if you find it in the same package. |
 | 1 | Bourns MF-R500 polyfuse, 5 A hold, 30 V | TME symbol MFR500-BOU (confirmed) | 30 V matters: the MF-RHT and MF-RG families are 16 V parts and a 24 V pixel supply is outside them. |
 | 5 | 10k 1206, 1 % | search: 10k 1206 1% | Any maker. |
 | 3 | 120R 1206, 1 % | search: 120R 1206 1% | Any maker. |

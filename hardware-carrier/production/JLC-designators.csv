@@ -1,0 +1,47 @@
+Designator,Board label,Layer,Mid X,Mid Y
+C1,100nF W5500,Bottom,100.2000mm,-63.5000mm
+C2,1uF W5500,Bottom,100.2000mm,-68.5000mm
+C3,22uF W5500,Bottom,100.2000mm,-73.5000mm
+C4,100nF,Bottom,138.2425mm,-89.4000mm
+C5,22uF 3V3 bulk,Bottom,138.2425mm,-94.9000mm
+C6,1000uF 35V,Top,124.0000mm,-116.5000mm
+D1,TVS bidir,Bottom,120.0000mm,-60.0000mm
+D2,TVS bidir,Bottom,136.9875mm,-60.0000mm
+D3,TVS bidir,Bottom,143.5000mm,-60.0000mm
+D4,TVS bidir,Bottom,160.4875mm,-60.0000mm
+D5,TVS bidir,Bottom,167.0000mm,-60.0000mm
+D6,TVS bidir,Bottom,183.9875mm,-60.0000mm
+F2,Polyfuse MF-R 5.1(4A)/10.2(9A),Top,103.7300mm,-112.8300mm
+J1,DMX 1 - GND/B/A,Top,128.5000mm,-59.4500mm
+J2,DMX 2 - GND/B/A,Top,152.0000mm,-59.4500mm
+J3,DMX 3 - GND/B/A,Top,175.5000mm,-59.4500mm
+J4,Display:SDA/SCL/3V3/GND,Top,169.3100mm,-115.5000mm
+J5,Pixel1:Vcc/Data/GND,Top,110.6572mm,-130.9700mm
+J6,Pixel2:Vcc/Data/GND,Top,126.9214mm,-130.9700mm
+J7,Pixel3:Vcc/Data/GND,Top,143.1857mm,-130.9700mm
+J8,Pixel4:Vcc/Data/GND,Top,159.4500mm,-130.9700mm
+J9,Pixel5:Vcc/Data/GND,Top,175.7142mm,-130.9700mm
+J10,12-24V IN,Top,96.7800mm,-131.0500mm
+R1,10k dir,Bottom,128.5500mm,-65.5000mm
+R2,10k dir,Bottom,152.0500mm,-65.5000mm
+R3,10k dir,Bottom,175.5500mm,-65.5000mm
+R4,10k ETH_RST pu,Bottom,108.4500mm,-66.0000mm
+R5,330R bias+,Bottom,126.0475mm,-70.9500mm
+R6,330R bias+,Bottom,149.5475mm,-70.9500mm
+R7,330R bias+,Bottom,173.0475mm,-70.9500mm
+R8,10k ETH_CS pu,Bottom,108.4500mm,-71.5000mm
+R9,120R term,Bottom,131.0000mm,-72.5000mm
+R10,120R term,Bottom,154.5000mm,-72.5000mm
+R11,120R term,Bottom,178.0000mm,-72.5000mm
+R12,330R bias-,Bottom,126.0000mm,-78.0500mm
+R13,330R bias-,Bottom,149.5000mm,-78.0500mm
+R14,330R bias-,Bottom,173.0000mm,-78.0500mm
+R15,330R PIX5,Bottom,116.2000mm,-88.5000mm
+R16,330R PIX4,Bottom,124.2000mm,-91.5000mm
+R17,330R PIX3,Bottom,116.2000mm,-95.0000mm
+R18,330R PIX2,Bottom,124.2000mm,-98.5000mm
+R19,330R PIX1,Bottom,116.2000mm,-102.0000mm
+SW1,Encoder A/B/SW,Top,140.7500mm,-117.0001mm
+SW2,Button 2,Top,158.7500mm,-120.7500mm
+SW3,Button 1,Top,179.7500mm,-120.7500mm
+U1,74AHCT541 pixel buffer,Bottom,104.2850mm,-95.1500mm

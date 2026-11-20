@@ -32,11 +32,12 @@ TME = {
  "CL31A226MQHNNNE": ("22uF 1206 X5R, 6.3 V or more", "search: 22uF 1206 X5R",
                      "6.3 V is the minimum; 10 V or 16 V is fine and often cheaper. Sits on "
                      "a 3.3 V rail."),
- "KM108M035J20RR0VH2FP0": ("1000uF 35 V radial, 13 mm can, 5 mm lead pitch",
+ "EEU-FR1V102": ("1000uF 35 V radial, 13 mm can at most, 5 mm lead pitch",
                      "search: 1000uF 35V 105C radial",
                      "The can must not exceed 13 mm diameter and the leads must be 5 mm "
                      "apart - the land is drawn for exactly that."),
- "74HCT541D,653": ("74HCT541 in SO-20 300 mil", "TME lists 74HCT541D,653 (confirmed)",
+ "SN74AHCT541DWR": ("74AHCT541 or 74HCT541 in SO-20 300 mil",
+                    "TME lists 74HCT541D,653 (confirmed), which fits the same land",
                      "WARNING, two ways to get this wrong. The suffix PW is TSSOP at 0.65 mm "
                      "and does NOT fit this board; only D (SO-20 300 mil) or TI's DW does. "
                      "And TME appeared to hold it on reel only, in poor supply - worth "

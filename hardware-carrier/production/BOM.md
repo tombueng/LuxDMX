@@ -1,6 +1,6 @@
 # Bill of materials
 
-Everything fitted: 50 positions. Quantities come from the board.
+Everything fitted: 54 positions. Quantities come from the board.
 
 LCSC stock checked **2026-08-16**. Look again before ordering, it changes daily.
 
@@ -13,41 +13,48 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 2 | 100nF | Capacitor 100nF 50V X7R 1206 | `CL31B104KBCNNNC` | [C24497](https://www.lcsc.com/product-detail/C24497.html) | hoch | 0.023 | 0.05 |
 | 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 703670 | 0.06 | 0.06 |
 | 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 23.140 | 0.129 | 0.26 |
-| 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch | `KM108M035J20RR0VH2FP0` | [C10749](https://www.lcsc.com/product-detail/C10749.html) | 48.810 | 0.171 | 0.17 |
-| 1 | 74AHCT541 pixel buffer | Octal buffer 74HCT541, SO-20 300 mil (SOIC-20W land) | `74HCT541D,653` | [C547781](https://www.lcsc.com/product-detail/Buffers-Drivers_Nexperia_C547781.html) | 16712 | 0.42 | 0.42 |
+| 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C | `EEU-FR1V102` | [C128518](https://www.lcsc.com/product-detail/C128518.html) | 529 | 0.58 | 0.58 |
+| 1 | Display socket | Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED | `HC-PM254-8.5H-1x4PZ-02A` | [C22373890](https://www.lcsc.com/product-detail/C22373890.html) | 14940 | 0.06 | 0.06 |
+| 1 | 74AHCT541 pixel buffer | Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land) | `SN74AHCT541DWR` | [C2682058](https://www.lcsc.com/product-detail/C2682058.html) | 2778 | 0.64 | 0.64 |
 | 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 644 | 0.419 | 0.42 |
 | 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 204.500 | 0.018 | 0.09 |
-| 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | - | ? | 0.004 | 0.01 |
+| 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | [C17909](https://www.lcsc.com/product-detail/C17909.html) | 158200 | 0.004 | 0.01 |
 | 11 | 330R bias+ / 330R bias- / 330R pixel | Resistor 330R 1206 5% (fail-safe bias) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 79.100 | 0.012 | 0.13 |
+| 1 | EC11 | Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch | `EC11E15244B2` | [C470754](https://www.lcsc.com/product-detail/C470754.html) | 3172 | 2.22 | 2.22 |
 | 1 | 12-24V IN 24A | Screw terminal, 2 pole, 5.08 mm pitch, 24 A | `KF128-5.08-2P-AA` | [C474952](https://www.lcsc.com/product-detail/C474952.html) | 63.515 | 0.177 | 0.18 |
+| 3 | header-1x03-P2.54-terminal | Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows | `XY308-2.54-3P` | [C557686](https://www.lcsc.com/product-detail/C557686.html) | 5930 | 0.35 | 1.05 |
 | 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 16.545 | 0.175 | 0.88 |
 | 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
+| 2 | Tact 6x6 H30 | Tactile switch 6 x 6 mm, through hole, 5 mm tall | `K2-1102DP-C4SW-04` | [C110153](https://www.lcsc.com/product-detail/C110153.html) | 61190 | 0.03 | 0.06 |
 
-**Small parts total: about 2.80 EUR**
+**Small parts total: about 6.82 EUR**
 
 Deliberately not listed:
 
 - **PinHeader**: 2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below.
-- **header-1x03-P2.54-terminal**: The three DMX rows: a 3-pin piece off the same header strip, or a 2.54 mm screw terminal if you would rather screw the XLR tails down. Both fit the 1.20 mm holes.
-- **Display socket**: The display sits on a 1x04 FEMALE socket, not a piece of header strip. PinSocket 1x04 P2.54, 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.
 
 ### Notes
 
 - **100nF**: 1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR. Over a million in stock.
 - **1uF**: The middle rung of the W5500's decoupling. Same Samsung series and package as the 100nF, so one reel family covers both. It closes a factor-220 gap: the rail had 100nF and 22uF and nothing between them.
 - **22uF 3V3 bulk / 22uF W5500**: Half the price of the 25 V part (C12891, 0.24 EUR) for the same job. 6.3 V on a 3.3 V rail is roughly a factor of two margin, normal for X5R. Worth knowing: ceramics lose capacitance under DC bias, a 6.3 V part at 3.3 V keeps about half, so 11 to 13 uF rather than 22. Ample for holding up the rail when three transceivers key at once. For the full 22 uF take C12891 (25 V, keeps about 85 %) and pay 12 cents more.
+- **1000uF 35V**: The land takes any radial can up to 13 mm across with 5.00 mm lead spacing. Panasonic FR series, low ESR, 10,000 h at 105 C, and JLCPCB has a footprint for it (the Chemi-Con EKYA350ELL102MK20S, C709540, has none). Two parts before it fell out (2026-11-16): the Chengx KM108M035J20RR0VH2FP0 (C10749) is discontinued at JLCPCB, the Rubycon 35YXJ1000M12.5X20 (C88743) at LCSC's BOM tool, although both still showed stock.
+- **Display socket**: The display sits on a 1x04 FEMALE socket, not a piece of header strip. 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.
 - **74AHCT541 pixel buffer**: Two things decide this part, and neither is the number 541.
 1) The T. HCT, AHCT and ACT have TTL input thresholds (VIH 2.0 V), so 3.3 V from the S3 switches them reliably on a 5 V supply. HC, AHC and AC do not: their threshold is 0.7 x VCC = 3.5 V.
 2) The package. The land is SOIC-20W: 1.27 mm pitch, rows 10.10 mm apart, copper from 3.63 to 6.47 mm off the axis, pads reaching 1.32 mm past the lead tip so an iron fits. Only the 1.27 mm parts land on it - TI calls that DW, Nexperia calls it D.
 Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x bit.
 - **MF-R 30V**: The largest that fits the current placement: body 17.4 x 3.0 mm, 3.8 mm clear of the 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series but its body is 24.2 mm and would come within 0.40 mm of the can; both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.  Two numbers decide a replacement and neither is the current: the voltage (30 V, not 16) and the lead pitch (5.08 or 10.2 mm, nothing else). The table below is what has been checked so far.
-- **120R term**: Same series as the verified 10k. The C number could not be confirmed by search, look up the manufacturer part number on LCSC.
+- **120R term**: Same series as the 10k. JLCPCB basic part, so no extended-part fee for assembly.
 - **330R bias+ / 330R bias- / 330R pixel**: Fail-safe bias on a 3.3 V bus needs more than 200 mV idle differential. With two terminators (60 R, the normal case once this board is the controller at one end) 330 R gives 275 mV, 470 R only 198 mV. Anything from 270 R to 430 R works, see the table. Bus loading 4.6 mA, which no RS-485 driver cares about, and 5 % tolerance is irrelevant for a bias resistor. The land takes anything from 0402 to 1206: copper runs 0.30 to 2.30 mm off centre, so every end cap lands on it, an 0402's at 0.25 to 0.50 as much as a 1206's at 1.10 to 1.60. The 390R that only exists in 0805 therefore goes in without any trickery.
   - lcsc: [390R exists only in 0805 (C17655) and fits the 1206 land by hand if needed](https://lcsc.com/product-detail/Chip-Resistor-Surface-Mount-UniOhm_390R-3900-1_C17655.html) - 0.004 USD
+- **EC11**: The EC11 land is the standard 11 mm footprint, so the Alps original and every EC11 clone fit. This one: vertical, 20 mm flat shaft, 30 detents and 15 pulses, push switch with 1.5 mm travel (Alps' own series table, 2026-11-16). 30/15 means two quadrature edges per click, so set Steps per detent to 2 (half-step) in /config; the cheap 20/20 clones want the default 4. ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups. Add a knob for a 6 mm D-shaft.
+- **header-1x03-P2.54-terminal**: Screws the XLR tails down. One of the three terminals the 1.20 mm DMX land was drawn for (with Phoenix MPT 0,5/3-2,54 and TE 282834-3). A 3-pin piece off the header strip fits the same holes if you would rather plug the tails on.
 - **TVS bidir**: The land is universal: copper runs from 0.30 to 2.90 mm off centre, so SOD-123, SOD-123F, SOD-123FL, DO-214AC (SMA) and a plain 1206 all sit on it. SMF12CA in SOD-123FL is the cheap default. SMAJ12CA in SMA is the same diode at 400 W instead of 200 W, same 12 V standoff and the same breakdown window, and its feet reach 2.80 mm so it now lands properly rather than hanging off the end. VRWM 12 V, so it does not conduct at the +12 V common mode RS-485 allows, VBR 14.7 V, clamps at 19.9 V with 10 A. Two per port, A and B to GND. A varistor is no substitute, it would not clamp until about 40 V.
   - amazon: [50 x SMF12CA, bidirectional, SOD-123FL](https://www.amazon.com/Pcs-TVS-Diode-Bidirectional-Vrwm/dp/B0CNK4R5SC) - approx. 8-10 EUR / 50 pcs
   - amazon: [SMF 200W SOD-123 TVS kit, 20 values x 10 pcs, bidirectional](https://www.amazon.com/Values-SOD-123-Bi-Directional-Surface-Protection/dp/B0C5SLJQBB) - approx. 15-20 EUR
   - lcsc: [Littelfuse SMF12CA, brand part, 1265 pcs](https://www.lcsc.com/product-detail/C1851360.html) - approx. 0.19 EUR ea
+- **Tact 6x6 H30**: Short plunger, for buttons reached through a cap or used on the open board. The land takes every 6 x 6 mm through-hole switch, plungers from 5 to 30 mm. The 20 mm encoder shaft needs about 30 mm to reach the same front panel; LCSC/JLCPCB stock stops at 19 mm (K2-1102DP-Z4SW-04, C194449), so a panel build takes 30 mm switches from a marketplace or long caps. Goes straight to GND, IO3 and IO46 pull up internally.
 
 ### What may go in the 74AHCT541 pixel buffer position, and what may not
 
@@ -55,9 +62,9 @@ Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x
 
 | Type | Family | Package | Note |
 |---|---|---|---|
-| `74HCT541D,653 (Nexperia)` | HCT | D = SO-20 300 mil | LCSC C547781, in stock, about 0.42 EUR. What this BOM names. |
+| `74HCT541D,653 (Nexperia)` | HCT | D = SO-20 300 mil | LCSC C547781, about 0.42 EUR. Was the BOM part until JLCPCB had only 1 left (2026-11). |
 | `74AHCT541D,118 (Nexperia)` | AHCT | D = SO-20 300 mil | Same land, faster. LCSC C554678, out of stock when last checked. |
-| `SN74AHCT541DW / DWR (TI)` | AHCT | DW = SOIC-20 300 mil | Same land. R is tape and reel, otherwise identical. |
+| `SN74AHCT541DW / DWR (TI)` | AHCT | DW = SOIC-20 300 mil | Same land. R is tape and reel, otherwise identical. DWR is what the BOM names: LCSC C2682058, about 0.64 EUR, 2778 in stock 2026-11-16. |
 | `SN74HCT541DW / DWR (TI)` | HCT | DW = SOIC-20 300 mil | Same land. |
 | `CD74ACT541M (TI)` | ACT | M = SOIC-20 300 mil | ACT has TTL thresholds too. Stronger drive, noisier supply. |
 
@@ -152,21 +159,6 @@ Fuse holder, MINI blade (ATM), PCB vertical, Keystone 3568
 
 > The land is KiCad's Fuseholder_Blade_Mini_Keystone_3568: four 1.78 mm holes, pairs 3.40 mm apart and 9.92 mm between the pairs. It takes MINI blade fuses - Bussmann ATM, Littelfuse 297/997, APM - and NOT the regular ATO/ATC size, which is nearly twice as wide. This entry used to say 'ATO/ATC mini, 10.2 mm pitch' and was wrong on both counts. The holder itself is rated 30 A, far above anything this board can carry; the fuse you put in it is what matters, and the copper gives out at 9.8 A. Alternative to the polyfuse, never fitted alongside it: a blade fuse blows once and is replaced, the polyfuse resets itself but runs warm and drops voltage while it holds.
 
-### 1 x EC11
-
-Rotary encoder EC11, 20 mm D-shaft, with push switch
-
-| Platform | Search term |
-|---|---|
-| amazon | `EC11 rotary encoder 20mm shaft push switch` |
-| ebay | `EC11 rotary encoder switch 20mm D shaft` |
-| aliexpress | `EC11 encoder 20mm handle with switch 5 pin` |
-
-| Platform | Offer | Price |
-|---|---|---|
-
-> The part inside every KY-040 module, without the little board and its three 10k pullups: ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups, so the resistors buy nothing. 12.4 mm can, 2.5 mm pin pitch, two mounting posts. Sold in tens for small money; any EC11 clone fits, the case and pin positions are the same across the family. Add a knob for a 6 mm D-shaft.
-
 ### 1 x ESP32-S3 N16R8
 
 ESP32-S3-DevKitC-1 N16R8, USB-C, two ports
@@ -225,21 +217,6 @@ MAX3485 TTL to RS-485 module, 3.3 V, with enable pin
 | ebay | [1.3 inch OLED SH1106 I2C](https://www.ebay.de/sch/i.html?_nkw=1.3+OLED+SH1106+I2C) | approx. 4-7 EUR |
 
 > These ship in two pin orders that differ by VCC and GND. Read the module's own silk, not the product page.
-
-### 2 x Tact 6x6 H30
-
-Tact switch 6 x 6 mm, through hole, 30 mm plunger
-
-| Platform | Search term |
-|---|---|
-| amazon | `tact switch 6x6x30mm through hole long plunger` |
-| ebay | `6x6x30 tactile push button switch THT` |
-| aliexpress | `6*6*30mm tact switch 4 pin long stem` |
-
-| Platform | Offer | Price |
-|---|---|---|
-
-> The plunger length is the only thing that varies on this land - 5, 7, 9, 13, 17, 25 and 30 mm all use the same 6 x 6 footprint. 30 mm because the encoder shaft already stands 20 mm off the board, so anything shorter disappears behind the same front panel. Goes straight to GND, IO3 and IO46 pull up internally.
 
 ### 1 x USR-ES1 W5500
 

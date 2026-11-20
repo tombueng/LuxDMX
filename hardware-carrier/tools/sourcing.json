@@ -7,10 +7,11 @@
       "source": "LCSC",
       "mpn": "1206W4F1200T5E",
       "vendor": "UNI-ROYAL",
-      "lcsc": null,
-      "note": "Same series as the verified 10k. The C number could not be confirmed by search, look up the manufacturer part number on LCSC.",
+      "lcsc": "C17909",
+      "url": "https://www.lcsc.com/product-detail/C17909.html",
+      "note": "Same series as the 10k. JLCPCB basic part, so no extended-part fee for assembly.",
       "price_eur": 0.004,
-      "stock": null
+      "stock": 158200
     },
     "10k dir": {
       "desc": "Resistor 10k 1206 1%",
@@ -82,14 +83,15 @@
       "stock": "184.100"
     },
     "1000uF 35V": {
-      "desc": "Electrolytic 1000uF 35V radial, D13 x L20, 5 mm pitch",
+      "desc": "Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C",
       "source": "LCSC",
-      "mpn": "KM108M035J20RR0VH2FP0",
-      "vendor": "Chengx",
-      "lcsc": "C10749",
-      "url": "https://www.lcsc.com/product-detail/C10749.html",
-      "price_eur": 0.171,
-      "stock": "48.810"
+      "mpn": "EEU-FR1V102",
+      "vendor": "Panasonic",
+      "lcsc": "C128518",
+      "url": "https://www.lcsc.com/product-detail/C128518.html",
+      "note": "The land takes any radial can up to 13 mm across with 5.00 mm lead spacing. Panasonic FR series, low ESR, 10,000 h at 105 C, and JLCPCB has a footprint for it (the Chemi-Con EKYA350ELL102MK20S, C709540, has none). Two parts before it fell out (2026-11-16): the Chengx KM108M035J20RR0VH2FP0 (C10749) is discontinued at JLCPCB, the Rubycon 35YXJ1000M12.5X20 (C88743) at LCSC's BOM tool, although both still showed stock.",
+      "price_eur": 0.58,
+      "stock": 529
     },
     "MF-R 30V": {
       "desc": "Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch",
@@ -177,15 +179,15 @@
       }
     },
     "74AHCT541 pixel buffer": {
-      "desc": "Octal buffer 74HCT541, SO-20 300 mil (SOIC-20W land)",
+      "desc": "Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land)",
       "source": "LCSC",
-      "mpn": "74HCT541D,653",
-      "vendor": "Nexperia",
-      "lcsc": "C547781",
-      "url": "https://www.lcsc.com/product-detail/Buffers-Drivers_Nexperia_C547781.html",
+      "mpn": "SN74AHCT541DWR",
+      "vendor": "TI",
+      "lcsc": "C2682058",
+      "url": "https://www.lcsc.com/product-detail/C2682058.html",
       "note": "Two things decide this part, and neither is the number 541.\n1) The T. HCT, AHCT and ACT have TTL input thresholds (VIH 2.0 V), so 3.3 V from the S3 switches them reliably on a 5 V supply. HC, AHC and AC do not: their threshold is 0.7 x VCC = 3.5 V.\n2) The package. The land is SOIC-20W: 1.27 mm pitch, rows 10.10 mm apart, copper from 3.63 to 6.47 mm off the axis, pads reaching 1.32 mm past the lead tip so an iron fits. Only the 1.27 mm parts land on it - TI calls that DW, Nexperia calls it D.\nSpeed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x bit.",
-      "price_eur": 0.42,
-      "stock": 16712,
+      "price_eur": 0.64,
+      "stock": 2778,
       "alternatives": {
         "Works": {
           "cols": [
@@ -199,7 +201,7 @@
               "74HCT541D,653 (Nexperia)",
               "HCT",
               "D = SO-20 300 mil",
-              "LCSC C547781, in stock, about 0.42 EUR. What this BOM names."
+              "LCSC C547781, about 0.42 EUR. Was the BOM part until JLCPCB had only 1 left (2026-11)."
             ],
             [
               "74AHCT541D,118 (Nexperia)",
@@ -211,7 +213,7 @@
               "SN74AHCT541DW / DWR (TI)",
               "AHCT",
               "DW = SOIC-20 300 mil",
-              "Same land. R is tape and reel, otherwise identical."
+              "Same land. R is tape and reel, otherwise identical. DWR is what the BOM names: LCSC C2682058, about 0.64 EUR, 2778 in stock 2026-11-16."
             ],
             [
               "SN74HCT541DW / DWR (TI)",
@@ -296,6 +298,50 @@
       "url": "https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html",
       "price_eur": 0.175,
       "stock": "16.545"
+    },
+    "header-1x03-P2.54-terminal": {
+      "desc": "Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows",
+      "source": "LCSC",
+      "mpn": "XY308-2.54-3P",
+      "vendor": "Xinlaiya",
+      "lcsc": "C557686",
+      "url": "https://www.lcsc.com/product-detail/C557686.html",
+      "note": "Screws the XLR tails down. One of the three terminals the 1.20 mm DMX land was drawn for (with Phoenix MPT 0,5/3-2,54 and TE 282834-3). A 3-pin piece off the header strip fits the same holes if you would rather plug the tails on.",
+      "price_eur": 0.35,
+      "stock": 5930
+    },
+    "EC11": {
+      "desc": "Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch",
+      "source": "LCSC",
+      "mpn": "EC11E15244B2",
+      "vendor": "Alps Alpine",
+      "lcsc": "C470754",
+      "url": "https://www.lcsc.com/product-detail/C470754.html",
+      "note": "The EC11 land is the standard 11 mm footprint, so the Alps original and every EC11 clone fit. This one: vertical, 20 mm flat shaft, 30 detents and 15 pulses, push switch with 1.5 mm travel (Alps' own series table, 2026-11-16). 30/15 means two quadrature edges per click, so set Steps per detent to 2 (half-step) in /config; the cheap 20/20 clones want the default 4. ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups. Add a knob for a 6 mm D-shaft.",
+      "price_eur": 2.22,
+      "stock": 3172
+    },
+    "Display socket": {
+      "desc": "Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED",
+      "source": "LCSC",
+      "mpn": "HC-PM254-8.5H-1x4PZ-02A",
+      "vendor": "Hong Cheng",
+      "lcsc": "C22373890",
+      "url": "https://www.lcsc.com/product-detail/C22373890.html",
+      "note": "The display sits on a 1x04 FEMALE socket, not a piece of header strip. 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.",
+      "price_eur": 0.06,
+      "stock": 14940
+    },
+    "Tact 6x6 H30": {
+      "desc": "Tactile switch 6 x 6 mm, through hole, 5 mm tall",
+      "source": "LCSC",
+      "mpn": "K2-1102DP-C4SW-04",
+      "vendor": "Korean Hroparts",
+      "lcsc": "C110153",
+      "url": "https://www.lcsc.com/product-detail/C110153.html",
+      "note": "Short plunger, for buttons reached through a cap or used on the open board. The land takes every 6 x 6 mm through-hole switch, plungers from 5 to 30 mm. The 20 mm encoder shaft needs about 30 mm to reach the same front panel; LCSC/JLCPCB stock stops at 19 mm (K2-1102DP-Z4SW-04, C194449), so a panel build takes 30 mm switches from a marketplace or long caps. Goes straight to GND, IO3 and IO46 pull up internally.",
+      "price_eur": 0.03,
+      "stock": 61190
     },
     "DC jack": {
       "desc": "DC barrel jack, Kycon KLDX-0202 land, 3.5 A",
@@ -610,32 +656,6 @@
       ],
       "note": "These ship in two pin orders that differ by VCC and GND. Read the module's own silk, not the product page."
     },
-    "EC11": {
-      "desc": "Rotary encoder EC11, 20 mm D-shaft, with push switch",
-      "source": "marketplace",
-      "search": {
-        "amazon": "EC11 rotary encoder 20mm shaft push switch",
-        "ebay": "EC11 rotary encoder switch 20mm D shaft",
-        "aliexpress": "EC11 encoder 20mm handle with switch 5 pin"
-      },
-      "note": "The part inside every KY-040 module, without the little board and its three 10k pullups: ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups, so the resistors buy nothing. 12.4 mm can, 2.5 mm pin pitch, two mounting posts. Sold in tens for small money; any EC11 clone fits, the case and pin positions are the same across the family. Add a knob for a 6 mm D-shaft.",
-      "price_eur": 0.4,
-      "qty": 1,
-      "links": []
-    },
-    "Tact 6x6 H30": {
-      "desc": "Tact switch 6 x 6 mm, through hole, 30 mm plunger",
-      "source": "marketplace",
-      "search": {
-        "amazon": "tact switch 6x6x30mm through hole long plunger",
-        "ebay": "6x6x30 tactile push button switch THT",
-        "aliexpress": "6*6*30mm tact switch 4 pin long stem"
-      },
-      "note": "The plunger length is the only thing that varies on this land - 5, 7, 9, 13, 17, 25 and 30 mm all use the same 6 x 6 footprint. 30 mm because the encoder shaft already stands 20 mm off the board, so anything shorter disappears behind the same front panel. Goes straight to GND, IO3 and IO46 pull up internally.",
-      "price_eur": 0.15,
-      "qty": 2,
-      "links": []
-    },
     "Blade fuse holder, alternative to the polyfuse": {
       "desc": "Fuse holder, MINI blade (ATM), PCB vertical, Keystone 3568",
       "source": "marketplace",
@@ -653,9 +673,7 @@
     }
   },
   "ignore": {
-    "PinHeader": "2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below.",
-    "header-1x03-P2.54-terminal": "The three DMX rows: a 3-pin piece off the same header strip, or a 2.54 mm screw terminal if you would rather screw the XLR tails down. Both fit the 1.20 mm holes.",
-    "Display socket": "The display sits on a 1x04 FEMALE socket, not a piece of header strip. PinSocket 1x04 P2.54, 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board."
+    "PinHeader": "2.54 mm headers are not listed: one 40-pin strip to snap apart covers all the header positions. The Display row is the exception, see below."
   },
   "_price_basis": "Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume price. Converted at about 0.92 EUR/USD. Where a page could not be checked the value is an estimate and the stock column says ?."
 }

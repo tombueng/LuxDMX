@@ -99,10 +99,11 @@ def main():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    # placement file, same origin as the gerbers
-    run(CLI, "pcb", "export", "pos", PCB, "-o", os.path.join(OUT, STEM + "-cpl.csv"),
-        "--format", "csv", "--units", "mm", "--use-drill-file-origin", "--side", "both")
-    print(f"   {STEM}-cpl.csv")
+    # The placement file is not kicad-cli's pos export: JLCPCB refuses that one (its headers,
+    # and the board's references, which are hand-assembly labels, issue #164). gen_bom.py
+    # writes it together with the BOM it has to match, in the same origin as these gerbers.
+    print(run(sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                           "gen_bom.py")), end="")
     return 0
 
 
