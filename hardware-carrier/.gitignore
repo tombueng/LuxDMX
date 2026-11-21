@@ -28,7 +28,8 @@ __pycache__/
 *.pyc
 
 # 3D models. The .wrl files and the STEPs exported by KiCad from modules/*.kicad_pcb (W5500,
-# MAX3485, the two Pololu regulators) are ours and are tracked. These two are not:
+# MAX3485, the regulator modules) and the ones gen_regulator_marks.py draws are ours and are
+# tracked. These two are not:
 #   esp32-s3-devkitc1-yd.step   GrabCAD Community Library, non-commercial terms (see README)
 #   oled-1v3-128x64.step        third party, licence never established (see README)
 # They change how the renders look and nothing about the board.

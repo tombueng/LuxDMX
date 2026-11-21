@@ -176,10 +176,17 @@ R-78E-1.0 and Mornsun K78xx-1000R3 datasheets), written into `modules.json` and 
 footprint by `tools/gen_footprints.py`. `tools/update_buck_footprint.py` put them on the routed
 board. None of the four has been fitted to a real carrier yet.
 
-The 3D view shows a D24V10F5 on row A. Its model, and the D36V28F5's (attached to the same
-footprint, hidden; switch it on in KiCad's 3D settings), are built from stock KiCad parts laid out
-like Pololu's drawings by `tools/gen_regulator_modules.py` (`modules/pololu-*.kicad_pcb`, exported
-to `3dmodels/pololu-*.step`).
+The 3D view shows a D24V10F5 on row A. All five regulators are attached to the footprint, the
+others hidden; switch one on (and the D24 off) in KiCad's 3D settings to see how it sits.
+
+- Pololu D24V10F5 and D36V28F5, and the MP1584EN board: dummy boards of stock KiCad parts laid
+  out like Pololu's dimension drawings and ProtoSupplies' MP1584 photos, built by
+  `tools/gen_regulator_modules.py` (`modules/*.kicad_pcb` -> `3dmodels/*.step`).
+- RECOM R-78E5.0-1.0: KiCad's own R-78E model (same package).
+- Mornsun K7805-1000R3: no model exists, `tools/gen_regulator_marks.py` draws it from the
+  datasheet. That script also adds what the stock models lack: the printing on the parts
+  ("MP1584EN", "SS34", "4R7", "RECOM"...) and the MP1584's trimmer, as `*-marks.step` overlays.
+  It needs build123d (see the script).
 
 ### Current rating
 
@@ -527,8 +534,9 @@ which needs the original designer's explicit permission.
 The OLED module model is a third-party one whose licence has not been established. It is not
 part of this repository either, and it only affects how the renders look, not the board.
 
-Everything else in the renders is drawn from KiCad's own libraries. The Pololu regulators too:
-`tools/gen_regulator_modules.py` puts stock KiCad parts where Pololu's dimension drawings show
-them, so they look like the real boards without using anyone's model.
+Everything else in the renders is drawn from KiCad's own libraries. The regulator modules too:
+`tools/gen_regulator_modules.py` puts stock KiCad parts where Pololu's dimension drawings and
+ProtoSupplies' MP1584 photos show them, and `tools/gen_regulator_marks.py` draws the Mornsun SIP
+and the part markings, so they look like the real things without using anyone's model.
 
 Hobby project, no certification claimed.

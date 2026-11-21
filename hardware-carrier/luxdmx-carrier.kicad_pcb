@@ -12051,6 +12051,66 @@
 				(xyz 0 0 0)
 			)
 		)
+		(model "${KIPRJMOD}/3dmodels/mp1584en-module.step"
+			(hide yes)
+			(offset
+				(xyz 0 -0 0.1)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 180)
+			)
+		)
+		(model "${KIPRJMOD}/3dmodels/mp1584en-module-marks.step"
+			(hide yes)
+			(offset
+				(xyz 0 -0 0.1)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 180)
+			)
+		)
+		(model "${KICAD10_3DMODEL_DIR}/Converter_DCDC.3dshapes/Converter_DCDC_RECOM_R-78E-0.5_THT.step"
+			(hide yes)
+			(offset
+				(xyz -7.88 1.27 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
+		)
+		(model "${KIPRJMOD}/3dmodels/recom-r78e-marks.step"
+			(hide yes)
+			(offset
+				(xyz -7.88 1.27 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
+		)
+		(model "${KIPRJMOD}/3dmodels/mornsun-k7805-1000r3.step"
+			(hide yes)
+			(offset
+				(xyz -7.88 1.27 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
+		)
 	)
 	(footprint "chip-universal-tvs"
 		(layer "B.Cu")
