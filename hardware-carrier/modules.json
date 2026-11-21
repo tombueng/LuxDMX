@@ -718,9 +718,9 @@
     "buck-module-universal": {
       "category": "power",
       "vendor": "generic",
-      "name": "Universal step-down module land pattern (12-24V -> 5V)",
+      "name": "Universal 12-24V -> 5V regulator spot: MP1584-class corner-pad modules, Pololu D24V10F5 / D36V28F5, 3-pin 78xx-style SIP",
       "confidence": "USER-SPECIFIED",
-      "source": "user spec 2026-08-01, shrunk 2026-08-13: modules in this class run from about 22 x 18 to 30 x 18 mm, so their pins sit about 18-26 mm apart across and 12-15 mm apart up the board. Pads are 12 x 5 mm on a 24 / 12 mm grid, which covers 12-36 mm across and 7-17 mm up. The first cut was 16 x 10 mm, generous in both directions; the height was insurance against a spread that does not exist, since every module in this class is 18 mm wide, and it cost 640 mm2 of solid back-side copper right where the signals cross to the right-hand headers. 240 mm2 now.",
+      "source": "user spec 2026-08-01, shrunk 2026-08-13: modules in this class run from about 22 x 18 to 30 x 18 mm, so their pins sit about 18-26 mm apart across and 12-15 mm apart up the board. Pads are 12 x 5 mm on a 24 / 12 mm grid, which covers 12-36 mm across and 7-17 mm up. The first cut was 16 x 10 mm, generous in both directions; the height was insurance against a spread that does not exist, since every module in this class is 18 mm wide, and it cost 640 mm2 of solid back-side copper right where the signals cross to the right-hand headers. 240 mm2 now. Extended 2026-11-21: two 0.1 in rows and two M2 holes for fixed 5 V modules, in the gap between the right-hand lands. Pin positions from the vendors' own drawings: Pololu d24v10fx dimension PDF + drill guide reg17a01-drill.dxf (5 pins on 0.1 in, 0.05 in in from the short edge and the side), Pololu d36v28fx dimension PDF + reg24g-drill.dxf (edge row at x 0.25-0.65 in, y 0.05 in; PG at 0.25/0.15 in; holes 2.18 mm at 0.085 in from two opposite corners), RECOM R-78E-1.0 datasheet p.4 and Mornsun K78xx-1000R3(L) datasheet p.4 (pin 1 +Vin, 2 GND, 3 +Vout, 2.54 mm).",
       "pcb": {
         "length": 22.0,
         "width": 40.0
@@ -759,13 +759,144 @@
           "net": "+5V"
         }
       ],
-      "orientation": "input LEFT, output RIGHT, minus TOP, plus BOTTOM",
+      "orientation": "corner lands: input LEFT, output RIGHT, minus TOP, plus BOTTOM (top view). Row A: VOUT GND VIN SHDN PG, row B: VOUT GND GND VIN EN, both read from x=17.2 towards x=7.04. D36V28 PG drops into row A's PG hole.",
       "gotchas": [
         "Pads are 12 x 5 mm with NO drill, larger than any single module pad, so the different module lengths all land on copper. Covers 22 x 18 and 30 x 18 mm modules with margin. Do not grow them back: this is the largest back-side obstacle on the board and the routing is tight around it.",
         "The four lands carry a solder mask GRID, not one big opening: 7 x 3 windows of 1.1 mm on a 1.6 mm pitch, 0.5 mm of mask between them, laid by tools/mask_grid.py. The copper stays one continuous 12 x 5 mm piece, only the mask is broken up. A 60 mm2 opening is miserable to hand solder, the tin runs out flat across it instead of standing up round the pin. Re-run mask_grid.py after regenerating this footprint, gen_footprints.py does not know about it.",
         "Envelope is 40 x 22 mm. 30 mm tall would NOT fit: the S3's pin rows leave only 23.7 mm of clear back-side strip and a taller pattern would short onto its through-hole pads.",
         "Deliberately placed under the S3, not under the display: under the display it would sit against the antenna keepout, and a switching node next to a WiFi antenna is the worst possible neighbour.",
-        "Check your module's pin order before soldering: this pattern assumes in-left / out-right / minus-top / plus-bottom."
+        "Check your module's pin order before soldering: this pattern assumes in-left / out-right / minus-top / plus-bottom.",
+        "Row A takes the Pololu D24V10F5 (all five pins) and a 3-pin 78xx-style SIP (VIN/GND/VOUT on row A's VIN/GND/VOUT, body towards the corner lands). Row B takes the D36V28F5 edge row; its PG pin lands in row A's PG hole. SHDN, PG and EN have no net: Pololu pulls SHDN and EN up to VIN through 100k, PG is open drain.",
+        "Pololu modules go label side to the board, components facing out, the way a breadboard module sits. Turned over, VIN and VOUT swap.",
+        "The two M2 holes are plated GND and replace the stitching vias that were at board (186.5, 100) and (174.5, 84). They are the D36V28F5's own holes.",
+        "With a corner-pad module fitted flat, rows A/B sit open under its belly: tape (Kapton) between them.",
+        "Courtyard is the union of the 40 x 22 envelope and the three module bodies, so it has a tab above the right-hand lands."
+      ],
+      "tht_pads": [
+        {
+          "name": "VOUT",
+          "row": "A",
+          "x": 17.2,
+          "y": 9.73,
+          "net": "+5V"
+        },
+        {
+          "name": "GND",
+          "row": "A",
+          "x": 14.66,
+          "y": 9.73,
+          "net": "GND"
+        },
+        {
+          "name": "VIN",
+          "row": "A",
+          "x": 12.12,
+          "y": 9.73,
+          "net": "V_PIX",
+          "shape": "rect"
+        },
+        {
+          "name": "SHDN",
+          "row": "A",
+          "x": 9.58,
+          "y": 9.73,
+          "net": null
+        },
+        {
+          "name": "PG",
+          "row": "A",
+          "x": 7.04,
+          "y": 9.73,
+          "net": null
+        },
+        {
+          "name": "VOUT",
+          "row": "B",
+          "x": 17.2,
+          "y": 12.27,
+          "net": "+5V"
+        },
+        {
+          "name": "GND",
+          "row": "B",
+          "x": 14.66,
+          "y": 12.27,
+          "net": "GND"
+        },
+        {
+          "name": "GND",
+          "row": "B",
+          "x": 12.12,
+          "y": 12.27,
+          "net": "GND"
+        },
+        {
+          "name": "VIN",
+          "row": "B",
+          "x": 9.58,
+          "y": 12.27,
+          "net": "V_PIX",
+          "shape": "rect"
+        },
+        {
+          "name": "EN",
+          "row": "B",
+          "x": 7.04,
+          "y": 12.27,
+          "net": null
+        },
+        {
+          "name": "M2",
+          "x": 2.87,
+          "y": 11.34,
+          "net": "GND",
+          "drill": 2.2,
+          "size": 3.2
+        },
+        {
+          "name": "M2",
+          "x": 16.27,
+          "y": -4.56,
+          "net": "GND",
+          "drill": 2.2,
+          "size": 3.2
+        }
+      ],
+      "bodies": [
+        {
+          "name": "D24V10F5",
+          "x0": 5.77,
+          "y0": -6.8,
+          "x1": 18.47,
+          "y1": 11.0
+        },
+        {
+          "name": "D36V28F5",
+          "x0": 0.67,
+          "y0": -6.76,
+          "x1": 18.47,
+          "y1": 13.54
+        },
+        {
+          "name": "78xx SIP",
+          "x0": 8.91,
+          "y0": 2.88,
+          "x1": 20.51,
+          "y1": 11.88
+        }
+      ],
+      "courtyard": "union",
+      "silk_text": [
+        {
+          "text": "A",
+          "x": 18.9,
+          "y": 9.73
+        },
+        {
+          "text": "B",
+          "x": 18.9,
+          "y": 12.27
+        }
       ]
     }
   }

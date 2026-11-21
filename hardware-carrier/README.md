@@ -14,7 +14,7 @@ The board is built and runs on the bench; most firmware testing happens on it.
 | DMX / RDM | up to 3 ports, one MAX3485 module each, direction pin driven, **not isolated** |
 | Pixels | up to 5 WS281x ports, buffered to 5 V by a 74HCT541 |
 | Network | wired with a W5500 module (recommended), or WiFi with an external antenna, see [Network](#network-w5500-or-an-external-antenna) |
-| Logic supply | USB-C on the ESP module, external 5 V, or a buck module off the pixel rail |
+| Logic supply | USB-C on the ESP module, external 5 V, or a 5 V regulator module off the pixel rail (Pololu D24V10F5 recommended, MP1584EN, D36V28F5 and 78xx-style SIPs fit too) |
 | Pixel supply | 12 or 24 V screw terminal, fused on the board, 9.8 A max |
 | UI | 1.3" SH1106 OLED, EC11 encoder with push switch, two buttons |
 | Firmware | **ESP32-S3 + PSRAM** image, then the **LuxDMX Carrier** board in `/config` |
@@ -134,14 +134,47 @@ MF-R500: ECE RB500-30, Littelfuse RUEF500. Full list in [`production/BOM.md`](pr
 
 Never polyfuse and bridge together.
 
-### Buck module
+### Regulator
 
-MP1584EN step-down module. Input max **28 V**, so a 24 V supply must not idle above that. **Set it to
-5.0 V before soldering it in**: they ship with the trimmer anywhere, and 12 V on `+5V` kills the ESP32,
-the W5500 and the display. Input is `V_PIX`, so it sits behind the fuse.
+The `5V Buck Converter` spot on the back makes `+5V` from `V_PIX`, so it sits behind the fuse. It
+takes four kinds of module. Fit one.
 
-The land is four 12 x 5 mm pads with a solder-mask grid (7 x 3 windows of 1.1 mm), so modules from
-22 x 18 to 30 x 18 mm land. LM2596 modules (43 x 21 mm) do not fit.
+| Module | Rating | Sits on | |
+|---|---|---|---|
+| **Pololu D24V10F5** | 5 V, 1 A, 5.1-36 V in | row A, all 5 pins | **recommended** |
+| Pololu D36V28F5 | 5 V, 3.2 A, 5.3-50 V in | row B (PG optional, into row A's last hole), two M2 holes | plenty of headroom |
+| 78xx-style SIP: RECOM R-78E5.0-1.0, Mornsun K7805-1000R3 | 5 V, 1 A | row A, pins 3/2/1 on VOUT/GND/VIN | 10.4 / 17.5 mm tall |
+| MP1584EN mini module, ~22 x 17 mm | adjustable, 28 V max in | the four 12 x 5 mm corner lands | **set to 5.0 V first** |
+
+Why the D24V10F5: the worst case on `+5V` is about 0.7 A, from datasheet numbers, not measured
+(S3 transmitting on WiFi ~355 mA, PSRAM/flash ~50, W5500 ~135, three MAX3485 into 54 Ω ~120,
+OLED ~30, LED ~20, buffer ~10). 1 A covers that. It's fixed at 5 V, so there's no trimmer to set
+wrong, and 36 V in is relaxed on a 24 V rail. The MP1584EN is fine on 12 V, but its 28 V maximum
+is tight on 24 V supplies (they idle above 24), and it ships with the trimmer anywhere: 12 V on
+`+5V` kills the ESP32, the W5500 and the display. Pololu's D36V6F5 (600 mA) is too small, LM2596
+boards (43 x 21 mm) don't fit.
+
+How they sit:
+
+- **Corner lands** (MP1584 class): four 12 x 5 mm pads with a solder-mask grid (7 x 3 windows of
+  1.1 mm), so modules from 22 x 18 to 30 x 18 mm land. `VIN-`/`VIN+` on one end, `VOUT-`/`VOUT+`
+  on the other, as the silk says. Rows A and B are bare copper under the module's belly, so put a
+  bit of Kapton tape in between.
+- **Row A** (0.1 in, silk `A`), from the mark: VOUT, GND, VIN, SHDN, PG. The D24V10F5 takes all
+  five. A 3-pin SIP takes VOUT/GND/VIN (pin 3/2/1) with its body towards the minus lands.
+- **Row B** (silk `B`), from the mark: VOUT, GND, GND, VIN, EN. The D36V28F5's edge row. Its PG
+  pin, if you fit one, drops into row A's PG hole. The two plated M2 holes are GND and match the
+  module's own.
+- Both rows sit in the gap between the input lands, with the module bodies hanging over the minus
+  lands and the space above them.
+- SHDN, PG and EN have no net. Pololu pulls SHDN and EN up to VIN through 100k, PG is open drain.
+- **Pololu modules go label side to the board**, parts facing out, like on a breadboard. Turned
+  over, VIN and VOUT swap.
+
+Pin positions are from the vendors' drawings (Pololu dimension PDFs and drill-guide DXFs, RECOM
+R-78E-1.0 and Mornsun K78xx-1000R3 datasheets), written into `modules.json` and generated into the
+footprint by `tools/gen_footprints.py`. `tools/update_buck_footprint.py` put them on the routed
+board. None of the four has been fitted to a real carrier yet.
 
 ### Current rating
 
@@ -308,7 +341,7 @@ BOM, the lands take 0402 to 1206.
 
 | Part | Value / part number | Fit when |
 |---|---|---|
-| `5V Buck Converter` | MP1584EN module, set to 5.0 V first | logic from 12/24 V, no USB, no `5V IN` |
+| `5V Buck Converter` | Pololu D24V10F5 (or D36V28F5, a 78xx-style SIP, an MP1584EN set to 5.0 V first), see [Regulator](#regulator) | logic from 12/24 V, no USB, no `5V IN` |
 | `5V IN` | 1x2 pin header | external 5 V instead of USB |
 | `100nF` | 100 nF X7R, CL31B104KBCNNNC (C24497) | recommended |
 | `22uF 3V3 bulk` | 22 µF 6.3 V X5R, CL31A226MQHNNNE (C159757) | recommended |
@@ -366,7 +399,7 @@ for LCSC's BOM tool and for JLCPCB assembly alike.
 | 1206 resistors and capacitors, TVS diodes | ESP32-S3-DevKitC-1 clone, 25.40 mm rows (LCSC's Espressif original doesn't fit) |
 | 74AHCT541 pixel buffer | MAX3485 modules with EN pin, one per DMX port |
 | 1000 µF electrolytic, MF-R500 polyfuse | USR-ES1 W5500 module |
-| screw terminals: DMX (2.54 mm), pixels and inlet (5.08 mm) | MP1584EN buck module |
+| screw terminals: DMX (2.54 mm), pixels and inlet (5.08 mm) | 5 V regulator: Pololu D24V10F5 (or see [Regulator](#regulator)) |
 | EC11 encoder, two 6 x 6 mm buttons | 1.3" SH1106 I2C OLED |
 | 8.5 mm female socket for the display | male pin headers for the module rows, `5V IN`, `EXP` |
 | | blade fuse holder (alternative to the polyfuse), encoder knob |
@@ -430,7 +463,7 @@ when your bus wants them.
 
 1. Back side first: all small parts sit under the modules.
 2. Then the headers and sockets on the front.
-3. Set the buck to 5.0 V, then solder it.
+3. The 5 V regulator: Pololu label side down. An MP1584 gets set to 5.0 V first, then soldered.
 4. Plug in the modules.
 
 Hand soldering only. Resistor and capacitor lands run 0.30 to 2.30 mm off centre, so 0402, 0603,
@@ -441,7 +474,8 @@ self-aligns, so this board doesn't reflow.
 ## Before you power it
 
 - **One 5 V source at a time.** USB, `5V IN` and the buck share `+5V` with no diodes.
-- **Buck set to 5.0 V** before it goes on the board.
+- **Adjustable buck (MP1584) set to 5.0 V** before it goes on the board. The fixed 5 V modules
+  don't need it, check the Pololu is label side down.
 - **Pixel power goes into `12-24V IN`**, also for 5 V pixels. USB and `5V IN` don't reach `V+`, see
   [5 V pixels and USB](#5-v-pixels-and-usb).
 - **Polyfuse or bridge or blade fuse**, exactly one.

@@ -248,7 +248,7 @@ headers.
 | EC11 rotary encoder (the part inside a KY-040, no pull-ups needed) | you want the on-unit menu |
 | 2 × 6x6 mm tact switch | you want the buttons (IO3 and IO46). Plunger length is up to you, 30 mm reaches the same front panel as the encoder shaft |
 | **Supply and misc** | |
-| MP1584EN buck module | you power the logic from the 12/24 V pixel supply |
+| 5 V regulator module: Pololu D24V10F5 (MP1584EN, D36V28F5 or a 78xx-style SIP fit too) | you power the logic from the 12/24 V pixel supply |
 | `5V IN` header | 5 V comes from outside instead of USB |
 | 100 nF + 22 µF on 3.3 V | recommended |
 | `EXP` header | spare pins: 3.3 V, GND, the UART0 pins and IO47/48 (pixel 4 and 5, unbuffered) |
@@ -279,9 +279,12 @@ that, and on a module trap with USB, in
 **One 5 V source at a time.** USB, `5V IN` and the buck share one rail with no diodes between them.
 With the buck fitted, don't plug in USB while the 12/24 V is on, the two will fight.
 
-**Set the buck to 5.0 V before you solder it in.** They arrive with the trimmer anywhere, and 12 V on
-the logic rail takes out the ESP32, the W5500 and the display in one go. The MP1584EN tops out at
-28 V input, so a 24 V supply that idles higher than that is a problem.
+**Which regulator.** The spot takes a Pololu D24V10F5, a D36V28F5, a 78xx-style SIP or a cheap
+MP1584EN board. Get the D24V10F5: fixed 5 V, 1 A (the worst-case peak from the datasheets is about
+0.7 A), 36 V in. The MP1584EN works but it's adjustable, so **set it to 5.0 V before you solder it
+in**: they arrive with the trimmer anywhere, and 12 V on the logic rail takes out the ESP32, the
+W5500 and the display in one go. It also tops out at 28 V input, which is tight on a 24 V supply.
+Where each one goes: [`hardware-carrier/README.md`](hardware-carrier/README.md#regulator).
 
 **The fuse, pick exactly one:**
 

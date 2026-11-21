@@ -81,7 +81,8 @@ def emit(fid, mod):
         descr += "ASSUMED GEOMETRY - 1:1 paper test MANDATORY before fab. "
     descr += f"Source: {mod.get('source','')}"
     lines.append(f'  (descr "{descr.replace(chr(34), chr(39))}")')
-    lines.append('  (attr %s)' % ("smd" if (smd and not headers) else "through_hole"))
+    tht = mod.get("tht_pads") or []
+    lines.append('  (attr %s)' % ("smd" if (smd and not headers and not tht) else "through_hole"))
     lines.append(f'  (fp_text reference "REF**" (at 0 {-oy-1.6:.3f}) (layer "F.SilkS")'
                  ' (effects (font (size 1 1) (thickness 0.15))))')
     lines.append(f'  (fp_text value "{name}" (at 0 {oy+1.6:.3f}) (layer "F.Fab")'
@@ -99,8 +100,26 @@ def emit(fid, mod):
         lines.append(f'  (pad "{padno}" smd rect (at {x:.3f} {y:.3f})'
                      f' (size {sp["w"]} {sp["h"]})'
                      ' (layers "F.Cu" "F.Paste" "F.Mask"))')
-        lines.append(f'  (fp_text user "{sp["name"]}" (at {x:.3f} {y - sp["h"]/2 - 0.9:.3f})'
+        # label on the outer side of the land, so nothing in between gets written over
+        ly = y - sp["h"]/2 - 0.9 if y <= 0 else y + sp["h"]/2 + 0.9
+        lines.append(f'  (fp_text user "{sp["name"]}" (at {x:.3f} {ly:.3f})'
                      ' (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))')
+    # Loose through-holes on top of an SMD land pattern: rows for modules with a pin header,
+    # and plated mounting holes. Numbered after the SMD pads, in the order modules.json lists
+    # them; the nets live in modules.json too and are set on the board, not here.
+    for tp in tht:
+        padno += 1
+        x = tp["x"] - ox
+        y = tp["y"] - oy
+        size = tp.get("size", PAD_SIZE)
+        tdrill = tp.get("drill", drill)
+        shape = tp.get("shape", "circle")
+        lines.append(f'  (pad "{padno}" thru_hole {shape} (at {x:.3f} {y:.3f})'
+                     f' (size {size} {size}) (drill {tdrill})'
+                     ' (layers "*.Cu" "*.Mask"))')
+        label = tp["name"] + (f' {tp["row"]}' if tp.get("row") else "")
+        lines.append(f'  (fp_text user "{label}" (at {x:.3f} {y + size/2 + 0.45:.3f})'
+                     ' (layer "F.Fab") (effects (font (size 0.4 0.4) (thickness 0.06))))')
     if smd and not headers:
         headers = []
     pin1_pos = None
@@ -135,9 +154,32 @@ def emit(fid, mod):
         lines.append(f'  (fp_rect (start {x0:.3f} {y0:.3f}) (end {x1:.3f} {y1:.3f})'
                      f' (stroke (width {wdt}) (type solid)) (fill none) (layer "{layer}"))')
 
+    # Module bodies that may sit on the land, each its own outline on F.Fab.
+    for bd in mod.get("bodies", []):
+        x0, y0, x1, y1 = bd["x0"] - ox, bd["y0"] - oy, bd["x1"] - ox, bd["y1"] - oy
+        lines.append(f'  (fp_rect (start {x0:.3f} {y0:.3f}) (end {x1:.3f} {y1:.3f})'
+                     f' (stroke (width {FAB_W}) (type dash)) (fill none) (layer "F.Fab"))')
+        lines.append(f'  (fp_text user "{bd["name"]}" (at {(x0 + x1) / 2:.3f} {y0 + 0.8:.3f})'
+                     ' (layer "F.Fab") (effects (font (size 0.6 0.6) (thickness 0.08))))')
+    for st in mod.get("silk_text", []):
+        lines.append(f'  (fp_text user "{st["text"]}" (at {st["x"] - ox:.3f} {st["y"] - oy:.3f})'
+                     ' (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))')
+
     c = CRTYD_MARGIN
-    lines.append(f'  (fp_rect (start {-ox-c:.3f} {-oy-c:.3f}) (end {ox+c:.3f} {oy+c:.3f})'
-                 f' (stroke (width {CRTYD_W}) (type solid)) (fill none) (layer "F.CrtYd"))')
+    if mod.get("courtyard") == "union" and mod.get("bodies"):
+        # One outline round the envelope and every body that can sit on it.
+        from shapely.geometry import box
+        from shapely.ops import unary_union
+        shape = unary_union([box(-ox - c, -oy - c, ox + c, oy + c)] +
+                            [box(bd["x0"] - ox - c, bd["y0"] - oy - c,
+                                 bd["x1"] - ox + c, bd["y1"] - oy + c)
+                             for bd in mod["bodies"]]).simplify(0.001)
+        pts = " ".join(f"(xy {x:.3f} {y:.3f})" for x, y in list(shape.exterior.coords)[:-1])
+        lines.append(f'  (fp_poly (pts {pts})'
+                     f' (stroke (width {CRTYD_W}) (type solid)) (fill none) (layer "F.CrtYd"))')
+    else:
+        lines.append(f'  (fp_rect (start {-ox-c:.3f} {-oy-c:.3f}) (end {ox+c:.3f} {oy+c:.3f})'
+                     f' (stroke (width {CRTYD_W}) (type solid)) (fill none) (layer "F.CrtYd"))')
 
     # pin-1 marker, so a mirrored placement is visible on the board
     if pin1_pos:

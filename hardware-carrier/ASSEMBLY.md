@@ -22,7 +22,7 @@ Almost nothing here is mandatory.
 
 | Part | Side | Fit it when | Note |
 |---|---|---|---|
-| `5V Buck Converter` | back | supplied from 12/24 V **and** neither 5V-IN nor USB connected | Set it to 5.0 V **before** soldering it in. |
+| `5V Buck Converter` | back | supplied from 12/24 V **and** neither 5V-IN nor USB connected | Pololu D24V10F5 is the easy pick (fixed 5 V, row A). Other modules that fit: see *The 5 V regulator* below. |
 | `5V IN` | front | 5 V comes from outside | Alternative to USB and the buck. |
 | `F1` | front | you would rather replace a blown fuse than wait for a polyfuse to cool | Alternative to the polyfuse, never both. Its own two holes, same nets. |
 
@@ -163,6 +163,39 @@ its two left holes. Not a component, just a blob of solder.
 
 Exactly one of the two. Both together is a bridged fuse, which is no fuse.
 
+## The 5 V regulator
+
+The spot on the back takes four kinds of module, all on the same nets: input from the pixel
+rail behind the fuse, GND, and 5 V out to the logic rail. Fit **one**.
+
+Worst case on 5 V is about 0.7 A (datasheet numbers: S3 with WiFi transmitting, W5500, three
+RS-485 transceivers driving a terminated bus, OLED, LED, buffer). Anything rated 1 A covers it.
+
+| Module | Rating | Where | Notes |
+|---|---|---|---|
+| **Pololu D24V10F5** (recommended) | 5 V, 1 A, 5.1-36 V in | row A, all 5 pins | Fixed 5 V, nothing to set. Fine on 24 V. 12.7 x 17.8 mm. |
+| Pololu D36V28F5 | 5 V, 3.2 A, 5.3-50 V in | row B, PG pin (optional) in row A's last hole | Two M2 holes on the carrier match the module's. Overkill here, but bulletproof on 24 V. |
+| 78xx-style SIP, RECOM R-78E5.0-1.0 or Mornsun K7805-1000R3 | 5 V, 1 A | row A, the VOUT / GND / VIN holes (pin 3 / 2 / 1) | Body towards the minus lands. Standing height 10.4 mm (RECOM) or 17.5 mm (Mornsun). |
+| MP1584EN mini module, ~22 x 17 mm | adjustable, 28 V max in | the four big corner lands | **Set it to 5.0 V first.** Fine on 12 V; on 24 V the 28 V limit is tight. Put Kapton tape under it, rows A/B are bare copper under its belly. |
+
+Rows A and B sit between the two input lands (`VIN-` and `VIN+`). Silk marks them `A` and
+`B`; row A is the one nearer the minus lands.
+
+- Row A from the `A` mark: VOUT, GND, VIN, SHDN, PG.
+- Row B from the `B` mark: VOUT, GND, GND, VIN, EN.
+
+SHDN, PG and EN have no net. Pololu pulls SHDN and EN up to VIN with 100k, so the regulator
+just runs. PG is an open-drain output nobody reads.
+
+**Pololu modules go on label side down**, components facing away from the carrier, the way you
+would plug them into a breadboard. Solder the header into the module first, then into the
+carrier. Flipped over, VIN and VOUT swap and the module dies on power-up.
+
+Three of the GND holes are connected solid to the pours, not through thermal spokes, because
+there's no room for spokes between the neighbouring pins. They want a bit more heat.
+
+D36V6F5 (600 mA) is too small, LM2596 boards (43 x 21 mm) don't fit.
+
 ## Watch out
 
 **One 5 V source at a time.** USB, the 5V-IN header and the buck share a rail and back-feed
@@ -173,8 +206,10 @@ is no reverse or ORing protection on the board.
 for 5 V pixels like WS2812, and then without the buck. Details and the USB trap on some S3 modules
 in [the README](README.md#5-v-pixels-and-usb).
 
-**Set the buck before soldering it in.** These modules have a trimmer and arrive in any
-position. At 12 V out the ESP32, the W5500 and the display all go at once.
+**An adjustable buck gets set before it goes on.** The MP1584 modules have a trimmer and
+arrive in any position. At 12 V out the ESP32, the W5500 and the display all go at once. The
+fixed 5 V parts (Pololu, 78xx SIP) don't have that problem, which is half the reason they're
+the recommendation.
 
 **120 R only at the end of the bus.** And check the RS-485 module first, the cheap ones
 usually carry 120 R and bias already. A second one puts 60 R on the bus.

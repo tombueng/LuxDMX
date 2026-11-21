@@ -126,23 +126,26 @@ The links are examples from 2026-08-16 and will rot. The **search terms** are th
 
 ### 1 x 12-24V -> 5V buck
 
-DC-DC step-down to 5 V, adjustable, 1 A or more
+5 V step-down. Recommended: Pololu D24V10F5 (fixed 5 V, 1 A, 5.1-36 V in). Also fits: Pololu D36V28F5, an MP1584EN mini module (set it to 5.0 V first), or a 3-pin 78xx-style SIP (RECOM R-78E5.0-1.0, Mornsun K7805-1000R3)
 
 | Platform | Search term |
 |---|---|
-| amazon | `MP1584EN DC-DC step down module 3A adjustable` |
-| ebay | `MP1584EN buck converter 3A adjustable` |
+| pololu | `D24V10F5 (product 2831), or D36V28F5 (product 3782)` |
+| amazon | `Pololu D24V10F5 5V 1A step-down regulator` |
+| ebay | `Pololu D24V10F5` |
 | aliexpress | `MP1584EN DC-DC step down module 3A` |
 
 | Platform | Offer | Price |
 |---|---|---|
+| pololu | [D24V10F5, 5 V 1 A (recommended)](https://www.pololu.com/product/2831) | US$ 13.95 (2026-11-21, active) |
+| pololu | [D36V28F5, 5 V 3.2 A, up to 50 V in](https://www.pololu.com/product/3782) | US$ 23.95 (2026-11-21, rationed) |
 | amazon | [HiLetgo 5x MP1584EN Mini Buck](https://www.amazon.com/HiLetgo-MP1584EN-Adjustable-Module-Effect/dp/B00LTQU4EQ) | approx. 1.50 EUR ea |
 | amazon | [Rakstore 4x MP1584 Step-Down](https://www.amazon.com/Rakstore-MP1584EN-Adjustable-Converter-Arduino/dp/B09J4KH116) | approx. 1.50-2 EUR ea |
 | ebay | [MP1584EN DC-DC Step Down 3A](https://www.ebay.com/itm/165434363045) | approx. 1-2 EUR |
 | aliexpress | [MP1584EN 5/10 pcs adjustable](https://www.aliexpress.us/item/3256807294351325.html) | approx. 0.40-0.80 EUR ea |
 | aliexpress | [MP1584 DC-DC 3A Buck, 10 pcs](https://www.aliexpress.us/item/3256803643955109.html) | approx. 0.50 EUR ea |
 
-> MP1584EN rather than LM2596: the LM2596 module is about 43 x 21 mm and no longer fits the 40 x 22 mm envelope. The MP1584EN input is rated to 28 V, so a 24 V supply must not rise above that at no load. Set it to 5.0 V BEFORE soldering it in.
+> Worst case on +5V is about 0.7 A (datasheet numbers: S3 WiFi TX ~355 mA, PSRAM/flash ~50, W5500 ~135, 3x MAX3485 into 54 ohm ~120, OLED ~30, LED ~20, buffer ~10). The D24V10F5 covers that with margin, takes 24 V rails without worry and has no trimmer to get wrong. The MP1584EN is fine on 12 V but its 28 V input limit is tight on a 24 V supply, and it has to be set to 5.0 V BEFORE soldering. Pololu D36V6F5 (600 mA) is too small. LM2596 modules (43 x 21 mm) do not fit. Where each one goes on the land: hardware-carrier/README.md, Power, Regulator.
 
 ### 1 x Blade fuse holder, alternative to the polyfuse
 

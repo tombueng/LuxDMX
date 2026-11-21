@@ -66,6 +66,8 @@ def expected_pads(mod):
     out = []
     for sp in mod.get("smd_pads") or []:
         out.append((sp["x"] - ox, sp["y"] - oy))
+    for tp in mod.get("tht_pads") or []:
+        out.append((tp["x"] - ox, tp["y"] - oy))
     for hdr in mod.get("headers") or []:
         p1 = hdr["pin1"]
         step = hdr.get("pitch", 2.54)
@@ -131,6 +133,20 @@ def main():
                 fail(f"{fn}: pad {num} at ({gx:.3f},{gy:.3f}), modules.json says "
                      f"({ex:.3f},{ey:.3f}), off by "
                      f"({gx-ex:+.3f},{gy-ey:+.3f}) mm")
+
+        # loose through-hole rows on a land pattern: each row must sit on a straight 0.1 in
+        # line, or a pin header will not go in
+        rows = {}
+        for tp in mod.get("tht_pads") or []:
+            if tp.get("row"):
+                rows.setdefault(tp["row"], []).append((tp["x"], tp["y"]))
+        for row, pts in rows.items():
+            if len({round(y, 3) for _, y in pts}) != 1:
+                fail(f"{fn}: row {row} is not straight")
+            xs = sorted(x for x, _ in pts)
+            for a, c in zip(xs, xs[1:]):
+                if abs((c - a) - 2.54) > TOL:
+                    fail(f"{fn}: row {row} pitch {c - a:.3f} mm, a 0.1 in header needs 2.54")
 
         # SMD land patterns are all rect by nature and have no pin-1 convention
         if mod.get("smd_pads") and not mod.get("headers"):

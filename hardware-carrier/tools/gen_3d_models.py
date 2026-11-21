@@ -47,7 +47,7 @@ XY = {
     "desk_binghe-esp32-s3-devkitc1-n16r8-usbc": (27.9, 57.5),
     "usr-es1-w5500": (25.0, 15.0),
     "polyfuse-dual-pitch": (24.2, 3.0),
-    "buck-module-universal": (26.0, 18.0),
+    "buck-module-universal": (12.7, 17.8),     # the D24V10F5 drawn by d24v10_parts()
 }
 
 #  footprint id -> (height mm, standoff mm, rgb, what it is)
@@ -59,7 +59,7 @@ MODELS = {
     "usr-es1-w5500":
         (14.0, 2.5, (0.15, 0.15, 0.18), "W5500 mit RJ45, der Buchsenkoerper dominiert"),
     "buck-module-universal":
-        (4.5, 0.0, (0.35, 0.10, 0.10), "Buck, SMD auf der Rueckseite"),
+        (6.3, 0.0, (0.10, 0.42, 0.16), "Pololu D24V10F5 auf Stiftleiste in Reihe A (die Empfehlung)"),
     "polyfuse-dual-pitch":
         (25.0, 1.0, (0.60, 0.45, 0.10), "MF-R500/900, stehende Scheibe, ca. 25 mm hoch"),
 }
@@ -107,6 +107,67 @@ Transform {{
     open(path, "w", encoding="utf-8").write(body)
 
 
+def d24v10_parts():
+    """The regulator spot's model: the recommended part, a Pololu D24V10F5, on a 0.1 in header
+    in row A, label side to the board. Boxes in footprint coordinates (mm, y down, origin at the
+    footprint centre). Pin positions and the body come from modules.json; the parts on top
+    (inductor, regulator IC, caps) are placed after Pololu's top-view drawing (d24v10fx
+    dimension PDF): inductor about 6 x 6 mm next to the VOUT end, 2.8 mm tall per the profile.
+    Pin row, header plastic and the module board are what matter for fit; the rest is so it
+    reads as that part in a render."""
+    import json
+    with open(os.path.join(HERE, "modules.json")) as f:
+        m = json.load(f)["modules"]["buck-module-universal"]
+    ox, oy = m["pcb"]["width"] / 2.0, m["pcb"]["length"] / 2.0
+    body = next(b for b in m["bodies"] if b["name"] == "D24V10F5")
+    x0, y0, x1, y1 = body["x0"] - ox, body["y0"] - oy, body["x1"] - ox, body["y1"] - oy
+    pins = [(t["x"] - ox, t["y"] - oy) for t in m["tht_pads"] if t.get("row") == "A"]
+    row_y = pins[0][1]
+    HDR, PCB, TOP = 2.5, 1.0, 2.8          # header plastic, module board, tallest part
+    green, black, grey, gold = (0.10, 0.42, 0.16), (0.04, 0.04, 0.04), (0.20, 0.20, 0.22), (0.80, 0.65, 0.20)
+    parts = [
+        # header plastic, one 2.54 mm cell per pin
+        (x1 - x0 - 0.2, 2.5, HDR, (x0 + x1) / 2, row_y, 0.0, black),
+        # module board, label side down on the plastic
+        (x1 - x0, y1 - y0, PCB, (x0 + x1) / 2, (y0 + y1) / 2, HDR, green),
+    ]
+    for px, py in pins:   # 0.64 mm square pins, from under the carrier to just above the module
+        parts.append((0.64, 0.64, 1.6 + 3.0 + HDR + PCB + 0.6, px, py, -1.6 - 3.0, gold))
+    # top-view drawing, origin bottom-left of the module = (x0, y1) here, "up" = -y
+    def on_top(ax, ay, bx, by, h, rgb):
+        parts.append((bx - ax, by - ay, h, x0 + (ax + bx) / 2, y1 - (ay + by) / 2, HDR + PCB, rgb))
+    on_top(5.7, 2.9, 11.7, 8.9, TOP, grey)       # inductor
+    on_top(1.1, 9.7, 5.3, 13.5, 1.0, black)      # regulator IC
+    on_top(6.6, 10.4, 8.2, 13.6, 1.2, (0.55, 0.45, 0.30))   # input / output caps
+    on_top(8.8, 10.4, 10.4, 13.6, 1.2, (0.55, 0.45, 0.30))
+    on_top(1.3, 4.0, 3.5, 5.3, 0.9, (0.55, 0.45, 0.30))
+    return parts
+
+
+def wrl_parts(path, parts, note):
+    """Several boxes in one file: (w, l, h, cx, cy, z0, rgb) each, mm."""
+    out = ["#VRML V2.0 utf8", f"# {note}",
+           "# Erzeugt von gen_3d_models.py, nicht von Hand pflegen."]
+    for w, l, h, cx, cy, z0, (r, g, b) in parts:
+        out.append(f"""Transform {{
+  translation {cx/U:.6f} {-cy/U:.6f} {(z0 + h/2)/U:.6f}
+  children [
+    Shape {{
+      appearance Appearance {{
+        material Material {{
+          diffuseColor {r:.3f} {g:.3f} {b:.3f}
+          specularColor 0.10 0.10 0.10
+          ambientIntensity 0.30
+          shininess 0.15
+        }}
+      }}
+      geometry Box {{ size {w/U:.6f} {l/U:.6f} {h/U:.6f} }}
+    }}
+  ]
+}}""")
+    open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
+
+
 def main():
     dry = "--dry-run" in sys.argv
     os.makedirs(OUTDIR, exist_ok=True)
@@ -127,7 +188,9 @@ def main():
             cx, cy = 5.1, 0.6      # centred on the 10.2 mm hole pair, which is the 9 A part
         path = os.path.join(OUTDIR, fid + ".wrl")
         if fid not in done:
-            if not dry:
+            if not dry and fid == "buck-module-universal":
+                wrl_parts(path, d24v10_parts(), note)
+            elif not dry:
                 wrl(path, w, l, h, cx, cy, z0, rgb, note)
             print(f"{fid[:40]:42s} {w:5.1f} x {l:5.1f} x {h:5.1f} mm  "
                   f"Mitte ({cx:+5.1f},{cy:+5.1f})  {note}")
