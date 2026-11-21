@@ -12028,9 +12028,21 @@
 			(uuid "26b34ded-5a4a-4b5a-b174-b367525c4dcb")
 		)
 		(embedded_fonts no)
-		(model "${KIPRJMOD}/3dmodels/buck-module-universal.wrl"
+		(model "${KIPRJMOD}/3dmodels/pololu-d24v10f5.step"
 			(offset
+				(xyz -7.88 8.9 2.54)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
 				(xyz 0 0 0)
+			)
+		)
+		(model "${KIPRJMOD}/3dmodels/pololu-d36v28f5.step"
+			(hide yes)
+			(offset
+				(xyz -10.43 7.61 2.54)
 			)
 			(scale
 				(xyz 1 1 1)

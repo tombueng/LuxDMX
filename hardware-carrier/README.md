@@ -176,6 +176,11 @@ R-78E-1.0 and Mornsun K78xx-1000R3 datasheets), written into `modules.json` and 
 footprint by `tools/gen_footprints.py`. `tools/update_buck_footprint.py` put them on the routed
 board. None of the four has been fitted to a real carrier yet.
 
+The 3D view shows a D24V10F5 on row A. Its model, and the D36V28F5's (attached to the same
+footprint, hidden; switch it on in KiCad's 3D settings), are built from stock KiCad parts laid out
+like Pololu's drawings by `tools/gen_regulator_modules.py` (`modules/pololu-*.kicad_pcb`, exported
+to `3dmodels/pololu-*.step`).
+
 ### Current rating
 
 The pixel supply runs as 4.8 mm tracks from the inlet through the fuse along the terminal row. Each
@@ -522,6 +527,8 @@ which needs the original designer's explicit permission.
 The OLED module model is a third-party one whose licence has not been established. It is not
 part of this repository either, and it only affects how the renders look, not the board.
 
-Everything else in the renders is drawn from KiCad's own libraries.
+Everything else in the renders is drawn from KiCad's own libraries. The Pololu regulators too:
+`tools/gen_regulator_modules.py` puts stock KiCad parts where Pololu's dimension drawings show
+them, so they look like the real boards without using anyone's model.
 
 Hobby project, no certification claimed.
