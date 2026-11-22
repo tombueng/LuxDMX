@@ -78,7 +78,9 @@ body { background:#0d1117; animation:lxfade .16s ease-out; }
   <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
       <span>Fixtures (RDM)</span>
-      <div class="d-flex align-items-center gap-3">
+      <!-- flex-wrap: on a phone in portrait this row is wider than the card, and without it the
+           Discover buttons sat past the card's right edge (issue #150) -->
+      <div class="d-flex align-items-center flex-wrap gap-3 row-gap-2">
         <div class="form-check form-switch mb-0" title="Toggle all currently-selected sensors off, then back on. Never enables everything.">
           <input class="form-check-input" type="checkbox" id="live-sw" onclick="aggClick(event,'master')">
           <label class="form-check-label small" for="live-sw">Live sensors</label>
@@ -93,7 +95,7 @@ body { background:#0d1117; animation:lxfade .16s ease-out; }
           </select>
         </div>
         <span class="pill" id="art-port">&nbsp;</span>
-        <span id="disc-ctl" class="d-flex gap-1"></span>
+        <span id="disc-ctl" class="d-flex flex-wrap gap-1"></span>
       </div>
     </div>
     <div class="card-body">

@@ -14,12 +14,16 @@ you actually set some pins in `/config`. A board with no encoder pays nothing.
 
 - **Set the universe** for each output, live, shown big on the display.
 - **Switch the input protocol** (Art-Net / sACN / both).
+- **Switch the network** between WiFi (joins your network), WiFi AP (the box makes
+  its own) and Ethernet, issue [#150](https://github.com/tombueng/LuxDMX/issues/150).
+  Handy for a travel box: phone as hotspot in one place, phone joining the box in
+  the next. Ethernet only shows up when a wired PHY is set in `/config`.
 - Two outputs? You get a "Uni A" / "Uni B" pair in the menu. One output? It just
   says "Universe".
 - The choice persists (NVS), same as the web UI.
 
-The menu is deliberately small right now (universes, protocol, exit). It's built
-from a plain list so more items are easy to add later.
+The menu is deliberately small right now (universes, protocol, network, exit). It's
+built from a plain list so more items are easy to add later.
 
 ## Wiring
 
@@ -106,10 +110,19 @@ you give a button a pin.
   which owns the sockets). No reboot.
 - **Protocol**: saved, then the device reboots to bring the right listeners up
   cleanly (the display flashes `REBOOT` for a moment first). Same as the web form.
+- **Network**: saved, then the device reboots into the new mode, same as saving the
+  Network card on `/config` (it sets `useeth` and `wifimode`). A few things to know:
+  - **WiFi** joins the networks saved on `/config`. With none saved it opens the
+    `LuxDMX-setup` portal, like a fresh box.
+  - **WiFi AP** is named after the hostname. It uses the AP password from `/config`
+    (8+ characters, WPA2). Without one the AP is **open**, so set one before you
+    travel with it.
+  - **Ethernet** keeps the WiFi mode it had, so switching back gets you that again.
+    No link at boot means the link-loss policy from `/config` kicks in as usual.
 
 ## For the curious: how it's built
 
-The fiddly logic lives in three small, Arduino-free headers so it can be unit-tested
+The fiddly logic lives in a few small, Arduino-free headers so it can be unit-tested
 on a PC with no board attached:
 
 - [`src/enc_decode.h`](../src/enc_decode.h) — the quadrature state-table decoder,
@@ -120,11 +133,13 @@ on a PC with no board attached:
   including all the long-press synthesis above.
 - [`src/menu.h`](../src/menu.h) — the browse/edit menu state machine (wrapping
   values, action items, disabled items that just vanish).
+- [`src/net_choice.h`](../src/net_choice.h) - the Network entry: one value for the
+  `useeth` + `wifimode` pair, and Ethernet only when a wired PHY is set.
 
 `main.cpp` only samples the pins in a low-priority task, renders the menu, and applies
 the result. The host test is [`test/native/controls_test.cpp`](../test/native/controls_test.cpp)
-(run `test\native\run_controls.bat`), which covers the decode, every input
-combination, and the menu.
+(run `test/native/run.sh`, or `test\native\run_controls.bat` on Windows), which covers
+the decode, every input combination, the menu and its Network entry.
 
 ## Measuring `encsteps` instead of guessing it
 

@@ -145,6 +145,7 @@ static RmtDmx g_rmt[MAX_OUTPUTS];      // RMT-based DMX TX per output (issue #64
 // the pins, renders the menu, and applies the result.
 #include "input_map.h"
 #include "menu.h"
+#include "net_choice.h"               // the menu's Network entry (issue #150, host-tested)
 
 // ---------------------------------------------------------------------------
 // Hardware
@@ -4866,7 +4867,7 @@ static void dispRateLine(char* b, size_t n, int out) {
 // overlay). A one-frame-stale read just redraws next tick and nothing is ever
 // freed, so plain volatiles are enough — no lock on the DMX path.
 // ---------------------------------------------------------------------------
-enum { CTL_ID_UNI_A = 1, CTL_ID_UNI_B = 2, CTL_ID_PROTO = 3, CTL_ID_EXIT = 9 };
+enum { CTL_ID_UNI_A = 1, CTL_ID_UNI_B = 2, CTL_ID_PROTO = 3, CTL_ID_NET = 4, CTL_ID_EXIT = 9 };
 
 static bool        ctlEnabled = false;   // any control wired -> input task runs
 static bool        ctlUseMenu = false;   // an ENTER-capable input exists -> full menu (else direct nudge)
@@ -4926,6 +4927,7 @@ static bool ctlOverlayActive() {
 static void ctlItemValue(const MenuItem& it, int32_t v, char* buf, size_t n) {
     if (it.kind == MI_ACTION)       buf[0] = '\0';
     else if (it.id == CTL_ID_PROTO) snprintf(buf, n, "%s", v == 0 ? "Art-Net" : v == 1 ? "sACN" : "Both");
+    else if (it.id == CTL_ID_NET)   snprintf(buf, n, "%s", netChoiceName(v));
     else                            snprintf(buf, n, "%d", (int)v);
 }
 
@@ -5285,6 +5287,18 @@ static void ctlApplyUniverse(int out, int uni) {
     Serial.printf("[CTL] out%d universe -> %d (saved)\n", out, uni);
 }
 
+// A wired PHY is set up in /config: the same test the page's "Wired Ethernet" list and
+// setup() make. Without one the menu's Network entry offers only the two WiFi modes.
+static bool ctlWiredConfigured() {
+#if defined(HAS_ETH_RMII)
+    if (cfg.wiredPhy == WIRED_PHY_RMII) return true;
+#endif
+#if defined(HAS_ETH_SPI)
+    if (cfg.wiredPhy == WIRED_PHY_SPI && cfg.ethW5500) return true;
+#endif
+    return false;
+}
+
 static void ctlBuildMenu() {
     ctlMenu.clear();
     const int  mx   = cfg.ctlUniMax > 0 ? cfg.ctlUniMax : 15;
@@ -5294,6 +5308,9 @@ static void ctlBuildMenu() {
     if (MAX_OUTPUTS > 1)
         ctlMenu.addValue(CTL_ID_UNI_B, "Uni B", cfg.outputs[1].universe, 0, mx, cfg.outputs[1].enabled);
     ctlMenu.addValue(CTL_ID_PROTO, "Protocol", cfg.protocol, 0, 2, true);
+    const bool wired = ctlWiredConfigured();
+    ctlMenu.addValue(CTL_ID_NET, "Network", netChoiceOf(cfg.useEthernet, wired, cfg.wifiMode),
+                     0, netChoiceMax(wired), true);
     ctlMenu.addAction(CTL_ID_EXIT, "Exit", true);
 }
 
@@ -5312,6 +5329,18 @@ static void ctlApplyCommit(int id, int value) {
                 Serial.printf("[CTL] protocol -> %d (save + reboot)\n", value);
             }
             break;
+        case CTL_ID_NET: {
+            // Same as saving the Network card on /config: the interface is picked at boot.
+            const bool wired = ctlWiredConfigured();
+            if (value == netChoiceOf(cfg.useEthernet, wired, cfg.wifiMode)) break;
+            netChoiceApply(value, cfg.useEthernet, cfg.wifiMode);
+            saveConfig();
+            ctlMenu.close();
+            ctlFlash("REBOOT", 1500);
+            pendingRebootAt = millis() + 1500;
+            Serial.printf("[CTL] network -> %s (save + reboot)\n", netChoiceName(value));
+            break;
+        }
     }
 }
 

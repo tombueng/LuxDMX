@@ -7,11 +7,12 @@
 // wrap/actions/disabled items).
 //
 //   test\native\run_controls.bat        (MSVC)
-//   g++ -std=c++17 -I src test/native/controls_test.cpp -o build/ctl && ./build/ctl
+//   test/native/run.sh  (or: g++ -std=c++17 -I include -I src test/native/controls_test.cpp -o build/ctl && ./build/ctl)
 // ---------------------------------------------------------------------------
 #include "enc_decode.h"
 #include "input_map.h"
 #include "menu.h"
+#include "net_choice.h"
 #include <cstdio>
 
 static int g_pass = 0, g_fail = 0;
@@ -228,10 +229,49 @@ static void test_menu() {
       for (int i = 0; i < 6; i++) { mn.handle(NAV_INC); CHECK(mn.items[mn.sel].id != 11, "never selects disabled"); } }
 }
 
+// The menu's Network entry (issue #150): one value for useeth + wifimode.
+static void test_net_choice() {
+    CHECK(netChoiceOf(false, true,  NET_WIFI_STA) == NETC_WIFI, "net: STA reads as WiFi");
+    CHECK(netChoiceOf(false, false, NET_WIFI_AP)  == NETC_AP,   "net: AP reads as WiFi AP");
+    CHECK(netChoiceOf(true,  true,  NET_WIFI_STA) == NETC_ETH,  "net: useeth + wired PHY reads as Ethernet");
+    CHECK(netChoiceOf(true,  false, NET_WIFI_AP)  == NETC_AP,   "net: useeth without a wired PHY reads as what boots (AP)");
+    CHECK(netChoiceMax(true) == NETC_ETH && netChoiceMax(false) == NETC_AP, "net: Ethernet offered only with a wired PHY");
+
+    { bool eth = true; int wm = NET_WIFI_STA;
+      netChoiceApply(NETC_AP, eth, wm);
+      CHECK(!eth && wm == NET_WIFI_AP, "net: AP clears useeth, sets wifimode AP"); }
+    { bool eth = true; int wm = NET_WIFI_AP;
+      netChoiceApply(NETC_WIFI, eth, wm);
+      CHECK(!eth && wm == NET_WIFI_STA, "net: WiFi clears useeth, sets wifimode STA"); }
+    { bool eth = false; int wm = NET_WIFI_AP;
+      netChoiceApply(NETC_ETH, eth, wm);
+      CHECK(eth && wm == NET_WIFI_AP, "net: Ethernet keeps the WiFi mode for later"); }
+    for (int c = NETC_WIFI; c <= NETC_ETH; c++) {
+        bool eth = false; int wm = NET_WIFI_STA;
+        netChoiceApply(c, eth, wm);
+        CHECK(netChoiceOf(eth, true, wm) == c, "net: apply then read back gives the same choice");
+    }
+
+    // In the menu: on a WiFi-only box the value wraps WiFi <-> WiFi AP, never Ethernet.
+    { Menu mn;
+      mn.addValue(4, "Network", NETC_WIFI, 0, netChoiceMax(false));
+      mn.addAction(9, "Exit");
+      mn.open();
+      mn.handle(NAV_ENTER);
+      mn.handle(NAV_INC);
+      CHECK(mn.edit == NETC_AP, "net menu: WiFi -> WiFi AP");
+      mn.handle(NAV_INC);
+      CHECK(mn.edit == NETC_WIFI, "net menu: WiFi AP wraps to WiFi without a wired PHY");
+      mn.handle(NAV_DEC);
+      MenuResult r = mn.handle(NAV_ENTER);
+      CHECK(r.committedId == 4 && r.value == NETC_AP, "net menu: commit reports the choice"); }
+}
+
 int main() {
     test_encoder();
     test_input_map();
     test_menu();
+    test_net_choice();
     printf("\ncontrols_test: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

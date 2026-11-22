@@ -7,7 +7,7 @@ set ROOT=%~dp0..\..
 pushd "%ROOT%"
 if not exist build mkdir build
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul
-cl /nologo /EHsc /std:c++17 /I src ^
+cl /nologo /EHsc /std:c++17 /I include /I src ^
    test\native\controls_test.cpp ^
    /Fe:build\ctltest.exe /Fobuild\ > build\ctl_compile.log 2>&1
 if errorlevel 1 ( type build\ctl_compile.log & popd & exit /b 1 )
