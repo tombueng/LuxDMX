@@ -130,10 +130,10 @@ Exactly one of these three:
 | Solder bridge | pad pair on the back, inside the polyfuse footprint | the supply lead already has a fuse |
 
 Polyfuse land: three holes in a slightly staggered row, about 5.1 mm (middle, MF-R110 to MF-R400,
-up to 4 A hold) and 10.2 mm (right, MF-R500 and up) from the left one; radial leads bend the
-last bit. The silk's `9A` is the series' limit on that spacing, not something that fits here:
-MF-R900 (24 mm body) hits the 1000 µF can, so check the body width of anything above the 5 A
-MF-R500. Use **30 V** parts only. MF-RHT, MF-RG and anything else rated 16 V is out of
+up to 4 A hold) and 10.2 mm (right, MF-R500 to MF-R900, 5 to 9 A hold) from the left one; radial
+leads bend the last bit. The MF-R500 clears the 13 mm 1000 µF can by about 5 mm, the 24.2 mm
+MF-R900 by about 1.8 mm (measured on the board, disc upright, centred on its leads). Use **30 V**
+parts only. MF-RHT, MF-RG and anything else rated 16 V is out of
 rating at 24 V the moment it trips. Equivalents to the
 MF-R500: ECE RB500-30, Littelfuse RUEF500. Full list in [`production/BOM.md`](production/BOM.md).
 
@@ -148,7 +148,7 @@ takes four kinds of module. Fit one.
 |---|---|---|---|
 | **Pololu D24V10F5** | 5 V, 1 A, 5.1-36 V in | row A, all 5 pins | **recommended** |
 | Pololu D36V28F5 | 5 V, 3.2 A, 5.3-50 V in | row B (PG optional, into row A's last hole), two M2 holes | plenty of headroom |
-| 78xx-style SIP: RECOM R-78E5.0-1.0, Mornsun K7805-1000R3 | 5 V, 1 A | row A, pins 3/2/1 on VOUT/GND/VIN | 10.4 / 17.5 mm tall |
+| 78xx-style SIP: RECOM R-78E5.0-1.0, Mornsun K7805-1000R3 | 5 V, 1 A; RECOM 8-28 V in, Mornsun 8-36 V in | row A, pins 3/2/1 on VOUT/GND/VIN | 10.4 / 17.5 mm tall. The two face **opposite ways**, see below |
 | MP1584EN mini module, ~22 x 17 mm | adjustable, 28 V max in | the four 12 x 5 mm corner lands | **set to 5.0 V first** |
 
 Why the D24V10F5: the worst case on `+5V` is about 0.7 A, from datasheet numbers, not measured
@@ -169,15 +169,23 @@ How they sit:
   (VIN), so a square pad would lead one of them a hole off. The silk says `OUT` and `IN` at the
   ends of each row instead.
 - **Row A** (0.1 in, silk `A`), from the mark: VOUT, GND, VIN, SHDN, PG. The D24V10F5 takes all
-  five. A 3-pin SIP takes VOUT/GND/VIN (pin 3/2/1) with its body towards the minus lands.
+  five. A 3-pin SIP takes VOUT/GND/VIN (pin 3/2/1), pin 1 always in the VIN hole. Which way the
+  body hangs depends on the maker, because their pins sit on different faces:
+  - **RECOM R-78E**: pins 2.0 mm from the printed front. Body towards the **minus** lands,
+    printing facing row B.
+  - **Mornsun K78xx**: pins 2.15 mm from the plain back. Body towards the **plus** lands, over
+    row B, printing facing away from row A.
+  Go by pin 1 on VIN, never by copying how the other part sat. Turned round, the SIP gets 12/24 V
+  on its output pin and that can reach the 5 V rail.
 - **Row B** (silk `B`), from the mark: VOUT, GND, GND, VIN, EN. The D36V28F5's edge row. Its PG
   pin, if you fit one, drops into row A's PG hole. The two plated M2 holes are GND and match the
   module's own.
-- Both rows sit in the gap between the input lands, with the module bodies hanging over the minus
-  lands and the space above them.
+- Both rows sit in the gap between the input lands. The Pololu and RECOM bodies hang over the
+  minus lands and the space above them, the Mornsun over row B towards the plus lands.
 - SHDN, PG and EN have no net. Pololu pulls SHDN and EN up to VIN through 100k, PG is open drain.
 - **Pololu modules go label side to the board**, parts facing out, like on a breadboard. Turned
-  over, VIN and VOUT swap.
+  over, a D24V10F5 just stays off (its GND and VOUT end up in the unconnected SHDN/PG holes); a
+  D36V28F5 gets reverse polarity and dies, and its screw holes won't line up either.
 
 Pin positions are from the vendors' drawings (Pololu dimension PDFs and drill-guide DXFs, RECOM
 R-78E-1.0 and Mornsun K78xx-1000R3 datasheets), written into `modules.json` and generated into the
@@ -198,8 +206,8 @@ others hidden; switch one on (and the D24 off) in KiCad's 3D settings to see how
 
 ### Current rating
 
-The pixel supply runs as 4.8 mm tracks from the inlet through the fuse along the terminal row. Each
-output gets the full width and its own 4.8 mm GND return.
+The pixel supply runs as 4.7-4.8 mm tracks from the inlet to the fuse and a 4.6 mm bus along the
+terminal row. Each output gets the full 4.6 mm width and its own GND return.
 
 | 1 oz copper | 10 K rise | 20 K rise | at 24 V |
 |---|---:|---:|---:|
@@ -213,7 +221,8 @@ output gets the full width and its own 4.8 mm GND return.
 - All five ports in use: about 2 A each. A 5 m WS2815 run is about 5 A at full white.
 - More than that: inject power at the strip.
 - The polyfuse bridge pads limit a fuse-less build to 8.8 A. Bridge the through-holes with a wire for more.
-- The bulk cap and buck hang off 2.0 mm spurs (5.3 A), they aren't load paths.
+- The bulk cap hangs off a 2.0 mm spur (5.3 A), the regulator off a 1.0 mm one (well over its
+  ~0.3 A input at 24 V). Neither is a load path.
 
 ### Decoupling
 

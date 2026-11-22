@@ -100,7 +100,7 @@
       "vendor": "Bourns",
       "lcsc": "C208489",
       "url": "https://www.lcsc.com/product-detail/C208489.html",
-      "note": "The largest that fits the current placement: body 17.4 x 3.0 mm, 3.8 mm clear of the 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series but its body is 24.2 mm and would come within 0.40 mm of the can; both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.  Two numbers decide a replacement and neither is the current: the voltage (30 V, not 16) and the lead pitch (5.08 or 10.2 mm, nothing else). The table below is what has been checked so far.",
+      "note": "Body 17.4 x 3.0 mm, about 5 mm clear of the 13 mm 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series, 24.2 mm wide, and still clears the can by about 1.8 mm (measured 2026-11-22: disc upright, centred on its leads, can edge at x 117.5); both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.  Two numbers decide a replacement and neither is the current: the voltage (30 V, not 16) and the lead pitch (5.08 or 10.2 mm, nothing else). The table below is what has been checked so far.",
       "price_eur": 0.419,
       "stock": 898,
       "alternatives": {
@@ -168,7 +168,7 @@
             ],
             [
               "Bourns MF-R900 and other 24 mm bodies",
-              "The disc stands upright and a 24.2 mm one clears the 1000 uF can by 0.40 mm. 17.4 mm (MF-R500) is proven to fit."
+              "Fits: the disc stands upright and a 24.2 mm one clears the 13 mm 1000 uF can by about 1.8 mm. 17.4 mm (MF-R500) is the default."
             ],
             [
               "Any lead pitch other than 5.08 or 10.2 mm",

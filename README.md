@@ -258,7 +258,8 @@ Part numbers, LCSC codes and what each one does: [`hardware-carrier/README.md`](
 ### Carrier: power
 
 Two rails. The **logic** (ESP32, RS-485 modules, W5500, display) runs on 5 V and pulls about
-270 mA fully loaded, so any decent USB port does it. The **pixel rail** is a fused pass-through from
+270 mA in normal use. Add up every datasheet maximum (WiFi transmitting, all three DMX lines
+driving) and it peaks near 0.7 A, so use a USB-C port or a 1 A charger, not a tired USB 2 hub. The **pixel rail** is a fused pass-through from
 the `12-24V IN` terminal to the five pixel terminals and doesn't touch the logic at all unless you fit
 the buck.
 
@@ -295,7 +296,7 @@ Where each one goes: [`hardware-carrier/README.md`](hardware-carrier/README.md#r
 
 Never the polyfuse and the bridge together, a bridged fuse is no fuse.
 
-**How much current.** The pixel rail is 4.8 mm tracks on standard 1 oz copper: 7.2 A if you want the
+**How much current.** The pixel rail is 4.6-4.8 mm tracks on standard 1 oz copper: 7.2 A if you want the
 board to stay hand-warm, 9.8 A if it may run 20 K warmer. That's about 2 A per port with all five in use,
 and a 5 m WS2815 run draws about 5 A at full white, so two of those. Beyond that, inject power at the
 strip instead of pulling it through the board. 5 V strip works too (the rail doesn't care about

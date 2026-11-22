@@ -11,7 +11,8 @@
     its body outline instead, above the screw pads, with its "+" and "-" moved up next to it:
     they used to sit on the pads, where the fab clips them away.
   * pixel inlet: "+" and "-" over its two pads, same band. The two loose marks at x 91.5 went:
-    the "-" sat nearest the PLUS pads and read as reverse polarity.
+    the "-" sat nearest the PLUS pads and read as reverse polarity. Two more beside the
+    encoder's GND lugs went too.
   * DMX headers: the references ("DMX 1 - GND/B/A") ran across the pads and off the edge. Hidden;
     each header gets "DMXn" and, under it, "G B A" (its pins left to right) beside pin 1.
   * odd sizes: the polyfuse's BRIDGE text 0.7 -> 0.8 mm, the OLED outline note had stroke 0.
@@ -102,7 +103,8 @@ def pixel_labels(b):
 BAND_Y = 126.1                  # the strip inside the terminal bodies, above the screw pads
 MARK_SIZE = 1.2
 INLET = "12-24V IN"
-STRAY_MARKS = [(91.5, 110.5), (91.5, 123.5)]
+STRAY_MARKS = [(91.5, 110.5), (91.5, 123.5),
+               (144.5, 111.0), (145.0, 122.0)]    # leftovers beside the encoder lugs (GND)
 REMOVE = []
 REMOVE_FP = []
 DMX_RE = re.compile(r"DMX (\d) - GND/B/A$")
@@ -191,6 +193,20 @@ def dmx_labels(b):
         print(f"  {f.GetReference():18s} -> " + " / ".join(w[0] for w in want))
 
 
+# reference texts that ran onto a pad: (reference, footprint x, y) -> new text position
+NUDGE = [("330R bias-", (126.0, 78.05), (128.0, 76.8))]   # DMX1: its "-" sat on ESP pin 8
+
+
+def nudge_refs(b):
+    for f in b.GetFootprints():
+        q = f.GetPosition()
+        for ref, (fx, fy), (tx, ty) in NUDGE:
+            if f.GetReference() == ref and abs(pcbnew.ToMM(q.x) - fx) < 0.05 \
+                    and abs(pcbnew.ToMM(q.y) - fy) < 0.05:
+                f.Reference().SetPosition(pcbnew.VECTOR2I(mm(tx), mm(ty)))
+                print(f"  {ref} at {fx}, {fy}: reference text to {tx}, {ty}")
+
+
 def odd_sizes(b):
     for f in b.GetFootprints():
         for g in f.GraphicalItems():
@@ -209,6 +225,7 @@ def main():
     polarity_marks(b)
     dmx_labels(b)
     odd_sizes(b)
+    nudge_refs(b)
     for d in REMOVE:
         b.Remove(d)
     for f, g in REMOVE_FP:

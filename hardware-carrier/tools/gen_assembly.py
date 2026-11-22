@@ -81,7 +81,7 @@ RULES = {
         "Rated 3.5 A. Above about 3 A use the screw terminal."),
     "MF-R": ("Pixel", "pixel ports are used **and** no external fuse",
              "Bourns MF-R, 30 V. Middle hole MF-R110 to MF-R400 (up to 4 A), right hole "
-             "MF-R500 (5 A). Bigger ones hit the 1000 uF can, the silk's 9A doesn't fit. "
+             "MF-R500 to MF-R900 (5 to 9 A); the MF-R900 clears the 1000 uF can by about 1.8 mm. "
              "MF-RHT and MF-RG are 16 V parts and unusable on 24 V."),
     "12-24V -> 5V buck": ("Supply",
                           "supplied from 12/24 V **and** neither 5V-IN nor USB connected",
@@ -178,7 +178,7 @@ RS-485 transceivers driving a terminated bus, OLED, LED, buffer). Anything rated
 |---|---|---|---|
 | **Pololu D24V10F5** (recommended) | 5 V, 1 A, 5.1-36 V in | row A, all 5 pins | Fixed 5 V, nothing to set. Fine on 24 V. 12.7 x 17.8 mm. |
 | Pololu D36V28F5 | 5 V, 3.2 A, 5.3-50 V in | row B, PG pin (optional) in row A's last hole | Two M2 holes on the carrier match the module's. Overkill here, but bulletproof on 24 V. |
-| 78xx-style SIP, RECOM R-78E5.0-1.0 or Mornsun K7805-1000R3 | 5 V, 1 A | row A, the VOUT / GND / VIN holes (pin 3 / 2 / 1) | Body towards the minus lands. Standing height 10.4 mm (RECOM) or 17.5 mm (Mornsun). |
+| 78xx-style SIP, RECOM R-78E5.0-1.0 (8-28 V in) or Mornsun K7805-1000R3 (8-36 V in) | 5 V, 1 A | row A, the VOUT / GND / VIN holes (pin 3 / 2 / 1) | Pin 1 in VIN. **They face opposite ways:** RECOM body towards the minus lands, Mornsun body towards the plus lands (its pins sit near its back). Standing height 10.4 mm (RECOM) or 17.5 mm (Mornsun). |
 | MP1584EN mini module, ~22 x 17 mm | adjustable, 28 V max in | the four big corner lands | **Set it to 5.0 V first.** Fine on 12 V; on 24 V the 28 V limit is tight. Put Kapton tape under it, rows A/B are bare copper under its belly. |
 
 Rows A and B sit between the two input lands (`VIN-` and `VIN+`). Silk marks them `A` and
@@ -194,7 +194,8 @@ just runs. PG is an open-drain output nobody reads.
 
 **Pololu modules go on label side down**, components facing away from the carrier, the way you
 would plug them into a breadboard. Solder the header into the module first, then into the
-carrier. Flipped over, VIN and VOUT swap and the module dies on power-up.
+carrier. Flipped over, a D24V10F5 just stays off, but a D36V28F5 gets reverse polarity and
+dies, and its screw holes won't line up.
 
 Three of the GND holes are connected solid to the pours, not through thermal spokes, because
 there's no room for spokes between the neighbouring pins. They want a bit more heat.

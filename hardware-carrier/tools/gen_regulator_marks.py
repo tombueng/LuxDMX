@@ -23,8 +23,13 @@ What it makes, all in 3dmodels/:
                                on the face.
   mornsun-k7805-1000r3.step    the whole part, no stock model exists. Mornsun K78xx-1000R3
                                datasheet: 11.50 x 9.00 x 17.50 mm, pins 0.50 wide on 2.54 mm,
-                               4.10 mm below the body, 2.15 mm from one face, pin 1 = +Vin. Origin
-                               pin 1, body towards -y in KiCad terms like the RECOM model.
+                               4.10 mm below the body, pin 1 = +Vin. The pins sit 2.15 mm from the
+                               BACK face, the printed front is 6.85 mm away on the other side
+                               (third-angle bottom and top views, p.4). That is the opposite of
+                               the RECOM, whose pins sit 2.00 mm from its printed front: with the
+                               same pin 1 the two bodies hang opposite ways. Origin pin 1, body
+                               towards +y in KiCad terms (towards the front), pin 1 on the left
+                               seen from the front, as in the datasheet's front view.
 
 Coordinates below are KiCad's (y down), converted to STEP's y-up on the way in.
 """
@@ -155,10 +160,11 @@ def k7805():
     L, W, H = 11.50, 9.00, 17.50
     seat = 0.50
     x0 = 2.54 - L / 2                      # pin 2 in the middle of the case
-    # KiCad y: pins at 0, the case reaches 2.15 mm one way and 6.85 the other (towards -y)
+    # KiCad y: pins at 0, back face 2.15 mm towards -y, printed front 6.85 mm towards +y.
+    # STEP y is KiCad -y, so the case runs from STEP y -6.85 (front) to +2.15 (back).
     body = Box(L, W, H, align=(Align.MIN, Align.MIN, Align.MIN))
     body = fillet(body.edges().filter_by(Axis.Z), 0.4)
-    body = body.moved(Location((x0, -2.15, seat)))
+    body = body.moved(Location((x0, -6.85, seat)))
     body.color = BLACK
     parts = [body]
     for i in range(3):
@@ -166,14 +172,14 @@ def k7805():
         p = p.moved(Location((2.54 * i, 0, -4.10)))
         p.color = TIN
         parts.append(p)
-    yf = 6.85                              # STEP y of the face away from the pins
+    yf = -6.85                             # STEP y of the printed front, away from the pins
     cx = x0 + L / 2
-    parts.append(face_text("MORNSUN", 1.5, cx, seat + H - 3.0, yf, +1, WHITE))
-    parts.append(face_text("K7805-1000R3", 1.1, cx, seat + H - 5.4, yf, +1, WHITE))
-    parts.append(face_text("4.75-36V  5V/1A", 0.8, cx, seat + H - 7.2, yf, +1, WHITE))
-    parts.append(face_text("2544", 0.8, cx, seat + H - 8.8, yf, +1, WHITE))
+    parts.append(face_text("MORNSUN", 1.5, cx, seat + H - 3.0, yf, -1, WHITE))
+    parts.append(face_text("K7805-1000R3", 1.1, cx, seat + H - 5.4, yf, -1, WHITE))
+    parts.append(face_text("8-36V  5V/1A", 0.8, cx, seat + H - 7.2, yf, -1, WHITE))
+    parts.append(face_text("2544", 0.8, cx, seat + H - 8.8, yf, -1, WHITE))
     dot = Cylinder(0.45, 0.02, align=(Align.CENTER, Align.CENTER, Align.MIN))
-    dot = dot.rotate(Axis.X, -90).moved(Location((0.0, yf, seat + 1.6)))
+    dot = dot.rotate(Axis.X, 90).moved(Location((0.0, yf, seat + 1.6)))
     dot.color = WHITE
     parts.append(dot)                      # pin 1 mark over pin 1, as in the datasheet's front view
     export_step(Compound(children=parts), os.path.join(OUT, "mornsun-k7805-1000r3.step"))

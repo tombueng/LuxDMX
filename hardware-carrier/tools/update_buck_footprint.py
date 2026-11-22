@@ -95,7 +95,8 @@ def stage_swap():
                 rsize=old.Reference().GetTextSize(), rvis=old.Reference().IsVisible(),
                 vvis=old.Value().IsVisible(), dnp=old.IsDNP(),
                 nobom=old.IsExcludedFromBOM(), nopos=old.IsExcludedFromPosFiles(),
-                models=[(m.m_Filename, m.m_Show) for m in old.Models()])
+                models=[(m.m_Filename, m.m_Show, m.m_Offset, m.m_Rotation, m.m_Scale, m.m_Opacity)
+                        for m in old.Models()])
     nets = {n: p.GetNet() for n, p in oldpads.items()}
     b.Remove(old)
     new.SetReference(REF)
@@ -103,10 +104,15 @@ def stage_swap():
     new.SetDNP(keep["dnp"])
     new.SetExcludedFromBOM(keep["nobom"])
     new.SetExcludedFromPosFiles(keep["nopos"])
-    for fn, show in keep["models"]:
+    for fn, show, off, rot, scale, opacity in keep["models"]:
+        # offsets and rotations too: losing them dumps every model at the footprint centre
         m = pcbnew.FP_3DMODEL()
         m.m_Filename = fn
         m.m_Show = show
+        m.m_Offset = pcbnew.VECTOR3D(off.x, off.y, off.z)
+        m.m_Rotation = pcbnew.VECTOR3D(rot.x, rot.y, rot.z)
+        m.m_Scale = pcbnew.VECTOR3D(scale.x, scale.y, scale.z)
+        m.m_Opacity = opacity
         new.Models().push_back(m)
     new.Value().SetVisible(keep["vvis"])
     r = new.Reference()

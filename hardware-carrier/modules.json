@@ -766,8 +766,8 @@
         "Envelope is 40 x 22 mm. Taller would run into the parts and vias above and below the spot; the routing round it is tight.",
         "Sits under the OLED, just past the S3's antenna end (the ESP outline ends about 3 mm before the left lands). With a WROOM-1 (PCB antenna) WiFi build an MP1584's switch node is about 5 mm from the antenna: for WiFi use the 1U module with an external antenna, or a Pololu module. Wired (W5500) builds don't care.",
         "Check your module's pin order before soldering: this pattern assumes in-left / out-right / minus-top / plus-bottom.",
-        "Row A takes the Pololu D24V10F5 (all five pins) and a 3-pin 78xx-style SIP (VIN/GND/VOUT on row A's VIN/GND/VOUT, body towards the corner lands). Row B takes the D36V28F5 edge row; its PG pin lands in row A's PG hole. SHDN, PG and EN have no net: Pololu pulls SHDN and EN up to VIN through 100k, PG is open drain.",
-        "Pololu modules go label side to the board, components facing out, the way a breadboard module sits. Turned over, VIN and VOUT swap.",
+        "Row A takes the Pololu D24V10F5 (all five pins) and a 3-pin 78xx-style SIP (VIN/GND/VOUT on row A's VIN/GND/VOUT). The SIPs don't all face the same way: the RECOM R-78E has its pins 2.00 mm from its printed front, so its body hangs towards the minus lands; the Mornsun K78xx has them 2.15 mm from its BACK, so its body hangs towards the plus lands, over row B. Pin 1 on VIN either way; never turn one round to match the other. Row B takes the D36V28F5 edge row; its PG pin lands in row A's PG hole. SHDN, PG and EN have no net: Pololu pulls SHDN and EN up to VIN through 100k, PG is open drain.",
+        "Pololu modules go label side to the board, components facing out, the way a breadboard module sits. Turned over, a D24V10F5 just stays off (VIN still in the VIN hole, its GND and VOUT in the unconnected SHDN/PG holes); a D36V28F5 gets GND on V_PIX and VIN on GND, reverse polarity, and its screw holes don't line up.",
         "The two M2 holes are plated GND and replace the stitching vias that were at board (186.5, 100) and (174.5, 84). They are the D36V28F5's own holes.",
         "With a corner-pad module fitted flat, rows A/B sit open under its belly: tape (Kapton) between them.",
         "Courtyard is the union of the 40 x 22 envelope and the three module bodies, so it has a tab above the right-hand lands.",
@@ -877,11 +877,18 @@
           "y1": 13.54
         },
         {
-          "name": "78xx SIP",
+          "name": "R-78E (RECOM)",
+          "x0": 8.86,
+          "y0": 3.23,
+          "x1": 20.46,
+          "y1": 11.73
+        },
+        {
+          "name": "K78xx (Mornsun)",
           "x0": 8.91,
-          "y0": 2.88,
-          "x1": 20.51,
-          "y1": 11.88
+          "y0": 7.58,
+          "x1": 20.41,
+          "y1": 16.58
         }
       ],
       "courtyard": "union",
