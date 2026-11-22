@@ -196,7 +196,7 @@ def write_libs():
                 "3": (4.80, 3.30 + grow, 0.0, grow / 2)}
         out[f"terminal-1x0{n}-P5.08-bigpad"] = derive(
             "TerminalBlock_Phoenix.pretty", src, f"terminal-1x0{n}-P5.08-bigpad",
-            (3.60, 3.30), 1.30, "roundrect",
+            (3.60, 3.30), 1.40, "roundrect",   # 1.40: Kefa KF128 wants 1.40 +0.10 (terminal_drill.py)
             "Pads enlarged and stretched out to 0.5 mm off the board edge so a wire can be "
             "soldered flat onto the copper from outside instead of threaded into the hole. "
             "V+ and GND are 4.80 mm wide for 10 A at a 20 K rise; DATA is 2.00, it carries a "

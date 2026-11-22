@@ -10,7 +10,7 @@ HC-PM254-8.5H-1x4PZ-02A,J4,PinHeader_1x04_P2.54mm_Vertical,C22373890,1,HC-PM254-
 KF128-5.08-3P-AA,"J5,J6,J7,J8,J9",terminal-1x03-P5.08-bigpad,C474953,5,KF128-5.08-3P-AA,"Screw terminal, 3 pole, 5.08 mm pitch"
 KF128-5.08-2P-AA,J10,terminal-1x02-P5.08-bigpad,C474952,1,KF128-5.08-2P-AA,"Screw terminal, 2 pole, 5.08 mm pitch, 24 A"
 10k,"R1,R2,R3,R4,R8",1206,C17902,5,1206W4F1002T5E,Resistor 10k 1206 1%
-330R,"R5,R6,R7,R12,R13,R14,R15,R16,R17,R18,R19",1206,C25374,11,1206W4J0331T5E,Resistor 330R 1206 5% (fail-safe bias)
+330R,"R5,R6,R7,R12,R13,R14,R15,R16,R17,R18,R19",1206,C25374,11,1206W4J0331T5E,"Resistor 330R 1206 5% (RS-485 fail-safe bias, and the pixel data series resistors)"
 120R,"R9,R10,R11",1206,C17909,3,1206W4F1200T5E,Resistor 120R 1206 1%
 EC11E15244B2,SW1,encoder-ec11-switch,C470754,1,EC11E15244B2,"Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch"
 K2-1102DP-C4SW-04,"SW2,SW3",SW_PUSH_6mm,C110153,2,K2-1102DP-C4SW-04,"Tactile switch 6 x 6 mm, through hole, 5 mm tall"

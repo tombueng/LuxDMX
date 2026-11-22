@@ -21,7 +21,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 898 | 0.419 | 0.42 |
 | 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 352200 | 0.018 | 0.09 |
 | 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | [C17909](https://www.lcsc.com/product-detail/C17909.html) | 157500 | 0.004 | 0.01 |
-| 11 | 330R bias+ / 330R bias- / 330R pixel | Resistor 330R 1206 5% (fail-safe bias) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 3400 | 0.012 | 0.13 |
+| 11 | 330R bias+ / 330R bias- / 330R pixel | Resistor 330R 1206 5% (RS-485 fail-safe bias, and the pixel data series resistors) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 3400 | 0.012 | 0.13 |
 | 1 | EC11 | Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch | `EC11E15244B2` | [C470754](https://www.lcsc.com/product-detail/C470754.html) | 3134 | 2.22 | 2.22 |
 | 1 | 12-24V IN 24A | Screw terminal, 2 pole, 5.08 mm pitch, 24 A | `KF128-5.08-2P-AA` | [C474952](https://www.lcsc.com/product-detail/C474952.html) | 48930 | 0.177 | 0.18 |
 | 3 | header-1x03-P2.54-terminal | Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows | `XY308-2.54-3P` | [C557686](https://www.lcsc.com/product-detail/C557686.html) | 5590 | 0.35 | 1.05 |
@@ -98,13 +98,13 @@ Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x
 | `Eaton PTR030V0500` | 30 V / 5 A / 40 A max | CHECK | Numbers match exactly; the datasheet would not load, so confirm the pitch. |
 | `Bel Fuse 0ZRB0500FF1A` | 30 V / 5 A / 10 A / 40 A max | CHECK | Matches the MF-R500 figure for figure. Pitch unconfirmed - TME lists it as 'Ausgangsraster'. |
 | `Bourns MF-R110 .. MF-R400` | 30 V / up to 4 A | 5.08 mm | The smaller half of the family, on the middle hole. Right if 4 A is enough. |
+| `Bourns MF-R600 .. MF-R900` | 30 V / 6 to 9 A | 10.2 mm | Fit too: the 24.2 mm MF-R900 disc stands upright and clears the 13 mm 1000 uF can by about 1.8 mm (measured 2026-11-22). Check the height in a case. |
 
 **Does not work**
 
 | Type | Why |
 |---|---|
 | `Anything rated 16 V: Bourns MF-RHT and MF-RG, Eaton PTR016V*, ECE RG500-16` | Vmax on a PPTC is what it has to hold off AFTER it trips, when the full supply stands across it. This rail is 12/24 V. At 12 V they are fine; at 24 V they are outside their rating at the exact moment they are supposed to work. |
-| `Bourns MF-R900 and other 24 mm bodies` | Fits: the disc stands upright and a 24.2 mm one clears the 13 mm 1000 uF can by about 1.8 mm. 17.4 mm (MF-R500) is the default. |
 | `Any lead pitch other than 5.08 or 10.2 mm` | The land has three holes on exactly those two pitches, because Bourns changes pitch in the middle of the family. 7.5 or 10.0 mm will not drop in. |
 
 ### What may go in the 330R bias+ / 330R bias- / 330R pixel position, and what may not

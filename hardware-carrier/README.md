@@ -148,7 +148,7 @@ takes four kinds of module. Fit one.
 |---|---|---|---|
 | **Pololu D24V10F5** | 5 V, 1 A, 5.1-36 V in | row A, all 5 pins | **recommended** |
 | Pololu D36V28F5 | 5 V, 3.2 A, 5.3-50 V in | row B (PG optional, into row A's last hole), two M2 holes | plenty of headroom |
-| 78xx-style SIP: RECOM R-78E5.0-1.0, Mornsun K7805-1000R3 | 5 V, 1 A; RECOM 8-28 V in, Mornsun 8-36 V in | row A, pins 3/2/1 on VOUT/GND/VIN | 10.4 / 17.5 mm tall. The two face **opposite ways**, see below |
+| 78xx-style SIP: RECOM R-78E5.0-1.0, Mornsun K7805-1000R3 | 5 V, 1 A; RECOM 8-28 V in (tight on 24 V, like the MP1584), Mornsun 8-36 V in | row A, pins 3/2/1 on VOUT/GND/VIN | 10.4 / 17.5 mm tall. The two face **opposite ways**, see below |
 | MP1584EN mini module, ~22 x 17 mm | adjustable, 28 V max in | the four 12 x 5 mm corner lands | **set to 5.0 V first** |
 
 Why the D24V10F5: the worst case on `+5V` is about 0.7 A, from datasheet numbers, not measured
@@ -166,8 +166,8 @@ How they sit:
   on the other, as the silk says. Rows A and B are bare copper under the module's belly, so put a
   bit of Kapton tape in between.
 - No square pad on either row, on purpose: Pololu marks GND square and a 78xx SIP marks pin 1
-  (VIN), so a square pad would lead one of them a hole off. The silk says `OUT` and `IN` at the
-  ends of each row instead.
+  (VIN), so a square pad would lead one of them a hole off. The silk says `OUT` at the VOUT end
+  of each row and `IN` over each row's VIN hole instead.
 - **Row A** (0.1 in, silk `A`), from the mark: VOUT, GND, VIN, SHDN, PG. The D24V10F5 takes all
   five. A 3-pin SIP takes VOUT/GND/VIN (pin 3/2/1), pin 1 always in the VIN hole. Which way the
   body hangs depends on the maker, because their pins sit on different faces:
@@ -185,7 +185,8 @@ How they sit:
 - SHDN, PG and EN have no net. Pololu pulls SHDN and EN up to VIN through 100k, PG is open drain.
 - **Pololu modules go label side to the board**, parts facing out, like on a breadboard. Turned
   over, a D24V10F5 just stays off (its GND and VOUT end up in the unconnected SHDN/PG holes); a
-  D36V28F5 gets reverse polarity and dies, and its screw holes won't line up either.
+  D36V28F5 ends up with its VIN on GND and its GND pins on `V_PIX`, a dead short across the pixel
+  supply (the fuse trips), and its screw holes won't line up either.
 
 Pin positions are from the vendors' drawings (Pololu dimension PDFs and drill-guide DXFs, RECOM
 R-78E-1.0 and Mornsun K78xx-1000R3 datasheets), written into `modules.json` and generated into the
@@ -307,7 +308,7 @@ Same part as the DMX bias resistors.
 ### Terminals
 
 5.08 mm, 3 pole: V+ / DATA / GND, marked `+ PIXn -` on the silk above the pads. V+ and GND pads
-are 4.80 x 6.15 mm, DATA 2.00 x 6.15 mm, all on 1.30 mm holes. Fit the terminal or solder the
+are 4.80 x 6.15 mm, DATA 2.00 x 6.15 mm, all on 1.40 mm holes (Kefa KF128 asks for 1.40). Fit the terminal or solder the
 wire flat onto the pad. The 12-24 V inlet has the same big pads (4.80 x 6.10 mm) with `+` and `-`
 above them.
 
@@ -468,7 +469,9 @@ when your bus wants them.
   [`production/luxdmx-carrier-cpl.csv`](production/) as the CPL, next to the gerber zip. Both use
   plain designators (`R12`, `C3`) because JLCPCB refuses the board's own labels;
   [`production/JLC-designators.csv`](production/) maps them back (`R9` = `120R term`). Things to
-  check in JLCPCB's preview before you pay:
+  check in JLCPCB's preview before you pay. Be aware the back paste layer opens the whole
+  hand-solder land, roughly twice the paste a 1206 wants, and nothing self-aligns on those long
+  lands: expect a few skewed parts to touch up. Nobody has had a carrier machine-assembled yet.
   - nearly every SMD part sits on the **back**, so it is a bottom-side (or two-sided) job;
   - the lands are sized for hand soldering, longer than the parts, so check the placement
     preview of the 1206 parts and the SOIC buffer;
@@ -497,10 +500,10 @@ when your bus wants them.
 3. The 5 V regulator: Pololu label side down. An MP1584 gets set to 5.0 V first, then soldered.
 4. Plug in the modules.
 
-Hand soldering only. Resistor and capacitor lands run 0.30 to 2.30 mm off centre, so 0402, 0603,
+Hand soldering is the intended route. Resistor and capacitor lands run 0.30 to 2.30 mm off centre, so 0402, 0603,
 0805 and 1206 all land on copper (1210 overhangs in width). TVS lands go to 2.90 mm and take
 SOD-123, SOD-123F, SOD-123FL, SMA and 1206. The lands are longer than the parts and nothing
-self-aligns, so this board doesn't reflow.
+self-aligns, so a reflowed board needs checking part by part (see JLCPCB assembly above).
 
 ## Before you power it
 

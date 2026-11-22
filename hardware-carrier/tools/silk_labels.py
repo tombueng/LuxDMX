@@ -16,6 +16,8 @@
   * DMX headers: the references ("DMX 1 - GND/B/A") ran across the pads and off the edge. Hidden;
     each header gets "DMXn" and, under it, "G B A" (its pins left to right) beside pin 1.
   * odd sizes: the polyfuse's BRIDGE text 0.7 -> 0.8 mm, the OLED outline note had stroke 0.
+  * silk lines thinner than 0.15 mm (most stock footprints draw 0.12) go to 0.15, the width a
+    fab reliably prints; that includes the 1000 uF polarity hatch and the buffer's pin-1 mark.
 
 Idempotent: texts are found again by their content and moved/updated, never doubled.
 Silk only, no copper is touched.
@@ -197,6 +199,24 @@ def dmx_labels(b):
 NUDGE = [("330R bias-", (126.0, 78.05), (128.0, 76.8))]   # DMX1: its "-" sat on ESP pin 8
 
 
+MIN_STROKE = 0.15
+
+
+def min_stroke(b):
+    n = 0
+    items = [d for d in b.GetDrawings()]
+    for f in b.GetFootprints():
+        items += list(f.GraphicalItems())
+    for it in items:
+        if it.GetClass() != "PCB_SHAPE" or it.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
+            continue
+        w = it.GetWidth()
+        if 0 < w < mm(MIN_STROKE) - 1:
+            it.SetWidth(mm(MIN_STROKE))
+            n += 1
+    print(f"  {n} silk lines widened to {MIN_STROKE} mm")
+
+
 def nudge_refs(b):
     for f in b.GetFootprints():
         q = f.GetPosition()
@@ -226,6 +246,7 @@ def main():
     dmx_labels(b)
     odd_sizes(b)
     nudge_refs(b)
+    min_stroke(b)
     for d in REMOVE:
         b.Remove(d)
     for f, g in REMOVE_FP:

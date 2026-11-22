@@ -160,8 +160,8 @@ the headers, or you will not get to them.
 
 **The lands take more than one size.** Resistors and capacitors go on a land running 0.30 to
 2.30 mm off centre, so 0402, 0603, 0805 and 1206 all sit on copper and you can use whatever
-you have. The TVS lands go out to 2.90 mm and take SOD-123 through SMA as well. None of it
-reflows, the lands are longer than the parts and nothing self-aligns, but by hand it does not
+you have. The TVS lands go out to 2.90 mm and take SOD-123 through SMA as well. It isn't made
+for reflow: the lands are longer than the parts and nothing self-aligns. By hand it does not
 matter.
 """
 
@@ -178,11 +178,12 @@ RS-485 transceivers driving a terminated bus, OLED, LED, buffer). Anything rated
 |---|---|---|---|
 | **Pololu D24V10F5** (recommended) | 5 V, 1 A, 5.1-36 V in | row A, all 5 pins | Fixed 5 V, nothing to set. Fine on 24 V. 12.7 x 17.8 mm. |
 | Pololu D36V28F5 | 5 V, 3.2 A, 5.3-50 V in | row B, PG pin (optional) in row A's last hole | Two M2 holes on the carrier match the module's. Overkill here, but bulletproof on 24 V. |
-| 78xx-style SIP, RECOM R-78E5.0-1.0 (8-28 V in) or Mornsun K7805-1000R3 (8-36 V in) | 5 V, 1 A | row A, the VOUT / GND / VIN holes (pin 3 / 2 / 1) | Pin 1 in VIN. **They face opposite ways:** RECOM body towards the minus lands, Mornsun body towards the plus lands (its pins sit near its back). Standing height 10.4 mm (RECOM) or 17.5 mm (Mornsun). |
+| 78xx-style SIP, RECOM R-78E5.0-1.0 (8-28 V in, tight on 24 V) or Mornsun K7805-1000R3 (8-36 V in) | 5 V, 1 A | row A, the VOUT / GND / VIN holes (pin 3 / 2 / 1) | Pin 1 in VIN. **They face opposite ways:** RECOM body towards the minus lands, Mornsun body towards the plus lands (its pins sit near its back). Standing height 10.4 mm (RECOM) or 17.5 mm (Mornsun). |
 | MP1584EN mini module, ~22 x 17 mm | adjustable, 28 V max in | the four big corner lands | **Set it to 5.0 V first.** Fine on 12 V; on 24 V the 28 V limit is tight. Put Kapton tape under it, rows A/B are bare copper under its belly. |
 
 Rows A and B sit between the two input lands (`VIN-` and `VIN+`). Silk marks them `A` and
-`B`; row A is the one nearer the minus lands. `OUT` and `IN` on the silk mark the row ends.
+`B`; row A is the one nearer the minus lands. `OUT` on the silk marks each row's VOUT end, `IN`
+sits over each row's VIN hole.
 Neither row has a square pad: Pololu marks GND square and a SIP marks pin 1, so line the module
 up by `OUT`, not by a square pad.
 
@@ -194,8 +195,8 @@ just runs. PG is an open-drain output nobody reads.
 
 **Pololu modules go on label side down**, components facing away from the carrier, the way you
 would plug them into a breadboard. Solder the header into the module first, then into the
-carrier. Flipped over, a D24V10F5 just stays off, but a D36V28F5 gets reverse polarity and
-dies, and its screw holes won't line up.
+carrier. Flipped over, a D24V10F5 just stays off, but a D36V28F5 shorts the pixel supply
+through its GND pins (the fuse trips), and its screw holes won't line up.
 
 Three of the GND holes are connected solid to the pours, not through thermal spokes, because
 there's no room for spokes between the neighbouring pins. They want a bit more heat.
@@ -209,7 +210,7 @@ STAGES = """
 | | DMX | Pixel | Network | What you need |
 |---|---|---|---|---|
 | **DMX only, USB powered** | 1-3 | - | WiFi | ESP32, one RS-485 module per port, XLR headers, 10k dir, bias and termination as required |
-| **DMX + LAN** | 1-3 | - | W5500 | plus the W5500 and its two 10k |
+| **DMX + LAN** | 1-3 | - | W5500 | plus the W5500, its two 10k and its 100 nF / 1 uF / 22 uF |
 | **Pixel only** | - | 1-5 | WiFi | ESP32, buffer, terminals, 1000uF, power inlet, fuse, buck |
 | **Everything** | 3 | 5 | W5500 | all of the above, plus display and encoder |
 
