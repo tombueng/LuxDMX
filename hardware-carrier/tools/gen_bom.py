@@ -47,6 +47,13 @@ SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sourcing.json")
 OUT = os.path.join(HERE, "production")
 
 
+def board_rev():
+    """The board revision, from tools/silk_labels.py, the one place it is kept."""
+    import re
+    txt = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "silk_labels.py")).read()
+    return re.search(r'^REV = "([^"]+)"', txt, re.M).group(1)
+
+
 def generic(val, fpid):
     """Board value -> sourcing key.
 
@@ -296,7 +303,10 @@ def main():
 
     # ---- Markdown ----------------------------------------------------------------
     L = ["# Bill of materials", "",
-         f"Everything fitted: {sum(counts.values())} positions. Quantities come from the board.", "",
+         f"Board **rev {board_rev()}** (printed on both sides of the PCB).", "",
+         f"Everything fitted: {sum(counts.values())} positions. Quantities come from the board. "
+         "The 5 V regulator spot isn't in here: that module is bought separately, see the "
+         "README's Regulator section.", "",
          f"LCSC stock checked **{src['_checked']}**. Look again before ordering, it changes "
          "daily.", "",
          src.get("_price_basis", ""), "",

@@ -80,8 +80,9 @@ RULES = {
         "Pixel", "pixel ports are used **and** you want a plug-in supply",
         "Rated 3.5 A. Above about 3 A use the screw terminal."),
     "MF-R": ("Pixel", "pixel ports are used **and** no external fuse",
-             "Bourns MF-R, 30 V. Middle hole up to 4 A, right hole up to 9 A. MF-RHT and "
-             "MF-RG are 16 V parts and unusable on 24 V."),
+             "Bourns MF-R, 30 V. Middle hole MF-R110 to MF-R400 (up to 4 A), right hole "
+             "MF-R500 (5 A). Bigger ones hit the 1000 uF can, the silk's 9A doesn't fit. "
+             "MF-RHT and MF-RG are 16 V parts and unusable on 24 V."),
     "12-24V -> 5V buck": ("Supply",
                           "supplied from 12/24 V **and** neither 5V-IN nor USB connected",
                           "Pololu D24V10F5 is the easy pick (fixed 5 V, row A). "
@@ -92,7 +93,8 @@ RULES = {
                        "EC11 with a push switch, the part inside a KY-040. No pullups "
                        "needed, GPIO42/41/21 have their own."),
     "Tact 6x6 H30": ("Interface", "you want the buttons", "6 x 6 mm tact switch on "
-                     "IO3 and IO46. Take a 30 mm plunger if it has to reach the same front "
+                     "IO3 and IO46, any plunger height 5 to 30 mm (the BOM part is 5 mm, "
+                     "H30 is only the 3D model). Take a 30 mm plunger if it has to reach the same front "
                      "panel as the 20 mm encoder shaft. Both go to GND, the pins pull up "
                      "internally."),
     "Blade fuse holder, alternative to the polyfuse": ("Supply", "you would rather replace a blown fuse than wait for a polyfuse to "
@@ -180,7 +182,9 @@ RS-485 transceivers driving a terminated bus, OLED, LED, buffer). Anything rated
 | MP1584EN mini module, ~22 x 17 mm | adjustable, 28 V max in | the four big corner lands | **Set it to 5.0 V first.** Fine on 12 V; on 24 V the 28 V limit is tight. Put Kapton tape under it, rows A/B are bare copper under its belly. |
 
 Rows A and B sit between the two input lands (`VIN-` and `VIN+`). Silk marks them `A` and
-`B`; row A is the one nearer the minus lands.
+`B`; row A is the one nearer the minus lands. `OUT` and `IN` on the silk mark the row ends.
+Neither row has a square pad: Pololu marks GND square and a SIP marks pin 1, so line the module
+up by `OUT`, not by a square pad.
 
 - Row A from the `A` mark: VOUT, GND, VIN, SHDN, PG.
 - Row B from the `B` mark: VOUT, GND, GND, VIN, EN.
@@ -264,7 +268,11 @@ def main():
     for g, ref, val, side, cond, note in rows:
         groups.setdefault(g, []).append((ref, val, side, cond, note))
 
+    import re as _re
+    rev = _re.search(r'^REV = "([^"]+)"', open(os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), "silk_labels.py")).read(), _re.M).group(1)
     L = ["# Assembly", "",
+         f"For board **rev {rev}** (it says so on the silk).", "",
          f"How many of the {len(rows)} positions you actually solder depends on what you are building.",
          "Almost nothing here is mandatory.", "",
          "## Answer these first", "",

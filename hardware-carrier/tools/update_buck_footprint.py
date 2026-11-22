@@ -116,7 +116,7 @@ def stage_swap():
     r.SetTextAngleDegrees(keep["rangle"])
     r.SetLayer(keep["rlayer"])
     r.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(0.8), pcbnew.FromMM(0.8)))
-    r.SetTextThickness(pcbnew.FromMM(0.12))
+    r.SetTextThickness(pcbnew.FromMM(0.15))
     r.SetVisible(keep["rvis"])
     want = tht_nets()
     for p in new.Pads():

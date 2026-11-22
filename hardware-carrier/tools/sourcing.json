@@ -1,6 +1,6 @@
 {
   "_comment": "Sourcing per part. gen_bom.py marries this with the board. LCSC stock is from the date below and must be re-checked before ordering; marketplace links rot within months, the search terms do not.",
-  "_checked": "2026-08-16",
+  "_checked": "2026-11-22",
   "parts": {
     "120R term": {
       "desc": "Resistor 120R 1206 1%",
@@ -11,7 +11,7 @@
       "url": "https://www.lcsc.com/product-detail/C17909.html",
       "note": "Same series as the 10k. JLCPCB basic part, so no extended-part fee for assembly.",
       "price_eur": 0.004,
-      "stock": 158200
+      "stock": 157500
     },
     "10k dir": {
       "desc": "Resistor 10k 1206 1%",
@@ -21,7 +21,7 @@
       "lcsc": "C17902",
       "url": "https://www.lcsc.com/product-detail/C17902.html",
       "price_eur": 0.018,
-      "stock": "204.500"
+      "stock": 352200
     },
     "10k ETH_CS pu": {
       "same_as": "10k dir"
@@ -37,7 +37,7 @@
       "lcsc": "C24497",
       "url": "https://www.lcsc.com/product-detail/C24497.html",
       "price_eur": 0.023,
-      "stock": "hoch",
+      "stock": 458500,
       "note": "1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR. Over a million in stock."
     },
     "22uF 3V3 bulk": {
@@ -49,7 +49,7 @@
       "url": "https://www.lcsc.com/product-detail/C159757.html",
       "note": "Half the price of the 25 V part (C12891, 0.24 EUR) for the same job. 6.3 V on a 3.3 V rail is roughly a factor of two margin, normal for X5R. Worth knowing: ceramics lose capacitance under DC bias, a 6.3 V part at 3.3 V keeps about half, so 11 to 13 uF rather than 22. Ample for holding up the rail when three transceivers key at once. For the full 22 uF take C12891 (25 V, keeps about 85 %) and pay 12 cents more.",
       "price_eur": 0.129,
-      "stock": "23.140"
+      "stock": 12980
     },
     "TVS bidir": {
       "desc": "TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W",
@@ -80,7 +80,7 @@
       ],
       "note": "The land is universal: copper runs from 0.30 to 2.90 mm off centre, so SOD-123, SOD-123F, SOD-123FL, DO-214AC (SMA) and a plain 1206 all sit on it. SMF12CA in SOD-123FL is the cheap default. SMAJ12CA in SMA is the same diode at 400 W instead of 200 W, same 12 V standoff and the same breakdown window, and its feet reach 2.80 mm so it now lands properly rather than hanging off the end. VRWM 12 V, so it does not conduct at the +12 V common mode RS-485 allows, VBR 14.7 V, clamps at 19.9 V with 10 A. Two per port, A and B to GND. A varistor is no substitute, it would not clamp until about 40 V.",
       "price_eur": 0.022,
-      "stock": "184.100"
+      "stock": 85880
     },
     "1000uF 35V": {
       "desc": "Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C",
@@ -91,7 +91,7 @@
       "url": "https://www.lcsc.com/product-detail/C128518.html",
       "note": "The land takes any radial can up to 13 mm across with 5.00 mm lead spacing. Panasonic FR series, low ESR, 10,000 h at 105 C, and JLCPCB has a footprint for it (the Chemi-Con EKYA350ELL102MK20S, C709540, has none). Two parts before it fell out (2026-11-16): the Chengx KM108M035J20RR0VH2FP0 (C10749) is discontinued at JLCPCB, the Rubycon 35YXJ1000M12.5X20 (C88743) at LCSC's BOM tool, although both still showed stock.",
       "price_eur": 0.58,
-      "stock": 529
+      "stock": 405
     },
     "MF-R 30V": {
       "desc": "Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch",
@@ -102,7 +102,7 @@
       "url": "https://www.lcsc.com/product-detail/C208489.html",
       "note": "The largest that fits the current placement: body 17.4 x 3.0 mm, 3.8 mm clear of the 1000uF can. Sits in the left and right hole (10.2 mm pitch). The MF-R900 (9 A, C208493) is the largest of the series but its body is 24.2 mm and would come within 0.40 mm of the can; both parts stand 20 to 25 mm tall. MF-RHT and MF-RG are 16 V parts above 1 A and unusable on 24 V.  Two numbers decide a replacement and neither is the current: the voltage (30 V, not 16) and the lead pitch (5.08 or 10.2 mm, nothing else). The table below is what has been checked so far.",
       "price_eur": 0.419,
-      "stock": "644",
+      "stock": 898,
       "alternatives": {
         "Works": {
           "cols": [
@@ -187,7 +187,7 @@
       "url": "https://www.lcsc.com/product-detail/C2682058.html",
       "note": "Two things decide this part, and neither is the number 541.\n1) The T. HCT, AHCT and ACT have TTL input thresholds (VIH 2.0 V), so 3.3 V from the S3 switches them reliably on a 5 V supply. HC, AHC and AC do not: their threshold is 0.7 x VCC = 3.5 V.\n2) The package. The land is SOIC-20W: 1.27 mm pitch, rows 10.10 mm apart, copper from 3.63 to 6.47 mm off the axis, pads reaching 1.32 mm past the lead tip so an iron fits. Only the 1.27 mm parts land on it - TI calls that DW, Nexperia calls it D.\nSpeed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x bit.",
       "price_eur": 0.64,
-      "stock": 2778,
+      "stock": 2742,
       "alternatives": {
         "Works": {
           "cols": [
@@ -287,7 +287,7 @@
       "lcsc": "C474952",
       "url": "https://www.lcsc.com/product-detail/C474952.html",
       "price_eur": 0.177,
-      "stock": "63.515"
+      "stock": 48930
     },
     "PIXn V+/DATA/GND": {
       "desc": "Screw terminal, 3 pole, 5.08 mm pitch",
@@ -297,7 +297,7 @@
       "lcsc": "C474953",
       "url": "https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html",
       "price_eur": 0.175,
-      "stock": "16.545"
+      "stock": 9795
     },
     "header-1x03-P2.54-terminal": {
       "desc": "Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows",
@@ -308,7 +308,7 @@
       "url": "https://www.lcsc.com/product-detail/C557686.html",
       "note": "Screws the XLR tails down. One of the three terminals the 1.20 mm DMX land was drawn for (with Phoenix MPT 0,5/3-2,54 and TE 282834-3). A 3-pin piece off the header strip fits the same holes if you would rather plug the tails on.",
       "price_eur": 0.35,
-      "stock": 5930
+      "stock": 5590
     },
     "EC11": {
       "desc": "Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch",
@@ -319,7 +319,7 @@
       "url": "https://www.lcsc.com/product-detail/C470754.html",
       "note": "The EC11 land is the standard 11 mm footprint, so the Alps original and every EC11 clone fit. This one: vertical, 20 mm flat shaft, 30 detents and 15 pulses, push switch with 1.5 mm travel (Alps' own series table, 2026-11-16). 30/15 means two quadrature edges per click, so set Steps per detent to 2 (half-step) in /config; the cheap 20/20 clones want the default 4. ENC_A is GPIO42, ENC_B GPIO41 and ENC_SW GPIO21, all with internal pullups. Add a knob for a 6 mm D-shaft.",
       "price_eur": 2.22,
-      "stock": 3172
+      "stock": 3134
     },
     "Display socket": {
       "desc": "Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED",
@@ -330,7 +330,7 @@
       "url": "https://www.lcsc.com/product-detail/C22373890.html",
       "note": "The display sits on a 1x04 FEMALE socket, not a piece of header strip. 8.50 mm tall, which lifts the OLED 10.9 mm off the carrier so it clears the modules around it. A male header there would put the glass almost flat on the board.",
       "price_eur": 0.06,
-      "stock": 14940
+      "stock": 14910
     },
     "Tact 6x6 H30": {
       "desc": "Tactile switch 6 x 6 mm, through hole, 5 mm tall",
@@ -341,7 +341,7 @@
       "url": "https://www.lcsc.com/product-detail/C110153.html",
       "note": "Short plunger, for buttons reached through a cap or used on the open board. The land takes every 6 x 6 mm through-hole switch, plungers from 5 to 30 mm. The 20 mm encoder shaft needs about 30 mm to reach the same front panel; LCSC/JLCPCB stock stops at 19 mm (K2-1102DP-Z4SW-04, C194449), so a panel build takes 30 mm switches from a marketplace or long caps. Goes straight to GND, IO3 and IO46 pull up internally.",
       "price_eur": 0.03,
-      "stock": 61190
+      "stock": 63930
     },
     "DC jack": {
       "desc": "DC barrel jack, Kycon KLDX-0202 land, 3.5 A",
@@ -370,7 +370,7 @@
       ],
       "note": "Fail-safe bias on a 3.3 V bus needs more than 200 mV idle differential. With two terminators (60 R, the normal case once this board is the controller at one end) 330 R gives 275 mV, 470 R only 198 mV. Anything from 270 R to 430 R works, see the table. Bus loading 4.6 mA, which no RS-485 driver cares about, and 5 % tolerance is irrelevant for a bias resistor. The land takes anything from 0402 to 1206: copper runs 0.30 to 2.30 mm off centre, so every end cap lands on it, an 0402's at 0.25 to 0.50 as much as a 1206's at 1.10 to 1.60. The 390R that only exists in 0805 therefore goes in without any trickery.",
       "price_eur": 0.012,
-      "stock": "79.100",
+      "stock": 3400,
       "alternatives": {
         "Usable values on a 3.3 V bus (RS-485 needs more than 200 mV idle)": {
           "cols": [
@@ -446,7 +446,7 @@
       "vendor": "Samsung",
       "lcsc": "C1848",
       "url": "https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html",
-      "stock": 703670,
+      "stock": 129050,
       "price_eur": 0.06,
       "qty": 1,
       "note": "The middle rung of the W5500's decoupling. Same Samsung series and package as the 100nF, so one reel family covers both. It closes a factor-220 gap: the rail had 100nF and 22uF and nothing between them."

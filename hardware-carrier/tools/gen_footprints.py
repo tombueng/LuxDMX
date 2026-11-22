@@ -103,7 +103,7 @@ def emit(fid, mod):
         # label on the outer side of the land, so nothing in between gets written over
         ly = y - sp["h"]/2 - 0.9 if y <= 0 else y + sp["h"]/2 + 0.9
         lines.append(f'  (fp_text user "{sp["name"]}" (at {x:.3f} {ly:.3f})'
-                     ' (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))')
+                     ' (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.15))))')
     # Loose through-holes on top of an SMD land pattern: rows for modules with a pin header,
     # and plated mounting holes. Numbered after the SMD pads, in the order modules.json lists
     # them; the nets live in modules.json too and are set on the board, not here.
@@ -163,7 +163,7 @@ def emit(fid, mod):
                      ' (layer "F.Fab") (effects (font (size 0.6 0.6) (thickness 0.08))))')
     for st in mod.get("silk_text", []):
         lines.append(f'  (fp_text user "{st["text"]}" (at {st["x"] - ox:.3f} {st["y"] - oy:.3f})'
-                     ' (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))')
+                     ' (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.15))))')
 
     c = CRTYD_MARGIN
     if mod.get("courtyard") == "union" and mod.get("bodies"):

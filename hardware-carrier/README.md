@@ -11,8 +11,9 @@ The board is built and runs on the bench; most firmware testing happens on it.
 | | |
 |---|---|
 | Board | 100 x 80 mm, 2 layers, 1 oz copper, no mounting holes |
+| Revision | **rev 1.1**, printed on the silk (front between the buttons, back along the bottom edge). Boards without a rev on them are rev 1.0, see [Known issues](#known-issues) |
 | DMX / RDM | up to 3 ports, one MAX3485 module each, direction pin driven, **not isolated** |
-| Pixels | up to 5 WS281x ports, buffered to 5 V by a 74HCT541 |
+| Pixels | up to 5 WS281x ports, buffered to 5 V by a 74AHCT541 |
 | Network | wired with a W5500 module (recommended), or WiFi with an external antenna, see [Network](#network-w5500-or-an-external-antenna) |
 | Logic supply | USB-C on the ESP module, external 5 V, or a 5 V regulator module off the pixel rail (Pololu D24V10F5 recommended, MP1584EN, D36V28F5 and 78xx-style SIPs fit too) |
 | Pixel supply | 12 or 24 V screw terminal, fused on the board, 9.8 A max |
@@ -41,7 +42,8 @@ size match, check both before buying.
 ### Network: W5500, or an external antenna
 
 The S3's antenna end sits in the middle of the board, over the ground copper and between the
-RS-485 modules and the display. A module with the usual PCB antenna (WROOM-1) loses a lot of
+RS-485 modules and the display, about 3 mm from the 5 V regulator spot on the back (an MP1584's
+switch node ends up about 5 mm from a WROOM-1's antenna; a Pololu module is quieter). A module with the usual PCB antenna (WROOM-1) loses a lot of
 range there, and modules, cables and an enclosure make it worse.
 
 - **Recommended: the W5500 module.** Wired Ethernet, no radio questions.
@@ -75,7 +77,7 @@ Not used, and not usable: 35/36/37 (octal PSRAM on any R8 module), 45 (flash vol
 
 | Net | Comes from | Feeds |
 |---|---|---|
-| `+5V` | USB-C on the ESP module, **or** the `5V IN` header, **or** the buck module | ESP module 5V pin, 74HCT541 |
+| `+5V` | USB-C on the ESP module, **or** the `5V IN` header, **or** the buck module | ESP module 5V pin, 74AHCT541 |
 | `+3V3` | the ESP module's own regulator (800 mA on Espressif's design) | ESP32-S3, MAX3485 x3, W5500, OLED, DMX bias, pull-ups |
 | `V_PIX_IN` | `12-24V IN` screw terminal | the fuse |
 | `V_PIX` | after the fuse | 1000 µF, V+ on all five pixel terminals, buck module input |
@@ -127,9 +129,12 @@ Exactly one of these three:
 | Blade fuse | Keystone 3568 holder, MINI blade fuses (ATM, Littelfuse 297/997) | you'd rather swap a fuse. Not ATO/ATC, those are twice as wide |
 | Solder bridge | pad pair on the back, inside the polyfuse footprint | the supply lead already has a fuse |
 
-Polyfuse land: three holes, 5.08 mm (middle, MF-R110 to MF-R400, up to 4 A) and 10.2 mm (right,
-MF-R500, up to 9 A). Use **30 V** parts only. MF-RHT, MF-RG and anything else rated 16 V is out of
-rating at 24 V the moment it trips. MF-R900 (24 mm body) hits the 1000 µF can. Equivalents to the
+Polyfuse land: three holes in a slightly staggered row, about 5.1 mm (middle, MF-R110 to MF-R400,
+up to 4 A hold) and 10.2 mm (right, MF-R500 and up) from the left one; radial leads bend the
+last bit. The silk's `9A` is the series' limit on that spacing, not something that fits here:
+MF-R900 (24 mm body) hits the 1000 µF can, so check the body width of anything above the 5 A
+MF-R500. Use **30 V** parts only. MF-RHT, MF-RG and anything else rated 16 V is out of
+rating at 24 V the moment it trips. Equivalents to the
 MF-R500: ECE RB500-30, Littelfuse RUEF500. Full list in [`production/BOM.md`](production/BOM.md).
 
 Never polyfuse and bridge together.
@@ -160,6 +165,9 @@ How they sit:
   1.1 mm), so modules from 22 x 18 to 30 x 18 mm land. `VIN-`/`VIN+` on one end, `VOUT-`/`VOUT+`
   on the other, as the silk says. Rows A and B are bare copper under the module's belly, so put a
   bit of Kapton tape in between.
+- No square pad on either row, on purpose: Pololu marks GND square and a 78xx SIP marks pin 1
+  (VIN), so a square pad would lead one of them a hole off. The silk says `OUT` and `IN` at the
+  ends of each row instead.
 - **Row A** (0.1 in, silk `A`), from the mark: VOUT, GND, VIN, SHDN, PG. The D24V10F5 takes all
   five. A 3-pin SIP takes VOUT/GND/VIN (pin 3/2/1) with its body towards the minus lands.
 - **Row B** (silk `B`), from the mark: VOUT, GND, GND, VIN, EN. The D36V28F5's edge row. Its PG
@@ -249,7 +257,7 @@ module on a separate build if you need it.
 ## Pixel ports
 
 ```
-GPIO 38/39/40/47/48 ── 74HCT541 (5 V) ── 330 Ω ── terminal DATA
+GPIO 38/39/40/47/48 ── 74AHCT541 (5 V) ── 330 Ω ── terminal DATA
                                          V_PIX ── terminal V+
                                            GND ── terminal GND
 ```
@@ -289,8 +297,10 @@ Same part as the DMX bias resistors.
 
 ### Terminals
 
-5.08 mm, 3 pole: V+ / DATA / GND. Pads 3.60 x 3.30 mm on 1.30 mm holes. Fit the terminal or solder
-the wire flat onto the pad.
+5.08 mm, 3 pole: V+ / DATA / GND, marked `+ PIXn -` on the silk above the pads. V+ and GND pads
+are 4.80 x 6.15 mm, DATA 2.00 x 6.15 mm, all on 1.30 mm holes. Fit the terminal or solder the
+wire flat onto the pad. The 12-24 V inlet has the same big pads (4.80 x 6.10 mm) with `+` and `-`
+above them.
 
 ### Things to know
 
@@ -509,6 +519,9 @@ self-aligns, so this board doesn't reflow.
 From source: `pio run -e luxdmx_carrier` builds an image that boots with the carrier pin map.
 
 ## Known issues
+
+Revisions: the board says `rev 1.1` on the silk from 2026-11-22 on. Older boards have no revision
+printed; call them rev 1.0. The items below say which boards they affect.
 
 - **Boards from gerbers before 2026-10-26: buffer inputs A6 to A8 (pins 7, 8, 9) float.** Unused
   CMOS inputs belong on GND or VCC; left open they can draw extra current and make the unused

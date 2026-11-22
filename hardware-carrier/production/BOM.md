@@ -1,8 +1,10 @@
 # Bill of materials
 
-Everything fitted: 54 positions. Quantities come from the board.
+Board **rev 1.1** (printed on both sides of the PCB).
 
-LCSC stock checked **2026-08-16**. Look again before ordering, it changes daily.
+Everything fitted: 54 positions. Quantities come from the board. The 5 V regulator spot isn't in here: that module is bought separately, see the README's Regulator section.
+
+LCSC stock checked **2026-11-22**. Look again before ordering, it changes daily.
 
 Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume price. Converted at about 0.92 EUR/USD. Where a page could not be checked the value is an estimate and the stock column says ?.
 
@@ -10,22 +12,22 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 
 | Qty | Part | Description | MPN | LCSC | Stock | EUR ea. | EUR total |
 |---:|---|---|---|---|---:|---:|---:|
-| 2 | 100nF | Capacitor 100nF 50V X7R 1206 | `CL31B104KBCNNNC` | [C24497](https://www.lcsc.com/product-detail/C24497.html) | hoch | 0.023 | 0.05 |
-| 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 703670 | 0.06 | 0.06 |
-| 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 23.140 | 0.129 | 0.26 |
-| 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C | `EEU-FR1V102` | [C128518](https://www.lcsc.com/product-detail/C128518.html) | 529 | 0.58 | 0.58 |
-| 1 | Display socket | Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED | `HC-PM254-8.5H-1x4PZ-02A` | [C22373890](https://www.lcsc.com/product-detail/C22373890.html) | 14940 | 0.06 | 0.06 |
-| 1 | 74AHCT541 pixel buffer | Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land) | `SN74AHCT541DWR` | [C2682058](https://www.lcsc.com/product-detail/C2682058.html) | 2778 | 0.64 | 0.64 |
-| 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 644 | 0.419 | 0.42 |
-| 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 204.500 | 0.018 | 0.09 |
-| 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | [C17909](https://www.lcsc.com/product-detail/C17909.html) | 158200 | 0.004 | 0.01 |
-| 11 | 330R bias+ / 330R bias- / 330R pixel | Resistor 330R 1206 5% (fail-safe bias) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 79.100 | 0.012 | 0.13 |
-| 1 | EC11 | Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch | `EC11E15244B2` | [C470754](https://www.lcsc.com/product-detail/C470754.html) | 3172 | 2.22 | 2.22 |
-| 1 | 12-24V IN 24A | Screw terminal, 2 pole, 5.08 mm pitch, 24 A | `KF128-5.08-2P-AA` | [C474952](https://www.lcsc.com/product-detail/C474952.html) | 63.515 | 0.177 | 0.18 |
-| 3 | header-1x03-P2.54-terminal | Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows | `XY308-2.54-3P` | [C557686](https://www.lcsc.com/product-detail/C557686.html) | 5930 | 0.35 | 1.05 |
-| 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 16.545 | 0.175 | 0.88 |
-| 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 184.100 | 0.022 | 0.13 |
-| 2 | Tact 6x6 H30 | Tactile switch 6 x 6 mm, through hole, 5 mm tall | `K2-1102DP-C4SW-04` | [C110153](https://www.lcsc.com/product-detail/C110153.html) | 61190 | 0.03 | 0.06 |
+| 2 | 100nF | Capacitor 100nF 50V X7R 1206 | `CL31B104KBCNNNC` | [C24497](https://www.lcsc.com/product-detail/C24497.html) | 458500 | 0.023 | 0.05 |
+| 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 129050 | 0.06 | 0.06 |
+| 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 12980 | 0.129 | 0.26 |
+| 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C | `EEU-FR1V102` | [C128518](https://www.lcsc.com/product-detail/C128518.html) | 405 | 0.58 | 0.58 |
+| 1 | Display socket | Female header 1x4, 2.54 mm, 8.5 mm tall, for the OLED | `HC-PM254-8.5H-1x4PZ-02A` | [C22373890](https://www.lcsc.com/product-detail/C22373890.html) | 14910 | 0.06 | 0.06 |
+| 1 | 74AHCT541 pixel buffer | Octal buffer 74AHCT541, SOIC-20 300 mil (SOIC-20W land) | `SN74AHCT541DWR` | [C2682058](https://www.lcsc.com/product-detail/C2682058.html) | 2742 | 0.64 | 0.64 |
+| 1 | MF-R 30V | Polyfuse Bourns MF-R500, 30 V, 5 A hold / 10 A trip, 10.2 mm pitch | `MF-R500` | [C208489](https://www.lcsc.com/product-detail/C208489.html) | 898 | 0.419 | 0.42 |
+| 5 | 10k ETH_CS pu / 10k ETH_RST pu / 10k dir | Resistor 10k 1206 1% | `1206W4F1002T5E` | [C17902](https://www.lcsc.com/product-detail/C17902.html) | 352200 | 0.018 | 0.09 |
+| 3 | 120R term | Resistor 120R 1206 1% | `1206W4F1200T5E` | [C17909](https://www.lcsc.com/product-detail/C17909.html) | 157500 | 0.004 | 0.01 |
+| 11 | 330R bias+ / 330R bias- / 330R pixel | Resistor 330R 1206 5% (fail-safe bias) | `1206W4J0331T5E` | [C25374](https://www.lcsc.com/product-detail/Chip-Resistor-Surface-Mount_Uniroyal-Elec-1206W4J0331T5E_C25374.html) | 3400 | 0.012 | 0.13 |
+| 1 | EC11 | Rotary encoder Alps EC11E15244B2, 20 mm flat (D) shaft, push switch | `EC11E15244B2` | [C470754](https://www.lcsc.com/product-detail/C470754.html) | 3134 | 2.22 | 2.22 |
+| 1 | 12-24V IN 24A | Screw terminal, 2 pole, 5.08 mm pitch, 24 A | `KF128-5.08-2P-AA` | [C474952](https://www.lcsc.com/product-detail/C474952.html) | 48930 | 0.177 | 0.18 |
+| 3 | header-1x03-P2.54-terminal | Screw terminal, 3 pole, 2.54 mm pitch, for the DMX rows | `XY308-2.54-3P` | [C557686](https://www.lcsc.com/product-detail/C557686.html) | 5590 | 0.35 | 1.05 |
+| 5 | PIXn V+/DATA/GND | Screw terminal, 3 pole, 5.08 mm pitch | `KF128-5.08-3P-AA` | [C474953](https://lcsc.com/product-detail/Screw-terminal_Cixi-Kefa-Elec-KF128-5-08-3P-AA_C474953.html) | 9795 | 0.175 | 0.88 |
+| 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 85880 | 0.022 | 0.13 |
+| 2 | Tact 6x6 H30 | Tactile switch 6 x 6 mm, through hole, 5 mm tall | `K2-1102DP-C4SW-04` | [C110153](https://www.lcsc.com/product-detail/C110153.html) | 63930 | 0.03 | 0.06 |
 
 **Small parts total: about 6.82 EUR**
 
@@ -122,7 +124,7 @@ Speed does not decide it: 14 ns against 6 ns is nothing next to a 1250 ns WS281x
 
 ## Modules from Amazon / eBay / AliExpress
 
-The links are examples from 2026-08-16 and will rot. The **search terms** are the durable part.
+The links are examples from 2026-11-22 and will rot. The **search terms** are the durable part.
 
 ### 1 x 12-24V -> 5V buck
 

@@ -195,7 +195,7 @@ solder a few small parts. If you just want to try it tonight, skip to the
 > except the ones for what you actually use.
 >
 > - **DMX + RDM on up to 3 ports**, one RS-485 module per port, direction pin driven so RDM works
-> - **WS281x pixels on up to 5 ports** once you add the 74HCT541 buffer chip. It lifts the S3's
+> - **WS281x pixels on up to 5 ports** once you add the 74AHCT541 buffer chip. It lifts the S3's
 >   3.3 V data to the 5 V the strips want, so no pixels without it
 > - **WiFi**, or wired Ethernet when the W5500 module is fitted
 > - 12/24 V pixel supply with a fuse on the board; the logic runs off USB, an external 5 V or a
@@ -238,7 +238,7 @@ headers.
 | 2 × 330 Ω fail-safe bias | the port drives its bus, which it normally does. Once per bus, so leave it out if the module already biases the line |
 | 2 × TVS diode (SMF12CA or SMAJ12CA) | the port leaves the enclosure |
 | **Pixels** | |
-| 74HCT541 buffer (SO-20 wide) | at least one pixel port is used. **HCT**, not HC: the HC parts don't switch reliably on 3.3 V. And not the `PW` (TSSOP) version LCSC stocks most of, it won't land |
+| 74AHCT541 buffer (SO-20 wide) | at least one pixel port is used. **HCT**, not HC: the HC parts don't switch reliably on 3.3 V. And not the `PW` (TSSOP) version LCSC stocks most of, it won't land |
 | 330 Ω series resistor, per port | you use that pixel port. Damps the ringing on the strip wire |
 | 3-pole screw terminal, per port | you use that pixel port |
 | 1000 µF 35 V, `12-24V IN` terminal, fuse | any pixel port is used, see power below |
@@ -1539,7 +1539,7 @@ Applied on first boot; everything is overrideable in the web UI (no recompile).
 | ESP32-S3 DevKitC-1 | `esp32s3dev` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 (RX −1) | LED = WS2812 on GPIO48; v3 build disables the brownout detector (`CONFIG_ESP_BROWNOUT_DET=n`, a from-source build) to avoid an S3 boot-loop |
 | WT32-ETH01 | `wt32eth01` | Ethernet | 2 | GPIO4 / 5 / −1 | UART2, TX-only | GPIO16 = LAN8720 PHY power, so pins are shifted; 2nd output best TX-only (no RX/RDM) |
 | LuxDMX v6 (ESP32-S3 + W5500) | `esp32s3dev` + **LuxDMX v6** template | Ethernet (W5500 SPI) | 2 | GPIO17 / 18 / 8 | UART2 | Open-hardware board ([hardware/](hardware/)). No dedicated build, flash `esp32s3dev` and apply the **LuxDMX v6** template in `/config` for the fixed pin map. 5-LED status panel; W5500 on SPI3 (CS=10/INT=14/RST=9); RTS/EN=8 for RDM direction |
-| LuxDMX Carrier (ESP32-S3 DevKitC + modules) | `luxdmx_carrier` | Ethernet (W5500 SPI) | 3 | GPIO17 / 18 / 16 | UART, TX 15 / RX 7 / RTS 6 (third: 5 / 4 / 8) | Passive carrier for off-the-shelf modules ([hardware-carrier/](hardware-carrier/)). Extends `esp32s3_psram`, so it wants an N16R8 and a USB flash at least once: PSRAM is set up by the bootloader and OTA can never switch it on. Five pixel ports on GPIO38/39/40/47/48 behind a 74HCT541 level shifter, encoder on 42/41/21, two buttons on 3/46, I2C display on 1/2. W5500 on CS=10 / SCK=12 / MOSI=11 / MISO=13 / INT=14 / RST=9, and it needs **both** `useeth=1` and `ethon=1` before it comes up. Only output A is enabled by default: a bare board has no transceiver modules on it yet |
+| LuxDMX Carrier (ESP32-S3 DevKitC + modules) | `luxdmx_carrier` | Ethernet (W5500 SPI) | 3 | GPIO17 / 18 / 16 | UART, TX 15 / RX 7 / RTS 6 (third: 5 / 4 / 8) | Passive carrier for off-the-shelf modules ([hardware-carrier/](hardware-carrier/)). Extends `esp32s3_psram`, so it wants an N16R8 and a USB flash at least once: PSRAM is set up by the bootloader and OTA can never switch it on. Five pixel ports on GPIO38/39/40/47/48 behind a 74AHCT541 level shifter, encoder on 42/41/21, two buttons on 3/46, I2C display on 1/2. W5500 on CS=10 / SCK=12 / MOSI=11 / MISO=13 / INT=14 / RST=9, and it needs **both** `useeth=1` and `ethon=1` before it comes up. Only output A is enabled by default: a bare board has no transceiver modules on it yet |
 | ESP32-S3 with **octal** PSRAM (N8R8 / N16R8) | `esp32s3_psram` | WiFi | 2 | GPIO17 / 16 / −1 | UART2, TX 18 | Enables the 8 MB **octal** PSRAM: RDM tables, WiFi/lwIP buffers and pixel framebuffers move to external RAM, so the RDM cap auto-detects to 64 and the internal heap stays open. Measured on an N16R8: 8 MB found, 121 KB internal heap free against 57 KB with the plain image. **Octal only.** Quad vs octal is fixed at build time on the ESP32-S3, so a module with 2 MB *quad* PSRAM (`R2`) runs the plain `esp32s3dev` image and simply does not use its PSRAM. Folding quad into that image was tried and dropped on purpose: it would change the firmware every S3 in the field auto-updates to, in exchange for a size of PSRAM none of our boards use. PSRAM occupies GPIO33-37, DMX on 16/17 is clear. One image for both sizes: it is built with an 8 MB flash header, because IDF refuses to boot a chip smaller than its header says, and the partition table only uses 4 MB anyway |
 
 **Any ESP32 / ESP32-S3 build can add wired Ethernet with an external SPI module**: the W5500 and

@@ -763,14 +763,15 @@
       "gotchas": [
         "Pads are 12 x 5 mm with NO drill, larger than any single module pad, so the different module lengths all land on copper. Covers 22 x 18 and 30 x 18 mm modules with margin. Do not grow them back: this is the largest back-side obstacle on the board and the routing is tight around it.",
         "The four lands carry a solder mask GRID, not one big opening: 7 x 3 windows of 1.1 mm on a 1.6 mm pitch, 0.5 mm of mask between them, laid by tools/mask_grid.py. The copper stays one continuous 12 x 5 mm piece, only the mask is broken up. A 60 mm2 opening is miserable to hand solder, the tin runs out flat across it instead of standing up round the pin. Re-run mask_grid.py after regenerating this footprint, gen_footprints.py does not know about it.",
-        "Envelope is 40 x 22 mm. 30 mm tall would NOT fit: the S3's pin rows leave only 23.7 mm of clear back-side strip and a taller pattern would short onto its through-hole pads.",
-        "Deliberately placed under the S3, not under the display: under the display it would sit against the antenna keepout, and a switching node next to a WiFi antenna is the worst possible neighbour.",
+        "Envelope is 40 x 22 mm. Taller would run into the parts and vias above and below the spot; the routing round it is tight.",
+        "Sits under the OLED, just past the S3's antenna end (the ESP outline ends about 3 mm before the left lands). With a WROOM-1 (PCB antenna) WiFi build an MP1584's switch node is about 5 mm from the antenna: for WiFi use the 1U module with an external antenna, or a Pololu module. Wired (W5500) builds don't care.",
         "Check your module's pin order before soldering: this pattern assumes in-left / out-right / minus-top / plus-bottom.",
         "Row A takes the Pololu D24V10F5 (all five pins) and a 3-pin 78xx-style SIP (VIN/GND/VOUT on row A's VIN/GND/VOUT, body towards the corner lands). Row B takes the D36V28F5 edge row; its PG pin lands in row A's PG hole. SHDN, PG and EN have no net: Pololu pulls SHDN and EN up to VIN through 100k, PG is open drain.",
         "Pololu modules go label side to the board, components facing out, the way a breadboard module sits. Turned over, VIN and VOUT swap.",
         "The two M2 holes are plated GND and replace the stitching vias that were at board (186.5, 100) and (174.5, 84). They are the D36V28F5's own holes.",
         "With a corner-pad module fitted flat, rows A/B sit open under its belly: tape (Kapton) between them.",
-        "Courtyard is the union of the 40 x 22 envelope and the three module bodies, so it has a tab above the right-hand lands."
+        "Courtyard is the union of the 40 x 22 envelope and the three module bodies, so it has a tab above the right-hand lands.",
+        "No square pad on rows A/B on purpose: Pololu marks GND square, a 78xx SIP marks pin 1 (VIN), so a square pad here would mislead one of them. The silk says IN and OUT at the row ends instead."
       ],
       "tht_pads": [
         {
@@ -792,8 +793,7 @@
           "row": "A",
           "x": 12.12,
           "y": 9.73,
-          "net": "V_PIX",
-          "shape": "rect"
+          "net": "V_PIX"
         },
         {
           "name": "SHDN",
@@ -835,8 +835,7 @@
           "row": "B",
           "x": 9.58,
           "y": 12.27,
-          "net": "V_PIX",
-          "shape": "rect"
+          "net": "V_PIX"
         },
         {
           "name": "EN",
@@ -896,6 +895,26 @@
           "text": "B",
           "x": 18.9,
           "y": 12.27
+        },
+        {
+          "text": "OUT",
+          "x": 17.2,
+          "y": 8.15
+        },
+        {
+          "text": "IN",
+          "x": 12.12,
+          "y": 8.15
+        },
+        {
+          "text": "OUT",
+          "x": 17.2,
+          "y": 13.85
+        },
+        {
+          "text": "IN",
+          "x": 9.58,
+          "y": 13.85
         }
       ]
     }
