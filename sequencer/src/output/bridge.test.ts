@@ -1,11 +1,74 @@
 // @vitest-environment happy-dom
 // The box's name is kept for the next start: a tablet switched on again (nothing connected yet) can
 // say "the bar's box isn't connected" instead of an address nobody knows.
-import { describe, it, expect, beforeEach } from 'vitest';
-import { Bridge } from './bridge';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Bridge, PROBE_MS, QUIET_MS } from './bridge';
 
 describe('Bridge', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  // the box's window, as this page sees it
+  const boxWindow = () => {
+    const win = { closed: false, postMessage: vi.fn(), close() { this.closed = true; } };
+    vi.stubGlobal('open', () => win);
+    const hellos = () => win.postMessage.mock.calls.filter((c) => c[0]?.type === 'hello').length;
+    return { win, hellos };
+  };
+
+  // Its window reloaded (F5 in it) waits for a hello and takes nothing; the "socket closed" it says
+  // on the way out didn't always get here, and this said "connected" while the lights got nothing.
+  // Crashed or hanging: the same. It says its stats every second, so quiet is the sign.
+  it('its page gone quiet while connected: asked with a hello; a live one answers and stays; two unanswered: lost', () => {
+    let clock = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    const { win, hellos } = boxWindow();
+    const b = new Bridge('h', () => {});
+    b.open();
+    b.handle({ type: 'ready', name: 'x' });
+    win.postMessage.mockClear();
+    const at = (ms: number) => { clock += ms; b.watch(); };
+    at(1000);
+    expect(hellos()).toBe(0);                                 // (a second without a word: nothing)
+    at(QUIET_MS);
+    expect(hellos()).toBe(1);
+    expect(b.state).toBe('ready');
+    at(50); b.handle({ type: 'status', ws: 'open' });         // a live page answers at once
+    at(QUIET_MS - 100);
+    expect(hellos()).toBe(1);
+    expect(b.state).toBe('ready');
+    // quiet again and nobody answers: two hellos, PROBE_MS apart, then lost
+    at(200); at(50);
+    expect(hellos()).toBe(2);
+    at(PROBE_MS);
+    expect(hellos()).toBe(3);
+    expect(b.state).toBe('ready');
+    at(PROBE_MS);
+    expect(b.state).toBe('reconnecting');                     // (the red bar; its hellos go on from here)
+    expect(b.lostAt).toBeGreaterThan(0);
+    b.close();
+    vi.restoreAllMocks();
+  });
+
+  it('a page that says ready again is a new one (its window reloaded): a new page for the output thread, every frame goes again', () => {
+    const { win } = boxWindow();
+    const b = new Bridge('h', () => {});
+    b.open();
+    b.handle({ type: 'ready', name: 'x' });
+    const first = b.page;
+    b.handle({ type: 'port', ok: 1 });
+    expect(b.portTaken).toBe(true);
+    const frames = () => win.postMessage.mock.calls.filter((c) => c[0]?.type === 'dmx').length;
+    const look = new Uint8Array([255, 0, 0]);
+    b.send(0, look); b.send(0, look);
+    expect(frames()).toBe(1);                                 // (only what changed)
+    b.handle({ type: 'ready', name: 'x' });
+    expect(b.page).toBe(first + 1);
+    expect(b.portTaken).toBe(false);                          // (the old page's channel went with it)
+    b.send(0, look);
+    expect(frames()).toBe(2);                                 // (the new page has had nothing yet)
+    b.close();
+  });
 
   it('remembers the name a box gave and knows it at the next start', () => {
     const b = new Bridge('192.168.1.50', () => {});

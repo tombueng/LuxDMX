@@ -9,6 +9,8 @@
   import { ui } from './ui.svelte';
   import { typeLabel } from '../model/library';
   import { groundAt, roomFor, type Rot, type V3 } from '../stage3d/geometry';
+  import { BAR_DEPTH, BAR_FACE, FIXED_SIZE, barLength, fixedLookOf } from '../stage3d/lightSize';
+  import { profileOf } from '../stage3d/profiles';
   import {
     aimHead, copySetup, DIR_LABEL, dirOf, frontOf, frontsFor, marksOf, mirrorRot, motors, mountOf, mountRot, MOUNTS, offsetsFor, opticsOf, otherSide,
     placeFor, placeOf, pointOf, pointRot, POINTS, rigFixtureOf, upOf, withFront, type Dir, type Mark, type MountId, type PanTilt, type PlaceRule, type PointId,
@@ -22,6 +24,14 @@
   const room = $derived(roomFor(app.show.settings.stage3d));
   const mover = $derived(kind === 'mover');
   const machine = $derived(kind === 'fog' || kind === 'sfx');
+  // a bar or a strip without a ring or matrix layout: its face across and its depth can be set too
+  const plainBar = $derived(kind === 'bar' && !app.modeOf(id)?.layout);
+  const barCells = $derived(new Set(app.modeOf(id)?.channels.map((c) => c.cell).filter((c) => c !== undefined)).size || 1);
+  // a PAR, a fresnel, a blinder or a strobe drawn as the generic one (not a real fixture's own model):
+  // its face and depth can be set too
+  const fixedLook = $derived(!app.modeOf(id)?.layout && !profileOf(t?.manufacturer, t?.model) ? fixedLookOf(kind, t?.model) : undefined);
+  // the face and the depth it has as it comes (a bar's, or the fixed light's)
+  const asComes = $derived(plainBar ? { h: BAR_FACE, d: BAR_DEPTH } : fixedLook ? FIXED_SIZE[fixedLook] : undefined);
   // a winch (kinetics): its soft limits are set here
   const winch = $derived(!!app.modeOf(id)?.channels.some((c) => c.attr === 'hoist'));
   const sortOf = (k: string) => (k === 'mover' ? 'mover' : k === 'fog' || k === 'sfx' ? 'machine' : 'fixed');
@@ -110,16 +120,16 @@
     }
     app.markDirty(0);
   }
-  // its size on the 3D stage: this light's own width (a strip's or a bar's length), over its type's;
-  // empty: as its type has it again
-  function setWidth(v: number) {
+  // its size on the 3D stage: this light's own width (a strip's or a bar's length), and a bar's face
+  // across (h) and its depth (d), over its type's; empty: as its type has it again
+  function setDim(k: 'w' | 'h' | 'd', v: number) {
     app.checkpoint();
     const ok = Number.isFinite(v) && v >= 0.02 && v <= 100;
     for (const x of peers) {
       const g = fx(x);
       if (!g) continue;
       const rest = { ...(g.dims ?? {}) };
-      if (ok) rest.w = Math.round(v * 1000) / 1000; else delete rest.w;
+      if (ok) rest[k] = Math.round(v * 1000) / 1000; else delete rest[k];
       if (Object.keys(rest).length) g.dims = rest; else delete g.dims;
     }
     app.markDirty(0);
@@ -345,9 +355,15 @@
       <h3 id="size-h">Its size</h3>
       <div class="angles">
         <label title="How wide it is in metres: a strip's or a bar's length, a matrix's or a ring's width; any other light is drawn that much bigger or smaller">Width m<input type="number" min="0.02" max="100" step="0.05" aria-label="Width in metres" value={f.dims?.w ?? ''}
-          placeholder={t?.physical?.dims?.w ? `${t.physical.dims.w} (its type)` : 'as drawn'} onfocus={pickAll} onchange={(e) => { setWidth(num(e)); shown(e, f.dims?.w); }} /></label>
+          placeholder={t?.physical?.dims?.w ? `${t.physical.dims.w} (its type)` : 'as drawn'} onfocus={pickAll} onchange={(e) => { setDim('w', num(e)); shown(e, f.dims?.w); }} /></label>
+        {#if asComes}
+          <label title={plainBar ? 'How wide its lit face is across, in metres: a slim pixel batten, a wide LED column' : "Its face's other side, in metres (its width is across): a 4-lite blinder is as tall as wide"}>Face m<input type="number" min="0.02" max="100" step="0.01" aria-label="Face across in metres" value={f.dims?.h ?? ''}
+            placeholder={`${t?.physical?.dims?.h ?? asComes.h}${t?.physical?.dims?.h ? ' (its type)' : ''}`} onfocus={pickAll} onchange={(e) => { setDim('h', num(e)); shown(e, f.dims?.h); }} /></label>
+          <label title="How deep its body is, front to back, in metres">Depth m<input type="number" min="0.02" max="100" step="0.01" aria-label="Depth in metres" value={f.dims?.d ?? ''}
+            placeholder={`${t?.physical?.dims?.d ?? asComes.d}${t?.physical?.dims?.d ? ' (its type)' : ''}`} onfocus={pickAll} onchange={(e) => { setDim('d', num(e)); shown(e, f.dims?.d); }} /></label>
+        {/if}
       </div>
-      <p class="faint small">For the 3D stage: a strip of 144 LEDs over 2.4 m, a matrix the size of the real one. Empty: as its type has it.</p>
+      <p class="faint small">For the 3D stage: a strip of 144 LEDs over 2.4 m, a matrix the size of the real one{plainBar ? `, a bar's face as wide as the real one (as it comes: ${barLength(barCells)} m long, ${BAR_FACE} m across, ${BAR_DEPTH} m deep)` : fixedLook ? `, a light as big as the real one (as it comes: ${FIXED_SIZE[fixedLook].w} m across, ${FIXED_SIZE[fixedLook].h} m the other way, ${FIXED_SIZE[fixedLook].d} m deep)` : ''}. Empty: as its type has it.</p>
     </section>
     {#if testable.length}
       <section aria-labelledby="try-h">

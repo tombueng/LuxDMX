@@ -63,3 +63,24 @@ it('"Stop effects" muting the cues\' effects goes to the thread too', async () =
   expect(posted.filter((m) => m.t === 'call').map((m) => m.m)).toEqual(['go', 'stopAllEffects', 'muteCueEffects']);
   vi.unstubAllGlobals();
 });
+
+// The box's window reloaded: its new page has none of the old one's channel. The thread is told to
+// drop the old one and gets a new one to offer (it went on sending into the old one: nothing out).
+it('a box whose page is a new one (its window reloaded): the thread drops the old channel, a new one is offered', async () => {
+  const posted: { t: string; key?: string }[] = [];
+  (globalThis as unknown as { Worker: unknown }).Worker = class { onmessage: unknown; onerror: unknown; postMessage(m: { t: string; key?: string }) { posted.push(m); } terminate() {} };
+  const { OutputThread } = await import('./host.svelte');
+  const host = new OutputThread(), s = emptyShow(), eng = new Engine(() => s);
+  host.start(eng, () => s);
+  let offers = 0;
+  const box = { host: '10.0.0.9', state: 'ready', page: 1, outputs: [{ en: true, uni: 0 }], pixels: [], portTaken: false, offerPort: () => { offers++; return true; } };
+  const sync = () => host.sync(eng, s, false, null, [box as never], 'artnet' as never);
+  sync(); sync();
+  expect(offers).toBe(1);
+  expect(posted.filter((m) => m.t === 'drop')).toHaveLength(0);
+  box.page = 2;                                                // (its window was reloaded and said ready again)
+  sync();
+  expect(posted.filter((m) => m.t === 'drop' && m.key === '10.0.0.9')).toHaveLength(1);
+  expect(offers).toBe(2);
+  vi.unstubAllGlobals();
+});

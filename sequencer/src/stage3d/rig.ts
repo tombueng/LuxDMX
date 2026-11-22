@@ -3,6 +3,7 @@
 // Moving heads turn their yoke (pan) and head (tilt) the way the real ones do (geometry.ts).
 // Updated every frame from what the engine puts on stage.
 import * as THREE from 'three';
+import { BAR_DEPTH, BAR_FACE, FIXED_SIZE, barLength, isFixedLook } from './lightSize';
 import { shapeH, shapeW, type Places } from '../model/pixelLayout';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Resolved } from '../model/types';
@@ -30,9 +31,10 @@ function pleated(n: number, depth: number) {
 const pleatsRepeat = () => { if (!pleatTex) { pleatTex = pleats().clone(); pleatTex.wrapS = THREE.RepeatWrapping; pleatTex.repeat.set(10, 1); pleatTex.needsUpdate = true; } return pleatTex; };
 
 export type Sfx = 'confetti' | 'bubbles' | 'flame' | 'sparks' | 'co2';
-// (barLen: a bar's or a strip's length in metres when it says; scale: a light drawn bigger or smaller,
-// its own size against its kind's)
-export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number; barLen?: number; scale?: number; profile?: Profile;
+// (barLen: a bar's or a strip's length in metres when it says, barFace its lit face across and
+// barDepth its body's depth (lightSize.ts has them as they come); scale: a light drawn bigger or
+// smaller, its own size against its kind's; scaleY / scaleZ: a fixed light's own depth and face over that)
+export interface RigFixture { id: string; name: string; kind: FixtureKind; look: Look; cells: number; p: V3; rot: Rot; optics: Optics; sfx?: Sfx; fog?: boolean; hazer?: boolean; shape?: Places; size?: number; barLen?: number; barFace?: number; barDepth?: number; scale?: number; scaleY?: number; scaleZ?: number; profile?: Profile;
   gobos?: GoboWheel[]; prism?: { ranges?: Ranges; rot?: Ranges }; anim?: { rot?: Ranges };
   // more than two axes: endless pan / tilt (their turning channels' ranges; null: a channel without
   // ranges), a third axis (roll: how far it turns), and its endless turning
@@ -194,6 +196,15 @@ export class Rig {
   readonly scenery = new THREE.Group();
   winchOf(id: string) { return this.winchNow.get(id); }
   private barHeads = new Map<string, { p: Axis; t: Axis[]; hp: Axis[]; pan?: number; tilts: number[]; pans: number[] }>();
+  // a bar's or a strip's size as drawn (its own, else as it comes); undefined for anything else
+  barSizeOf(id: string) { const f = this.list.find((x) => x.id === id); return f && f.kind === 'bar' && !f.shape ? { len: f.barLen ?? barLength(f.cells), face: f.barFace ?? BAR_FACE, depth: f.barDepth ?? BAR_DEPTH } : undefined; }
+  // a PAR's, a fresnel's, a blinder's or a strobe's size as drawn (metres: w across, h its face, d deep)
+  fixedSizeOf(id: string) {
+    const f = this.list.find((x) => x.id === id), z = f && isFixedLook(f.look) && !f.profile ? FIXED_SIZE[f.look] : undefined;
+    if (!f || !z) return undefined;
+    const s1 = f.scale ?? 1, r = (v: number) => Math.round(v * 1000) / 1000;
+    return { w: r(z.w * s1), h: r(z.h * (f.scaleZ ?? s1)), d: r(z.d * (f.scaleY ?? s1)) };
+  }
   barOf(id: string) { const m = this.barHeads.get(id); return m ? { pan: m.pan ?? 0, tilts: [...m.tilts], pans: [...m.pans] } : undefined; }
   // A winch's height on the wire (live, not armed: where it's held, the real one doesn't move): a
   // part of its travel; null: held but nobody knows where (it stays where it's drawn); undefined:
@@ -601,14 +612,14 @@ export class Rig {
       const f = this.list[fi], v = stage[f.id];
       pos.set(f.p.x, f.p.y, f.p.z);
       q.setFromEuler(E.set(f.rot.pitch * RAD, f.rot.yaw * RAD, f.rot.roll * RAD, 'YXZ'));
-      const s1 = f.scale ?? 1, base = BASE.compose(pos, q, sc.set(s1, s1, s1));
+      const s1 = f.scale ?? 1, sy = f.scaleY ?? s1, sz = f.scaleZ ?? s1, base = BASE.compose(pos, q, sc.set(s1, sy, sz));
       const level = lightOf(wholeLook(v), t), inSel = selected.has(f.id), isSel = inSel && marked;   // (a head lit only by its cells has a beam too)
       if (f.shape) m4.compose(pos, q, sc.set(f.size! * shapeW(f.shape) + 0.06, 0.2, f.size! * shapeH(f.shape) + 0.06));
       else if (f.look === 'headbar') m4.compose(pos, q, sc.set(HEADBAR_PITCH * (f.heads ?? 1) + 0.15, 0.45, 0.35));
       else if (f.look === 'winch') m4.compose(pos, q, sc.set(0.4, 0.4, 0.4));
       else if (f.cloth) m4.compose(pos, CQ.setFromAxisAngle(UPY, f.rot.yaw * RAD), sc.set(f.cloth.w, 0.5, 0.5));
       else if (f.profile?.panel) m4.compose(pos, q, sc.set(f.profile.panel.w, 0.2, f.profile.panel.h));
-      else m4.compose(pos, q, sc.set(f.kind === 'bar' ? (f.barLen ?? Math.max(1, f.cells / 30)) : 0.6 * s1, 0.7 * s1, 0.6 * s1));
+      else m4.compose(pos, q, sc.set(f.kind === 'bar' ? (f.barLen ?? Math.max(1, f.cells / 30)) : 0.6 * s1, 0.7 * sy, f.kind === 'bar' ? Math.max(0.6, f.barFace ?? 0) : 0.6 * sz));
       this.hit.setMatrixAt(nh++, m4); this.hitIds.push(f.id);
       if (inSel && ns < this.sel.instanceMatrix.count) this.sel.setMatrixAt(ns++, m4);   // (placed while it fades out too)
       if (f.look === 'spot' || f.look === 'wash') {
@@ -808,8 +819,10 @@ export class Rig {
         pushLit(fi, pos, dir, cellsMean(), level * 0.4, 60);
       } else if (f.kind === 'bar') {
         // the bar lies along its x; its cells shine along its up
-        const L = f.barLen ?? (f.cells > 24 ? f.cells / 30 : 1);
-        put('bar', TMP.copy(base).multiply(TMP2.makeScale(L + 0.04, 1, 1)));
+        const L = f.barLen ?? barLength(f.cells);
+        // (its own face across and depth over the body's as it comes: a wide LED column, a slim batten)
+        const face = f.barFace ?? BAR_FACE;
+        put('bar', TMP.copy(base).multiply(TMP2.makeScale(L + 0.04, (f.barDepth ?? BAR_DEPTH) / BAR_DEPTH, face / BAR_FACE)));
         const dir = DIR.copy(UP).applyQuaternion(q);
         cellsFrom();
         for (let i = 0; i < f.cells; i++) {
@@ -818,8 +831,9 @@ export class Rig {
           addCell(cl);
           const cp = CP.set(-L / 2 + (L * (i + 0.5)) / f.cells, 0.012, 0).applyMatrix4(base);
           const cc = cl > 0.01 ? C2.copy(col).multiplyScalar(0.5 + cl * 1.3) : isSel ? sel : off;
-          const d = Math.min((L / f.cells) * 0.86, 0.07);
-          m4.compose(cp, q, sc.set(d, 0.016, d)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
+          // (a cell a square up to 7 cm; on a wider face as wide as the face, as long as there's room)
+          const d = Math.min((L / f.cells) * 0.86, f.barFace ? face * 0.8 : 0.07), across = f.barFace ? face * 0.8 : d;
+          m4.compose(cp, q, sc.set(d, 0.016, across)); this.cells.setMatrixAt(nc, m4); this.cells.setColorAt(nc, cc); nc++;
           if (f.cells <= 24) beamAt(cp, dir, 30, cl * 0.6, col, 5, false);
         }
         pushLit(fi, pos, dir, cellsMean(), level * 0.6, 40);

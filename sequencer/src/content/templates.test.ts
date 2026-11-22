@@ -19,6 +19,16 @@ describe('the templates', () => {
   for (const t of TEMPLATES) {
     describe(t.name, () => {
       const s = t.build();
+      // (the Bar's two strobes hung 4 cm from the dance floor's washes on the same rail: one body in
+      // the other in 3D, one dot over the other on the plan)
+      it('no two lights in the same place: at least 0.3 m apart in the room', () => {
+        const fs = s.fixtures.filter((f) => f.p3), close: string[] = [];
+        for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) {
+          const a = fs[i].p3!, b = fs[j].p3!, d = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+          if (d < 0.3) close.push(`${fs[i].name} / ${fs[j].name}: ${d.toFixed(2)} m`);
+        }
+        expect(close).toEqual([]);
+      });
       it('is a rich rig: lights of many kinds, the machines, groups, effects and plenty of cues', () => {
         expect(s.fixtures.length).toBeGreaterThanOrEqual(25);
         const types = new Set(s.fixtures.map((f) => f.typeId));

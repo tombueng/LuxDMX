@@ -11,13 +11,13 @@
 //   node tools/qa/q.mjs <action> '{"sel":"...","nth":2}'   (any action with its full options)
 //   Selectors find what's on screen only (the hidden views stay in the page); 'any:' in front for
 //   hidden ones too (a file input always is: files 'any:[role=dialog] input[type=file]' a.json).
-//   Role names match a part, any case: name="GO" also finds "Gobos", "GO" s is exact.
+//   Role names match the WHOLE name, case and all: name="GO" finds only "GO"; name=/GO/ finds "Gobos" too.
 // Several steps in one go: separate them with ' -- ' as one argument list.
 const PORT = Number(process.env.QA_PORT ?? 9333);
 const POS = {
   click: ['sel'], dblclick: ['sel'], hover: ['sel'], fill: ['sel', 'value'], type: ['text'], press: ['key', 'sel'],
   select: ['sel', 'value'], check: ['sel', 'on'], goto: ['url'], reset: ['url'], eval: ['js'], shot: ['name', 'sel'],
-  snap: ['sel'], text: ['sel'], count: ['sel'], controls: ['sel'], logs: ['since', 'errors'], page: ['i'], wait: ['ms'],
+  mouse: ['action', 'x', 'y'], snap: ['sel'], text: ['sel'], count: ['sel'], controls: ['sel'], logs: ['since', 'errors'], page: ['i'], wait: ['ms'],
   viewport: ['w', 'h'], drag: ['from', 'to'], files: ['sel', 'paths'], download: ['sel'], profile: ['ms', 'name'], trace: ['ms', 'name', 'at'],
 };
 const steps = [];
@@ -40,4 +40,6 @@ for (const [cmd, ...rest] of steps) {
   else { console.log(`${cmd}: ${show(r)}`); if (text !== undefined) console.log(text); }
   if (said) console.log(said.map((e) => `  ! ${e.type}/${e.level}: ${e.text.split('\n').slice(0, 4).join(' | ')}`).join('\n'));
 }
-process.exit(failed ? 1 : 0);
+// (exitCode, not process.exit(): exit() cut a piped output off at 64 KB, so "logs" lost its newest
+// entries and the closing "seq N" line, and checks for errors read only the oldest ones)
+process.exitCode = failed ? 1 : 0;

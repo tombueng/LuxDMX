@@ -502,6 +502,8 @@
       gobo: (id: string) => rig.goboOf(id),
       beam: (id: string) => rig.beamOf(id),
       bar: (id: string) => rig.barOf(id),
+      barSize: (id: string) => rig.barSizeOf(id),
+      fixedSize: (id: string) => rig.fixedSizeOf(id),
       winch: (id: string) => rig.winchOf(id),
       gobos: () => (goboAtlas ? { count: GOBOS.length, empty: [...goboAtlas.empty], size: goboAtlas.canvas.width } : null),
       rendering: () => (rendering ? { ...rendering } : null),

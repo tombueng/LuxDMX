@@ -83,7 +83,7 @@ replaced by the next visit's rather than piling up (one you changed stays in you
    added to a show that already has looks can **play along like one that's there** ("In the
    looks: like PAR 3" in the Add dialog, suggested for a light of the same type or kind): they get
    its part in every look, its groups and its effects. Otherwise they stay dark until you set them.
-3. **Select lights and set them** (on the stage Shift or Ctrl adds to the selection, in the fixture list Shift picks a range and Ctrl adds one; on a touch screen, **+ Add** on the stage adds) in the programmer on the right: intensity, colour (presets or
+3. **Select lights and set them** (on the stage Shift or Ctrl adds to the selection, lights on one spot of the plan (shelves above each other) come one after the other as you click again, in the fixture list Shift picks a range and Ctrl adds one; on a touch screen, **+ Add** on the stage adds) in the programmer on the right: intensity, colour (presets or
    the wheel), position for moving heads, and every other channel under "All channels". The
    number next to a slider takes a typed value too (click it: 37 %, a channel at 127). A channel
    set by hand under "All channels" shows on the stage plan and in 3D as what its value does (a
@@ -107,11 +107,11 @@ Press `?` for every keyboard shortcut and `Ctrl+K` to find anything. No lights c
 With **the last show** chosen, the app opens with a **welcome** in front of everything (the plan
 and the 3D stage alike) while the show has nothing in it. It's two rows of tiles, each saying what it is and what's in it (how
 many lights and cues):
-- **Demo shows**: the festival, a DJ in a club, a house party and a test truss, finished shows on
+- **Demo shows**: the festival, a small band, a DJ in a club, a house party and a test truss, finished shows on
   the 3D stage. Each tile has its music (its own song, or any song from the list, or the demo beat)
   and **Play the show**. **Hide the demos** folds the big tiles away for good in this browser
   (handy when you start shows every day): the demos stay as a row of buttons, one click plays one
-  with the song picked for it; **Show the 4 demos** brings the tiles back, and Ctrl+K "demo" or
+  with the song picked for it; **Show the 5 demos** brings the tiles back, and Ctrl+K "demo" or
   **Demo shows…** in the Shows dialog shows them anyway.
 - **Start a show**: an **empty stage**, one of the templates (band, DJ, theatre, church, cinema,
   bar, wedding, rings and matrices), or **a show file** from another computer. The templates play as shows
@@ -153,6 +153,18 @@ first chord, then it dies away under the song; after it people talk as the light
 song comes down first (a few MB; the progress is on the button);
 when it can't, the demo plays on the demo beat and says so. Every pixel show plays in it, and the
 Formula and Picture effects too. Full screen on the 3D stage for a presentation.
+
+**Band on a small rig** plays on the same big stage, lit with what a small band actually owns:
+four wash heads on the front truss on the band, four beam heads standing at the back of the deck,
+two small heads on each side, ten LED columns as the backdrop (2.4 m tall, 40 cm wide: four times
+as wide as an LED bar comes), a row of eight PARs on the mid truss, two strobes, two blinders, a
+hazer and a fog machine. 36 lights on two universes, so a box with two outputs plays all of it.
+Cued to a rock song ("Whiskey en el Hotel" by Whiskey Therapy). It's meant as a start for your own
+rig: delete what you don't have and it still works. Every look lights the PARs and the columns
+*and* the heads, so with only PARs and columns every part still has its colours, and with only
+heads too; the heads aim by where they stand in their row, the effects run on groups, so two
+back heads instead of four still fan out left and right. (A head you add later isn't in the looks
+yet: record it into the ones you want.)
 
 Three more demos come with their own room on the 3D stage:
 - **DJ in a club**: a DJ at the decks on a 12 m stage (nodding along, a hand on the mixer, the
@@ -363,7 +375,8 @@ Three more demos come with their own room on the 3D stage:
   `#unlock` on the end and confirm: the show unlocks and the PIN is gone. A locked show sent to
   another device opens unlocked there.
 - **When the lights stop getting anything** (the box's Wi-Fi drops, someone closes the box's little
-  window) a red bar says so at the top, with Reconnect when a tap can fix it. With two boxes it says
+  window, or it stops answering) a red bar says so at the top, with Reconnect when a tap can fix it.
+  Reloaded (F5 in it), the little window is taken back by itself within a few seconds. With two boxes it says
   which universes get nothing, and which box (by its address too when both have the same name).
   Once the box is back the bar turns green for 15 seconds, so a link that keeps dropping doesn't
   push the page up and down each time. Connected but **slow** (venue Wi-Fi: the lights get a look
@@ -507,7 +520,13 @@ Three more demos come with their own room on the 3D stage:
 - **Background tabs** don't slow the output down (the clock runs in a Worker).
 - **A light's size** (its setup, Mounting: Width m): how wide the 3D stage draws it. A strip's or a
   bar's length (144 LEDs over the whole back bar), a matrix's or a ring's width, any other light that
-  much bigger or smaller. Empty: as its type has it. Kept with the show (`dims`).
+  much bigger or smaller. A bar or a strip also has **Face m** (how wide its lit face is across, as it
+  comes 0.1 m; a wide LED column 0.4) and **Depth m** (its body front to back, 0.08 m). So do PARs
+  (as they come 0.28 across, 0.28 the other way, 0.3 deep), fresnels (0.22, 0.22, 0.34), blinders
+  (0.62, 0.3, 0.12) and strobes (0.6, 0.24, 0.1): a flat LED PAR, a 4-lite blinder. Width alone
+  draws the whole light bigger; Face or Depth stretch it just that way. A moving head, or a light
+  with its own model, only has Width. Empty: as its type has it (the field shows that), each one
+  on its own. Kept with the show (`dims`: w, h for the face, d).
 - **No internet at the venue?** Open the app once at home: it keeps all of itself and works
   offline after that (shows live in the browser anyway). A Wi-Fi without internet doesn't hold it
   up: after 4 seconds without an answer it starts from its own copy. Chrome and Edge can also
@@ -666,7 +685,8 @@ Three more demos come with their own room on the 3D stage:
     the file); the editor says how big.
 - **Setting up at the venue**: **Check the patch** (under the fixture list) lights one fixture at
   a time at full white, the others dark, with its name, address and DIP switches on screen. Arrows
-  step, Auto walks the rig by itself; if a different light comes on, fix the address right there
+  step, Home and End jump to the first and last, a light clicked on the stage or in the list is the one checked,
+  Auto walks the rig by itself; if a different light comes on, fix the address right there
   (type it, or click the switches the way they're set on the fixture).
 - **The rig with RDM** (**Rig** next to the boxes at the top, or Ctrl+K "rdm"): lights that speak
   RDM say who they are, where they listen and how they're doing. **Scan the rig** asks every

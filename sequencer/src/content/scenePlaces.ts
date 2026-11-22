@@ -74,7 +74,9 @@ const BAR_PLACES: Table = {
   Pinspot: (i) => { const p = i ? { x: -5.4, y: rail, z: 5.0 } : { x: -3.9, y: rail, z: 2.4 }; return aim(p, { x: B.ball.x, y: B.ball.y, z: B.ball.z }); },
   // the mirror ball's motor at the ceiling, the ball on its chain where the room's own hung
   'Mirror ball': () => ({ p: { x: B.ball.x, y: B.ceiling - 0.02, z: B.ball.z }, rot: { yaw: 0, pitch: 0, roll: 0 } }),
-  Strobe: (i) => aim({ x: i ? 0.6 : -0.6, y: rail, z: 5.0 }, { x: i ? 0.6 : -0.6, y: 0, z: 5.0 }),
+  // (on the dance floor's rail, in the gaps between its washes: at 0.6 they hung 4 cm from Dance 3
+  // and 4, one body in the other)
+  Strobe: (i) => { const x = i ? 1.28 : -1.28; return aim({ x, y: rail, z: 5.0 }, { x, y: 0, z: 5.0 }); },
   // the LED sign over the bottles, on the back wall beside the bar's own neon, facing the room
   'Neon sign': () => ({ p: { x: 3.4, y: 3.32, z: B.backZ + 0.12 }, rot: { yaw: 0, pitch: 90, roll: 0 } }),
   Fog: () => stand({ x: -7.2, y: 0, z: 8.4 }, 140),

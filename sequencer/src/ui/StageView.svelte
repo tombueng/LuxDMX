@@ -47,7 +47,7 @@
     return () => ro.disconnect();
   });
   let svg = $state<SVGSVGElement>();
-  let drag: { ids: string[]; start: { x: number; y: number }; orig: Record<string, { x: number; y: number }>; moved: boolean; cell?: number } | null = null;
+  let drag: { ids: string[]; start: { x: number; y: number }; orig: Record<string, { x: number; y: number }>; moved: boolean; cell?: number; prev?: string | null } | null = null;
   let band = $state<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   let labels = $state(true), addrs = $state(false);
 
@@ -59,20 +59,37 @@
     const q = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
     return { x: q.x / W, y: q.y / H };
   };
+  // Lights on the same spot of the plan (shelves above each other on a wall, seen from above): the
+  // click lands on the top one, so the others couldn't be picked here. Clicked again, the next one
+  // in the stack. (in groups of a few screen pixels, only where there's more than one)
+  const stacks = $derived.by(() => {
+    const at = new Map<string, string[]>(), cell = 5 * px;
+    for (const f of app.show.fixtures) {
+      const k = `${Math.round((f.x * W) / cell)},${Math.round((f.y * H) / cell)}`;
+      const l = at.get(k); if (l) l.push(f.id); else at.set(k, [f.id]);
+    }
+    const of = new Map<string, string[]>();
+    for (const l of at.values()) if (l.length > 1) for (const id of l) of.set(id, l);
+    return of;
+  });
   function downFixture(e: PointerEvent, id: string) {
     if (readonly) return;                          // (Live only looks: a pinch or a pan starting on a light is the plan's)
     e.stopPropagation();
     if (e.button !== 0) return;                    // right-click: the menu, the selection stays
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     const multi = ui.adding(e);
+    // (the one light picked before, and whether it's under this one: then it's the one picked up)
+    const prev = app.selected.length === 1 ? app.selected[0] : null;
+    const under = !multi && prev && prev !== id && stacks.get(id)?.includes(prev) ? prev : null;
     if (multi) app.select(id, true);
-    else if (!app.selected.includes(id)) app.select(id, false);
-    const ids = app.selected.includes(id) ? [...app.selected] : [id];
+    else if (!under && !app.selected.includes(id)) app.select(id, false);
+    const lead = under ?? id;
+    const ids = app.selected.includes(lead) ? [...app.selected] : [lead];
     const orig: Record<string, { x: number; y: number }> = {};
     for (const f of app.show.fixtures) if (ids.includes(f.id)) orig[f.id] = { x: f.x, y: f.y };
     // (Alt on one of its pixels: that cell, picked or let go on release if it didn't move)
     const cell = e.altKey ? (e.target as Element).closest('[data-cell]')?.getAttribute('data-cell') : null;
-    drag = { ids, start: pt(e), orig, moved: false, ...(cell != null ? { cell: +cell } : {}) };
+    drag = { ids, start: pt(e), orig, moved: false, prev, ...(cell != null ? { cell: +cell } : {}) };
   }
   // Dragging snaps to the lines of the other lights (same row, same column), like the guides in a
   // drawing program; Alt drags freely. The guides show while it snaps.
@@ -108,7 +125,10 @@
       if (!app.selected.includes(id)) app.select(id, false);
       const now = app.cellsPicked(id), k = drag.cell;
       app.selectCells(now.includes(k) ? now.filter((x) => x !== k) : [...now, k].sort((a, b) => a - b));
-    } else if (drag && !drag.moved && !ui.adding(e)) app.select(id, false);
+    } else if (drag && !drag.moved && !ui.adding(e)) {
+      const st = stacks.get(id);
+      app.select(st && drag.prev && st.includes(drag.prev) ? st[(st.indexOf(drag.prev) + 1) % st.length] : id, false);
+    }
     if (drag?.moved) { app.holdUndo = false; app.markDirty(0); }
     drag = null; guides = {};
   }
@@ -445,7 +465,7 @@
            ondragover={(e) => { if (isPreset(e)) { e.preventDefault(); dropFx = f.id; } }} ondragleave={() => { if (dropFx === f.id) dropFx = null; }} ondrop={(e) => presetDrop(e, f.id)}
            onpointerdown={(e) => downFixture(e, f.id)} onpointerup={(e) => upFixture(e, f.id)} onpointercancel={endDrag}>
           <StageSymbol {f} {l} {c} {kind} {sel} {x} {y} {size} {px} {blur} {moving} mc={machines.get(f.id)} barW={barHalf.get(f.id)} />
-          <title>{f.num ? `${f.num} ` : ''}{f.name} · {oneUni ? `address ${f.address}` : `universe ${f.universe}, address ${f.address}`}</title>
+          <title>{f.num ? `${f.num} ` : ''}{f.name} · {oneUni ? `address ${f.address}` : `universe ${f.universe}, address ${f.address}`}{stacks.has(f.id) ? ` · ${stacks.get(f.id)!.length - 1} more on this spot: click again for the next` : ''}</title>
         </g>
       {/each}
       <!-- names and addresses on top of every light, beam and glow, with a dark halo -->
