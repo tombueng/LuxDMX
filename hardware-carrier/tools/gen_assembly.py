@@ -98,7 +98,7 @@ RULES = {
                      "panel as the 20 mm encoder shaft. Both go to GND, the pins pull up "
                      "internally."),
     "Blade fuse holder, alternative to the polyfuse": ("Supply", "you would rather replace a blown fuse than wait for a polyfuse to "
-           "cool", "Alternative to the polyfuse, never both. Its own two holes, same nets."),
+           "cool", "Alternative to the polyfuse, never both. Its own holes (two per clip, four in all), same nets."),
     "EXP 3V3/GND/47/48/43/44": ("Other", "optional",
                                 "Brings out 3V3, GND, the two UART-bridge pins and the "
                                 "**unbuffered** pixel signals 4 and 5."),

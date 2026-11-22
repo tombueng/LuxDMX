@@ -21,6 +21,11 @@ removing zones and tracks together does in tools/autoroute.py. Each on its own i
 one board per process is the rule the rest of this toolchain already follows.
 
 Run:  python tools/oled_mount_keepouts.py [--dia 7.0] [--remove]
+
+2026-11-22: NOT on the board. The board was routed without these keepouts, so tracks (I2C,
+BTN2, +5V) and the GND pour run through all four spots; the drill marks it had left on the silk
+pointed straight at live copper. Removed with --remove. Only run it again together with a
+reroute of whatever crosses the spots.
 """
 import math
 import os

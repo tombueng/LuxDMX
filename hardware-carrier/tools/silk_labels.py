@@ -15,7 +15,8 @@
     encoder's GND lugs went too.
   * DMX headers: the references ("DMX 1 - GND/B/A") ran across the pads and off the edge. Hidden;
     each header gets "DMXn" and, under it, "G B A" (its pins left to right) beside pin 1.
-  * odd sizes: the polyfuse's BRIDGE text 0.7 -> 0.8 mm, the OLED outline note had stroke 0.
+  * odd sizes: the polyfuse's BRIDGE text 0.7 -> 1.0 mm, the OLED outline note had stroke 0.
+  * silk text under 1.0 mm high goes to 1.0 mm (JLCPCB's minimum), keeping its proportions.
   * silk lines thinner than 0.15 mm (most stock footprints draw 0.12) go to 0.15, the width a
     fab reliably prints; that includes the 1000 uF polarity hatch and the buffer's pin-1 mark.
 
@@ -196,10 +197,33 @@ def dmx_labels(b):
 
 
 # reference texts that ran onto a pad: (reference, footprint x, y) -> new text position
-NUDGE = [("330R bias-", (126.0, 78.05), (128.0, 76.8))]   # DMX1: its "-" sat on ESP pin 8
+NUDGE = [("330R bias-", (126.0, 78.05), (128.0, 76.8)),   # DMX1: its "-" sat on ESP pin 8
+         # at 1.0 mm these three reach the buffer's vertical reference, 0.5 mm along clears it
+         ("330R PIX1", (116.2, 102.0), (116.7, 99.9)),
+         ("330R PIX3", (116.2, 95.0), (116.7, 92.9)),
+         ("330R PIX5", (116.2, 88.5), (116.7, 86.4))]
 
 
 MIN_STROKE = 0.15
+MIN_TEXT = 1.0          # JLCPCB: characters under 1.0 mm high may come out unreadable
+
+
+def min_text(b):
+    n = []
+    items = [d for d in b.GetDrawings()]
+    for f in b.GetFootprints():
+        items += list(f.GraphicalItems()) + [f.Reference(), f.Value()]
+    for it in items:
+        if it.GetClass() not in ("PCB_TEXT", "PCB_FIELD") or \
+                it.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS) or not it.IsVisible():
+            continue
+        h = it.GetTextSize()
+        if h.y < mm(MIN_TEXT) - 1:
+            it.SetTextSize(pcbnew.VECTOR2I(mm(MIN_TEXT * h.x / h.y), mm(MIN_TEXT)))
+            if it.GetTextThickness() < mm(MIN_STROKE):
+                it.SetTextThickness(mm(MIN_STROKE))
+            n.append(it.GetText())
+    print(f"  {len(n)} silk texts raised to {MIN_TEXT} mm: {sorted(set(n))}")
 
 
 def min_stroke(b):
@@ -231,15 +255,28 @@ def odd_sizes(b):
     for f in b.GetFootprints():
         for g in f.GraphicalItems():
             if g.GetClass() == "PCB_TEXT" and g.GetText() == "BRIDGE":
-                g.SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
+                g.SetTextSize(pcbnew.VECTOR2I(mm(1.0), mm(1.0)))
+                # at 1.0 mm it reaches the bridge pads below it: 0.35 mm up
+                p = g.GetPosition()
+                if abs(pcbnew.ToMM(p.y) - 110.33) < 0.01:
+                    g.SetPosition(pcbnew.VECTOR2I(p.x, mm(109.98)))
                 g.SetTextThickness(mm(0.15))
     for d in b.GetDrawings():
         if d.GetClass() == "PCB_TEXT" and d.GetText().startswith("OLED ") and d.GetTextThickness() == 0:
             d.SetTextThickness(mm(0.18))
 
 
+def title_block(b):
+    # the gerber job file and every plot carry this, so the fab files say which rev they are
+    tb = b.GetTitleBlock()
+    tb.SetTitle("LuxDMX carrier")
+    tb.SetRevision(REV)
+    print(f"  title block: {tb.GetTitle()} rev {tb.GetRevision()}")
+
+
 def main():
     b = pcbnew.LoadBoard(BOARD)
+    title_block(b)
     rev_texts(b)
     pixel_labels(b)
     polarity_marks(b)
@@ -247,6 +284,7 @@ def main():
     odd_sizes(b)
     nudge_refs(b)
     min_stroke(b)
+    min_text(b)
     for d in REMOVE:
         b.Remove(d)
     for f, g in REMOVE_FP:

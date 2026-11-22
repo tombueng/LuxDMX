@@ -26,7 +26,7 @@ Almost nothing here is mandatory.
 |---|---|---|---|
 | `5V Buck Converter` | back | supplied from 12/24 V **and** neither 5V-IN nor USB connected | Pololu D24V10F5 is the easy pick (fixed 5 V, row A). Other modules that fit: see *The 5 V regulator* below. |
 | `5V IN` | front | 5 V comes from outside | Alternative to USB and the buck. |
-| `F1` | front | you would rather replace a blown fuse than wait for a polyfuse to cool | Alternative to the polyfuse, never both. Its own two holes, same nets. |
+| `F1` | front | you would rather replace a blown fuse than wait for a polyfuse to cool | Alternative to the polyfuse, never both. Its own holes (two per clip, four in all), same nets. |
 
 ## Pixel
 
