@@ -138,7 +138,11 @@ test.describe('Pixel output — shape and arithmetic', () => {
       await expect(page.locator(`[name="${f}"]`)).toHaveCount(1);
   });
 
-  test('the planner states the universe span and the next free universe', async ({ page }) => {
+  test('the planner states the universe span and the next free universe', async ({ page, request }) => {
+    // (the next free one is after every port that's on: the box's other ports count too, a
+    // fixed 10 only held on a box with no other port on)
+    const others = (await (await request.get('/pixels.json')).json()).ports
+      .filter((p, i) => i > 0 && p.en && p.spans > 0).map((p) => p.uni + p.spans);
     // Unfold first: the pixel cards fold like every other section, and a folded field can't be typed into.
     await openConfig(page);
     await page.waitForFunction(() => document.querySelectorAll('.pix-card').length > 0,
@@ -151,7 +155,7 @@ test.describe('Pixel output — shape and arithmetic', () => {
     await page.locator('[name="p0_count"]').dispatchEvent('input');
     await expect(page.locator('.pix-card').first().locator('.pix-span')).toContainText('3 universes');
     await expect(page.locator('#pix-plan')).toContainText('universes 7-9');
-    await expect(page.locator('#pix-plan')).toContainText('Next free universe: 10');
+    await expect(page.locator('#pix-plan')).toContainText(`Next free universe: ${Math.max(10, ...others)}`);
   });
 });
 
