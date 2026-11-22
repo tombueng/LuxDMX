@@ -32,15 +32,15 @@ Almost nothing here is mandatory.
 
 | Part | Side | Fit it when | Note |
 |---|---|---|---|
-| `1000uF 35V` | front | pixel ports are used | Buffers the current steps of the strips. 13 mm can, 5.00 mm pitch. |
-| `12-24V IN` | front | pixel ports are used | The inlet for the pixel rail. Fit the screw terminal, or solder the wire flat onto the pad. |
+| `1000uF 35V` | front | pixel ports are used **or** the regulator powers the logic | Buffers the current steps of the strips, and is the regulator's input bulk against plug-in spikes. 13 mm can, 5.00 mm pitch. |
+| `12-24V IN` | front | pixel ports are used **or** the regulator powers the logic | The inlet for the pixel rail, which also feeds the regulator. Fit the screw terminal, or solder the wire flat onto the pad. |
 | `74AHCT541 pixel buffer` | back | **at least one** pixel port is used | Not optional: the terminals hang off its outputs. WS281x want 0.7 x VDD = 3.5 V and the 3.3 V from the S3 will not do it reliably. |
 | `Pixel1:Vcc/Data/GND` | front | pixel port 1 is used |  |
 | `Pixel2:Vcc/Data/GND` | front | pixel port 2 is used |  |
 | `Pixel3:Vcc/Data/GND` | front | pixel port 3 is used |  |
 | `Pixel4:Vcc/Data/GND` | front | pixel port 4 is used |  |
 | `Pixel5:Vcc/Data/GND` | front | pixel port 5 is used |  |
-| `Polyfuse MF-R 5.1(4A)/10.2(9A)` | front | pixel ports are used **and** no external fuse | Bourns MF-R, 30 V. Middle hole MF-R110 to MF-R400 (up to 4 A), right hole MF-R500 to MF-R900 (5 to 9 A); the MF-R900 clears the 1000 uF can by about 1.8 mm. MF-RHT and MF-RG are 16 V parts and unusable on 24 V. |
+| `Polyfuse MF-R 5.1(4A)/10.2(9A)` | front | (pixel ports are used **or** the regulator powers the logic) **and** no external fuse | Bourns MF-R, 30 V. Middle hole MF-R110 to MF-R400 (up to 4 A), right hole MF-R500 to MF-R900 (5 to 9 A); the MF-R900 clears the 1000 uF can by about 1.8 mm. MF-RHT and MF-RG are 16 V parts and unusable on 24 V. |
 
 ## Network
 
@@ -50,7 +50,7 @@ Almost nothing here is mandatory.
 | `10k ETH_CS pu` | back | W5500 fitted | Holds CS high while the GPIOs are still floating out of reset. |
 | `10k ETH_RST pu` | back | W5500 fitted | Same for RST, otherwise the W5500 resets itself during boot. |
 | `1uF W5500` | back | W5500 fitted | Middle of the three. 100nF / 1uF / 22uF in ascending order away from the pin, because the rail had a factor of 220 between its only two values. |
-| `22uF W5500` | back | W5500 fitted | Local bulk under the module, 2.5 mm from its 3V3 pin. The regulator is 62 mm and 62 nH away on the dev board, so this is what holds the rail up when the PHY steps its load; the other bulk is too far off to help. |
+| `22uF W5500` | back | W5500 fitted | Local bulk under the module, about 15 mm from its 3V3 pins. The regulator is 62 mm and 62 nH away on the dev board, so this is what holds the rail up when the PHY steps its load; the other bulk is too far off to help. |
 | `W5500 Ethernet Module` | front | you want wired Ethernet | Leave it out and everything runs over WiFi. |
 
 ## DMX port 1
@@ -134,11 +134,11 @@ Almost nothing here is mandatory.
 | 3 | XLRn 1=shld 2=D- 3=D+ | front | any DMX port is used |
 | 2 | 100nF | back | recommended |
 | 2 | Tact 6x6 H30 | front | you want the buttons |
-| 1 | 1000uF 35V | front | pixel ports are used |
+| 1 | 1000uF 35V | front | pixel ports are used **or** the regulator powers the logic |
 | 1 | 10k ETH_CS pu | back | W5500 fitted |
 | 1 | 10k ETH_RST pu | back | W5500 fitted |
 | 1 | 12-24V -> 5V buck | back | supplied from 12/24 V **and** neither 5V-IN nor USB connected |
-| 1 | 12-24V IN 24A | front | pixel ports are used |
+| 1 | 12-24V IN 24A | front | pixel ports are used **or** the regulator powers the logic |
 | 1 | 1uF | back | W5500 fitted |
 | 1 | 22uF 3V3 bulk | back | recommended |
 | 1 | 22uF W5500 | back | W5500 fitted |
@@ -148,7 +148,7 @@ Almost nothing here is mandatory.
 | 1 | EC11 | front | you want the encoder |
 | 1 | ESP32-S3 N16R8 | front | always |
 | 1 | EXP 3V3/GND/47/48/43/44 | front | optional |
-| 1 | MF-R 30V | front | pixel ports are used **and** no external fuse |
+| 1 | MF-R 30V | front | (pixel ports are used **or** the regulator powers the logic) **and** no external fuse |
 | 1 | OLED SDA/SCL/VCC/GND | front | you want the display |
 | 1 | USR-ES1 W5500 | front | you want wired Ethernet |
 
@@ -163,7 +163,9 @@ its two left holes. Not a component, just a blob of solder.
 | external fuse in the supply lead | leave out | close |
 | no fuse at all | leave out | close |
 
-Exactly one of the two. Both together is a bridged fuse, which is no fuse.
+Exactly one of the two. Both together is a bridged fuse, which is no fuse. The bridge pads sit
+0.3 mm apart right at the polyfuse's left holes, so after soldering the polyfuse look with a
+loupe that no tin ran across them. A meter can't tell, the polyfuse reads as a short anyway.
 
 ## The 5 V regulator
 
@@ -238,7 +240,8 @@ matter.
 |---|---|---|---|---|
 | **DMX only, USB powered** | 1-3 | - | WiFi | ESP32, one RS-485 module per port, XLR headers, 10k dir, bias and termination as required |
 | **DMX + LAN** | 1-3 | - | W5500 | plus the W5500, its two 10k and its 100 nF / 1 uF / 22 uF |
-| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer, terminals, 1000uF, power inlet, fuse, buck |
+| **... from 12/24 V** | | | | plus the regulator module, the power inlet, the fuse and the 1000uF: the regulator hangs off the pixel rail behind the fuse |
+| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer, a 330R and a terminal per port (the 330R is the only link from buffer to terminal), 1000uF, power inlet, fuse, regulator or USB |
 | **Everything** | 3 | 5 | W5500 | all of the above, plus display and encoder |
 
 The buck is only needed where 12/24 V is present **and** neither USB nor 5V-IN. On the bench

@@ -15,6 +15,7 @@
     encoder's GND lugs went too.
   * DMX headers: the references ("DMX 1 - GND/B/A") ran across the pads and off the edge. Hidden;
     each header gets "DMXn" and, under it, "G B A" (its pins left to right) beside pin 1.
+  * "USB" at the ESP socket's USB end, so the dev board can't go in the wrong way round.
   * odd sizes: the polyfuse's BRIDGE text 0.7 -> 1.0 mm, the OLED outline note had stroke 0.
   * silk text under 1.0 mm high goes to 1.0 mm (JLCPCB's minimum), keeping its proportions.
   * silk lines thinner than 0.15 mm (most stock footprints draw 0.12) go to 0.15, the width a
@@ -266,6 +267,14 @@ def odd_sizes(b):
             d.SetTextThickness(mm(0.18))
 
 
+def usb_end(b):
+    # The ESP socket has a pin-1 dot but nothing said which end the USB goes; turned round,
+    # the module's 3V3 lands on a GND pad. "USB" at the left end, inside the outline.
+    t = board_text(b, pcbnew.F_SilkS, "USB", 92.3, 95.2, 1.5, 0.25)
+    t.SetTextAngleDegrees(90)
+    print("  USB end mark at 92.3, 95.2")
+
+
 def title_block(b):
     # the gerber job file and every plot carry this, so the fab files say which rev they are
     tb = b.GetTitleBlock()
@@ -277,6 +286,7 @@ def title_block(b):
 def main():
     b = pcbnew.LoadBoard(BOARD)
     title_block(b)
+    usb_end(b)
     rev_texts(b)
     pixel_labels(b)
     polarity_marks(b)

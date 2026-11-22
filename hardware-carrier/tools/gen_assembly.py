@@ -71,15 +71,16 @@ RULES = {
                                "want 0.7 x VDD = 3.5 V and the 3.3 V from the S3 will not "
                                "do it reliably."),
     "PIX{n} V+/DATA/GND": ("Pixel", "pixel port {n} is used", ""),
-    "1000uF 35V": ("Pixel", "pixel ports are used",
-                   "Buffers the current steps of the strips. 13 mm can, 5.00 mm pitch."),
-    "12-24V IN 24A": ("Pixel", "pixel ports are used",
-                      "The inlet for the pixel rail. Fit the screw terminal, or solder "
-                      "the wire flat onto the pad."),
+    "1000uF 35V": ("Pixel", "pixel ports are used **or** the regulator powers the logic",
+                   "Buffers the current steps of the strips, and is the regulator's input "
+                   "bulk against plug-in spikes. 13 mm can, 5.00 mm pitch."),
+    "12-24V IN 24A": ("Pixel", "pixel ports are used **or** the regulator powers the logic",
+                      "The inlet for the pixel rail, which also feeds the regulator. Fit the "
+                      "screw terminal, or solder the wire flat onto the pad."),
     "DC jack, alternativ zu Schraubklemme": (
         "Pixel", "pixel ports are used **and** you want a plug-in supply",
         "Rated 3.5 A. Above about 3 A use the screw terminal."),
-    "MF-R": ("Pixel", "pixel ports are used **and** no external fuse",
+    "MF-R": ("Pixel", "(pixel ports are used **or** the regulator powers the logic) **and** no external fuse",
              "Bourns MF-R, 30 V. Middle hole MF-R110 to MF-R400 (up to 4 A), right hole "
              "MF-R500 to MF-R900 (5 to 9 A); the MF-R900 clears the 1000 uF can by about 1.8 mm. "
              "MF-RHT and MF-RG are 16 V parts and unusable on 24 V."),
@@ -110,7 +111,7 @@ RULES = {
             "Middle of the three. 100nF / 1uF / 22uF in ascending order away from the pin, "
             "because the rail had a factor of 220 between its only two values."),
     "22uF W5500": ("Network", "W5500 fitted",
-                   "Local bulk under the module, 2.5 mm from its 3V3 pin. The regulator is "
+                   "Local bulk under the module, about 15 mm from its 3V3 pins. The regulator is "
                    "62 mm and 62 nH away on the dev board, so this is what holds the rail up "
                    "when the PHY steps its load; the other bulk is too far off to help."),
     "22uF 3V3 bulk": ("Other", "recommended",
@@ -130,7 +131,9 @@ its two left holes. Not a component, just a blob of solder.
 | external fuse in the supply lead | leave out | close |
 | no fuse at all | leave out | close |
 
-Exactly one of the two. Both together is a bridged fuse, which is no fuse.
+Exactly one of the two. Both together is a bridged fuse, which is no fuse. The bridge pads sit
+0.3 mm apart right at the polyfuse's left holes, so after soldering the polyfuse look with a
+loupe that no tin ran across them. A meter can't tell, the polyfuse reads as a short anyway.
 """
 
 PITFALLS = """
@@ -211,7 +214,8 @@ STAGES = """
 |---|---|---|---|---|
 | **DMX only, USB powered** | 1-3 | - | WiFi | ESP32, one RS-485 module per port, XLR headers, 10k dir, bias and termination as required |
 | **DMX + LAN** | 1-3 | - | W5500 | plus the W5500, its two 10k and its 100 nF / 1 uF / 22 uF |
-| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer, terminals, 1000uF, power inlet, fuse, buck |
+| **... from 12/24 V** | | | | plus the regulator module, the power inlet, the fuse and the 1000uF: the regulator hangs off the pixel rail behind the fuse |
+| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer, a 330R and a terminal per port (the 330R is the only link from buffer to terminal), 1000uF, power inlet, fuse, regulator or USB |
 | **Everything** | 3 | 5 | W5500 | all of the above, plus display and encoder |
 
 The buck is only needed where 12/24 V is present **and** neither USB nor 5V-IN. On the bench

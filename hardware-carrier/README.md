@@ -137,7 +137,9 @@ parts only. MF-RHT, MF-RG and anything else rated 16 V is out of
 rating at 24 V the moment it trips. Equivalents to the
 MF-R500: ECE RB500-30, Littelfuse RUEF500. Full list in [`production/BOM.md`](production/BOM.md).
 
-Never polyfuse and bridge together.
+Never polyfuse and bridge together. Careful when you solder the polyfuse: the two bridge pads
+sit 0.3 mm apart, unmasked, right at its left holes on the back. Use little tin, then look with a
+loupe that the gap is still open. A meter can't tell you, a polyfuse measures as a short anyway.
 
 ### Regulator
 
@@ -186,7 +188,9 @@ How they sit:
 - **Pololu modules go label side to the board**, parts facing out, like on a breadboard. Turned
   over, a D24V10F5 just stays off (its GND and VOUT end up in the unconnected SHDN/PG holes); a
   D36V28F5 ends up with its VIN on GND and its GND pins on `V_PIX`, a dead short across the pixel
-  supply (the fuse trips), and its screw holes won't line up either.
+  supply (the fuse trips), and its screw holes won't line up either. The body goes towards the
+  minus lands and the top of the board (over row A's side, away from row B), not down over
+  row B: turned that way a D24V10F5 still runs but lies parts-down on the bare `V_PIX` land.
 
 Pin positions are from the vendors' drawings (Pololu dimension PDFs and drill-guide DXFs, RECOM
 R-78E-1.0 and Mornsun K78xx-1000R3 datasheets), written into `modules.json` and generated into the
@@ -222,8 +226,8 @@ terminal row. Each output gets the full 4.6 mm width and its own GND return.
 - All five ports in use: about 2 A each. A 5 m WS2815 run is about 5 A at full white.
 - More than that: inject power at the strip.
 - The polyfuse bridge pads limit a fuse-less build to 8.8 A. Bridge the through-holes with a wire for more.
-- The bulk cap hangs off a 2.0 mm spur (5.3 A), the regulator off a 1.0 mm one (well over its
-  ~0.3 A input at 24 V). Neither is a load path.
+- The bulk cap hangs off a 2.0 mm spur (5.3 A), the regulator off a 1.0 mm one, 0.8 mm for the
+  last bit between its rows (well over its ~0.3 A input at 24 V). Neither is a load path.
 
 ### Decoupling
 
@@ -365,9 +369,9 @@ BOM, the lands take 0402 to 1206.
 | `74AHCT541 pixel buffer` | SN74AHCT541DWR, SOIC-20 300 mil | C2682058 | at least one pixel port used |
 | `330R PIX1..5` | 330 Ω, 1206W4J0331T5E | C25374 | that port used |
 | `Pixel1..5` | KF128-5.08-3P screw terminal | C474953 | that port used |
-| `12-24V IN` | KF128-5.08-2P screw terminal, 24 A | C474952 | any pixel port used |
-| `1000uF 35V` | Panasonic EEU-FR1V102, D12.5 x 20 mm (any can up to 13 mm, 5 mm pitch) | C128518 | any pixel port used |
-| Fuse | MF-R500 polyfuse **or** Keystone 3568 blade holder **or** solder bridge | C208489 (MF-R500) | any pixel port used, see [Fuse](#fuse) |
+| `12-24V IN` | KF128-5.08-2P screw terminal, 24 A | C474952 | any pixel port used, or the regulator powers the logic |
+| `1000uF 35V` | Panasonic EEU-FR1V102, D12.5 x 20 mm (any can up to 13 mm, 5 mm pitch) | C128518 | any pixel port used, or the regulator powers the logic |
+| Fuse | MF-R500 polyfuse **or** Keystone 3568 blade holder **or** solder bridge | C208489 (MF-R500) | any pixel port used, or the regulator powers the logic, see [Fuse](#fuse) |
 
 ### Supply
 
@@ -409,6 +413,7 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 |---|---|---|---|---|
 | DMX only, USB powered | 1-3 | - | WiFi, external antenna | ESP, RS-485 module + header + 10k per port, bias / termination / TVS as needed |
 | DMX + LAN | 1-3 | - | W5500 | above + W5500, its two 10k and 100 nF / 1 µF / 22 µF |
+| ... from 12/24 V | | | | above + regulator module, `12-24V IN`, the fuse and the 1000 µF. The regulator sits on the pixel rail behind the fuse, so it needs all three even with no pixels |
 | Pixels only | - | 1-5 | WiFi, external antenna | ESP, buffer, 330 Ω + terminal per port, 1000 µF, inlet, fuse, buck or USB |
 | Everything | 3 | 5 | W5500 | all of it, plus display, encoder, buttons |
 

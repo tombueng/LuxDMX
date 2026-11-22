@@ -16714,6 +16714,17 @@
 			)
 		)
 	)
+	(gr_text "USB"
+		(at 92.3 95.2 90)
+		(layer "F.SilkS")
+		(uuid "7743656a-6616-4249-bcf2-47ee9453b571")
+		(effects
+			(font
+				(size 1.5 1.5)
+				(thickness 0.25)
+			)
+		)
+	)
 	(gr_text "-"
 		(at 186.5 58 0)
 		(layer "F.SilkS")

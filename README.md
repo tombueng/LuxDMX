@@ -241,14 +241,14 @@ headers.
 | 74AHCT541 buffer (SO-20 wide) | at least one pixel port is used. **HCT**, not HC: the HC parts don't switch reliably on 3.3 V. And not the `PW` (TSSOP) version LCSC stocks most of, it won't land |
 | 330 Ω series resistor, per port | you use that pixel port. Damps the ringing on the strip wire |
 | 3-pole screw terminal, per port | you use that pixel port |
-| 1000 µF 35 V, `12-24V IN` terminal, fuse | any pixel port is used, see power below |
+| 1000 µF 35 V, `12-24V IN` terminal, fuse | any pixel port is used, **or** the 5 V regulator runs the logic (it sits behind the fuse), see power below |
 | **Network and UI** | |
 | W5500 module + 2 × 10k pull-ups + 100 nF / 1 µF / 22 µF | you want wired Ethernet |
 | 1.3" OLED | you want the display |
 | EC11 rotary encoder (the part inside a KY-040, no pull-ups needed) | you want the on-unit menu |
 | 2 × 6x6 mm tact switch | you want the buttons (IO3 and IO46). Plunger length is up to you, 30 mm reaches the same front panel as the encoder shaft |
 | **Supply and misc** | |
-| 5 V regulator module: Pololu D24V10F5 (MP1584EN, D36V28F5 or a 78xx-style SIP fit too) | you power the logic from the 12/24 V pixel supply |
+| 5 V regulator module: Pololu D24V10F5 (MP1584EN, D36V28F5 or a 78xx-style SIP fit too) | you power the logic from the 12/24 V pixel supply. Needs the inlet, fuse and 1000 µF too, even without pixels |
 | `5V IN` header | 5 V comes from outside instead of USB |
 | 100 nF + 22 µF on 3.3 V | recommended |
 | `EXP` header | spare pins: 3.3 V, GND, the UART0 pins and IO47/48 (pixel 4 and 5, unbuffered) |
