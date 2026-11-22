@@ -126,12 +126,12 @@ test('the demo from the command palette opens the welcome with the demos (the mu
   await expect(welcomeDialog(page).getByLabel('Music for Festival stage')).toBeVisible();
 });
 
-test('the welcome offers four demo shows, a tile each: each opens in its own room, the test truss without music to pick', async ({ page }) => {
+test('the welcome offers five demo shows, a tile each: each opens in its own room, the test truss without music to pick', async ({ page }) => {
   test.setTimeout(240_000);
-  for (const [name, room, music] of [['Test truss', 'truss', false], ['DJ in a club', 'club', true], ['House party', 'party', true]] as const) {
+  for (const [name, room, music] of [['Test truss', 'truss', false], ['Band on a small rig', 'hall', true], ['DJ in a club', 'club', true], ['House party', 'party', true]] as const) {
     await fresh(page, true);
     const w = welcomeDialog(page), t = demoTile(w, name);
-    await expect(w.getByRole('group')).toHaveCount(4 + 8);                     // (four demos, eight templates)
+    await expect(w.getByRole('group')).toHaveCount(5 + 8);                     // (five demos, eight templates)
     await expect(t.getByLabel(`Music for ${name}`)).toHaveCount(music ? 1 : 0);
     if (music) await t.getByLabel(`Music for ${name}`).selectOption('beat');      // (no download in the test)
     await t.getByRole('button', { name: /^Play the show/ }).click();

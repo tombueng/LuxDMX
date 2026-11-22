@@ -1,11 +1,13 @@
-// The demos you can start from the welcome or the command palette: the festival stage, a DJ in a
-// club, a house party under a square of truss, and an empty test truss. Each is a whole show (a rig,
-// looks, a timeline) in its own room of the 3D stage; `song` is the catalog song it's cued to by
-// default (built without one, it runs on the demo beat).
+// The demos you can start from the welcome or the command palette: the festival stage, a small
+// band's rig on the same stage (band.ts), a DJ in a club, a house party under a square of truss,
+// and an empty test truss. Each is a whole show (a rig, looks, a timeline) in its own room of the
+// 3D stage; `song` is the catalog song it's cued to by default (built without one, it runs on the
+// demo beat).
 import type { Show } from '../model/types';
 import type { RoomId } from '../stage3d/geometry';
 import { DEMO_SONG } from '../timeline/beat';
 import { buildDemo, type DemoSong } from './demo';
+import { buildBand, BAND_SONG } from './band';
 import { buildClub, CLUB_SONG } from './club';
 import { buildParty, PARTY_SONG } from './party';
 import { buildTrussTest } from './trussTest';
@@ -16,6 +18,10 @@ export const DEMOS: DemoInfo[] = [
   {
     id: 'festival', name: 'Festival stage', icon: 'mover', room: 'hall', song: DEMO_SONG, build: (song) => buildDemo(song),
     blurb: 'A band on a big stage in a hall: over a hundred moving heads hitting the beat, every effect machine, a crowd of hundreds. Cued to a hard rock song.',
+  },
+  {
+    id: 'band', name: 'Band on a small rig', icon: 'mover', room: 'hall', song: BAND_SONG, build: (song) => buildBand(song),
+    blurb: 'The same big stage with what a small band owns: four wash heads up front, four beam heads at the back, two on each side, ten wide LED columns, a row of PARs. Built so it still looks right with fewer. Cued to a rock song.',
   },
   {
     id: 'club', name: 'DJ in a club', icon: 'music', room: 'club', song: CLUB_SONG, build: (song) => buildClub(song),

@@ -2,6 +2,7 @@
 // Each is built around where its light comes out: the lens at the origin, the beam along +y, the
 // body behind it (-y). A moving head comes in three parts (base, yoke, head) that turn separately.
 import * as THREE from 'three';
+import { BAR_DEPTH, BAR_FACE } from './lightSize';
 import type { Profile } from './profiles';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -87,7 +88,7 @@ export function body(look: Look): { geo: THREE.BufferGeometry } {
       return { geo: merge([new THREE.BoxGeometry(0.62, 0.12, 0.3).translate(0, -0.06, 0), new THREE.TorusGeometry(0.33, 0.012, 4, 12, Math.PI).rotateY(Math.PI / 2).translate(0, -0.06, 0)]) };
     }
     case 'strobe': return { geo: merge([new THREE.BoxGeometry(0.55, 0.1, 0.24).translate(0, -0.05, 0), new THREE.BoxGeometry(0.6, 0.02, 0.05).translate(0, -0.1, -0.13)]) };
-    case 'bar': return { geo: new THREE.BoxGeometry(1, 0.08, 0.1).translate(0, -0.04, 0) };
+    case 'bar': return { geo: new THREE.BoxGeometry(1, BAR_DEPTH, BAR_FACE).translate(0, -BAR_DEPTH / 2, 0) };
     // the board behind a LED ring or a matrix (scaled to its size)
     case 'disc': return { geo: new THREE.CylinderGeometry(0.5, 0.5, 0.02, 48).translate(0, -0.01, 0) };
     case 'panel': return { geo: new THREE.BoxGeometry(1, 0.02, 1).translate(0, -0.01, 0) };

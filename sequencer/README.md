@@ -55,6 +55,10 @@ play the show from big buttons, your phone or a song's timeline. No install, no 
 "Ready To Go" by Endtape. Over a hundred moving heads on the beat, hard changes on the song's
 hits, flames, sparks and confetti.
 
+Too big for your gig? **Band on a small rig** is the same stage with a band's budget: 12 moving
+heads, 10 wide LED columns, 8 PARs, strobes, blinders, haze, on two universes. Delete what you
+don't own and it keeps working.
+
 <p align="center"><img src="docs/media/demo-moments.gif" width="720" alt="Four moments of the demo: green beams, flame columns, spark fountains, a colour wash"></p>
 
 ## What the 3D stage draws

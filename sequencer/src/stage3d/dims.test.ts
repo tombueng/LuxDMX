@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
-// A light's own size (Fixture.dims, over its type's physical.dims): a strip or a bar its length, a
-// ring or a matrix its width, any other light drawn that much bigger; kept in the show file only
-// when it can be right. And a strip's colours in the order its chips want them.
+// A light's own size (Fixture.dims, over its type's physical.dims): a strip or a bar its length (and
+// its face across and depth), a ring or a matrix its width, any other light drawn that much bigger;
+// kept in the show file only when it can be right. And a strip's colours in the order its chips want them.
 import { describe, expect, it } from 'vitest';
 import { GENERIC, kindOf, pixelShape } from '../model/library';
 import { rigFixtureFull } from './rigOf';
 import { HALL } from './geometry';
-import { lookWidth } from './models';
+import { body, lookWidth } from './models';
+import { BAR_DEPTH, BAR_FACE, FIXED_SIZE, barLength, fixedLookOf } from './lightSize';
 import { shapeW } from '../model/pixelLayout';
 import { emptyShow, parseShow, serializeShow } from '../model/format';
 import type { Fixture, FixtureType } from '../model/types';
@@ -29,6 +30,44 @@ describe('a light\'s own size on the 3D stage', () => {
     expect(r.size! * shapeW(r.shape!)).toBeCloseTo(2.4, 5);
     const own = rf(t, { dims: { w: 5 } });
     expect(own.size! * shapeW(own.shape!)).toBeCloseTo(5, 5);
+  });
+  it('a bar without a layout: its face across and its depth too (a wide LED column); as it comes without', () => {
+    const bar = generic('gen-bar12');
+    expect(rf(bar, { dims: { w: 2.4, h: 0.4, d: 0.12 } })).toMatchObject({ barLen: 2.4, barFace: 0.4, barDepth: 0.12 });
+    const plain = rf(bar);
+    expect([plain.barLen, plain.barFace, plain.barDepth]).toEqual([undefined, undefined, undefined]);
+    expect([BAR_FACE, BAR_DEPTH, barLength(12), barLength(60)]).toEqual([0.1, 0.08, 1, 2]);
+    // (the body as it comes is that size: a face of its own is drawn so much wider)
+    const g = body('bar').geo; g.computeBoundingBox();
+    const bb = g.boundingBox!;
+    expect(bb.max.z - bb.min.z).toBeCloseTo(BAR_FACE, 6); expect(bb.max.y - bb.min.y).toBeCloseTo(BAR_DEPTH, 6); expect(bb.max.y).toBeCloseTo(0, 6);
+    // (a PAR has no face of its own: h and d are a bar's)
+    expect(rf(generic('gen-drgbw'), { dims: { h: 0.4 } }).barFace).toBeUndefined();
+  });
+  it('a PAR, a fresnel, a blinder, a strobe: its own face (h) and depth (d) stretch it just that way, over its width', () => {
+    const par = generic('gen-drgbw');
+    expect(rf(par, { dims: { h: 0.56 } })).toMatchObject({ scaleZ: 2 });
+    expect(rf(par, { dims: { h: 0.56 } }).scale).toBeUndefined(); expect(rf(par, { dims: { h: 0.56 } }).scaleY).toBeUndefined();
+    const both = rf(par, { dims: { w: 0.56, d: 0.15 } });
+    expect(both.scale).toBeCloseTo(2, 5); expect(both.scaleY).toBeCloseTo(0.5, 5); expect(both.scaleZ).toBeUndefined();
+    // (each its own over its type's: the type's width, the light's own depth)
+    const t = { ...par, id: 'p2', physical: { dims: { w: 0.56 } } } as FixtureType;
+    const mixed = rf(t, { dims: { d: 0.6 } });
+    expect(mixed.scale).toBeCloseTo(2, 5); expect(mixed.scaleY).toBeCloseTo(2, 5);
+    // (a moving head grows all of a piece: no face or depth of its own)
+    const head = rf(generic('gen-wash'), { dims: { h: 1, d: 1 } });
+    expect([head.scaleY, head.scaleZ]).toEqual([undefined, undefined]);
+  });
+  it('the sizes as they come: a fixed light as wide as its model is drawn, its face and depth inside its model', () => {
+    for (const [look, z] of Object.entries(FIXED_SIZE)) {
+      expect(z.w, look).toBeCloseTo(lookWidth(look as never), 3);
+      const g = body(look as never).geo; g.computeBoundingBox();
+      const bb = g.boundingBox!;
+      expect(z.h, look).toBeLessThanOrEqual(bb.max.z - bb.min.z + 1e-6); expect(z.d, look).toBeLessThanOrEqual(bb.max.y - bb.min.y + 1e-6);
+      expect(rf(generic(look === 'par' ? 'gen-drgbw' : look === 'strobe' ? 'gen-strobe' : look === 'blinder' ? 'gen-blinder2' : 'gen-dimmer')).look, look).toBe(look);
+    }
+    expect([fixedLookOf('par'), fixedLookOf('strobe'), fixedLookOf('dimmer', 'Blinder, 2-lite'), fixedLookOf('dimmer', 'Dimmer'), fixedLookOf('mover'), fixedLookOf('bar')])
+      .toEqual(['par', 'strobe', 'blinder', 'fresnel', undefined, undefined]);
   });
   it('any other light: drawn that much bigger (its width against its kind\'s)', () => {
     const par = generic('gen-drgbw'), r = rf(par, { dims: { w: lookWidth(rf(par).look) * 2 } });

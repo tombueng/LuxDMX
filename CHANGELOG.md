@@ -10,6 +10,15 @@ get the newest one.
 
 **Sequencer**
 
+- **A new demo, Band on a small rig.** The festival's big stage, but with the gear a small band
+  really has: 4 wash heads up front, 4 beam heads at the back, 2 on each side, 10 wide LED columns,
+  a row of PARs, strobes, blinders, haze. Fits on two universes. Delete what you don't own and it
+  still looks right: every look lights the PARs and the columns as well as the heads, and the heads
+  aim by where they stand in their row, not by a number per head.
+- **Lights get a face and a depth, not just a width** (Mounting, next to Width). Bars and strips
+  (so a fat LED column looks fat in 3D), PARs, fresnels, blinders and strobes (a flat LED PAR, a
+  4-lite). The fields show the size it comes in. Moving heads still only scale as a whole.
+
 A long round of testing it the way people use it (on a laptop, an upright tablet and a phone; a DJ,
 a church volunteer, a theatre tech, a band). Mostly fixes, a few things that were missing:
 
@@ -37,6 +46,22 @@ a church volunteer, a theatre tech, a band). Mostly fixes, a few things that wer
 - **Faster where it adds up:** the output thread's frame on the festival demo went from 4.5 to
   2.6 ms, and working out every light's 3D look again (on any change, on every pointer move of a
   drag) from 5 to 1 ms.
+- **A reloaded or stuck box window no longer looks connected.** Reload the box's little window
+  (F5 in it) and the app sometimes kept saying "connected" while nothing reached the lights: the
+  window was waiting to be spoken to. The app notices a quiet window now (it reports every second),
+  asks it, and takes it back within a few seconds; one that doesn't answer gets the red bar.
+- Lights on one spot of the plan (the bar's four shelves, above each other on its back wall) can be
+  picked there now: click again and the next one comes. Before, every click got the top one.
+- Check the patch: Home and End go to the first and last light (233 in the big demo), and it says
+  that a light clicked on the stage or in the list is the one it checks.
+- The festival demo's machines no longer stand inside each other. They were five rows 10-25 cm
+  apart along the front of the stage. Now the flames line the front edge, the spark machines stand
+  on the floor in front of the stage, CO2 and confetti take turns on the wings beside it, and the
+  fog machines sit at its front corners. Two hazers inside the outer beam heads moved too.
+- The Bar's two strobes hung 4 cm from the dance floor's washes, one inside the other. They hang
+  in the gaps now, and every template is checked for that.
+- Demo songs from Jamendo come from our copy first, like ccMixter's: their server lets a browser
+  have the file on about every second request, so half the songs started with a failed download.
 - **Small things:** a follow waits for a cue's own colour, position and beam times; a light with
   more than a universe per pixel no longer hangs the page; "saving..." can't get stuck when the
   browser's storage is full; a pasted cue is checked like one from a file.

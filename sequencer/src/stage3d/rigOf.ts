@@ -3,6 +3,7 @@
 // for the 3D stage (Stage3D.svelte) and the library's live previews (preview.ts), so a preview
 // shows what the stage will.
 import type { Fixture, FixtureMode, FixtureType } from '../model/types';
+import { FIXED_SIZE, isFixedLook } from './lightSize';
 import type { FixtureKind } from '../model/library';
 import { capsOf, headCellsOf, machineryOf } from '../model/library';
 import { slotsOf } from '../engine/render';
@@ -66,13 +67,18 @@ export function rigFixtureFull(f: Fixture, m: Mode, k: FixtureKind, t: FixtureTy
   const look: Look = profile?.head ? 'matrixhead' : profile?.panel ? 'panel' : sfx ?? (machinery ?? (c.fog ? 'fog' : k === 'mover' ? (c.heads > 1 ? 'headbar' : /wash/i.test(t?.model ?? '') || (has('zoom') && !has('gobo')) ? 'wash' : 'spot')
     : shape ? (shape.round ? 'disc' : 'panel') : k === 'bar' ? 'bar' : k === 'strobe' ? 'strobe' : k === 'par' ? 'par' : /blinder/i.test(t?.model ?? '') ? 'blinder' : 'fresnel'));
   const cloth = clothOf(f, look, t);
-  // (its size: its own, else its type's; a strip or a bar its length, a ring or a matrix its width,
-  // anything else drawn that much bigger or smaller)
-  const dims = f.dims ?? t?.physical?.dims, w = dims?.w;
+  // (its size: its own, else its type's; a strip or a bar its length (and its face across, its body's
+  // depth), a ring or a matrix its width, anything else drawn that much bigger or smaller, a PAR, a
+  // fresnel, a blinder or a strobe stretched by its own face and depth too)
+  // (each of w, h, d its own where it has one, else its type's)
+  const dims = f.dims || t?.physical?.dims ? { ...t?.physical?.dims, ...f.dims } : undefined, w = dims?.w;
+  // (a fixed light: its own face (h) and depth (d) stretch it just that way, over its width's scale)
+  const fixed = !shape && !cloth && !profile && isFixedLook(look) ? FIXED_SIZE[look] : undefined, s1 = w ? w / lookWidth(look) : 1;
   return {
     id: f.id, name: f.name, kind: k, look, cells: Math.max(1, c.cells), ...(profile ? { profile } : {}), sfx, fog: c.fog, hazer: c.fog && has('haze') && !has('fog'),
     p: f.p3 ? { ...f.p3 } : shape ? shapeStanding(def.p, shape).p : def.p, rot: f.rot ? { ...f.rot } : shape ? shapeStanding(def.p, shape).rot : def.rot, shape,
-    size: shape && w ? w / Math.max(1e-6, shapeW(shape)) : size, ...(w && !shape && k === 'bar' ? { barLen: w } : w && !shape && k !== 'bar' && !cloth ? { scale: w / lookWidth(look) } : {}),
+    size: shape && w ? w / Math.max(1e-6, shapeW(shape)) : size, ...(!shape && k === 'bar' ? { ...(w ? { barLen: w } : {}), ...(dims?.h ? { barFace: dims.h } : {}), ...(dims?.d ? { barDepth: dims.d } : {}) } : w && !shape && !cloth ? { scale: s1 } : {}),
+    ...(fixed && dims?.h ? { scaleZ: dims.h / fixed.h } : {}), ...(fixed && dims?.d ? { scaleY: dims.d / fixed.d } : {}),
     // (the light's own pan / tilt range first, then its type's; swapped when it says so)
     optics: { ...opticsOf(f, t), swap: !!f.swapPanTilt },
     // its gobo wheels: each slot's pattern from its name (gobos.ts), and its rotation channel's ranges

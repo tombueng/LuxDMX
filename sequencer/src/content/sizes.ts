@@ -1,5 +1,5 @@
 // How big each template and demo is (lights, cues), for the welcome's tiles. Written down here
-// rather than worked out on the welcome: that built all twelve shows to count them, the festival
+// rather than worked out on the welcome: that built all thirteen shows to count them, the festival
 // alone 50 to 100 ms in one go, while the demo played behind the dialog. sizes.test.ts builds them
 // and says when a number here is out of date.
 export const SIZES: Record<string, { lights: number; cues: number }> = {
@@ -12,6 +12,7 @@ export const SIZES: Record<string, { lights: number; cues: number }> = {
   "t:Wedding": { lights: 67, cues: 28 },
   "t:Ring and matrix": { lights: 4, cues: 21 },
   "d:festival": { lights: 233, cues: 67 },
+  "d:band": { lights: 36, cues: 15 },
   "d:club": { lights: 90, cues: 24 },
   "d:party": { lights: 62, cues: 20 },
   "d:truss": { lights: 32, cues: 70 },

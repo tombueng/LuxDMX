@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020';
 import { DEMOS, demoById } from './demos';
 import { buildDemo, partKind } from './demo';
+import { BAND_RIG, COLUMN, buildBand, type BandRig } from './band';
+import { BAR_FACE } from '../stage3d/lightSize';
 import { buildTrussTest, TRUSS_KINDS, TRUSS_MACHINES } from './trussTest';
 import { buskingPage, isMachineList } from './busking';
 import { CATALOG } from '../timeline/catalog';
@@ -18,7 +20,7 @@ import { DEMO_SECONDS } from '../timeline/beat';
 import { parseShow, serializeShow } from '../model/format';
 import { capsOf, kindOf, modeOf, typeMap } from '../model/library';
 import { EFFECT_MAP } from '../engine/effects';
-import { DECK, DJ_BOOTH, onDeck, roomOf, toWorld, type Room, type Seg, type V3 } from '../stage3d/geometry';
+import { D, DECK, DJ_BOOTH, TRUSS, W, beamDir, onDeck, roomOf, toWorld, type Room, type Seg, type V3 } from '../stage3d/geometry';
 import type { Fixture, Show } from '../model/types';
 
 const MACHINES = ['confetti', 'co2', 'sparks', 'flame', 'bubbles'] as const;
@@ -38,11 +40,14 @@ function toSeg(p: V3, [a, b]: Seg) {
 // Where a light rests: on a piece of truss (within a clamp's reach of its middle line), on the deck
 // (its top, or its front face), or on the floor inside the walls. A bar or a strip may rest on
 // either end or its middle (a strip stood up on the deck rests on its lower end).
+// (A bar as long as its own size says, else as it comes. The hall's trusses are spans across it, no
+// list of pieces: the band demo hangs there.)
 function restsOn(f: Fixture, cells: number, r: Room): string | undefined {
-  const p = f.p3!, L = cells > 24 ? cells / 30 : 1, ax = toWorld({ x: L / 2, y: 0, z: 0 }, f.rot!);
+  const p = f.p3!, L = f.dims?.w ?? (cells > 24 ? cells / 30 : 1), ax = toWorld({ x: L / 2, y: 0, z: 0 }, f.rot!);
   const pts = cells > 1 ? [p, { x: p.x + ax.x, y: p.y + ax.y, z: p.z + ax.z }, { x: p.x - ax.x, y: p.y - ax.y, z: p.z - ax.z }] : [p];
+  const frame: Seg[] = r.frame ?? r.truss.map((t) => [[-r.W / 2 - 1, t.y + 0.15, t.z], [r.W / 2 + 1, t.y + 0.15, t.z]]);
   for (const q of pts) {
-    if ((r.frame ?? []).some((s) => toSeg(q, s) < 0.6)) return 'truss';
+    if (frame.some((s) => toSeg(q, s) < 0.6)) return 'truss';
     if (Math.abs(q.y - DECK) < 0.15 && onDeck(q.x, q.z, r)) return 'deck';
     if (r.deck.x > 0 && Math.abs(q.z - r.deck.z1) < 0.1 && q.y > 0 && q.y < DECK && Math.abs(q.x) <= r.deck.x) return 'deck front';
     if (q.y >= 0 && q.y < 0.15 && Math.abs(q.x) < r.walls.x && q.z > r.walls.z0 && q.z < r.walls.z1 && !onDeck(q.x, q.z, r)) return 'floor';
@@ -64,18 +69,19 @@ function gobosInLooks(s: ReturnType<typeof buildTrussTest>, list: string, share:
 }
 
 describe('the list of demos', () => {
-  it('the festival first (the big demo on its metal song), then the club, the party and the test truss', () => {
-    expect(DEMOS.map((d) => d.id)).toEqual(['festival', 'club', 'party', 'truss']);
+  it('the festival first (the big demo on its metal song), then the small band, the club, the party and the test truss', () => {
+    expect(DEMOS.map((d) => d.id)).toEqual(['festival', 'band', 'club', 'party', 'truss']);
     // (the same show as the big demo's, apart from when it was made)
     const same = (x: Show) => ({ ...x, meta: { ...x.meta, created: '', modified: '' } });
     expect(same(DEMOS[0].build())).toEqual(same(buildDemo()));
-    expect(DEMOS.map((d) => d.room)).toEqual(['hall', 'club', 'party', 'truss']);
+    expect(DEMOS.map((d) => d.room)).toEqual(['hall', 'hall', 'club', 'party', 'truss']);
     for (const d of DEMOS) {
       expect(d.name.length).toBeGreaterThan(3); expect(d.blurb.length).toBeGreaterThan(20); expect(d.blurb).not.toMatch(/\u2014/);
       if (d.song) expect(songOf(d.song), d.song).toBeDefined();
       expect(roomOf(d.room).id).toBe(d.room);
     }
     expect(songOf(demoById('club')!.song)!.genre).toBe('techno');
+    expect(songOf(demoById('band')!.song)!.genre).toBe('rock');
     expect(['house', 'pop']).toContain(songOf(demoById('party')!.song)!.genre);
   });
 });
@@ -223,6 +229,88 @@ describe('the party', () => {
   });
 });
 
+// The small band on the big stage: the rig the user asked for, and built from rows and groups so a
+// smaller (or bigger) rig still gets every look.
+describe('the small band', () => {
+  const s = demoById('band')!.build(songOf(demoById('band')!.song)), r = roomOf('hall');
+  const named = (x: Show, re: RegExp) => x.fixtures.filter((f) => re.test(f.name));
+  const OPTICS = { panDeg: 540, tiltDeg: 270, panOffset: 0, tiltOffset: 0, invertPan: false, invertTilt: false };
+  it('gobos in its looks, from the beam heads at the back', () => gobosInLooks(s, 'Show', 0.75, false));
+  it('four heads on the front truss, four standing at the back, two on each side; a row of PARs on the mid truss', () => {
+    const front = named(s, /^Front wash/), back = named(s, /^Back head/), side = named(s, /^Side head/), par = named(s, /^PAR/);
+    expect([front.length, back.length, side.length, par.length]).toEqual([4, 4, 4, 8]);
+    for (const f of [...front, ...back, ...side]) expect(kindIn(s, f), f.name).toBe('mover');
+    for (const f of front) { expect(restsOn(f, 1, r)).toBe('truss'); expect(Math.abs(f.p3!.z - TRUSS[2].z)).toBeLessThan(0.01); }
+    for (const f of par) { expect(restsOn(f, 1, r)).toBe('truss'); expect(Math.abs(f.p3!.z - TRUSS[1].z)).toBeLessThan(0.01); }
+    for (const f of back) { expect(restsOn(f, 1, r)).toBe('deck'); expect(f.p3!.z).toBeLessThan(-D / 2 + 1.5); }
+    expect(side.filter((f) => f.p3!.x < -W / 2 + 1).length).toBe(2); expect(side.filter((f) => f.p3!.x > W / 2 - 1).length).toBe(2);
+    for (const f of side) expect(restsOn(f, 1, r)).toBe('deck');
+  });
+  it('all of it on two universes, so a box with two outputs plays it', () => {
+    expect(new Set(s.fixtures.map((f) => f.universe))).toEqual(new Set([0, 1]));
+    expect(new Set(buildBand(undefined, { front: 6, back: 8, side: 6, columns: 14, pars: 12 }).fixtures.map((f) => f.universe))).toEqual(new Set([0, 1]));
+  });
+  it('ten LED columns along the back, standing on the deck, four times as wide as an LED bar comes', () => {
+    const col = named(s, /^Column/);
+    expect(col).toHaveLength(10);
+    expect(COLUMN.face).toBeCloseTo(4 * BAR_FACE, 6);
+    for (const f of col) {
+      expect(kindIn(s, f)).toBe('bar'); expect(f.dims).toEqual({ w: COLUMN.h, h: COLUMN.face });
+      expect(restsOn(f, cellsOf(s, f), r)).toBe('deck');
+      expect(toWorld({ x: 1, y: 0, z: 0 }, f.rot!).y).toBeCloseTo(1, 5);                  // (stood on end)
+      expect(toWorld({ x: 0, y: 1, z: 0 }, f.rot!).z).toBeCloseTo(1, 5);                  // (its cells to the audience)
+      expect(Math.abs(toWorld({ x: 0, y: 0, z: 1 }, f.rot!).x)).toBeCloseTo(1, 5);        // (its wide face across the stage)
+    }
+  });
+  // what a look lights: its lights with a level
+  const lit = (x: Show, c: Show['cueLists'][number]['cues'][number]) => x.fixtures.filter((f) => Number(c.values[f.id]?.intensity ?? 0) > 0);
+  const rigs: [string, BandRig][] = [
+    ['only PARs and columns', { front: 0, back: 0, side: 0, columns: 10, pars: 8 }], ['only heads', { ...BAND_RIG, columns: 0, pars: 0 }],
+    ['a few of each', { front: 2, back: 1, side: 1, columns: 3, pars: 2 }], ['more of each', { front: 6, back: 8, side: 6, columns: 14, pars: 12 }],
+  ];
+  for (const [what, rig] of rigs) it(`with ${what}: every look still lit, everything named there, nothing in one place, rows spread evenly`, () => {
+    const x = buildBand(undefined, rig);
+    expect(named(x, /^Front wash/)).toHaveLength(rig.front); expect(named(x, /^Back head/)).toHaveLength(rig.back); expect(named(x, /^Side head/)).toHaveLength(rig.side);
+    expect(named(x, /^Column/)).toHaveLength(rig.columns); expect(named(x, /^PAR/)).toHaveLength(rig.pars);
+    const ok = validate(JSON.parse(serializeShow(JSON.parse(JSON.stringify(x)))));
+    expect(ok ? [] : validate.errors!.map((e) => `${e.instancePath} ${e.message}`)).toEqual([]);
+    const ids = new Set(x.fixtures.map((f) => f.id)), fx = new Set(x.effects.map((e) => e.id));
+    for (const g of x.groups) expect(g.fixtures.length, g.name).toBeGreaterThan(0);
+    for (const c of x.cueLists.flatMap((l) => l.cues)) { for (const id of Object.keys(c.values)) expect(ids.has(id)).toBe(true); for (const id of c.effects ?? []) expect(fx.has(id)).toBe(true); }
+    for (const i of x.timeline!.items) if (i.do.do === 'effect') expect(fx.has(i.do.effect)).toBe(true);
+    for (const c of x.cueLists[0].cues.filter((q) => q.name !== 'The end')) expect(lit(x, c).length, c.name).toBeGreaterThan(0);
+    for (const f of x.fixtures) expect(restsOn(f, cellsOf(x, f), r), f.name).toBeDefined();
+    for (let i = 0; i < x.fixtures.length; i++) for (let j = i + 1; j < x.fixtures.length; j++) {
+      const a = x.fixtures[i].p3!, b = x.fixtures[j].p3!;
+      expect(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z), `${x.fixtures[i].name} / ${x.fixtures[j].name}`).toBeGreaterThan(0.25);
+    }
+    // every row centred on the stage, its lights evenly apart
+    for (const re of [/^Front wash/, /^Back head/, /^Column/, /^PAR/]) {
+      const xs = named(x, re).map((f) => f.p3!.x).sort((a, b) => a - b);
+      if (!xs.length) continue;
+      expect(xs.reduce((a, b) => a + b, 0) / xs.length, String(re)).toBeCloseTo(0, 3);
+      for (let k = 2; k < xs.length; k++) expect(xs[k] - xs[k - 1]).toBeCloseTo(xs[1] - xs[0], 3);
+    }
+  });
+  it('the heads aim by where they stand in their row: in the fan the left one points furthest left, the side heads across at the band', () => {
+    for (const rig of [BAND_RIG, { ...BAND_RIG, back: 7 }]) {
+      const x = buildBand(undefined, rig), c = x.cueLists[0].cues.find((q) => q.name === 'Verse: red and amber')!;
+      const dirX = (f: Fixture) => beamDir(c.values[f.id].pan as number, c.values[f.id].tilt as number, f.rot!, OPTICS).x;
+      const back = named(x, /^Back head/).sort((a, b) => a.p3!.x - b.p3!.x).map(dirX);
+      for (let k = 1; k < back.length; k++) expect(back[k]).toBeGreaterThan(back[k - 1]);
+      for (const f of named(x, /^Side head/)) expect(Math.sign(dirX(f))).toBe(-Math.sign(f.p3!.x));
+      for (const f of named(x, /^Back head/)) expect(beamDir(c.values[f.id].pan as number, c.values[f.id].tilt as number, f.rot!, OPTICS).z).toBeGreaterThan(0);   // (out to the crowd, not into the columns)
+    }
+  });
+  it('without heads, every look still has its colour on the PARs and the columns', () => {
+    const x = buildBand(undefined, { ...BAND_RIG, front: 0, back: 0, side: 0 });
+    for (const c of x.cueLists[0].cues.filter((q) => q.name !== 'The end')) {
+      const on = x.fixtures.filter((f) => /^(PAR|Column)/.test(f.name) && Number(c.values[f.id]?.intensity ?? 0) > 0);
+      expect(on.length, c.name).toBeGreaterThanOrEqual(8);
+    }
+  });
+});
+
 describe('the test truss', () => {
   const s = buildTrussTest(), r = roomOf('truss');
   // what the 3D stage draws each as
@@ -277,5 +365,20 @@ describe('the audience at the club and the party', () => {
       expect(tl.crowd!.some((c) => c.do.do === 'cheer' && c.at > 0 && c.at < tl.duration - 10), id).toBe(true);
       expect(loudness(crowdAt(tl.crowd, tl.duration + 1)), id).toBeGreaterThan(0.4);
     }
+  });
+});
+
+// The festival's machines stood in five rows 10-25 cm apart along the deck's front, every kind
+// spread over the same width: at both ends five machines in one, every flame half inside its spark
+// machine; two hazers inside the outer beam heads. (0.25 m: a strip on a truss face and a machine
+// on top of the same truss, as at the house party, are a hand apart and fine.)
+describe('the demos: no two lights in one place', () => {
+  for (const d of DEMOS) it(`${d.name}: at least 0.25 m apart in the room`, () => {
+    const fs = d.build().fixtures.filter((f) => f.p3), close: string[] = [];
+    for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) {
+      const a = fs[i].p3!, b = fs[j].p3!, m = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+      if (m < 0.25) close.push(`${fs[i].name} / ${fs[j].name}: ${m.toFixed(2)} m`);
+    }
+    expect(close).toEqual([]);
   });
 });
