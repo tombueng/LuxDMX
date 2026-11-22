@@ -7,8 +7,9 @@ pass them on with the app. Thank you, all of you.
 How it works:
 
 - Picking a song downloads it from where the artist put it. Some sites don't let a web page
-  fetch their files: ccMixter and joshwoodward.com never do, so their songs come straight from our
-  copy in `public/songs/` (no failed request first); the odd Jamendo file falls back to it too. Our copies are the artists' files byte for byte (the sha256 is
+  fetch their files: ccMixter and joshwoodward.com never do, and Jamendo only on about half the
+  requests (at random), so their songs come straight from our copy in `public/songs/` (no failed
+  request first). Our copies are the artists' files byte for byte (the sha256 is
   below). They aren't in git: put them in `public/songs/` before building, from the "File" links
   below (`npm run songs` does it). An app that runs somewhere without them (a dev server on this
   computer) takes the ones on the public site last (GitHub Pages lets any page fetch them).

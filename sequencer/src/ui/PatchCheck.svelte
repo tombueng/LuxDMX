@@ -51,6 +51,9 @@
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(1); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
     else if (e.key === ' ' && el.tagName !== 'INPUT' && el.tagName !== 'BUTTON' && !el.closest('.dip')) { e.preventDefault(); step(1); }
+    // the first or the last light (233 in the big demo: the arrows alone took 232 presses); in the
+    // address field they stay the cursor's
+    else if ((e.key === 'Home' || e.key === 'End') && el.tagName !== 'INPUT' && order.length) { e.preventDefault(); auto = false; curId = order[e.key === 'Home' ? 0 : order.length - 1].id; }
   }
   // the address is only taken when typed and confirmed (Enter, or leaving the field)
   function setAddress(e: Event) {
@@ -67,7 +70,7 @@
 <Modal title="Check the patch" {onclose} dock>
   {#if f}
     <div class="pc">
-      <p class="faint">Each light goes full white in turn. If a different one lights up, its address is off.</p>
+      <p class="faint">Each light goes full white in turn. If a different one lights up, its address is off. Click a light on the stage or in the list to check that one.</p>
       {#if app.output !== 'live'}
         <!-- blind, nothing would light: said, with the way out -->
         <p class="blindnote">You're blind: the lights don't get this. <button onclick={() => void app.askOnStage()}>Send to the stage…</button></p>

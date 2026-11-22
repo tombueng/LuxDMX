@@ -106,7 +106,17 @@ const actions = {
   async dblclick(b) { await loc(b.sel, b.nth).dblclick({ timeout: b.timeout ?? 15000, position: b.pos }); return {}; },
   async hover(b) { await loc(b.sel, b.nth).hover({ timeout: b.timeout ?? 15000 }); return {}; },
   async fill(b) { await loc(b.sel, b.nth).fill(String(b.value), { timeout: b.timeout ?? 15000 }); return {}; },
-  async type(b) { if (b.sel) await loc(b.sel, b.nth).focus(); await page().keyboard.type(String(b.text), { delay: b.delay ?? 10 }); return {}; },
+  // (without a field to type into, the keys go to the page's shortcuts: Space is GO, R records, P
+  // adds a song part. Twice a "type" after a click that hadn't opened its field fired those: it
+  // says so instead, unless told `force`)
+  async type(b) {
+    if (b.sel) await loc(b.sel, b.nth).focus();
+    else if (!b.force) {
+      const into = await page().evaluate(() => { const e = document.activeElement; return !!e && (e.matches('input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=button]), textarea, select') || e.isContentEditable); });
+      if (!into) return { ok: false, error: 'type: no text field has the focus (the keys would go to the page\'s shortcuts); give a selector, or force' };
+    }
+    await page().keyboard.type(String(b.text), { delay: b.delay ?? 10 }); return {};
+  },
   async press(b) { if (b.sel) await loc(b.sel, b.nth).press(b.key, { timeout: b.timeout ?? 15000 }); else await page().keyboard.press(b.key); return {}; },
   async select(b) { return { picked: await loc(b.sel, b.nth).selectOption(b.value, { timeout: b.timeout ?? 15000 }) }; },
   async check(b) { await loc(b.sel, b.nth).setChecked(b.on !== false, { timeout: b.timeout ?? 15000 }); return {}; },
@@ -118,6 +128,8 @@ const actions = {
     else if (b.action === 'up') await m.up({ button: b.button });
     else if (b.action === 'click') await m.click(b.x, b.y, { button: b.button, clickCount: b.count });
     else if (b.action === 'wheel') { if (b.x !== undefined) await m.move(b.x, b.y); await m.wheel(b.dx ?? 0, b.dy ?? 0); }
+    // (no action, or one it doesn't know: said, not an "ok" that did nothing)
+    else return { ok: false, error: `mouse: action is move, down, up, click or wheel (got ${b.action})` };
     return {};
   },
   async drag(b) {

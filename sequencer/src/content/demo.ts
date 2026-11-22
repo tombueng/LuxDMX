@@ -114,12 +114,27 @@ export function buildDemo(song?: DemoSong) {
   place(crowdBlinder, (f, i) => { const side = i % 2 ? 1 : -1, k = Math.floor(i / 2); f.p3 = { x: side * (W / 2 + 0.9), y: 3 + k * 1.1, z: 3.6 }; f.rot = { yaw: side * -20, pitch: 80, roll: 0 }; });
   // the pixel line on the deck's front face, shining at the audience
   place(edge, (f, i, n) => { f.p3 = { x: spread(i, n, 12), y: DECK - 0.12, z: D / 2 + 0.03 }; f.rot = { yaw: 0, pitch: 90, roll: 0 }; });
-  for (const [ids, z] of [[confetti, D / 2 - 0.4], [flame, D / 2 - 0.3], [sparks, D / 2 - 0.55], [co2, D / 2 - 0.7], [fog, D / 2 - 0.2]] as const)
-    place([...ids], (f, i, n) => { f.p3 = { x: (n > 1 ? i / (n - 1) - 0.5 : 0) * (W - 1.5), y: DECK, z }; f.rot = { yaw: ids === fog ? faceBand(f.p3) : 0, pitch: 0, roll: 0 }; });
+  // The machines. They stood in five rows 10-25 cm apart along the deck's front, every kind spread
+  // over the same width: at both ends five machines in one, every flame half inside its spark
+  // machine. Now: the flames along the front (the deck washes in their gaps), the sparks before
+  // the stage on the floor, under its lip in front of the floor heads (between and outside the
+  // subs), CO2 and confetti beside the
+  // stage on the wings, taking turns, clear of the truss towers, the fog machines on the floor at
+  // the stage's front corners.
+  place(flame, (f, i, n) => { f.p3 = { x: (i / (n - 1) - 0.5) * (W - 1.5), y: DECK, z: D / 2 - 0.3 }; f.rot = { ...stand }; });
+  const PIT = D / 2 + 0.35, pitX = [-3.6, -2.16, -0.72, 0.72, 2.16, 3.6, -7.6, 7.6];
+  place(sparks, (f, i) => { f.p3 = { x: pitX[i % pitX.length], y: 0, z: PIT }; f.rot = { ...stand }; });
+  const WING = W / 2 + 1.4, wingZ = [-3.9, -2.4, -0.8, 0.8, 2.4, 4.0];   // (confetti at the even ones, CO2 at the odd)
+  const wing = (i: number, odd: number) => ({ x: (i % 2 ? 1 : -1) * WING, y: DECK, z: wingZ[2 * Math.floor(i / 2) + odd] });
+  place(confetti, (f, i) => { f.p3 = wing(i, 0); f.rot = { ...stand }; });
+  place(co2, (f, i) => { f.p3 = wing(i, 1); f.rot = { ...stand }; });
+  place(fog, (f, i) => { const side = i % 2 ? 1 : -1; f.p3 = { x: side * (W / 2 + 2.6), y: 0, z: D / 2 + 0.6 }; f.rot = { yaw: faceBand(f.p3), pitch: 0, roll: 0 }; });
   // (in the gaps between the flames, sparks, confetti and CO2)
   place(deckWash, (f, i) => { f.p3 = { x: [-5.35, -3.2, -1.85, 1.85, 3.2, 5.35][i], y: DECK, z: D / 2 - 0.25 }; f.rot = { ...stand }; onPlan(f); });
-  place(bubbles, (f, i) => { const side = i % 2 ? 1 : -1; f.p3 = { x: side * (W / 2 + 0.6), y: i < 2 ? 6.5 : 5.2, z: i < 2 ? 3.4 : -0.2 }; f.rot = { yaw: 0, pitch: 0, roll: 0 }; });
-  place(haze, (f, i) => { const side = i % 2 ? 1 : -1; f.p3 = { x: side * (W / 2 - 0.5), y: DECK, z: i < 2 ? -D / 2 + 1 : 0.6 }; f.rot = { yaw: side * -90, pitch: 0, roll: 0 }; });
+  // (the front pair hung under the front truss: at 6.5 m they touched the crowd blinders' top)
+  place(bubbles, (f, i) => { const side = i % 2 ? 1 : -1; f.p3 = { x: side * (W / 2 + 0.6), y: i < 2 ? TRUSS[2].y - 0.35 : 5.2, z: i < 2 ? 3.4 : -0.2 }; f.rot = { yaw: 0, pitch: 0, roll: 0 }; });
+  // (the back pair in front of the beam row: at -D/2 + 1 each stood inside the outer beam head)
+  place(haze, (f, i) => { const side = i % 2 ? 1 : -1; f.p3 = { x: side * (W / 2 - 0.5), y: DECK, z: i < 2 ? -D / 2 + 1.9 : 0.6 }; f.rot = { yaw: side * -90, pitch: 0, roll: 0 }; });
 
   // ---- groups and effects
   const BEAMS = [backBeam, spot, sideSpot, towerHead, floorHead, beam], WASHES = [backWash, frontWash, deckWash];

@@ -13,7 +13,7 @@
     ['Programmer', [['1 … 9, 0, F', 'Intensity of the selected lights: 10 … 90 %, off, full (also with a fader in focus; not while typing in a field)'], ['R', 'Record a cue (also with a fader in focus)'], ['Arrows on the position pad', 'Nudge the heads (Shift: bigger steps)'], ['Arrows on the colour wheel', 'Change the colour']]],
     ['Cells (pixel lights)', [['Alt+click a pixel on the plan', 'Pick that cell (Alt again takes it out)'], ['Arrows, Space (the cell picture)', 'Move the blue ring, pick the cell under it'], ['Alt+drag a box (the cell picture)', 'Take the cells in it out']]],
     ['Console', [['Typing anywhere on it', 'Goes to the command line: 1 thru 4 @ 50, group 2 @ full, 1.3, goto cue 5, record cue 5, next'], ['↑ in the command line', 'The last command again'], ['@ 5 / @ 05 / @ 5%', '50 % (one digit is tens) / 5 % / 5 %'], ['1 - 4', 'Light 1 without 4 (a run is 1 thru 4, or 1>4)'], ['Space', 'GO on the list Live plays'], ['Arrows, Page Up/Down, Home, End (a fader)', 'Move it; Home is 0, End is full'], ['Arrows, Enter (an encoder)', 'Turn it (Shift: fine), type a value']]],
-    ['Tools', [['← → (Check the patch)', 'The previous or next light'], ['Arrows, Enter (DMX output)', 'Move between channels, select the fixture'], ['↑ ↓ Enter (fixture library)', 'Pick a result, load it, use it']]],
+    ['Tools', [['← → / Home End (Check the patch)', 'The previous or next light / the first or last'], ['Arrows, Enter (DMX output)', 'Move between channels, select the fixture'], ['↑ ↓ Enter (fixture library)', 'Pick a result, load it, use it']]],
   ];
 </script>
 

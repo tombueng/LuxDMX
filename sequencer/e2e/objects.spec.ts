@@ -150,6 +150,29 @@ test('the stage: drag a box to select, drag a light to move it', async ({ page }
   await expect(fixturesOnStage(page)).toHaveCount(4);
 });
 
+// Lights on one spot of the plan (the bar's four shelves above each other on its back wall, seen
+// from above): the click landed on the top one every time, the others couldn't be picked on the
+// plan. Clicked again: the next one in the stack, round; the one picked is the one a drag takes.
+test('the stage: lights on one spot (shelves above each other): clicked again, the next one; a drag takes the one picked', async ({ page }) => {
+  await openConnected(page);
+  await startTemplate(page, 'Bar');
+  const sel = () => page.evaluate(() => { const a = (window as any).__luxdmx; return a.selected.map((id: string) => a.show.fixtures.find((f: any) => f.id === id)?.name).join(); });
+  const top = page.locator('.stage-wrap .fx[data-name="Shelf strip 4"]');
+  await expect(top.locator('title')).toContainText('3 more on this spot: click again for the next');
+  const b = (await top.boundingBox())!, at = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  const seen: string[] = [];
+  for (let i = 0; i < 5; i++) { await page.mouse.click(at.x, at.y); seen.push(await sel()); }
+  expect(seen).toEqual(['Shelf strip 4', 'Shelf strip 1', 'Shelf strip 2', 'Shelf strip 3', 'Shelf strip 4']);
+  // strip 2 picked, then dragged from the spot: strip 2 moves, the others stay
+  await page.mouse.click(at.x, at.y); await page.mouse.click(at.x, at.y);
+  expect(await sel()).toBe('Shelf strip 2');
+  await page.mouse.move(at.x, at.y); await page.mouse.down(); await page.mouse.move(at.x + 60, at.y + 30, { steps: 6 }); await page.mouse.up();
+  const pos = await page.evaluate(() => Object.fromEntries((window as any).__luxdmx.show.fixtures.filter((f: any) => /Shelf/.test(f.name)).map((f: any) => [f.name, [f.x, f.y]])));
+  expect(pos['Shelf strip 2']).not.toEqual(pos['Shelf strip 1']);
+  expect(pos['Shelf strip 3']).toEqual(pos['Shelf strip 1']);
+  expect(pos['Shelf strip 4']).toEqual(pos['Shelf strip 1']);
+});
+
 test('keyboard: arrows select, Shift extends, Alt moves; cues move with Alt+arrows and the menu', async ({ page }) => {
   await openConnected(page);
   await patch(page, 'gen-dimmer', 4, 0, 'D');

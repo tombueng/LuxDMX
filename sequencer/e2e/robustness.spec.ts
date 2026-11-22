@@ -311,6 +311,38 @@ test('the box\'s window reloaded (F5 in it): the app takes it back by itself, th
   await expect(page.locator('.dev.ready').or(page.locator('.top .boxes.ready')).first()).toBeVisible();
 });
 
+// The same, when the "socket closed" its window says on the way out doesn't get here (it didn't, in
+// a real Chrome window): the app went on saying "connected" and sent into a page that waited for a
+// hello. Its page says its stats every second; quiet for a few seconds, the app asks it.
+test('the box\'s window reloaded and its goodbye never came: found out by its silence, taken back, the look goes out again', async ({ page }) => {
+  const popup = await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await selectAll(page); await intensity(page, 1);
+  await expect.poll(() => channels(0, 2)).toEqual([255, 255]);
+  // (the old page reaches nobody from here on: no "socket closed" from its goodbye or its socket; the
+  // new page has its own window.opener)
+  await popup.evaluate(() => Object.defineProperty(window, 'opener', { value: null, configurable: true }));
+  await popup.reload();
+  await resetFake();
+  await expect.poll(() => channels(0, 2), { timeout: 15000 }).toEqual([255, 255]);
+  await expect(popup.locator('#idle')).toBeHidden();
+  await expect(boxReady(page)).toBeVisible();
+});
+
+// Its window's page hangs or crashed ("Aw, Snap"): no goodbye at all, the window still open. Said
+// within seconds, in red, not "connected" for ever. (A crash can't be had here: in the tests the
+// box's window is the same site as the app and shares its process; a page that neither hears nor
+// says anything any more is the same to the app.)
+test('the box\'s window stopped answering (hanging, crashed): the red bar within seconds, not "connected"', async ({ page }) => {
+  const popup = await openConnected(page);
+  await patch(page, 'gen-dimmer', 2, 0, 'D');
+  await selectAll(page); await intensity(page, 1);
+  await expect.poll(() => channels(0, 2)).toEqual([255, 255]);
+  await popup.evaluate(() => { (window as { opener: unknown }).opener = null; });
+  await expect(page.locator('.lost[role="alert"]')).toContainText("The lights aren't getting anything", { timeout: 10000 });
+  await expect(page.locator('.lost[role="alert"]')).toContainText('lost its connection');
+});
+
 // Show night: the box drops off the network for a few seconds (its Wi-Fi, a cable), GO is pressed
 // while it's gone. The app says so plainly, and once the box is back the lights get the look GO
 // went to, by themselves: no click, no old frame.

@@ -16,6 +16,10 @@ export type BridgeState = 'closed' | 'opening' | 'asking' | 'ready' | 'denied' |
 
 export interface BoxOutput { en: boolean; uni: number }
 
+// A live box page says something at least every second (its stats). Quiet this long: ask it (a
+// hello); not answered after two of those, PROBE_MS apart: it's lost.
+export const QUIET_MS = 3000, PROBE_MS = 1500;
+
 // A box's pixel ports as its bridge page says them (only the well-formed ones)
 export const portsOf = (v: unknown): PortInfo[] => (Array.isArray(v) ? v : []).filter((q): q is PortInfo => !!q && typeof q === 'object'
   && ['uni', 'start', 'count', 'bright', 'gamma', 'maxMa', 'mAPerCh', 'quiesMa'].every((k) => Number.isFinite((q as Record<string, unknown>)[k])));
@@ -46,6 +50,13 @@ export class Bridge {
   protected rdmWaiting = new Map<number, { done: (r: RdmReply) => void; timer: ReturnType<typeof setTimeout> }>();
   protected rdmNext = 1;
   rdmSilent = 0;                   // requests nobody answered in a row (an older bridge page: no RDM)
+  // when its page last said anything (performance.now()), and the hellos asked since without an answer
+  heardAt = 0;
+  private probedAt = 0;
+  private probes = 0;
+  // one more each time a page of the box says it's ready: a new one (its window reloaded) has none of
+  // the old one's channel, the output thread is offered a new one (output/host.svelte.ts)
+  page = 0;
 
   constructor(readonly host: string, private changed: () => void) {
     this.origin = 'http://' + host;
@@ -92,6 +103,7 @@ export class Bridge {
 
   // Messages from our popup only (checked by the caller against source and origin).
   handle(m: any) {
+    this.heardAt = performance.now(); this.probes = 0;
     switch (m.type) {
       case 'asking': this.set('asking'); break;
       case 'ready':
@@ -99,6 +111,8 @@ export class Bridge {
         // kept for this tab: a popup taken back after a reload doesn't say it again
         BOX_INFO.of(this.host).set({ outputs: this.outputs, pixels: this.pixels, ports: this.ports, name: this.name, ip: this.ip });
         if (this.name) BOX_NAME.of(this.host).set(this.name);
+        // (a page that says ready is a fresh one: it has had nothing yet)
+        this.page++; this.sent.clear(); this.portTaken = false;
         this.set('ready'); break;
       case 'denied': this.adopting = false; this.set('denied'); break;
       case 'status':
@@ -156,7 +170,20 @@ export class Bridge {
 
   // Its window closed (the popup shut by hand): said at once, whoever sends to it (this page or the
   // output thread), so the red bar comes up. Called every frame.
-  watch() { if (this.usesWindow && (this.state === 'ready' || this.state === 'reconnecting') && (!this.win || this.win.closed)) this.set('closed'); }
+  // And its page gone quiet while live (it says its stats every second): reloaded (F5 in it, and the
+  // "socket closed" it says on the way out didn't always get here: it waited for a hello and took
+  // nothing, while this said "connected" and sent into nowhere), crashed or hanging. A hello finds
+  // out: a live page answers at once with its status (in the background its timers are held back,
+  // not its messages), a reloaded one says ready (or asks to be allowed again). Two unanswered: lost,
+  // the red bar, and the hellos go on (set below) until it's back.
+  watch(now = performance.now()) {
+    if (!this.usesWindow) return;
+    if ((this.state === 'ready' || this.state === 'reconnecting') && (!this.win || this.win.closed)) { this.set('closed'); return; }
+    if (this.state !== 'ready' || !this.win || now - this.heardAt < QUIET_MS || now - this.probedAt < PROBE_MS) return;
+    if (this.probes >= 2) { this.set('reconnecting'); return; }
+    this.probes++; this.probedAt = now;
+    this.win.postMessage({ luxdmx: 1, type: 'hello' }, this.origin);
+  }
   // only what changed, plus a heartbeat so the box keeps the source (wire.ts)
   send(uni: number, data: Uint8Array, now = performance.now()) {
     if (this.state !== 'ready' || !this.win || this.win.closed) { this.watch(); return; }
@@ -194,6 +221,7 @@ export class Bridge {
     if (this.state === 'ready' && s !== 'ready') this.lostAt = Date.now();
     else if (s === 'ready') { if (this.lostAt) this.backAt = Date.now(); this.lostAt = 0; }
     if (s !== 'ready') this.recent = [];
+    else { this.heardAt = performance.now(); this.probes = 0; }
     this.state = s; this.changed();
     // reconnecting: its window may say it's closed only after its socket did; look again
     clearInterval(this.recheck);

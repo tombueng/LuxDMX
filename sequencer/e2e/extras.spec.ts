@@ -247,6 +247,15 @@ test('check the patch: one light at a time at full, then everything as it was', 
   await expect(dlg.locator('h3')).toHaveText('D 2');
   await page.keyboard.press('ArrowRight');
   await expect(dlg.locator('h3')).toHaveText('D 3');
+  // the first and the last light at once (and it says a click on the stage or in the list picks one:
+  // on a phone the dialog covers the stage's tab, the list is above it)
+  await expect(dlg).toContainText('Click a light on the stage or in the list to check that one.');
+  await page.locator('.fl li.oitem').filter({ hasText: 'D 2' }).click();
+  await expect(dlg.locator('h3')).toHaveText('D 2');
+  await page.keyboard.press('Home');
+  await expect(dlg.locator('h3')).toHaveText('D 1');
+  await page.keyboard.press('End');
+  await expect(dlg.locator('h3')).toHaveText('D 3');
   // a cue playing doesn't hide which light it is: the others stay dark
   await page.evaluate(() => { const a = (window as any).__luxdmx; a.programmer = Object.fromEntries(a.show.fixtures.map((f: any) => [f.id, { intensity: 1 }])); });
   await expect.poll(() => channels(0, 3)).toEqual([0, 0, 255]);

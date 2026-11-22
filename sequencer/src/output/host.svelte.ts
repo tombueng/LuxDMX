@@ -28,7 +28,7 @@ export class OutputThread {
   private showJson = '';
   private showDirty = true;
   private quietSent: boolean | null = null;
-  private boxes = new Map<Bridge, { mode: 'asking' | 'port' | 'page'; since: number; outputs: string; port?: MessagePort }>();
+  private boxes = new Map<Bridge, { mode: 'asking' | 'port' | 'page'; since: number; outputs: string; port?: MessagePort; page: number }>();
   private linkKey = '';
   // the thread's own timing (shown by the load display)
   stats = $state({ rate: 0, worst: 0, late: 0, quiet: true, link: false });
@@ -147,7 +147,8 @@ export class OutputThread {
   // Each box's page: a channel to it from the thread, if it takes one (it says so); else the page
   // sends to it. A box that goes away, or comes back, is asked again.
   private boxesNow(bridges: Bridge[], t: number) {
-    for (const [b, s] of this.boxes) if (!bridges.includes(b) || b.state !== 'ready') { this.post({ t: 'drop', key: b.host }); s.port?.close(); this.boxes.delete(b); b.portTaken = false; }
+    // (and a box whose page is a new one, its window reloaded: the old channel went with the old page)
+    for (const [b, s] of this.boxes) if (!bridges.includes(b) || b.state !== 'ready' || s.page !== b.page) { this.post({ t: 'drop', key: b.host }); s.port?.close(); this.boxes.delete(b); b.portTaken = false; }
     for (const b of bridges) {
       if (b.host === LINK || b.state !== 'ready') continue;
       // (to the thread a pixel port is one more thing that plays a universe)
@@ -155,7 +156,7 @@ export class OutputThread {
       let s = this.boxes.get(b);
       if (!s) {
         const ch = new MessageChannel();
-        s = b.offerPort?.(ch.port2) ? { mode: 'asking', since: t, outputs, port: ch.port1 } : { mode: 'page', since: t, outputs };
+        s = b.offerPort?.(ch.port2) ? { mode: 'asking', since: t, outputs, port: ch.port1, page: b.page } : { mode: 'page', since: t, outputs, page: b.page };
         this.boxes.set(b, s);
         continue;
       }

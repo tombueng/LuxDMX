@@ -79,6 +79,9 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/bridge' || url.pathname === '/remote') {
     res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' });
     res.end(fs.readFileSync(url.pathname === '/bridge' ? BRIDGE : REMOTE, 'utf8'));
+  } else if (url.pathname === '/favicon.ico') {
+    // (a real box has one: without it every window of this one logged a red 404)
+    res.writeHead(204); res.end();
   } else if (url.pathname === '/pixels.json') {
     json({ ports: pixelPorts.map(([uni, spans, bright = 255, maxMa = 0]) => ({ en: true, uni, spans, start: 1, count: spans * 170, bright, gamma: 220, maxMa, mAPerCh: 2000, quiesMa: 100 }))
       .concat({ en: false, uni: 999, spans: 0, start: 1, count: 0, bright: 255, gamma: 220, maxMa: 0, mAPerCh: 2000, quiesMa: 100 }) });

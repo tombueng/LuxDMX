@@ -44,12 +44,14 @@ describe('downloading a demo song', () => {
       expect(f.name).toBe('The Testers - Night Bus.ogg');
     }
   });
-  it('an artist\'s site that turns every browser away (ccmixter): straight to our copy, no failed request', async () => {
-    const fetch = vi.fn(async (_u: string) => streamed([500], { 'content-type': 'audio/mpeg' }));
-    vi.stubGlobal('fetch', fetch);
-    await downloadSong({ ...song, url: 'https://ccmixter.org/content/x/x_-_Song.mp3' }, () => {});
-    expect(fetch.mock.calls.map((c) => c[0])).toEqual([song.mirror]);
-  });
+  // (ccmixter turns every browser away, Jamendo's storage about every second request, at random)
+  it.each(['https://ccmixter.org/content/x/x_-_Song.mp3', 'https://prod-1.storage.jamendo.com/download/track/1093615/mp32/'])(
+    'an artist\'s site that turns browsers away (%s): straight to our copy, no failed request', async (url) => {
+      const fetch = vi.fn(async (_u: string) => streamed([500], { 'content-type': 'audio/mpeg' }));
+      vi.stubGlobal('fetch', fetch);
+      await downloadSong({ ...song, url }, () => {});
+      expect(fetch.mock.calls.map((c) => c[0])).toEqual([song.mirror]);
+    });
   it('our copy here isn\'t there either (a local server): the one on the public site', async () => {
     const fetch = vi.fn()
       .mockImplementationOnce(async () => { throw new TypeError('Failed to fetch'); })
