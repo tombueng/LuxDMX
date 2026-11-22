@@ -149,7 +149,7 @@ test('one place to start a show: New show… in Shows is the start dialog (no se
   await shows.getByRole('button', { name: 'New show…' }).click();
   const w = page.getByRole('dialog', { name: "Let's get some light on stage" });
   await expect(w.getByRole('group', { name: 'Festival stage' })).toHaveCount(0);           // (folded away, as asked)
-  await w.getByRole('button', { name: 'Show the 4 demos' }).click();
+  await w.getByRole('button', { name: 'Show the 5 demos' }).click();
   await expect(w.getByRole('group', { name: 'Festival stage' }).getByRole('button', { name: /^Play the show/ })).toBeVisible();
   // the empty stage: a new show (it used to only close the dialog, the Bar show still open)
   await w.getByRole('button', { name: 'Start with an empty stage' }).click();

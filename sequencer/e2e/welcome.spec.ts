@@ -209,7 +209,7 @@ test('the demos fold away and stay folded; every start stays there; Lights only 
   // (what's in it: written down per template, there at once, not worked out by building each show)
   const band = await page.evaluate(async () => (await import('/src/content/sizes.ts')).sizeSaid('t:Band'));
   expect(band).toMatch(/^\d+ lights · \d+ cues$/);
-  await expect(w.getByRole('group', { name: 'Band' })).toContainText(band);
+  await expect(w.getByRole('group', { name: 'Band', exact: true })).toContainText(band);
   await w.getByRole('button', { name: 'Hide the demos' }).click();
   await expect(demoTile(w)).toHaveCount(0);
   await w.getByRole('button', { name: 'Start with an empty stage' }).click();
@@ -219,9 +219,9 @@ test('the demos fold away and stay folded; every start stays there; Lights only 
   await expect(w.getByRole('button', { name: 'Start with an empty stage' })).toBeFocused();
   // (folded, the demos are still there: a button each that plays it, with its song)
   const strip = w.getByRole('group', { name: 'The demo shows' });
-  await expect(strip.getByRole('button', { name: /^Play the show: / })).toHaveCount(4);
+  await expect(strip.getByRole('button', { name: /^Play the show: / })).toHaveCount(5);
   await expect(strip.getByRole('button', { name: 'Play the show: Festival stage' })).toContainText('Festival stage');
-  await w.getByRole('button', { name: 'Show the 4 demos' }).click();
+  await w.getByRole('button', { name: 'Show the 5 demos' }).click();
   await expect(demoTile(w)).toBeVisible();
   // a template's lights only
   await w.getByRole('button', { name: 'Band, lights only' }).click();
