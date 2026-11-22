@@ -56,6 +56,44 @@ test.describe('RDM tab — page + shape (always)', () => {
   });
 });
 
+// Issue #150: on Android Chrome in portrait the Discover button sat past the right edge of the
+// Fixtures card, because the header's control group couldn't wrap. Every control in that header
+// has to stay inside the card at phone widths, with the device's real /rdm.json and with a
+// three-line one (four scan buttons, the widest header the page can draw).
+async function headerOutsideCard(page) {
+  return page.evaluate(() => {
+    const card = document.querySelector('#disc-ctl').closest('.card');
+    const cb = card.getBoundingClientRect();
+    return [...card.querySelectorAll('.card-header button, .card-header select, .card-header .form-check, .card-header .pill')]
+      .filter((e) => { const b = e.getBoundingClientRect(); return b.width && (b.right > cb.right + 0.5 || b.left < cb.left - 0.5); })
+      .map((e) => `${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''} "${e.textContent.trim().slice(0, 24)}"`);
+  });
+}
+for (const w of [320, 360, 393, 412]) {
+  test.describe(`RDM tab - phone portrait ${w} px (always)`, () => {
+    test.use({ viewport: { width: w, height: 800 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2.6 });
+
+    test('the Fixtures header stays inside its card', async ({ page }) => {
+      await page.goto('/rdm');
+      await expect(page.locator('#rdm-status')).not.toHaveText('Loading…', { timeout: 10_000 });
+      expect(await headerOutsideCard(page)).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), 'page scrolls sideways').toBe(false);
+    });
+
+    test('...also with three RDM lines (four scan buttons)', async ({ page }) => {
+      await page.route('**/rdm.json*', async (route) => {
+        const j = await (await route.fetch()).json();
+        j.available = true;
+        j.rdmLines = [{ line: 0, uni: 0 }, { line: 1, uni: 1 }, { line: 2, uni: 2 }];
+        await route.fulfill({ json: j });
+      });
+      await page.goto('/rdm');
+      await expect(page.locator('#disc-ctl button')).toHaveCount(4, { timeout: 10_000 });
+      expect(await headerOutsideCard(page)).toEqual([]);
+    });
+  });
+}
+
 test.describe('RDM tab — controls + live sensors (LUXDMX_WRITE=1)', () => {
   test.skip(!WRITE, 'wire-mutating: set LUXDMX_WRITE=1 to run against the bench bus');
   let host;

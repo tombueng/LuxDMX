@@ -155,7 +155,7 @@ Manual channel control, labels, sparkline history, identify, blackout and the se
 |---|---|
 | **Status LED** | Plain GPIO, WS2812 RGB NeoPixel, or 5-LED panel (v6 board), all showing the same states: green = up (stays on; slow blink = DMX coming in), blue = RDM/identify **added on top of green** (both LEDs on the panel, cyan on a single RGB LED), orange = Ethernet-on-WiFi-fallback, red = no network, Knight-Rider boot |
 | **Status display** | Optional I²C OLED (SSD1306 / SH1106) or colour SPI OLED (SSD1351): IP, universe, FPS, sources + auto-rotating conflict/identify/manual banners |
-| **On-unit controls** | Optional rotary encoder and/or up to 4 buttons drive a small on-display menu to set the universe (and protocol) without a phone or PC, and the choice persists. Works with any mix of inputs: encoder only, one button, or the lot. See [docs/controls.md](docs/controls.md) |
+| **On-unit controls** | Optional rotary encoder and/or up to 4 buttons drive a small on-display menu to set the universe, protocol and network (WiFi / WiFi AP / Ethernet) without a phone or PC, and the choice persists. Works with any mix of inputs: encoder only, one button, or the lot. See [docs/controls.md](docs/controls.md) |
 
 ### Updates, settings and API
 

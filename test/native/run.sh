@@ -26,6 +26,11 @@ g++ -std=c++17 -O1 -Wall -Wextra -Wno-unused-parameter \
 
 build/cfgtest
 
+# On-unit controls: encoder, buttons, the menu and its Network entry (src/enc_decode.h,
+# input_map.h, menu.h, net_choice.h; issues #24 and #150).
+g++ -std=c++17 -O1 -Wall -Wextra -Wno-misleading-indentation -I include -I src test/native/controls_test.cpp -o build/ctltest
+build/ctltest
+
 # Pixel mapping / power / gamma arithmetic (src/pixel_map.h). Pure integer maths, no
 # Arduino and no hardware, so it runs here rather than needing a strip on a bench.
 g++ -std=c++17 -O1 -Wall -Wextra \
