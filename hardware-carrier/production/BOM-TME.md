@@ -1,6 +1,6 @@
 # Shopping list for TME
 
-For board **rev 1.1**.
+For board **rev 1.2**.
 
 The same board, sourced at <https://www.tme.eu/>. Quantities are for one board and come straight out of `BOM.csv`.
 
@@ -8,7 +8,7 @@ The same board, sourced at <https://www.tme.eu/>. Quantities are for one board a
 
 | Qty | What it has to be | Where to look | Watch out |
 |---:|---|---|---|
-| 2 | 100nF 1206 X7R, 50 V | search: 100nF 1206 X7R 50V | Any maker. X7R matters, X5R or Y5V do not belong on a decoupling line. |
+| 3 | 100nF 1206 X7R, 50 V | search: 100nF 1206 X7R 50V | Any maker. X7R matters, X5R or Y5V do not belong on a decoupling line. |
 | 1 | 1uF 1206 X7R, 50 V | search: 1uF 1206 X7R 50V | X7R again. A 1uF Y5V loses most of its value at voltage. |
 | 2 | 22uF 1206 X5R, 6.3 V or more | search: 22uF 1206 X5R | 6.3 V is the minimum; 10 V or 16 V is fine and often cheaper. Sits on a 3.3 V rail. |
 | 1 | 1000uF 35 V radial, 13 mm can at most, 5 mm lead pitch | search: 1000uF 35V 105C radial | The can must not exceed 13 mm diameter and the leads must be 5 mm apart - the land is drawn for exactly that. |

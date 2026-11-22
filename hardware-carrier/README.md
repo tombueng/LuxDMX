@@ -11,7 +11,7 @@ The board is built and runs on the bench; most firmware testing happens on it.
 | | |
 |---|---|
 | Board | 100 x 80 mm, 2 layers, 1 oz copper, no mounting holes |
-| Revision | **rev 1.1**, printed on the silk (front between the buttons, back along the bottom edge). Boards without a rev on them are rev 1.0, see [Known issues](#known-issues) |
+| Revision | **rev 1.2**, printed on the silk (front between the buttons, back along the bottom edge). Boards without a rev on them are rev 1.0, see [Known issues](#known-issues) |
 | DMX / RDM | up to 3 ports, one MAX3485 module each, direction pin driven, **not isolated** |
 | Pixels | up to 5 WS281x ports, buffered to 5 V by a 74AHCT541 |
 | Network | wired with a W5500 module (recommended), or WiFi with an external antenna, see [Network](#network-w5500-or-an-external-antenna) |
@@ -137,9 +137,11 @@ parts only. MF-RHT, MF-RG and anything else rated 16 V is out of
 rating at 24 V the moment it trips. Equivalents to the
 MF-R500: ECE RB500-30, Littelfuse RUEF500. Full list in [`production/BOM.md`](production/BOM.md).
 
-Never polyfuse and bridge together. Careful when you solder the polyfuse: the two bridge pads
-sit 0.3 mm apart, unmasked, right at its left holes on the back. Use little tin, then look with a
-loupe that the gap is still open. A meter can't tell you, a polyfuse measures as a short anyway.
+Never polyfuse and bridge together. The bridge is two 0.75 mm strips of bare copper with a 0.3 mm
+gap in one mask opening, on the back between the polyfuse's left holes. Solder mask keeps them 0.55 mm away from the
+hole rings, so a normal joint on the fuse leads doesn't reach them. If a joint got flooded, look with
+a loupe that the gap is still open. A meter can't tell you, a polyfuse measures as a short anyway.
+On rev 1.1 the bridge pads ran bare right into the holes, so there that loupe check is a must.
 
 ### Regulator
 
@@ -235,6 +237,7 @@ terminal row. Each output gets the full 4.6 mm width and its own GND return.
 |---|---|
 | 3.3 V at the ESP module | 100 nF + 22 µF |
 | W5500, under the module on the back | 100 nF / 1 µF / 22 µF, smallest closest to its 3V3 pin |
+| 74AHCT541, on the back | 100 nF at pin 20 (VCC), GND end on a via into both pours (rev 1.2). The chip's GND pin 10 is at the far corner, so the loop is not tight, but plenty for five WS281x lines |
 | Pixel rail | 1000 µF 35 V, 13 mm can, 5.0 mm pitch |
 
 The W5500 set matters: the 3.3 V reaches it through 62 mm of 0.60 mm track (about 62 nH), so the
@@ -263,7 +266,8 @@ TVS: SMF12CA (SOD-123FL, 200 W), or SMAJ12CA (SMA, 400 W). 12 V standoff so it s
 substitute, it clamps around 40 V.
 
 Header: 2.54 mm pitch, 1.20 mm holes. Takes a pin header or a 2.54 mm screw terminal (Phoenix
-MPT 0,5/3-2,54, TE 282834-3, Xinya XY308-2.54-3P). The BOM names the Xinya, LCSC C557686.
+MPT 0,5/3-2,54, TE 282834-3, Xinya XY308-2.54-3P). The BOM names the Xinya, LCSC C557686. The three
+unplated holes on the edge side of each row are for the Phoenix's pegs; the others ignore them.
 
 **Not isolated.** DMX GND is board GND. Fine for a desk or a small rig. Use an isolated RS-485
 module on a separate build if you need it.
@@ -366,7 +370,8 @@ BOM, the lands take 0402 to 1206.
 
 | Part | Value / part number | LCSC | Fit when |
 |---|---|---|---|
-| `74AHCT541 pixel buffer` | SN74AHCT541DWR, SOIC-20 300 mil | C2682058 | at least one pixel port used |
+| `74AHCT541 pixel buffer` | SN74AHCT541DWR, SOIC-20 300 mil. The silk just says `74AHCT541` | C2682058 | at least one pixel port used |
+| `100nF buffer` | 100 nF X7R, CL31B104KBCNNNC. Outline only on the silk, beside the buffer's pin 20 | C24497 | the 74AHCT541 is fitted |
 | `330R PIX1..5` | 330 Ω, 1206W4J0331T5E | C25374 | that port used |
 | `Pixel1..5` | KF128-5.08-3P screw terminal | C474953 | that port used |
 | `12-24V IN` | KF128-5.08-2P screw terminal, 24 A | C474952 | any pixel port used, or the regulator powers the logic |
@@ -414,7 +419,7 @@ side and fit condition: [`ASSEMBLY.md`](ASSEMBLY.md).
 | DMX only, USB powered | 1-3 | - | WiFi, external antenna | ESP, RS-485 module + header + 10k per port, bias / termination / TVS as needed |
 | DMX + LAN | 1-3 | - | W5500 | above + W5500, its two 10k and 100 nF / 1 µF / 22 µF |
 | ... from 12/24 V | | | | above + regulator module, `12-24V IN`, the fuse and the 1000 µF. The regulator sits on the pixel rail behind the fuse, so it needs all three even with no pixels |
-| Pixels only | - | 1-5 | WiFi, external antenna | ESP, buffer, 330 Ω + terminal per port, 1000 µF, inlet, fuse, buck or USB |
+| Pixels only | - | 1-5 | WiFi, external antenna | ESP, buffer + its 100 nF, 330 Ω + terminal per port, 1000 µF, inlet, fuse, buck or USB |
 | Everything | 3 | 5 | W5500 | all of it, plus display, encoder, buttons |
 
 ## Ordering
@@ -537,8 +542,17 @@ From source: `pio run -e luxdmx_carrier` builds an image that boots with the car
 
 ## Known issues
 
-Revisions: the board says `rev 1.1` on the silk from 2026-11-22 on. Older boards have no revision
-printed; call them rev 1.0. The items below say which boards they affect.
+Revisions: the board says its revision on the silk from rev 1.1 (2026-11-22) on. Older boards have
+no revision printed; call them rev 1.0. The items below say which boards they affect.
+
+- **rev 1.1 and older: no decoupling cap at the 74AHCT541.** Its 5 V came in over a long track
+  with nothing at the pin. Rev 1.2 has a 100 nF right at pin 20. On an older board, tack a 1206 or
+  0805 100 nF from pin 20 to pin 19 (OE2, which is on GND) on the back.
+- **rev 1.1 and older: the fuse bridge pads are bare right up to the polyfuse holes**, so a
+  flooded joint on the fuse can run across and bypass it. Check the 0.3 mm gap with a loupe.
+- **rev 1.1 and older: the DMX rows' peg holes sit 0.36 mm from the top edge.** Only the Phoenix
+  MPT terminal uses them. If the mill took the web out, the Xinya, TE or a pin header don't care.
+  Rev 1.2 moved the rows 0.45 mm in (0.81 mm left).
 
 - **Boards from gerbers before 2026-10-26: buffer inputs A6 to A8 (pins 7, 8, 9) float.** Unused
   CMOS inputs belong on GND or VCC; left open they can draw extra current and make the unused

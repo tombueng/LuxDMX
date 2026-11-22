@@ -69,7 +69,7 @@ RULES = {
     "74AHCT541 pixel buffer": ("Pixel", "**at least one** pixel port is used",
                                "Not optional: the terminals hang off its outputs. WS281x "
                                "want 0.7 x VDD = 3.5 V and the 3.3 V from the S3 will not "
-                               "do it reliably."),
+                               "do it reliably. On the silk it just says 74AHCT541."),
     "PIX{n} V+/DATA/GND": ("Pixel", "pixel port {n} is used", ""),
     "1000uF 35V": ("Pixel", "pixel ports are used **or** the regulator powers the logic",
                    "Buffers the current steps of the strips, and is the regulator's input "
@@ -131,9 +131,12 @@ its two left holes. Not a component, just a blob of solder.
 | external fuse in the supply lead | leave out | close |
 | no fuse at all | leave out | close |
 
-Exactly one of the two. Both together is a bridged fuse, which is no fuse. The bridge pads sit
-0.3 mm apart right at the polyfuse's left holes, so after soldering the polyfuse look with a
-loupe that no tin ran across them. A meter can't tell, the polyfuse reads as a short anyway.
+Exactly one of the two. Both together is a bridged fuse, which is no fuse. The bridge is two
+0.75 mm strips of bare copper with a 0.3 mm gap in one mask opening, and solder mask keeps them 0.55 mm away from
+the polyfuse's hole rings (rev 1.2), so a normal joint on the fuse leads stays off them. If you
+flooded a joint, look with a loupe that the gap is still open. A meter can't tell, the
+polyfuse reads as a short anyway. On a rev 1.1 board the bridge pads run bare right into the
+holes, so there the loupe check is a must.
 """
 
 PITFALLS = """
@@ -215,7 +218,7 @@ STAGES = """
 | **DMX only, USB powered** | 1-3 | - | WiFi | ESP32, one RS-485 module per port, XLR headers, 10k dir, bias and termination as required |
 | **DMX + LAN** | 1-3 | - | W5500 | plus the W5500, its two 10k and its 100 nF / 1 uF / 22 uF |
 | **... from 12/24 V** | | | | plus the regulator module, the power inlet, the fuse and the 1000uF: the regulator hangs off the pixel rail behind the fuse |
-| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer, a 330R and a terminal per port (the 330R is the only link from buffer to terminal), 1000uF, power inlet, fuse, regulator or USB |
+| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer and its 100nF, a 330R and a terminal per port (the 330R is the only link from buffer to terminal), 1000uF, power inlet, fuse, regulator or USB |
 | **Everything** | 3 | 5 | W5500 | all of the above, plus display and encoder |
 
 The buck is only needed where 12/24 V is present **and** neither USB nor 5V-IN. On the bench
@@ -246,7 +249,12 @@ def main():
                 rule = r
                 break
         if rule is None or rule[0] is None:
-            if val == "100nF":
+            if val == "100nF" and "+5V" in nets:
+                # rev 1.2: the only 100nF on +5V is the buffer's
+                rule = ("Pixel", "the 74AHCT541 is fitted",
+                        "Decoupling for the buffer, beside its pin 20 on the side away from the chip. "
+                        "No label on the silk, just the outline: there is no room for one.")
+            elif val == "100nF":
                 # both sit on +3V3/GND, so the net signature cannot tell them apart
                 x = pcbnew.ToMM(f.GetPosition().x)
                 rule = (("Network", "W5500 fitted", "Decoupling right at the module.")
@@ -309,15 +317,19 @@ def main():
 
     counts = {}
     for g, ref, val, side, cond, note in rows:
-        key = (generic(val), side)
-        counts.setdefault(key, [0, cond])
+        # one value doing different jobs (the 100nF) gets a row per job
+        key = (generic(val), side, re.sub(r"\b(DMX|pixel) port \d", r"any \1 port", cond))
+        counts.setdefault(key, [0, []])
         counts[key][0] += 1
+        c = re.sub(r"\b(DMX|pixel) port \d", r"any \1 port", cond)
+        if c not in counts[key][1]:
+            counts[key][1].append(c)
     L += ["## Shopping list, everything fitted", "",
           "| Qty | Part | Side | only needed when |", "|---:|---|---|---|"]
-    for (val, side), (n, cond) in sorted(counts.items(), key=lambda kv: (-kv[1][0], kv[0])):
-        # the per-port condition is the same text with a different number, so generalise it
-        c = re.sub(r"\b(DMX|pixel) port \d", r"any \1 port", cond)
-        L.append(f"| {n} | {val} | {side} | {c} |")
+    for (val, side, _), (n, conds) in sorted(counts.items(), key=lambda kv: (-kv[1][0], kv[0])):
+        # the per-port condition is the same text with a different number, so it was
+        # generalised above; one value doing different jobs (the 100nF) gets every condition
+        L.append(f"| {n} | {val} | {side} | {'; '.join(conds)} |")
     L.append("")
 
     L += [EXTRA.strip(), "", REGULATOR.strip(), "", PITFALLS.strip(), "", STAGES.strip(), ""]

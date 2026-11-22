@@ -32,7 +32,7 @@ import sys
 
 import pcbnew
 
-REV = "1.1"
+REV = "1.2"
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOARD = os.path.join(HERE, "luxdmx-carrier.kicad_pcb")
@@ -162,6 +162,38 @@ def polarity_marks(b):
             print(f"  inlet {mark} over pad {pad.GetNumber()} ({net}) at {x:.2f}")
 
 
+BUF_REF = "74AHCT541 pixel buffer"
+BUF_TEXT = "74AHCT541"
+
+
+def buffer_label(b):
+    """rev 1.2: the full reference ran 18 mm down beside the buffer and now hits the
+    decoupling cap at one end and ESP pin 15 at the other. The part number alone says it."""
+    for f in b.GetFootprints():
+        if f.GetReference() != BUF_REF:
+            continue
+        ref = f.Reference()
+        old = [g for g in f.GraphicalItems()
+               if g.GetClass() == "PCB_TEXT" and g.GetText() == BUF_TEXT]
+        if old:
+            t = old[0]
+        else:
+            t = pcbnew.PCB_TEXT(f)
+            t.SetLayer(ref.GetLayer())
+            f.Add(t)
+            t.SetText(BUF_TEXT)
+            t.SetPosition(ref.GetPosition())
+            t.SetTextAngle(ref.GetTextAngle())
+            t.SetMirrored(ref.IsMirrored())
+            t.SetTextSize(ref.GetTextSize())
+            t.SetTextThickness(ref.GetTextThickness())
+            t.SetHorizJustify(ref.GetHorizJustify())
+            t.SetVertJustify(ref.GetVertJustify())
+        ref.SetVisible(False)
+        p = t.GetPosition()
+        print(f"  {BUF_REF} -> {BUF_TEXT} at {pcbnew.ToMM(p.x):.2f}, {pcbnew.ToMM(p.y):.2f}")
+
+
 def dmx_labels(b):
     for f in b.GetFootprints():
         m = DMX_RE.match(f.GetReference())
@@ -179,8 +211,9 @@ def dmx_labels(b):
                 REMOVE_FP.append((f, g))
         first = pads[0].GetPosition()
         x = first.x - mm(4.6)
-        want = [(f"DMX{m.group(1)}", x, mm(58.0), 1.2, 0.2),
-                (letters, x, mm(60.45), 1.0, 0.18)]
+        # relative to the pin row, which moved 0.45 mm inwards in rev 1.2 (dmx_row_inward.py)
+        want = [(f"DMX{m.group(1)}", x, first.y - mm(1.45), 1.2, 0.2),
+                (letters, x, first.y + mm(1.0), 1.0, 0.18)]
         for text, x, y, size, thick in want:
             t = old.get(text)
             if t is None:
@@ -200,7 +233,9 @@ def dmx_labels(b):
 # reference texts that ran onto a pad: (reference, footprint x, y) -> new text position
 NUDGE = [("330R bias-", (126.0, 78.05), (128.0, 76.8)),   # DMX1: its "-" sat on ESP pin 8
          # at 1.0 mm these three reach the buffer's vertical reference, 0.5 mm along clears it
-         ("330R PIX1", (116.2, 102.0), (116.7, 99.9)),
+         # rev 1.2: the buffer's decoupling cap stands right of pin 20, so PIX1's label goes
+         # under its resistor (the buffer's own label is buffer_label())
+         ("330R PIX1", (116.2, 102.0), (117.6, 104.25)),
          ("330R PIX3", (116.2, 95.0), (116.7, 92.9)),
          ("330R PIX5", (116.2, 88.5), (116.7, 86.4))]
 
@@ -291,6 +326,7 @@ def main():
     pixel_labels(b)
     polarity_marks(b)
     dmx_labels(b)
+    buffer_label(b)
     odd_sizes(b)
     nudge_refs(b)
     min_stroke(b)

@@ -238,7 +238,7 @@ headers.
 | 2 × 330 Ω fail-safe bias | the port drives its bus, which it normally does. Once per bus, so leave it out if the module already biases the line |
 | 2 × TVS diode (SMF12CA or SMAJ12CA) | the port leaves the enclosure |
 | **Pixels** | |
-| 74AHCT541 buffer (SO-20 wide) | at least one pixel port is used. **HCT**, not HC: the HC parts don't switch reliably on 3.3 V. And not the `PW` (TSSOP) version LCSC stocks most of, it won't land |
+| 74AHCT541 buffer (SO-20 wide) + its 100 nF | at least one pixel port is used. **HCT**, not HC: the HC parts don't switch reliably on 3.3 V. And not the `PW` (TSSOP) version LCSC stocks most of, it won't land |
 | 330 Ω series resistor, per port | you use that pixel port. Damps the ringing on the strip wire |
 | 3-pole screw terminal, per port | you use that pixel port |
 | 1000 µF 35 V, `12-24V IN` terminal, fuse | any pixel port is used, **or** the 5 V regulator runs the logic (it sits behind the fuse), see power below |

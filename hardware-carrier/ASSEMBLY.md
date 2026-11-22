@@ -1,8 +1,8 @@
 # Assembly
 
-For board **rev 1.1** (it says so on the silk).
+For board **rev 1.2** (it says so on the silk).
 
-How many of the 55 positions you actually solder depends on what you are building.
+How many of the 56 positions you actually solder depends on what you are building.
 Almost nothing here is mandatory.
 
 ## Answer these first
@@ -33,8 +33,9 @@ Almost nothing here is mandatory.
 | Part | Side | Fit it when | Note |
 |---|---|---|---|
 | `1000uF 35V` | front | pixel ports are used **or** the regulator powers the logic | Buffers the current steps of the strips, and is the regulator's input bulk against plug-in spikes. 13 mm can, 5.00 mm pitch. |
+| `100nF buffer` | back | the 74AHCT541 is fitted | Decoupling for the buffer, beside its pin 20 on the side away from the chip. No label on the silk, just the outline: there is no room for one. |
 | `12-24V IN` | front | pixel ports are used **or** the regulator powers the logic | The inlet for the pixel rail, which also feeds the regulator. Fit the screw terminal, or solder the wire flat onto the pad. |
-| `74AHCT541 pixel buffer` | back | **at least one** pixel port is used | Not optional: the terminals hang off its outputs. WS281x want 0.7 x VDD = 3.5 V and the 3.3 V from the S3 will not do it reliably. |
+| `74AHCT541 pixel buffer` | back | **at least one** pixel port is used | Not optional: the terminals hang off its outputs. WS281x want 0.7 x VDD = 3.5 V and the 3.3 V from the S3 will not do it reliably. On the silk it just says 74AHCT541. |
 | `Pixel1:Vcc/Data/GND` | front | pixel port 1 is used |  |
 | `Pixel2:Vcc/Data/GND` | front | pixel port 2 is used |  |
 | `Pixel3:Vcc/Data/GND` | front | pixel port 3 is used |  |
@@ -132,9 +133,11 @@ Almost nothing here is mandatory.
 | 3 | 330R bias- | back | any DMX port drives the bus (controller role) |
 | 3 | MAX3485 DMXn | front | any DMX port is used |
 | 3 | XLRn 1=shld 2=D- 3=D+ | front | any DMX port is used |
-| 2 | 100nF | back | recommended |
 | 2 | Tact 6x6 H30 | front | you want the buttons |
 | 1 | 1000uF 35V | front | pixel ports are used **or** the regulator powers the logic |
+| 1 | 100nF | back | W5500 fitted |
+| 1 | 100nF | back | recommended |
+| 1 | 100nF | back | the 74AHCT541 is fitted |
 | 1 | 10k ETH_CS pu | back | W5500 fitted |
 | 1 | 10k ETH_RST pu | back | W5500 fitted |
 | 1 | 12-24V -> 5V buck | back | supplied from 12/24 V **and** neither 5V-IN nor USB connected |
@@ -163,9 +166,12 @@ its two left holes. Not a component, just a blob of solder.
 | external fuse in the supply lead | leave out | close |
 | no fuse at all | leave out | close |
 
-Exactly one of the two. Both together is a bridged fuse, which is no fuse. The bridge pads sit
-0.3 mm apart right at the polyfuse's left holes, so after soldering the polyfuse look with a
-loupe that no tin ran across them. A meter can't tell, the polyfuse reads as a short anyway.
+Exactly one of the two. Both together is a bridged fuse, which is no fuse. The bridge is two
+0.75 mm strips of bare copper with a 0.3 mm gap in one mask opening, and solder mask keeps them 0.55 mm away from
+the polyfuse's hole rings (rev 1.2), so a normal joint on the fuse leads stays off them. If you
+flooded a joint, look with a loupe that the gap is still open. A meter can't tell, the
+polyfuse reads as a short anyway. On a rev 1.1 board the bridge pads run bare right into the
+holes, so there the loupe check is a must.
 
 ## The 5 V regulator
 
@@ -241,7 +247,7 @@ matter.
 | **DMX only, USB powered** | 1-3 | - | WiFi | ESP32, one RS-485 module per port, XLR headers, 10k dir, bias and termination as required |
 | **DMX + LAN** | 1-3 | - | W5500 | plus the W5500, its two 10k and its 100 nF / 1 uF / 22 uF |
 | **... from 12/24 V** | | | | plus the regulator module, the power inlet, the fuse and the 1000uF: the regulator hangs off the pixel rail behind the fuse |
-| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer, a 330R and a terminal per port (the 330R is the only link from buffer to terminal), 1000uF, power inlet, fuse, regulator or USB |
+| **Pixel only** | - | 1-5 | WiFi | ESP32, buffer and its 100nF, a 330R and a terminal per port (the 330R is the only link from buffer to terminal), 1000uF, power inlet, fuse, regulator or USB |
 | **Everything** | 3 | 5 | W5500 | all of the above, plus display and encoder |
 
 The buck is only needed where 12/24 V is present **and** neither USB nor 5V-IN. On the bench

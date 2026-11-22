@@ -64,7 +64,7 @@ def _project_dir():
 HERE = _project_dir()
 BOARD = os.path.join(HERE, "luxdmx-carrier.kicad_pcb")
 LIB = os.path.join(HERE, "footprints", "LuxDMXCarrierCustom.pretty")
-DMX_Y_OLD, DMX_Y_NEW = 60.20, 59.45
+DMX_Y_OLD, DMX_Y_NEW = 60.20, 59.90   # 59.90 since rev 1.2, see dmx_row_inward.py
 
 CHIP_DESCR = (
     "Universal hand-solder chip land, copper 0.30 to {out:.2f} mm off centre. Takes {sizes}. "
@@ -173,16 +173,19 @@ def write_libs():
         "TE 282834-3, Xinya XY308-2.54-3P and a plain pin header ignore those holes.")
     # The pegs sit on the SAME side as the wire entry, not behind it, which is not something
     # the footprint's outline tells you: its body is symmetric across the pin row. Local +x
-    # is towards the board edge at this rotation, so that is where they go, at board y 56.91
-    # with the edge at 56.00. That is also why the row sits at 59.45 rather than 59.00: any
+    # is towards the board edge at this rotation, so that is where they go, at board y 57.36
+    # with the edge at 56.00 (rev 1.2; at 56.91 the web to the outline was only 0.36 mm,
+    # under JLC's +-0.2 mm milling tolerance). That is also why the row sits at 59.90: any
     # further out and the peg holes hang off the board.
     pegs = "\n".join(
         f'  (pad "" np_thru_hole circle (at 2.540 {i * 2.54:.3f}) (size 1.100 1.100)'
         f' (drill 1.100) (layers "F&B.Cu" "*.Mask"))' for i in range(3))
-    # elongated inwards, local -x, because local +x is where the Phoenix pegs sit at y 56.91
+    # elongated inwards, local -x, because local +x is where the Phoenix pegs sit at y 57.36
     # and there is no room between them and the board edge. 1.90 wide leaves 0.64 mm between
-    # pads at 2.54 pitch; the pad ends 1.09 mm short of the peg holes.
-    dmx = override_pads(dmx, {n: (3.85, 1.90, -1.025, 0.0) for n in ("1", "2", "3")})
+    # pads at 2.54 pitch; the pad ends 1.04 mm short of the peg holes (rev 1.2).
+    # rev 1.2: the row moved 0.45 mm in (peg holes off the edge) and the pads got 0.45 mm
+    # shorter so their inner end stays at y 62.40, clear of the tracks below (dmx_row_inward.py)
+    dmx = override_pads(dmx, {n: (3.45, 1.90, -0.775, 0.0) for n in ("1", "2", "3")})
     out["header-1x03-P2.54-terminal"] = dmx.rstrip()[:-1].rstrip() + "\n" + pegs + "\n)\n"
     # grow: how far the copper still has to travel to reach 0.5 mm off the board edge. Both
     # rows now sit 3.35 mm short of it, the pixel row at y 131.00 against the bottom edge at

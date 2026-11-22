@@ -69,6 +69,14 @@ BR_H, BR_GAP = 4.00, 0.30        # bridge pad height and the seam you blob acros
 # cross-section is BR_H, the pad's own height. Widths are computed from the hole positions,
 # not typed in, so they follow the lead pitch.
 MIN_CLEAR = 0.25
+# rev 1.2: the fuse's own leads are soldered on the back, right where the bridge is, and the
+# bridge pads ran unmasked into the hole rings. A generous fillet on hole A or B could flow
+# onto its bridge pad and across the 0.3 mm seam, which bypasses the fuse without anyone
+# meaning to. So the copper stays exactly as it was (each strap still runs into its hole,
+# BR_H wide), but only a BR_EXP wide strip either side of the seam is open in the mask.
+# Between that strip and the hole's ring is solder mask, at least MIN_DAM.
+BR_EXP = 0.75
+MIN_DAM = 0.50
 
 
 def read(name):
@@ -175,11 +183,12 @@ def main():
         f'18 A). MF-R1100 drops back to 16 V, so 9 A is the ceiling on a 24 V rail. At 12 V '
         f'the 16 V parts fit the same holes and reach 13 A. Holes {DRILL} mm clear the '
         f'0.81 mm MF-R lead. Bridge pads {BR_H} mm tall, {BR_GAP} mm apart on B.Cu, each '
-        f'running into its own hole: leave '
+        f'running into its own hole under solder mask; only a {BR_EXP} mm strip either side of the seam is open, so the fuse fillets cannot run across. Leave '
         f'the fuse off and blob them for an unfused board. Hole offsets generated from the '
         f'KiCad Bourns footprints and checked against the MF-R datasheet pitches.")',
         '  (tags "polyfuse pptc fuse dual-pitch solder-bridge hand-solder")',
-        '  (attr through_hole)',
+        # the bridge's one mask opening spans both nets on purpose (solder jumper)
+        '  (attr through_hole allow_soldermask_bridges)',
         f'  (fp_text reference "REF**" (at {bbody[0]:.2f} {bbody[1] - 1.4:.2f}) '
         f'(layer "F.SilkS") (effects (font (size 0.9 0.9) (thickness 0.15)) (justify left)))',
         f'  (fp_text value "{NAME}" (at {bbody[0]:.2f} {bbody[3] + 1.4:.2f}) '
@@ -199,8 +208,23 @@ def main():
         L.append(f'  (pad "{num}" thru_hole circle (at {x:.3f} {y:.3f}) '
                  f'(size {PAD} {PAD}) (drill {DRILL}) (layers "*.Cu" "*.Mask"))')
     for num, x, y, w in bridge:
+        # the strap: copper only, under mask
         L.append(f'  (pad "{num}" smd rect (at {x:.3f} {y:.3f}) '
-                 f'(size {w:.3f} {BR_H}) (layers "B.Cu" "B.Mask"))')
+                 f'(size {w:.3f} {BR_H}) (layers "B.Cu"))')
+    for num, x0 in (("1", mx - BR_GAP / 2 - BR_EXP), ("2", mx + BR_GAP / 2)):
+        # the part you blob: open in the mask, against the seam only
+        L.append(f'  (pad "{num}" smd rect (at {x0 + BR_EXP / 2:.3f} {my:.3f}) '
+                 f'(size {BR_EXP:.3f} {BR_H}) (layers "B.Cu" "B.Mask"))')
+    # one mask opening over both strips and the seam (an aperture pad, mask only), so there
+    # is no 0.3 mm mask dam left in the seam for a deliberate blob to fight with
+    L.append(f'  (pad "" smd rect (at {mx:.3f} {my:.3f}) '
+             f'(size {2 * BR_EXP + BR_GAP:.3f} {BR_H}) (layers "B.Mask"))')
+    # mask dam between each hole ring and the open strip (straight line, worst case)
+    dam_a = (mx - BR_GAP / 2 - BR_EXP) - PAD / 2
+    dam_b = (bx - PAD / 2) - (mx + BR_GAP / 2 + BR_EXP)
+    print(f"  Maskensteg Loch A {dam_a:.2f} mm, Loch B {dam_b:.2f} mm")
+    if min(dam_a, dam_b) < MIN_DAM:
+        raise SystemExit(f"Maskensteg zu schmal, mindestens {MIN_DAM}")
     L.append(")")
 
     os.makedirs(LIB, exist_ok=True)

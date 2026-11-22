@@ -4,7 +4,8 @@ C2,1uF W5500,Bottom,100.2000mm,-68.5000mm
 C3,22uF W5500,Bottom,100.2000mm,-73.5000mm
 C4,100nF,Bottom,138.2425mm,-89.4000mm
 C5,22uF 3V3 bulk,Bottom,138.2425mm,-94.9000mm
-C6,1000uF 35V,Top,124.0000mm,-116.5000mm
+C6,100nF buffer,Bottom,112.1000mm,-102.5000mm
+C7,1000uF 35V,Top,124.0000mm,-116.5000mm
 D1,TVS bidir,Bottom,120.0000mm,-60.0000mm
 D2,TVS bidir,Bottom,136.9875mm,-60.0000mm
 D3,TVS bidir,Bottom,143.5000mm,-60.0000mm
@@ -12,9 +13,9 @@ D4,TVS bidir,Bottom,160.4875mm,-60.0000mm
 D5,TVS bidir,Bottom,167.0000mm,-60.0000mm
 D6,TVS bidir,Bottom,183.9875mm,-60.0000mm
 F2,Polyfuse MF-R 5.1(4A)/10.2(9A),Top,103.7300mm,-112.8300mm
-J1,DMX 1 - GND/B/A,Top,128.5000mm,-59.4500mm
-J2,DMX 2 - GND/B/A,Top,152.0000mm,-59.4500mm
-J3,DMX 3 - GND/B/A,Top,175.5000mm,-59.4500mm
+J1,DMX 1 - GND/B/A,Top,128.5000mm,-59.9000mm
+J2,DMX 2 - GND/B/A,Top,152.0000mm,-59.9000mm
+J3,DMX 3 - GND/B/A,Top,175.5000mm,-59.9000mm
 J4,Display:SDA/SCL/3V3/GND,Top,169.3100mm,-115.5000mm
 J5,Pixel1:Vcc/Data/GND,Top,110.6572mm,-130.9700mm
 J6,Pixel2:Vcc/Data/GND,Top,126.9214mm,-130.9700mm

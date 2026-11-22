@@ -1,8 +1,8 @@
 # Bill of materials
 
-Board **rev 1.1** (printed on both sides of the PCB).
+Board **rev 1.2** (printed on both sides of the PCB).
 
-Everything fitted: 54 positions. Quantities come from the board. The 5 V regulator spot isn't in here: that module is bought separately, see the README's Regulator section.
+Everything fitted: 55 positions. Quantities come from the board. The 5 V regulator spot isn't in here: that module is bought separately, see the README's Regulator section.
 
 LCSC stock checked **2026-11-22**. Look again before ordering, it changes daily.
 
@@ -12,7 +12,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 
 | Qty | Part | Description | MPN | LCSC | Stock | EUR ea. | EUR total |
 |---:|---|---|---|---|---:|---:|---:|
-| 2 | 100nF | Capacitor 100nF 50V X7R 1206 | `CL31B104KBCNNNC` | [C24497](https://www.lcsc.com/product-detail/C24497.html) | 458500 | 0.023 | 0.05 |
+| 3 | 100nF | Capacitor 100nF 50V X7R 1206 | `CL31B104KBCNNNC` | [C24497](https://www.lcsc.com/product-detail/C24497.html) | 458240 | 0.023 | 0.07 |
 | 1 | 1uF | Capacitor 1uF 50V X7R 1206 | `CL31B105KBHNNNE` | [C1848](https://www.lcsc.com/product-detail/Multilayer-Ceramic-Capacitors-MLCC-SMD-SMT_Samsung-Electro-Mechanics-CL31B105KBHNNNE_C1848.html) | 129050 | 0.06 | 0.06 |
 | 2 | 22uF 3V3 bulk / 22uF W5500 | Capacitor 22uF 6.3V X5R 1206 | `CL31A226MQHNNNE` | [C159757](https://www.lcsc.com/product-detail/C159757.html) | 12980 | 0.129 | 0.26 |
 | 1 | 1000uF 35V | Electrolytic 1000uF 35V radial, D12.5 x L20, 5 mm pitch, 105 C | `EEU-FR1V102` | [C128518](https://www.lcsc.com/product-detail/C128518.html) | 405 | 0.58 | 0.58 |
@@ -29,7 +29,7 @@ Prices in EUR per piece at SMALL quantity (the LCSC tier at MOQ), not the volume
 | 6 | TVS bidir | TVS bidirectional SMF12CA, SOD-123FL, 12 V standoff, 200 W | `SMF12CA` | [C353317](https://lcsc.com/product-detail/TVS_Shandong-Jingdao-Microelectronics-SMF12CA_C353317.html) | 85880 | 0.022 | 0.13 |
 | 2 | Tact 6x6 H30 | Tactile switch 6 x 6 mm, through hole, 5 mm tall | `K2-1102DP-C4SW-04` | [C110153](https://www.lcsc.com/product-detail/C110153.html) | 63930 | 0.03 | 0.06 |
 
-**Small parts total: about 6.82 EUR**
+**Small parts total: about 6.84 EUR**
 
 Deliberately not listed:
 
@@ -37,7 +37,7 @@ Deliberately not listed:
 
 ### Notes
 
-- **100nF**: 1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR. Over a million in stock.
+- **100nF**: 1206 is a large package for 100 nF, hence 2.3 cents rather than a fraction of that. Nothing cheaper exists here: YAGEO CC1206KRX7R9BB104 (C82601) costs 0.037 EUR.
 - **1uF**: The middle rung of the W5500's decoupling. Same Samsung series and package as the 100nF, so one reel family covers both. It closes a factor-220 gap: the rail had 100nF and 22uF and nothing between them.
 - **22uF 3V3 bulk / 22uF W5500**: Half the price of the 25 V part (C12891, 0.24 EUR) for the same job. 6.3 V on a 3.3 V rail is roughly a factor of two margin, normal for X5R. Worth knowing: ceramics lose capacitance under DC bias, a 6.3 V part at 3.3 V keeps about half, so 11 to 13 uF rather than 22. Ample for holding up the rail when three transceivers key at once. For the full 22 uF take C12891 (25 V, keeps about 85 %) and pay 12 cents more.
 - **1000uF 35V**: The land takes any radial can up to 13 mm across with 5.00 mm lead spacing. Panasonic FR series, low ESR, 10,000 h at 105 C, and JLCPCB has a footprint for it (the Chemi-Con EKYA350ELL102MK20S, C709540, has none). Two parts before it fell out (2026-11-16): the Chengx KM108M035J20RR0VH2FP0 (C10749) is discontinued at JLCPCB, the Rubycon 35YXJ1000M12.5X20 (C88743) at LCSC's BOM tool, although both still showed stock.
